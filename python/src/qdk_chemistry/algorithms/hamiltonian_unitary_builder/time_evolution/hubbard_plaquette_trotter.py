@@ -12,8 +12,8 @@ from functools import cache
 
 import numpy as np
 
-from qdk_chemistry.algorithms.unitary_builder.base import TimeEvolutionBuilder, TimeEvolutionSettings
-from qdk_chemistry.data import LatticeGeometry
+from qdk_chemistry.algorithms.hamiltonian_unitary_builder.base import TimeEvolutionBuilder, TimeEvolutionSettings
+from qdk_chemistry.data import FermiHubbardModelHamiltonianDescription, LatticeGeometry
 from qdk_chemistry.data.unitary_representation.base import UnitaryRepresentation
 from qdk_chemistry.data.unitary_representation.containers.hubbard_plaquette import HubbardPlaquetteContainer
 from qdk_chemistry.utils import Logger
@@ -46,8 +46,6 @@ class HubbardPlaquetteTrotterSettings(TimeEvolutionSettings):
             0,
             "Explicit number of plaquette Trotter steps (0 means automatic).",
         )
-        self._set_default("t", "float", 1.0, "Uniform hopping amplitude of the Fermi-Hubbard model.")
-        self._set_default("u", "float", 0.0, "Uniform on-site interaction of the Fermi-Hubbard model.")
         self._set_default(
             "num_electrons",
             "int",
@@ -59,17 +57,18 @@ class HubbardPlaquetteTrotterSettings(TimeEvolutionSettings):
 class HubbardPlaquetteTrotter(TimeEvolutionBuilder):
     r"""Plaquette Trotterization of the Fermi-Hubbard model on a periodic two-dimensional square lattice.
 
-    The builder takes a :class:`~qdk_chemistry.data.LatticeGeometry` rather than a
-    :class:`~qdk_chemistry.data.QubitOperator`: it builds the Hubbard Hamiltonian on the
-    lattice itself, two spin orbitals per site. The uniform hopping amplitude :math:`t` and
-    on-site interaction :math:`U` are the settings ``t`` and ``u``.
+    The builder takes a :class:`~qdk_chemistry.data.FermiHubbardModelHamiltonianDescription` rather than a
+    :class:`~qdk_chemistry.data.QubitOperator`: it builds the Hamiltonian on the description's lattice
+    itself, two spin orbitals per site, from the uniform on-site energy :math:`\epsilon` (``epsilon``),
+    hopping amplitude :math:`t` (``t``) and on-site interaction :math:`U` (``u``).
 
     The interaction is taken in Campbell's particle-hole symmetric form
     :math:`U \sum_i (n_{i\uparrow} - 1/2)(n_{i\downarrow} - 1/2)`, whose Jordan-Wigner image is
-    pure :math:`ZZ`: there is no single-mode :math:`Z` layer. The conventional
-    :math:`U \sum_i n_{i\uparrow} n_{i\downarrow}` model differs by :math:`U\eta/2 - UM/4` on a
-    state of :math:`\eta` electrons, with :math:`M` the site count. Setting ``num_electrons``
-    records that offset so the phase-to-energy conversion reports the conventional energy.
+    pure :math:`ZZ`: there is no single-mode :math:`Z` layer. The described model
+    :math:`\epsilon \sum_{i\sigma} n_{i\sigma} + U \sum_i n_{i\uparrow} n_{i\downarrow}` differs by
+    :math:`(\epsilon + U/2)\eta - UM/4` on a state of :math:`\eta` electrons, with :math:`M` the site count.
+    Setting ``num_electrons`` records that offset so the phase-to-energy conversion reports the described
+    model's energy.
 
     The plaquette decomposition, its error constant, and the exact four-mode plaquette
     evolution are Campbell's :cite:`Campbell2022`. The factor ordering and the step-count
@@ -80,8 +79,6 @@ class HubbardPlaquetteTrotter(TimeEvolutionBuilder):
         self,
         order: int = 2,
         *,
-        t: float = 1.0,
-        u: float = 0.0,
         num_electrons: int | None = None,
         time: float = 0.0,
         target_accuracy: float = 0.0,
@@ -93,8 +90,6 @@ class HubbardPlaquetteTrotter(TimeEvolutionBuilder):
 
         Args:
             order: Trotter decomposition order. Only 2 is supported.
-            t: Uniform hopping amplitude of the Fermi-Hubbard model.
-            u: Uniform on-site interaction of the Fermi-Hubbard model.
             num_electrons: Electron count for the scalar shift to the estimated energy; ``None`` skips it.
             time: The evolution time. Defaults to 0.0.
             target_accuracy: Energy error budget that sizes the automatic step count; see ``_step_count`` for why
@@ -118,8 +113,6 @@ class HubbardPlaquetteTrotter(TimeEvolutionBuilder):
         settings.set("order", order)
         settings.set("target_accuracy", target_accuracy)
         settings.set("num_divisions", num_divisions)
-        settings.set("t", t)
-        settings.set("u", u)
         if num_electrons is not None:
             settings.set("num_electrons", num_electrons)
         self._settings = settings
@@ -133,8 +126,8 @@ class HubbardPlaquetteTrotter(TimeEvolutionBuilder):
         return "hamiltonian_unitary_builder"
 
     def _input_type(self) -> type:
-        """Return :class:`~qdk_chemistry.data.LatticeGeometry`, the input this builder evolves."""
-        return LatticeGeometry
+        """Return :class:`~qdk_chemistry.data.FermiHubbardModelHamiltonianDescription`, the model this evolves."""
+        return FermiHubbardModelHamiltonianDescription
 
     def _lattice_geometry(self, lattice: LatticeGeometry) -> tuple[int, int]:
         """Return the width and height of a periodic square lattice that the plaquettes tile.
@@ -143,7 +136,7 @@ class HubbardPlaquetteTrotter(TimeEvolutionBuilder):
         grid numbered ``y * width + x`` (a triangular patch, say) is rejected rather than mis-tiled.
 
         Args:
-            lattice: The lattice geometry passed to :meth:`run`.
+            lattice: The lattice of the model passed to :meth:`run`.
 
         Returns:
             The lattice width and height.
@@ -206,7 +199,7 @@ class HubbardPlaquetteTrotter(TimeEvolutionBuilder):
             sections.append(sector)
         return sections[0], sections[1]
 
-    def _run_impl(self, lattice: LatticeGeometry) -> UnitaryRepresentation:
+    def _run_impl(self, model: FermiHubbardModelHamiltonianDescription) -> UnitaryRepresentation:
         r"""Build the plaquette Trotter unitary representation for Fermi-Hubbard.
 
         For a periodic :math:`w \times h` square lattice of :math:`M = wh` sites, writing
@@ -222,11 +215,12 @@ class HubbardPlaquetteTrotter(TimeEvolutionBuilder):
                          \left( n_{i\downarrow} - \tfrac{1}{2} \right),
 
         where :math:`t` is the hopping amplitude and :math:`U` the on-site interaction. The interaction
-        is written in the particle-hole symmetric form of :cite:`Campbell2022`; the conventional
-        :math:`U \sum_i n_{i\uparrow} n_{i\downarrow}` model differs by :math:`U N / 2 - U M / 4`, with
-        :math:`N` the total number operator, so its energy follows from the simulated
-        :math:`\tilde{E}` by the classical shift :math:`E = \tilde{E} + U\eta/2 - UM/4` on a state of
-        :math:`\eta` electrons. The Hamiltonian is split into :math:`H_I`, the diagonal interaction
+        is written in the particle-hole symmetric form of :cite:`Campbell2022`; the described model, with
+        on-site energy :math:`\epsilon` and interaction :math:`U \sum_i n_{i\uparrow} n_{i\downarrow}`,
+        differs by :math:`(\epsilon + U/2) N - U M / 4`, with :math:`N` the total number operator, so its
+        energy follows from the simulated :math:`\tilde{E}` by the classical shift
+        :math:`E = \tilde{E} + (\epsilon + U/2)\eta - UM/4` on a state of :math:`\eta` electrons.
+        The Hamiltonian is split into :math:`H_I`, the diagonal interaction
         above, and :math:`H_h^p`, :math:`H_h^g`, the pink and gold tilings: two sets of
         vertex-disjoint four-cycles that together cover every bond exactly once.
 
@@ -270,14 +264,14 @@ class HubbardPlaquetteTrotter(TimeEvolutionBuilder):
         is applied exactly.
 
         Args:
-            lattice: The lattice geometry to build the Hubbard model on.
+            model: The Fermi-Hubbard model on a periodic square lattice.
 
         Returns:
             UnitaryRepresentation: The segmented plaquette product formula.
 
         Raises:
-            ValueError: If the order is not 2, the geometry is not a periodic square lattice, or ``num_electrons``
-                is neither -1 nor a valid electron count for the lattice.
+            ValueError: If the order is not 2, the lattice is not a periodic square lattice, or
+                ``num_electrons`` is neither -1 nor a valid electron count for the lattice.
 
         """
         order = self._settings.get("order")
@@ -285,13 +279,14 @@ class HubbardPlaquetteTrotter(TimeEvolutionBuilder):
             raise ValueError(f"HubbardPlaquetteTrotter supports order 2 only, got {order}.")
 
         # 1. Geometry
-        width, height = self._lattice_geometry(lattice)
+        width, height = self._lattice_geometry(model.lattice)
 
         # 2. Model parameters
         # A two-site periodic ring joins its pair going either way around, so the 2x2 torus, the
         # only tileable lattice with a side of two, doubles every hopping.
-        hopping = float(self._settings.get("t")) * (2 if width == 2 else 1)
-        interaction = float(self._settings.get("u"))
+        hopping = model.parameters["t"] * (2 if width == 2 else 1)
+        interaction = model.parameters["u"]
+        on_site = model.parameters["epsilon"]
         pair_angle = 0.25 * interaction
         num_electrons = int(self._settings.get("num_electrons"))
         num_sites = width * height
@@ -300,7 +295,9 @@ class HubbardPlaquetteTrotter(TimeEvolutionBuilder):
                 f"num_electrons must be -1 (no shift) or between 0 and the {2 * num_sites} spin orbitals of a "
                 f"{width}x{height} lattice, got {num_electrons}."
             )
-        shift = 0.0 if num_electrons < 0 else interaction * (0.5 * num_electrons - 0.25 * num_sites)
+        shift = (
+            0.0 if num_electrons < 0 else (on_site + 0.5 * interaction) * num_electrons - 0.25 * interaction * num_sites
+        )
 
         # 3. Step count
         time, power_repetitions = self._resolve_power()
