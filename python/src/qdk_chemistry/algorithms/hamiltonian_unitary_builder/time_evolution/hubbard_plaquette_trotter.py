@@ -69,9 +69,7 @@ class HubbardPlaquetteTrotter(TimeEvolutionBuilder):
     pure :math:`ZZ`: there is no single-mode :math:`Z` layer. The conventional
     :math:`U \sum_i n_{i\uparrow} n_{i\downarrow}` model differs by :math:`U\eta/2 - UM/4` on a
     state of :math:`\eta` electrons, with :math:`M` the site count. Setting ``num_electrons``
-    records that offset so the phase-to-energy conversion reports the conventional energy;
-    the Q# circuit omits the scalar identity term. Leaving it unset reports the symmetric model's
-    energy directly.
+    records that offset so the phase-to-energy conversion reports the conventional energy.
 
     The plaquette decomposition, its error constant, and the exact four-mode plaquette
     evolution are Campbell's :cite:`Campbell2022`. The factor ordering and the step-count
@@ -97,7 +95,7 @@ class HubbardPlaquetteTrotter(TimeEvolutionBuilder):
             order: Trotter decomposition order. Only 2 is supported.
             t: Uniform hopping amplitude of the Fermi-Hubbard model.
             u: Uniform on-site interaction of the Fermi-Hubbard model.
-            num_electrons: Electron count for the classical shift to the conventional model; ``None`` skips it.
+            num_electrons: Electron count for the scalar shift to the estimated energy; ``None`` skips it.
             time: The evolution time. Defaults to 0.0.
             target_accuracy: Energy error budget that sizes the automatic step count; see ``_step_count`` for why
                 it is an estimate rather than a guarantee. Use 0.0 to disable.
