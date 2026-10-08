@@ -99,7 +99,8 @@ sphinx-api:
 	@echo "** Building Sphinx API documentation..."
 	sphinx-apidoc $(SPHINX_API_OPTIONS) $(SPHINX_API_EXTRA_OPTIONS) \
 	    -o $(SPHINX_API_DIR) $(PYTHON_SRC_DIR)/qdk_chemistry \
-	    '$(PYTHON_SRC_DIR)/qdk_chemistry/_core*' | tee $(SPHINX_API_DEBUG) 2>&1
+	    '$(PYTHON_SRC_DIR)/qdk_chemistry/_core*' \
+	    '$(PYTHON_SRC_DIR)/qdk_chemistry/algorithms/hamiltonian_unitary_builder' | tee $(SPHINX_API_DEBUG) 2>&1
 	@echo "** Sphinx API documentation generated."
 	@echo "** Saved output to $(SPHINX_API_DEBUG)."
 	@count=$$(grep -E "WARNING|ERROR" $(SPHINX_API_DEBUG) | wc -l); \

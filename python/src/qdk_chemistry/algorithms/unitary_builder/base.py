@@ -50,7 +50,7 @@ class UnitaryBuilder(Algorithm):
             UnitaryRepresentation: The unitary for the given Hamiltonian.
 
         Raises:
-            TypeError: If the input is not an instance of :meth:`_input_type`.
+            TypeError: If the input is not an instance of the type ``_input_type()`` returns.
 
         """
         expected = self._input_type()
@@ -69,7 +69,7 @@ class UnitaryBuilder(Algorithm):
         """Construct a UnitaryRepresentation for the given Hamiltonian.
 
         Args:
-            qubit_hamiltonian: The Hamiltonian description, an instance of :meth:`_input_type`.
+            qubit_hamiltonian: The Hamiltonian description, an instance of the type ``_input_type()`` returns.
 
         Returns:
             UnitaryRepresentation: A UnitaryRepresentation for the given Hamiltonian.
@@ -164,7 +164,7 @@ class TimeEvolutionBuilder(UnitaryBuilder):
         """Construct a UnitaryRepresentation representing the time evolution unitary for the given Hamiltonian.
 
         Args:
-            qubit_hamiltonian: The Hamiltonian description, an instance of :meth:`_input_type`.
+            qubit_hamiltonian: The Hamiltonian description, an instance of the type ``_input_type()`` returns.
 
         Returns:
             UnitaryRepresentation: A UnitaryRepresentation representing the evolution of the given Hamiltonian.
