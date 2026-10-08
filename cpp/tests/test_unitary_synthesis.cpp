@@ -10,6 +10,8 @@
 #include <complex>
 #include <limits>
 #include <memory>
+#include <numeric>
+#include <qdk/chemistry/data/orbitals.hpp>
 #include <qdk/chemistry/data/wavefunction_containers/mps_wavefunction.hpp>
 #include <qdk/chemistry/utils/unitary_synthesis.hpp>
 #include <random>
@@ -18,13 +20,15 @@
 #include <vector>
 
 using qdk::chemistry::data::Configuration;
+using qdk::chemistry::data::MPSContainer;
 using qdk::chemistry::data::MPSSite;
 using qdk::chemistry::data::SymmetryBlockedTensor;
 using qdk::chemistry::data::SymmetryLabel;
 using qdk::chemistry::data::SymmetryProduct;
 using qdk::chemistry::data::Tensor;
-using qdk::chemistry::utils::detail::decompose_dense_sites;
-using qdk::chemistry::utils::detail::decompose_sparse_sites;
+using qdk::chemistry::utils::detail::block_sparse_unitary_synthesis;
+using qdk::chemistry::utils::detail::decompose_mps;
+using qdk::chemistry::utils::detail::dense_unitary_synthesis;
 using qdk::chemistry::utils::detail::DenseSiteSynthesis;
 using qdk::chemistry::utils::detail::GivensDecomposition;
 using qdk::chemistry::utils::detail::SparseSiteSynthesis;
@@ -35,9 +39,14 @@ Eigen::MatrixXd reconstruct(const GivensDecomposition& decomposition) {
   const Eigen::Index dim =
       static_cast<Eigen::Index>(decomposition.phases.size());
   Eigen::MatrixXd result = Eigen::MatrixXd::Identity(dim, dim);
+  EXPECT_EQ(decomposition.layer_shifted.size(),
+            decomposition.layer_angles.size());
   for (std::size_t layer = 0; layer < decomposition.layer_angles.size();
        ++layer) {
-    const Eigen::Index offset = decomposition.layer_shifted[layer] ? 1 : 0;
+    const Eigen::Index offset = decomposition.layer_shifted.at(layer) ? 1 : 0;
+    EXPECT_EQ(
+        static_cast<Eigen::Index>(decomposition.layer_angles[layer].size()),
+        (dim - offset) / 2);
     for (std::size_t slot = 0; slot < decomposition.layer_angles[layer].size();
          ++slot) {
       const Eigen::Index pair = offset + 2 * static_cast<Eigen::Index>(slot);
@@ -72,6 +81,22 @@ Eigen::MatrixXd random_orthogonal(Eigen::Index dim, std::uint32_t seed) {
 void expect_sparse_reconstruction(const SparseSiteSynthesis& result,
                                   const Eigen::MatrixXd& target) {
   const Eigen::MatrixXd block_diagonal = reconstruct(result.block_givens);
+  ASSERT_EQ(block_diagonal.rows(), target.rows());
+  ASSERT_EQ(result.row_permutation.size(),
+            static_cast<std::size_t>(target.rows()));
+  ASSERT_EQ(result.column_permutation.size(), result.row_permutation.size());
+  std::vector<Eigen::Index> expected_indices(result.row_permutation.size());
+  std::iota(expected_indices.begin(), expected_indices.end(), 0);
+  auto sorted_rows = result.row_permutation;
+  auto sorted_columns = result.column_permutation;
+  std::sort(sorted_rows.begin(), sorted_rows.end());
+  std::sort(sorted_columns.begin(), sorted_columns.end());
+  ASSERT_EQ(sorted_rows, expected_indices);
+  ASSERT_EQ(sorted_columns, expected_indices);
+  EXPECT_TRUE(
+      (block_diagonal.transpose() * block_diagonal)
+          .isApprox(Eigen::MatrixXd::Identity(target.rows(), target.rows()),
+                    1.0e-11));
   std::vector<Eigen::Index> inverse_rows(result.row_permutation.size());
   for (std::size_t index = 0; index < inverse_rows.size(); ++index) {
     inverse_rows[static_cast<std::size_t>(result.row_permutation[index])] =
@@ -129,11 +154,30 @@ MPSSite site_from_isometry(const Eigen::MatrixXd& isometry,
 
 // Dense synthesis of the site built from a physical-major isometry whose rows
 // fill the bond register.
+DenseSiteSynthesis synthesize_dense_site(const MPSSite& site,
+                                         Eigen::Index chi) {
+  return dense_unitary_synthesis(site, chi);
+}
+
+SparseSiteSynthesis synthesize_sparse_site(const MPSSite& site,
+                                           Eigen::Index chi) {
+  return block_sparse_unitary_synthesis(site, chi);
+}
+
+MPSContainer make_container(const std::vector<MPSSite>& sites) {
+  std::vector<MPSContainer::SitePtr> pointers;
+  for (const auto& site : sites) {
+    pointers.push_back(std::make_shared<const MPSSite>(site));
+  }
+  return MPSContainer(
+      std::move(pointers),
+      std::make_shared<qdk::chemistry::data::ModelOrbitals>(sites.size()));
+}
+
 DenseSiteSynthesis decompose_dense_target(const Eigen::MatrixXd& target,
                                           Eigen::Index chi) {
-  return decompose_dense_sites(
-             {site_from_isometry(target, target.rows() / chi)}, chi)
-      .front();
+  return synthesize_dense_site(site_from_isometry(target, target.rows() / chi),
+                               chi);
 }
 
 // Pads the right-bond rows of a physical-major isometry to ancilla_dim.
@@ -154,9 +198,8 @@ Eigen::MatrixXd pad_isometry(const Eigen::MatrixXd& isometry,
 SparseSiteSynthesis expect_sparse_site_reconstruction(
     const Eigen::MatrixXd& isometry, Eigen::Index physical,
     Eigen::Index ancilla_dim) {
-  auto result = decompose_sparse_sites({site_from_isometry(isometry, physical)},
-                                       ancilla_dim)
-                    .front();
+  auto result = synthesize_sparse_site(site_from_isometry(isometry, physical),
+                                       ancilla_dim);
   expect_sparse_reconstruction(result,
                                pad_isometry(isometry, physical, ancilla_dim));
   return result;
@@ -272,6 +315,30 @@ TEST(UnitarySynthesisTest, ReconstructsSparseSiteWithMixedBlockSizes) {
   EXPECT_EQ(result.block_givens.phases.size(), 16u);
   EXPECT_EQ(result.block_givens.layer_angles.size(),
             result.block_givens.layer_shifted.size());
+  const std::vector<Eigen::Index> target_columns(
+      result.column_permutation.begin(), result.column_permutation.begin() + 8);
+  EXPECT_EQ(target_columns,
+            (std::vector<Eigen::Index>{10, 5, 6, 0, 1, 2, 8, 9}));
+  EXPECT_EQ(result.row_permutation.front(), 4);
+}
+
+TEST(UnitarySynthesisTest, ReconstructsTwoThreeRowBlocksAndUnusedRows) {
+  Eigen::MatrixXd target = Eigen::MatrixXd::Zero(8, 2);
+  const double amplitude = 1.0 / std::sqrt(3.0);
+  for (const Eigen::Index row : {0, 5, 6}) {
+    target(row, 0) = amplitude;
+  }
+  for (const Eigen::Index row : {1, 2, 7}) {
+    target(row, 1) = amplitude;
+  }
+  const auto result = expect_sparse_site_reconstruction(target, 2, 4);
+  EXPECT_EQ(result.row_permutation,
+            (std::vector<Eigen::Index>{0, 5, 6, 1, 2, 7, 3, 4}));
+  EXPECT_EQ(result.column_permutation[0], 0);
+  EXPECT_EQ(result.column_permutation[1], 3);
+  const auto block_diagonal = reconstruct(result.block_givens);
+  EXPECT_TRUE(block_diagonal.bottomRightCorner(2, 2).isApprox(
+      Eigen::MatrixXd::Identity(2, 2), 1.0e-12));
 }
 
 TEST(UnitarySynthesisTest, ReconstructsSparseSiteIsometry) {
@@ -378,12 +445,12 @@ TEST(UnitarySynthesisTest, DecomposesSymmetryBlockedSparseMpsSite) {
     }
   }
 
-  const auto from_blocks = decompose_sparse_sites({blocked}, chi).front();
+  const auto from_blocks = synthesize_sparse_site(blocked, chi);
   expect_sparse_reconstruction(from_blocks, target);
 
   // The same entries stored as one dense block give the identical synthesis.
   const auto from_dense =
-      decompose_sparse_sites({make_site(packed, physical)}, chi).front();
+      synthesize_sparse_site(make_site(packed, physical), chi);
   EXPECT_EQ(from_blocks.row_permutation, from_dense.row_permutation);
   EXPECT_EQ(from_blocks.column_permutation, from_dense.column_permutation);
   EXPECT_EQ(from_blocks.block_givens.layer_angles,
@@ -394,18 +461,18 @@ TEST(UnitarySynthesisTest, DecomposesSymmetryBlockedSparseMpsSite) {
 }
 
 TEST(UnitarySynthesisTest, RejectsInvalidSparseInputs) {
-  // Errors raised while sites are decomposed concurrently still propagate.
   const MPSSite valid =
       site_from_isometry(random_orthogonal(4, 3).leftCols(2), 2);
   const MPSSite zero = site_from_isometry(Eigen::MatrixXd::Zero(4, 2), 2);
-  EXPECT_THROW(decompose_sparse_sites({valid, zero, valid}, 2),
-               std::invalid_argument);
+  EXPECT_THROW(synthesize_sparse_site(zero, 2), std::invalid_argument);
   Eigen::MatrixXd nonfinite = Eigen::MatrixXd::Identity(4, 2);
   nonfinite(3, 1) = std::numeric_limits<double>::quiet_NaN();
+  EXPECT_THROW(synthesize_sparse_site(site_from_isometry(nonfinite, 2), 2),
+               std::invalid_argument);
+  EXPECT_THROW(synthesize_sparse_site(valid, 0), std::invalid_argument);
   EXPECT_THROW(
-      decompose_sparse_sites({valid, site_from_isometry(nonfinite, 2)}, 2),
+      synthesize_sparse_site(valid, std::numeric_limits<Eigen::Index>::max()),
       std::invalid_argument);
-  EXPECT_TRUE(decompose_sparse_sites({}, 2).empty());
 }
 
 TEST(UnitarySynthesisTest, ReconstructsDenseSiteIsometry) {
@@ -490,7 +557,10 @@ TEST(UnitarySynthesisTest, ChainsDenseMpsSiteRightFactors) {
   for (const Eigen::Index physical : {2, 4}) {
     SCOPED_TRACE(::testing::Message() << "physical " << physical);
     // Site i has left bond bonds[i] and right bond bonds[i + 1].
-    const std::vector<Eigen::Index> bonds{3, 2, 4, physical == 4 ? 1 : 2};
+    std::vector<Eigen::Index> bonds{3, 2, 4, physical == 4 ? 1 : 2};
+    if (physical == 2) {
+      bonds.push_back(1);
+    }
     std::vector<Eigen::MatrixXd> isometries;
     std::vector<MPSSite> sites;
     for (std::size_t index = 0; index + 1 < bonds.size(); ++index) {
@@ -499,7 +569,12 @@ TEST(UnitarySynthesisTest, ChainsDenseMpsSiteRightFactors) {
               .leftCols(bonds[index]));
       sites.push_back(site_from_isometry(isometries.back(), physical));
     }
-    const auto results = decompose_dense_sites(sites, chi);
+    std::vector<MPSSite> chain{make_site(
+        Eigen::MatrixXd::Ones(physical, bonds.front()).eval(), physical)};
+    chain.insert(chain.end(), sites.begin(), sites.end());
+    const auto mps = make_container(chain);
+    const auto results =
+        std::get<std::vector<DenseSiteSynthesis>>(decompose_mps(mps, chi));
     ASSERT_EQ(results.size(), sites.size());
 
     for (std::size_t index = 0; index < sites.size(); ++index) {
@@ -519,7 +594,7 @@ TEST(UnitarySynthesisTest, ChainsDenseMpsSiteRightFactors) {
 
       // Absorbing the following right factor changes only the terminal
       // blocks, so the rest matches the synthesis of the site on its own.
-      const auto alone = decompose_dense_sites({sites[index]}, chi).front();
+      const auto alone = synthesize_dense_site(sites[index], chi);
       ASSERT_EQ(results[index].rotation_angles.size(),
                 alone.rotation_angles.size());
       for (std::size_t step = 0; step < alone.rotation_angles.size(); ++step) {
@@ -560,37 +635,37 @@ TEST(UnitarySynthesisTest, DecomposesSparseMpsSite) {
   isometry(3 * right + 2, 2) = 0.8;
 
   const MPSSite site = site_from_isometry(isometry, physical);
-  expect_sparse_reconstruction(decompose_sparse_sites({site}, 4).front(),
+  expect_sparse_reconstruction(synthesize_sparse_site(site, 4),
                                pad_isometry(isometry, physical, 4));
 }
 
 TEST(UnitarySynthesisTest, RejectsInvalidMpsSites) {
   const Eigen::MatrixXd isometry = random_orthogonal(8, 90).leftCols(2);
   const MPSSite site = site_from_isometry(isometry, 4);
-  EXPECT_THROW(decompose_dense_sites({site}, 1), std::invalid_argument);
-  EXPECT_THROW(decompose_sparse_sites({site}, 1), std::invalid_argument);
+  EXPECT_THROW(synthesize_dense_site(site, 1), std::invalid_argument);
+  EXPECT_THROW(synthesize_sparse_site(site, 1), std::invalid_argument);
   // The right bond of the first site holds two states, while the following
   // site has three left-bond states.
   const MPSSite three_left =
       site_from_isometry(random_orthogonal(8, 91).leftCols(3), 4);
-  EXPECT_THROW(decompose_dense_sites({site, three_left}, 4),
-               std::invalid_argument);
-  EXPECT_TRUE(decompose_dense_sites({}, 2).empty());
+  EXPECT_THROW(
+      make_container(
+          {make_site(Eigen::MatrixXd::Ones(4, 2).eval(), 4), site, three_left,
+           site_from_isometry(random_orthogonal(4, 92).leftCols(2), 4)}),
+      std::invalid_argument);
 
   Eigen::MatrixXd non_isometric = Eigen::MatrixXd::Zero(8, 2);
   non_isometric(0, 0) = 1.0;
   non_isometric(1, 1) = 2.0;
   const MPSSite scaled = site_from_isometry(non_isometric, 4);
-  EXPECT_THROW(decompose_dense_sites({site, scaled}, 2), std::invalid_argument);
-  EXPECT_THROW(decompose_sparse_sites({site, scaled}, 2),
-               std::invalid_argument);
+  EXPECT_THROW(synthesize_dense_site(scaled, 2), std::invalid_argument);
+  EXPECT_THROW(synthesize_sparse_site(scaled, 2), std::invalid_argument);
 
   const Eigen::MatrixXcd complex_packed =
       Eigen::MatrixXcd::Identity(4, 2) * std::complex<double>(0.0, 1.0);
   const MPSSite complex_site = make_site(complex_packed, 4);
-  EXPECT_THROW(decompose_dense_sites({complex_site}, 2), std::invalid_argument);
-  EXPECT_THROW(decompose_sparse_sites({complex_site}, 2),
-               std::invalid_argument);
+  EXPECT_THROW(synthesize_dense_site(complex_site, 2), std::invalid_argument);
+  EXPECT_THROW(synthesize_sparse_site(complex_site, 2), std::invalid_argument);
 
   // Three physical states are neither the ('0', '1') nor the ('0', 'u', 'd',
   // '2') basis.
@@ -601,7 +676,7 @@ TEST(UnitarySynthesisTest, RejectsInvalidMpsSites) {
   const MPSSite three_state_site =
       make_site(Eigen::MatrixXd(Eigen::MatrixXd::Identity(3, 2)), 3,
                 std::move(three_states));
-  EXPECT_THROW(decompose_dense_sites({three_state_site}, 2),
+  EXPECT_THROW(synthesize_dense_site(three_state_site, 2),
                std::invalid_argument);
   // Three left-bond states do not fit a two-state bond register.
   EXPECT_THROW(decompose_dense_target(Eigen::MatrixXd::Identity(8, 3), 2),
@@ -609,7 +684,17 @@ TEST(UnitarySynthesisTest, RejectsInvalidMpsSites) {
 
   Eigen::MatrixXd nonfinite = isometry;
   nonfinite(5, 1) = std::numeric_limits<double>::quiet_NaN();
-  EXPECT_THROW(decompose_dense_sites({site_from_isometry(nonfinite, 4)}, 2),
+  EXPECT_THROW(synthesize_dense_site(site_from_isometry(nonfinite, 4), 2),
+               std::invalid_argument);
+
+  EXPECT_THROW(dense_unitary_synthesis(site, 0), std::invalid_argument);
+  EXPECT_THROW(
+      dense_unitary_synthesis(site, std::numeric_limits<Eigen::Index>::max()),
+      std::invalid_argument);
+  EXPECT_THROW(
+      dense_unitary_synthesis(site, 2, Eigen::MatrixXd::Identity(3, 3)),
+      std::invalid_argument);
+  EXPECT_THROW(dense_unitary_synthesis(site, 2, Eigen::MatrixXd::Zero(2, 2)),
                std::invalid_argument);
 }
 
@@ -634,9 +719,9 @@ TEST(UnitarySynthesisTest, ReconstructsStructuredSparseSites) {
   EXPECT_EQ(rotated.block_givens.layer_angles.size(), 1u);
 }
 
-TEST(UnitarySynthesisTest, ReconstructsBatchOfRandomSparseSites) {
+TEST(UnitarySynthesisTest, ReconstructsRandomSparseSites) {
   // One dense block of n rows per site, completed to an n x n orthogonal
-  // block, with all sites decomposed in one call.
+  // block.
   constexpr Eigen::Index chi = 32;
   std::vector<Eigen::MatrixXd> targets;
   std::vector<MPSSite> sites;
@@ -649,11 +734,46 @@ TEST(UnitarySynthesisTest, ReconstructsBatchOfRandomSparseSites) {
       targets.push_back(std::move(target));
     }
   }
-  const auto results = decompose_sparse_sites(sites, chi);
-  ASSERT_EQ(results.size(), sites.size());
   for (std::size_t index = 0; index < sites.size(); ++index) {
     SCOPED_TRACE(::testing::Message() << "site " << index);
-    expect_sparse_reconstruction(results[index], targets[index]);
+    expect_sparse_reconstruction(synthesize_sparse_site(sites[index], chi),
+                                 targets[index]);
   }
+}
+
+TEST(UnitarySynthesisTest, ContainerDispatchSkipsInitialSite) {
+  const auto first = make_site(Eigen::MatrixXd::Ones(4, 2).eval(), 4);
+  const auto last =
+      site_from_isometry(random_orthogonal(4, 122).leftCols(2), 4);
+  const auto mps = make_container({first, last});
+  const auto sparse = std::get<std::vector<SparseSiteSynthesis>>(
+      decompose_mps(mps, 2, "block_sparse"));
+  ASSERT_EQ(sparse.size(), 1u);
+  expect_sparse_reconstruction(
+      sparse.front(),
+      pad_isometry(random_orthogonal(4, 122).leftCols(2), 4, 2));
+  const auto dense = std::get<std::vector<DenseSiteSynthesis>>(
+      decompose_mps(mps, 2, "general"));
+  ASSERT_EQ(dense.size(), 1u);
+  expect_dense_reconstruction(
+      dense.front(), pad_isometry(random_orthogonal(4, 122).leftCols(2), 4, 2),
+      2);
+  EXPECT_THROW(decompose_mps(mps, 1), std::invalid_argument);
+  EXPECT_THROW(decompose_mps(mps, 2, "unknown"), std::invalid_argument);
+
+  const auto single =
+      make_container({make_site(Eigen::MatrixXd::Ones(4, 1).eval(), 4)});
+  EXPECT_TRUE(
+      std::get<std::vector<DenseSiteSynthesis>>(decompose_mps(single, 2))
+          .empty());
+  EXPECT_TRUE(std::get<std::vector<SparseSiteSynthesis>>(
+                  decompose_mps(single, 2, "block_sparse"))
+                  .empty());
+
+  const auto invalid = make_container(
+      {first, make_site(Eigen::MatrixXd::Zero(8, 2).eval(), 4), last});
+  EXPECT_THROW(decompose_mps(invalid, 2, "general"), std::invalid_argument);
+  EXPECT_THROW(decompose_mps(invalid, 2, "block_sparse"),
+               std::invalid_argument);
 }
 }  // namespace detail

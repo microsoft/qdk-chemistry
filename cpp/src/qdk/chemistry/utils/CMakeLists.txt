@@ -6,4 +6,5 @@ target_sources(chemistry PRIVATE
     golden_section.cpp
     logger.cpp
     unitary_synthesis.cpp
+    sparse_unitary_synthesis.cpp
 )

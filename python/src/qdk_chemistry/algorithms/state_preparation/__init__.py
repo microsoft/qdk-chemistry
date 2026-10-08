@@ -14,8 +14,7 @@ from typing import Any
 from qdk_chemistry.algorithms.state_preparation.alias_sampling import AliasSamplingStatePreparation
 from qdk_chemistry.algorithms.state_preparation.dense_pure_state import DensePureStatePreparation
 from qdk_chemistry.algorithms.state_preparation.identity import identity_state_prep
-from qdk_chemistry.algorithms.state_preparation.mps_sequential import MPSSequentialStatePreparation
-from qdk_chemistry.algorithms.state_preparation.mps_sparse import MPSSparseStatePreparation
+from qdk_chemistry.algorithms.state_preparation.matrix_product_state import MatrixProductStatePreparation
 from qdk_chemistry.algorithms.state_preparation.qrom_state_prep import QROMStatePreparation
 from qdk_chemistry.algorithms.state_preparation.sparse_isometry import (
     SparseIsometryStatePreparation,
@@ -31,8 +30,7 @@ from qdk_chemistry.algorithms.state_preparation.state_preparation import (
 __all__ = [
     "AliasSamplingStatePreparation",
     "DensePureStatePreparation",
-    "MPSSequentialStatePreparation",
-    "MPSSparseStatePreparation",
+    "MatrixProductStatePreparation",
     "QROMStatePreparation",
     "SparseIsometryStatePreparation",
     "StatePreparationFactory",

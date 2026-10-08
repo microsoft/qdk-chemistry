@@ -124,41 +124,13 @@ namespace QDKChemistry.Utils.MPSSequential {
         rot2 : Bool[][],
         w0Layers : Bool[][][],
         w0Shifted : Bool[],
-        w0Phases : Bool[][],
+        w0Phases : Bool[],
         w1Layers : Bool[][][],
         w1Shifted : Bool[],
-        w1Phases : Bool[][],
+        w1Phases : Bool[],
         uLayers : Bool[][][],
         uShifted : Bool[],
-        uPhases : Bool[][],
-    }
-
-    /// # Summary
-    /// Quantizes the rotation angles of one site decomposition for table lookup.
-    function QuantizeSiteUnitary(
-        decomp : SequentialSiteDecomposition,
-        numQubitsPerSite : Int,
-        ancillaBits : Int,
-        rotationBits : Int
-    ) : QuantizedSiteUnitary {
-        let ancillaDim = 1 <<< ancillaBits;
-        // A Givens layer on an n-qubit register is addressed by its n - 1 upper qubits.
-        let wAddresses = ancillaDim / 2;
-        let uAddresses = (ancillaDim <<< numQubitsPerSite) / 2;
-        new QuantizedSiteUnitary {
-            rot0 = QuantizeRyAngles(decomp.rot0Angles, rotationBits),
-            rot1 = QuantizeRyAngles(decomp.rot1Angles, rotationBits),
-            rot2 = QuantizeRyAngles(decomp.rot2Angles, rotationBits),
-            w0Layers = Mapped(layer -> QuantizeGivensAngles(layer, wAddresses, rotationBits), decomp.w0LayerAngles),
-            w0Shifted = decomp.w0LayerShifted,
-            w0Phases = PhaseFlipsAsSelectData(decomp.w0Phases),
-            w1Layers = Mapped(layer -> QuantizeGivensAngles(layer, wAddresses, rotationBits), decomp.w1LayerAngles),
-            w1Shifted = decomp.w1LayerShifted,
-            w1Phases = PhaseFlipsAsSelectData(decomp.w1Phases),
-            uLayers = Mapped(layer -> QuantizeGivensAngles(layer, uAddresses, rotationBits), decomp.uLayerAngles),
-            uShifted = decomp.uLayerShifted,
-            uPhases = PhaseFlipsAsSelectData(decomp.uPhases),
-        }
+        uPhases : Bool[],
     }
 
     /// # Summary
@@ -206,23 +178,20 @@ namespace QDKChemistry.Utils.MPSSequential {
                 // ('0', 'u', 'd', '2') basis. The rotation tables are addressed by the
                 // little-endian bond register; the Givens operations take
                 // most-significant-first registers, hence `Reversed(ancilla)`.
-                if Length(newSite) == 1 {
-                    ApplyMultiplexedRy(site.rot0, ancilla, newSite[0], phaseGradient, angleReg);
-                    // The joint register newSite + Reversed(ancilla) selects block q of U.
-                    ApplyRealUnitaryViaGivens(site.uLayers, site.uShifted, site.uPhases, newSite + Reversed(ancilla), phaseGradient, angleReg);
-                } else {
+                ApplyMultiplexedRy(site.rot0, ancilla, newSite[0], phaseGradient, angleReg);
+                if Length(newSite) == 2 {
                     let q0 = newSite[0];
                     let q1 = newSite[1];
-                    ApplyMultiplexedRy(site.rot0, ancilla, q0, phaseGradient, angleReg);
                     CNOT(q1, q0);
                     ApplyControlledRealUnitaryViaGivens(site.w0Layers, site.w0Shifted, site.w0Phases, Reversed(ancilla), phaseGradient, q0, angleReg);
                     ApplyControlledMultiplexedRy(site.rot1, ancilla, q0, q1, phaseGradient, angleReg);
                     CNOT(q1, q0);
                     ApplyControlledRealUnitaryViaGivens(site.w1Layers, site.w1Shifted, site.w1Phases, Reversed(ancilla), phaseGradient, q1, angleReg);
                     ApplyControlledMultiplexedRy(site.rot2, ancilla, q1, q0, phaseGradient, angleReg);
-                    // The joint register [q1, q0] + Reversed(ancilla) selects block 2·q1 + q0 of U.
-                    ApplyRealUnitaryViaGivens(site.uLayers, site.uShifted, site.uPhases, [q1, q0] + Reversed(ancilla), phaseGradient, angleReg);
                 }
+                // The joint register Reversed(ancilla + newSite) selects block q, or block
+                // 2·q1 + q0, of U.
+                ApplyRealUnitaryViaGivens(site.uLayers, site.uShifted, site.uPhases, Reversed(ancilla + newSite), phaseGradient, angleReg);
                 if cacheSites {
                     EndEstimateCaching();
                 }
@@ -277,7 +246,6 @@ namespace QDKChemistry.Utils.MPSSequential {
         ancilla : Qubit[]
     ) : Unit {
         Fact(Length(siteDecompositions) == numSites - 1, "MPS sequential preparation needs one decomposition per site after the first.");
-        let ancillaBits = Length(ancilla);
         // Sites with the ('0', '1') physical basis use one qubit each, and sites with the
         // ('0', 'u', 'd', '2') physical basis use two.
         Fact(
@@ -285,30 +253,33 @@ namespace QDKChemistry.Utils.MPSSequential {
             "The state register must hold one or two qubits per MPS site."
         );
         let numQubitsPerSite = Length(state) / numSites;
+        let ancillaDim = 1 <<< Length(ancilla);
+        // A Givens layer on an n-qubit register is addressed by its n - 1 upper qubits.
+        let wAddresses = ancillaDim / 2;
+        let uAddresses = (ancillaDim <<< numQubitsPerSite) / 2;
         PrepareSequentialMPS(
             initialStateVec,
             numSites,
             siteToOrbitalOrder,
             rotationBits,
-            siteIdx -> QuantizeSiteUnitary(siteDecompositions[siteIdx], numQubitsPerSite, ancillaBits, rotationBits),
+            siteIdx -> {
+                let decomp = siteDecompositions[siteIdx];
+                new QuantizedSiteUnitary {
+                    rot0 = QuantizeRyAngles(decomp.rot0Angles, rotationBits),
+                    rot1 = QuantizeRyAngles(decomp.rot1Angles, rotationBits),
+                    rot2 = QuantizeRyAngles(decomp.rot2Angles, rotationBits),
+                    w0Layers = Mapped(layer -> QuantizeGivensAngles(layer, wAddresses, rotationBits), decomp.w0LayerAngles),
+                    w0Shifted = decomp.w0LayerShifted,
+                    w0Phases = decomp.w0Phases,
+                    w1Layers = Mapped(layer -> QuantizeGivensAngles(layer, wAddresses, rotationBits), decomp.w1LayerAngles),
+                    w1Shifted = decomp.w1LayerShifted,
+                    w1Phases = decomp.w1Phases,
+                    uLayers = Mapped(layer -> QuantizeGivensAngles(layer, uAddresses, rotationBits), decomp.uLayerAngles),
+                    uShifted = decomp.uLayerShifted,
+                    uPhases = decomp.uPhases,
+                }
+            },
             false,
-            state,
-            ancilla
-        );
-    }
-
-    operation ApplyMPSSequential(params : MPSSequentialParams, state : Qubit[]) : Unit {
-        Fact(
-            Length(state) == params.numQubitsPerSite * params.numSites,
-            "State register size must equal the number of qubits per MPS site times the number of sites."
-        );
-        use ancilla = Qubit[params.numAncillaQubits];
-        MPSSequential(
-            params.initialStateVec,
-            params.numSites,
-            params.siteToOrbitalOrder,
-            params.rotationBits,
-            params.siteDecompositions,
             state,
             ancilla
         );
@@ -318,7 +289,22 @@ namespace QDKChemistry.Utils.MPSSequential {
     /// Returns a composable operation that prepares the MPS on a numQubitsPerSite·numSites-qubit
     /// register.
     function MakeMPSSequentialOp(params : MPSSequentialParams) : Qubit[] => Unit {
-        ApplyMPSSequential(params, _)
+        (state) => {
+            Fact(
+                Length(state) == params.numQubitsPerSite * params.numSites,
+                "State register size must equal the number of qubits per MPS site times the number of sites."
+            );
+            use ancilla = Qubit[params.numAncillaQubits];
+            MPSSequential(
+                params.initialStateVec,
+                params.numSites,
+                params.siteToOrbitalOrder,
+                params.rotationBits,
+                params.siteDecompositions,
+                state,
+                ancilla
+            );
+        }
     }
 
     /// Circuit wrapper for resource estimation - allocates qubits internally.
