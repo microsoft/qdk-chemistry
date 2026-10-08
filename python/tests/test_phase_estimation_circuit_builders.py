@@ -24,8 +24,8 @@ from qdk_chemistry.algorithms.phase_estimation.circuit_builder.standard_builder 
 from qdk_chemistry.data import (
     AlgorithmRef,
     Circuit,
+    FermiHubbardModelHamiltonianDescription,
     LatticeGeometry,
-    ModelHamiltonianDescription,
     QubitOperator,
     UnitaryRepresentation,
 )
@@ -394,7 +394,7 @@ def test_controlled_circuit_takes_system_width_from_unitary(monkeypatch: pytest.
     """QPE sizes a model's system register from its unitary, so the unitary's ancillas are counted."""
     builder = QdkStandardQpeCircuitBuilder(num_bits=2)
     unitary_builder, circuit_mapper = _stub_nested(builder, monkeypatch, num_qubits=5, num_system_qubits=3)
-    model = ModelHamiltonianDescription("hubbard", LatticeGeometry.chain(3), {"epsilon": 0.0, "t": 1.0, "U": 4.0})
+    model = FermiHubbardModelHamiltonianDescription(LatticeGeometry.chain(3), t=1.0, u=4.0)
 
     circuit, num_ancilla_qubits = builder._create_controlled_circuit(model, power=1)
 

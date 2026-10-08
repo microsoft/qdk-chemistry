@@ -14,6 +14,7 @@ import scipy
 from qdk_chemistry.algorithms.hamiltonian_unitary_builder.time_evolution.trotter import Trotter
 from qdk_chemistry.algorithms.hamiltonian_unitary_builder.time_evolution.trotter_error import trotter_steps_commutator
 from qdk_chemistry.data import (
+    FermiHubbardModelHamiltonianDescription,
     FlatPartition,
     Hamiltonian,
     HamiltonianDescription,
@@ -959,12 +960,13 @@ class TestHamiltonianDescription:
 
     def test_rejects_a_description_it_does_not_evolve(self):
         """QubitOperator and ModelHamiltonianDescription are descriptions; Trotter turns a model away."""
+        assert issubclass(FermiHubbardModelHamiltonianDescription, HamiltonianDescription)
         assert issubclass(QubitOperator, HamiltonianDescription)
         assert issubclass(ModelHamiltonianDescription, HamiltonianDescription)
         assert not issubclass(LatticeGeometry, HamiltonianDescription)
         assert not issubclass(Hamiltonian, HamiltonianDescription)
-        model = ModelHamiltonianDescription("hubbard", LatticeGeometry.chain(2), {"epsilon": 0.0, "t": 1.0, "U": 4.0})
-        with pytest.raises(TypeError, match="takes a QubitOperator, got ModelHamiltonianDescription"):
+        model = FermiHubbardModelHamiltonianDescription(LatticeGeometry.chain(2), t=1.0, u=4.0)
+        with pytest.raises(TypeError, match="takes a QubitOperator, got FermiHubbardModelHamiltonianDescription"):
             Trotter(time=0.1).run(model)
 
 
