@@ -332,6 +332,24 @@ TEST_F(LatticeGraphTest, BondFlavorAxesAreScaleInvariant) {
   }
 }
 
+TEST_F(LatticeGraphTest, BondFlavorIdsAreValidatedBeforeMatching) {
+  const auto geometry = LatticeGeometry::square(3, 3);
+  const std::uint64_t largest_flavor = std::uint64_t{1} << 53;
+  for (const auto& definition : std::vector<BondFlavorDefinition>{
+           {1, Eigen::RowVector2d(1.0, 0.0), largest_flavor + 1},
+           {2, Eigen::RowVector2d(1.0, 0.0), largest_flavor + 1},
+           {1, Eigen::RowVector2d(1.0, 2.0), largest_flavor + 1}}) {
+    EXPECT_THROW(LatticeGraph::from_geometry(geometry, {1}, {definition}),
+                 std::invalid_argument);
+    auto valid = definition;
+    valid.flavor = largest_flavor;
+    EXPECT_NO_THROW(LatticeGraph::from_geometry(geometry, {1}, {valid}));
+  }
+  const auto graph = LatticeGraph::from_geometry(
+      geometry, {1}, {{1, Eigen::RowVector2d(1.0, 0.0), largest_flavor}});
+  EXPECT_EQ(graph.edge_labels().at({0, 1}).flavor, largest_flavor);
+}
+
 TEST_F(LatticeGraphTest, OppositeFlavorAxesMatchAboveHalfRootTwoTolerance) {
   // Above 1/sqrt(2), both diagonal components lie within the tolerance of 0.
   auto json = LatticeGeometry::square(3, 3).to_json();

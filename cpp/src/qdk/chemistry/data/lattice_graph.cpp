@@ -60,6 +60,9 @@ static double axis_distance(const Eigen::RowVector2d& lhs,
 static std::vector<BondFlavorDefinition> prepare_flavors(
     std::vector<BondFlavorDefinition> definitions, double tolerance) {
   for (auto& definition : definitions) {
+    if (definition.flavor > kMaxEdgeLabelValue) {
+      throw std::invalid_argument("Bond-flavor IDs must be at most 2^53.");
+    }
     if (definition.shell == 0 || definition.axis.size() == 0 ||
         !definition.axis.allFinite() ||
         definition.axis.cwiseAbs().maxCoeff() == 0.0) {

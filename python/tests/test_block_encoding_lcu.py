@@ -246,6 +246,44 @@ class TestLCUBuilder:
         with pytest.raises(ValueError, match="L1 norm is too small"):
             builder.run(hamiltonian)
 
+    @pytest.mark.parametrize("sparse", [False, True])
+    @pytest.mark.parametrize("quantum_walk", [False, True])
+    @pytest.mark.parametrize("retained_coefficients", [[2e-12], [2e-12, -4e-12]])
+    def test_normalization_uses_retained_coefficients(
+        self, sparse: bool, quantum_walk: bool, retained_coefficients: list[float]
+    ) -> None:
+        """Discarded coefficients contribute neither to PREPARE normalization nor to the quantum-walk scale."""
+        labels = ["IX", "ZI"][: len(retained_coefficients)] + ["YI"] * 100
+        coefficients = np.array(retained_coefficients + [6e-13] * 100)
+        hamiltonian = (
+            QubitOperator.from_sparse_terms(
+                2, [LCUBuilder._pauli_label_to_map(label) for label in labels], coefficients
+            )
+            if sparse
+            else QubitOperator(labels, coefficients)
+        )
+        container = LCUBuilder(quantum_walk=quantum_walk).run(hamiltonian).get_container()
+        lcu = container.block_encoding if quantum_walk else container
+        retained_norm = sum(abs(coefficient) for coefficient in retained_coefficients)
+        expected_amplitudes = np.sqrt(np.abs(retained_coefficients) / retained_norm)
+        np.testing.assert_allclose(
+            lcu.prepare.get_coefficients(),
+            expected_amplitudes,
+            rtol=float_comparison_relative_tolerance,
+            atol=float_comparison_absolute_tolerance,
+        )
+        assert len(lcu.select.controlled_operations) == len(retained_coefficients)
+        if quantum_walk:
+            assert container.scale == pytest.approx(retained_norm, rel=float_comparison_relative_tolerance, abs=0.0)
+
+    def test_norm_tolerance_uses_retained_coefficients(self) -> None:
+        """A large discarded coefficient sum cannot bypass the retained Hamiltonian's minimum-norm check."""
+        hamiltonian = QubitOperator(["IX"] + ["YI"] * 100, np.array([2e-12] + [6e-13] * 100))
+        builder = LCUBuilder()
+        builder.settings().set("tolerance", 3e-12)
+        with pytest.raises(ValueError, match="L1 norm is too small"):
+            builder.run(hamiltonian)
+
     def test_prepare_select_prepare_with_alias_sampling(self):
         """Verify alias sampling supplies its entangled scratch register to PREPARE."""
         hamiltonian = QubitOperator(

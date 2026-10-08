@@ -134,7 +134,7 @@ class LCUBuilder(HamiltonianUnitaryBuilder):
         num_terms = len(real_terms)
         num_prepare_ancillas = int(np.ceil(np.log2(num_terms)))
 
-        l1_norm = qubit_hamiltonian.schatten_norm
+        l1_norm = sum(abs(coefficient) for _, coefficient in real_terms)
         prepare_wfn = self._build_prepare(real_terms, l1_norm, num_prepare_ancillas, self._settings.get("tolerance"))
         select = self._build_select(real_terms, qubit_hamiltonian.num_qubits, num_prepare_ancillas)
 
@@ -166,7 +166,7 @@ class LCUBuilder(HamiltonianUnitaryBuilder):
 
         Args:
             real_terms: Retained Pauli labels and real coefficients defining the amplitudes.
-            l1_norm: Hamiltonian L1 norm used to normalize the amplitudes.
+            l1_norm: Retained coefficients' L1 norm used to normalize the amplitudes.
             num_prepare_ancillas: Number of qubits in the prepare ancillary register.
             tolerance: Minimum allowable L1 norm; raises if the norm is below this threshold.
 
