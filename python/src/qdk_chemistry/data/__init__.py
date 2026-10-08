@@ -25,11 +25,13 @@ Exposed classes are:
 - :class:`FactorizedHamiltonianContainer`: Container for factorized hamiltonians.
 - :class:`Hamiltonian`: Quantum mechanical Hamiltonian operator representation.
 - :class:`HamiltonianContainer`: Abstract base class for different Hamiltonian storage formats.
+- :class:`HamiltonianDescription`: Abstract type of the Hamiltonian descriptions a Hamiltonian unitary builder takes.
 - :class:`HamiltonianType`: Enumeration of Hamiltonian types (Hermitian, NonHermitian).
 - :class:`LatticeGeometry`: Immutable two-dimensional geometry of a built-in lattice.
 - :class:`LatticeGraph`: Lattice graph defining the connectivity and geometry of a model Hamiltonian.
 - :class:`MajoranaMapping`: Majorana-to-Pauli mapping data class for fermion-to-qubit encodings.
 - :class:`MeasurementData`: Measurement bitstring data and metadata for QubitOperator objects.
+- :class:`ModelHamiltonianDescription`: Lattice model Hamiltonian described by its lattice and model parameters.
 - :class:`SparseHamiltonianContainer`: Container for lattice model Hamiltonians with sparse internal storage.
 - :class:`ModelOrbitals`: Simple orbital representation for model systems without full basis set information.
 - :class:`NuclearGradients`: Nuclear gradient values associated with a molecular structure.
@@ -51,7 +53,6 @@ Exposed classes are:
 - :class:`TermPartition`: Index-based partition of Hamiltonian terms.
   See :class:`FlatPartition` and :class:`LayeredPartition`.
 - :class:`UnitaryRepresentation`: Unitary representation.
-- :class:`UnitaryBuilderInput`: Abstract type of the Hamiltonian descriptions a unitary builder can take.
 - :class:`UnitaryContainer`: Abstract base class for different unitary representations.
 - :class:`Wavefunction`: Electronic wavefunction data and coefficients.
 - :class:`WavefunctionContainer`: Abstract base class for different wavefunction representations.
@@ -123,6 +124,8 @@ from qdk_chemistry.data.circuit import Circuit
 from qdk_chemistry.data.circuit_executor_data import CircuitExecutorData
 from qdk_chemistry.data.enums.fermion_mode_order import FermionModeOrder
 from qdk_chemistry.data.estimator_data import EnergyExpectationResult, MeasurementData
+from qdk_chemistry.data.hamiltonian_description import HamiltonianDescription
+from qdk_chemistry.data.model_hamiltonian_description import ModelHamiltonianDescription
 from qdk_chemistry.data.noise_models import QuantumErrorProfile
 from qdk_chemistry.data.qpe_result import QpeResult
 
@@ -135,7 +138,6 @@ from qdk_chemistry.data.time_dependent_qubit_hamiltonian.base import TimeDepende
 from qdk_chemistry.data.time_dependent_qubit_hamiltonian.containers.base import TimeDependentQubitHamiltonianContainer
 from qdk_chemistry.data.time_dependent_qubit_hamiltonian.containers.driven import DrivenContainer
 from qdk_chemistry.data.time_dependent_qubit_hamiltonian.driven import DrivenQubitHamiltonian
-from qdk_chemistry.data.unitary_builder_input import UnitaryBuilderInput
 from qdk_chemistry.data.unitary_representation.base import UnitaryRepresentation
 from qdk_chemistry.data.unitary_representation.containers.base import UnitaryContainer
 from qdk_chemistry.data.unitary_representation.containers.pauli_product_formula import PauliProductFormulaContainer
@@ -172,12 +174,14 @@ __all__ = [
     "FlatPartition",
     "Hamiltonian",
     "HamiltonianContainer",
+    "HamiltonianDescription",
     "HamiltonianType",
     "LatticeGeometry",
     "LatticeGraph",
     "LayeredPartition",
     "MajoranaMapping",
     "MeasurementData",
+    "ModelHamiltonianDescription",
     "ModelOrbitals",
     "NuclearGradients",
     "NuclearHessian",
@@ -209,7 +213,6 @@ __all__ = [
     "TermPartition",
     "TimeDependentQubitHamiltonian",
     "TimeDependentQubitHamiltonianContainer",
-    "UnitaryBuilderInput",
     "UnitaryContainer",
     "UnitaryRepresentation",
     "Wavefunction",

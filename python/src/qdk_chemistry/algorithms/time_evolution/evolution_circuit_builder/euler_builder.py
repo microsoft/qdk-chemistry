@@ -20,8 +20,8 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
+from qdk_chemistry.algorithms.hamiltonian_unitary_builder.base import TimeEvolutionBuilder
 from qdk_chemistry.algorithms.propagator.base import Propagator
-from qdk_chemistry.algorithms.unitary_builder.base import TimeEvolutionBuilder
 from qdk_chemistry.data import (
     Circuit,
     QubitOperator,

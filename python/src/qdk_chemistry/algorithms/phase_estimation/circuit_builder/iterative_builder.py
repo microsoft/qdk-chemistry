@@ -11,7 +11,7 @@ without executing them, enabling standalone resource estimation and circuit prev
 # Licensed under the MIT License. See LICENSE.txt in the project root for license information.
 # --------------------------------------------------------------------------------------------
 
-from qdk_chemistry.data import AlgorithmRef, Circuit, UnitaryBuilderInput
+from qdk_chemistry.data import AlgorithmRef, Circuit, HamiltonianDescription
 from qdk_chemistry.data.circuit import QsharpFactoryData
 from qdk_chemistry.utils import Logger
 from qdk_chemistry.utils.qsharp import QSHARP_UTILS
@@ -77,7 +77,7 @@ class QdkIterativeQpeCircuitBuilder(IterativeQpeCircuitBuilder):
     def _run_impl(
         self,
         state_preparation: Circuit,
-        qubit_hamiltonian: UnitaryBuilderInput,
+        qubit_hamiltonian: HamiltonianDescription,
     ) -> list[Circuit]:
         """Build IQPE iteration circuits.
 
@@ -88,7 +88,7 @@ class QdkIterativeQpeCircuitBuilder(IterativeQpeCircuitBuilder):
 
         Args:
             state_preparation: The circuit that prepares the initial state.
-            qubit_hamiltonian: The Hamiltonian or geometry the unitary builder takes.
+            qubit_hamiltonian: The Hamiltonian description the unitary builder takes.
 
         Returns:
             A list of quantum circuits, one per phase bit iteration (or a single-element
@@ -125,7 +125,7 @@ class QdkIterativeQpeCircuitBuilder(IterativeQpeCircuitBuilder):
     def _create_iteration_circuit(
         self,
         state_preparation: Circuit,
-        qubit_hamiltonian: UnitaryBuilderInput,
+        qubit_hamiltonian: HamiltonianDescription,
         *,
         iteration: int,
         total_iterations: int,
@@ -135,7 +135,7 @@ class QdkIterativeQpeCircuitBuilder(IterativeQpeCircuitBuilder):
 
         Args:
             state_preparation: Trial-state preparation circuit that prepares the initial state on the system qubits.
-            qubit_hamiltonian: The Hamiltonian or geometry the unitary builder takes.
+            qubit_hamiltonian: The Hamiltonian description the unitary builder takes.
             iteration: Current iteration index (0-based); iteration 0 uses the largest power and
                 measures the least-significant bit.
             total_iterations: Total number of phase bits to measure across all iterations.

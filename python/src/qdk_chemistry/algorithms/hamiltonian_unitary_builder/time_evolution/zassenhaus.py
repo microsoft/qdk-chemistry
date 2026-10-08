@@ -23,9 +23,9 @@ from itertools import product
 
 import numpy as np
 
-from qdk_chemistry.algorithms.unitary_builder.base import TimeEvolutionBuilder, TimeEvolutionSettings
-from qdk_chemistry.algorithms.unitary_builder.time_evolution.trotter import Trotter
-from qdk_chemistry.algorithms.unitary_builder.time_evolution.zassenhaus_error import (
+from qdk_chemistry.algorithms.hamiltonian_unitary_builder.base import TimeEvolutionBuilder, TimeEvolutionSettings
+from qdk_chemistry.algorithms.hamiltonian_unitary_builder.time_evolution.trotter import Trotter
+from qdk_chemistry.algorithms.hamiltonian_unitary_builder.time_evolution.zassenhaus_error import (
     zassenhaus_steps_commutator,
     zassenhaus_steps_naive,
 )

@@ -9,9 +9,9 @@ from math import ceil, isfinite, isnan, log2, nan, sqrt
 
 import numpy as np
 
-from qdk_chemistry.algorithms.unitary_builder.base import (
-    UnitaryBuilder,
-    UnitaryBuilderSettings,
+from qdk_chemistry.algorithms.hamiltonian_unitary_builder.base import (
+    HamiltonianUnitaryBuilder,
+    HamiltonianUnitaryBuilderSettings,
 )
 from qdk_chemistry.data import (
     Configuration,
@@ -32,7 +32,7 @@ from qdk_chemistry.data.unitary_representation.containers.sossa import (
 __all__: list[str] = ["SOSSABuilder", "SOSSABuilderSettings"]
 
 
-class SOSSABuilderSettings(UnitaryBuilderSettings):
+class SOSSABuilderSettings(HamiltonianUnitaryBuilderSettings):
     """Settings for the SOSSA block encoding builder."""
 
     def __init__(self):
@@ -63,7 +63,7 @@ class SOSSABuilderSettings(UnitaryBuilderSettings):
         )
 
 
-class SOSSABuilder(UnitaryBuilder):
+class SOSSABuilder(HamiltonianUnitaryBuilder):
     """Sum of Squares Spectral Amplification (SOSSA) block encoding builder."""
 
     def __init__(

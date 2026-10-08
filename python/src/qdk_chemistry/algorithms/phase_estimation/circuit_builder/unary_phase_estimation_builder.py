@@ -7,7 +7,7 @@
 
 import numpy as np
 
-from qdk_chemistry.data import AlgorithmRef, Circuit, UnitaryBuilderInput
+from qdk_chemistry.data import AlgorithmRef, Circuit, HamiltonianDescription
 from qdk_chemistry.data.circuit import QsharpFactoryData
 from qdk_chemistry.data.unitary_representation.base import UnitaryRepresentation
 from qdk_chemistry.data.unitary_representation.containers.block_encoding import (
@@ -156,13 +156,13 @@ class QdkUnaryQpeCircuitBuilder(QpeCircuitBuilder):
     def _run_impl(
         self,
         state_preparation: Circuit,
-        qubit_hamiltonian: UnitaryBuilderInput,
+        qubit_hamiltonian: HamiltonianDescription,
     ) -> list[Circuit]:
         """Build the unary-iteration QPE circuit.
 
         Args:
             state_preparation: The circuit that prepares the initial state.
-            qubit_hamiltonian: The Hamiltonian or geometry the unitary builder takes.
+            qubit_hamiltonian: The Hamiltonian description the unitary builder takes.
 
         Returns:
             A single-element list containing the unary-iteration QPE circuit.

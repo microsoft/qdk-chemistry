@@ -16,10 +16,11 @@ from qdk_chemistry.algorithms.hamiltonian_unitary_builder.time_evolution.trotter
 from qdk_chemistry.data import (
     FlatPartition,
     Hamiltonian,
+    HamiltonianDescription,
     LatticeGeometry,
     LayeredPartition,
+    ModelHamiltonianDescription,
     QubitOperator,
-    UnitaryBuilderInput,
     UnitaryRepresentation,
 )
 from qdk_chemistry.data.unitary_representation.containers.pauli_product_formula import (
@@ -953,16 +954,18 @@ class TestTrotterAccuracyAware:
         )
 
 
-class TestUnitaryBuilderInput:
-    """Trotter evolves a QubitOperator and rejects any other UnitaryBuilderInput."""
+class TestHamiltonianDescription:
+    """Trotter evolves a QubitOperator and rejects any other HamiltonianDescription."""
 
-    def test_rejects_an_input_it_does_not_evolve(self):
-        """QubitOperator and LatticeGeometry are inputs and Hamiltonian is not; Trotter turns a geometry away."""
-        assert issubclass(QubitOperator, UnitaryBuilderInput)
-        assert issubclass(LatticeGeometry, UnitaryBuilderInput)
-        assert not issubclass(Hamiltonian, UnitaryBuilderInput)
-        with pytest.raises(TypeError, match="takes a QubitOperator, got LatticeGeometry"):
-            Trotter(time=0.1).run(LatticeGeometry.chain(2))
+    def test_rejects_a_description_it_does_not_evolve(self):
+        """QubitOperator and ModelHamiltonianDescription are descriptions; Trotter turns a model away."""
+        assert issubclass(QubitOperator, HamiltonianDescription)
+        assert issubclass(ModelHamiltonianDescription, HamiltonianDescription)
+        assert not issubclass(LatticeGeometry, HamiltonianDescription)
+        assert not issubclass(Hamiltonian, HamiltonianDescription)
+        model = ModelHamiltonianDescription(LatticeGeometry.chain(2), {"t": 1.0, "u": 4.0})
+        with pytest.raises(TypeError, match="takes a QubitOperator, got ModelHamiltonianDescription"):
+            Trotter(time=0.1).run(model)
 
 
 class TestNoPartitionFallback:

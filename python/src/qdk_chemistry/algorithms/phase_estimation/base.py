@@ -11,10 +11,10 @@ from qdk_chemistry.algorithms.base import Algorithm, AlgorithmFactory
 from qdk_chemistry.data import (
     AlgorithmRef,
     Circuit,
+    HamiltonianDescription,
     QpeResult,
     QuantumErrorProfile,
     Settings,
-    UnitaryBuilderInput,
 )
 
 __all__: list[str] = ["PhaseEstimation", "PhaseEstimationFactory", "PhaseEstimationSettings"]
@@ -59,7 +59,7 @@ class PhaseEstimation(Algorithm):
     def _run_impl(
         self,
         state_preparation: Circuit,
-        qubit_hamiltonian: UnitaryBuilderInput,
+        qubit_hamiltonian: HamiltonianDescription,
         *,
         noise: QuantumErrorProfile | None = None,
     ) -> QpeResult:
@@ -75,7 +75,7 @@ class PhaseEstimation(Algorithm):
 
         Args:
             state_preparation: The circuit that prepares the initial state.
-            qubit_hamiltonian: The :class:`~qdk_chemistry.data.UnitaryBuilderInput` whose eigenvalues to estimate.
+            qubit_hamiltonian: The :class:`~qdk_chemistry.data.HamiltonianDescription` whose eigenvalues to estimate.
             noise: The quantum error profile to simulate noise, defaults to None.
 
         Returns:

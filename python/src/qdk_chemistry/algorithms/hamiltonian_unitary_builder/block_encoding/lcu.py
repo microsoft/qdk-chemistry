@@ -14,9 +14,9 @@ References:
 
 import numpy as np
 
-from qdk_chemistry.algorithms.unitary_builder.base import (
-    UnitaryBuilder,
-    UnitaryBuilderSettings,
+from qdk_chemistry.algorithms.hamiltonian_unitary_builder.base import (
+    HamiltonianUnitaryBuilder,
+    HamiltonianUnitaryBuilderSettings,
 )
 from qdk_chemistry.data import (
     Configuration,
@@ -37,7 +37,7 @@ from qdk_chemistry.data.unitary_representation.containers.quantum_walk import LC
 __all__: list[str] = ["LCUBuilder", "LCUSettings"]
 
 
-class LCUSettings(UnitaryBuilderSettings):
+class LCUSettings(HamiltonianUnitaryBuilderSettings):
     """Settings for the LCU block encoding builder."""
 
     def __init__(self):
@@ -67,7 +67,7 @@ class LCUSettings(UnitaryBuilderSettings):
         )
 
 
-class LCUBuilder(UnitaryBuilder):
+class LCUBuilder(HamiltonianUnitaryBuilder):
     r"""LCU (Linear Combination of Unitaries) block encoding builder."""
 
     def __init__(

@@ -423,7 +423,7 @@ When enabled and the graph has a stored :ref:`edge coloring <lattice-edge-colori
 * each *layer* within a coupling group is a set of edges of the same color, which by construction have disjoint qubit supports and can be applied in parallel;
 * mixed-axis families (such as ``XY``) use a separate group for each disjoint layer, since different layers need not commute.
 
-Downstream consumers — most importantly the :doc:`Trotter time-evolution builder <algorithms/unitary_builder>` — read ``term_partition`` automatically and use it to schedule fewer sequential exponentials per Trotter step.
+Downstream consumers — most importantly the :doc:`Trotter time-evolution builder <algorithms/hamiltonian_unitary_builder>` — read ``term_partition`` automatically and use it to schedule fewer sequential exponentials per Trotter step.
 No manual geometry boilerplate is required at the call site.
 
 Pass ``include_term_groups=False`` to skip this step and obtain a Hamiltonian with ``term_partition is None`` (useful for benchmarking or when a different partition is desired).

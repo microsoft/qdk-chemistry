@@ -422,7 +422,7 @@ A geometry graph with no edges has an empty coloring, not ``None``.
 Nearest-neighbor convenience factories retain their existing topology colorings; raw-adjacency constructors do not assign one.
 
 :meth:`~qdk_chemistry.data.LatticeGraph.from_geometry` uses the native greedy search with its ``coloring_seed`` (default ``0``) and 32 trials, like the other factories that color greedily; it is deterministic for a given seed but is not guaranteed to be optimal.
-Edges sharing a color have disjoint vertices, enabling parallel Pauli exponentials in a :doc:`Trotter step <../algorithms/unitary_builder>`.
+Edges sharing a color have disjoint vertices, enabling parallel Pauli exponentials in a :doc:`Trotter step <../algorithms/hamiltonian_unitary_builder>`.
 :meth:`~qdk_chemistry.data.LatticeGraph.permute` relabels their endpoints without recoloring.
 Serialization retains the stored assignment.
 

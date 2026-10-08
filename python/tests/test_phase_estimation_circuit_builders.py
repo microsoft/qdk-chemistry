@@ -25,6 +25,7 @@ from qdk_chemistry.data import (
     AlgorithmRef,
     Circuit,
     LatticeGeometry,
+    ModelHamiltonianDescription,
     QubitOperator,
     UnitaryRepresentation,
 )
@@ -390,17 +391,17 @@ def _stub_nested(
 
 
 def test_controlled_circuit_takes_system_width_from_unitary(monkeypatch: pytest.MonkeyPatch) -> None:
-    """QPE sizes a geometry's system register from its unitary, so the unitary's ancillas are counted."""
+    """QPE sizes a model's system register from its unitary, so the unitary's ancillas are counted."""
     builder = QdkStandardQpeCircuitBuilder(num_bits=2)
     unitary_builder, circuit_mapper = _stub_nested(builder, monkeypatch, num_qubits=5, num_system_qubits=3)
-    geometry = LatticeGeometry.chain(3)
+    model = ModelHamiltonianDescription(LatticeGeometry.chain(3), {"t": 1.0, "u": 4.0})
 
-    circuit, num_ancilla_qubits = builder._create_controlled_circuit(geometry, power=1)
+    circuit, num_ancilla_qubits = builder._create_controlled_circuit(model, power=1)
 
-    unitary_builder.run.assert_called_once_with(geometry)
+    unitary_builder.run.assert_called_once_with(model)
     assert circuit is circuit_mapper.run.return_value
     assert num_ancilla_qubits == 2
-    assert builder._num_system_qubits(geometry, unitary_builder.run.return_value) == 3
+    assert builder._num_system_qubits(model, unitary_builder.run.return_value) == 3
 
 
 @pytest.mark.parametrize("builder_class", [QdkStandardQpeCircuitBuilder, QdkIterativeQpeCircuitBuilder])

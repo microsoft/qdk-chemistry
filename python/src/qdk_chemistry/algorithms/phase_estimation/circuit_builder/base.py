@@ -11,9 +11,9 @@ from qdk_chemistry.algorithms.base import Algorithm, AlgorithmFactory
 from qdk_chemistry.data import (
     AlgorithmRef,
     Circuit,
+    HamiltonianDescription,
     QubitOperator,
     Settings,
-    UnitaryBuilderInput,
     UnitaryRepresentation,
 )
 
@@ -83,13 +83,13 @@ class QpeCircuitBuilder(Algorithm):
     def _run_impl(
         self,
         state_preparation: Circuit,
-        qubit_hamiltonian: UnitaryBuilderInput,
+        qubit_hamiltonian: HamiltonianDescription,
     ) -> list[Circuit]:
         """Build phase estimation circuits.
 
         Args:
             state_preparation: The circuit that prepares the initial state.
-            qubit_hamiltonian: The Hamiltonian or geometry the unitary builder takes.
+            qubit_hamiltonian: The Hamiltonian description the unitary builder takes.
 
         Returns:
             A list of quantum circuits for phase estimation.
@@ -98,7 +98,7 @@ class QpeCircuitBuilder(Algorithm):
 
     def _create_controlled_circuit(
         self,
-        qubit_hamiltonian: UnitaryBuilderInput,
+        qubit_hamiltonian: HamiltonianDescription,
         power: int,
     ) -> tuple[Circuit, int]:
         r"""Create the controlled circuit for the given Hamiltonian and power.
@@ -107,7 +107,7 @@ class QpeCircuitBuilder(Algorithm):
         according to its ``power_strategy``, then maps the result to a controlled circuit.
 
         Args:
-            qubit_hamiltonian: The Hamiltonian or geometry the unitary builder takes.
+            qubit_hamiltonian: The Hamiltonian description the unitary builder takes.
             power: The power to which the unitary should be raised.
 
         Returns:
@@ -127,7 +127,7 @@ class QpeCircuitBuilder(Algorithm):
 
     def _num_system_qubits(
         self,
-        qubit_hamiltonian: UnitaryBuilderInput,
+        qubit_hamiltonian: HamiltonianDescription,
         unitary_rep: UnitaryRepresentation | None = None,
     ) -> int:
         """Return the width of the system register the unitary acts on.
@@ -136,7 +136,7 @@ class QpeCircuitBuilder(Algorithm):
         takes the width from its unitary, which is built here when not given.
 
         Args:
-            qubit_hamiltonian: The Hamiltonian or geometry the unitary builder takes.
+            qubit_hamiltonian: The Hamiltonian description the unitary builder takes.
             unitary_rep: The unitary already built from ``qubit_hamiltonian``, if any.
 
         Returns:

@@ -18,12 +18,12 @@ References:
 
 import numpy as np
 
-from qdk_chemistry.algorithms.unitary_builder.base import (
+from qdk_chemistry.algorithms.hamiltonian_unitary_builder.base import (
+    HamiltonianUnitaryBuilder,
     TimeEvolutionBuilder,
     TimeEvolutionSettings,
-    UnitaryBuilder,
 )
-from qdk_chemistry.algorithms.unitary_builder.time_evolution.qdrift_error import (
+from qdk_chemistry.algorithms.hamiltonian_unitary_builder.time_evolution.qdrift_error import (
     qdrift_samples_campbell,
 )
 from qdk_chemistry.data import QubitOperator, UnitaryRepresentation
@@ -360,7 +360,7 @@ class QDrift(TimeEvolutionBuilder):
         for idx in term_indices:
             label, coeff = terms[idx]
             sign = 1.0 if coeff >= 0 else -1.0
-            mapping = UnitaryBuilder._pauli_label_to_map(label)  # noqa: SLF001
+            mapping = HamiltonianUnitaryBuilder._pauli_label_to_map(label)  # noqa: SLF001
             result.append(ExponentiatedPauliTerm(pauli_term=mapping, angle=sign * angle_magnitude))
 
         return result

@@ -1,11 +1,10 @@
-"""QDK/Chemistry unitary builder abstractions."""
+"""QDK/Chemistry Hamiltonian unitary builder abstractions."""
 
 # --------------------------------------------------------------------------------------------
 # Copyright (c) Microsoft Corporation. All rights reserved.
 # Licensed under the MIT License. See LICENSE.txt in the project root for license information.
 # --------------------------------------------------------------------------------------------
 
-import warnings
 from abc import abstractmethod
 from typing import Any
 
@@ -14,11 +13,11 @@ import numpy as np
 from qdk_chemistry.algorithms.base import Algorithm, AlgorithmFactory
 from qdk_chemistry.data import (
     FlatPartition,
+    HamiltonianDescription,
     LayeredPartition,
     QubitOperator,
     Settings,
     TermPartition,
-    UnitaryBuilderInput,
     UnitaryRepresentation,
 )
 from qdk_chemistry.data.unitary_representation.containers.pauli_product_formula import ExponentiatedPauliTerm
@@ -26,22 +25,21 @@ from qdk_chemistry.utils import Logger
 
 __all__: list[str] = [
     "HamiltonianUnitaryBuilder",
+    "HamiltonianUnitaryBuilderFactory",
+    "HamiltonianUnitaryBuilderSettings",
     "TimeEvolutionBuilder",
     "TimeEvolutionSettings",
-    "UnitaryBuilder",
-    "UnitaryBuilderFactory",
-    "UnitaryBuilderSettings",
 ]
 
 
-class UnitaryBuilder(Algorithm):
-    """Base class for algorithms that build a unitary from a Hamiltonian description."""
+class HamiltonianUnitaryBuilder(Algorithm):
+    """Base class for Hamiltonian unitary builders in QDK/Chemistry algorithms."""
 
     def __init__(self):
-        """Initialize the UnitaryBuilder."""
+        """Initialize the HamiltonianUnitaryBuilder."""
         super().__init__()
 
-    def run(self, qubit_hamiltonian: UnitaryBuilderInput, *args: Any, **kwargs: Any) -> UnitaryRepresentation:
+    def run(self, qubit_hamiltonian: HamiltonianDescription, *args: Any, **kwargs: Any) -> UnitaryRepresentation:
         """Check the input is the type this builder evolves, then build its unitary.
 
         Args:
@@ -68,7 +66,7 @@ class UnitaryBuilder(Algorithm):
         return object
 
     @abstractmethod
-    def _run_impl(self, qubit_hamiltonian: UnitaryBuilderInput) -> UnitaryRepresentation:
+    def _run_impl(self, qubit_hamiltonian: HamiltonianDescription) -> UnitaryRepresentation:
         """Construct a UnitaryRepresentation for the given Hamiltonian.
 
         Args:
@@ -97,36 +95,11 @@ class UnitaryBuilder(Algorithm):
         return mapping
 
 
-class HamiltonianUnitaryBuilder(UnitaryBuilder):
-    """Deprecated former name of :class:`UnitaryBuilder`; subclass :class:`UnitaryBuilder` instead.
-
-    Every :class:`UnitaryBuilder` still counts as an instance of this class.
-    """
-
-    def __init_subclass__(cls, **kwargs: Any) -> None:
-        """Warn that subclasses should derive from :class:`UnitaryBuilder` instead."""
-        warnings.warn(
-            f"Subclassing 'HamiltonianUnitaryBuilder' (in {cls.__qualname__!r}) is deprecated and will be "
-            "removed in a future release; subclass 'UnitaryBuilder' instead.",
-            DeprecationWarning,
-            stacklevel=3,
-        )
-        super().__init_subclass__(**kwargs)
-
-    @classmethod
-    def __subclasshook__(cls, subclass: type) -> bool:
-        """Count every :class:`UnitaryBuilder` as a subclass of the deprecated base."""
-        # Check the MRO rather than call issubclass, which would recurse back here.
-        if cls is HamiltonianUnitaryBuilder and UnitaryBuilder in getattr(subclass, "__mro__", ()):
-            return True
-        return NotImplemented
-
-
-class UnitaryBuilderSettings(Settings):
-    """Base settings for unitary builders."""
+class HamiltonianUnitaryBuilderSettings(Settings):
+    """Base settings for Hamiltonian unitary builders."""
 
     def __init__(self):
-        """Initialize UnitaryBuilderSettings with default values.
+        """Initialize HamiltonianUnitaryBuilderSettings with default values.
 
         Attributes:
             power: The exponent to which the unitary is raised.
@@ -136,7 +109,7 @@ class UnitaryBuilderSettings(Settings):
         self._set_default("power", "int", 1, "The power to raise the unitary to.")
 
 
-class TimeEvolutionSettings(UnitaryBuilderSettings):
+class TimeEvolutionSettings(HamiltonianUnitaryBuilderSettings):
     """Base settings for time evolution builders."""
 
     def __init__(self):
@@ -162,7 +135,7 @@ class TimeEvolutionSettings(UnitaryBuilderSettings):
         )
 
 
-class TimeEvolutionBuilder(UnitaryBuilder):
+class TimeEvolutionBuilder(HamiltonianUnitaryBuilder):
     """Base class for time evolution Builders in QDK/Chemistry algorithms."""
 
     def __init__(self):
@@ -188,7 +161,7 @@ class TimeEvolutionBuilder(UnitaryBuilder):
         return time, power
 
     @abstractmethod
-    def _run_impl(self, qubit_hamiltonian: UnitaryBuilderInput) -> UnitaryRepresentation:
+    def _run_impl(self, qubit_hamiltonian: HamiltonianDescription) -> UnitaryRepresentation:
         """Construct a UnitaryRepresentation representing the time evolution unitary for the given Hamiltonian.
 
         Args:
@@ -296,8 +269,8 @@ class TimeEvolutionBuilder(UnitaryBuilder):
         return terms
 
 
-class UnitaryBuilderFactory(AlgorithmFactory):
-    """Factory class for creating UnitaryBuilder instances."""
+class HamiltonianUnitaryBuilderFactory(AlgorithmFactory):
+    """Factory class for creating HamiltonianUnitaryBuilder instances."""
 
     def algorithm_type_name(self) -> str:
         """Return hamiltonian_unitary_builder as the algorithm type name."""
@@ -306,29 +279,3 @@ class UnitaryBuilderFactory(AlgorithmFactory):
     def default_algorithm_name(self) -> str:
         """Return Trotter as the default algorithm name."""
         return "trotter"
-
-
-# Deprecated public names mapped to their replacements.
-_DEPRECATED_ALIASES = {
-    "HamiltonianUnitaryBuilderFactory": "UnitaryBuilderFactory",
-    "HamiltonianUnitaryBuilderSettings": "UnitaryBuilderSettings",
-}
-
-
-def __getattr__(name: str) -> Any:
-    """Resolve deprecated class names to their replacements."""
-    target = _DEPRECATED_ALIASES.get(name)
-    if target is None:
-        raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
-    warnings.warn(
-        f"'{__name__}.{name}' is deprecated and will be removed in a "
-        f"future release; use '{__name__}.{target}' instead.",
-        DeprecationWarning,
-        stacklevel=2,
-    )
-    return globals()[target]
-
-
-def __dir__() -> list[str]:
-    """Ensure dir() lists the deprecated aliases alongside the current names."""
-    return sorted(set(globals()) | set(_DEPRECATED_ALIASES))

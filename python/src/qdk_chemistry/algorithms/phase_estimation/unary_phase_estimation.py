@@ -10,9 +10,9 @@ from collections.abc import Callable
 from qdk_chemistry.data import (
     AlgorithmRef,
     Circuit,
+    HamiltonianDescription,
     QpeResult,
     QuantumErrorProfile,
-    UnitaryBuilderInput,
 )
 from qdk_chemistry.utils import Logger
 
@@ -135,7 +135,7 @@ class UnaryPhaseEstimation(PhaseEstimation):
     def _run_impl(
         self,
         state_preparation: Circuit,
-        qubit_hamiltonian: UnitaryBuilderInput,
+        qubit_hamiltonian: HamiltonianDescription,
         *,
         noise: QuantumErrorProfile | None = None,
     ) -> QpeResult:
@@ -143,7 +143,7 @@ class UnaryPhaseEstimation(PhaseEstimation):
 
         Args:
             state_preparation: The circuit that prepares the initial state.
-            qubit_hamiltonian: The Hamiltonian or geometry the unitary builder takes.
+            qubit_hamiltonian: The Hamiltonian description the unitary builder takes.
             noise: The quantum error profile to simulate noise, defaults to None.
 
         Returns:

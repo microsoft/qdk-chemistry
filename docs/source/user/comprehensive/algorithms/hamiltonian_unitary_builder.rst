@@ -1,24 +1,23 @@
-Unitary Builder
-===============
+Hamiltonian Unitary Builder
+===========================
 
-The :class:`~qdk_chemistry.algorithms.UnitaryBuilder` algorithm in QDK/Chemistry constructs a unitary based on the Hamiltonian, such as time simulation unitary :math:`U(t) = e^{-iHt}` or block-encoded unitary :math:`U = \frac{H}{\|H\|}`.
-Following QDK/Chemistry's :doc:`algorithm design principles <../design/index>`, it takes a :class:`~qdk_chemistry.data.UnitaryBuilderInput` (a :class:`~qdk_chemistry.data.QubitOperator` or :class:`~qdk_chemistry.data.LatticeGeometry`) and produces a :class:`~qdk_chemistry.data.UnitaryRepresentation` as output.
+The :class:`~qdk_chemistry.algorithms.HamiltonianUnitaryBuilder` algorithm in QDK/Chemistry constructs a unitary based on the Hamiltonian, such as time simulation unitary :math:`U(t) = e^{-iHt}` or block-encoded unitary :math:`U = \frac{H}{\|H\|}`.
+Following QDK/Chemistry's :doc:`algorithm design principles <../design/index>`, it takes a :class:`~qdk_chemistry.data.HamiltonianDescription` (a :class:`~qdk_chemistry.data.QubitOperator` or a :class:`~qdk_chemistry.data.ModelHamiltonianDescription`) and produces a :class:`~qdk_chemistry.data.UnitaryRepresentation` as output.
 
 Overview
 --------
 
 Building unitary from Hamiltonian — such as the Hamiltonian simulation unitary :math:`U(t) = e^{-iHt}` or block encoding unitary :math:`U = \frac{H}{\|H\|}` — is a central subroutine in many quantum algorithms.
-The :class:`~qdk_chemistry.algorithms.UnitaryBuilder` provides a unified interface for methods that construct this operator from a Hamiltonian description.
-:class:`~qdk_chemistry.data.QubitOperator` and :class:`~qdk_chemistry.data.LatticeGeometry` are :class:`~qdk_chemistry.data.UnitaryBuilderInput` types; a builder that names the one it evolves raises :class:`TypeError` for the other, and the built-in builders all evolve a :class:`~qdk_chemistry.data.QubitOperator`.
-``HamiltonianUnitaryBuilder`` remains available as a deprecated subclass of :class:`~qdk_chemistry.algorithms.UnitaryBuilder`, and the ``qdk_chemistry.algorithms.hamiltonian_unitary_builder`` package as a deprecated alias of ``qdk_chemistry.algorithms.unitary_builder``.
+The :class:`~qdk_chemistry.algorithms.HamiltonianUnitaryBuilder` provides a unified interface for methods that construct this operator from a :class:`~qdk_chemistry.data.QubitOperator`.
+:class:`~qdk_chemistry.data.QubitOperator` and :class:`~qdk_chemistry.data.ModelHamiltonianDescription` are both :class:`~qdk_chemistry.data.HamiltonianDescription` types; a builder that names the one it evolves raises :class:`TypeError` for the other, and the built-in builders all evolve a :class:`~qdk_chemistry.data.QubitOperator`.
 
 QDK/Chemistry currently provides two families of implementations for this task: Trotter-Suzuki product formulas and block encoding.
 
 The resulting :class:`~qdk_chemistry.data.UnitaryRepresentation` objects wrap either a ``PauliProductFormulaContainer`` (Trotter) or an ``LCUContainer`` (block encoding).
 
 
-Using the UnitaryBuilder
-------------------------
+Using the HamiltonianUnitaryBuilder
+------------------------------------
 
 .. note::
    This algorithm is currently available only in the Python API.
@@ -29,17 +28,17 @@ The ``run`` method returns a :class:`~qdk_chemistry.data.UnitaryRepresentation` 
 Input requirements
 ~~~~~~~~~~~~~~~~~~
 
-The :class:`~qdk_chemistry.algorithms.UnitaryBuilder` requires the following inputs:
+The :class:`~qdk_chemistry.algorithms.HamiltonianUnitaryBuilder` requires the following inputs:
 
-UnitaryBuilderInput
-   A :class:`~qdk_chemistry.data.QubitOperator` or :class:`~qdk_chemistry.data.LatticeGeometry`, whichever the configured unitary builder takes.
-   Most builders take a :class:`~qdk_chemistry.data.QubitOperator`, obtained from the :doc:`QubitMapper <qubit_mapper>` algorithm, a :doc:`model Hamiltonian <../model_hamiltonians>`, or built directly.
+HamiltonianDescription
+   A :class:`~qdk_chemistry.data.HamiltonianDescription`: either a :class:`~qdk_chemistry.data.QubitOperator` containing the Pauli-string representation of the Hamiltonian, or a :class:`~qdk_chemistry.data.ModelHamiltonianDescription` holding a lattice and its model parameters, whichever the builder evolves.
+   A :class:`~qdk_chemistry.data.QubitOperator` can be obtained from the :doc:`QubitMapper <qubit_mapper>` algorithm, constructed from a :doc:`model Hamiltonian <../model_hamiltonians>`, or built directly.
 
 .. rubric:: Creating a builder
 
 .. tab:: Python API
 
-   .. literalinclude:: ../../../_static/examples/python/unitary_builder.py
+   .. literalinclude:: ../../../_static/examples/python/hamiltonian_unitary_builder.py
       :language: python
       :start-after: # start-cell-create
       :end-before: # end-cell-create
@@ -51,7 +50,7 @@ See `Available implementations`_ below for implementation-specific options.
 
 .. tab:: Python API
 
-   .. literalinclude:: ../../../_static/examples/python/unitary_builder.py
+   .. literalinclude:: ../../../_static/examples/python/hamiltonian_unitary_builder.py
       :language: python
       :start-after: # start-cell-configure-trotter
       :end-before: # end-cell-configure-trotter
@@ -60,7 +59,7 @@ See `Available implementations`_ below for implementation-specific options.
 
 .. tab:: Python API
 
-   .. literalinclude:: ../../../_static/examples/python/unitary_builder.py
+   .. literalinclude:: ../../../_static/examples/python/hamiltonian_unitary_builder.py
       :language: python
       :start-after: # start-cell-run
       :end-before: # end-cell-run
@@ -68,12 +67,12 @@ See `Available implementations`_ below for implementation-specific options.
 Available implementations
 -------------------------
 
-QDK/Chemistry's :class:`~qdk_chemistry.algorithms.UnitaryBuilder` provides a unified interface for Hamiltonian simulation methods.
+QDK/Chemistry's :class:`~qdk_chemistry.algorithms.HamiltonianUnitaryBuilder` provides a unified interface for Hamiltonian simulation methods.
 You can discover available implementations programmatically:
 
 .. tab:: Python API
 
-   .. literalinclude:: ../../../_static/examples/python/unitary_builder.py
+   .. literalinclude:: ../../../_static/examples/python/hamiltonian_unitary_builder.py
       :language: python
       :start-after: # start-cell-list-implementations
       :end-before: # end-cell-list-implementations
@@ -411,7 +410,7 @@ The walk operator has eigenvalues :math:`e^{\pm i \arccos(E_k/\lambda)}` where :
 
 .. tab:: Python API
 
-   .. literalinclude:: ../../../_static/examples/python/unitary_builder.py
+   .. literalinclude:: ../../../_static/examples/python/hamiltonian_unitary_builder.py
       :language: python
       :start-after: # start-cell-run-lcu
       :end-before: # end-cell-run-lcu
@@ -422,7 +421,7 @@ To use alias sampling for the PREPARE oracle, pass an
 
 .. tab:: Python API -- alias sampling PREPARE
 
-   .. literalinclude:: ../../../_static/examples/python/unitary_builder.py
+   .. literalinclude:: ../../../_static/examples/python/hamiltonian_unitary_builder.py
       :language: python
       :start-after: # start-cell-lcu-prepare
       :end-before: # end-cell-lcu-prepare
@@ -440,7 +439,7 @@ Related classes
 Further reading
 ---------------
 
-- The above examples can be downloaded as a complete `Python <../../../_static/examples/python/unitary_builder.py>`_ script.
+- The above examples can be downloaded as a complete `Python <../../../_static/examples/python/hamiltonian_unitary_builder.py>`_ script.
 - :doc:`PhaseEstimation <phase_estimation>`: Quantum phase estimation algorithms
 - :doc:`QubitMapper <qubit_mapper>`: Map fermionic Hamiltonians to qubit operators
 - :doc:`Settings <settings>`: Configuration settings for algorithms

@@ -21,7 +21,7 @@ from qdk_chemistry.algorithms.phase_estimation.circuit_builder.base import (
 from qdk_chemistry.algorithms.phase_estimation.circuit_builder.iterative_builder import (
     _validate_iteration_inputs,
 )
-from qdk_chemistry.data import AlgorithmRef, Circuit, UnitaryBuilderInput
+from qdk_chemistry.data import AlgorithmRef, Circuit, HamiltonianDescription
 from qdk_chemistry.utils import Logger
 
 __all__: list[str] = ["QiskitIterativeQpeCircuitBuilder", "QiskitStandardQpeCircuitBuilder"]
@@ -74,13 +74,13 @@ class QiskitStandardQpeCircuitBuilder(StandardQpeCircuitBuilder):
     def _run_impl(
         self,
         state_preparation: Circuit,
-        qubit_hamiltonian: UnitaryBuilderInput,
+        qubit_hamiltonian: HamiltonianDescription,
     ) -> list[Circuit]:
         """Build the standard QPE circuit.
 
         Args:
             state_preparation: The circuit that prepares the initial state.
-            qubit_hamiltonian: The Hamiltonian or geometry the unitary builder takes.
+            qubit_hamiltonian: The Hamiltonian description the unitary builder takes.
 
         Returns:
             A list containing a single standard QPE circuit.
@@ -94,13 +94,13 @@ class QiskitStandardQpeCircuitBuilder(StandardQpeCircuitBuilder):
     def build_circuit(
         self,
         state_preparation: Circuit,
-        qubit_hamiltonian: UnitaryBuilderInput,
+        qubit_hamiltonian: HamiltonianDescription,
     ) -> Circuit:
         """Build the standard QPE circuit using Qiskit.
 
         Args:
             state_preparation: The circuit that prepares the initial state.
-            qubit_hamiltonian: The Hamiltonian or geometry the unitary builder takes.
+            qubit_hamiltonian: The Hamiltonian description the unitary builder takes.
 
         Returns:
             The constructed QPE quantum circuit.
@@ -166,7 +166,7 @@ class QiskitStandardQpeCircuitBuilder(StandardQpeCircuitBuilder):
     def _append_controlled_unitary(
         self,
         circuit: QuantumCircuit,
-        qubit_hamiltonian: UnitaryBuilderInput,
+        qubit_hamiltonian: HamiltonianDescription,
         control_qubit: int,
         target_qubits: list,
         *,
@@ -176,7 +176,7 @@ class QiskitStandardQpeCircuitBuilder(StandardQpeCircuitBuilder):
 
         Args:
             circuit: The quantum circuit to modify.
-            qubit_hamiltonian: The Hamiltonian or geometry the unitary builder takes.
+            qubit_hamiltonian: The Hamiltonian description the unitary builder takes.
             control_qubit: The control qubit.
             target_qubits: List of target qubits.
             power: The power to which the controlled unitary is raised.
@@ -244,7 +244,7 @@ class QiskitIterativeQpeCircuitBuilder(IterativeQpeCircuitBuilder):
     def _run_impl(
         self,
         state_preparation: Circuit,
-        qubit_hamiltonian: UnitaryBuilderInput,
+        qubit_hamiltonian: HamiltonianDescription,
     ) -> list[Circuit]:
         """Build IQPE iteration circuits using Qiskit.
 
@@ -255,7 +255,7 @@ class QiskitIterativeQpeCircuitBuilder(IterativeQpeCircuitBuilder):
 
         Args:
             state_preparation: The circuit that prepares the initial state.
-            qubit_hamiltonian: The Hamiltonian or geometry the unitary builder takes.
+            qubit_hamiltonian: The Hamiltonian description the unitary builder takes.
 
         Returns:
             A list of quantum circuits, one per phase bit iteration (or a single-element
@@ -293,7 +293,7 @@ class QiskitIterativeQpeCircuitBuilder(IterativeQpeCircuitBuilder):
     def _create_iteration_circuit(
         self,
         state_preparation: Circuit,
-        qubit_hamiltonian: UnitaryBuilderInput,
+        qubit_hamiltonian: HamiltonianDescription,
         *,
         iteration: int,
         total_iterations: int,
@@ -303,7 +303,7 @@ class QiskitIterativeQpeCircuitBuilder(IterativeQpeCircuitBuilder):
 
         Args:
             state_preparation: Trial-state preparation circuit that prepares the initial state on the system qubits.
-            qubit_hamiltonian: The Hamiltonian or geometry the unitary builder takes.
+            qubit_hamiltonian: The Hamiltonian description the unitary builder takes.
             iteration: Current iteration index (0-based); iteration 0 uses the largest power and
                 measures the least-significant bit.
             total_iterations: Total number of phase bits to measure across all iterations.

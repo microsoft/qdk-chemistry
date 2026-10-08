@@ -148,7 +148,7 @@ Further reading
 - The above examples can be downloaded as a complete `Python <../../../_static/examples/python/hamiltonian_simulation.py>`_ script.
 - :doc:`EvolutionCircuitBuilder <evolution_circuit_builder>`: Time-evolution circuit composition
 - :doc:`Propagator <propagator>`: Effective Hamiltonians for time-dependent evolution
-- :doc:`UnitaryBuilder <unitary_builder>`: Constructs the time-evolution unitary from the effective Hamiltonian
+- :doc:`HamiltonianUnitaryBuilder <hamiltonian_unitary_builder>`: Constructs the time-evolution unitary from the effective Hamiltonian
 - :doc:`ExpectationEstimator <expectation_estimator>`: Observable expectation value estimation
 - :doc:`CircuitExecutor <circuit_executor>`: Quantum circuit execution backends
 - :doc:`Settings <settings>`: Configuration settings for algorithms
