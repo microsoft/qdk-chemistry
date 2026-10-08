@@ -6,6 +6,10 @@
 # --------------------------------------------------------------------------------------------
 
 from .base import ControlledCircuitMapperFactory, ControlledCircuitMapperSettings
+from .controlled_hubbard_plaquette_mapper import (
+    ControlledHubbardPlaquetteMapper,
+    ControlledHubbardPlaquetteMapperSettings,
+)
 from .controlled_pauli_sequence_mapper import ControlledPauliSequenceMapper
 from .controlled_psp_mapper import ControlledPSPMapper, ControlledPSPMapperSettings
 from .controlled_swap_pauli_sequence_mapper import (
@@ -16,6 +20,8 @@ from .controlled_swap_pauli_sequence_mapper import (
 __all__ = [
     "ControlledCircuitMapperFactory",
     "ControlledCircuitMapperSettings",
+    "ControlledHubbardPlaquetteMapper",
+    "ControlledHubbardPlaquetteMapperSettings",
     "ControlledPSPMapper",
     "ControlledPSPMapperSettings",
     "ControlledPauliSequenceMapper",

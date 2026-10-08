@@ -115,3 +115,24 @@ def test_qpe_stretched_n2():
             },
         },
     )
+
+
+@_requires_notebook_deps
+@pytest.mark.slow
+@pytest.mark.skipif(
+    not _HAS_JUPYTER_KERNEL,
+    reason="Jupyter kernel 'python3' not available. Install ipykernel and register the kernel.",
+)
+@pytest.mark.skipif(
+    not _HAS_QRE,
+    reason="qdk.qre not available",
+)
+def test_estimation_hubbard_2d():
+    """Test the 2D Fermi-Hubbard resource-estimation notebook executes without errors.
+
+    The logical counts this notebook reports are pinned unconditionally by
+    ``test_hubbard_plaquette_trotter.py``; this test only covers the notebook itself.
+    """
+    notebook_path = EXAMPLES_DIR / "benchmark" / "estimation_hubbard_2d.ipynb"
+    assert notebook_path.exists(), f"Notebook not found: {notebook_path}"
+    _execute_notebook_skip_visualizations(notebook_path)
