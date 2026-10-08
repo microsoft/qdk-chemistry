@@ -52,8 +52,6 @@ jobs:
       with:
         python-version: '3.12'
         architecture: ${{ matrix.architecture }}
-        cache: pip
-        cache-dependency-path: python/pyproject.toml
 
     - name: Read tutorial package version
       id: tutorial-version
