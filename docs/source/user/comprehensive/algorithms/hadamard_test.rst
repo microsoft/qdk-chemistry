@@ -2,7 +2,7 @@ Hadamard test
 =============
 
 The :class:`~qdk_chemistry.algorithms.HadamardTest` algorithm in QDK/Chemistry estimates expectation values associated with a target unitary by measuring a single control qubit after a controlled evolution.
-Following QDK/Chemistry's :doc:`algorithm design principles <../design/index>`, it takes a state-preparation :class:`~qdk_chemistry.data.Circuit` (typically from :doc:`StatePreparation <state_preparation>`), a :class:`~qdk_chemistry.data.UnitaryRepresentation` (for example from :doc:`HamiltonianUnitaryBuilder <hamiltonian_unitary_builder>`), and shot count as input, and returns :class:`~qdk_chemistry.data.CircuitExecutorData` containing measurement bitstring counts.
+Following QDK/Chemistry's :doc:`algorithm design principles <../design/index>`, it takes a state-preparation :class:`~qdk_chemistry.data.Circuit` (typically from :doc:`StatePreparation <state_preparation>`), a :class:`~qdk_chemistry.data.UnitaryRepresentation` (for example from :doc:`UnitaryBuilder <unitary_builder>`), and shot count as input, and returns :class:`~qdk_chemistry.data.CircuitExecutorData` containing measurement bitstring counts.
 
 Overview
 --------
@@ -31,7 +31,7 @@ Typical workflow
 A Hadamard-test workflow usually needs two prepared inputs:
 
 1. A state-preparation :class:`~qdk_chemistry.data.Circuit` (often produced by :doc:`StatePreparation <state_preparation>` from a reference wavefunction)
-2. A target :class:`~qdk_chemistry.data.UnitaryRepresentation` (commonly a Hamiltonian time-evolution operator from :doc:`HamiltonianUnitaryBuilder <hamiltonian_unitary_builder>`)
+2. A target :class:`~qdk_chemistry.data.UnitaryRepresentation` (commonly a Hamiltonian time-evolution operator from :doc:`UnitaryBuilder <unitary_builder>`)
 3. A configured :class:`~qdk_chemistry.algorithms.HadamardTest` instance to execute the circuit and collect counts
 
 In molecular pipelines, structure setup, :term:`SCF`, and multi-configuration steps are typically used only to provide the wavefunction and Hamiltonian needed to build those two inputs.
@@ -55,7 +55,7 @@ State preparation circuit
 
 UnitaryRepresentation
    A :class:`~qdk_chemistry.data.UnitaryRepresentation` describing the unitary to apply under control.
-   This is often generated from a qubit Hamiltonian via :doc:`HamiltonianUnitaryBuilder <hamiltonian_unitary_builder>`.
+   This is often generated from a qubit Hamiltonian via :doc:`UnitaryBuilder <unitary_builder>`.
 
 Shots
    A positive integer number of circuit executions used to estimate expectation values from counts.
@@ -164,7 +164,7 @@ Further reading
 ---------------
 
 - The above examples can be downloaded as a complete `Python <../../../_static/examples/python/hadamard_test.py>`_ script.
-- :doc:`HamiltonianUnitaryBuilder <hamiltonian_unitary_builder>`: Build target unitaries such as time evolution
+- :doc:`UnitaryBuilder <unitary_builder>`: Build target unitaries such as time evolution
 - :doc:`StatePreparation <state_preparation>`: Build state-preparation circuits from wavefunctions
 - :doc:`ControlledCircuitMapper <circuit_mapper>`: Synthesize controlled-unitary circuits
 - :doc:`CircuitExecutor <circuit_executor>`: Execute circuits and collect bitstring counts

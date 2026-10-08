@@ -13,21 +13,21 @@ import numpy as np
 import pytest
 
 from qdk_chemistry.algorithms import create
-from qdk_chemistry.algorithms.hamiltonian_unitary_builder.block_encoding.lcu import LCUBuilder
-from qdk_chemistry.algorithms.hamiltonian_unitary_builder.block_encoding.sossa import SOSSABuilder
-from qdk_chemistry.algorithms.hamiltonian_unitary_builder.time_evolution.partially_randomized import (
+from qdk_chemistry.algorithms.qubit_mapper.sum_of_squares import SumOfSquaresQubitMapper
+from qdk_chemistry.algorithms.unitary_builder.block_encoding.lcu import LCUBuilder
+from qdk_chemistry.algorithms.unitary_builder.block_encoding.sossa import SOSSABuilder
+from qdk_chemistry.algorithms.unitary_builder.time_evolution.partially_randomized import (
     PartiallyRandomized,
 )
-from qdk_chemistry.algorithms.hamiltonian_unitary_builder.time_evolution.qdrift import QDrift
-from qdk_chemistry.algorithms.hamiltonian_unitary_builder.time_evolution.qdrift_error import qdrift_samples_campbell
-from qdk_chemistry.algorithms.hamiltonian_unitary_builder.time_evolution.trotter import Trotter
-from qdk_chemistry.algorithms.hamiltonian_unitary_builder.time_evolution.trotter_error import trotter_steps_naive
-from qdk_chemistry.algorithms.hamiltonian_unitary_builder.time_evolution.zassenhaus import Zassenhaus
-from qdk_chemistry.algorithms.hamiltonian_unitary_builder.time_evolution.zassenhaus_error import (
+from qdk_chemistry.algorithms.unitary_builder.time_evolution.qdrift import QDrift
+from qdk_chemistry.algorithms.unitary_builder.time_evolution.qdrift_error import qdrift_samples_campbell
+from qdk_chemistry.algorithms.unitary_builder.time_evolution.trotter import Trotter
+from qdk_chemistry.algorithms.unitary_builder.time_evolution.trotter_error import trotter_steps_naive
+from qdk_chemistry.algorithms.unitary_builder.time_evolution.zassenhaus import Zassenhaus
+from qdk_chemistry.algorithms.unitary_builder.time_evolution.zassenhaus_error import (
     zassenhaus_omitted_commutator_norm,
     zassenhaus_steps_naive,
 )
-from qdk_chemistry.algorithms.qubit_mapper.sum_of_squares import SumOfSquaresQubitMapper
 from qdk_chemistry.data import (
     FactorizedHamiltonianContainer,
     Hamiltonian,

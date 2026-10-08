@@ -2,7 +2,7 @@ Evolution circuit builder
 =========================
 
 The :class:`~qdk_chemistry.algorithms.time_evolution.evolution_circuit_builder.base.EvolutionCircuitBuilder` is an abstract base class that defines the interface for constructing time-evolution circuits.
-It serves as the central component that orchestrates circuit synthesis by composing a :doc:`HamiltonianUnitaryBuilder <hamiltonian_unitary_builder>` (to construct the time-evolution unitary) with a :doc:`CircuitMapper <circuit_mapper>` (to compile the unitary into a quantum circuit).
+It serves as the central component that orchestrates circuit synthesis by composing a :doc:`UnitaryBuilder <unitary_builder>` (to construct the time-evolution unitary) with a :doc:`CircuitMapper <circuit_mapper>` (to compile the unitary into a quantum circuit).
 
 The ``EvolutionCircuitBuilder`` mirrors the role of :doc:`QpeCircuitBuilder <qpe_circuit_builder>` for phase estimation: it produces a :class:`~qdk_chemistry.data.circuit.Circuit` suitable for resource estimation or further analysis without requiring a simulator backend.
 
@@ -118,7 +118,7 @@ To accomplish this, the :class:`~qdk_chemistry.algorithms.time_evolution.evoluti
 
    Default: :class:`~qdk_chemistry.data.AlgorithmRef` to ``"hamiltonian_unitary_builder"`` with method ``"trotter"``
 
-   The evolution builder (typically :doc:`HamiltonianUnitaryBuilder <hamiltonian_unitary_builder>`) produces a :class:`~qdk_chemistry.data.UnitaryRepresentation` of the time-evolution operator from a :class:`~qdk_chemistry.data.QubitOperator`.
+   The evolution builder (typically :doc:`UnitaryBuilder <unitary_builder>`) produces a :class:`~qdk_chemistry.data.UnitaryRepresentation` of the time-evolution operator from a :class:`~qdk_chemistry.data.QubitOperator`.
 
 **Nested Algorithm 3: Circuit Mapper**
    Reference setting: ``"circuit_mapper"``

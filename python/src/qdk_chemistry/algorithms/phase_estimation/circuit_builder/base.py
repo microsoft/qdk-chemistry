@@ -11,8 +11,8 @@ from qdk_chemistry.algorithms.base import Algorithm, AlgorithmFactory
 from qdk_chemistry.data import (
     AlgorithmRef,
     Circuit,
-    QubitOperator,
     Settings,
+    UnitaryBuilderInput,
 )
 
 __all__: list[str] = [
@@ -81,13 +81,13 @@ class QpeCircuitBuilder(Algorithm):
     def _run_impl(
         self,
         state_preparation: Circuit,
-        qubit_hamiltonian: QubitOperator,
+        qubit_hamiltonian: UnitaryBuilderInput,
     ) -> list[Circuit]:
         """Build phase estimation circuits.
 
         Args:
             state_preparation: The circuit that prepares the initial state.
-            qubit_hamiltonian: The qubit Hamiltonian for which to build circuits.
+            qubit_hamiltonian: The Hamiltonian or geometry the unitary builder takes.
 
         Returns:
             A list of quantum circuits for phase estimation.
@@ -96,32 +96,34 @@ class QpeCircuitBuilder(Algorithm):
 
     def _create_controlled_circuit(
         self,
-        qubit_hamiltonian: QubitOperator,
+        qubit_hamiltonian: UnitaryBuilderInput,
         power: int,
-    ) -> tuple[Circuit, int]:
+    ) -> tuple[Circuit, int, int]:
         r"""Create the controlled circuit for the given Hamiltonian and power.
 
         Sets the ``power`` on the unitary builder so it produces :math:`U^{\\text{power}}`
         according to its ``power_strategy``, then maps the result to a controlled circuit.
 
         Args:
-            qubit_hamiltonian: The qubit Hamiltonian to evolve under.
+            qubit_hamiltonian: The Hamiltonian or geometry the unitary builder takes.
             power: The power to which the unitary should be raised.
 
         Returns:
-            A tuple of (circuit, num_ancilla_qubits) where circuit implements
-            controlled-:math:`U^{\\text{power}}` and num_ancilla_qubits is the number
-            of ancilla qubits used by the unitary beyond the system qubits.
+            A tuple of (circuit, num_system_qubits, num_ancilla_qubits) where circuit implements
+            controlled-:math:`U^{\\text{power}}`, num_system_qubits is the width of the register
+            the unitary acts on, and num_ancilla_qubits is the number of ancilla qubits used by
+            the unitary beyond the system qubits.
 
         """
         unitary_builder = self._create_nested("unitary_builder")
         unitary_builder.settings().update("power", power)
         unitary_rep = unitary_builder.run(qubit_hamiltonian)
-        num_ancilla_qubits = unitary_rep.get_num_qubits() - qubit_hamiltonian.num_qubits
+        num_system_qubits = unitary_rep.get_num_system_qubits()
+        num_ancilla_qubits = unitary_rep.get_num_qubits() - num_system_qubits
         circuit_mapper = self._create_nested("controlled_circuit_mapper")
         circuit_mapper.settings().update("control_indices", [0])
         circuit = circuit_mapper.run(unitary_rep)
-        return circuit, num_ancilla_qubits
+        return circuit, num_system_qubits, num_ancilla_qubits
 
     @staticmethod
     def _validate_state_prep_width(state_preparation: Circuit, num_qubits_passed: int) -> None:

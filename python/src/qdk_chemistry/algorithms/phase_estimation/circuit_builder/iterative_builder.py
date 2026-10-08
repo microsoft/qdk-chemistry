@@ -11,7 +11,7 @@ without executing them, enabling standalone resource estimation and circuit prev
 # Licensed under the MIT License. See LICENSE.txt in the project root for license information.
 # --------------------------------------------------------------------------------------------
 
-from qdk_chemistry.data import AlgorithmRef, Circuit, QubitOperator
+from qdk_chemistry.data import AlgorithmRef, Circuit, UnitaryBuilderInput
 from qdk_chemistry.data.circuit import QsharpFactoryData
 from qdk_chemistry.utils import Logger
 from qdk_chemistry.utils.qsharp import QSHARP_UTILS
@@ -77,7 +77,7 @@ class QdkIterativeQpeCircuitBuilder(IterativeQpeCircuitBuilder):
     def _run_impl(
         self,
         state_preparation: Circuit,
-        qubit_hamiltonian: QubitOperator,
+        qubit_hamiltonian: UnitaryBuilderInput,
     ) -> list[Circuit]:
         """Build IQPE iteration circuits.
 
@@ -88,7 +88,7 @@ class QdkIterativeQpeCircuitBuilder(IterativeQpeCircuitBuilder):
 
         Args:
             state_preparation: The circuit that prepares the initial state.
-            qubit_hamiltonian: The qubit Hamiltonian for which to build circuits.
+            qubit_hamiltonian: The Hamiltonian or geometry the unitary builder takes.
 
         Returns:
             A list of quantum circuits, one per phase bit iteration (or a single-element
@@ -125,7 +125,7 @@ class QdkIterativeQpeCircuitBuilder(IterativeQpeCircuitBuilder):
     def _create_iteration_circuit(
         self,
         state_preparation: Circuit,
-        qubit_hamiltonian: QubitOperator,
+        qubit_hamiltonian: UnitaryBuilderInput,
         *,
         iteration: int,
         total_iterations: int,
@@ -135,7 +135,7 @@ class QdkIterativeQpeCircuitBuilder(IterativeQpeCircuitBuilder):
 
         Args:
             state_preparation: Trial-state preparation circuit that prepares the initial state on the system qubits.
-            qubit_hamiltonian: The qubit Hamiltonian for which to estimate the phase.
+            qubit_hamiltonian: The Hamiltonian or geometry the unitary builder takes.
             iteration: Current iteration index (0-based); iteration 0 uses the largest power and
                 measures the least-significant bit.
             total_iterations: Total number of phase bits to measure across all iterations.
@@ -146,10 +146,11 @@ class QdkIterativeQpeCircuitBuilder(IterativeQpeCircuitBuilder):
 
         """
         _validate_iteration_inputs(iteration, total_iterations)
-        num_system_qubits = qubit_hamiltonian.num_qubits
         power = 2 ** (total_iterations - iteration - 1)
 
-        ctrl_unitary_circuit, num_ancilla_qubits = self._create_controlled_circuit(qubit_hamiltonian, power)
+        ctrl_unitary_circuit, num_system_qubits, num_ancilla_qubits = self._create_controlled_circuit(
+            qubit_hamiltonian, power
+        )
 
         if state_preparation._qsharp_op and ctrl_unitary_circuit._qsharp_op:  # noqa: SLF001
             return self._create_circuit_from_qsharp_op(

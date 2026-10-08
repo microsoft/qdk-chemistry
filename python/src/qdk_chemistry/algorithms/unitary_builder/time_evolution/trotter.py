@@ -22,8 +22,8 @@ from __future__ import annotations
 
 import numpy as np
 
-from qdk_chemistry.algorithms.hamiltonian_unitary_builder.base import TimeEvolutionBuilder, TimeEvolutionSettings
-from qdk_chemistry.algorithms.hamiltonian_unitary_builder.time_evolution.trotter_error import (
+from qdk_chemistry.algorithms.unitary_builder.base import TimeEvolutionBuilder, TimeEvolutionSettings
+from qdk_chemistry.algorithms.unitary_builder.time_evolution.trotter_error import (
     trotter_steps_commutator,
     trotter_steps_naive,
 )

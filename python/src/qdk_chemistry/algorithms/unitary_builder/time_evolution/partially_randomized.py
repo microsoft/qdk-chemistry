@@ -25,8 +25,8 @@ from __future__ import annotations
 
 import numpy as np
 
-from qdk_chemistry.algorithms.hamiltonian_unitary_builder.base import TimeEvolutionSettings
-from qdk_chemistry.algorithms.hamiltonian_unitary_builder.time_evolution.qdrift import QDrift
+from qdk_chemistry.algorithms.unitary_builder.base import TimeEvolutionSettings
+from qdk_chemistry.algorithms.unitary_builder.time_evolution.qdrift import QDrift
 from qdk_chemistry.data import QubitOperator, UnitaryRepresentation
 from qdk_chemistry.data.qubit_operator.containers.pauli_decomposition import PauliDecompositionContainer
 from qdk_chemistry.data.unitary_representation.containers.pauli_product_formula import (

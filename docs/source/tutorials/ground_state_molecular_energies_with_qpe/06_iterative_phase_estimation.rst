@@ -284,7 +284,7 @@ Five controls determine the approximation and sampling behavior of this workflow
 :ref:`Evolution time <tutorial-energy-to-phase-encoding>`
    The value :math:`t` sets the signed energy interval and spacing of the phase grid, as described above.
    Here it is tuned with the known classical reference to produce a :math:`1\ \mathrm{m}E_{\mathrm{h}}` grid error.
-:doc:`Hamiltonian simulation <../../user/comprehensive/algorithms/hamiltonian_unitary_builder>`
+:doc:`Hamiltonian simulation <../../user/comprehensive/algorithms/unitary_builder>`
    The qubit Hamiltonian is a sum of Pauli terms that generally do not commute.
    A first-order `Trotter product formula <https://en.wikipedia.org/wiki/Lie_product_formula>`_ approximates evolution under that sum by applying the exponential of each Pauli term in sequence.
    For :math:`\hat H=\sum_\ell h_\ell P_\ell`, using :math:`r` Trotter divisions gives
@@ -516,6 +516,6 @@ Further reading
 
 - :doc:`Phase estimation <../../user/comprehensive/algorithms/phase_estimation>`
 - :doc:`Phase-estimation circuit builders <../../user/comprehensive/algorithms/qpe_circuit_builder>`
-- :doc:`Hamiltonian unitary builders <../../user/comprehensive/algorithms/hamiltonian_unitary_builder>`
+- :doc:`Hamiltonian unitary builders <../../user/comprehensive/algorithms/unitary_builder>`
 - :doc:`Circuit execution <../../user/comprehensive/algorithms/circuit_executor>`
 - :doc:`Phase-estimation results <../../user/comprehensive/data/qpe_result>`

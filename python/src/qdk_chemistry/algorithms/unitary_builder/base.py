@@ -1,11 +1,13 @@
-"""QDK/Chemistry Hamiltonian unitary builder abstractions."""
+"""QDK/Chemistry unitary builder abstractions."""
 
 # --------------------------------------------------------------------------------------------
 # Copyright (c) Microsoft Corporation. All rights reserved.
 # Licensed under the MIT License. See LICENSE.txt in the project root for license information.
 # --------------------------------------------------------------------------------------------
 
+import warnings
 from abc import abstractmethod
+from typing import Any
 
 import numpy as np
 
@@ -16,33 +18,63 @@ from qdk_chemistry.data import (
     QubitOperator,
     Settings,
     TermPartition,
+    UnitaryBuilderInput,
     UnitaryRepresentation,
 )
 from qdk_chemistry.data.unitary_representation.containers.pauli_product_formula import ExponentiatedPauliTerm
 from qdk_chemistry.utils import Logger
 
 __all__: list[str] = [
-    "HamiltonianUnitaryBuilder",
-    "HamiltonianUnitaryBuilderFactory",
-    "HamiltonianUnitaryBuilderSettings",
     "TimeEvolutionBuilder",
     "TimeEvolutionSettings",
+    "UnitaryBuilder",
+    "UnitaryBuilderFactory",
+    "UnitaryBuilderSettings",
 ]
 
 
-class HamiltonianUnitaryBuilder(Algorithm):
-    """Base class for Hamiltonian unitary builders in QDK/Chemistry algorithms."""
+class UnitaryBuilder(Algorithm):
+    """Base class for algorithms that build a unitary from a Hamiltonian description.
+
+    :meth:`run` accepts any :class:`~qdk_chemistry.data.UnitaryBuilderInput`, so phase estimation
+    can hand a builder whatever it was given. Each builder evolves the one type
+    :meth:`_input_type` names and :meth:`run` raises :class:`TypeError` for any other.
+    """
 
     def __init__(self):
-        """Initialize the HamiltonianUnitaryBuilder."""
+        """Initialize the UnitaryBuilder."""
         super().__init__()
 
+    def run(self, qubit_hamiltonian: UnitaryBuilderInput) -> UnitaryRepresentation:
+        """Check the input is the type this builder evolves, then build its unitary.
+
+        Args:
+            qubit_hamiltonian: The Hamiltonian description to build the unitary from.
+
+        Returns:
+            UnitaryRepresentation: The unitary for the given Hamiltonian.
+
+        Raises:
+            TypeError: If the input is not an instance of :meth:`_input_type`.
+
+        """
+        expected = self._input_type()
+        if not isinstance(qubit_hamiltonian, expected):
+            raise TypeError(
+                f"The {self.name()!r} builder takes a {expected.__name__}, got {type(qubit_hamiltonian).__name__}."
+            )
+        return super().run(qubit_hamiltonian)
+
+    def _input_type(self) -> type:
+        """Return the input type this builder evolves; :class:`~qdk_chemistry.data.QubitOperator` by default."""
+        return QubitOperator
+
     @abstractmethod
-    def _run_impl(self, qubit_hamiltonian: QubitOperator) -> UnitaryRepresentation:
+    def _run_impl(self, qubit_hamiltonian: UnitaryBuilderInput) -> UnitaryRepresentation:
         """Construct a UnitaryRepresentation for the given Hamiltonian.
 
         Args:
-            qubit_hamiltonian: The qubit Hamiltonian.
+            qubit_hamiltonian: The Hamiltonian description, an instance of :meth:`_input_type`.
 
         Returns:
             UnitaryRepresentation: A UnitaryRepresentation for the given Hamiltonian.
@@ -67,11 +99,11 @@ class HamiltonianUnitaryBuilder(Algorithm):
         return mapping
 
 
-class HamiltonianUnitaryBuilderSettings(Settings):
-    """Base settings for Hamiltonian unitary builders."""
+class UnitaryBuilderSettings(Settings):
+    """Base settings for unitary builders."""
 
     def __init__(self):
-        """Initialize HamiltonianUnitaryBuilderSettings with default values.
+        """Initialize UnitaryBuilderSettings with default values.
 
         Attributes:
             power: The exponent to which the unitary is raised.
@@ -81,7 +113,7 @@ class HamiltonianUnitaryBuilderSettings(Settings):
         self._set_default("power", "int", 1, "The power to raise the unitary to.")
 
 
-class TimeEvolutionSettings(HamiltonianUnitaryBuilderSettings):
+class TimeEvolutionSettings(UnitaryBuilderSettings):
     """Base settings for time evolution builders."""
 
     def __init__(self):
@@ -107,7 +139,7 @@ class TimeEvolutionSettings(HamiltonianUnitaryBuilderSettings):
         )
 
 
-class TimeEvolutionBuilder(HamiltonianUnitaryBuilder):
+class TimeEvolutionBuilder(UnitaryBuilder):
     """Base class for time evolution Builders in QDK/Chemistry algorithms."""
 
     def __init__(self):
@@ -133,14 +165,14 @@ class TimeEvolutionBuilder(HamiltonianUnitaryBuilder):
         return time, power
 
     @abstractmethod
-    def _run_impl(self, qubit_hamiltonian: QubitOperator) -> UnitaryRepresentation:
-        """Construct a UnitaryRepresentation representing the time evolution unitary for the given QubitOperator.
+    def _run_impl(self, qubit_hamiltonian: UnitaryBuilderInput) -> UnitaryRepresentation:
+        """Construct a UnitaryRepresentation representing the time evolution unitary for the given Hamiltonian.
 
         Args:
-            qubit_hamiltonian: The qubit Hamiltonian.
+            qubit_hamiltonian: The Hamiltonian description, an instance of :meth:`_input_type`.
 
         Returns:
-            UnitaryRepresentation: A UnitaryRepresentation representing the evolution of the given QubitOperator.
+            UnitaryRepresentation: A UnitaryRepresentation representing the evolution of the given Hamiltonian.
 
         """
 
@@ -241,8 +273,8 @@ class TimeEvolutionBuilder(HamiltonianUnitaryBuilder):
         return terms
 
 
-class HamiltonianUnitaryBuilderFactory(AlgorithmFactory):
-    """Factory class for creating HamiltonianUnitaryBuilder instances."""
+class UnitaryBuilderFactory(AlgorithmFactory):
+    """Factory class for creating UnitaryBuilder instances."""
 
     def algorithm_type_name(self) -> str:
         """Return hamiltonian_unitary_builder as the algorithm type name."""
@@ -251,3 +283,31 @@ class HamiltonianUnitaryBuilderFactory(AlgorithmFactory):
     def default_algorithm_name(self) -> str:
         """Return Trotter as the default algorithm name."""
         return "trotter"
+
+
+# Deprecated public names mapped to their replacements. Accessing an alias emits a
+# DeprecationWarning but returns the new class object, so existing code keeps working.
+_DEPRECATED_ALIASES = {
+    "HamiltonianUnitaryBuilder": "UnitaryBuilder",
+    "HamiltonianUnitaryBuilderFactory": "UnitaryBuilderFactory",
+    "HamiltonianUnitaryBuilderSettings": "UnitaryBuilderSettings",
+}
+
+
+def __getattr__(name: str) -> Any:
+    """Resolve deprecated class names to their replacements."""
+    target = _DEPRECATED_ALIASES.get(name)
+    if target is None:
+        raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
+    warnings.warn(
+        f"'{__name__}.{name}' is deprecated and will be removed in a "
+        f"future release; use '{__name__}.{target}' instead.",
+        DeprecationWarning,
+        stacklevel=2,
+    )
+    return globals()[target]
+
+
+def __dir__() -> list[str]:
+    """Ensure dir() lists the deprecated aliases alongside the current names."""
+    return sorted(set(globals()) | set(_DEPRECATED_ALIASES))

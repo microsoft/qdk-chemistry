@@ -90,7 +90,7 @@ The partition is index-based — it stores indices into :attr:`~qdk_chemistry.da
 The partition is *optional* metadata — ``term_partition is None`` means the partition has not been computed for this operator.
 Transformations that change term ordering or qubit support (for example :meth:`~qdk_chemistry.data.QubitOperator.to_interleaved`) reset the partition to ``None`` on the new instance.
 
-Algorithms that consume a partition treat its presence as an explicit signal to exploit it — for example, the :doc:`Trotter time-evolution builder <../algorithms/hamiltonian_unitary_builder>` reads ``term_partition`` and uses it for schedule-level Suzuki recursion and reduction.
+Algorithms that consume a partition treat its presence as an explicit signal to exploit it — for example, the :doc:`Trotter time-evolution builder <../algorithms/unitary_builder>` reads ``term_partition`` and uses it for schedule-level Suzuki recursion and reduction.
 
 FlatPartition
 ~~~~~~~~~~~~~

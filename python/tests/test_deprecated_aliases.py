@@ -6,7 +6,9 @@ These tests guard the backward-compatibility shims added when
 :class:`~qdk_chemistry.algorithms.ExpectationEstimator`, and the
 ``"energy_estimator"`` algorithm-type key was renamed to
 ``"expectation_estimator"``, the v1 time-evolution type keys were renamed, and
-``SparseIsometryGF2X`` state preparation was renamed to ``SparseIsometry``.
+``SparseIsometryGF2X`` state preparation was renamed to ``SparseIsometry``, and
+``HamiltonianUnitaryBuilder`` and its ``hamiltonian_unitary_builder`` package were
+renamed to ``UnitaryBuilder`` and ``unitary_builder``.
 The old names must keep working while emitting a ``DeprecationWarning`` so
 downstream users are not broken immediately.
 """
@@ -16,14 +18,23 @@ downstream users are not broken immediately.
 # Licensed under the MIT License. See LICENSE.txt in the project root for license information.
 # --------------------------------------------------------------------------------------------
 
+import importlib
+import sys
 import warnings
 
 import numpy as np
 import pytest
 
 from qdk_chemistry import algorithms
-from qdk_chemistry.algorithms import ExpectationEstimator, QdkExpectationEstimator, state_preparation
+from qdk_chemistry.algorithms import (
+    ExpectationEstimator,
+    QdkExpectationEstimator,
+    state_preparation,
+    unitary_builder,
+)
 from qdk_chemistry.algorithms.state_preparation import SparseIsometryStatePreparation
+from qdk_chemistry.algorithms.unitary_builder import base as unitary_builder_base
+from qdk_chemistry.algorithms.unitary_builder.time_evolution import trotter
 from qdk_chemistry.data import AlgorithmRef, Circuit, QubitHamiltonian, QubitOperator, Settings
 from qdk_chemistry.plugins.qiskit import QDK_CHEMISTRY_HAS_QISKIT
 
@@ -74,6 +85,32 @@ class TestQubitHamiltonianDeprecation:
         with warnings.catch_warnings():
             warnings.simplefilter("error", DeprecationWarning)
             _ = QubitHamiltonian  # referencing the class object must not warn
+
+
+@pytest.mark.parametrize(
+    ("module", "old"),
+    [
+        (algorithms, "HamiltonianUnitaryBuilder"),
+        (unitary_builder, "HamiltonianUnitaryBuilderFactory"),
+        (unitary_builder_base, "HamiltonianUnitaryBuilder"),
+        (unitary_builder_base, "HamiltonianUnitaryBuilderSettings"),
+    ],
+)
+def test_hamiltonian_unitary_builder_names_warn_and_resolve_to_unitary_builder(module, old):
+    """Each ``HamiltonianUnitaryBuilder*`` name warns and returns its ``UnitaryBuilder*`` class."""
+    with pytest.warns(DeprecationWarning, match=old):
+        alias = getattr(module, old)
+    assert alias is getattr(unitary_builder_base, old.removeprefix("Hamiltonian"))
+
+
+def test_hamiltonian_unitary_builder_package_warns_and_aliases_unitary_builder():
+    """The old package path warns and resolves to the renamed modules rather than copies."""
+    old = "qdk_chemistry.algorithms.hamiltonian_unitary_builder"
+    for name in [name for name in sys.modules if name.startswith(old)]:
+        del sys.modules[name]
+    with pytest.warns(DeprecationWarning, match=old):
+        module = importlib.import_module(f"{old}.time_evolution.trotter")
+    assert module is trotter
 
 
 class TestEnergyEstimatorDeprecation:

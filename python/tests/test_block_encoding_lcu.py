@@ -15,7 +15,7 @@ import pytest
 from qdk.test_utils import dump_operation_on_state
 
 from qdk_chemistry.algorithms import registry
-from qdk_chemistry.algorithms.hamiltonian_unitary_builder.block_encoding.lcu import LCUBuilder
+from qdk_chemistry.algorithms.unitary_builder.block_encoding.lcu import LCUBuilder
 from qdk_chemistry.data import AlgorithmRef, QubitOperator
 from qdk_chemistry.data.unitary_representation.base import UnitaryRepresentation
 from qdk_chemistry.data.unitary_representation.containers.block_encoding import BlockEncodingContainer, LCUContainer

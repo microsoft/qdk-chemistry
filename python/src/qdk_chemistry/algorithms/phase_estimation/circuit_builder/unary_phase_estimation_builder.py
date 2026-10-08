@@ -7,7 +7,7 @@
 
 import numpy as np
 
-from qdk_chemistry.data import AlgorithmRef, Circuit, QubitOperator
+from qdk_chemistry.data import AlgorithmRef, Circuit, UnitaryBuilderInput
 from qdk_chemistry.data.circuit import QsharpFactoryData
 from qdk_chemistry.data.unitary_representation.base import UnitaryRepresentation
 from qdk_chemistry.data.unitary_representation.containers.block_encoding import (
@@ -156,13 +156,13 @@ class QdkUnaryQpeCircuitBuilder(QpeCircuitBuilder):
     def _run_impl(
         self,
         state_preparation: Circuit,
-        qubit_hamiltonian: QubitOperator,
+        qubit_hamiltonian: UnitaryBuilderInput,
     ) -> list[Circuit]:
         """Build the unary-iteration QPE circuit.
 
         Args:
             state_preparation: The circuit that prepares the initial state.
-            qubit_hamiltonian: The qubit Hamiltonian for which to build the circuit.
+            qubit_hamiltonian: The Hamiltonian or geometry the unitary builder takes.
 
         Returns:
             A single-element list containing the unary-iteration QPE circuit.
@@ -216,7 +216,7 @@ class QdkUnaryQpeCircuitBuilder(QpeCircuitBuilder):
         num_qubits = block_encoding.num_qubits
         if num_qubits is None:
             raise ValueError(f"Circuit mapper '{type(mapper).__name__}' did not report num_qubits.")
-        num_system_qubits = qubit_hamiltonian.num_qubits
+        num_system_qubits = unitary_rep.get_num_system_qubits()
 
         block_encoding_shared = block_encoding.metadata.num_phase_gradient_ancillas
         state_prep_shared = state_preparation.metadata.num_phase_gradient_ancillas

@@ -818,7 +818,6 @@ def _register_python_factories():
     from qdk_chemistry.algorithms.hadamard_test.circuit_builder import (  # noqa: PLC0415
         HadamardTestCircuitBuilderFactory,
     )
-    from qdk_chemistry.algorithms.hamiltonian_unitary_builder import HamiltonianUnitaryBuilderFactory  # noqa: PLC0415
     from qdk_chemistry.algorithms.phase_estimation import PhaseEstimationFactory  # noqa: PLC0415
     from qdk_chemistry.algorithms.phase_estimation.circuit_builder import QpeCircuitBuilderFactory  # noqa: PLC0415
     from qdk_chemistry.algorithms.propagator import PropagatorFactory  # noqa: PLC0415
@@ -832,6 +831,7 @@ def _register_python_factories():
     from qdk_chemistry.algorithms.time_evolution.hamiltonian_simulation import (  # noqa: PLC0415
         HamiltonianSimulationFactory,
     )
+    from qdk_chemistry.algorithms.unitary_builder import UnitaryBuilderFactory  # noqa: PLC0415
 
     register_factory(ExpectationEstimatorFactory())
     register_factory(CircuitMapperFactory())
@@ -841,7 +841,7 @@ def _register_python_factories():
     register_factory(TermGrouperFactory())
     register_factory(QubitMapperFactory())
     register_factory(QubitHamiltonianSolverFactory())
-    register_factory(HamiltonianUnitaryBuilderFactory())
+    register_factory(UnitaryBuilderFactory())
     register_factory(ControlledCircuitMapperFactory())
     register_factory(CircuitExecutorFactory())
     register_factory(QpeCircuitBuilderFactory())
@@ -925,20 +925,6 @@ def _register_python_algorithms():
         QdkHadamardTestCircuitBuilder,
     )
     from qdk_chemistry.algorithms.hadamard_test.hadamard_test import HadamardTest  # noqa: PLC0415
-    from qdk_chemistry.algorithms.hamiltonian_unitary_builder.block_encoding.lcu import (  # noqa: PLC0415
-        LCUBuilder,
-    )
-    from qdk_chemistry.algorithms.hamiltonian_unitary_builder.block_encoding.sossa import (  # noqa: PLC0415
-        SOSSABuilder,
-    )
-    from qdk_chemistry.algorithms.hamiltonian_unitary_builder.time_evolution.partially_randomized import (  # noqa: PLC0415
-        PartiallyRandomized,
-    )
-    from qdk_chemistry.algorithms.hamiltonian_unitary_builder.time_evolution.qdrift import QDrift  # noqa: PLC0415
-    from qdk_chemistry.algorithms.hamiltonian_unitary_builder.time_evolution.trotter import Trotter  # noqa: PLC0415
-    from qdk_chemistry.algorithms.hamiltonian_unitary_builder.time_evolution.zassenhaus import (  # noqa: PLC0415
-        Zassenhaus,
-    )
     from qdk_chemistry.algorithms.phase_estimation.circuit_builder.iterative_builder import (  # noqa: PLC0415
         QdkIterativeQpeCircuitBuilder,
     )
@@ -975,6 +961,20 @@ def _register_python_algorithms():
         EulerEvolutionCircuitBuilder,
     )
     from qdk_chemistry.algorithms.time_evolution.hamiltonian_simulation import EulerIntegrator  # noqa: PLC0415
+    from qdk_chemistry.algorithms.unitary_builder.block_encoding.lcu import (  # noqa: PLC0415
+        LCUBuilder,
+    )
+    from qdk_chemistry.algorithms.unitary_builder.block_encoding.sossa import (  # noqa: PLC0415
+        SOSSABuilder,
+    )
+    from qdk_chemistry.algorithms.unitary_builder.time_evolution.partially_randomized import (  # noqa: PLC0415
+        PartiallyRandomized,
+    )
+    from qdk_chemistry.algorithms.unitary_builder.time_evolution.qdrift import QDrift  # noqa: PLC0415
+    from qdk_chemistry.algorithms.unitary_builder.time_evolution.trotter import Trotter  # noqa: PLC0415
+    from qdk_chemistry.algorithms.unitary_builder.time_evolution.zassenhaus import (  # noqa: PLC0415
+        Zassenhaus,
+    )
 
     register(lambda: QdkExpectationEstimator())
     # Must precede SparseIsometryStatePreparation, whose settings resolve it by name at construction.

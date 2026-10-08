@@ -51,6 +51,16 @@ class UnitaryContainer(DataClass):
 
         """
 
+    @property
+    def num_system_qubits(self) -> int:
+        """Get the width of the system register, which a container with ancillas overrides.
+
+        Returns:
+            The number of system qubits, :attr:`num_qubits` unless overridden.
+
+        """
+        return self.num_qubits
+
     @abstractmethod
     def to_json(self) -> dict[str, Any]:
         """Convert the UnitaryContainer to a dictionary for JSON serialization.

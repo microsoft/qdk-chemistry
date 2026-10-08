@@ -51,6 +51,7 @@ Exposed classes are:
 - :class:`TermPartition`: Index-based partition of Hamiltonian terms.
   See :class:`FlatPartition` and :class:`LayeredPartition`.
 - :class:`UnitaryRepresentation`: Unitary representation.
+- :class:`UnitaryBuilderInput`: Abstract type of the Hamiltonian descriptions a unitary builder can take.
 - :class:`UnitaryContainer`: Abstract base class for different unitary representations.
 - :class:`Wavefunction`: Electronic wavefunction data and coefficients.
 - :class:`WavefunctionContainer`: Abstract base class for different wavefunction representations.
@@ -134,6 +135,7 @@ from qdk_chemistry.data.time_dependent_qubit_hamiltonian.base import TimeDepende
 from qdk_chemistry.data.time_dependent_qubit_hamiltonian.containers.base import TimeDependentQubitHamiltonianContainer
 from qdk_chemistry.data.time_dependent_qubit_hamiltonian.containers.driven import DrivenContainer
 from qdk_chemistry.data.time_dependent_qubit_hamiltonian.driven import DrivenQubitHamiltonian
+from qdk_chemistry.data.unitary_builder_input import UnitaryBuilderInput
 from qdk_chemistry.data.unitary_representation.base import UnitaryRepresentation
 from qdk_chemistry.data.unitary_representation.containers.base import UnitaryContainer
 from qdk_chemistry.data.unitary_representation.containers.pauli_product_formula import PauliProductFormulaContainer
@@ -207,6 +209,7 @@ __all__ = [
     "TermPartition",
     "TimeDependentQubitHamiltonian",
     "TimeDependentQubitHamiltonianContainer",
+    "UnitaryBuilderInput",
     "UnitaryContainer",
     "UnitaryRepresentation",
     "Wavefunction",

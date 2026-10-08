@@ -1,10 +1,24 @@
-"""QDK/Chemistry Hamiltonian unitary builder module."""
+"""Deprecated alias of :mod:`qdk_chemistry.algorithms.unitary_builder`."""
 
 # --------------------------------------------------------------------------------------------
 # Copyright (c) Microsoft Corporation. All rights reserved.
 # Licensed under the MIT License. See LICENSE.txt in the project root for license information.
 # --------------------------------------------------------------------------------------------
 
-from .base import HamiltonianUnitaryBuilderFactory
+import importlib
+import pkgutil
+import sys
+import warnings
 
-__all__: list[str] = ["HamiltonianUnitaryBuilderFactory"]
+from qdk_chemistry.algorithms import unitary_builder
+
+warnings.warn(
+    f"'{__name__}' is deprecated and will be removed in a future release; use '{unitary_builder.__name__}' instead.",
+    DeprecationWarning,
+    stacklevel=2,
+)
+
+# Alias every submodule.
+for _module in pkgutil.walk_packages(unitary_builder.__path__, f"{unitary_builder.__name__}."):
+    sys.modules[__name__ + _module.name.removeprefix(unitary_builder.__name__)] = importlib.import_module(_module.name)
+sys.modules[__name__] = unitary_builder

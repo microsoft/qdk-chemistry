@@ -12,7 +12,7 @@ The time-dependent nature of these systems makes them challenging to simulate di
 
 1. Divide the total evolution into short time steps.
 2. For each step, compute an **effective Hamiltonian** that approximates the time-dependent Hamiltonian over that interval.
-3. Feed that effective Hamiltonian into a time-evolution routine (a :doc:`HamiltonianUnitaryBuilder <hamiltonian_unitary_builder>`) to produce the quantum circuit for that step.
+3. Feed that effective Hamiltonian into a time-evolution routine (a :doc:`UnitaryBuilder <unitary_builder>`) to produce the quantum circuit for that step.
 
 Step 2 is what a propagator does.  Given an interval :math:`[t_1, t_2]` and a time-dependent Hamiltonian :math:`H(t)`, the propagator returns a time-independent :math:`H_\text{eff}` that best represents the evolution during that interval.
 
@@ -31,7 +31,7 @@ sequence within each step is:
 
 1. The circuit builder passes the :class:`~qdk_chemistry.data.TimeDependentQubitHamiltonian` and the current interval :math:`[t_1, t_2]` to the propagator
 2. The propagator returns an effective :class:`~qdk_chemistry.data.QubitOperator`
-3. The :doc:`HamiltonianUnitaryBuilder <hamiltonian_unitary_builder>` implements the effective evolution as a :class:`~qdk_chemistry.data.UnitaryRepresentation`
+3. The :doc:`UnitaryBuilder <unitary_builder>` implements the effective evolution as a :class:`~qdk_chemistry.data.UnitaryRepresentation`
 4. A :doc:`CircuitMapper <circuit_mapper>` converts the unitary into executable gates
 
 The :class:`~qdk_chemistry.algorithms.time_evolution.evolution_circuit_builder.euler_builder.EulerEvolutionCircuitBuilder`
@@ -161,7 +161,7 @@ Related classes
 - :class:`~qdk_chemistry.data.TimeDependentQubitHamiltonian`: Input time-dependent Hamiltonian
 - :class:`~qdk_chemistry.data.QubitOperator`: Output effective Hamiltonian
 - :class:`~qdk_chemistry.algorithms.time_evolution.evolution_circuit_builder.base.EvolutionCircuitBuilder`: The circuit builder that calls the propagator each step
-- :class:`~qdk_chemistry.algorithms.HamiltonianUnitaryBuilder`: Constructs the time-evolution unitary from the effective Hamiltonian produced by the propagator
+- :class:`~qdk_chemistry.algorithms.UnitaryBuilder`: Constructs the time-evolution unitary from the effective Hamiltonian produced by the propagator
 
 Further reading
 ---------------
@@ -169,6 +169,6 @@ Further reading
 - The above examples can be downloaded as a complete `Python <../../../_static/examples/python/propagator.py>`_ script.
 - :doc:`EvolutionCircuitBuilder <evolution_circuit_builder>`: Time-evolution circuit composition
 - :doc:`HamiltonianSimulation <hamiltonian_simulation>`: Full simulation with circuit execution and measurement
-- :doc:`HamiltonianUnitaryBuilder <hamiltonian_unitary_builder>`: Constructs the time-evolution unitary from the effective Hamiltonian
+- :doc:`UnitaryBuilder <unitary_builder>`: Constructs the time-evolution unitary from the effective Hamiltonian
 - :doc:`Settings <settings>`: Configuration settings for algorithms
 - :doc:`Factory Pattern <factory_pattern>`: Understanding algorithm creation
