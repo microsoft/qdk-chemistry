@@ -91,6 +91,26 @@ namespace QDKChemistry.Utils.HammingWeightPhasing {
         CNOT(a, b);
     }
 
+    /// Rotates every term onto a single Z on its last qubit and computes the Hamming weight of
+    /// those qubits with the adder tree `schedule`, indexed into `work`.
+    internal operation ComputeHammingWeight(
+        pauliOps : Pauli[][],
+        targets : Qubit[][],
+        schedule : (Int, Int, Int, Int)[],
+        work : Qubit[]
+    ) : Unit is Adj {
+        for t in 0..Length(targets) - 1 {
+            MapPauliTermToSingleZ(pauliOps[t], targets[t]);
+        }
+        for (a, b, c, carry) in schedule {
+            if c < 0 {
+                HalfAdderStep(work[a], work[b], work[carry]);
+            } else {
+                FullAdderStep(work[a], work[b], work[c], work[carry]);
+            }
+        }
+    }
+
     /// Applies exp(-i theta P_t) for every term P_t, phasing the batch through a Hamming-weight
     /// register once it reaches the measured break-even size.
     ///
@@ -200,16 +220,7 @@ namespace QDKChemistry.Utils.HammingWeightPhasing {
             use scratch = Qubit[Length(schedule)];
             let work = inputs + scratch;
             within {
-                for t in 0..count - 1 {
-                    MapPauliTermToSingleZ(pauliOps[t], targets[t]);
-                }
-                for (a, b, c, carry) in schedule {
-                    if c < 0 {
-                        HalfAdderStep(work[a], work[b], work[carry]);
-                    } else {
-                        FullAdderStep(work[a], work[b], work[c], work[carry]);
-                    }
-                }
+                ComputeHammingWeight(pauliOps, targets, schedule, work);
             } apply {
                 // w = Σ_j 2^j w_j, so e^{2 i theta w} is one rotation per place value, the bit of
                 // place value 2^j taking the angle 2 theta 2^j.

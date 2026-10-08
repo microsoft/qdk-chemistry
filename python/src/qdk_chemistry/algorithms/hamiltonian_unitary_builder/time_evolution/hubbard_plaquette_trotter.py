@@ -399,8 +399,7 @@ class HubbardPlaquetteTrotter(TimeEvolutionBuilder):
         This constant is derived for the "IPG" factor ordering (interaction outermost), while the circuit
         this builder emits uses the "PIG" ordering based on Sec. 4.8.2 of :cite:`Apel2026`.
         The pure-hopping block ``[[H_h^p, H_h^g], .]`` is replaced by a mixed interaction-hopping block,
-        which is reported to make the constant slightly larger than the IPG one. That difference is neglected, so
-        the step count is an estimate for the emitted circuit, not a certified bound on its error.
+        which is reported to make the constant slightly larger than the IPG one. That difference is neglected.
 
         Here::
 
