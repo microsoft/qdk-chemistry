@@ -41,7 +41,7 @@ def plot_lattice_graph(
 
     Args:
         graph: Graph to draw, such as one from LatticeGraph.from_geometry; supply a small graph for a preview.
-        positions: Two-dimensional site positions with one row per graph site, such as LatticeGeometry.positions.
+        positions: Array of shape (num_sites, 2) with one Cartesian position per graph site, such as LatticeGeometry.positions.
         flavor_labels: Optional legend labels by flavor ID; IDs themselves are used otherwise.
         title: Optional figure title.
 
@@ -49,12 +49,12 @@ def plot_lattice_graph(
         Figure and a one-dimensional array of axes; the caller handles display or saving.
 
     Raises:
-        ValueError: If positions are not one two-dimensional row per site.
+        ValueError: If positions is not an array of shape (num_sites, 2).
 
     """
     site_positions = np.asarray(positions, dtype=float)
     if site_positions.shape != (graph.num_sites, 2):
-        raise ValueError("positions must have one two-dimensional row per graph site.")
+        raise ValueError("positions must have shape (num_sites, 2).")
     edges: dict[tuple[int, int], tuple[int, int | None]] = {
         pair: (label.shell, label.flavor) for pair, label in graph.edge_labels.items()
     }
@@ -63,9 +63,9 @@ def plot_lattice_graph(
         edges = {
             (min(i, j), max(i, j)): (1, None)
             for i, j, weight in zip(
-                adjacency.row.tolist(),
-                adjacency.col.tolist(),
-                adjacency.data.tolist(),
+                adjacency.row,
+                adjacency.col,
+                adjacency.data,
                 strict=True,
             )
             if i != j and weight != 0.0
