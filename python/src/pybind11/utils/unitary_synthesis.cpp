@@ -7,8 +7,8 @@
 #include <pybind11/stl.h>
 
 #include <cstdint>
-#include <qdk/chemistry/data/wavefunction_containers/mps_wavefunction.hpp>
 #include <qdk/chemistry/utils/unitary_synthesis.hpp>
+#include <string>
 #include <vector>
 
 namespace py = pybind11;
@@ -30,109 +30,131 @@ py::tuple givens_to_tuple(const synthesis::GivensDecomposition& result) {
                         to_bool_list(result.phases));
 }
 
+py::tuple synthesis_to_tuple(const synthesis::DenseSiteSynthesis& result) {
+  py::list mixing;
+  for (const auto& givens : result.mixing_givens) {
+    mixing.append(givens_to_tuple(givens));
+  }
+  return py::make_tuple(result.rotation_angles, mixing,
+                        givens_to_tuple(result.block_givens),
+                        result.right_factor);
+}
+
+py::tuple synthesis_to_tuple(const synthesis::SparseSiteSynthesis& result) {
+  return py::make_tuple(result.column_permutation, result.row_permutation,
+                        givens_to_tuple(result.block_givens));
+}
+
 }  // namespace detail
 
 void bind_unitary_synthesis(py::module& module) {
   namespace synthesis = qdk::chemistry::utils::detail;
+  namespace data = qdk::chemistry::data;
   auto unitary_synthesis =
       module.def_submodule("unitary_synthesis", "Unitary synthesis utilities.");
 
   unitary_synthesis.def(
-      "decompose_dense_sites",
-      [](const std::vector<qdk::chemistry::data::MPSSite>& sites,
-         Eigen::Index ancilla_dimension) {
-        std::vector<synthesis::DenseSiteSynthesis> results;
+      "dense_unitary_synthesis",
+      [](const data::MPSSite& site, Eigen::Index ancilla_dimension,
+         const Eigen::MatrixXd& following_right_factor) {
+        synthesis::DenseSiteSynthesis result;
         {
           py::gil_scoped_release release;
-          results = synthesis::decompose_dense_sites(sites, ancilla_dimension);
+          result = synthesis::dense_unitary_synthesis(site, ancilla_dimension,
+                                                      following_right_factor);
         }
-        py::list output;
-        for (const auto& result : results) {
-          py::list mixing;
-          for (const auto& givens : result.mixing_givens) {
-            mixing.append(detail::givens_to_tuple(givens));
-          }
-          output.append(
-              py::make_tuple(result.rotation_angles, mixing,
-                             detail::givens_to_tuple(result.block_givens),
-                             result.right_factor));
-        }
-        return output;
+        return detail::synthesis_to_tuple(result);
       },
       R"(
-Synthesize the dense site unitaries of the sequential MPS preparation.
-
-A site with physical basis ``('0', 'u', 'd', '2')`` is factored into three
-uniformly controlled Ry rotations, two mixing unitaries, and a block-diagonal
-unitary. A site with physical basis ``('0', '1')`` is factored into one
-uniformly controlled Ry rotation and a block-diagonal unitary. Each site absorbs
-the right factor of the following site, so only the right factor of the first
-site remains to be absorbed by the caller. All sites are synthesized
-concurrently.
+Synthesize one validated MPS site with the general decomposition.
 
 Args:
-    sites (Sequence[MPSSite]): Consecutive real sites with two or four physical
-        states. The right bond dimension of each site must equal the left bond
-        dimension of the following site.
-    ancilla_dimension (int): Dimension of the bond register. Both bond
-        dimensions of every site must be at most this value.
+    site (MPSSite): Real site with two or four physical states.
+    ancilla_dimension (int): Dimension of the bond register.
+    following_right_factor (numpy.ndarray): Optional successor factor to absorb
+        into the right bond. An empty matrix selects the identity.
 
 Returns:
-    list[tuple]: One ``(rotation_angles, mixing_givens, block_givens,
-    right_factor)`` tuple per site, in input order. ``rotation_angles`` holds
-    one list of Ry angles per rotation, each of length ``ancilla_dimension``.
-    ``mixing_givens`` holds the Givens data ``(layer_angles, layer_shifted,
-    phases)`` of the two mixing unitaries for four physical states and is empty
-    for two. ``block_givens`` is the Givens data of the block-diagonal unitary
-    on the physical and bond registers. ``right_factor`` acts on the left bond
-    of the site and is absorbed into the preceding site of the sequence.
+    tuple: ``(rotation_angles, mixing_givens, block_givens, right_factor)``.
+        Each Givens value holds ``(layer_angles, layer_shifted, phases)``.
 
 Raises:
-    ValueError: If a site is complex, does not fit the bond register, has an
-        unsupported physical dimension, is not right-orthonormal, or the bonds
-        of consecutive sites do not match.
+    ValueError: If the site is complex, has an unsupported physical dimension,
+        is nonisometric, or is incompatible with the register or successor factor.
 )",
-      py::arg("sites"), py::arg("ancilla_dimension"));
+      py::arg("site"), py::arg("ancilla_dimension"),
+      py::arg("following_right_factor") = Eigen::MatrixXd{});
 
   unitary_synthesis.def(
-      "decompose_sparse_sites",
-      [](const std::vector<qdk::chemistry::data::MPSSite>& sites,
-         Eigen::Index ancilla_dimension) {
-        std::vector<synthesis::SparseSiteSynthesis> results;
+      "block_sparse_unitary_synthesis",
+      [](const data::MPSSite& site, Eigen::Index ancilla_dimension) {
+        synthesis::SparseSiteSynthesis result;
         {
           py::gil_scoped_release release;
-          results = synthesis::decompose_sparse_sites(sites, ancilla_dimension);
+          result = synthesis::block_sparse_unitary_synthesis(site,
+                                                             ancilla_dimension);
+        }
+        return detail::synthesis_to_tuple(result);
+      },
+      R"(
+Synthesize one symmetry-blocked site without forming its dense matrix.
+
+Args:
+    site (MPSSite): Validated real site whose stored sector offsets are reused.
+    ancilla_dimension (int): Dimension of the bond register.
+
+Returns:
+    tuple: ``(column_permutation, row_permutation, block_givens)``. The site
+        unitary applies the column permutation, the block-diagonal Givens
+        network, and then the row permutation. Basis index
+        ``physical * ancilla_dimension + bond`` holds the physical and bond states.
+
+Raises:
+    ValueError: If the site is complex, does not fit the register, or is not
+        right-orthonormal.
+)",
+      py::arg("site"), py::arg("ancilla_dimension"));
+
+  unitary_synthesis.def(
+      "decompose_mps",
+      [](const data::MPSContainer& mps, Eigen::Index ancilla_dimension,
+         const std::string& method) {
+        synthesis::MPSSynthesis results;
+        {
+          py::gil_scoped_release release;
+          results = synthesis::decompose_mps(mps, ancilla_dimension, method);
         }
         py::list output;
-        for (const auto& result : results) {
-          output.append(
-              py::make_tuple(result.column_permutation, result.row_permutation,
-                             detail::givens_to_tuple(result.block_givens)));
-        }
+        std::visit(
+            [&](const auto& sites) {
+              for (const auto& site : sites) {
+                output.append(detail::synthesis_to_tuple(site));
+              }
+            },
+            results);
         return output;
       },
       R"(
-Decompose sparse MPS sites into permutations around block-diagonal unitaries.
+Synthesize sites 1 onward of an MPS container, in chain order.
 
-Basis state ``b + ancilla_dimension * p`` of the joint register holds bond state
-``b`` and physical state ``p``. Sites are independent and are decomposed
-concurrently.
+The container validates adjacent bond spaces. Site zero is prepared separately
+as the initial state. General synthesis absorbs every successor's right factor
+into its predecessor; the first returned factor must be absorbed into site zero.
+Block-sparse synthesis reads the stored tensor blocks directly.
 
 Args:
-    sites (Sequence[MPSSite]): Real right-orthonormal sites.
-    ancilla_dimension (int): Dimension of the bond register. Both bond
-        dimensions of every site must be at most this value.
+    mps (MPSContainer): Real MPS with right-orthonormal sites after site zero.
+    ancilla_dimension (int): Dimension of the bond register.
+    unitary_synthesis (str): ``"general"`` (default) or ``"block_sparse"``.
 
 Returns:
-    list[tuple]: One ``(column_permutation, row_permutation, block_givens)``
-    tuple per site, in input order. The site unitary maps basis state ``i`` to
-    ``column_permutation[i]``, applies the block-diagonal unitary with Givens
-    data ``(layer_angles, layer_shifted, phases)``, and maps basis state ``j``
-    to ``row_permutation[j]``.
+    list[tuple]: One tensor-level synthesis result per site after site zero.
+        A single-site container returns an empty list.
 
 Raises:
-    ValueError: If a site is complex, does not fit the bond register, or is not
-        right-orthonormal.
+    ValueError: If the method is unknown, the MPS is complex, a bond does not
+        fit the register, or a synthesized site is not right-orthonormal.
 )",
-      py::arg("sites"), py::arg("ancilla_dimension"));
+      py::arg("mps"), py::arg("ancilla_dimension"),
+      py::arg("unitary_synthesis") = "general");
 }

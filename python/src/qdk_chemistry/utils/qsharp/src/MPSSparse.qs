@@ -185,7 +185,7 @@ namespace QDKChemistry.Utils.MPSSparse {
             ApplyRealUnitaryViaGivens(
                 blockData,
                 decomp.blockLayerShifted,
-                PhaseFlipsAsSelectData(decomp.blockPhases),
+                decomp.blockPhases,
                 Reversed(target),
                 phaseGradient,
                 angleReg

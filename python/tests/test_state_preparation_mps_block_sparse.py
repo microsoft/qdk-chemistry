@@ -1,4 +1,4 @@
-"""Tests for MPS sparse state preparation algorithm.
+"""Tests for matrix product state preparation with block-sparse unitary synthesis.
 
 Tests both the classical preprocessing (decomposition correctness) and
 the full Q# circuit (state preparation fidelity via statevector simulation).
@@ -13,14 +13,14 @@ import numpy as np
 import pytest
 
 from qdk_chemistry.algorithms import create
-from qdk_chemistry.algorithms.state_preparation.mps_sparse import (
-    MPSSparsePreparationData,
-    generate_mps_sparse_preparation_data,
+from qdk_chemistry.algorithms.state_preparation.matrix_product_state import (
+    MatrixProductStatePreparationData,
+    generate_matrix_product_state_preparation_data,
 )
-from qdk_chemistry.data import Circuit, Configuration, MPSContainer, Orbitals, Wavefunction
+from qdk_chemistry.data import Circuit, Configuration, MPSContainer, MPSSite, Orbitals, Wavefunction
 from qdk_chemistry.data import symmetry as sym
 from qdk_chemistry.utils.qsharp import QSHARP_UTILS, get_qsharp_context
-from qdk_chemistry.utils.unitary_synthesis import decompose_sparse_sites
+from qdk_chemistry.utils.unitary_synthesis import block_sparse_unitary_synthesis, decompose_mps
 
 from .mps_test_helpers import (
     JORDAN_WIGNER_CONVENTION_CASES,
@@ -49,7 +49,9 @@ _OPERATION = "QDKChemistry.Utils.MPSSparse.MPSSparse"
 _SITE_STRUCT = "QDKChemistry.Utils.MPSSparse.SparseUnitaryDecomposition"
 
 
-def assert_same_preparation_data(actual: MPSSparsePreparationData, expected: MPSSparsePreparationData) -> None:
+def assert_same_preparation_data(
+    actual: MatrixProductStatePreparationData, expected: MatrixProductStatePreparationData
+) -> None:
     """Require identical permutations and numerically identical rotation data."""
     assert actual.num_sites == expected.num_sites
     assert actual.num_qubits_per_site == expected.num_qubits_per_site
@@ -67,7 +69,7 @@ def assert_same_preparation_data(actual: MPSSparsePreparationData, expected: MPS
 
 
 def assert_prepares_state(params: dict, num_sites: int, ancilla_bits: int, target_state: np.ndarray) -> None:
-    """Simulate sparse MPS preparation and compare the post-selected state with the target.
+    """Simulate block-sparse MPS preparation and compare the post-selected state with the target.
 
     ``target_state`` is indexed like :func:`contract_mps` and is mapped to the blocked
     Jordan-Wigner qubit basis with the site-to-orbital order in ``params``.
@@ -79,18 +81,20 @@ def assert_prepares_state(params: dict, num_sites: int, ancilla_bits: int, targe
     assert fidelity > 0.90, f"Fidelity {fidelity:.4f} too low for num_sites={num_sites}"
 
 
-class TestMPSSparseQSharpFidelity:
+class TestBlockSparseQSharpFidelity:
     """Test that the MPSSparse Q# circuit produces the correct state."""
 
     def test_fidelity_random_mps(self):
         """Test sparse state preparation fidelity on a random MPS."""
         mps = random_mps(num_sites=2, bond_dim=4, rng=np.random.default_rng(42))
-        data = generate_mps_sparse_preparation_data(mps.sites)
+        data = generate_matrix_product_state_preparation_data(mps.sites, "block_sparse")
         assert_prepares_state(data.to_qsharp_params(rotation_bits=6), 2, data.ancilla_bits, contract_mps(mps))
 
     def test_fidelity_reference_mps(self):
         """Test sparse preparation fidelity on a fixed four-site MPS."""
-        data = generate_mps_sparse_preparation_data(right_normalized_mps(REFERENCE_MPS_TENSORS).sites)
+        data = generate_matrix_product_state_preparation_data(
+            right_normalized_mps(REFERENCE_MPS_TENSORS).sites, "block_sparse"
+        )
         params = data.to_qsharp_params(rotation_bits=6)
         assert_prepares_state(params, 4, data.ancilla_bits, REFERENCE_MPS_EXPECTED_STATE)
 
@@ -98,23 +102,28 @@ class TestMPSSparseQSharpFidelity:
         """A non-identity site_to_orbital_order must place each chain site on its mapped orbital."""
         # Scramble the chain -> orbital placement (a permutation of range(num_sites)).
         site_to_orbital_order = [2, 0, 3, 1]
-        data = generate_mps_sparse_preparation_data(right_normalized_mps(REFERENCE_MPS_TENSORS).sites)
-        params = data.to_qsharp_params(rotation_bits=6, site_to_orbital_order=site_to_orbital_order)
+        data = generate_matrix_product_state_preparation_data(
+            make_mps(right_normalized_tensors(REFERENCE_MPS_TENSORS), site_to_orbital_order=site_to_orbital_order),
+            "block_sparse",
+        )
+        params = data.to_qsharp_params(rotation_bits=6)
         assert_prepares_state(params, 4, data.ancilla_bits, REFERENCE_MPS_EXPECTED_STATE)
 
     @pytest.mark.parametrize(("num_sites", "bond_dim"), [(2, 2), (4, 4)])
     def test_fidelity_random_spinless_mps(self, num_sites, bond_dim):
         """Random right-canonical spinless MPSs are prepared with one qubit per site."""
         mps = random_mps(num_sites=num_sites, bond_dim=bond_dim, site_dim=2, rng=np.random.default_rng(13))
-        data = generate_mps_sparse_preparation_data(mps.sites)
+        data = generate_matrix_product_state_preparation_data(mps.sites, "block_sparse")
         assert data.num_qubits_per_site == 1
         assert_prepares_state(data.to_qsharp_params(rotation_bits=6), num_sites, data.ancilla_bits, contract_mps(mps))
 
     def test_fidelity_permuted_spinless_site_order(self):
         """Spinless chain sites land on their mapped orbitals with the reordering signs."""
         mps = random_mps(num_sites=4, bond_dim=4, site_dim=2, rng=np.random.default_rng(21))
-        data = generate_mps_sparse_preparation_data(mps.sites)
-        params = data.to_qsharp_params(rotation_bits=6, site_to_orbital_order=[1, 3, 0, 2])
+        data = generate_matrix_product_state_preparation_data(
+            make_mps(mps.sites, site_to_orbital_order=[1, 3, 0, 2]), "block_sparse"
+        )
+        params = data.to_qsharp_params(rotation_bits=6)
         assert_prepares_state(params, 4, data.ancilla_bits, contract_mps(mps))
 
     @pytest.mark.parametrize("site_dim", [2, 4])
@@ -122,7 +131,7 @@ class TestMPSSparseQSharpFidelity:
         """Particle-number-blocked sites, whose dense arrays have zero blocks, are prepared exactly."""
         tensors = random_particle_number_tensors(4, 2, max_bond=3, site_dim=site_dim, rng=np.random.default_rng(4))
         mps = make_mps(particle_number_blocked_sites(tensors))
-        data = generate_mps_sparse_preparation_data(mps.sites)
+        data = generate_matrix_product_state_preparation_data(mps.sites, "block_sparse")
         assert_prepares_state(data.to_qsharp_params(rotation_bits=6), 4, data.ancilla_bits, contract_mps(mps))
 
     @pytest.mark.parametrize(
@@ -131,8 +140,10 @@ class TestMPSSparseQSharpFidelity:
     )
     def test_fidelity_follows_blocked_jordan_wigner_convention(self, tensors, site_to_orbital_order, expected):
         """Sites land on blocked Jordan-Wigner qubits with the fermionic reordering signs."""
-        data = generate_mps_sparse_preparation_data(make_mps(tensors).sites)
-        params = data.to_qsharp_params(rotation_bits=6, site_to_orbital_order=site_to_orbital_order)
+        data = generate_matrix_product_state_preparation_data(
+            make_mps(tensors, site_to_orbital_order=site_to_orbital_order), "block_sparse"
+        )
+        params = data.to_qsharp_params(rotation_bits=6)
         ancilla_zero_prob, prepared = simulate_mps_preparation(_OPERATION, _SITE_STRUCT, params, 2, data.ancilla_bits)
         assert ancilla_zero_prob > 0.85, f"P(ancilla=0) = {ancilla_zero_prob:.4f} too low"
         fidelity = np.abs(np.vdot(dense_target(expected, 2 * params["numQubitsPerSite"]), prepared)) ** 2
@@ -183,7 +194,7 @@ class TestMPSSparseQSharpFidelity:
             assert np.abs(np.vdot(expected, state)) ** 2 > 1 - 1e-10
 
 
-class TestMPSSparsePreprocessing:
+class TestBlockSparsePreprocessing:
     """Test the classical site decompositions independently of Q# simulation."""
 
     def test_reference_mps_contracts_to_expected_state(self):
@@ -194,8 +205,10 @@ class TestMPSSparsePreprocessing:
     def test_array_and_site_inputs_agree(self):
         """Dense arrays take the same native MPSSite path as explicit sites."""
         tensors = right_normalized_tensors(REFERENCE_MPS_TENSORS)
-        from_arrays = generate_mps_sparse_preparation_data(tensors)
-        from_sites = generate_mps_sparse_preparation_data(right_normalized_mps(REFERENCE_MPS_TENSORS).sites)
+        from_arrays = generate_matrix_product_state_preparation_data(tensors, "block_sparse")
+        from_sites = generate_matrix_product_state_preparation_data(
+            right_normalized_mps(REFERENCE_MPS_TENSORS).sites, "block_sparse"
+        )
         assert_same_preparation_data(from_arrays, from_sites)
         assert from_arrays.num_sites == 4
         assert len(from_arrays.sites) == 3
@@ -212,15 +225,15 @@ class TestMPSSparsePreprocessing:
         blocked_mps = make_mps(blocked)
         np.testing.assert_allclose(contract_mps(blocked_mps), REFERENCE_MPS_EXPECTED_STATE, atol=1e-7)
         assert_same_preparation_data(
-            generate_mps_sparse_preparation_data(blocked_mps.sites),
-            generate_mps_sparse_preparation_data(tensors),
+            generate_matrix_product_state_preparation_data(blocked_mps.sites, "block_sparse"),
+            generate_matrix_product_state_preparation_data(tensors, "block_sparse"),
         )
 
     @pytest.mark.parametrize("site_dim", [2, 4])
     def test_site_permutations_are_bijections(self, site_dim):
         """Every decomposed site permutation acts on the full site-plus-ancilla register."""
         mps = random_mps(num_sites=4, bond_dim=4, site_dim=site_dim, rng=np.random.default_rng(2))
-        data = generate_mps_sparse_preparation_data(mps.sites)
+        data = generate_matrix_product_state_preparation_data(mps.sites, "block_sparse")
         assert data.num_qubits_per_site == site_dim // 2
         active_dim = site_dim * (1 << data.ancilla_bits)
         assert len(data.initial_state_vec) == active_dim
@@ -238,7 +251,8 @@ class TestMPSSparsePreprocessing:
         assert tensors[1].shape[0] > 1
         assert np.count_nonzero(tensors[1]) < tensors[1].size
 
-        results = decompose_sparse_sites([make_site(tensor) for tensor in tensors], chi)
+        results = decompose_mps(make_mps(tensors), chi, "block_sparse")
+        tensors = tensors[1:]
 
         assert len(results) == len(tensors)
         for tensor, (col_perm, row_perm, block_givens) in zip(tensors, results, strict=True):
@@ -250,24 +264,30 @@ class TestMPSSparsePreprocessing:
             np.testing.assert_allclose(unitary[:, : tensor.shape[0]], site_isometry(tensor, chi), atol=1e-10)
 
     def test_sparse_site_decomposition_rejects_invalid_sites(self):
-        """Native validation errors surface as ValueError, including from any site of a batch."""
+        """Native validation errors surface as ValueError for blocked tensors."""
         tensor = random_orthogonal(8, np.random.default_rng(5))[:, :2].reshape(4, 2, 2).transpose(2, 0, 1)
+        site = make_site(tensor)
         with pytest.raises(ValueError, match="bond"):
-            decompose_sparse_sites([make_site(tensor)], 1)
+            block_sparse_unitary_synthesis(site, 1)
+        complex_site = make_site(tensor.astype(complex))
         with pytest.raises(ValueError, match="real"):
-            decompose_sparse_sites([make_site(tensor.astype(complex))], 2)
+            block_sparse_unitary_synthesis(complex_site, 2)
+        scaled = make_site(2.0 * tensor)
         with pytest.raises(ValueError, match="isometric"):
-            decompose_sparse_sites([make_site(tensor), make_site(2.0 * tensor), make_site(tensor)], 2)
-        assert decompose_sparse_sites([], 2) == []
+            block_sparse_unitary_synthesis(scaled, 2)
+        with pytest.raises(ValueError, match="sector order"):
+            MPSSite(site.tensor, [], site.physical_sector_order, site.right_sector_order)
 
 
-class TestMPSSparseValidation:
+class TestBlockSparseValidation:
     """Test that unsupported MPS inputs are rejected before circuit construction."""
 
     def test_requires_mps_container(self):
         """Non-MPS wavefunctions are rejected."""
         with pytest.raises(TypeError, match="requires an MPSContainer"):
-            create("state_prep", "mps_sparse").run(create_test_wavefunction(2))
+            create("state_prep", "matrix_product_state", unitary_synthesis="block_sparse").run(
+                create_test_wavefunction(2)
+            )
 
     @pytest.mark.parametrize("orthogonality_center", [None, 1])
     def test_requires_center_zero(self, orthogonality_center):
@@ -275,7 +295,7 @@ class TestMPSSparseValidation:
         mps = make_mps(right_normalized_tensors(REFERENCE_MPS_TENSORS), orthogonality_center=orthogonality_center)
         assert mps.orthogonality_center == orthogonality_center
         with pytest.raises(ValueError, match="right-canonical MPS with center zero"):
-            create("state_prep", "mps_sparse").run(Wavefunction(mps))
+            create("state_prep", "matrix_product_state", unitary_synthesis="block_sparse").run(Wavefunction(mps))
 
     def test_requires_canonical_physical_basis_on_every_site(self):
         """A permuted local basis on any site is rejected."""
@@ -285,9 +305,11 @@ class TestMPSSparseValidation:
         sites[2] = make_site(tensors[2], swapped_basis)
         assert sites[2].physical_basis == swapped_basis
         with pytest.raises(ValueError, match=r"physical basis ordering \('0', 'u', 'd', '2'\)"):
-            create("state_prep", "mps_sparse").run(Wavefunction(make_mps(sites)))
+            create("state_prep", "matrix_product_state", unitary_synthesis="block_sparse").run(
+                Wavefunction(make_mps(sites))
+            )
         with pytest.raises(ValueError, match=r"physical basis ordering \('0', 'u', 'd', '2'\)"):
-            generate_mps_sparse_preparation_data(sites)
+            generate_matrix_product_state_preparation_data(sites, "block_sparse")
 
     def test_requires_canonical_spinless_basis(self):
         """A permuted binary local basis is rejected."""
@@ -295,36 +317,44 @@ class TestMPSSparseValidation:
         swapped_basis = [Configuration.from_bitstring(state) for state in ("1", "0")]
         sites = [sites[0], make_site(dense_site(sites[1]), swapped_basis)]
         with pytest.raises(ValueError, match=r"physical basis ordering \('0', '1'\)"):
-            create("state_prep", "mps_sparse").run(Wavefunction(make_mps(sites)))
+            create("state_prep", "matrix_product_state", unitary_synthesis="block_sparse").run(
+                Wavefunction(make_mps(sites))
+            )
         with pytest.raises(ValueError, match=r"physical basis ordering \('0', '1'\)"):
-            generate_mps_sparse_preparation_data(sites)
+            generate_matrix_product_state_preparation_data(sites, "block_sparse")
 
     def test_requires_two_or_four_physical_states_per_site(self):
         """Sites with any other local dimension are rejected."""
         three_states = [Configuration.from_spin_half_string(state) for state in ("0", "u", "d")]
         site = make_site(np.array([[[1.0], [0.0], [0.0]]]), three_states)
         with pytest.raises(ValueError, match="two or four physical states per site"):
-            create("state_prep", "mps_sparse").run(Wavefunction(make_mps([site])))
+            create("state_prep", "matrix_product_state", unitary_synthesis="block_sparse").run(
+                Wavefunction(make_mps([site]))
+            )
         with pytest.raises(ValueError, match="two or four physical states per site"):
-            generate_mps_sparse_preparation_data([site])
+            generate_matrix_product_state_preparation_data([site], "block_sparse")
         with pytest.raises(ValueError, match="two or four physical states per site"):
-            generate_mps_sparse_preparation_data([np.ones((1, 3, 1))])
+            generate_matrix_product_state_preparation_data([np.ones((1, 3, 1))], "block_sparse")
 
     def test_requires_uniform_physical_dimension(self):
         """Spinless and spatial-orbital sites cannot be mixed in one chain."""
         sites = [make_site(np.array([[[1.0, 0.0], [0.0, 0.0]]])), make_site(np.ones((2, 4, 1)) / np.sqrt(8))]
         with pytest.raises(ValueError, match="same physical dimension on every site"):
-            create("state_prep", "mps_sparse").run(Wavefunction(make_mps(sites)))
+            create("state_prep", "matrix_product_state", unitary_synthesis="block_sparse").run(
+                Wavefunction(make_mps(sites))
+            )
         with pytest.raises(ValueError, match="same physical dimension on every site"):
-            generate_mps_sparse_preparation_data(sites)
+            generate_matrix_product_state_preparation_data(sites, "block_sparse")
 
     def test_requires_real_tensors(self):
         """Complex MPS tensors are rejected."""
         tensors = [tensor.astype(complex) for tensor in right_normalized_tensors(REFERENCE_MPS_TENSORS)]
         with pytest.raises(ValueError, match="only real-valued"):
-            create("state_prep", "mps_sparse").run(Wavefunction(make_mps(tensors)))
+            create("state_prep", "matrix_product_state", unitary_synthesis="block_sparse").run(
+                Wavefunction(make_mps(tensors))
+            )
         with pytest.raises(ValueError, match="only real-valued"):
-            generate_mps_sparse_preparation_data(tensors)
+            generate_matrix_product_state_preparation_data(tensors, "block_sparse")
 
     def test_requires_one_site_per_molecular_orbital(self):
         """An active-space MPS that omits molecular orbitals is rejected."""
@@ -340,30 +370,32 @@ class TestMPSSparseValidation:
         )
         mps = MPSContainer([make_site(tensor) for tensor in tensors], orbitals, orthogonality_center=0)
         with pytest.raises(ValueError, match="exactly one MPS site per molecular orbital"):
-            create("state_prep", "mps_sparse").run(Wavefunction(mps))
+            create("state_prep", "matrix_product_state", unitary_synthesis="block_sparse").run(Wavefunction(mps))
 
     def test_rejects_empty_open_boundary_and_nonfinite_inputs(self):
         """The direct preprocessing entry point validates chain shape and amplitudes."""
-        with pytest.raises(ValueError, match="at least one site"):
-            generate_mps_sparse_preparation_data([])
-        with pytest.raises(ValueError, match="open boundary bonds"):
-            generate_mps_sparse_preparation_data([np.ones((2, 4, 1))])
+        with pytest.raises(ValueError, match="nonempty sites"):
+            generate_matrix_product_state_preparation_data([], "block_sparse")
+        with pytest.raises(ValueError, match="outer bond dimensions"):
+            generate_matrix_product_state_preparation_data([np.ones((2, 4, 1))], "block_sparse")
         with pytest.raises(ValueError, match="finite amplitudes with nonzero norm"):
-            generate_mps_sparse_preparation_data([np.zeros((1, 4, 1))])
-        with pytest.raises(ValueError, match="finite amplitudes with nonzero norm"):
-            generate_mps_sparse_preparation_data([np.full((1, 4, 1), np.nan)])
+            generate_matrix_product_state_preparation_data([np.zeros((1, 4, 1))], "block_sparse")
+        with pytest.raises(ValueError, match="finite"):
+            generate_matrix_product_state_preparation_data([np.full((1, 4, 1), np.nan)], "block_sparse")
         with pytest.raises(ValueError, match="shape"):
-            generate_mps_sparse_preparation_data([np.ones((4, 1))])
+            generate_matrix_product_state_preparation_data([np.ones((4, 1))], "block_sparse")
 
-    def test_rejects_invalid_site_to_orbital_order(self):
-        """Q# parameters require one unique nonnegative orbital index per site."""
-        data = generate_mps_sparse_preparation_data(right_normalized_tensors(REFERENCE_MPS_TENSORS))
-        for order in ([0, 1, 2], [0, 1, 1, 2], [0, 1, 2, -1]):
-            with pytest.raises(ValueError, match="site_to_orbital_order"):
-                data.to_qsharp_params(rotation_bits=6, site_to_orbital_order=order)
+    def test_site_to_orbital_order_comes_from_container(self):
+        """A container supplies its site order, and bare sites map chain site k to orbital k."""
+        tensors = right_normalized_tensors(REFERENCE_MPS_TENSORS)
+        data = generate_matrix_product_state_preparation_data(tensors, "block_sparse")
+        assert data.site_to_orbital_order == [0, 1, 2, 3]
+        container = make_mps(tensors, site_to_orbital_order=[2, 0, 3, 1])
+        params = generate_matrix_product_state_preparation_data(container, "block_sparse").to_qsharp_params(6)
+        assert params["siteToOrbitalOrder"] == [2, 0, 3, 1]
 
 
-class TestMPSSparseStatePreparationRun:
+class TestBlockSparseStatePreparationRun:
     """Test the registered algorithm end to end on native MPS containers."""
 
     def test_run_builds_qsharp_factory_from_container(self):
@@ -371,7 +403,7 @@ class TestMPSSparseStatePreparationRun:
         site_to_orbital_order = [2, 0, 3, 1]
         tensors = right_normalized_tensors(REFERENCE_MPS_TENSORS)
         wavefunction = Wavefunction(make_mps(tensors, site_to_orbital_order=site_to_orbital_order))
-        prep = create("state_prep", "mps_sparse", rotation_bits=8)
+        prep = create("state_prep", "matrix_product_state", unitary_synthesis="block_sparse", rotation_bits=8)
         circuit = prep.run(wavefunction)
 
         assert isinstance(circuit, Circuit)
@@ -379,7 +411,10 @@ class TestMPSSparseStatePreparationRun:
         factory = circuit._qsharp_factory
         assert factory is not None
         assert factory.program is QSHARP_UTILS.MPSSparse.MakeMPSSparseCircuit
-        expected = generate_mps_sparse_preparation_data(tensors).to_qsharp_params(8, site_to_orbital_order)
+        expected = generate_matrix_product_state_preparation_data(
+            wavefunction.get_container(), "block_sparse"
+        ).to_qsharp_params(8)
+        assert factory.parameter["siteToOrbitalOrder"] == site_to_orbital_order
         assert factory.parameter.keys() == expected.keys()
         for key in ("numSites", "numQubitsPerSite", "siteToOrbitalOrder", "rotationBits", "numAncillaQubits"):
             assert factory.parameter[key] == expected[key]
@@ -388,15 +423,26 @@ class TestMPSSparseStatePreparationRun:
     def test_run_defaults_to_identity_site_order(self):
         """An omitted site order maps chain site k to orbital k."""
         wavefunction = Wavefunction(right_normalized_mps(REFERENCE_MPS_TENSORS))
-        circuit = create("state_prep", "mps_sparse").run(wavefunction)
+        circuit = create("state_prep", "matrix_product_state", unitary_synthesis="block_sparse").run(wavefunction)
         assert circuit._qsharp_factory.parameter["siteToOrbitalOrder"] == [0, 1, 2, 3]
         assert circuit._qsharp_factory.parameter["rotationBits"] == 10
+
+    def test_run_rejects_fast_resource_estimation(self):
+        """The placeholder circuit models general synthesis only, so block-sparse synthesis rejects it."""
+        wavefunction = Wavefunction(right_normalized_mps(REFERENCE_MPS_TENSORS))
+        prep = create(
+            "state_prep", "matrix_product_state", unitary_synthesis="block_sparse", fast_resource_estimation=True
+        )
+        with pytest.raises(ValueError, match="fast_resource_estimation requires unitary_synthesis='general'"):
+            prep.run(wavefunction)
 
     def test_resource_estimate(self):
         """The generated Adaptive circuit compiles for logical resource estimation."""
         num_sites = 2
         mps = random_mps(num_sites=num_sites, bond_dim=4, rng=np.random.default_rng(42))
-        circuit = create("state_prep", "mps_sparse", rotation_bits=6).run(Wavefunction(mps))
+        circuit = create("state_prep", "matrix_product_state", unitary_synthesis="block_sparse", rotation_bits=6).run(
+            Wavefunction(mps)
+        )
         logical_counts = circuit.estimate()["logicalCounts"]
         assert logical_counts["numQubits"] >= 2 * num_sites
         assert logical_counts["cczCount"] + logical_counts["tCount"] + logical_counts["rotationCount"] > 0
@@ -405,7 +451,7 @@ class TestMPSSparseStatePreparationRun:
         """A spinless MPS needs fewer qubits and Toffolis than a spatial-orbital MPS of equal bond dimension."""
         spinless = random_mps(num_sites=4, bond_dim=4, site_dim=2, rng=np.random.default_rng(42))
         spatial = random_mps(num_sites=4, bond_dim=4, rng=np.random.default_rng(42))
-        prep = create("state_prep", "mps_sparse", rotation_bits=6)
+        prep = create("state_prep", "matrix_product_state", unitary_synthesis="block_sparse", rotation_bits=6)
         spinless_circuit = prep.run(Wavefunction(spinless))
         assert spinless_circuit._qsharp_factory.parameter["numQubitsPerSite"] == 1
         spinless_counts = spinless_circuit.estimate()["logicalCounts"]

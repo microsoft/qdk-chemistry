@@ -11,7 +11,7 @@ import Std.ResourceEstimation.*;
 import QDKChemistry.Utils.SelectSwap.SelectSwap;
 import QDKChemistry.Utils.PhaseGradient.RyViaPhaseGradient;
 
-export ApplyRealUnitaryViaGivens, ApplyControlledRealUnitaryViaGivens, QuantizeGivensAngles, QuantizeRyAngles, PhaseFlipsAsSelectData, ApplyPhasePolynomial, ApplyMultiplexedRy, ApplyControlledMultiplexedRy;
+export ApplyRealUnitaryViaGivens, ApplyControlledRealUnitaryViaGivens, QuantizeGivensAngles, QuantizeRyAngles, ApplyMultiplexedRy, ApplyControlledMultiplexedRy;
 
 // =============================================================================
 // Multiplexed Ry rotations (QROM-loaded angles + phase gradient)
@@ -236,23 +236,6 @@ function QuantizeRyAngles(angles : Double[], rotationBits : Int) : Bool[][] {
     return data;
 }
 
-/// # Summary
-/// Convert a Bool[] phase flip array to Bool[][1] format for Select.
-///
-/// # Input
-/// ## phases
-/// Bool[dim]: true if state |i⟩ needs a Z flip.
-///
-/// # Output
-/// Bool[dim][1]: Select-compatible format.
-function PhaseFlipsAsSelectData(phases : Bool[]) : Bool[][] {
-    mutable data : Bool[][] = [];
-    for p in phases {
-        set data += [[p]];
-    }
-    return data;
-}
-
 // =============================================================================
 // Phase polynomial correction (Reed-Muller decomposition)
 // =============================================================================
@@ -348,8 +331,8 @@ operation ApplyPhasePolynomial(phases : Bool[], register : Qubit[]) : Unit {
 /// rotationBits-bit integer x such that θ = 4π·x/2^rotationBits.
 /// ## layerIsShifted
 /// Bool[numLayers]: whether each layer is shifted (Berry eq. 24).
-/// ## phaseFlipData
-/// Bool[dim][1]: phase correction. phaseFlipData[i] = [true] if state |i⟩ gets Z.
+/// ## phaseFlips
+/// Bool[dim]: phase correction. phaseFlips[i] is true if state |i⟩ gets Z.
 /// Empty array means no phase correction needed.
 /// ## target
 /// Target register in MSB (Most Significant Bit)-first format
@@ -362,12 +345,14 @@ operation ApplyPhasePolynomial(phases : Bool[], register : Qubit[]) : Unit {
 operation ApplyRealUnitaryViaGivens(
     layerAngleData : Bool[][][],
     layerIsShifted : Bool[],
-    phaseFlipData : Bool[][],
+    phaseFlips : Bool[],
     target : Qubit[],
     phaseGradient : Qubit[],
     angleReg : Qubit[]
 ) : Unit {
     let n = Length(target);
+    Fact(Length(layerIsShifted) == Length(layerAngleData), "Givens data needs one shift flag per layer.");
+    Fact(IsEmpty(phaseFlips) or Length(phaseFlips) == 1 <<< n, "Givens phase data needs one entry per basis state of the target register.");
     // Active qubit = LSB of state = target[n-1].
     // Address = higher bits = target[0..n-2], reversed for Select (LSB-first).
     let activeQubit = target[n - 1];
@@ -391,9 +376,8 @@ operation ApplyRealUnitaryViaGivens(
     }
 
     // Phase correction: D = diag(±1) via Reed-Muller polynomial
-    let phases = Mapped(row -> Length(row) > 0 and row[0], phaseFlipData);
-    if Any(flip -> flip, phases) {
-        ApplyPhasePolynomial(phases, Reversed(target));
+    if Any(flip -> flip, phaseFlips) {
+        ApplyPhasePolynomial(phaseFlips, Reversed(target));
     }
 }
 
@@ -412,8 +396,8 @@ operation ApplyRealUnitaryViaGivens(
 /// Bool[numLayers][numAngles][rotationBits]: angle data for each Givens layer.
 /// ## layerIsShifted
 /// Bool[numLayers]: whether each layer is shifted.
-/// ## phaseFlipData
-/// Bool[dim][1]: phase correction data. Empty array means no correction.
+/// ## phaseFlips
+/// Bool[dim]: phase correction. Empty array means no correction.
 /// ## target
 /// Target register.
 /// ## phaseGradient
@@ -425,13 +409,15 @@ operation ApplyRealUnitaryViaGivens(
 operation ApplyControlledRealUnitaryViaGivens(
     layerAngleData : Bool[][][],
     layerIsShifted : Bool[],
-    phaseFlipData : Bool[][],
+    phaseFlips : Bool[],
     target : Qubit[],
     phaseGradient : Qubit[],
     control : Qubit,
     angleReg : Qubit[]
 ) : Unit {
     let n = Length(target);
+    Fact(Length(layerIsShifted) == Length(layerAngleData), "Givens data needs one shift flag per layer.");
+    Fact(IsEmpty(phaseFlips) or Length(phaseFlips) == 1 <<< n, "Givens phase data needs one entry per basis state of the target register.");
     let activeQubit = target[n - 1];
     let address = Reversed(target[0..n - 2]);
 
@@ -450,9 +436,8 @@ operation ApplyControlledRealUnitaryViaGivens(
     }
 
     // Controlled phase correction: a diagonal on Reversed(target) + [control], where the
-    // control is the MSB. Extended phases: ctrl=0 → no flip, ctrl=1 → phaseFlipData.
-    let phases = Mapped(row -> Length(row) > 0 and row[0], phaseFlipData);
-    if Any(flip -> flip, phases) {
-        ApplyPhasePolynomial(Repeated(false, Length(phases)) + phases, Reversed(target) + [control]);
+    // control is the MSB. Extended phases: ctrl=0 → no flip, ctrl=1 → phaseFlips.
+    if Any(flip -> flip, phaseFlips) {
+        ApplyPhasePolynomial(Repeated(false, Length(phaseFlips)) + phaseFlips, Reversed(target) + [control]);
     }
 }
