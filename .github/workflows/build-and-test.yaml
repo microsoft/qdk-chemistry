@@ -382,6 +382,7 @@ jobs:
 
     - name: Generate C++ coverage report
       if: matrix.enable-coverage
+      continue-on-error: true
       run: |
         # Run after the Python tests so pytest exercises the same coverage-instrumented binary ctest did,
         # and their hits share $BUILD_DIR's .gcda files.
@@ -409,6 +410,7 @@ jobs:
 
     - name: Generate Pybind11 coverage report
       if: matrix.enable-coverage
+      continue-on-error: true
       working-directory: python
       run: |
         PYBIND_BUILD_DIR=$(find . -wholename "./build/cp*/CMakeFiles/_core.dir" | head -1)
@@ -435,6 +437,7 @@ jobs:
 
     - name: Add coverage report to job summary
       if: matrix.enable-coverage
+      continue-on-error: true
       run: |
         # Extract coverage percentages
         extract_coverage() {
@@ -483,6 +486,7 @@ jobs:
 
     - name: Retain coverage XML for benchmarks
       if: always() && matrix.enable-coverage && github.event_name == 'workflow_dispatch'
+      continue-on-error: true
       uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
       with:
         name: cobertura-xml-linux-py${{ matrix.python-version }}
@@ -496,6 +500,7 @@ jobs:
     - name: Upload C++ code coverage
       if: matrix.enable-coverage && (github.event_name == 'pull_request' || github.event_name == 'push')
       uses: actions/upload-code-coverage@bfa741d815a28cb064a8e3a0837e577457a017d5 # v1.4.3
+      continue-on-error: true
       with:
         file: coverage-reports/cpp_coverage.cobertura.xml
         language: C++
@@ -505,6 +510,7 @@ jobs:
     - name: Upload Pybind11 code coverage
       if: matrix.enable-coverage && (github.event_name == 'pull_request' || github.event_name == 'push')
       uses: actions/upload-code-coverage@bfa741d815a28cb064a8e3a0837e577457a017d5 # v1.4.3
+      continue-on-error: true
       with:
         file: coverage-reports/pybind11_coverage.cobertura.xml
         language: C++
@@ -514,6 +520,7 @@ jobs:
     - name: Upload Python code coverage
       if: matrix.enable-coverage && (github.event_name == 'pull_request' || github.event_name == 'push')
       uses: actions/upload-code-coverage@bfa741d815a28cb064a8e3a0837e577457a017d5 # v1.4.3
+      continue-on-error: true
       with:
         file: coverage-reports/python_coverage.xml
         language: Python
@@ -544,6 +551,7 @@ jobs:
 
     - name: Upload JUnit test results
       if: always()
+      continue-on-error: true
       uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
       with:
         name: junit-${{ matrix.os-name }}-py${{ matrix.python-version }}
@@ -767,6 +775,7 @@ jobs:
 
     - name: Upload JUnit test results
       if: always()
+      continue-on-error: true
       uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
       with:
         name: junit-windows-x64-${{ matrix.compiler }}
@@ -1032,6 +1041,7 @@ jobs:
 
     - name: Upload JUnit test results
       if: always()
+      continue-on-error: true
       uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
       with:
         name: junit-windows-arm64-${{ matrix.compiler }}
@@ -1133,6 +1143,7 @@ jobs:
 
     - name: Upload test results
       if: always()
+      continue-on-error: true
       uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
       with:
         name: qdk-branch-test-results
