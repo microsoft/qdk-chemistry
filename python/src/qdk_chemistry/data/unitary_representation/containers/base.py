@@ -53,10 +53,10 @@ class UnitaryContainer(DataClass):
 
     @property
     def num_system_qubits(self) -> int:
-        """Get the width of the system register, which a container with ancillas overrides.
+        """Get the width of the system register.
 
         Returns:
-            The number of system qubits, :attr:`num_qubits` unless overridden.
+            The number of system qubits.
 
         """
         return self.num_qubits

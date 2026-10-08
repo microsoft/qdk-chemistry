@@ -80,7 +80,7 @@ class UnitaryRepresentation(DataClass):
         return self._container.num_qubits
 
     def get_num_system_qubits(self) -> int:
-        """Get the width of the system register, excluding any ancillas the unitary uses.
+        """Get the width of the system register.
 
         Returns:
             The number of system qubits.

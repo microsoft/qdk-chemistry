@@ -12,8 +12,7 @@ from .base import UnitaryBuilderFactory
 
 __all__: list[str] = ["UnitaryBuilderFactory"]
 
-# Deprecated public names mapped to their replacements. Accessing an alias emits a
-# DeprecationWarning but returns the new class object, so existing code keeps working.
+# Deprecated public names mapped to their replacements.
 _DEPRECATED_ALIASES = {
     "HamiltonianUnitaryBuilderFactory": "UnitaryBuilderFactory",
 }

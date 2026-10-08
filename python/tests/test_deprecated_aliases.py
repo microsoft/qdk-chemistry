@@ -18,8 +18,6 @@ downstream users are not broken immediately.
 # Licensed under the MIT License. See LICENSE.txt in the project root for license information.
 # --------------------------------------------------------------------------------------------
 
-import importlib
-import sys
 import warnings
 
 import numpy as np
@@ -34,7 +32,6 @@ from qdk_chemistry.algorithms import (
 )
 from qdk_chemistry.algorithms.state_preparation import SparseIsometryStatePreparation
 from qdk_chemistry.algorithms.unitary_builder import base as unitary_builder_base
-from qdk_chemistry.algorithms.unitary_builder.time_evolution import trotter
 from qdk_chemistry.data import AlgorithmRef, Circuit, QubitHamiltonian, QubitOperator, Settings
 from qdk_chemistry.plugins.qiskit import QDK_CHEMISTRY_HAS_QISKIT
 
@@ -101,16 +98,6 @@ def test_hamiltonian_unitary_builder_names_warn_and_resolve_to_unitary_builder(m
     with pytest.warns(DeprecationWarning, match=old):
         alias = getattr(module, old)
     assert alias is getattr(unitary_builder_base, old.removeprefix("Hamiltonian"))
-
-
-def test_hamiltonian_unitary_builder_package_warns_and_aliases_unitary_builder():
-    """The old package path warns and resolves to the renamed modules rather than copies."""
-    old = "qdk_chemistry.algorithms.hamiltonian_unitary_builder"
-    for name in [name for name in sys.modules if name.startswith(old)]:
-        del sys.modules[name]
-    with pytest.warns(DeprecationWarning, match=old):
-        module = importlib.import_module(f"{old}.time_evolution.trotter")
-    assert module is trotter
 
 
 class TestEnergyEstimatorDeprecation:

@@ -34,12 +34,7 @@ __all__: list[str] = [
 
 
 class UnitaryBuilder(Algorithm):
-    """Base class for algorithms that build a unitary from a Hamiltonian description.
-
-    :meth:`run` accepts any :class:`~qdk_chemistry.data.UnitaryBuilderInput`, so phase estimation
-    can hand a builder whatever it was given. Each builder evolves the one type
-    :meth:`_input_type` names and :meth:`run` raises :class:`TypeError` for any other.
-    """
+    """Base class for algorithms that build a unitary from a Hamiltonian description."""
 
     def __init__(self):
         """Initialize the UnitaryBuilder."""
@@ -285,8 +280,7 @@ class UnitaryBuilderFactory(AlgorithmFactory):
         return "trotter"
 
 
-# Deprecated public names mapped to their replacements. Accessing an alias emits a
-# DeprecationWarning but returns the new class object, so existing code keeps working.
+# Deprecated public names mapped to their replacements.
 _DEPRECATED_ALIASES = {
     "HamiltonianUnitaryBuilder": "UnitaryBuilder",
     "HamiltonianUnitaryBuilderFactory": "UnitaryBuilderFactory",
