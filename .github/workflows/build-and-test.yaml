@@ -324,6 +324,7 @@ jobs:
         python -m ipykernel install --user --name python3 --display-name "Python 3"
 
     - name: Run Python tests
+      timeout-minutes: 90
       env:
         OMP_NUM_THREADS: ${{ matrix.python-omp-threads }}
         PYTHON_TEST_WORKERS: ${{ matrix.python-test-workers }}
@@ -496,7 +497,7 @@ jobs:
     # Fork PRs are skipped by the action itself (no write access), not by this condition.
     - name: Upload C++ code coverage
       if: matrix.enable-coverage && (github.event_name == 'pull_request' || github.event_name == 'push')
-      uses: actions/upload-code-coverage@d8e329117199404bba6fc81efe8093dc7c015e34 # v1.4.2
+      uses: actions/upload-code-coverage@bfa741d815a28cb064a8e3a0837e577457a017d5 # v1.4.3
       with:
         file: coverage-reports/cpp_coverage.cobertura.xml
         language: C++
@@ -505,7 +506,7 @@ jobs:
 
     - name: Upload Pybind11 code coverage
       if: matrix.enable-coverage && (github.event_name == 'pull_request' || github.event_name == 'push')
-      uses: actions/upload-code-coverage@d8e329117199404bba6fc81efe8093dc7c015e34 # v1.4.2
+      uses: actions/upload-code-coverage@bfa741d815a28cb064a8e3a0837e577457a017d5 # v1.4.3
       with:
         file: coverage-reports/pybind11_coverage.cobertura.xml
         language: C++
@@ -514,7 +515,7 @@ jobs:
 
     - name: Upload Python code coverage
       if: matrix.enable-coverage && (github.event_name == 'pull_request' || github.event_name == 'push')
-      uses: actions/upload-code-coverage@d8e329117199404bba6fc81efe8093dc7c015e34 # v1.4.2
+      uses: actions/upload-code-coverage@bfa741d815a28cb064a8e3a0837e577457a017d5 # v1.4.3
       with:
         file: coverage-reports/python_coverage.xml
         language: Python
@@ -753,6 +754,7 @@ jobs:
 
     - name: Run Python tests
       shell: pwsh
+      timeout-minutes: 90
       env:
         QDK_CHEMISTRY_RUN_SLOW_TESTS: ${{ ((github.event_name == 'workflow_dispatch' && inputs.run_slow_tests) || github.event_name == 'merge_group') && '1' || '0' }}
       run: |
@@ -1100,7 +1102,7 @@ jobs:
     # Reuses the coverage job's own Linux/x86-64-v3/Python-3.13 build (dependencies + C++ + Python install)
     # Adds the "install qdk from branch" override and re-runs the Python test suite against it.
     - name: Download coverage build (Linux x86-64-v3, Python 3.13)
-      uses: actions/download-artifact@37930b1c2abaa49bbe596cd826c3c89aef350131 # v7.0.0
+      uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
       with:
         name: qdk-chemistry-install-linux-x86-64-v3-py3.13
         path: ${{ github.workspace }}/install
@@ -1125,6 +1127,7 @@ jobs:
         python -m pip show qdk
 
     - name: Run Python tests
+      timeout-minutes: 90
       env:
         QDK_CHEMISTRY_RUN_SLOW_TESTS: ${{ ((github.event_name == 'workflow_dispatch' && inputs.run_slow_tests) || github.event_name == 'merge_group') && '1' || '0' }}
       working-directory: python
