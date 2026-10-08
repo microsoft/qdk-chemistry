@@ -5,7 +5,7 @@ fonttools>=4.61.0
 opentelemetry-api==1.42.1; sys_platform == 'linux'
 opentelemetry-exporter-otlp-proto-grpc==1.42.1; sys_platform == 'linux'
 opentelemetry-sdk==1.42.1; sys_platform == 'linux'
-urllib3>=2.6.0
+urllib3>=2.8.0
 # Mirror python/pyproject.toml [build-system].requires so CG sees the wheel's
 # PEP 517 build-time deps in the buildenv pip-report (they otherwise only live
 # inside `python -m build`'s ephemeral isolated env, which CG never inspects).
