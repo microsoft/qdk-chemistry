@@ -132,9 +132,6 @@ class QpeCircuitBuilder(Algorithm):
     ) -> int:
         """Return the width of the system register the unitary acts on.
 
-        A :class:`~qdk_chemistry.data.QubitOperator` acts on all of its qubits. Any other input
-        takes the width from its unitary, which is built here when not given.
-
         Args:
             qubit_hamiltonian: The Hamiltonian description the unitary builder takes.
             unitary_rep: The unitary already built from ``qubit_hamiltonian``, if any.
