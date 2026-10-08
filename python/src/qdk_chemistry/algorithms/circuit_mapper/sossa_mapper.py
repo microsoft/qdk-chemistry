@@ -60,6 +60,37 @@ class SOSSAMapperSettings(Settings):
             "Number of bits for alias sampling coefficient precision, from 1 to 30 inclusive.",
             (1, 30),
         )
+        self._set_default(
+            "num_givens_rotation_batches",
+            "int",
+            1,
+            "Maximum number of passes SELECT makes over the N-1 Givens angles. 1 is the cheapest in Toffolis "
+            "and the widest in qubits. More passes shrink the rotation register to "
+            "ceil((N-1)/num_givens_rotation_batches) angles, at one extra table lookup per batch in each direction. "
+            "SELECT makes the fewest passes that register allows, which can be fewer than requested.",
+            (1, 4096),
+        )
+        self._set_default(
+            "lookup_method",
+            "string",
+            "select_swap",
+            "How every QROM table in the walk is routed, including the Givens rotation tables and the "
+            "inner alias-sampling tables. 'select' is a plain unary-iteration lookup; 'select_swap' is "
+            "a clean QROAM that cuts Toffolis but allocates scratch. 'dirty_select_swap' runs the same "
+            "network on borrowed dirty qubits that are provably idle across the load, so it costs no "
+            "width at all, but it pays roughly two to three times the Toffolis of the clean network at "
+            "equal width. Every method falls back to a plain lookup at shapes where its own cost model "
+            "says no network pays.",
+            ["select", "select_swap", "dirty_select_swap"],
+        )
+        self._set_default(
+            "max_swap_bits",
+            "int",
+            -1,
+            "Ceiling on the swap width k of every QROAM in the walk. -1 leaves each loader's own "
+            "selector alone, 0 forces plain select, and a positive value caps the swap bits.",
+            (-1, 30),
+        )
 
 
 class SOSSAMapper(CircuitMapper):
@@ -143,10 +174,14 @@ class SOSSAMapper(CircuitMapper):
         free_rider_data = free_rider_data.tolist() if free_rider_data is not None else []
 
         if algorithm == "controlled_alias_sampling":
+            # The walk lends its system register (2N qubits) to the inner PREPARE's QROAM.
+            available_dirty = 2 * container.metadata.num_spatial_orbitals if self._borrow_dirty else 0
             return QSHARP_UTILS.SOSSAWalk.MakeInnerPrepareAliasSamplingOracles(
                 coefficients,
                 free_rider_data,
                 coeff_bits,
+                self._max_swap_bits,
+                available_dirty,
             )
         if algorithm == "direct":
             return (
@@ -179,6 +214,14 @@ class SOSSAMapper(CircuitMapper):
         else:
             raise ValueError(f"Unsupported SOSSA inner PREPARE algorithm '{inner_algorithm}'.")
 
+        num_angles = max(meta.num_spatial_orbitals - 1, 0)
+        num_givens_rotation_batches = int(self._settings.get("num_givens_rotation_batches"))
+        if 0 < num_angles < num_givens_rotation_batches:
+            raise ValueError(
+                f"num_givens_rotation_batches must be at most the {num_angles} rotation angles of a "
+                f"{meta.num_spatial_orbitals}-orbital system, got {num_givens_rotation_batches}"
+            )
+
         select_data = {
             "numOrbitals": meta.num_spatial_orbitals,
             "numRanks": meta.num_ranks,
@@ -188,6 +231,10 @@ class SOSSAMapper(CircuitMapper):
             "OneBodyRotationAngles": container.select.one_body_rotation_angles.tolist(),
             "TwoBodyRotationAngles": container.select.two_body_rotation_angles.tolist(),
             "rotationBitPrecision": rot_bits,
+            # Narrowest lambda within num_givens_rotation_batches passes; 6 on 19 angles gives lambda 4, so 5 passes.
+            "rotationBatchSize": -(-num_angles // num_givens_rotation_batches),
+            "borrowDirty": self._borrow_dirty,
+            "maxSwapBits": self._max_swap_bits,
             "numFreeRiderBits": num_free_rider_bits,
             "signQubitIndex": sign_qubit_index,
         }
@@ -310,6 +357,10 @@ class SOSSAMapper(CircuitMapper):
         outer_prepare_circuit = self._build_outer_prepare_circuit(container)
         regs, register_layout = self._compute_register_sizes(container, outer_prepare_circuit)
         outer_prepare_op = outer_prepare_circuit._qsharp_op  # noqa: SLF001
+        # Resolved per run (settings stay mutable); "select" is a width-0 cap, so only borrowing is passed on.
+        lookup_method = self._settings.get("lookup_method")
+        self._max_swap_bits = 0 if lookup_method == "select" else int(self._settings.get("max_swap_bits"))
+        self._borrow_dirty = lookup_method == "dirty_select_swap"
         inner_prepare_op, free_rider_op = self._build_inner_oracles(container)
         select_op = self._build_select(container)
 

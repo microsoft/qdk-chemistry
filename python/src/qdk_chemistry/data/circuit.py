@@ -224,12 +224,17 @@ class Circuit(DataClass):
 
         raise RuntimeError("The QIR representation of the quantum circuit is not set.")
 
-    def get_qsharp_circuit(self, prune_classical_qubits: bool = False) -> QdkCircuitType:
+    def get_qsharp_circuit(
+        self,
+        prune_classical_qubits: bool = False,
+        **kwargs: Any,
+    ) -> QdkCircuitType:
         """Parse a Circuit object into a Q# circuit object.
 
         Args:
             prune_classical_qubits: If True, classical qubits are removed from the circuit. Only applicable
                 when converting from Q# factory data.
+            **kwargs: Forwarded to ``qsharp.circuit``, e.g. ``generation_method=CircuitGenerationMethod.Simulate``.
 
         Returns:
             QdkCircuitType: A Q# Circuit object.
@@ -253,6 +258,7 @@ class Circuit(DataClass):
                 self._qsharp_factory.program,
                 *self._qsharp_factory.parameter.values(),
                 prune_classical_qubits=prune_classical_qubits,
+                **kwargs,
             )
         if self.qasm:
             return openqasm_circuit(self.qasm)

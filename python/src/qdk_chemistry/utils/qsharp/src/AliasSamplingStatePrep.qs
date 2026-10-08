@@ -29,8 +29,10 @@ namespace QDKChemistry.Utils.AliasSampling {
     import Std.Arrays.Mapped;
     import Std.Arrays.Sorted;
     import QDKChemistry.Utils.SelectSwap.ComputeOptimalLambda2D;
+    import QDKChemistry.Utils.SelectSwapDirty.ComputeOptimalDirtySwapBits2D;
     import QDKChemistry.Utils.SelectSwap.SelectSwap2D;
     import QDKChemistry.Utils.SelectSwap.SelectSwap;
+    import Std.Arrays.IsEmpty;
 
     /// Parameters for alias sampling state preparation.
     struct AliasSamplingParams {
@@ -190,6 +192,11 @@ namespace QDKChemistry.Utils.AliasSampling {
         return result;
     }
 
+    /// Create an alias sampling state preparation callable.
+    function MakeAliasSamplingOp(params : AliasSamplingParams) : Qubit[] => Unit is Adj + Ctl {
+        AliasSamplingPrepare(params, _)
+    }
+
     /// Prepare a uniform superposition over |0⟩ .. |nStates - 1⟩ without ancillas.
     ///
     /// `Std.StatePreparation.PrepareUniformSuperposition` allocates an ancilla that is
@@ -298,24 +305,25 @@ namespace QDKChemistry.Utils.AliasSampling {
     operation ConditionalAliasSamplingPrepare(
         coefficients : Double[][],
         bitsPrecision : Int,
+        numSwapBits : Int,
         conditionalRegister : Qubit[],
         indexRegister : Qubit[],
         uniformRegister : Qubit[],
         flagQubit : Qubit,
         qromOutput : Qubit[],
-        numSwapBits : Int
     ) : Unit is Adj {
         ConditionalAliasSamplingPrepareWithFreeRider(
             coefficients,
             [],
             bitsPrecision,
+            numSwapBits,
             conditionalRegister,
             indexRegister,
             uniformRegister,
             flagQubit,
             qromOutput,
             [],
-            numSwapBits
+            []
         );
     }
 
@@ -333,17 +341,19 @@ namespace QDKChemistry.Utils.AliasSampling {
     ///   5. Conditional swap index ↔ alt
     ///   6. Conditional swap signOrig ↔ signAlt
     ///   7. Z(signOrig) for sign encoding
+    /// `numSwapBits` caps the swap width (-1 free, 0 `Select`); a non-empty `dirty` lends the block.
     operation ConditionalAliasSamplingPrepareWithFreeRider(
         coefficients : Double[][],
         freeRiderData : Bool[][],
         bitsPrecision : Int,
+        numSwapBits : Int,
         conditionalRegister : Qubit[],
         indexRegister : Qubit[],
         uniformRegister : Qubit[],
         flagQubit : Qubit,
         qromOutput : Qubit[],
         freeRiderRegister : Qubit[],
-        numSwapBits : Int
+        dirty : Qubit[],
     ) : Unit is Adj {
         let nIndexBits = Length(indexRegister);
         let nCoeffs = Length(coefficients[0]);
@@ -363,19 +373,21 @@ namespace QDKChemistry.Utils.AliasSampling {
         let nCond = Length(table3D);
         let nInnerData = Length(table3D[0]);
         let m = Length(qromOutput) + Length(freeRiderRegister);
-        let lambda = if numSwapBits == -1 {
+        // A borrowed network has its own cost optimum and is capped by what the caller lent.
+        let selected = if IsEmpty(dirty) {
             ComputeOptimalLambda2D(nCond, nInnerData, m, true)
-        } elif numSwapBits > 0 {
-            numSwapBits
         } else {
-            0
+            ComputeOptimalDirtySwapBits2D(nCond, nInnerData, m, true, Length(dirty))
         };
+        // A cap, not an override: it can narrow what the selector chose but never widen it.
+        let lambda = if numSwapBits < 0 { selected } else { MinI(selected, numSwapBits) };
         SelectSwap2D(
             table3D,
-            conditionalRegister,
-            indexRegister,
             lambda,
             true,
+            conditionalRegister,
+            indexRegister,
+            dirty,
             qromOutput + freeRiderRegister
         );
 
@@ -394,11 +406,6 @@ namespace QDKChemistry.Utils.AliasSampling {
         Z(signOrigQubit);
     }
 
-    /// Create an alias sampling state preparation callable.
-    function MakeAliasSamplingOp(params : AliasSamplingParams) : Qubit[] => Unit is Adj + Ctl {
-        AliasSamplingPrepare(params, _)
-    }
-
     /// Circuit entry point for alias sampling.
     operation MakeAliasSamplingCircuit(
         coefficients : Double[],
@@ -415,6 +422,8 @@ namespace QDKChemistry.Utils.AliasSampling {
         use qs = Qubit[numQubits];
         AliasSamplingPrepare(params, qs);
     }
+
+    // ═══ Test wrappers ══════════════════════════════════════════════════════════
 
     /// Test wrapper: conditional alias sampling on `[condition | index | uniform | flag | qrom]`.
     internal function MakeConditionalAliasSamplingPrepOp(
@@ -441,12 +450,12 @@ namespace QDKChemistry.Utils.AliasSampling {
             ConditionalAliasSamplingPrepare(
                 coefficients,
                 bitsPrecision,
+                numSwapBits,
                 conditionalReg,
                 indexReg,
                 uniformReg,
                 flagQubit,
-                qromOut,
-                numSwapBits
+                qromOut
             );
         }
     }
@@ -478,12 +487,12 @@ namespace QDKChemistry.Utils.AliasSampling {
                 ConditionalAliasSamplingPrepare(
                     coefficients,
                     bitsPrecision,
+                    numSwapBits,
                     conditionalReg,
                     indexReg,
                     uniformReg,
                     flagQubit,
-                    qromOut,
-                    numSwapBits
+                    qromOut
                 );
             } apply {
                 Z(indexReg[0]);
@@ -519,13 +528,14 @@ namespace QDKChemistry.Utils.AliasSampling {
                 coefficients,
                 freeRiderData,
                 bitsPrecision,
+                0,
                 conditionalReg,
                 indexReg,
                 uniformReg,
                 flagQubit,
                 qromOut,
                 freeRiderReg,
-                0
+                []
             );
         }
     }

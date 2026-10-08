@@ -305,8 +305,12 @@ def _sossa_circuit_mapper_ref(
     select_algorithm: str = "direct",
     coefficient_bit_precision: int = 10,
     rotation_bit_precision: int = 10,
+    **settings,
 ) -> AlgorithmRef:
-    """Return an AlgorithmRef for the SOSSA circuit mapper."""
+    """Return an AlgorithmRef for the SOSSA circuit mapper.
+
+    Extra keyword settings pass through so callers can vary one mapper knob at a time.
+    """
     return AlgorithmRef(
         "circuit_mapper",
         "sossa",
@@ -315,6 +319,7 @@ def _sossa_circuit_mapper_ref(
         select_algorithm=select_algorithm,
         coefficient_bit_precision=coefficient_bit_precision,
         rotation_bit_precision=rotation_bit_precision,
+        **settings,
     )
 
 
@@ -735,12 +740,11 @@ class TestSOSSAQPEScope:
 class TestSOSSAResourceEstimation:
     """Logical-resource estimation of the SOSSA unary-iteration QPE circuit."""
 
-    def test_fe2s2_logical_resource_estimate(self):
-        """Pin the Fe2S2-20 logical cost of the circuit that actually runs.
+    @staticmethod
+    def _fe2s2_logical_counts(**select_settings):
+        """Estimate Fe2S2-20 while varying only SELECT rotation settings.
 
-        Uses a random factorized Hamiltonian rather than the H2 data because the point is
-        to exercise the register widths at ``(N, R, B, C) = (20, 14, 15, 5)``, not to
-        recover an energy.
+        Random data exercises the ``(N, R, B, C) = (20, 14, 15, 5)`` register widths.
         """
         num_orbitals = 20
         factorized = create_random_factorized_hamiltonian(
@@ -764,14 +768,39 @@ class TestSOSSAResourceEstimation:
                 select_algorithm="qrom_phase_gradient",
                 coefficient_bit_precision=11,
                 rotation_bit_precision=15,
+                **select_settings,
             ),
             unitary_builder=AlgorithmRef("hamiltonian_unitary_builder", "sossa"),
         )
         circuit = builder.run(state_preparation=state_prep, qubit_hamiltonian=operator)[0]
 
-        logical_counts = circuit.estimate().logical_counts
+        counts = circuit.estimate().logical_counts
+        return counts["numQubits"], counts["cczCount"] + counts["ccixCount"]
 
-        toffoli_count = logical_counts["cczCount"] + logical_counts["ccixCount"]
+    def test_fe2s2_logical_resource_estimate(self):
+        """Pin the Fe2S2-20 logical cost of the circuit that actually runs.
 
-        assert toffoli_count == pytest.approx(42_558_509, rel=0.01)
-        assert logical_counts["numQubits"] == 486
+        Uses a random factorized Hamiltonian rather than the H2 data because the point is
+        to exercise the register widths at ``(N, R, B, C) = (20, 14, 15, 5)``, not to
+        recover an energy.
+        Tolerance is estimator noise only; re-measure and re-pin when design changes move it.
+        """
+        num_qubits, toffoli_count = self._fe2s2_logical_counts()
+
+        assert toffoli_count == pytest.approx(42_751_587, rel=0.01)
+        assert num_qubits == 486
+
+    def test_fe2s2_streamed_logical_resource_estimate(self):
+        """Pin the streamed Fe2S2 cost used by the example."""
+        # Fewest passes reaching the 379-qubit PREPARE floor, which needs lambda <= 19 - ceil((486 - 379) / 15) = 11.
+        num_qubits, toffoli_count = self._fe2s2_logical_counts(num_givens_rotation_batches=2)
+
+        assert num_qubits == 379
+        assert toffoli_count == pytest.approx(60_535_087, rel=0.01)
+
+    def test_fe2s2_streamed_select_logical_resource_estimate(self):
+        """Pin the streamed Fe2S2 cost with the plain ``select`` lookup, as the example's streamed cell runs it."""
+        num_qubits, toffoli_count = self._fe2s2_logical_counts(num_givens_rotation_batches=2, lookup_method="select")
+
+        assert num_qubits == 350
+        assert toffoli_count == pytest.approx(80_991_193, rel=0.01)
