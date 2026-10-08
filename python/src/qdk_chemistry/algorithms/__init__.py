@@ -69,7 +69,11 @@ from qdk_chemistry.algorithms.qubit_mapper import QdkQubitMapper, QubitMapper
 from qdk_chemistry.algorithms.scf_solver import QdkScfSolver, QdkStabilizedScfSolver, ScfSolver
 from qdk_chemistry.algorithms.stability_checker import QdkStabilityChecker, StabilityChecker
 from qdk_chemistry.algorithms.state_preparation import StatePreparation
-from qdk_chemistry.algorithms.unitary_builder.base import TimeEvolutionBuilder, UnitaryBuilder
+from qdk_chemistry.algorithms.unitary_builder.base import (
+    HamiltonianUnitaryBuilder,
+    TimeEvolutionBuilder,
+    UnitaryBuilder,
+)
 from qdk_chemistry.utils.telemetry import TELEMETRY_ENABLED
 from qdk_chemistry.utils.telemetry_events import telemetry_tracker
 
@@ -89,6 +93,7 @@ __all__ = [
     "HadamardTest",
     "HamiltonianConstructor",
     "HamiltonianFactorization",
+    "HamiltonianUnitaryBuilder",
     "MultiConfigurationCalculator",
     "MultiConfigurationScf",
     "NuclearDerivativeCalculator",
@@ -153,7 +158,6 @@ _REGISTRY_EXPORTS = frozenset(
 # DeprecationWarning but returns the new class object, so existing code keeps working.
 _DEPRECATED_ALIASES = {
     "EnergyEstimator": "ExpectationEstimator",
-    "HamiltonianUnitaryBuilder": "UnitaryBuilder",
     "QdkEnergyEstimator": "QdkExpectationEstimator",
 }
 

@@ -146,11 +146,10 @@ class QdkIterativeQpeCircuitBuilder(IterativeQpeCircuitBuilder):
 
         """
         _validate_iteration_inputs(iteration, total_iterations)
+        num_system_qubits = self._num_system_qubits(qubit_hamiltonian)
         power = 2 ** (total_iterations - iteration - 1)
 
-        ctrl_unitary_circuit, num_system_qubits, num_ancilla_qubits = self._create_controlled_circuit(
-            qubit_hamiltonian, power
-        )
+        ctrl_unitary_circuit, num_ancilla_qubits = self._create_controlled_circuit(qubit_hamiltonian, power)
 
         if state_preparation._qsharp_op and ctrl_unitary_circuit._qsharp_op:  # noqa: SLF001
             return self._create_circuit_from_qsharp_op(

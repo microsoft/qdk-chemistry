@@ -7,7 +7,7 @@
 
 from abc import ABC
 
-from qdk_chemistry._core.data import Hamiltonian, LatticeGeometry
+from qdk_chemistry._core.data import LatticeGeometry
 from qdk_chemistry.data.qubit_operator import QubitOperator
 
 __all__ = ["UnitaryBuilderInput"]
@@ -18,11 +18,10 @@ class UnitaryBuilderInput(ABC):  # noqa: B024
 
     The built-in types are registered below; a plugin registers its own with
     ``UnitaryBuilderInput.register``. Registering a type lets phase estimation pass it through;
-    each :class:`~qdk_chemistry.algorithms.UnitaryBuilder` still evolves only the one type it
-    names, and rejects the rest.
+    a :class:`~qdk_chemistry.algorithms.UnitaryBuilder` that names the one type it evolves
+    rejects the rest.
     """
 
 
 UnitaryBuilderInput.register(QubitOperator)
-UnitaryBuilderInput.register(Hamiltonian)
 UnitaryBuilderInput.register(LatticeGeometry)

@@ -91,6 +91,10 @@ class SOSSABuilder(UnitaryBuilder):
         self._settings.set("reference_ground_state_energy", reference_ground_state_energy)
         self._settings.set("reference_energy_gap", reference_energy_gap)
 
+    def _input_type(self) -> type:
+        """Return :class:`~qdk_chemistry.data.QubitOperator`, the input SOSSA block-encodes."""
+        return QubitOperator
+
     def _run_impl(self, qubit_hamiltonian: QubitOperator) -> UnitaryRepresentation:
         """Build the SOSSA block encoding from qubit operator.
 

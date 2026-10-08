@@ -11,12 +11,12 @@ import numpy as np
 import pytest
 import scipy
 
-from qdk_chemistry.algorithms.unitary_builder.time_evolution.trotter import Trotter
-from qdk_chemistry.algorithms.unitary_builder.time_evolution.trotter_error import trotter_steps_commutator
+from qdk_chemistry.algorithms.hamiltonian_unitary_builder.time_evolution.trotter import Trotter
+from qdk_chemistry.algorithms.hamiltonian_unitary_builder.time_evolution.trotter_error import trotter_steps_commutator
 from qdk_chemistry.data import (
     FlatPartition,
+    Hamiltonian,
     LatticeGeometry,
-    LatticeGraph,
     LayeredPartition,
     QubitOperator,
     UnitaryBuilderInput,
@@ -26,7 +26,6 @@ from qdk_chemistry.data.unitary_representation.containers.pauli_product_formula 
     ExponentiatedPauliTerm,
     PauliProductFormulaContainer,
 )
-from qdk_chemistry.utils.model_hamiltonians import create_hubbard_hamiltonian
 from qdk_chemistry.utils.pauli_commutation import (
     commutator_bound_first_order,
     commutator_bound_higher_order,
@@ -955,24 +954,15 @@ class TestTrotterAccuracyAware:
 
 
 class TestUnitaryBuilderInput:
-    """A builder accepts any UnitaryBuilderInput by type, and evolves only the one it names."""
+    """Trotter evolves a QubitOperator and rejects any other UnitaryBuilderInput."""
 
-    def test_hamiltonian_descriptions_are_unitary_builder_inputs(self):
-        """QubitOperator, Hamiltonian, and LatticeGeometry register; a LatticeGraph does not."""
-        lattice = LatticeGraph.chain(2, periodic=False)
-        inputs = (
-            QubitOperator(["Z"], np.array([1.0])),
-            create_hubbard_hamiltonian(lattice, epsilon=0.0, t=1.0, U=1.0),
-            LatticeGeometry.square(2, 2, periodic_x=True, periodic_y=True),
-        )
-        assert all(isinstance(value, UnitaryBuilderInput) for value in inputs)
-        assert not isinstance(lattice, UnitaryBuilderInput)
-
-    def test_rejects_a_hamiltonian_it_does_not_evolve(self):
-        """Trotter takes a QubitOperator, so a fermionic Hamiltonian is turned away by name."""
-        hamiltonian = create_hubbard_hamiltonian(LatticeGraph.chain(2, periodic=False), epsilon=0.0, t=1.0, U=1.0)
-        with pytest.raises(TypeError, match="takes a QubitOperator, got Hamiltonian"):
-            Trotter(time=0.1).run(hamiltonian)
+    def test_rejects_an_input_it_does_not_evolve(self):
+        """QubitOperator and LatticeGeometry are inputs and Hamiltonian is not; Trotter turns a geometry away."""
+        assert issubclass(QubitOperator, UnitaryBuilderInput)
+        assert issubclass(LatticeGeometry, UnitaryBuilderInput)
+        assert not issubclass(Hamiltonian, UnitaryBuilderInput)
+        with pytest.raises(TypeError, match="takes a QubitOperator, got LatticeGeometry"):
+            Trotter(time=0.1).run(LatticeGeometry.chain(2))
 
 
 class TestNoPartitionFallback:

@@ -639,7 +639,7 @@ def test_iterative_qpe_builder_pairs_largest_power_with_first_iteration(
     class _PowerRecordingBuilder(QdkIterativeQpeCircuitBuilder):
         """Records the controlled power requested for each iteration."""
 
-        def _create_controlled_circuit(self, qubit_hamiltonian: QubitOperator, power: int) -> tuple[Circuit, int, int]:
+        def _create_controlled_circuit(self, qubit_hamiltonian: QubitOperator, power: int) -> tuple[Circuit, int]:
             recorded_powers.append(power)
             return super()._create_controlled_circuit(qubit_hamiltonian, power)
 

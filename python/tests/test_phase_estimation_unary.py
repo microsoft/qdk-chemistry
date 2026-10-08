@@ -10,6 +10,7 @@ import pytest
 from qdk.test_utils import dump_operation_on_state
 
 from qdk_chemistry.algorithms.circuit_mapper.psp_mapper import PSPMapper
+from qdk_chemistry.algorithms.hamiltonian_unitary_builder.block_encoding.lcu import LCUBuilder
 from qdk_chemistry.algorithms.phase_estimation.circuit_builder import unary_phase_estimation_builder
 from qdk_chemistry.algorithms.phase_estimation.circuit_builder.unary_phase_estimation_builder import (
     QdkUnaryQpeCircuitBuilder,
@@ -21,7 +22,6 @@ from qdk_chemistry.algorithms.phase_estimation.unary_phase_estimation import (
 )
 from qdk_chemistry.algorithms.state_preparation import identity_state_prep
 from qdk_chemistry.algorithms.state_preparation.qrom_state_prep import QROMStatePreparation
-from qdk_chemistry.algorithms.unitary_builder.block_encoding.lcu import LCUBuilder
 from qdk_chemistry.data import (
     AlgorithmRef,
     Configuration,

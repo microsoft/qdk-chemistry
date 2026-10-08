@@ -216,7 +216,7 @@ class QdkUnaryQpeCircuitBuilder(QpeCircuitBuilder):
         num_qubits = block_encoding.num_qubits
         if num_qubits is None:
             raise ValueError(f"Circuit mapper '{type(mapper).__name__}' did not report num_qubits.")
-        num_system_qubits = unitary_rep.get_num_system_qubits()
+        num_system_qubits = self._num_system_qubits(qubit_hamiltonian, unitary_rep)
 
         block_encoding_shared = block_encoding.metadata.num_phase_gradient_ancillas
         state_prep_shared = state_preparation.metadata.num_phase_gradient_ancillas

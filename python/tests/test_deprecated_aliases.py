@@ -7,8 +7,7 @@ These tests guard the backward-compatibility shims added when
 ``"energy_estimator"`` algorithm-type key was renamed to
 ``"expectation_estimator"``, the v1 time-evolution type keys were renamed, and
 ``SparseIsometryGF2X`` state preparation was renamed to ``SparseIsometry``, and
-``HamiltonianUnitaryBuilder`` and its ``hamiltonian_unitary_builder`` package were
-renamed to ``UnitaryBuilder`` and ``unitary_builder``.
+``HamiltonianUnitaryBuilder`` was renamed to ``UnitaryBuilder``.
 The old names must keep working while emitting a ``DeprecationWarning`` so
 downstream users are not broken immediately.
 """
@@ -26,12 +25,13 @@ import pytest
 from qdk_chemistry import algorithms
 from qdk_chemistry.algorithms import (
     ExpectationEstimator,
+    HamiltonianUnitaryBuilder,
     QdkExpectationEstimator,
+    UnitaryBuilder,
     state_preparation,
     unitary_builder,
 )
 from qdk_chemistry.algorithms.state_preparation import SparseIsometryStatePreparation
-from qdk_chemistry.algorithms.unitary_builder import base as unitary_builder_base
 from qdk_chemistry.data import AlgorithmRef, Circuit, QubitHamiltonian, QubitOperator, Settings
 from qdk_chemistry.plugins.qiskit import QDK_CHEMISTRY_HAS_QISKIT
 
@@ -87,17 +87,46 @@ class TestQubitHamiltonianDeprecation:
 @pytest.mark.parametrize(
     ("module", "old"),
     [
-        (algorithms, "HamiltonianUnitaryBuilder"),
         (unitary_builder, "HamiltonianUnitaryBuilderFactory"),
-        (unitary_builder_base, "HamiltonianUnitaryBuilder"),
-        (unitary_builder_base, "HamiltonianUnitaryBuilderSettings"),
+        (unitary_builder.base, "HamiltonianUnitaryBuilderSettings"),
     ],
 )
 def test_hamiltonian_unitary_builder_names_warn_and_resolve_to_unitary_builder(module, old):
     """Each ``HamiltonianUnitaryBuilder*`` name warns and returns its ``UnitaryBuilder*`` class."""
     with pytest.warns(DeprecationWarning, match=old):
         alias = getattr(module, old)
-    assert alias is getattr(unitary_builder_base, old.removeprefix("Hamiltonian"))
+    assert alias is getattr(unitary_builder.base, old.removeprefix("Hamiltonian"))
+
+
+class TestHamiltonianUnitaryBuilderDeprecation:
+    """``HamiltonianUnitaryBuilder`` is a deprecated subclass of :class:`~qdk_chemistry.algorithms.UnitaryBuilder`."""
+
+    def test_star_export_matches_every_builder_without_warning(self):
+        """``from qdk_chemistry.algorithms import *`` still provides the class silently, and every builder is one."""
+        with warnings.catch_warnings():
+            warnings.simplefilter("error", DeprecationWarning)
+            exported = {name: getattr(algorithms, name) for name in algorithms.__all__}
+        assert exported["HamiltonianUnitaryBuilder"] is HamiltonianUnitaryBuilder
+        assert isinstance(algorithms.create("hamiltonian_unitary_builder", "trotter"), HamiltonianUnitaryBuilder)
+        assert issubclass(UnitaryBuilder, HamiltonianUnitaryBuilder)
+        assert not issubclass(int, HamiltonianUnitaryBuilder)
+
+    def test_legacy_subclass_warns_and_keeps_its_input_and_run_arguments(self):
+        """Subclassing the old base warns at the class statement; the subclass keeps its input and ``run`` arguments."""
+        with pytest.warns(DeprecationWarning, match="subclass 'UnitaryBuilder'") as record:
+
+            class _ScaledBuilder(HamiltonianUnitaryBuilder):
+                def name(self) -> str:
+                    return "scaled"
+
+                def type_name(self) -> str:
+                    return "hamiltonian_unitary_builder"
+
+                def _run_impl(self, model: dict, scale: float = 1.0):  # type: ignore[override]
+                    return model, scale
+
+        assert record[0].filename == __file__
+        assert _ScaledBuilder().run({"J": 1.0}, scale=2.0) == ({"J": 1.0}, 2.0)
 
 
 class TestEnergyEstimatorDeprecation:

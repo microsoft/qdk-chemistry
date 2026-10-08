@@ -11,8 +11,10 @@ from qdk_chemistry.algorithms.base import Algorithm, AlgorithmFactory
 from qdk_chemistry.data import (
     AlgorithmRef,
     Circuit,
+    QubitOperator,
     Settings,
     UnitaryBuilderInput,
+    UnitaryRepresentation,
 )
 
 __all__: list[str] = [
@@ -98,7 +100,7 @@ class QpeCircuitBuilder(Algorithm):
         self,
         qubit_hamiltonian: UnitaryBuilderInput,
         power: int,
-    ) -> tuple[Circuit, int, int]:
+    ) -> tuple[Circuit, int]:
         r"""Create the controlled circuit for the given Hamiltonian and power.
 
         Sets the ``power`` on the unitary builder so it produces :math:`U^{\\text{power}}`
@@ -109,21 +111,43 @@ class QpeCircuitBuilder(Algorithm):
             power: The power to which the unitary should be raised.
 
         Returns:
-            A tuple of (circuit, num_system_qubits, num_ancilla_qubits) where circuit implements
-            controlled-:math:`U^{\\text{power}}`, num_system_qubits is the width of the register
-            the unitary acts on, and num_ancilla_qubits is the number of ancilla qubits used by
-            the unitary beyond the system qubits.
+            A tuple of (circuit, num_ancilla_qubits) where circuit implements
+            controlled-:math:`U^{\\text{power}}` and num_ancilla_qubits is the number
+            of ancilla qubits used by the unitary beyond the system qubits.
 
         """
         unitary_builder = self._create_nested("unitary_builder")
         unitary_builder.settings().update("power", power)
         unitary_rep = unitary_builder.run(qubit_hamiltonian)
-        num_system_qubits = unitary_rep.get_num_system_qubits()
-        num_ancilla_qubits = unitary_rep.get_num_qubits() - num_system_qubits
+        num_ancilla_qubits = unitary_rep.get_num_qubits() - self._num_system_qubits(qubit_hamiltonian, unitary_rep)
         circuit_mapper = self._create_nested("controlled_circuit_mapper")
         circuit_mapper.settings().update("control_indices", [0])
         circuit = circuit_mapper.run(unitary_rep)
-        return circuit, num_system_qubits, num_ancilla_qubits
+        return circuit, num_ancilla_qubits
+
+    def _num_system_qubits(
+        self,
+        qubit_hamiltonian: UnitaryBuilderInput,
+        unitary_rep: UnitaryRepresentation | None = None,
+    ) -> int:
+        """Return the width of the system register the unitary acts on.
+
+        A :class:`~qdk_chemistry.data.QubitOperator` acts on all of its qubits. Any other input
+        takes the width from its unitary, which is built here when not given.
+
+        Args:
+            qubit_hamiltonian: The Hamiltonian or geometry the unitary builder takes.
+            unitary_rep: The unitary already built from ``qubit_hamiltonian``, if any.
+
+        Returns:
+            The number of system qubits.
+
+        """
+        if isinstance(qubit_hamiltonian, QubitOperator):
+            return qubit_hamiltonian.num_qubits
+        if unitary_rep is None:
+            unitary_rep = self._create_nested("unitary_builder").run(qubit_hamiltonian)
+        return unitary_rep.get_num_system_qubits()
 
     @staticmethod
     def _validate_state_prep_width(state_preparation: Circuit, num_qubits_passed: int) -> None:

@@ -12,7 +12,7 @@ import pytest
 from qdk.test_utils import dump_operation_on_state
 
 from qdk_chemistry.algorithms.circuit_mapper import SOSSAMapper
-from qdk_chemistry.algorithms.unitary_builder.block_encoding.sossa import SOSSABuilder
+from qdk_chemistry.algorithms.hamiltonian_unitary_builder.block_encoding.sossa import SOSSABuilder
 from qdk_chemistry.data import AlgorithmRef, Circuit, FactorizedHamiltonianContainer
 from qdk_chemistry.data.circuit import CircuitMetadata
 from qdk_chemistry.data.unitary_representation.base import UnitaryRepresentation

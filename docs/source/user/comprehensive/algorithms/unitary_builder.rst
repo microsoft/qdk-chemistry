@@ -2,15 +2,15 @@ Unitary Builder
 ===============
 
 The :class:`~qdk_chemistry.algorithms.UnitaryBuilder` algorithm in QDK/Chemistry constructs a unitary based on the Hamiltonian, such as time simulation unitary :math:`U(t) = e^{-iHt}` or block-encoded unitary :math:`U = \frac{H}{\|H\|}`.
-Following QDK/Chemistry's :doc:`algorithm design principles <../design/index>`, it takes a :class:`~qdk_chemistry.data.UnitaryBuilderInput` (a :class:`~qdk_chemistry.data.Hamiltonian`, :class:`~qdk_chemistry.data.QubitOperator`, or :class:`~qdk_chemistry.data.LatticeGeometry`) and produces a :class:`~qdk_chemistry.data.UnitaryRepresentation` as output.
+Following QDK/Chemistry's :doc:`algorithm design principles <../design/index>`, it takes a :class:`~qdk_chemistry.data.UnitaryBuilderInput` (a :class:`~qdk_chemistry.data.QubitOperator` or :class:`~qdk_chemistry.data.LatticeGeometry`) and produces a :class:`~qdk_chemistry.data.UnitaryRepresentation` as output.
 
 Overview
 --------
 
 Building unitary from Hamiltonian — such as the Hamiltonian simulation unitary :math:`U(t) = e^{-iHt}` or block encoding unitary :math:`U = \frac{H}{\|H\|}` — is a central subroutine in many quantum algorithms.
 The :class:`~qdk_chemistry.algorithms.UnitaryBuilder` provides a unified interface for methods that construct this operator from a Hamiltonian description.
-:class:`~qdk_chemistry.data.QubitOperator`, :class:`~qdk_chemistry.data.Hamiltonian`, and :class:`~qdk_chemistry.data.LatticeGeometry` are all :class:`~qdk_chemistry.data.UnitaryBuilderInput` types, and each builder evolves one of them, raising :class:`TypeError` for the others.
-``HamiltonianUnitaryBuilder`` and the ``qdk_chemistry.algorithms.hamiltonian_unitary_builder`` package remain available as deprecated aliases of :class:`~qdk_chemistry.algorithms.UnitaryBuilder` and ``qdk_chemistry.algorithms.unitary_builder``.
+:class:`~qdk_chemistry.data.QubitOperator` and :class:`~qdk_chemistry.data.LatticeGeometry` are :class:`~qdk_chemistry.data.UnitaryBuilderInput` types; a builder that names the one it evolves raises :class:`TypeError` for the other, and the built-in builders all evolve a :class:`~qdk_chemistry.data.QubitOperator`.
+``HamiltonianUnitaryBuilder`` remains available as a deprecated subclass of :class:`~qdk_chemistry.algorithms.UnitaryBuilder`, and the ``qdk_chemistry.algorithms.hamiltonian_unitary_builder`` package as a deprecated alias of ``qdk_chemistry.algorithms.unitary_builder``.
 
 QDK/Chemistry currently provides two families of implementations for this task: Trotter-Suzuki product formulas and block encoding.
 
@@ -32,7 +32,7 @@ Input requirements
 The :class:`~qdk_chemistry.algorithms.UnitaryBuilder` requires the following inputs:
 
 UnitaryBuilderInput
-   A :class:`~qdk_chemistry.data.Hamiltonian`, :class:`~qdk_chemistry.data.QubitOperator`, or :class:`~qdk_chemistry.data.LatticeGeometry`, whichever the configured unitary builder takes.
+   A :class:`~qdk_chemistry.data.QubitOperator` or :class:`~qdk_chemistry.data.LatticeGeometry`, whichever the configured unitary builder takes.
    Most builders take a :class:`~qdk_chemistry.data.QubitOperator`, obtained from the :doc:`QubitMapper <qubit_mapper>` algorithm, a :doc:`model Hamiltonian <../model_hamiltonians>`, or built directly.
 
 .. rubric:: Creating a builder

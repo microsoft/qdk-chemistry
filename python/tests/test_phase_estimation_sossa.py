@@ -18,8 +18,8 @@ import numpy as np
 import pytest
 
 from qdk_chemistry.algorithms import available, create
+from qdk_chemistry.algorithms.hamiltonian_unitary_builder.block_encoding.sossa import SOSSABuilder
 from qdk_chemistry.algorithms.phase_estimation.unary_phase_estimation import UnaryPhaseEstimation
-from qdk_chemistry.algorithms.unitary_builder.block_encoding.sossa import SOSSABuilder
 from qdk_chemistry.data import (
     AlgorithmRef,
     Circuit,

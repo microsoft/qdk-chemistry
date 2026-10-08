@@ -101,6 +101,10 @@ class LCUBuilder(UnitaryBuilder):
         self._settings.set("power", power)
         self._settings.set("quantum_walk", quantum_walk)
 
+    def _input_type(self) -> type:
+        """Return :class:`~qdk_chemistry.data.QubitOperator`, the input LCU block-encodes."""
+        return QubitOperator
+
     def _run_impl(self, qubit_hamiltonian: QubitOperator) -> UnitaryRepresentation:
         """Construct the unitary representation using LCU block encoding.
 

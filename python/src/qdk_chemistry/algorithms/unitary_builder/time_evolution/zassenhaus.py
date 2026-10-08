@@ -139,6 +139,10 @@ class Zassenhaus(TimeEvolutionBuilder):
         if term_grouper is not None:
             self._settings.set("term_grouper", term_grouper)
 
+    def _input_type(self) -> type:
+        """Return :class:`~qdk_chemistry.data.QubitOperator`, the input Zassenhaus evolves."""
+        return QubitOperator
+
     def _run_impl(self, qubit_hamiltonian: QubitOperator) -> UnitaryRepresentation:
         """Construct the unitary representation using Zassenhaus decomposition.
 

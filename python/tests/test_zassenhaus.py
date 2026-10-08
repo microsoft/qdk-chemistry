@@ -13,8 +13,8 @@ import pytest
 import scipy.linalg
 
 from qdk_chemistry.algorithms import create
-from qdk_chemistry.algorithms.unitary_builder.time_evolution.zassenhaus import Zassenhaus
-from qdk_chemistry.algorithms.unitary_builder.time_evolution.zassenhaus_error import (
+from qdk_chemistry.algorithms.hamiltonian_unitary_builder.time_evolution.zassenhaus import Zassenhaus
+from qdk_chemistry.algorithms.hamiltonian_unitary_builder.time_evolution.zassenhaus_error import (
     zassenhaus_steps_commutator,
     zassenhaus_steps_naive,
 )

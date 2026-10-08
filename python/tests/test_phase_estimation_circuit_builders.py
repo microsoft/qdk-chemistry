@@ -370,22 +370,50 @@ class TestStandardQpeCircuitBuilder:
         assert builder.type_name() == "qpe_circuit_builder"
 
 
-def test_controlled_circuit_takes_system_width_from_unitary(monkeypatch: pytest.MonkeyPatch) -> None:
-    """QPE sizes the system register from the unitary, not the input, so a geometry with ancillas works."""
+def _stub_nested(
+    builder: QdkStandardQpeCircuitBuilder | QdkIterativeQpeCircuitBuilder,
+    monkeypatch: pytest.MonkeyPatch,
+    *,
+    num_qubits: int,
+    num_system_qubits: int,
+) -> tuple[Mock, Mock]:
+    """Swap the builder's nested algorithms for mocks whose unitary has the given widths."""
     unitary_builder = Mock()
     unitary_builder.run.return_value = UnitaryRepresentation(
-        Mock(spec=UnitaryContainer, num_qubits=5, num_system_qubits=3)
+        Mock(spec=UnitaryContainer, num_qubits=num_qubits, num_system_qubits=num_system_qubits)
     )
-    controlled_circuit = object()
     circuit_mapper = Mock()
-    circuit_mapper.run.return_value = controlled_circuit
-    builder = QdkStandardQpeCircuitBuilder(num_bits=2)
+    circuit_mapper.run.return_value = Mock(_qsharp_op=object())
     nested = {"unitary_builder": unitary_builder, "controlled_circuit_mapper": circuit_mapper}
     monkeypatch.setattr(builder, "_create_nested", nested.__getitem__)
+    return unitary_builder, circuit_mapper
+
+
+def test_controlled_circuit_takes_system_width_from_unitary(monkeypatch: pytest.MonkeyPatch) -> None:
+    """QPE sizes a geometry's system register from its unitary, so the unitary's ancillas are counted."""
+    builder = QdkStandardQpeCircuitBuilder(num_bits=2)
+    unitary_builder, circuit_mapper = _stub_nested(builder, monkeypatch, num_qubits=5, num_system_qubits=3)
     geometry = LatticeGeometry.chain(3)
 
-    circuit, num_system_qubits, num_ancilla_qubits = builder._create_controlled_circuit(geometry, power=1)
+    circuit, num_ancilla_qubits = builder._create_controlled_circuit(geometry, power=1)
 
     unitary_builder.run.assert_called_once_with(geometry)
-    assert circuit is controlled_circuit
-    assert (num_system_qubits, num_ancilla_qubits) == (3, 2)
+    assert circuit is circuit_mapper.run.return_value
+    assert num_ancilla_qubits == 2
+    assert builder._num_system_qubits(geometry, unitary_builder.run.return_value) == 3
+
+
+@pytest.mark.parametrize("builder_class", [QdkStandardQpeCircuitBuilder, QdkIterativeQpeCircuitBuilder])
+def test_qubit_operator_system_width_is_its_qubit_count(
+    monkeypatch: pytest.MonkeyPatch,
+    builder_class: type[QdkStandardQpeCircuitBuilder | QdkIterativeQpeCircuitBuilder],
+) -> None:
+    """A QubitOperator still sets the system width, even if its unitary's container does not say which are ancillas."""
+    builder = builder_class(num_bits=1)
+    _stub_nested(builder, monkeypatch, num_qubits=3, num_system_qubits=3)
+    widths: list[tuple[int, int]] = []
+    monkeypatch.setattr(builder, "_create_circuit_from_qsharp_op", lambda *args: widths.append(args[-2:]))
+
+    builder._run_impl(Mock(_qsharp_op=object()), QubitOperator(["ZZ"], np.array([1.0])))
+
+    assert widths == [(2, 1)]

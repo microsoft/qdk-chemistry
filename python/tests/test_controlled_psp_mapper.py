@@ -9,7 +9,7 @@ import numpy as np
 import pytest
 
 from qdk_chemistry.algorithms.controlled_circuit_mapper import ControlledPSPMapper
-from qdk_chemistry.algorithms.unitary_builder.block_encoding.lcu import LCUBuilder
+from qdk_chemistry.algorithms.hamiltonian_unitary_builder.block_encoding.lcu import LCUBuilder
 from qdk_chemistry.data import Circuit, QubitOperator
 from qdk_chemistry.data.unitary_representation.base import UnitaryRepresentation
 from qdk_chemistry.plugins.qiskit import QDK_CHEMISTRY_HAS_QISKIT

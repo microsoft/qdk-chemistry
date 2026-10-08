@@ -25,6 +25,7 @@ from qdk_chemistry.data.unitary_representation.containers.pauli_product_formula 
 from qdk_chemistry.utils import Logger
 
 __all__: list[str] = [
+    "HamiltonianUnitaryBuilder",
     "TimeEvolutionBuilder",
     "TimeEvolutionSettings",
     "UnitaryBuilder",
@@ -40,11 +41,13 @@ class UnitaryBuilder(Algorithm):
         """Initialize the UnitaryBuilder."""
         super().__init__()
 
-    def run(self, qubit_hamiltonian: UnitaryBuilderInput) -> UnitaryRepresentation:
+    def run(self, qubit_hamiltonian: UnitaryBuilderInput, *args: Any, **kwargs: Any) -> UnitaryRepresentation:
         """Check the input is the type this builder evolves, then build its unitary.
 
         Args:
             qubit_hamiltonian: The Hamiltonian description to build the unitary from.
+            *args: Further positional arguments, passed on to ``_run_impl``.
+            **kwargs: Further keyword arguments, passed on to ``_run_impl``.
 
         Returns:
             UnitaryRepresentation: The unitary for the given Hamiltonian.
@@ -58,11 +61,11 @@ class UnitaryBuilder(Algorithm):
             raise TypeError(
                 f"The {self.name()!r} builder takes a {expected.__name__}, got {type(qubit_hamiltonian).__name__}."
             )
-        return super().run(qubit_hamiltonian)
+        return super().run(qubit_hamiltonian, *args, **kwargs)
 
     def _input_type(self) -> type:
-        """Return the input type this builder evolves; :class:`~qdk_chemistry.data.QubitOperator` by default."""
-        return QubitOperator
+        """Return the input type this builder evolves; ``object``, which accepts any input, unless overridden."""
+        return object
 
     @abstractmethod
     def _run_impl(self, qubit_hamiltonian: UnitaryBuilderInput) -> UnitaryRepresentation:
@@ -92,6 +95,31 @@ class UnitaryBuilder(Algorithm):
             if char != "I":
                 mapping[index] = char
         return mapping
+
+
+class HamiltonianUnitaryBuilder(UnitaryBuilder):
+    """Deprecated former name of :class:`UnitaryBuilder`; subclass :class:`UnitaryBuilder` instead.
+
+    Every :class:`UnitaryBuilder` still counts as an instance of this class.
+    """
+
+    def __init_subclass__(cls, **kwargs: Any) -> None:
+        """Warn that subclasses should derive from :class:`UnitaryBuilder` instead."""
+        warnings.warn(
+            f"Subclassing 'HamiltonianUnitaryBuilder' (in {cls.__qualname__!r}) is deprecated and will be "
+            "removed in a future release; subclass 'UnitaryBuilder' instead.",
+            DeprecationWarning,
+            stacklevel=3,
+        )
+        super().__init_subclass__(**kwargs)
+
+    @classmethod
+    def __subclasshook__(cls, subclass: type) -> bool:
+        """Count every :class:`UnitaryBuilder` as a subclass of the deprecated base."""
+        # Check the MRO rather than call issubclass, which would recurse back here.
+        if cls is HamiltonianUnitaryBuilder and UnitaryBuilder in getattr(subclass, "__mro__", ()):
+            return True
+        return NotImplemented
 
 
 class UnitaryBuilderSettings(Settings):
@@ -282,7 +310,6 @@ class UnitaryBuilderFactory(AlgorithmFactory):
 
 # Deprecated public names mapped to their replacements.
 _DEPRECATED_ALIASES = {
-    "HamiltonianUnitaryBuilder": "UnitaryBuilder",
     "HamiltonianUnitaryBuilderFactory": "UnitaryBuilderFactory",
     "HamiltonianUnitaryBuilderSettings": "UnitaryBuilderSettings",
 }

@@ -12,7 +12,7 @@ import pytest
 from scipy.linalg import expm
 
 from qdk_chemistry.algorithms import create
-from qdk_chemistry.algorithms.unitary_builder.time_evolution.qdrift import QDrift, QDriftSettings
+from qdk_chemistry.algorithms.hamiltonian_unitary_builder.time_evolution.qdrift import QDrift, QDriftSettings
 from qdk_chemistry.data import QubitOperator, UnitaryRepresentation
 from qdk_chemistry.data.unitary_representation.containers.pauli_product_formula import (
     ExponentiatedPauliTerm,

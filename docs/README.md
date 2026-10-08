@@ -77,8 +77,7 @@ breathe-apidoc -f -m -g namespace -p "QDK/Chemistry" `
 # 3. Sphinx API stubs for the Python package
 sphinx-apidoc -f --separate --module-first --private --implicit-namespaces `
     --doc-project="QDK/Chemistry Python API" `
-    -o source/api/api_autogen ../python/src/qdk_chemistry `
-    ../python/src/qdk_chemistry/algorithms/hamiltonian_unitary_builder
+    -o source/api/api_autogen ../python/src/qdk_chemistry
 
 # 4. First Sphinx pass, which populates the autosummary stubs
 sphinx-build -M html source build -T -j 1 -n -w sphinx-autosummary-warnings.txt
