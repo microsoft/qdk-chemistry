@@ -225,7 +225,7 @@ Setting ``num_electrons`` records the scalar offset to the conventional :math:`U
 The output is a ``HubbardPlaquetteContainer`` that stores the angles and step count rather than individual Pauli terms.
 It is consumed by the ``"hubbard_plaquette"`` controlled circuit mapper, :class:`~qdk_chemistry.algorithms.controlled_circuit_mapper.ControlledHubbardPlaquetteMapper`.
 
-The number of steps can be set directly (``num_divisions``) or estimated from ``target_accuracy`` with Campbell's error constant for the related IPG ordering :cite:`Campbell2022`; this is an estimate for the emitted ordering, not a guarantee.
+The number of steps can be set directly (``num_divisions``) or estimated from ``target_accuracy`` with Campbell's error constant for the related IPG ordering :cite:`Campbell2022`.
 
 .. rubric:: Settings
 
