@@ -397,7 +397,8 @@ class TestContainerAndValidation:
         with h5py.File(tmp_path / "step.h5", "r") as file:
             restored = UnitaryRepresentation.from_hdf5(file["step"]).get_container()
         expected = step.get_container().to_json()
-        assert HubbardPlaquetteContainer.from_json(expected).to_json() == restored.to_json() == expected
+        from_json = UnitaryRepresentation.from_json(step.to_json()).get_container()
+        assert from_json.to_json() == restored.to_json() == expected
 
     @pytest.mark.parametrize(
         ("build", "error", "match"),
