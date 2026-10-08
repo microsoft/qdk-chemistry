@@ -71,6 +71,7 @@ State preparation circuit
 HamiltonianDescription
    A :class:`~qdk_chemistry.data.HamiltonianDescription`, such as a :class:`~qdk_chemistry.data.QubitOperator` containing the Pauli-string representation of the Hamiltonian, or a :class:`~qdk_chemistry.data.ModelHamiltonianDescription` like :class:`~qdk_chemistry.data.FermiHubbardModelHamiltonianDescription` holding a lattice and the model parameters, whichever the configured :doc:`HamiltonianUnitaryBuilder <hamiltonian_unitary_builder>` evolves.
    A :class:`~qdk_chemistry.data.QubitOperator` can be obtained from the :doc:`QubitMapper <qubit_mapper>` algorithm, constructed from a :doc:`model Hamiltonian <../model_hamiltonians>`, or built directly by the user.
+   The ``hubbard_plaquette`` builder takes a :class:`~qdk_chemistry.data.ModelHamiltonianDescription`.
 
 Settings
    The :class:`~qdk_chemistry.algorithms.PhaseEstimation` is configured via its settings object, which includes:

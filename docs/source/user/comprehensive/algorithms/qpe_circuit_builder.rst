@@ -40,6 +40,7 @@ State preparation circuit
 HamiltonianDescription
    A :class:`~qdk_chemistry.data.HamiltonianDescription`, such as a :class:`~qdk_chemistry.data.QubitOperator` containing the Pauli-string representation of the Hamiltonian, or a :class:`~qdk_chemistry.data.ModelHamiltonianDescription` like :class:`~qdk_chemistry.data.FermiHubbardModelHamiltonianDescription` holding a lattice and the model parameters, whichever the configured :doc:`HamiltonianUnitaryBuilder <hamiltonian_unitary_builder>` evolves.
    A :class:`~qdk_chemistry.data.QubitOperator` can be obtained from the :doc:`QubitMapper <qubit_mapper>` algorithm, constructed from a :doc:`model Hamiltonian <../model_hamiltonians>`, or built directly by the user.
+   The ``hubbard_plaquette`` builder takes a :class:`~qdk_chemistry.data.ModelHamiltonianDescription`.
 
 
 The :class:`~qdk_chemistry.algorithms.phase_estimation.circuit_builder.base.QpeCircuitBuilderSettings` class defines the general configuration parameters shared by all QPE circuit builders.
@@ -131,6 +132,22 @@ Constructs the textbook multi-ancilla QPE circuit with inverse Quantum Fourier T
    * - ``qft_do_swaps``
      - bool
      - Whether to include swap gates in the inverse QFT decomposition. Default: ``True``.
+
+**Additional settings (QDK implementation):**
+
+.. list-table::
+   :header-rows: 1
+   :widths: 20 15 65
+
+   * - Setting
+     - Type
+     - Description
+   * - ``phase_state``
+     - str
+     - Phase-register state: ``"uniform"`` (Hadamard superposition) or ``"sine"`` (Heisenberg-limited sine window). Default: ``"uniform"``.
+   * - ``compute_capacity``
+     - int
+     - Maximum number of compute qubits in a memory compute layout; the rest are placed in memory. Must be ``-1`` (every qubit in compute) or positive. Default: ``-1``.
 
 **Usage example:**
 
