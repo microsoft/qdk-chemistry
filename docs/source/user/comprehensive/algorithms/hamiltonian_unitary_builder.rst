@@ -31,7 +31,7 @@ Input requirements
 The :class:`~qdk_chemistry.algorithms.HamiltonianUnitaryBuilder` requires the following inputs:
 
 HamiltonianDescription
-   A :class:`~qdk_chemistry.data.HamiltonianDescription`: either a :class:`~qdk_chemistry.data.QubitOperator` containing the Pauli-string representation of the Hamiltonian, or a :class:`~qdk_chemistry.data.ModelHamiltonianDescription` holding a lattice and its model parameters, whichever the builder evolves.
+   A :class:`~qdk_chemistry.data.HamiltonianDescription`: either a :class:`~qdk_chemistry.data.QubitOperator` containing the Pauli-string representation of the Hamiltonian, or a :class:`~qdk_chemistry.data.ModelHamiltonianDescription` holding a model name, a lattice and the model parameters, whichever the builder evolves.
    A :class:`~qdk_chemistry.data.QubitOperator` can be obtained from the :doc:`QubitMapper <qubit_mapper>` algorithm, constructed from a :doc:`model Hamiltonian <../model_hamiltonians>`, or built directly.
 
 .. rubric:: Creating a builder

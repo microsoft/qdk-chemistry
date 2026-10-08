@@ -963,7 +963,7 @@ class TestHamiltonianDescription:
         assert issubclass(ModelHamiltonianDescription, HamiltonianDescription)
         assert not issubclass(LatticeGeometry, HamiltonianDescription)
         assert not issubclass(Hamiltonian, HamiltonianDescription)
-        model = ModelHamiltonianDescription(LatticeGeometry.chain(2), {"t": 1.0, "u": 4.0})
+        model = ModelHamiltonianDescription("hubbard", LatticeGeometry.chain(2), {"epsilon": 0.0, "t": 1.0, "U": 4.0})
         with pytest.raises(TypeError, match="takes a QubitOperator, got ModelHamiltonianDescription"):
             Trotter(time=0.1).run(model)
 
