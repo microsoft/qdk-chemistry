@@ -49,6 +49,7 @@ def test_qpe_result_json_serialization():
         phase_fraction=0.125,
         eigenvalue_from_phase=_ppf_converter(2.0),
         bits_msb_first=[0, 0, 1],
+        bitstring_counts={"001": 7, "010": 3},
     )
 
     # Test to_json returns dict
@@ -58,6 +59,7 @@ def test_qpe_result_json_serialization():
     assert json_dict["phase_fraction"] == 0.125
     assert "raw_energy" in json_dict
     assert "branching" in json_dict
+    assert QpeResult.from_json(json_dict).bitstring_counts == {"001": 7, "010": 3}
 
 
 def test_qpe_result_json_file_io():
@@ -93,6 +95,7 @@ def test_qpe_result_hdf5_file_io():
         method="IQPE",
         phase_fraction=0.375,
         eigenvalue_from_phase=_ppf_converter(3.0),
+        bitstring_counts={"011": 5},
         metadata={"test": "data"},
     )
 
@@ -111,6 +114,7 @@ def test_qpe_result_hdf5_file_io():
         assert loaded_result.method == result.method
         assert loaded_result.phase_fraction == result.phase_fraction
         assert loaded_result.resolved_energy == result.resolved_energy
+        assert loaded_result.bitstring_counts == {"011": 5}
     finally:
         Path(filename).unlink()
 
