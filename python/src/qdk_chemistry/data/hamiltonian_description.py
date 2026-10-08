@@ -18,6 +18,8 @@ class HamiltonianDescription(ABC):  # noqa: B024
 
     :class:`~qdk_chemistry.data.QubitOperator` and :class:`~qdk_chemistry.data.ModelHamiltonianDescription`
     are registered below; a plugin registers its own type with ``HamiltonianDescription.register``.
+    A registered type must provide ``content_hash()``, as every :class:`~qdk_chemistry.data.DataClass` does,
+    so that algorithms can hash their inputs.
     Phase estimation passes any registered type through to its unitary builder; a
     :class:`~qdk_chemistry.algorithms.HamiltonianUnitaryBuilder` that names the one type it evolves
     rejects the rest.

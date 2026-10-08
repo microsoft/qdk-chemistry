@@ -42,6 +42,8 @@ def test_holds_lattice_and_float_parameters(model: FermiHubbardModelHamiltonianD
     assert "Lattice sites: 4" in model.get_summary()
     with pytest.raises(AttributeError):
         model.parameters = {}
+    with pytest.raises(TypeError):
+        model.parameters["u"] = 8.0  # type: ignore[index]
 
 
 def test_rejects_a_lattice_that_is_not_a_geometry() -> None:

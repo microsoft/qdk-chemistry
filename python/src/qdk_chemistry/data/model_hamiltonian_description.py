@@ -8,6 +8,7 @@
 import json
 from abc import abstractmethod
 from collections.abc import Mapping
+from types import MappingProxyType
 from typing import TYPE_CHECKING, Any
 
 import h5py
@@ -62,7 +63,9 @@ class ModelHamiltonianDescription(DataClass):
         if not isinstance(lattice, LatticeGeometry):
             raise TypeError(f"lattice must be a LatticeGeometry, got {type(lattice).__name__}.")
         self.lattice = lattice
-        self.parameters = {str(name): float(value) for name, value in parameters.items()}
+        self.parameters: Mapping[str, float] = MappingProxyType(
+            {str(name): float(value) for name, value in parameters.items()}
+        )
         super().__init__()
 
     @abstractmethod
