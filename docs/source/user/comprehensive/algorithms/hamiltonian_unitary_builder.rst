@@ -247,7 +247,7 @@ The number of steps can be set directly (``num_divisions``) or estimated from ``
      - Uniform on-site interaction. Default is 0.0.
    * - ``num_electrons``
      - int
-     - Electron count for the scalar shift to the conventional model. When set to -1 (default), the particle-hole symmetric model's energy is reported.
+     - Electron count for the scalar shift to the estimated energy. When set to -1 (default), the particle-hole symmetric model's energy is reported.
    * - ``target_accuracy``
      - float
      - Energy error budget that sizes the automatic step count. When set to 0.0 (default), automatic step-count estimation is disabled.
