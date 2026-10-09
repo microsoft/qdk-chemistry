@@ -49,8 +49,8 @@ def _model(
 def _reference_hamiltonian(model: FermiHubbardModelHamiltonianDescription, *, symmetric: bool = True) -> np.ndarray:
     """Return the dense Jordan-Wigner matrix of the 2x2 ``model``, or of its particle-hole symmetric form.
 
-    ``materialize()`` rejects the 2x2 torus, whose periodic images join each pair twice, so the
-    graph comes from ``LatticeGraph.square``, which doubles those bonds.
+    The 2x2 torus joins each pair through two periodic images, so ``LatticeGraph.square`` doubles
+    those bonds, as ``materialize()`` does.
     """
     t, u, epsilon = (model.parameters[name] for name in ("t", "u", "epsilon"))
     lattice = LatticeGraph.square(2, 2, periodic_x=True, periodic_y=True)
