@@ -144,17 +144,6 @@ namespace QDKChemistry.Utils.HammingWeightPhasing {
         targets : Qubit[][],
         maxBatchSize : Int
     ) : Unit is Adj + Ctl {
-        HammingWeightPhaseWithLegacyCosts(theta, pauliOps, targets, maxBatchSize, false);
-    }
-
-    /// `HammingWeightPhase`, with `legacyCosts` selecting the legacy phase ladder.
-    internal operation HammingWeightPhaseWithLegacyCosts(
-        theta : Double,
-        pauliOps : Pauli[][],
-        targets : Qubit[][],
-        maxBatchSize : Int,
-        legacyCosts : Bool
-    ) : Unit is Adj + Ctl {
         let count = Length(targets);
         Fact(Length(pauliOps) == count, "HammingWeightPhase needs one axis list per term.");
         if count > 0 {
@@ -163,7 +152,7 @@ namespace QDKChemistry.Utils.HammingWeightPhasing {
             let opBatches = Chunks(batchSize, pauliOps);
             let targetBatches = Chunks(batchSize, targets);
             for index in 0..Length(targetBatches) - 1 {
-                HammingWeightPhaseBatchWithLegacyCosts(theta, opBatches[index], targetBatches[index], legacyCosts);
+                HammingWeightPhaseBatch(theta, opBatches[index], targetBatches[index]);
             }
         }
     }
@@ -201,11 +190,10 @@ namespace QDKChemistry.Utils.HammingWeightPhasing {
 
     /// One batch of equal-angle terms, phased through a single Hamming-weight register.
     /// See `HammingWeightPhase`, which splits a tower into batches of this shape.
-    internal operation HammingWeightPhaseBatchWithLegacyCosts(
+    internal operation HammingWeightPhaseBatch(
         theta : Double,
         pauliOps : Pauli[][],
-        targets : Qubit[][],
-        legacyCosts : Bool
+        targets : Qubit[][]
     ) : Unit is Adj + Ctl {
         let count = Length(targets);
         if not UsesHammingWeightPhasing(count) {
@@ -224,21 +212,14 @@ namespace QDKChemistry.Utils.HammingWeightPhasing {
             } apply {
                 // w = Σ_j 2^j w_j, so e^{2 i theta w} is one rotation per place value, the bit of
                 // place value 2^j taking the angle 2 theta 2^j.
-                // TEMPORARY (legacy parity): the legacy ladder also phased every place value with an
-                // R(PauliI) and applied the whole batch constant at the end.
                 for j in 0..places - 1 {
-                    let angle = 2.0 * theta * IntAsDouble(1 <<< j);
-                    Rz(angle, work[finalBits[j]]);
-                    if legacyCosts {
-                        R(PauliI, -angle, work[finalBits[j]]);
-                    }
+                    Rz(2.0 * theta * IntAsDouble(1 <<< j), work[finalBits[j]]);
                 }
                 // `Rz(a) = e^{-ia/2} R1(a)`, so the ladder carries an extra
                 // Π_j e^{-i theta 2^j} = e^{-i theta (2^places - 1)} beyond the intended phase.
                 // `R(PauliI, g)` is e^{-ig/2}, so this g both supplies the batch constant
                 // e^{-i theta count} and undoes the ladder's. Under control it is not global.
-                let constant = legacyCosts ? count | count - ((1 <<< places) - 1);
-                R(PauliI, 2.0 * theta * IntAsDouble(constant), inputs[0]);
+                R(PauliI, 2.0 * theta * IntAsDouble(count - ((1 <<< places) - 1)), inputs[0]);
             }
         }
     }

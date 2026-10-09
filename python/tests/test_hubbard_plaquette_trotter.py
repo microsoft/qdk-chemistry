@@ -134,16 +134,8 @@ class TestHammingWeightPhasing:
     def test_batch_size(self, count, cap, expected):
         assert QSHARP_UTILS.HammingWeightPhasing.HammingWeightBatchSize(count, cap) == expected
 
-    @pytest.mark.parametrize(
-        ("num_pairs", "controlled", "name"),
-        [
-            (2, False, "HoppingPhases"),
-            (5, False, "HoppingPhases"),
-            (4, True, "HoppingPhases"),
-            (8, False, "HoppingPhasesWithForcedLegacyCostsForTest"),
-        ],
-    )
-    def test_hopping_tower(self, num_pairs, controlled, name):
+    @pytest.mark.parametrize(("num_pairs", "controlled"), [(2, False), (5, False), (4, True)])
+    def test_hopping_tower(self, num_pairs, controlled):
         """exp(i a (XX + YY)) on every pair, below and above the eight-rotation break-even."""
         angle = 3 * np.pi / 32
         xx_plus_yy = np.kron([[0, 1], [1, 0]], [[0, 1], [1, 0]]) + np.kron([[0, -1j], [1j, 0]], [[0, -1j], [1j, 0]])
@@ -155,7 +147,7 @@ class TestHammingWeightPhasing:
             target = expected[-1].reshape(4**pair, 4, -1)
             expected[-1] = np.einsum("ij,ajb->aib", pair_gate, target).reshape(-1)
         args = f"{angle}, Std.Arrays.Chunks(2, {{qs}}), -1"
-        actual = _apply(_operation(name, args, controlled=controlled), state)
+        actual = _apply(_operation("HoppingPhases", args, controlled=controlled), state)
         assert np.allclose(actual, expected.reshape(-1), atol=1e-10)
 
     @pytest.mark.parametrize("angle", [np.pi / 8, -13 * np.pi / 32])
@@ -325,29 +317,13 @@ class TestPlaquetteCircuit:
         actual = _apply(_operation("RepPlaquetteExp", params + ", {qs}"), state)
         assert abs(np.vdot(propagator @ state, actual)) == pytest.approx(1.0, abs=1e-9)
 
-    @pytest.mark.parametrize("controlled", [False, True])
-    def test_forced_legacy_evolution_adds_the_particle_number_phase(self, controlled):
-        """The legacy cost path is the normal one times exp(-i (U N / 2 - U M / 4) t)."""
-        time, u, sites = 0.05, 4.0, 4
-        params = f"{_PLAQUETTE}.HubbardPlaquetteParams(2, 2, {0.25 * u * time}, {2.0 * time}, 1, -1), {{qs}}"
-        normal, forced = (
-            _operation(name, params, controlled=controlled)
-            for name in ("RepPlaquetteExp", "RepPlaquetteExpWithForcedLegacyCostsForTest")
-        )
-        state = _random_state(2 * sites + controlled, seed=102)
-        electrons = np.array([(index % 2 ** (2 * sites)).bit_count() for index in range(len(state))])
-        phases = np.exp(-1j * (0.5 * u * electrons - 0.25 * u * sites) * time)
-        phases[: len(state) - 2 ** (2 * sites)] = 1.0
-        expected = phases * _apply(normal, state)
-        assert abs(np.vdot(expected, _apply(forced, state))) == pytest.approx(1.0, abs=1e-12)
-
 
 # Logical counts of the benchmark circuit in examples/estimation_hubbard_2d.ipynb.
-# TEMPORARY (legacy parity): they include the legacy circuit's extra work, so L=2 still has Toffolis.
+# At L=2 every tower is below the eight-rotation break-even, so the circuit has no Toffolis.
 _COUNT_KEYS = ("numQubits", "rotationCount", "rotationDepth", "tCount", "cczCount", "ccixCount", "measurementCount")
 _BENCHMARK_COUNTS = {
-    2: (25, 2224986, 1483458, 697995, 610582, 0, 610592),
-    4: (73, 729063, 551326, 758427, 710540, 0, 710550),
+    2: (18, 1047435, 698444, 697995, 0, 0, 10),
+    4: (57, 261233, 190086, 758427, 355350, 0, 355360),
 }
 
 
@@ -400,8 +376,8 @@ class TestBenchmarkResources:
     def test_batch_cap_trades_qubits_for_rotations(self):
         """A cap of 8 keeps the adder tree on fewer qubits; a cap of 1 turns phasing off."""
         uncapped = _benchmark_counts(4)
-        # TEMPORARY (legacy parity): the legacy tower spans all 32 modes, so 32 is the cap that splits nothing.
-        assert _benchmark_counts(4, max_batch_size=32) == uncapped
+        # At L=4 the interaction and hopping towers both have 16 terms, so 16 is the cap that splits nothing.
+        assert _benchmark_counts(4, max_batch_size=16) == uncapped
 
         capped = _benchmark_counts(4, max_batch_size=8)
         assert capped["numQubits"] < uncapped["numQubits"]
