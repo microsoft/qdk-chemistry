@@ -23,6 +23,8 @@ eggs/
 .eggs/
 install/
 install-*/
+!/.pipelines/install-scripts/
+!/.pipelines/install-scripts/**
 lib/
 lib64/
 parts/
@@ -34,7 +36,7 @@ share/python-wheels/
 *.egg-info/
 .installed.cfg
 *.egg
-MANIFEST
+/MANIFEST
 
 # PyInstaller
 #  Usually these files are written by a python script from a template
