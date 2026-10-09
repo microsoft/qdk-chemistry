@@ -35,9 +35,9 @@
 #include <stdexcept>
 
 #include "qdk/chemistry/algorithms/microsoft/hamiltonian.hpp"
-#include "qdk/chemistry/algorithms/microsoft/scalar_relativistic_hamiltonian.hpp"
 #include "qdk/chemistry/algorithms/microsoft/utils.hpp"
 #include "ut_common.hpp"
+#include "util/one_body.h"
 using namespace qdk::chemistry::data;
 using namespace qdk::chemistry::algorithms;
 
@@ -2865,6 +2865,16 @@ TEST_F(HamiltonianConstructorTest, X2CDefaultSettings) {
   }
 }
 
+TEST_F(HamiltonianConstructorTest, X2CRejectsMultiRankBeforeBasisSetup) {
+  auto mpi = qdk::chemistry::scf::mpi_default_input();
+  mpi.world_size = 2;
+  for (const bool decontract : {false, true}) {
+    EXPECT_THROW(
+        qdk::chemistry::scf::build_x2c_one_body_ao(nullptr, mpi, decontract),
+        std::runtime_error);
+  }
+}
+
 TEST_F(HamiltonianConstructorTest, X2CMetricScreeningMatchesEquivalentBasis) {
   std::vector<Eigen::Vector3d> coordinates = {Eigen::Vector3d::Zero()};
   std::vector<std::string> symbols = {"H"};
@@ -2922,6 +2932,7 @@ TEST_F(HamiltonianConstructorTest, X2CNearDependentBasisPermutation) {
       std::vector<std::string>{"Li", "H"});
   auto molecule =
       qdk::chemistry::utils::microsoft::convert_to_molecule(structure, 0, 1);
+  const auto mpi = qcs::mpi_default_input();
   const std::array<double, 6> exponents{89.71717804697998,
                                         89.71717693019926,
                                         3.681750530107935,
@@ -2948,7 +2959,7 @@ TEST_F(HamiltonianConstructorTest, X2CNearDependentBasisPermutation) {
     }
     auto basis = std::make_shared<qcs::BasisSet>(
         molecule, shells, qcs::BasisMode::PSI4, true, false);
-    return microsoft::detail::build_x2c_one_body_ao(basis, decontract);
+    return qcs::build_x2c_one_body_ao(basis, mpi, decontract);
   };
 
   for (const bool decontract : {false, true}) {
@@ -3014,10 +3025,10 @@ TEST_F(HamiltonianConstructorTest, X2CCommonSpaceMatchesContractedBasis) {
   auto reduced_basis = std::make_shared<qcs::BasisSet>(
       basis->mol, std::vector<qcs::Shell>{contracted}, qcs::BasisMode::RAW,
       true, false);
-  const Eigen::MatrixXd reference =
-      microsoft::detail::build_x2c_one_body_ao(reduced_basis, false);
+  const Eigen::MatrixXd reference = qcs::build_x2c_one_body_ao(
+      reduced_basis, qcs::mpi_default_input(), false);
   const Eigen::MatrixXd actual =
-      microsoft::detail::build_x2c_one_body_ao(basis, false);
+      qcs::build_x2c_one_body_ao(basis, qcs::mpi_default_input(), false);
   Eigen::VectorXd product(2);
   blas::gemv(blas::Layout::ColMajor, blas::Op::NoTrans, 2, 2, 1.0,
              actual.data(), 2, retained.data(), 1, 0.0, product.data(), 1);
@@ -3026,6 +3037,7 @@ TEST_F(HamiltonianConstructorTest, X2CCommonSpaceMatchesContractedBasis) {
 }
 
 TEST_F(HamiltonianConstructorTest, X2CDiffusePrimitiveRetainsKineticEnergy) {
+  namespace qcs = qdk::chemistry::scf;
   qdk::chemistry::utils::microsoft::initialize_backend();
   Structure structure(std::vector<Eigen::Vector3d>{Eigen::Vector3d::Zero()},
                       std::vector<std::string>{"H"});
@@ -3039,7 +3051,7 @@ TEST_F(HamiltonianConstructorTest, X2CDiffusePrimitiveRetainsKineticEnergy) {
   constexpr double reference = -0.0050312650433745115;
   for (const bool decontract : {false, true}) {
     const Eigen::MatrixXd actual =
-        microsoft::detail::build_x2c_one_body_ao(basis, decontract);
+        qcs::build_x2c_one_body_ao(basis, qcs::mpi_default_input(), decontract);
     EXPECT_NEAR(actual(0, 0), reference, 1e-11);
   }
 }
@@ -3087,7 +3099,7 @@ TEST_F(HamiltonianConstructorTest, X2CDecontractionUsesExactExponentKeys) {
     BasisSet basis_set("exponent-keys", shells, structure);
     auto internal =
         qdk::chemistry::utils::microsoft::convert_basis_set_from_qdk(basis_set);
-    return microsoft::detail::decontract_basis(internal);
+    return qdk::chemistry::scf::detail::decontract_basis(internal);
   };
 
   const auto exact_duplicates = decontract({1.0, 1.0});

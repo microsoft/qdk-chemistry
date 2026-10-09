@@ -2,7 +2,7 @@
 // Licensed under the MIT License. See LICENSE.txt in the project root for
 // license information.
 
-#include "scalar_relativistic_hamiltonian.hpp"
+#include "util/one_body.h"
 
 #include <qdk/chemistry/scf/util/int1e.h>
 
@@ -21,11 +21,9 @@
 #include <utility>
 #include <vector>
 
-namespace qdk::chemistry::algorithms::microsoft {
+namespace qdk::chemistry::scf {
 
 namespace qcs = qdk::chemistry::scf;
-
-namespace detail {
 
 namespace {
 
@@ -280,7 +278,7 @@ Eigen::MatrixXd compute_x2c_hamiltonian(const Eigen::MatrixXd& overlap,
 
 }  // namespace
 
-DecontractedBasis decontract_basis(
+detail::DecontractedBasis detail::decontract_basis(
     const std::shared_ptr<qcs::BasisSet>& contracted_basis) {
   using AtomAngularMomentum = std::pair<uint64_t, uint64_t>;
   using ExponentSet = std::set<double, std::greater<double>>;
@@ -355,7 +353,15 @@ DecontractedBasis decontract_basis(
 }
 
 Eigen::MatrixXd build_x2c_one_body_ao(
-    const std::shared_ptr<qcs::BasisSet>& internal_basis_set, bool decontract) {
+    const std::shared_ptr<qcs::BasisSet>& internal_basis_set,
+    const qcs::ParallelConfig& mpi, bool decontract) {
+  if (mpi.world_size > 1) {
+    throw std::runtime_error(
+        "X2C construction is not supported with MPI world_size > 1.");
+  }
+  if (!internal_basis_set->pure) {
+    throw std::invalid_argument("X2C-1e currently supports spherical AOs only");
+  }
   if (!internal_basis_set->ecp_shells.empty() ||
       internal_basis_set->get_n_ecp_electrons() != 0) {
     throw std::invalid_argument(
@@ -366,13 +372,12 @@ Eigen::MatrixXd build_x2c_one_body_ao(
   std::shared_ptr<qcs::BasisSet> working_basis = internal_basis_set;
   Eigen::MatrixXd contraction;
   if (decontract) {
-    auto decontracted = decontract_basis(internal_basis_set);
+    auto decontracted = detail::decontract_basis(internal_basis_set);
     working_basis = std::move(decontracted.basis);
     contraction = std::move(decontracted.contraction);
   }
 
   const size_t dimension = working_basis->num_atomic_orbitals;
-  const auto mpi = qcs::mpi_default_input();
   auto int1e = std::make_unique<qcs::OneBodyIntegral>(
       working_basis.get(), working_basis->mol.get(), mpi);
   Eigen::MatrixXd overlap(dimension, dimension);
@@ -412,6 +417,4 @@ Eigen::MatrixXd build_x2c_one_body_ao(
   return hamiltonian;
 }
 
-}  // namespace detail
-
-}  // namespace qdk::chemistry::algorithms::microsoft
+}  // namespace qdk::chemistry::scf

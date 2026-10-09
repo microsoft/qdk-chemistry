@@ -15,7 +15,7 @@
 #include <qdk/chemistry/data/hamiltonian_containers/canonical_four_center.hpp>
 #include <qdk/chemistry/utils/logger.hpp>
 
-#include "scalar_relativistic_hamiltonian.hpp"
+#include "util/one_body.h"
 #include "utils.hpp"
 
 namespace qdk::chemistry::algorithms::microsoft {
@@ -50,8 +50,8 @@ detail::build_one_body_ao(const data::BasisSet& basis_set,
 
   if (use_x2c) {
     return {internal_basis_set,
-            detail::build_x2c_one_body_ao(
-                internal_basis_set, relativity == qcs::Relativity::SFX2C)};
+            qcs::build_x2c_one_body_ao(internal_basis_set, mpi,
+                                       relativity == qcs::Relativity::SFX2C)};
   }
 
   const size_t dimension = basis_set.get_num_atomic_orbitals();

@@ -182,6 +182,7 @@ The native QDK/Chemistry implementation provides high-performance :term:`SCF` ca
 
 - Restricted Hartree-Fock (:term:`RHF`) and Unrestricted Hartree-Fock (:term:`UHF`)
 - Restricted Kohn-Sham (:term:`RKS`) and Unrestricted Kohn-Sham (:term:`UKS`) :term:`DFT`
+- Spin-free exact-two-component (X2C) relativistic treatment in the one-electron approximation
 - Extensive library of :doc:`basis sets <../basis_functionals>` including Pople, Dunning, and Karlsruhe families
 - Full range of :doc:`exchange-correlation functionals <../basis_functionals>` for :term:`DFT`
   - Optimization algorithms including the direct inversion in the iterative subspace (:term:`DIIS`) method :cite:`Pulay1982`, and the geometric direct minimization (:term:`GDM`) method :cite:`VanVoorhis2002`
@@ -279,6 +280,10 @@ This hybrid approach combines the speed of :term:`DIIS` for typical systems with
      - bool
      - ``False``
      - Use atomic operations for :term:`ERI` computation
+   * - ``relativity``
+     - string
+     - ``""``
+     - Relativistic treatment: ``""`` for nonrelativistic integrals, ``"sf-x2c"`` for spin-free X2C with basis decontraction and exact recontraction, or ``"sf-x2c-contracted"`` for spin-free X2C in the supplied contracted basis. Both X2C options use the one-electron approximation, leaving :term:`ERIs <ERI>` unchanged and excluding spin-orbit coupling. They require spherical all-electron basis sets (no ECPs or Cartesian AOs); analytic nuclear gradients and polarizabilities are unavailable. Use the same value for downstream :doc:`Hamiltonian construction <hamiltonian_constructor>` because :doc:`Orbitals <../data/orbitals>` do not retain the relativistic treatment.
    * - ``fock_reset_steps``
      - int
      - ``1073741824``
