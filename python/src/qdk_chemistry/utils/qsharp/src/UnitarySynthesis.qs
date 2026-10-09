@@ -18,7 +18,7 @@ namespace QDKChemistry.Utils.UnitarySynthesis {
     import QDKChemistry.Utils.PhaseGradient.ApplyMultiplexedRy;
     import QDKChemistry.Utils.PhaseGradient.QuantizeRyAngles;
 
-    export GivensDecomposition, QuantizedGivensDecomposition, QuantizeGivensDecomposition, ApplyRealUnitaryViaGivens, ApplyControlledRealUnitaryViaGivens;
+    export GivensDecomposition, QuantizedGivensDecomposition, QuantizeGivensDecomposition, ApplyRealUnitaryViaGivens;
 
     // =============================================================================
     // Givens decomposition data
@@ -151,7 +151,8 @@ namespace QDKChemistry.Utils.UnitarySynthesis {
     // =============================================================================
 
     /// # Summary
-    /// Applies a real unitary matrix via its Givens rotation decomposition.
+    /// Applies a real unitary matrix via its Givens rotation decomposition, controlled on
+    /// every qubit of `controls`.
     ///
     /// # Description
     /// A real unitary U is decomposed as: U = D · R_{k-1} · ... · R_1 · R_0
@@ -167,6 +168,10 @@ namespace QDKChemistry.Utils.UnitarySynthesis {
     ///   3. Adjoint SelectSwap uncomputes the angle register
     /// The phase correction is applied as a Reed-Muller phase polynomial.
     ///
+    /// With controls, only the angle lookups and the phase correction are controlled: when a
+    /// control is |0⟩ the angle register stays zero, Ry(0) = I, and the unconditional
+    /// shift/unshift pair of each shifted layer cancels.
+    ///
     /// # References
     /// - Berry et al. (PRX Quantum 6, 020327): https://doi.org/10.1103/PRXQuantum.6.020327
     /// - Clements et al. (arXiv:1603.08788): https://arxiv.org/abs/1603.08788
@@ -175,6 +180,8 @@ namespace QDKChemistry.Utils.UnitarySynthesis {
     /// ## givens
     /// Quantized Givens layers and sign corrections of the unitary. Empty `phases` apply no
     /// signs.
+    /// ## controls
+    /// Control qubits; an empty array applies the unitary unconditionally.
     /// ## target
     /// Target register in MSB (Most Significant Bit)-first format
     /// (target[0] = MSB, target[n-1] = LSB (Least Significant Bit)).
@@ -185,6 +192,7 @@ namespace QDKChemistry.Utils.UnitarySynthesis {
     /// Clean register that receives each loaded angle.
     operation ApplyRealUnitaryViaGivens(
         givens : QuantizedGivensDecomposition,
+        controls : Qubit[],
         target : Qubit[],
         phaseGradient : Qubit[],
         angleReg : Qubit[]
@@ -204,12 +212,16 @@ namespace QDKChemistry.Utils.UnitarySynthesis {
         // Cache by shifted/non-shifted variant to avoid re-tracing ~1000 identical layers.
         for i in 0..Length(layers) - 1 {
             let variant = n * 2 + (if layerIsShifted[i] { 1 } else { 0 });
-            if BeginEstimateCaching("GivensLayer", variant) {
+            if BeginEstimateCaching($"GivensLayer{Length(controls)}", variant) {
                 // Reversed(target) gives LE (little-endian) view: index 0 = LSB of state value
                 if layerIsShifted[i] {
                     AddConstant(-1, Reversed(target));
                 }
-                ApplyMultiplexedRy(layers[i], address, activeQubit, phaseGradient, angleReg);
+                if IsEmpty(controls) {
+                    ApplyMultiplexedRy(layers[i], address, activeQubit, phaseGradient, angleReg);
+                } else {
+                    ApplyControlledMultiplexedRy(layers[i], address, controls, activeQubit, phaseGradient, angleReg);
+                }
                 if layerIsShifted[i] {
                     AddConstant(1, Reversed(target));
                 }
@@ -217,68 +229,11 @@ namespace QDKChemistry.Utils.UnitarySynthesis {
             }
         }
 
-        // Phase correction: D = diag(±1) via Reed-Muller polynomial
+        // Phase correction D = diag(±1) on the LE register Reversed(target) + controls. The
+        // controls are its most significant qubits, so only the all-ones control block flips.
         if Any(flip -> flip, phaseFlips) {
-            ApplyPhasePolynomial(phaseFlips, Reversed(target));
-        }
-    }
-
-    /// # Summary
-    /// Applies a controlled real unitary via Givens decomposition.
-    ///
-    /// # Description
-    /// When control = |1⟩, applies the unitary. When control = |0⟩, identity.
-    /// The angle lookup of each Givens layer is controlled, so when control = |0⟩ the angle
-    /// register stays zero and Ry(0) = I. The shifts of shifted layers are therefore applied
-    /// unconditionally: when control = |0⟩ the shift/unshift pair cancels.
-    /// The phase correction is controlled as well.
-    ///
-    /// # Input
-    /// ## givens
-    /// Quantized Givens layers and sign corrections of the unitary. Empty `phases` apply no
-    /// signs.
-    /// ## target
-    /// Target register.
-    /// ## phaseGradient
-    /// Phase gradient register.
-    /// ## control
-    /// Control qubit.
-    /// ## angleReg
-    /// Clean register that receives each loaded angle.
-    operation ApplyControlledRealUnitaryViaGivens(
-        givens : QuantizedGivensDecomposition,
-        target : Qubit[],
-        phaseGradient : Qubit[],
-        control : Qubit,
-        angleReg : Qubit[]
-    ) : Unit {
-        let n = Length(target);
-        let layers = givens.layers;
-        let layerIsShifted = givens.layerShifted;
-        let phaseFlips = givens.phases;
-        Fact(Length(layerIsShifted) == Length(layers), "Givens data needs one shift flag per layer.");
-        Fact(IsEmpty(phaseFlips) or Length(phaseFlips) == 1 <<< n, "Givens phase data needs one entry per basis state of the target register.");
-        let activeQubit = target[n - 1];
-        let address = Reversed(target[0..n - 2]);
-
-        for i in 0..Length(layers) - 1 {
-            let variant = n * 2 + (if layerIsShifted[i] { 1 } else { 0 });
-            if BeginEstimateCaching("ControlledGivensLayer", variant) {
-                if layerIsShifted[i] {
-                    AddConstant(-1, Reversed(target));
-                }
-                ApplyControlledMultiplexedRy(layers[i], address, control, activeQubit, phaseGradient, angleReg);
-                if layerIsShifted[i] {
-                    AddConstant(1, Reversed(target));
-                }
-                EndEstimateCaching();
-            }
-        }
-
-        // Controlled phase correction: a diagonal on Reversed(target) + [control], where the
-        // control is the MSB. Extended phases: ctrl=0 → no flip, ctrl=1 → phaseFlips.
-        if Any(flip -> flip, phaseFlips) {
-            ApplyPhasePolynomial(Repeated(false, Length(phaseFlips)) + phaseFlips, Reversed(target) + [control]);
+            let uncontrolledFlips = Repeated(false, ((1 <<< Length(controls)) - 1) * Length(phaseFlips));
+            ApplyPhasePolynomial(uncontrolledFlips + phaseFlips, Reversed(target) + controls);
         }
     }
 }
