@@ -31,6 +31,7 @@ DecontractedBasis decontract_basis(
  * @param mpi Parallel configuration used for integral evaluation.
  * @param decontract Whether to decontract before X2C and recontract afterward.
  * @return X2C-1e one-electron matrix in the supplied basis.
+ * @throws std::runtime_error if mpi.world_size > 1.
  */
 Eigen::MatrixXd build_x2c_one_body_ao(
     const std::shared_ptr<BasisSet>& internal_basis_set,

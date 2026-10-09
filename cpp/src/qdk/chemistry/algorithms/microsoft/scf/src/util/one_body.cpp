@@ -21,10 +21,6 @@
 #include <utility>
 #include <vector>
 
-#ifdef QDK_CHEMISTRY_ENABLE_MPI
-#include <mpi.h>
-#endif
-
 namespace qdk::chemistry::scf {
 
 namespace qcs = qdk::chemistry::scf;
@@ -356,12 +352,13 @@ detail::DecontractedBasis detail::decontract_basis(
   return {std::move(uncontracted_basis), std::move(contraction)};
 }
 
-namespace {
-
-/** @brief Compute X2C-1e integrals, optionally in a decontracted basis. */
-Eigen::MatrixXd compute_x2c_one_electron(
+Eigen::MatrixXd build_x2c_one_body_ao(
     const std::shared_ptr<qcs::BasisSet>& internal_basis_set,
     const qcs::ParallelConfig& mpi, bool decontract) {
+  if (mpi.world_size > 1) {
+    throw std::runtime_error(
+        "X2C construction is not supported with MPI world_size > 1.");
+  }
   if (!internal_basis_set->pure) {
     throw std::invalid_argument("X2C-1e currently supports spherical AOs only");
   }
@@ -392,11 +389,6 @@ Eigen::MatrixXd compute_x2c_one_electron(
   int1e->nuclear_integral(potential.data());
   int1e->pvp_integral(pvp.data());
 
-  if (mpi.world_rank != 0) {
-    return Eigen::MatrixXd(internal_basis_set->num_atomic_orbitals,
-                           internal_basis_set->num_atomic_orbitals);
-  }
-
   Eigen::MatrixXd hamiltonian =
       compute_x2c_hamiltonian(overlap, kinetic, potential, pvp);
   if (decontract) {
@@ -422,50 +414,6 @@ Eigen::MatrixXd compute_x2c_one_electron(
   if (!hamiltonian.allFinite()) {
     throw std::runtime_error("X2C produced non-finite one-electron integrals");
   }
-  return hamiltonian;
-}
-
-}  // namespace
-
-Eigen::MatrixXd build_x2c_one_body_ao(
-    const std::shared_ptr<qcs::BasisSet>& internal_basis_set,
-    const qcs::ParallelConfig& mpi, bool decontract) {
-  Eigen::MatrixXd hamiltonian;
-#ifdef QDK_CHEMISTRY_ENABLE_MPI
-  if (mpi.world_size == 1) {
-    return compute_x2c_one_electron(internal_basis_set, mpi, decontract);
-  }
-  std::string local_error;
-  try {
-    hamiltonian = compute_x2c_one_electron(internal_basis_set, mpi, decontract);
-  } catch (const std::exception& error) {
-    local_error = error.what();
-  } catch (...) {
-    local_error = "unknown error";
-  }
-  const int local_failed_rank =
-      local_error.empty() ? mpi.world_size : mpi.world_rank;
-  int failed_rank = mpi.world_size;
-  MPI_Allreduce(&local_failed_rank, &failed_rank, 1, MPI_INT, MPI_MIN,
-                MPI_COMM_WORLD);
-  if (failed_rank < mpi.world_size) {
-    int message_size = mpi.world_rank == failed_rank
-                           ? static_cast<int>(local_error.size())
-                           : 0;
-    MPI_Bcast(&message_size, 1, MPI_INT, failed_rank, MPI_COMM_WORLD);
-    if (mpi.world_rank != failed_rank) {
-      local_error.resize(message_size);
-    }
-    MPI_Bcast(local_error.data(), message_size, MPI_CHAR, failed_rank,
-              MPI_COMM_WORLD);
-    throw std::runtime_error("X2C construction failed on MPI rank " +
-                             std::to_string(failed_rank) + ": " + local_error);
-  }
-  MPI_Bcast(hamiltonian.data(), static_cast<int>(hamiltonian.size()),
-            MPI_DOUBLE, 0, MPI_COMM_WORLD);
-#else
-  hamiltonian = compute_x2c_one_electron(internal_basis_set, mpi, decontract);
-#endif
   return hamiltonian;
 }
 

@@ -2865,6 +2865,16 @@ TEST_F(HamiltonianConstructorTest, X2CDefaultSettings) {
   }
 }
 
+TEST_F(HamiltonianConstructorTest, X2CRejectsMultiRankBeforeBasisSetup) {
+  auto mpi = qdk::chemistry::scf::mpi_default_input();
+  mpi.world_size = 2;
+  for (const bool decontract : {false, true}) {
+    EXPECT_THROW(
+        qdk::chemistry::scf::build_x2c_one_body_ao(nullptr, mpi, decontract),
+        std::runtime_error);
+  }
+}
+
 TEST_F(HamiltonianConstructorTest, X2CMetricScreeningMatchesEquivalentBasis) {
   std::vector<Eigen::Vector3d> coordinates = {Eigen::Vector3d::Zero()};
   std::vector<std::string> symbols = {"H"};
