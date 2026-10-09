@@ -225,7 +225,7 @@ def test_list_algorithms_filters_by_type():
     assert result["status"] == "ok"
     algorithm_types = result["result"]["algorithm_types"]
     assert list(algorithm_types) == ["nuclear_derivative_calculator"]
-    assert algorithm_types["nuclear_derivative_calculator"]["default"] == "qdk_finite_difference"
+    assert algorithm_types["nuclear_derivative_calculator"]["default"] == "qdk"
     assert "qdk" in algorithm_types["nuclear_derivative_calculator"]["implementations"]
 
 
@@ -264,12 +264,14 @@ def test_describe_algorithm_falls_back_when_default_is_unavailable(monkeypatch):
 
 
 def test_describe_algorithm_returns_settings_schema():
-    result = srv.describe_algorithm(algorithm_type="nuclear_derivative_calculator", algorithm_name="qdk")
+    result = srv.describe_algorithm(
+        algorithm_type="nuclear_derivative_calculator", algorithm_name="qdk_finite_difference"
+    )
 
     assert result["status"] == "ok"
     description = result["result"]
-    assert description["name"] == "qdk"
-    assert description["aliases"] == ["analytical_gradient", "qdk"]
+    assert description["name"] == "qdk_finite_difference"
+    assert description["aliases"] == ["numeric", "qdk_finite_difference"]
     assert description["is_default"] is False
     assert description["default_settings"]["compute_hessian"] is False
     settings = {setting["name"]: setting for setting in description["settings"]}
@@ -282,8 +284,8 @@ def test_describe_algorithm_reports_nuclear_derivative_default_aliases():
 
     assert result["status"] == "ok"
     description = result["result"]
-    assert description["name"] == "qdk_finite_difference"
-    assert description["aliases"] == ["numeric", "qdk_finite_difference"]
+    assert description["name"] == "qdk"
+    assert description["aliases"] == ["analytical_gradient", "qdk"]
     assert description["is_default"] is True
 
 
