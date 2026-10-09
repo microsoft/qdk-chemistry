@@ -12,7 +12,7 @@ The :class:`~qdk_chemistry.algorithms.HamiltonianUnitaryBuilder` provides a unif
 
 QDK/Chemistry currently provides two families of implementations for this task: product formulas (Trotter-Suzuki, Zassenhaus, and a plaquette Trotterization specialized to the Fermi-Hubbard model) and block encoding.
 
-The resulting :class:`~qdk_chemistry.data.UnitaryRepresentation` objects wrap a ``PauliProductFormulaContainer`` (Trotter-Suzuki and Zassenhaus), a ``HubbardPlaquetteContainer`` (plaquette Trotterization), or an ``LCUContainer`` (block encoding).
+The resulting :class:`~qdk_chemistry.data.UnitaryRepresentation` objects wrap a ``PauliProductFormulaContainer`` (Trotter-Suzuki and Zassenhaus), a ``HubbardPlaquetteContainer`` (plaquette Trotterization), or a block-encoding container (``LCUContainer``, ``LCUWalkContainer`` for the LCU quantum walk, or ``SOSSABlockEncodingContainer``).
 
 
 Using the HamiltonianUnitaryBuilder
@@ -475,7 +475,7 @@ The resulting :class:`~qdk_chemistry.data.UnitaryRepresentation` wraps an ``LCUC
 Related classes
 ---------------
 
-- :class:`~qdk_chemistry.data.UnitaryRepresentation`: Output data class wrapping the product formula, plaquette, or LCU container
+- :class:`~qdk_chemistry.data.UnitaryRepresentation`: Output data class wrapping the product formula, plaquette, or block-encoding container
 - :class:`~qdk_chemistry.data.HamiltonianDescription`: Input Hamiltonian, such as a :class:`~qdk_chemistry.data.QubitOperator` or a :class:`~qdk_chemistry.data.ModelHamiltonianDescription`
 - :doc:`PhaseEstimation <phase_estimation>`: Consumer of the hamiltonian unitary
 
