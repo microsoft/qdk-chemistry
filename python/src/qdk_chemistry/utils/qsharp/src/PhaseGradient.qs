@@ -150,22 +150,22 @@ namespace QDKChemistry.Utils.PhaseGradient {
     }
 
     /// # Summary
-    /// `ApplyMultiplexedRy` that rotates only when `control` is |1⟩.
+    /// `ApplyMultiplexedRy` that rotates only when every qubit of `controls` is |1⟩.
     ///
     /// # Description
-    /// Only the lookup is controlled: when `control` is |0⟩ the angle register stays zero and
-    /// the rotation is the identity. This is cheaper than `Controlled ApplyMultiplexedRy`,
-    /// which also controls the adder.
+    /// Only the lookup is controlled: otherwise the angle register stays zero and the
+    /// rotation is the identity. This is cheaper than `Controlled ApplyMultiplexedRy`, which
+    /// also controls the adder.
     operation ApplyControlledMultiplexedRy(
         data : Bool[][],
         address : Qubit[],
-        control : Qubit,
+        controls : Qubit[],
         targetQubit : Qubit,
         phaseGradient : Qubit[],
         angleReg : Qubit[]
     ) : Unit is Adj + Ctl {
         within {
-            Controlled SelectSwap([control], (-1, data, address, angleReg));
+            Controlled SelectSwap(controls, (-1, data, address, angleReg));
         } apply {
             RyViaPhaseGradient(targetQubit, angleReg, phaseGradient);
         }

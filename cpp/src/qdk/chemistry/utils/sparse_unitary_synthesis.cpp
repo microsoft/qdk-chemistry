@@ -16,6 +16,34 @@ namespace {
 
 constexpr Eigen::Index unused_row = -1;
 
+// Visit(column, row, value) reads M^p_{ab} at column a, row p * ancilla_dim +
+// b. Missing blocks and zero entries are not materialized.
+template <typename Visit>
+void for_each_nonzero_entry(const data::MPSSite& site, Eigen::Index ancilla_dim,
+                            const Visit& visit) {
+  const auto& tensor =
+      std::get<data::SymmetryBlockedTensor<3, double>>(site.tensor());
+  const auto& offsets = site.sector_offsets();
+  for (const auto& [labels, block] : tensor.blocks()) {
+    const auto left_offset = offsets[0].at(labels[0]);
+    const auto physical_offset = offsets[1].at(labels[1]);
+    const auto right_offset = offsets[2].at(labels[2]);
+    const auto local_physical =
+        static_cast<Eigen::Index>(tensor.extents()[1].at(labels[1]));
+    for (Eigen::Index b = 0; b < block->cols(); ++b) {
+      for (Eigen::Index packed = 0; packed < block->rows(); ++packed) {
+        const double value = (*block)(packed, b);
+        if (value != 0.0) {
+          visit(left_offset + packed / local_physical,
+                (physical_offset + packed % local_physical) * ancilla_dim +
+                    right_offset + b,
+                value);
+        }
+      }
+    }
+  }
+}
+
 // One column group with original column and row indices
 struct ColumnGroup {
   std::vector<Eigen::Index> columns;
@@ -155,9 +183,7 @@ void complete_blocks(std::vector<ColumnGroup>& groups, Eigen::Index left) {
         const Eigen::Index size = group.block.rows();
         const auto width = static_cast<Eigen::Index>(group.columns.size());
         const auto rectangle = group.block.leftCols(width);
-        group.residual = (rectangle.transpose() * rectangle -
-                          Eigen::MatrixXd::Identity(width, width))
-                             .squaredNorm();
+        group.residual = std::pow(isometry_residual(rectangle), 2);
         if (size > width) {
           group.block.rightCols(size - width) =
               decompose_svd(rectangle.transpose()).v.rightCols(size - width);
