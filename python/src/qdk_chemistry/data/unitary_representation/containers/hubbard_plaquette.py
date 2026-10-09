@@ -41,8 +41,9 @@ class HubbardPlaquetteContainer(UnitaryContainer):
     * ``hopping_angle`` is :math:`\kappa = 2t\delta`, shared by both tilings. A plaquette's
       hopping matrix is diagonalized with :math:`\pm 2t` nonzero eigenvalues.
 
-    * ``constant_shift`` is the per-step scalar phase from the classical energy
-      offset :math:`U\eta/2 - UM/4`. It is not sent to Q#; it is applied only by
+    * ``constant_shift`` is the per-step scalar phase from the classical energy offset
+      :math:`(\epsilon + U/2)\eta - UM/4`, for on-site energy :math:`\epsilon`, :math:`\eta`
+      electrons and :math:`M` sites. It is not sent to Q#; it is applied only by
       :meth:`eigenvalue_from_phase` when converting a measured phase back to energy.
 
     Args:

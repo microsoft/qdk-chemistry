@@ -38,7 +38,6 @@ class ControlledHubbardPlaquetteMapperSettings(ControlledCircuitMapperSettings):
             "ancilla count follows the batch rather than the whole lattice, at the cost of one "
             "extra set of place-value rotations per batch. A cap below 8 (e.g. 1) turns "
             "Hamming-weight phasing off, so every term is its own rotation. Set to -1 for no cap.",
-            (-1, 1 << 20),
         )
 
 

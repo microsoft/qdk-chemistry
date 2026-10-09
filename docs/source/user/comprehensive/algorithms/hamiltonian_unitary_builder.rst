@@ -224,7 +224,7 @@ The half-angle pink layers of neighbouring steps merge into one full-angle layer
 Setting ``num_electrons`` records the scalar offset to the described model, with its on-site energy :math:`\epsilon` and interaction :math:`U \sum_i n_{i\uparrow} n_{i\downarrow}`, so that phase estimation reports that model's energy.
 
 The output is a ``HubbardPlaquetteContainer`` that stores the angles and step count rather than individual Pauli terms.
-It is consumed by the ``"hubbard_plaquette"`` controlled circuit mapper, :class:`~qdk_chemistry.algorithms.controlled_circuit_mapper.ControlledHubbardPlaquetteMapper`.
+It is consumed by the :ref:`"hubbard_plaquette" controlled circuit mapper <hubbard-plaquette-mapper>`, :class:`~qdk_chemistry.algorithms.controlled_circuit_mapper.ControlledHubbardPlaquetteMapper`.
 
 The number of steps can be set directly (``num_divisions``) or estimated from ``target_accuracy`` with Campbell's error constant for the related IPG ordering :cite:`Campbell2022`.
 

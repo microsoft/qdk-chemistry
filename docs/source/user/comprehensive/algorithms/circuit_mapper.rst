@@ -212,6 +212,29 @@ so half of the vacuum amplitude leaks. Keeping the partners together instead giv
       :start-after: # start-cell-cswap
       :end-before: # end-cell-cswap
 
+.. _hubbard-plaquette-mapper:
+
+Hubbard plaquette mapper
+~~~~~~~~~~~~~~~~~~~~~~~~
+
+.. rubric:: Factory name: ``"hubbard_plaquette"``
+
+:class:`~qdk_chemistry.algorithms.controlled_circuit_mapper.ControlledHubbardPlaquetteMapper` maps the ``HubbardPlaquetteContainer`` from the ``"hubbard_plaquette"`` :doc:`HamiltonianUnitaryBuilder <hamiltonian_unitary_builder>` to a singly-controlled Q# circuit.
+Each layer of the plaquette step is a tower of same-angle :math:`R_z` rotations, which the mapper synthesizes with Hamming-weight phasing: an adder tree writes the tower's Hamming weight into a scratch register, and a few place-value rotations on that register replace the per-term rotations.
+
+.. rubric:: Settings
+
+.. list-table::
+   :header-rows: 1
+   :widths: 25 15 60
+
+   * - Setting
+     - Type
+     - Description
+   * - ``max_hamming_weight_phasing_batch_size``
+     - int
+     - Largest tower of same-angle rotations phased through one Hamming-weight register. Batches are phased one after another, so a smaller cap lowers the peak ancilla count at the cost of one extra set of place-value rotations per batch. A cap below 8, such as 1, turns phasing off, so every term is its own rotation. When set to -1 (default), there is no cap.
+
 Related classes
 ---------------
 
