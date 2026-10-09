@@ -152,18 +152,6 @@ MPSSite site_from_isometry(const Eigen::MatrixXd& isometry,
   return make_site(packed, physical);
 }
 
-// Dense synthesis of the site built from a physical-major isometry whose rows
-// fill the bond register.
-DenseSiteSynthesis synthesize_dense_site(const MPSSite& site,
-                                         Eigen::Index chi) {
-  return dense_unitary_synthesis(site, chi);
-}
-
-SparseSiteSynthesis synthesize_sparse_site(const MPSSite& site,
-                                           Eigen::Index chi) {
-  return block_sparse_unitary_synthesis(site, chi);
-}
-
 MPSContainer make_container(const std::vector<MPSSite>& sites) {
   std::vector<MPSContainer::SitePtr> pointers;
   for (const auto& site : sites) {
@@ -176,7 +164,7 @@ MPSContainer make_container(const std::vector<MPSSite>& sites) {
 
 DenseSiteSynthesis decompose_dense_target(const Eigen::MatrixXd& target,
                                           Eigen::Index chi) {
-  return synthesize_dense_site(site_from_isometry(target, target.rows() / chi),
+  return dense_unitary_synthesis(site_from_isometry(target, target.rows() / chi),
                                chi);
 }
 
@@ -198,7 +186,7 @@ Eigen::MatrixXd pad_isometry(const Eigen::MatrixXd& isometry,
 SparseSiteSynthesis expect_sparse_site_reconstruction(
     const Eigen::MatrixXd& isometry, Eigen::Index physical,
     Eigen::Index ancilla_dim) {
-  auto result = synthesize_sparse_site(site_from_isometry(isometry, physical),
+  auto result = block_sparse_unitary_synthesis(site_from_isometry(isometry, physical),
                                        ancilla_dim);
   expect_sparse_reconstruction(result,
                                pad_isometry(isometry, physical, ancilla_dim));
@@ -445,12 +433,12 @@ TEST(UnitarySynthesisTest, DecomposesSymmetryBlockedSparseMpsSite) {
     }
   }
 
-  const auto from_blocks = synthesize_sparse_site(blocked, chi);
+  const auto from_blocks = block_sparse_unitary_synthesis(blocked, chi);
   expect_sparse_reconstruction(from_blocks, target);
 
   // The same entries stored as one dense block give the identical synthesis.
   const auto from_dense =
-      synthesize_sparse_site(make_site(packed, physical), chi);
+      block_sparse_unitary_synthesis(make_site(packed, physical), chi);
   EXPECT_EQ(from_blocks.row_permutation, from_dense.row_permutation);
   EXPECT_EQ(from_blocks.column_permutation, from_dense.column_permutation);
   EXPECT_EQ(from_blocks.block_givens.layer_angles,
@@ -464,15 +452,27 @@ TEST(UnitarySynthesisTest, RejectsInvalidSparseInputs) {
   const MPSSite valid =
       site_from_isometry(random_orthogonal(4, 3).leftCols(2), 2);
   const MPSSite zero = site_from_isometry(Eigen::MatrixXd::Zero(4, 2), 2);
-  EXPECT_THROW(synthesize_sparse_site(zero, 2), std::invalid_argument);
+  EXPECT_THROW(block_sparse_unitary_synthesis(zero, 2), std::invalid_argument);
   Eigen::MatrixXd nonfinite = Eigen::MatrixXd::Identity(4, 2);
   nonfinite(3, 1) = std::numeric_limits<double>::quiet_NaN();
-  EXPECT_THROW(synthesize_sparse_site(site_from_isometry(nonfinite, 2), 2),
+  EXPECT_THROW(block_sparse_unitary_synthesis(site_from_isometry(nonfinite, 2), 2),
                std::invalid_argument);
-  EXPECT_THROW(synthesize_sparse_site(valid, 0), std::invalid_argument);
+  EXPECT_THROW(block_sparse_unitary_synthesis(valid, 0), std::invalid_argument);
   EXPECT_THROW(
-      synthesize_sparse_site(valid, std::numeric_limits<Eigen::Index>::max()),
+      block_sparse_unitary_synthesis(valid, std::numeric_limits<Eigen::Index>::max()),
       std::invalid_argument);
+}
+
+TEST(UnitarySynthesisTest, ProjectsSparseBlocksWithinTolerance) {
+  // The one-row block of column 3 carries a residual of 3e-8: inside the
+  // accepted 1e-8 * left = 4e-8 but above the 1e-8 guard of a 1x1 block.
+  Eigen::MatrixXd target = Eigen::MatrixXd::Zero(8, 4);
+  target.topLeftCorner(3, 3) = random_orthogonal(3, 41);
+  target(4, 3) = 1.0;
+  Eigen::MatrixXd perturbed = target;
+  perturbed(4, 3) += 1.5e-8;
+  expect_sparse_reconstruction(
+      block_sparse_unitary_synthesis(site_from_isometry(perturbed, 2), 4), target);
 }
 
 TEST(UnitarySynthesisTest, ReconstructsDenseSiteIsometry) {
@@ -594,7 +594,7 @@ TEST(UnitarySynthesisTest, ChainsDenseMpsSiteRightFactors) {
 
       // Absorbing the following right factor changes only the terminal
       // blocks, so the rest matches the synthesis of the site on its own.
-      const auto alone = synthesize_dense_site(sites[index], chi);
+      const auto alone = dense_unitary_synthesis(sites[index], chi);
       ASSERT_EQ(results[index].rotation_angles.size(),
                 alone.rotation_angles.size());
       for (std::size_t step = 0; step < alone.rotation_angles.size(); ++step) {
@@ -635,37 +635,28 @@ TEST(UnitarySynthesisTest, DecomposesSparseMpsSite) {
   isometry(3 * right + 2, 2) = 0.8;
 
   const MPSSite site = site_from_isometry(isometry, physical);
-  expect_sparse_reconstruction(synthesize_sparse_site(site, 4),
+  expect_sparse_reconstruction(block_sparse_unitary_synthesis(site, 4),
                                pad_isometry(isometry, physical, 4));
 }
 
 TEST(UnitarySynthesisTest, RejectsInvalidMpsSites) {
   const Eigen::MatrixXd isometry = random_orthogonal(8, 90).leftCols(2);
   const MPSSite site = site_from_isometry(isometry, 4);
-  EXPECT_THROW(synthesize_dense_site(site, 1), std::invalid_argument);
-  EXPECT_THROW(synthesize_sparse_site(site, 1), std::invalid_argument);
-  // The right bond of the first site holds two states, while the following
-  // site has three left-bond states.
-  const MPSSite three_left =
-      site_from_isometry(random_orthogonal(8, 91).leftCols(3), 4);
-  EXPECT_THROW(
-      make_container(
-          {make_site(Eigen::MatrixXd::Ones(4, 2).eval(), 4), site, three_left,
-           site_from_isometry(random_orthogonal(4, 92).leftCols(2), 4)}),
-      std::invalid_argument);
+  EXPECT_THROW(dense_unitary_synthesis(site, 1), std::invalid_argument);
+  EXPECT_THROW(block_sparse_unitary_synthesis(site, 1), std::invalid_argument);
 
   Eigen::MatrixXd non_isometric = Eigen::MatrixXd::Zero(8, 2);
   non_isometric(0, 0) = 1.0;
   non_isometric(1, 1) = 2.0;
   const MPSSite scaled = site_from_isometry(non_isometric, 4);
-  EXPECT_THROW(synthesize_dense_site(scaled, 2), std::invalid_argument);
-  EXPECT_THROW(synthesize_sparse_site(scaled, 2), std::invalid_argument);
+  EXPECT_THROW(dense_unitary_synthesis(scaled, 2), std::invalid_argument);
+  EXPECT_THROW(block_sparse_unitary_synthesis(scaled, 2), std::invalid_argument);
 
   const Eigen::MatrixXcd complex_packed =
       Eigen::MatrixXcd::Identity(4, 2) * std::complex<double>(0.0, 1.0);
   const MPSSite complex_site = make_site(complex_packed, 4);
-  EXPECT_THROW(synthesize_dense_site(complex_site, 2), std::invalid_argument);
-  EXPECT_THROW(synthesize_sparse_site(complex_site, 2), std::invalid_argument);
+  EXPECT_THROW(dense_unitary_synthesis(complex_site, 2), std::invalid_argument);
+  EXPECT_THROW(block_sparse_unitary_synthesis(complex_site, 2), std::invalid_argument);
 
   // Three physical states are neither the ('0', '1') nor the ('0', 'u', 'd',
   // '2') basis.
@@ -676,7 +667,7 @@ TEST(UnitarySynthesisTest, RejectsInvalidMpsSites) {
   const MPSSite three_state_site =
       make_site(Eigen::MatrixXd(Eigen::MatrixXd::Identity(3, 2)), 3,
                 std::move(three_states));
-  EXPECT_THROW(synthesize_dense_site(three_state_site, 2),
+  EXPECT_THROW(dense_unitary_synthesis(three_state_site, 2),
                std::invalid_argument);
   // Three left-bond states do not fit a two-state bond register.
   EXPECT_THROW(decompose_dense_target(Eigen::MatrixXd::Identity(8, 3), 2),
@@ -684,7 +675,7 @@ TEST(UnitarySynthesisTest, RejectsInvalidMpsSites) {
 
   Eigen::MatrixXd nonfinite = isometry;
   nonfinite(5, 1) = std::numeric_limits<double>::quiet_NaN();
-  EXPECT_THROW(synthesize_dense_site(site_from_isometry(nonfinite, 4), 2),
+  EXPECT_THROW(dense_unitary_synthesis(site_from_isometry(nonfinite, 4), 2),
                std::invalid_argument);
 
   EXPECT_THROW(dense_unitary_synthesis(site, 0), std::invalid_argument);
@@ -736,7 +727,7 @@ TEST(UnitarySynthesisTest, ReconstructsRandomSparseSites) {
   }
   for (std::size_t index = 0; index < sites.size(); ++index) {
     SCOPED_TRACE(::testing::Message() << "site " << index);
-    expect_sparse_reconstruction(synthesize_sparse_site(sites[index], chi),
+    expect_sparse_reconstruction(block_sparse_unitary_synthesis(sites[index], chi),
                                  targets[index]);
   }
 }

@@ -1,6 +1,11 @@
 // Copyright (c) Microsoft Corporation. All rights reserved.
 // Licensed under the MIT License. See LICENSE.txt in the project root for
 // license information.
+//
+// Portions of this file are adapted from code by Felix Rupprecht published at
+// https://zenodo.org/records/20393500, Copyright 2026 German Aerospace Center
+// (DLR), licensed under the Apache License, Version 2.0, and modified for QDK
+// Chemistry.
 
 #include <algorithm>
 #include <cmath>
@@ -177,24 +182,33 @@ RowGathering gather_rows(const data::MPSSite& site, Eigen::Index ancilla_dim,
 }
 
 void complete_blocks(std::vector<ColumnGroup>& groups, Eigen::Index left) {
+  const double tolerance = orthogonality_tolerance * static_cast<double>(left);
   run_tasks(
       static_cast<std::ptrdiff_t>(groups.size()), [&](std::ptrdiff_t index) {
         auto& group = groups[static_cast<std::size_t>(index)];
         const Eigen::Index size = group.block.rows();
         const auto width = static_cast<Eigen::Index>(group.columns.size());
-        const auto rectangle = group.block.leftCols(width);
-        group.residual = std::pow(isometry_residual(rectangle), 2);
-        if (size > width) {
-          group.block.rightCols(size - width) =
-              decompose_svd(rectangle.transpose()).v.rightCols(size - width);
+        auto rectangle = group.block.leftCols(width);
+        const double block_residual = isometry_residual(rectangle);
+        group.residual = block_residual * block_residual;
+        if (!(block_residual <= tolerance)) {
+          return;
         }
+        const bool project = !is_isometry(rectangle);
+        if (size == width && !project) {
+          return;
+        }
+        const auto svd = decompose_svd(rectangle.transpose());
+        if (project) {
+          rectangle = svd.v.leftCols(width) * svd.u.transpose();
+        }
+        group.block.rightCols(size - width) = svd.v.rightCols(size - width);
       });
   double residual = 0.0;
   for (const auto& group : groups) {
     residual += group.residual;
   }
-  if (!(std::sqrt(residual) <=
-        orthogonality_tolerance * static_cast<double>(left))) {
+  if (!(std::sqrt(residual) <= tolerance)) {
     throw std::invalid_argument(
         "Sparse site decomposition requires an isometric matrix.");
   }

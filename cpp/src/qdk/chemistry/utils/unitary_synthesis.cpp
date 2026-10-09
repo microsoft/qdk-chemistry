@@ -1,6 +1,11 @@
 // Copyright (c) Microsoft Corporation. All rights reserved.
 // Licensed under the MIT License. See LICENSE.txt in the project root for
 // license information.
+//
+// Portions of this file are adapted from code by Felix Rupprecht published at
+// https://zenodo.org/records/20393500, Copyright 2026 German Aerospace Center
+// (DLR), licensed under the Apache License, Version 2.0, and modified for QDK
+// Chemistry.
 
 #include <functional>
 #include <iterator>
@@ -65,8 +70,8 @@ DenseSiteSynthesis dense_unitary_synthesis(
     blocks.emplace_back(isometry.topRows(ancilla_dim),
                         isometry.bottomRows(ancilla_dim));
   } else {
-    // Three-step CSD peel: two QRs split the four physical blocks into three
-    // independent two-block CSDs.
+    // o-block CSDs.Three-step CSD peel: two QRs split the four physical blocks
+    // into three independent tw
     auto [b, r] =
         decompose_qr(isometry.bottomRows(3 * ancilla_dim), ancilla_dim);
     auto [c, s] = decompose_qr(b.bottomRows(2 * ancilla_dim), ancilla_dim);
