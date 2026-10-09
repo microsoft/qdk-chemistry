@@ -116,8 +116,6 @@ jobs:
       uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
       with:
         python-version: ${{ matrix.python-version }}
-        cache: pip
-        cache-dependency-path: python/pyproject.toml
 
     - name: Install Linux system packages
       if: runner.os == 'Linux'
@@ -327,6 +325,7 @@ jobs:
       timeout-minutes: 90
       env:
         OMP_NUM_THREADS: ${{ matrix.python-omp-threads }}
+        PYTEST_TIMEOUT: '1800'
         PYTHON_TEST_WORKERS: ${{ matrix.python-test-workers }}
         QDK_CHEMISTRY_RUN_SLOW_TESTS: ${{ ((github.event_name == 'workflow_dispatch' && inputs.run_slow_tests) || github.event_name == 'merge_group') && '1' || '0' }}
       working-directory: python
@@ -384,6 +383,7 @@ jobs:
 
     - name: Generate C++ coverage report
       if: matrix.enable-coverage
+      continue-on-error: true
       run: |
         # Run after the Python tests so pytest exercises the same coverage-instrumented binary ctest did,
         # and their hits share $BUILD_DIR's .gcda files.
@@ -411,6 +411,7 @@ jobs:
 
     - name: Generate Pybind11 coverage report
       if: matrix.enable-coverage
+      continue-on-error: true
       working-directory: python
       run: |
         PYBIND_BUILD_DIR=$(find . -wholename "./build/cp*/CMakeFiles/_core.dir" | head -1)
@@ -437,6 +438,7 @@ jobs:
 
     - name: Add coverage report to job summary
       if: matrix.enable-coverage
+      continue-on-error: true
       run: |
         # Extract coverage percentages
         extract_coverage() {
@@ -485,6 +487,7 @@ jobs:
 
     - name: Retain coverage XML for benchmarks
       if: always() && matrix.enable-coverage && github.event_name == 'workflow_dispatch'
+      continue-on-error: true
       uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
       with:
         name: cobertura-xml-linux-py${{ matrix.python-version }}
@@ -498,6 +501,7 @@ jobs:
     - name: Upload C++ code coverage
       if: matrix.enable-coverage && (github.event_name == 'pull_request' || github.event_name == 'push')
       uses: actions/upload-code-coverage@bfa741d815a28cb064a8e3a0837e577457a017d5 # v1.4.3
+      continue-on-error: true
       with:
         file: coverage-reports/cpp_coverage.cobertura.xml
         language: C++
@@ -507,6 +511,7 @@ jobs:
     - name: Upload Pybind11 code coverage
       if: matrix.enable-coverage && (github.event_name == 'pull_request' || github.event_name == 'push')
       uses: actions/upload-code-coverage@bfa741d815a28cb064a8e3a0837e577457a017d5 # v1.4.3
+      continue-on-error: true
       with:
         file: coverage-reports/pybind11_coverage.cobertura.xml
         language: C++
@@ -516,6 +521,7 @@ jobs:
     - name: Upload Python code coverage
       if: matrix.enable-coverage && (github.event_name == 'pull_request' || github.event_name == 'push')
       uses: actions/upload-code-coverage@bfa741d815a28cb064a8e3a0837e577457a017d5 # v1.4.3
+      continue-on-error: true
       with:
         file: coverage-reports/python_coverage.xml
         language: Python
@@ -546,6 +552,7 @@ jobs:
 
     - name: Upload JUnit test results
       if: always()
+      continue-on-error: true
       uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
       with:
         name: junit-${{ matrix.os-name }}-py${{ matrix.python-version }}
@@ -587,8 +594,6 @@ jobs:
       uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
       with:
         python-version: '3.13'
-        cache: pip
-        cache-dependency-path: python/pyproject.toml
 
     - name: Set memory-aware build parallelism
       shell: pwsh
@@ -756,6 +761,7 @@ jobs:
       shell: pwsh
       timeout-minutes: 90
       env:
+        PYTEST_TIMEOUT: '1800'
         QDK_CHEMISTRY_RUN_SLOW_TESTS: ${{ ((github.event_name == 'workflow_dispatch' && inputs.run_slow_tests) || github.event_name == 'merge_group') && '1' || '0' }}
       run: |
         New-Item -ItemType Directory -Force -Path test-results | Out-Null
@@ -771,6 +777,7 @@ jobs:
 
     - name: Upload JUnit test results
       if: always()
+      continue-on-error: true
       uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
       with:
         name: junit-windows-x64-${{ matrix.compiler }}
@@ -821,8 +828,6 @@ jobs:
       with:
         python-version: '3.13'
         architecture: arm64
-        cache: pip
-        cache-dependency-path: python/pyproject.toml
 
     - name: Verify the interpreter is native ARM64
       shell: pwsh
@@ -1023,6 +1028,7 @@ jobs:
       shell: pwsh
       timeout-minutes: 90
       env:
+        PYTEST_TIMEOUT: '1800'
         QDK_CHEMISTRY_RUN_SLOW_TESTS: ${{ ((github.event_name == 'workflow_dispatch' && inputs.run_slow_tests) || github.event_name == 'merge_group') && '1' || '0' }}
       run: |
         New-Item -ItemType Directory -Force -Path test-results | Out-Null
@@ -1038,6 +1044,7 @@ jobs:
 
     - name: Upload JUnit test results
       if: always()
+      continue-on-error: true
       uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
       with:
         name: junit-windows-arm64-${{ matrix.compiler }}
@@ -1073,8 +1080,6 @@ jobs:
       uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
       with:
         python-version: '3.13'
-        cache: pip
-        cache-dependency-path: python/pyproject.toml
 
     # This job does not build C++/Python itself -- these packages are only needed to satisfy the built
     # qdk_chemistry extension's runtime shared-library dependencies (OpenBLAS/HDF5/libgfortran).
@@ -1129,6 +1134,7 @@ jobs:
     - name: Run Python tests
       timeout-minutes: 90
       env:
+        PYTEST_TIMEOUT: '1800'
         QDK_CHEMISTRY_RUN_SLOW_TESTS: ${{ ((github.event_name == 'workflow_dispatch' && inputs.run_slow_tests) || github.event_name == 'merge_group') && '1' || '0' }}
       working-directory: python
       run: |
@@ -1141,6 +1147,7 @@ jobs:
 
     - name: Upload test results
       if: always()
+      continue-on-error: true
       uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
       with:
         name: qdk-branch-test-results
