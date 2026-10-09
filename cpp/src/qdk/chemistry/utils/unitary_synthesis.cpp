@@ -1,11 +1,6 @@
 // Copyright (c) Microsoft Corporation. All rights reserved.
 // Licensed under the MIT License. See LICENSE.txt in the project root for
 // license information.
-//
-// Portions of this file are adapted from code by Felix Rupprecht published at
-// https://zenodo.org/records/20393500, Copyright 2026 German Aerospace Center
-// (DLR), licensed under the Apache License, Version 2.0, and modified for QDK
-// Chemistry.
 
 #include <functional>
 #include <iterator>
@@ -70,8 +65,6 @@ DenseSiteSynthesis dense_unitary_synthesis(
     blocks.emplace_back(isometry.topRows(ancilla_dim),
                         isometry.bottomRows(ancilla_dim));
   } else {
-    // o-block CSDs.Three-step CSD peel: two QRs split the four physical blocks
-    // into three independent tw
     auto [b, r] =
         decompose_qr(isometry.bottomRows(3 * ancilla_dim), ancilla_dim);
     auto [c, s] = decompose_qr(b.bottomRows(2 * ancilla_dim), ancilla_dim);
@@ -101,8 +94,6 @@ DenseSiteSynthesis dense_unitary_synthesis(
   }
   unitaries.push_back(std::move(csds.back().u_2));
   if (following_right_factor.size() != 0) {
-    // Rotating the right bond changes only the terminal blocks, not the CSD
-    // angles, mixing unitaries, or this site's right factor.
     const auto num_blocks = static_cast<std::ptrdiff_t>(csds.size() + 1);
     for (auto block = unitaries.end() - num_blocks; block != unitaries.end();
          ++block) {
