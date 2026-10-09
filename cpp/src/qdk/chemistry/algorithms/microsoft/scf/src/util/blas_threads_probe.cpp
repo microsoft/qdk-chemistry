@@ -1,0 +1,15 @@
+// Copyright (c) Microsoft Corporation. All rights reserved.
+// Licensed under the MIT License. See LICENSE.txt in the project root for
+// license information.
+
+// Driver for the link probe in cmake/qdk-blas-threads.cmake: linking this
+// against the selected backend is what verifies that its vendor symbols
+// resolve against the BLAS this build uses.
+
+#include "blas_threads_backend.h"
+
+int main() {
+  using namespace qdk::chemistry::scf::util::detail;
+  blas_backend_set_num_threads(blas_backend_get_num_threads());
+  return 0;
+}
