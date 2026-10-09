@@ -163,7 +163,7 @@ void MPSSite::_validate() {
             throw std::invalid_argument(
                 "MPS sector order must contain every sector exactly once.");
           }
-          auto& offsets = _tensor_layout.offsets[slot];
+          auto& offsets = _sector_offsets[slot];
           std::size_t offset = 0;
           for (const auto& label : order) {
             const auto extent = extents.find(label);
@@ -179,7 +179,7 @@ void MPSSite::_validate() {
             }
             offset += extent->second;
           }
-          _tensor_layout.dimensions[slot] = static_cast<Eigen::Index>(offset);
+          _dimensions[slot] = offset;
           for (const auto& axis : tensor.symmetries()[slot]->axes()) {
             if (axis.equivalent()) {
               throw std::invalid_argument(
@@ -236,15 +236,9 @@ void MPSSite::_validate() {
   }
 }
 
-std::size_t MPSSite::left_bond_dimension() const {
-  return static_cast<std::size_t>(_tensor_layout.dimensions[0]);
-}
-std::size_t MPSSite::physical_dimension() const {
-  return static_cast<std::size_t>(_tensor_layout.dimensions[1]);
-}
-std::size_t MPSSite::right_bond_dimension() const {
-  return static_cast<std::size_t>(_tensor_layout.dimensions[2]);
-}
+std::size_t MPSSite::left_bond_dimension() const { return _dimensions[0]; }
+std::size_t MPSSite::physical_dimension() const { return _dimensions[1]; }
+std::size_t MPSSite::right_bond_dimension() const { return _dimensions[2]; }
 bool MPSSite::is_complex() const { return _tensor->index() == 1; }
 
 MPSSite::DenseMatrixVariant MPSSite::to_dense() const {
@@ -261,7 +255,7 @@ MPSSite::DenseMatrixVariant MPSSite::to_dense() const {
             std::remove_const_t<typename TensorType::BlockPtr::element_type>;
         Matrix dense = Matrix::Zero(static_cast<Eigen::Index>(left * physical),
                                     static_cast<Eigen::Index>(right));
-        const auto& offsets = _tensor_layout.offsets;
+        const auto& offsets = _sector_offsets;
         for (const auto& [labels, block] : tensor.blocks()) {
           const auto local_left = tensor.extents()[0].at(labels[0]);
           const auto local_physical = tensor.extents()[1].at(labels[1]);

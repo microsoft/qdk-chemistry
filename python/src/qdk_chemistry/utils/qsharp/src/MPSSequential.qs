@@ -5,13 +5,12 @@ namespace QDKChemistry.Utils.MPSSequential {
 
     import Std.Arrays.*;
     import Std.Diagnostics.Fact;
-    import Std.ResourceEstimation.*;
     import QDKChemistry.Utils.PhaseGradient.PreparePhaseGradientState;
     import QDKChemistry.Utils.QROMStatePrep.QROMStatePrepParams;
     import QDKChemistry.Utils.QROMStatePrep.QROMStatePrepare;
     import GivensDecomposition.*;
 
-    export SequentialSiteDecomposition, MPSSequentialParams, MPSSequential, MakeMPSSequentialOp, MakeMPSSequentialCircuit, MakeMPSSequentialPlaceholderCircuit, MPSSiteQubits, ApplyMPSFermionicOrderSigns;
+    export DenseSiteSynthesis, MPSSequentialParams, MPSSequential, MakeMPSSequentialOp, MakeMPSSequentialCircuit, MPSSiteQubits, ApplyMPSFermionicOrderSigns;
 
     /// # Summary
     /// Returns the qubit indices of one orbital in the blocked Jordan-Wigner layout.
@@ -68,40 +67,30 @@ namespace QDKChemistry.Utils.MPSSequential {
     }
 
     /// # Summary
-    /// Cosine-sine decomposition of one dense MPS site unitary.
+    /// Circuit data for one dense MPS site unitary, mirroring the C++
+    /// `qdk::chemistry::utils::detail::DenseSiteSynthesis`.
     ///
     /// # Description
     /// A site with the ('0', 'u', 'd', '2') physical basis is applied as
-    ///   UCR(rot0) → CNOT → W₀ → UCR(rot1) → CNOT → W₁ → UCR(rot2) → U
+    ///   UCR₀ → CNOT → W₀ → UCR₁ → CNOT → W₁ → UCR₂ → U
     /// (Fig. 5 of Rupprecht & Wölk, arXiv:2605.28489). A site with the ('0', '1') physical
-    /// basis is applied as UCR(rot0) → U, and its rot1, rot2, W₀ and W₁ fields are empty.
-    /// Each orthogonal factor is stored as Givens rotation layers. The right factor V of the
-    /// decomposition is absorbed into the preceding site or the initial state, so it never
-    /// appears in the circuit.
+    /// basis is applied as UCR₀ → U (Eq. 6 of the same reference). Each UCRₖ is a uniformly
+    /// controlled Ry rotation addressed by the bond register, and U is block diagonal. The
+    /// right factor V of the decomposition is absorbed into the preceding site or the initial
+    /// state, so the C++ `right_factor` has no counterpart here.
     ///
     /// # Input
-    /// ## rot0Angles, rot1Angles, rot2Angles
-    /// Double[ancillaDim]: Ry angles of the uniformly controlled rotations.
-    /// ## w0LayerAngles, w0LayerShifted, w0Phases
-    /// Givens layers and sign corrections of W₀ (ancillaDim × ancillaDim).
-    /// ## w1LayerAngles, w1LayerShifted, w1Phases
-    /// Givens layers and sign corrections of W₁ (ancillaDim × ancillaDim).
-    /// ## uLayerAngles, uLayerShifted, uPhases
-    /// Merged Givens layers and sign corrections of the block-diagonal U (d·ancillaDim for
-    /// d physical states).
-    struct SequentialSiteDecomposition {
-        rot0Angles : Double[],
-        rot1Angles : Double[],
-        rot2Angles : Double[],
-        w0LayerAngles : Double[][],
-        w0LayerShifted : Bool[],
-        w0Phases : Bool[],
-        w1LayerAngles : Double[][],
-        w1LayerShifted : Bool[],
-        w1Phases : Bool[],
-        uLayerAngles : Double[][],
-        uLayerShifted : Bool[],
-        uPhases : Bool[],
+    /// ## rotationAngles
+    /// Double[numRotations][ancillaDim]: Ry angles of UCR₀, UCR₁ and UCR₂ for four physical
+    /// states, or of UCR₀ for two.
+    /// ## mixingGivens
+    /// Givens data of W₀ and W₁ (ancillaDim × ancillaDim); empty for two physical states.
+    /// ## blockGivens
+    /// Merged Givens data of the block-diagonal U (d·ancillaDim for d physical states).
+    struct DenseSiteSynthesis {
+        rotationAngles : Double[][],
+        mixingGivens : GivensDecomposition[],
+        blockGivens : GivensDecomposition,
     }
 
     /// # Summary
@@ -113,24 +102,15 @@ namespace QDKChemistry.Utils.MPSSequential {
         siteToOrbitalOrder : Int[],
         rotationBits : Int,
         numAncillaQubits : Int,
-        siteDecompositions : SequentialSiteDecomposition[],
+        siteDecompositions : DenseSiteSynthesis[],
     }
 
     /// # Summary
-    /// Quantized table data for one site unitary, as consumed by `PrepareSequentialMPS`.
-    struct QuantizedSiteUnitary {
-        rot0 : Bool[][],
-        rot1 : Bool[][],
-        rot2 : Bool[][],
-        w0Layers : Bool[][][],
-        w0Shifted : Bool[],
-        w0Phases : Bool[],
-        w1Layers : Bool[][][],
-        w1Shifted : Bool[],
-        w1Phases : Bool[],
-        uLayers : Bool[][][],
-        uShifted : Bool[],
-        uPhases : Bool[],
+    /// `DenseSiteSynthesis` with quantized tables, as consumed by `PrepareSequentialMPS`.
+    struct QuantizedDenseSiteSynthesis {
+        rotations : Bool[][][],
+        mixingGivens : QuantizedGivensDecomposition[],
+        blockGivens : QuantizedGivensDecomposition,
     }
 
     /// # Summary
@@ -138,18 +118,14 @@ namespace QDKChemistry.Utils.MPSSequential {
     ///
     /// # Input
     /// ## siteData
-    /// Returns the quantized data of the unitary for site `siteIdx + 1`. It is evaluated
-    /// lazily, so cached site unitaries are never quantized during resource estimation.
-    /// ## cacheSites
-    /// Whether every site shares one circuit structure, so the resource estimator may trace
-    /// only the first site unitary.
+    /// Returns the quantized data of the unitary for site `siteIdx + 1`.
+    /// Quantization is deferred until the corresponding site is applied.
     operation PrepareSequentialMPS(
         initialStateVec : Double[],
         numSites : Int,
         siteToOrbitalOrder : Int[],
         rotationBits : Int,
-        siteData : Int -> QuantizedSiteUnitary,
-        cacheSites : Bool,
+        siteData : Int -> QuantizedDenseSiteSynthesis,
         state : Qubit[],
         ancilla : Qubit[]
     ) : Unit {
@@ -172,30 +148,25 @@ namespace QDKChemistry.Utils.MPSSequential {
 
         for siteIdx in 0..numSites - 2 {
             let newSite = MPSSiteQubits(state, numSites, siteToOrbitalOrder[siteIdx + 1]);
-            if not cacheSites or BeginEstimateCaching("MPSSequential.SiteUnitary", SingleVariant()) {
-                let site = siteData(siteIdx);
-                // `newSite` is [q] for the ('0', '1') physical basis or [q0, q1] for the
-                // ('0', 'u', 'd', '2') basis. The rotation tables are addressed by the
-                // little-endian bond register; the Givens operations take
-                // most-significant-first registers, hence `Reversed(ancilla)`.
-                ApplyMultiplexedRy(site.rot0, ancilla, newSite[0], phaseGradient, angleReg);
-                if Length(newSite) == 2 {
-                    let q0 = newSite[0];
-                    let q1 = newSite[1];
-                    CNOT(q1, q0);
-                    ApplyControlledRealUnitaryViaGivens(site.w0Layers, site.w0Shifted, site.w0Phases, Reversed(ancilla), phaseGradient, q0, angleReg);
-                    ApplyControlledMultiplexedRy(site.rot1, ancilla, q0, q1, phaseGradient, angleReg);
-                    CNOT(q1, q0);
-                    ApplyControlledRealUnitaryViaGivens(site.w1Layers, site.w1Shifted, site.w1Phases, Reversed(ancilla), phaseGradient, q1, angleReg);
-                    ApplyControlledMultiplexedRy(site.rot2, ancilla, q1, q0, phaseGradient, angleReg);
-                }
-                // The joint register Reversed(ancilla + newSite) selects block q, or block
-                // 2·q1 + q0, of U.
-                ApplyRealUnitaryViaGivens(site.uLayers, site.uShifted, site.uPhases, Reversed(ancilla + newSite), phaseGradient, angleReg);
-                if cacheSites {
-                    EndEstimateCaching();
-                }
+            let site = siteData(siteIdx);
+            // `newSite` is [q] for the ('0', '1') physical basis or [q0, q1] for the
+            // ('0', 'u', 'd', '2') basis. The rotation tables are addressed by the
+            // little-endian bond register; the Givens operations take
+            // most-significant-first registers, hence `Reversed(ancilla)`.
+            ApplyMultiplexedRy(site.rotations[0], ancilla, newSite[0], phaseGradient, angleReg);
+            if Length(newSite) == 2 {
+                let q0 = newSite[0];
+                let q1 = newSite[1];
+                CNOT(q1, q0);
+                ApplyControlledRealUnitaryViaGivens(site.mixingGivens[0], Reversed(ancilla), phaseGradient, q0, angleReg);
+                ApplyControlledMultiplexedRy(site.rotations[1], ancilla, q0, q1, phaseGradient, angleReg);
+                CNOT(q1, q0);
+                ApplyControlledRealUnitaryViaGivens(site.mixingGivens[1], Reversed(ancilla), phaseGradient, q1, angleReg);
+                ApplyControlledMultiplexedRy(site.rotations[2], ancilla, q1, q0, phaseGradient, angleReg);
             }
+            // The joint register Reversed(ancilla + newSite) selects block q, or block
+            // 2·q1 + q0, of U.
+            ApplyRealUnitaryViaGivens(site.blockGivens, Reversed(ancilla + newSite), phaseGradient, angleReg);
         }
         ApplyMPSFermionicOrderSigns(siteToOrbitalOrder, state);
 
@@ -241,7 +212,7 @@ namespace QDKChemistry.Utils.MPSSequential {
         numSites : Int,
         siteToOrbitalOrder : Int[],
         rotationBits : Int,
-        siteDecompositions : SequentialSiteDecomposition[],
+        siteDecompositions : DenseSiteSynthesis[],
         state : Qubit[],
         ancilla : Qubit[]
     ) : Unit {
@@ -263,23 +234,13 @@ namespace QDKChemistry.Utils.MPSSequential {
             siteToOrbitalOrder,
             rotationBits,
             siteIdx -> {
-                let decomp = siteDecompositions[siteIdx];
-                new QuantizedSiteUnitary {
-                    rot0 = QuantizeRyAngles(decomp.rot0Angles, rotationBits),
-                    rot1 = QuantizeRyAngles(decomp.rot1Angles, rotationBits),
-                    rot2 = QuantizeRyAngles(decomp.rot2Angles, rotationBits),
-                    w0Layers = Mapped(layer -> QuantizeGivensAngles(layer, wAddresses, rotationBits), decomp.w0LayerAngles),
-                    w0Shifted = decomp.w0LayerShifted,
-                    w0Phases = decomp.w0Phases,
-                    w1Layers = Mapped(layer -> QuantizeGivensAngles(layer, wAddresses, rotationBits), decomp.w1LayerAngles),
-                    w1Shifted = decomp.w1LayerShifted,
-                    w1Phases = decomp.w1Phases,
-                    uLayers = Mapped(layer -> QuantizeGivensAngles(layer, uAddresses, rotationBits), decomp.uLayerAngles),
-                    uShifted = decomp.uLayerShifted,
-                    uPhases = decomp.uPhases,
+                let synthesis = siteDecompositions[siteIdx];
+                new QuantizedDenseSiteSynthesis {
+                    rotations = Mapped(angles -> QuantizeRyAngles(angles, rotationBits), synthesis.rotationAngles),
+                    mixingGivens = Mapped(givens -> QuantizeGivensDecomposition(givens, wAddresses, rotationBits), synthesis.mixingGivens),
+                    blockGivens = QuantizeGivensDecomposition(synthesis.blockGivens, uAddresses, rotationBits),
                 }
             },
-            false,
             state,
             ancilla
         );
@@ -315,7 +276,7 @@ namespace QDKChemistry.Utils.MPSSequential {
         siteToOrbitalOrder : Int[],
         rotationBits : Int,
         numAncillaQubits : Int,
-        siteDecompositions : SequentialSiteDecomposition[]
+        siteDecompositions : DenseSiteSynthesis[]
     ) : Unit {
         use state = Qubit[numQubitsPerSite * numSites];
         use ancilla = Qubit[numAncillaQubits];
@@ -331,64 +292,4 @@ namespace QDKChemistry.Utils.MPSSequential {
         ResetAll(state + ancilla);
     }
 
-    /// # Summary
-    /// Resource-estimation circuit with placeholder site data.
-    ///
-    /// # Description
-    /// Every site unitary of the sequential preparation acts on the full ancilla register,
-    /// so its cost depends only on `numAncillaQubits` and `rotationBits`. This circuit
-    /// replaces the classical decompositions by placeholder data of the same structure and
-    /// traces one site unitary, which makes estimates feasible for large bond dimensions.
-    /// It does not prepare the target state.
-    ///
-    /// Table lookups and phase-gradient rotations cost the same for any angle values, so the
-    /// placeholder reproduces the Givens layer and rotation structure of a full Clements
-    /// decomposition without computing one. Sign corrections are omitted, which slightly
-    /// underestimates the cost of real data. With one qubit per site, block unitaries of
-    /// sites whose bonds are smaller than the ancilla register need fewer layers, so the
-    /// placeholder overestimates them.
-    operation MakeMPSSequentialPlaceholderCircuit(
-        initialStateVec : Double[],
-        numSites : Int,
-        numQubitsPerSite : Int,
-        siteToOrbitalOrder : Int[],
-        rotationBits : Int,
-        numAncillaQubits : Int
-    ) : Unit {
-        use state = Qubit[numQubitsPerSite * numSites];
-        use ancilla = Qubit[numAncillaQubits];
-        let ancillaDim = 1 <<< numAncillaQubits;
-        let numLayers = ancillaDim == 2 ? 1 | ancillaDim;
-        let shifted = MappedOverRange(layer -> layer % 2 == 1, 0..numLayers - 1);
-        let angle = 0.1;
-        let rot = QuantizeRyAngles(Repeated(angle, ancillaDim), rotationBits);
-        let hasMixing = numQubitsPerSite == 2;
-        let wLayers = hasMixing ? Repeated(QuantizeGivensAngles([angle], ancillaDim / 2, rotationBits), numLayers) | [];
-        let wShifted = hasMixing ? shifted | [];
-        let placeholder = new QuantizedSiteUnitary {
-            rot0 = rot,
-            rot1 = hasMixing ? rot | [],
-            rot2 = hasMixing ? rot | [],
-            w0Layers = wLayers,
-            w0Shifted = wShifted,
-            w0Phases = [],
-            w1Layers = wLayers,
-            w1Shifted = wShifted,
-            w1Phases = [],
-            uLayers = Repeated(QuantizeGivensAngles([angle], (ancillaDim <<< numQubitsPerSite) / 2, rotationBits), numLayers),
-            uShifted = shifted,
-            uPhases = [],
-        };
-        PrepareSequentialMPS(
-            initialStateVec,
-            numSites,
-            siteToOrbitalOrder,
-            rotationBits,
-            siteIdx -> placeholder,
-            true,
-            state,
-            ancilla
-        );
-        ResetAll(state + ancilla);
-    }
 }

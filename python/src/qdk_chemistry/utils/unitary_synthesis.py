@@ -6,9 +6,19 @@
 # --------------------------------------------------------------------------------------------
 
 from qdk_chemistry._core.utils.unitary_synthesis import (
+    DenseSiteSynthesis,
+    GivensDecomposition,
+    SparseSiteSynthesis,
     block_sparse_unitary_synthesis,
-    decompose_mps,
     dense_unitary_synthesis,
+    matrix_product_state_synthesis,
 )
 
-__all__ = ["block_sparse_unitary_synthesis", "decompose_mps", "dense_unitary_synthesis"]
+__all__ = [
+    "DenseSiteSynthesis",
+    "GivensDecomposition",
+    "SparseSiteSynthesis",
+    "block_sparse_unitary_synthesis",
+    "dense_unitary_synthesis",
+    "matrix_product_state_synthesis",
+]

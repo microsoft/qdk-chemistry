@@ -9,7 +9,7 @@
 #include <utility>
 #include <vector>
 
-#include "unitary_synthesis_utils.hpp"
+#include "unitary_synthesis_detail.hpp"
 
 namespace qdk::chemistry::utils::detail {
 namespace {
@@ -41,9 +41,9 @@ struct RowGathering {
 
 ColumnSupports discover_column_supports(const data::MPSSite& site,
                                         Eigen::Index ancilla_dim) {
-  const auto& layout = site.tensor_layout();
-  const auto left = layout.dimensions[0];
-  const Eigen::Index dim = layout.dimensions[1] * ancilla_dim;
+  const auto left = static_cast<Eigen::Index>(site.left_bond_dimension());
+  const Eigen::Index dim =
+      static_cast<Eigen::Index>(site.physical_dimension()) * ancilla_dim;
   ColumnSupports supports;
   std::vector<Eigen::Index> parent(static_cast<std::size_t>(left));
   std::iota(parent.begin(), parent.end(), 0);
@@ -94,9 +94,9 @@ ColumnSupports discover_column_supports(const data::MPSSite& site,
 
 RowGathering gather_rows(const data::MPSSite& site, Eigen::Index ancilla_dim,
                          ColumnSupports& supports) {
-  const auto& layout = site.tensor_layout();
-  const auto left = layout.dimensions[0];
-  const Eigen::Index dim = layout.dimensions[1] * ancilla_dim;
+  const auto left = static_cast<Eigen::Index>(site.left_bond_dimension());
+  const Eigen::Index dim =
+      static_cast<Eigen::Index>(site.physical_dimension()) * ancilla_dim;
   auto& groups = supports.groups;
   std::vector<Eigen::Index> local_index(static_cast<std::size_t>(dim));
   std::vector<std::vector<Eigen::Index>> rows_by_column(
@@ -160,7 +160,7 @@ void complete_blocks(std::vector<ColumnGroup>& groups, Eigen::Index left) {
                              .squaredNorm();
         if (size > width) {
           group.block.rightCols(size - width) =
-              full_svd(rectangle.transpose()).v.rightCols(size - width);
+              decompose_svd(rectangle.transpose()).v.rightCols(size - width);
         }
       });
   double residual = 0.0;
@@ -256,21 +256,22 @@ GivensDecomposition synthesize_completed_blocks(
 SparseSiteSynthesis block_sparse_unitary_synthesis(const data::MPSSite& site,
                                                    Eigen::Index ancilla_dim) {
   validate_site(site, ancilla_dim);
-  const auto& layout = site.tensor_layout();
+  const auto left = static_cast<Eigen::Index>(site.left_bond_dimension());
+  const Eigen::Index dim =
+      static_cast<Eigen::Index>(site.physical_dimension()) * ancilla_dim;
 
   // Step 1: [U' *].
   auto supports = discover_column_supports(site, ancilla_dim);
 
   // Step 2: [P_r^T U' R].
   auto rows = gather_rows(site, ancilla_dim, supports);
-  complete_blocks(supports.groups, layout.dimensions[0]);
+  complete_blocks(supports.groups, left);
   SparseSiteSynthesis result;
   result.row_permutation = std::move(rows.permutation);
 
   // Step 3: Gather each block's target and completion columns together.
   result.column_permutation =
-      gather_columns(supports.groups, rows.block_starts, layout.dimensions[0],
-                     layout.dimensions[1] * ancilla_dim);
+      gather_columns(supports.groups, rows.block_starts, left, dim);
 
   // Step 4: V = P_o^T B P_o.
   const auto order = sort_blocks(supports.groups, rows.block_starts, result);

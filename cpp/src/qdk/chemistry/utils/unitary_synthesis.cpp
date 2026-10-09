@@ -15,29 +15,170 @@
 #include <utility>
 #include <variant>
 
-#include "unitary_synthesis_utils.hpp"
+#include "unitary_synthesis_detail.hpp"
 
 namespace qdk::chemistry::utils::detail {
+namespace {
+
+// Cosine-sine factors [A; B] = diag(U_1, U_2) [D_1; D_2] V of a vertically
+// stacked two-block isometry, with diagonal D_1^2 + D_2^2 = I.
+struct TwoBlockCsd {
+  Eigen::MatrixXd u_1;
+  Eigen::MatrixXd u_2;
+  Eigen::VectorXd d_1;
+  Eigen::VectorXd d_2;
+  Eigen::MatrixXd v;
+};
+
+void validate_isometry(const Eigen::Ref<const Eigen::MatrixXd>& matrix,
+                       const char* message);
+
+std::pair<Eigen::MatrixXd, Eigen::MatrixXd> decompose_qr(
+    const Eigen::Ref<const Eigen::MatrixXd>& matrix, Eigen::Index num_columns);
+
+TwoBlockCsd decompose_csd(const Eigen::Ref<const Eigen::MatrixXd>& a,
+                          const Eigen::Ref<const Eigen::MatrixXd>& b);
+
+std::vector<double> rotation_angles(const Eigen::VectorXd& d,
+                                    const Eigen::VectorXd& d_prime,
+                                    Eigen::Index ancilla_dim);
+
+}  // namespace
+
+DenseSiteSynthesis dense_unitary_synthesis(
+    const data::MPSSite& site, Eigen::Index ancilla_dim,
+    const Eigen::MatrixXd& following_right_factor) {
+  validate_site(site, ancilla_dim);
+  const auto left = static_cast<Eigen::Index>(site.left_bond_dimension());
+  const auto physical = static_cast<Eigen::Index>(site.physical_dimension());
+  const auto right = static_cast<Eigen::Index>(site.right_bond_dimension());
+  if (physical != 2 && physical != 4) {
+    throw std::invalid_argument(
+        "Dense site synthesis requires two or four physical states.");
+  }
+  if (following_right_factor.size() != 0) {
+    if (following_right_factor.rows() != right ||
+        following_right_factor.cols() != right ||
+        !following_right_factor.allFinite()) {
+      throw std::invalid_argument(
+          "Dense site synthesis requires a finite successor factor matching "
+          "the right bond.");
+    }
+    validate_isometry(
+        following_right_factor,
+        "Dense site synthesis requires an orthogonal successor factor.");
+  } else if (following_right_factor.rows() != 0 ||
+             following_right_factor.cols() != 0) {
+    throw std::invalid_argument(
+        "Dense site synthesis requires an empty or square successor factor.");
+  }
+
+  // Row p * ancilla_dim + b and column a hold M^p_{ab}.
+  Eigen::MatrixXd isometry =
+      Eigen::MatrixXd::Zero(physical * ancilla_dim, left);
+  for_each_nonzero_entry(site, ancilla_dim,
+                         [&](Eigen::Index column, Eigen::Index row,
+                             double value) { isometry(row, column) = value; });
+  validate_isometry(isometry,
+                    "Dense site synthesis requires an isometric site.");
+
+  std::vector<std::pair<Eigen::MatrixXd, Eigen::MatrixXd>> blocks;
+  if (physical == 2) {
+    blocks.emplace_back(isometry.topRows(ancilla_dim),
+                        isometry.bottomRows(ancilla_dim));
+  } else {
+    // Three-step CSD peel: two QRs split the four physical blocks into three
+    // independent two-block CSDs.
+    auto [b, r] =
+        decompose_qr(isometry.bottomRows(3 * ancilla_dim), ancilla_dim);
+    auto [c, s] = decompose_qr(b.bottomRows(2 * ancilla_dim), ancilla_dim);
+    blocks.emplace_back(isometry.topRows(ancilla_dim), std::move(r));
+    blocks.emplace_back(b.topRows(ancilla_dim), std::move(s));
+    blocks.emplace_back(c.topRows(ancilla_dim), c.bottomRows(ancilla_dim));
+  }
+  std::vector<TwoBlockCsd> csds(blocks.size());
+  run_tasks(
+      static_cast<std::ptrdiff_t>(blocks.size()), [&](std::ptrdiff_t index) {
+        const auto step = static_cast<std::size_t>(index);
+        csds[step] = decompose_csd(blocks[step].first, blocks[step].second);
+      });
+
+  DenseSiteSynthesis result;
+  std::vector<Eigen::MatrixXd> unitaries;
+  for (const auto& csd : csds) {
+    result.rotation_angles.push_back(
+        rotation_angles(csd.d_1, csd.d_2, ancilla_dim));
+  }
+  if (csds.size() == 3) {
+    unitaries.push_back(csds[1].v * csds[0].u_2);
+    unitaries.push_back(csds[2].v * csds[1].u_2);
+  }
+  for (auto& csd : csds) {
+    unitaries.push_back(std::move(csd.u_1));
+  }
+  unitaries.push_back(std::move(csds.back().u_2));
+  if (following_right_factor.size() != 0) {
+    // Rotating the right bond changes only the terminal blocks, not the CSD
+    // angles, mixing unitaries, or this site's right factor.
+    const auto num_blocks = static_cast<std::ptrdiff_t>(csds.size() + 1);
+    for (auto block = unitaries.end() - num_blocks; block != unitaries.end();
+         ++block) {
+      block->topRows(right) = following_right_factor * block->topRows(right);
+    }
+  }
+  result.right_factor = std::move(csds.front().v);
+
+  std::vector<std::reference_wrapper<const Eigen::MatrixXd>> matrices;
+  for (const auto& unitary : unitaries) {
+    matrices.push_back(std::cref(unitary));
+  }
+  auto givens = decompose_unitaries_to_givens(matrices);
+  const auto terminal = givens.begin() + (physical == 4 ? 2 : 0);
+  result.mixing_givens.assign(std::make_move_iterator(givens.begin()),
+                              std::make_move_iterator(terminal));
+  result.block_givens = merge_block_givens(
+      std::vector<GivensDecomposition>(std::make_move_iterator(terminal),
+                                       std::make_move_iterator(givens.end())));
+  return result;
+}
+
+MPSSynthesis matrix_product_state_synthesis(
+    const data::MPSContainer& mps, Eigen::Index ancilla_dim,
+    std::string_view unitary_synthesis) {
+  if (unitary_synthesis != "dense" && unitary_synthesis != "block_sparse") {
+    throw std::invalid_argument(
+        "MPS unitary synthesis must be 'dense' or 'block_sparse'.");
+  }
+  const auto& sites = mps.sites();
+  validate_site(*sites.front(), ancilla_dim);
+  const auto count = sites.size() - 1;
+  if (unitary_synthesis == "dense") {
+    std::vector<DenseSiteSynthesis> results(count);
+    for (std::size_t index = count; index > 0; --index) {
+      const auto& site = *sites[index];
+      const Eigen::MatrixXd empty;
+      const auto& following =
+          index < count ? results[index].right_factor : empty;
+      results[index - 1] =
+          dense_unitary_synthesis(site, ancilla_dim, following);
+    }
+    return results;
+  }
+  std::vector<SparseSiteSynthesis> results(count);
+  run_tasks(static_cast<std::ptrdiff_t>(count), [&](std::ptrdiff_t index) {
+    const auto position = static_cast<std::size_t>(index);
+    const auto& site = *sites[position + 1];
+    results[position] = block_sparse_unitary_synthesis(site, ancilla_dim);
+  });
+  return results;
+}
+
 namespace {
 
 constexpr double elimination_tolerance = 1.0e-15;
 
 // A rotation is stored by the lower index of its adjacent pair and its angle.
 using Rotation = std::pair<Eigen::Index, double>;
-
-// Leading num_columns columns of the complete Q factor and the matching rows of
-// R, without forming the full square Q.
-std::pair<Eigen::MatrixXd, Eigen::MatrixXd> leading_qr(
-    const Eigen::Ref<const Eigen::MatrixXd>& matrix, Eigen::Index num_columns) {
-  Eigen::HouseholderQR<Eigen::MatrixXd> qr(matrix);
-  Eigen::MatrixXd q =
-      qr.householderQ() * Eigen::MatrixXd::Identity(matrix.rows(), num_columns);
-  Eigen::MatrixXd r = Eigen::MatrixXd::Zero(num_columns, matrix.cols());
-  r.topRows(matrix.cols()) = qr.matrixQR()
-                                 .topRows(matrix.cols())
-                                 .template triangularView<Eigen::Upper>();
-  return {std::move(q), std::move(r)};
-}
 
 void validate_isometry(const Eigen::Ref<const Eigen::MatrixXd>& matrix,
                        const char* message) {
@@ -52,11 +193,27 @@ void validate_isometry(const Eigen::Ref<const Eigen::MatrixXd>& matrix,
 
 }  // namespace
 
+void validate_site(const data::MPSSite& site, Eigen::Index ancilla_dim) {
+  if (site.is_complex()) {
+    throw std::invalid_argument(
+        "MPS site synthesis requires a real site tensor.");
+  }
+  const auto left = static_cast<Eigen::Index>(site.left_bond_dimension());
+  const auto physical = static_cast<Eigen::Index>(site.physical_dimension());
+  const auto right = static_cast<Eigen::Index>(site.right_bond_dimension());
+  if (ancilla_dim <= 0 || left > ancilla_dim || right > ancilla_dim ||
+      ancilla_dim > std::numeric_limits<Eigen::Index>::max() / physical) {
+    throw std::invalid_argument(
+        "MPS site synthesis requires both bond dimensions to be at most the "
+        "ancilla dimension.");
+  }
+}
+
 // Full SVD M = U diag(s) V^T with complete orthogonal U and V, computed by
 // LAPACK's QR-iteration driver. Eigen 3.4's divide-and-conquer SVD can return
 // non-finite factors or crash for spectra with many exact zeros, which the
 // zero-padded site blocks routinely have.
-FullSvd full_svd(const Eigen::Ref<const Eigen::MatrixXd>& matrix) {
+FullSvd decompose_svd(const Eigen::Ref<const Eigen::MatrixXd>& matrix) {
   const auto rows = static_cast<std::int64_t>(matrix.rows());
   const auto cols = static_cast<std::int64_t>(matrix.cols());
   Eigen::MatrixXd work = matrix;
@@ -76,22 +233,40 @@ FullSvd full_svd(const Eigen::Ref<const Eigen::MatrixXd>& matrix) {
   return result;
 }
 
-void validate_site(const data::MPSSite& site, Eigen::Index ancilla_dim) {
-  if (site.is_complex()) {
-    throw std::invalid_argument(
-        "MPS site synthesis requires a real site tensor.");
-  }
-  if (ancilla_dim <= 0 || site.tensor_layout().dimensions[0] > ancilla_dim ||
-      site.tensor_layout().dimensions[2] > ancilla_dim ||
-      ancilla_dim > std::numeric_limits<Eigen::Index>::max() /
-                        site.tensor_layout().dimensions[1]) {
-    throw std::invalid_argument(
-        "MPS site synthesis requires both bond dimensions to be at most the "
-        "ancilla dimension.");
-  }
+namespace {
+
+std::pair<Eigen::MatrixXd, Eigen::MatrixXd> decompose_qr(
+    const Eigen::Ref<const Eigen::MatrixXd>& matrix, Eigen::Index num_columns) {
+  Eigen::HouseholderQR<Eigen::MatrixXd> qr(matrix);
+  Eigen::MatrixXd q =
+      qr.householderQ() * Eigen::MatrixXd::Identity(matrix.rows(), num_columns);
+  Eigen::MatrixXd r = Eigen::MatrixXd::Zero(num_columns, matrix.cols());
+  r.topRows(matrix.cols()) = qr.matrixQR()
+                                 .topRows(matrix.cols())
+                                 .template triangularView<Eigen::Upper>();
+  return {std::move(q), std::move(r)};
 }
 
-namespace {
+// Two-block CSD of equally sized m x k blocks, m >= k, whose vertical stack is
+// an isometry. U_1 and U_2 are complete m x m orthogonal factors.
+TwoBlockCsd decompose_csd(const Eigen::Ref<const Eigen::MatrixXd>& a,
+                          const Eigen::Ref<const Eigen::MatrixXd>& b) {
+  FullSvd upper = decompose_svd(a);
+  // In the right basis of A the lower block has orthogonal columns with norms
+  // sqrt(1 - d_1^2); its polar factor completes U_2 without reordering D_2.
+  const FullSvd lower = decompose_svd(b * upper.v);
+  TwoBlockCsd result;
+  result.u_1 = std::move(upper.u);
+  result.d_1 = std::move(upper.singular_values);
+  result.v = upper.v.transpose();
+  result.u_2 = lower.u;
+  result.u_2.leftCols(a.cols()) =
+      lower.u.leftCols(a.cols()) * lower.v.transpose();
+  const Eigen::MatrixXd d_2_matrix =
+      lower.v * lower.singular_values.asDiagonal() * lower.v.transpose();
+  result.d_2 = d_2_matrix.diagonal();
+  return result;
+}
 
 // Ry angles 2 atan2(d', d) of a cosine-sine pair, zero-padded to the bond
 // register. atan2 keeps full precision where asin(d') is ill-conditioned.
@@ -105,37 +280,6 @@ std::vector<double> rotation_angles(const Eigen::VectorXd& d,
         2.0 * std::atan2(d_prime(index), d(index));
   }
   return angles;
-}
-
-// Cosine-sine factors [A; B] = diag(U_1, U_2) [D_1; D_2] V of a vertically
-// stacked two-block isometry, with diagonal D_1^2 + D_2^2 = I.
-struct TwoBlockCsd {
-  Eigen::MatrixXd u_1;
-  Eigen::MatrixXd u_2;
-  Eigen::VectorXd d_1;
-  Eigen::VectorXd d_2;
-  Eigen::MatrixXd v;
-};
-
-// Two-block CSD of equally sized m x k blocks, m >= k, whose vertical stack is
-// an isometry. U_1 and U_2 are complete m x m orthogonal factors.
-TwoBlockCsd decompose_2d(const Eigen::Ref<const Eigen::MatrixXd>& a,
-                         const Eigen::Ref<const Eigen::MatrixXd>& b) {
-  FullSvd upper = full_svd(a);
-  // In the right basis of A the lower block has orthogonal columns with norms
-  // sqrt(1 - d_1^2); its polar factor completes U_2 without reordering D_2.
-  const FullSvd lower = full_svd(b * upper.v);
-  TwoBlockCsd result;
-  result.u_1 = std::move(upper.u);
-  result.d_1 = std::move(upper.singular_values);
-  result.v = upper.v.transpose();
-  result.u_2 = lower.u;
-  result.u_2.leftCols(a.cols()) =
-      lower.u.leftCols(a.cols()) * lower.v.transpose();
-  const Eigen::MatrixXd d_2_matrix =
-      lower.v * lower.singular_values.asDiagonal() * lower.v.transpose();
-  result.d_2 = d_2_matrix.diagonal();
-  return result;
 }
 
 }  // namespace
@@ -373,134 +517,6 @@ GivensDecomposition merge_block_givens(
   }
 
   return result;
-}
-
-DenseSiteSynthesis dense_unitary_synthesis(
-    const data::MPSSite& site, Eigen::Index ancilla_dim,
-    const Eigen::MatrixXd& following_right_factor) {
-  validate_site(site, ancilla_dim);
-  const auto& dimensions = site.tensor_layout().dimensions;
-  const auto left = dimensions[0];
-  const auto physical = dimensions[1];
-  const auto right = dimensions[2];
-  if (physical != 2 && physical != 4) {
-    throw std::invalid_argument(
-        "Dense site synthesis requires two or four physical states.");
-  }
-  if (following_right_factor.size() != 0) {
-    if (following_right_factor.rows() != right ||
-        following_right_factor.cols() != right ||
-        !following_right_factor.allFinite()) {
-      throw std::invalid_argument(
-          "Dense site synthesis requires a finite successor factor matching "
-          "the right bond.");
-    }
-    validate_isometry(
-        following_right_factor,
-        "Dense site synthesis requires an orthogonal successor factor.");
-  } else if (following_right_factor.rows() != 0 ||
-             following_right_factor.cols() != 0) {
-    throw std::invalid_argument(
-        "Dense site synthesis requires an empty or square successor factor.");
-  }
-
-  // Row p * ancilla_dim + b and column a hold M^p_{ab}.
-  Eigen::MatrixXd isometry =
-      Eigen::MatrixXd::Zero(physical * ancilla_dim, left);
-  for_each_nonzero_entry(site, ancilla_dim,
-                         [&](Eigen::Index column, Eigen::Index row,
-                             double value) { isometry(row, column) = value; });
-  validate_isometry(isometry,
-                    "Dense site synthesis requires an isometric site.");
-
-  std::vector<std::pair<Eigen::MatrixXd, Eigen::MatrixXd>> blocks;
-  if (physical == 2) {
-    blocks.emplace_back(isometry.topRows(ancilla_dim),
-                        isometry.bottomRows(ancilla_dim));
-  } else {
-    // Three-step CSD peel: two QRs split the four physical blocks into three
-    // independent two-block CSDs.
-    auto [b, r] = leading_qr(isometry.bottomRows(3 * ancilla_dim), ancilla_dim);
-    auto [c, s] = leading_qr(b.bottomRows(2 * ancilla_dim), ancilla_dim);
-    blocks.emplace_back(isometry.topRows(ancilla_dim), std::move(r));
-    blocks.emplace_back(b.topRows(ancilla_dim), std::move(s));
-    blocks.emplace_back(c.topRows(ancilla_dim), c.bottomRows(ancilla_dim));
-  }
-  std::vector<TwoBlockCsd> csds(blocks.size());
-  run_tasks(
-      static_cast<std::ptrdiff_t>(blocks.size()), [&](std::ptrdiff_t index) {
-        const auto step = static_cast<std::size_t>(index);
-        csds[step] = decompose_2d(blocks[step].first, blocks[step].second);
-      });
-
-  DenseSiteSynthesis result;
-  std::vector<Eigen::MatrixXd> unitaries;
-  for (const auto& csd : csds) {
-    result.rotation_angles.push_back(
-        rotation_angles(csd.d_1, csd.d_2, ancilla_dim));
-  }
-  if (csds.size() == 3) {
-    unitaries.push_back(csds[1].v * csds[0].u_2);
-    unitaries.push_back(csds[2].v * csds[1].u_2);
-  }
-  for (auto& csd : csds) {
-    unitaries.push_back(std::move(csd.u_1));
-  }
-  unitaries.push_back(std::move(csds.back().u_2));
-  if (following_right_factor.size() != 0) {
-    // Rotating the right bond changes only the terminal blocks, not the CSD
-    // angles, mixing unitaries, or this site's right factor.
-    const auto num_blocks = static_cast<std::ptrdiff_t>(csds.size() + 1);
-    for (auto block = unitaries.end() - num_blocks; block != unitaries.end();
-         ++block) {
-      block->topRows(right) = following_right_factor * block->topRows(right);
-    }
-  }
-  result.right_factor = std::move(csds.front().v);
-
-  std::vector<std::reference_wrapper<const Eigen::MatrixXd>> matrices;
-  for (const auto& unitary : unitaries) {
-    matrices.push_back(std::cref(unitary));
-  }
-  auto givens = decompose_unitaries_to_givens(matrices);
-  const auto terminal = givens.begin() + (physical == 4 ? 2 : 0);
-  result.mixing_givens.assign(std::make_move_iterator(givens.begin()),
-                              std::make_move_iterator(terminal));
-  result.block_givens = merge_block_givens(
-      std::vector<GivensDecomposition>(std::make_move_iterator(terminal),
-                                       std::make_move_iterator(givens.end())));
-  return result;
-}
-
-MPSSynthesis decompose_mps(const data::MPSContainer& mps,
-                           Eigen::Index ancilla_dim,
-                           std::string_view unitary_synthesis) {
-  if (unitary_synthesis != "general" && unitary_synthesis != "block_sparse") {
-    throw std::invalid_argument(
-        "MPS unitary synthesis must be 'general' or 'block_sparse'.");
-  }
-  const auto& sites = mps.sites();
-  validate_site(*sites.front(), ancilla_dim);
-  const auto count = sites.size() - 1;
-  if (unitary_synthesis == "general") {
-    std::vector<DenseSiteSynthesis> results(count);
-    for (std::size_t index = count; index > 0; --index) {
-      const auto& site = *sites[index];
-      const Eigen::MatrixXd empty;
-      const auto& following =
-          index < count ? results[index].right_factor : empty;
-      results[index - 1] =
-          dense_unitary_synthesis(site, ancilla_dim, following);
-    }
-    return results;
-  }
-  std::vector<SparseSiteSynthesis> results(count);
-  run_tasks(static_cast<std::ptrdiff_t>(count), [&](std::ptrdiff_t index) {
-    const auto position = static_cast<std::size_t>(index);
-    const auto& site = *sites[position + 1];
-    results[position] = block_sparse_unitary_synthesis(site, ancilla_dim);
-  });
-  return results;
 }
 
 }  // namespace qdk::chemistry::utils::detail

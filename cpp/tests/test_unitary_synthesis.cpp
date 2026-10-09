@@ -27,10 +27,10 @@ using qdk::chemistry::data::SymmetryLabel;
 using qdk::chemistry::data::SymmetryProduct;
 using qdk::chemistry::data::Tensor;
 using qdk::chemistry::utils::detail::block_sparse_unitary_synthesis;
-using qdk::chemistry::utils::detail::decompose_mps;
 using qdk::chemistry::utils::detail::dense_unitary_synthesis;
 using qdk::chemistry::utils::detail::DenseSiteSynthesis;
 using qdk::chemistry::utils::detail::GivensDecomposition;
+using qdk::chemistry::utils::detail::matrix_product_state_synthesis;
 using qdk::chemistry::utils::detail::SparseSiteSynthesis;
 
 namespace detail {
@@ -573,8 +573,8 @@ TEST(UnitarySynthesisTest, ChainsDenseMpsSiteRightFactors) {
         Eigen::MatrixXd::Ones(physical, bonds.front()).eval(), physical)};
     chain.insert(chain.end(), sites.begin(), sites.end());
     const auto mps = make_container(chain);
-    const auto results =
-        std::get<std::vector<DenseSiteSynthesis>>(decompose_mps(mps, chi));
+    const auto results = std::get<std::vector<DenseSiteSynthesis>>(
+        matrix_product_state_synthesis(mps, chi));
     ASSERT_EQ(results.size(), sites.size());
 
     for (std::size_t index = 0; index < sites.size(); ++index) {
@@ -747,33 +747,37 @@ TEST(UnitarySynthesisTest, ContainerDispatchSkipsInitialSite) {
       site_from_isometry(random_orthogonal(4, 122).leftCols(2), 4);
   const auto mps = make_container({first, last});
   const auto sparse = std::get<std::vector<SparseSiteSynthesis>>(
-      decompose_mps(mps, 2, "block_sparse"));
+      matrix_product_state_synthesis(mps, 2, "block_sparse"));
   ASSERT_EQ(sparse.size(), 1u);
   expect_sparse_reconstruction(
       sparse.front(),
       pad_isometry(random_orthogonal(4, 122).leftCols(2), 4, 2));
   const auto dense = std::get<std::vector<DenseSiteSynthesis>>(
-      decompose_mps(mps, 2, "general"));
+      matrix_product_state_synthesis(mps, 2, "dense"));
   ASSERT_EQ(dense.size(), 1u);
   expect_dense_reconstruction(
       dense.front(), pad_isometry(random_orthogonal(4, 122).leftCols(2), 4, 2),
       2);
-  EXPECT_THROW(decompose_mps(mps, 1), std::invalid_argument);
-  EXPECT_THROW(decompose_mps(mps, 2, "unknown"), std::invalid_argument);
+  EXPECT_THROW(matrix_product_state_synthesis(mps, 1), std::invalid_argument);
+  EXPECT_THROW(matrix_product_state_synthesis(mps, 2, "unknown"),
+               std::invalid_argument);
+  EXPECT_THROW(matrix_product_state_synthesis(mps, 2, "general"),
+               std::invalid_argument);
 
   const auto single =
       make_container({make_site(Eigen::MatrixXd::Ones(4, 1).eval(), 4)});
-  EXPECT_TRUE(
-      std::get<std::vector<DenseSiteSynthesis>>(decompose_mps(single, 2))
-          .empty());
+  EXPECT_TRUE(std::get<std::vector<DenseSiteSynthesis>>(
+                  matrix_product_state_synthesis(single, 2))
+                  .empty());
   EXPECT_TRUE(std::get<std::vector<SparseSiteSynthesis>>(
-                  decompose_mps(single, 2, "block_sparse"))
+                  matrix_product_state_synthesis(single, 2, "block_sparse"))
                   .empty());
 
   const auto invalid = make_container(
       {first, make_site(Eigen::MatrixXd::Zero(8, 2).eval(), 4), last});
-  EXPECT_THROW(decompose_mps(invalid, 2, "general"), std::invalid_argument);
-  EXPECT_THROW(decompose_mps(invalid, 2, "block_sparse"),
+  EXPECT_THROW(matrix_product_state_synthesis(invalid, 2, "dense"),
+               std::invalid_argument);
+  EXPECT_THROW(matrix_product_state_synthesis(invalid, 2, "block_sparse"),
                std::invalid_argument);
 }
 }  // namespace detail

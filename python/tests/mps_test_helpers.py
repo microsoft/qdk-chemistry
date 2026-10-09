@@ -10,6 +10,10 @@ from collections.abc import Sequence
 import numpy as np
 import pytest
 
+from qdk_chemistry.algorithms.state_preparation.matrix_product_state import (
+    MatrixProductStatePreparation,
+    MatrixProductStatePreparationData,
+)
 from qdk_chemistry.data import Configuration, MPSContainer, MPSSite
 from qdk_chemistry.data import symmetry as sym
 from qdk_chemistry.utils.qsharp import get_qsharp_context
@@ -115,6 +119,13 @@ def make_mps(
     )
 
 
+def preparation_data(mps: MPSContainer, unitary_synthesis: str = "dense") -> MatrixProductStatePreparationData:
+    """Generate preparation data from a container using the selected algorithm setting."""
+    preparer = MatrixProductStatePreparation()
+    preparer.settings().update("unitary_synthesis", unitary_synthesis)
+    return preparer.generate_matrix_product_state_preparation_data(mps)
+
+
 def right_normalized_tensors(tensors: Sequence[np.ndarray]) -> list[np.ndarray]:
     """Return right-canonical dense tensors preserving the normalized state."""
     normalized = [np.array(tensor, dtype=float, copy=True) for tensor in tensors]
@@ -218,16 +229,25 @@ def random_orthogonal(dim: int, rng: np.random.Generator) -> np.ndarray:
     return matrix
 
 
-def reconstruct_givens(layer_angles, layer_shifted, phases) -> np.ndarray:
-    """Reconstruct ``D · L_l · ... · L_1`` from serialized Q# Givens data."""
-    result = np.eye(len(phases))
-    for angles, shifted in zip(layer_angles, layer_shifted, strict=True):
+def reconstruct_givens(givens) -> np.ndarray:
+    """Reconstruct ``D · L_l · ... · L_1`` from a ``GivensDecomposition``."""
+    result = np.eye(len(givens.phases))
+    for angles, shifted in zip(givens.layer_angles, givens.layer_shifted, strict=True):
         upper = (1 if shifted else 0) + 2 * np.arange(len(angles))
         cosine, sine = np.cos(angles)[:, None], np.sin(angles)[:, None]
         first, second = result[upper], result[upper + 1]
         result[upper] = cosine * first - sine * second
         result[upper + 1] = sine * first + cosine * second
-    return np.where(np.asarray(phases, dtype=bool), -1.0, 1.0)[:, None] * result
+    return np.where(np.asarray(givens.phases, dtype=bool), -1.0, 1.0)[:, None] * result
+
+
+def assert_same_givens(actual, expected) -> None:
+    """Require two ``GivensDecomposition`` objects with identical layers and close angles."""
+    assert actual.layer_shifted == expected.layer_shifted
+    assert actual.phases == expected.phases
+    assert len(actual.layer_angles) == len(expected.layer_angles)
+    for actual_layer, expected_layer in zip(actual.layer_angles, expected.layer_angles, strict=True):
+        np.testing.assert_allclose(actual_layer, expected_layer, atol=1e-12)
 
 
 def site_isometry(tensor: np.ndarray, ancilla_dim: int) -> np.ndarray:
@@ -509,15 +529,24 @@ def simulate_mps_preparation(
     return ancilla_zero_probability, amplitudes / np.sqrt(ancilla_zero_probability)
 
 
+_GIVENS_STRUCT = "GivensDecomposition.GivensDecomposition"
+_GIVENS_FIELDS = {"layerAngles", "layerShifted", "phases"}
+
+
 def _to_qsharp_literal(value, site_struct: str) -> str:
-    """Serialize nested numeric and Boolean data as a Q# literal."""
+    """Serialize nested numeric and Boolean data as a Q# literal.
+
+    Dictionaries with the fields of the Q# ``GivensDecomposition`` struct become that struct, and
+    every other dictionary becomes ``site_struct``.
+    """
     if isinstance(value, bool):
         return str(value).lower()
     if isinstance(value, float):
         return f"{value:.15f}"
     if isinstance(value, dict):
         fields = ", ".join(f"{name} = {_to_qsharp_literal(item, site_struct)}" for name, item in value.items())
-        return f"new {site_struct} {{ {fields} }}"
+        struct = _GIVENS_STRUCT if value.keys() == _GIVENS_FIELDS else site_struct
+        return f"new {struct} {{ {fields} }}"
     if isinstance(value, list):
         return f"[{', '.join(_to_qsharp_literal(item, site_struct) for item in value)}]"
     return str(value)
