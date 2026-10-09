@@ -424,4 +424,21 @@ inline std::shared_ptr<Structure> create_agh_structure() {
   return std::make_shared<Structure>(coords, elements);
 }
 
+/**
+ * Linear H5 chain (0.6 Angstrom spacing), doublet. With aug-cc-pVTZ the AO
+ * basis is linearly dependent (nMO < nAO at the default lindep threshold),
+ * which exercises the rectangular ROHF back-transform path (issue #543).
+ */
+inline std::shared_ptr<Structure> create_h5_chain_structure() {
+  std::vector<Eigen::Vector3d> coords;
+  for (int i = 0; i < 5; ++i) {
+    coords.emplace_back(0.0, 0.0, 0.6 * i);
+  }
+  for (auto& coord : coords) {
+    coord *= qdk::chemistry::constants::angstrom_to_bohr;
+  }
+  std::vector<Element> elements(5, Element::H);
+  return std::make_shared<Structure>(coords, elements);
+}
+
 }  // namespace testing

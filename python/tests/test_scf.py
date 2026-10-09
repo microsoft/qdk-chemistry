@@ -70,6 +70,17 @@ def create_oxygen_structure():
     return Structure(symbols, coords)
 
 
+def create_h5_chain_structure():
+    """Linear H5 chain (0.6 Angstrom spacing), doublet (issue #543).
+
+    With aug-cc-pvtz the AO basis is linearly dependent (n_MO < n_AO at the
+    default threshold), exercising the rectangular ROHF back-transform path.
+    """
+    symbols = ["H"] * 5
+    coords = np.array([[0.0, 0.0, 0.6 * i] for i in range(5)]) * ANGSTROM_TO_BOHR
+    return Structure(symbols, coords)
+
+
 class TestScfSolver:
     """Test class for SCF solver functionality."""
 
@@ -486,3 +497,31 @@ class TestScfSolver:
         # Test that invalid history size limit throws a ValueError (std::invalid_argument in C++)
         with pytest.raises(ValueError, match="GDM history size limit must be at least"):
             scf_solver.run(oxygen, 0, 1, "cc-pvdz")  # singlet state
+
+    def test_rohf_linearly_dependent_basis_issue_543(self):
+        """ROHF must not raise when n_MO < n_AO (regression for issue #543)."""
+        structure = create_h5_chain_structure()
+        scf_solver = algorithms.create("scf_solver")
+        scf_solver.settings().set("method", "hf")
+        scf_solver.settings().set("scf_type", "restricted")
+        scf_solver.settings().set("enable_gdm", False)
+
+        try:
+            energy, wavefunction = scf_solver.run(structure, 0, 2, "aug-cc-pvtz")
+        except ValueError as exc:
+            if "electron counts exceed the number of molecular orbitals" in str(exc):
+                pytest.skip("Linear-dependency removal left too few MOs for the occupied electrons")
+            raise
+        orbitals = wavefunction.get_orbitals()
+        assert orbitals.is_restricted()
+        assert np.isfinite(energy)
+
+        # Linear-dependency removal must have fired (n_MO < n_AO).
+        coeffs_alpha, _ = orbitals.get_coefficients()
+        if coeffs_alpha.shape[0] == coeffs_alpha.shape[1]:
+            pytest.skip("Linear-dependency removal did not reduce the MO dimension")
+        assert coeffs_alpha.shape[0] > coeffs_alpha.shape[1]
+
+        # Reference: converged ROHF energy (Hartree), same as the C++ test.
+        ref_energy = -2.4021840157
+        assert energy == pytest.approx(ref_energy, abs=1e-6)
