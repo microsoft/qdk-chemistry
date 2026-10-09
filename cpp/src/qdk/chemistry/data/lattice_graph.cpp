@@ -378,8 +378,8 @@ LatticeGraph LatticeGraph::from_geometry(
           "A lattice edge cannot join a site to its own periodic image.");
     }
     // Geometry records order endpoints with site_i < site_j.
-    const EdgeLabel label{
-        bond.shell, detail::flavor_of(flavors, bond.shell, bond.axis, tolerance)};
+    const EdgeLabel label{bond.shell, detail::flavor_of(flavors, bond.shell,
+                                                        bond.axis, tolerance)};
     const auto [existing, inserted] = labels.try_emplace({i, j}, label);
     if (!inserted && existing->second != label) {
       throw std::invalid_argument(

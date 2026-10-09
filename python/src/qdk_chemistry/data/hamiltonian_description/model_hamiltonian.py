@@ -22,8 +22,8 @@ if TYPE_CHECKING:
 
 __all__: list[str] = ["ModelHamiltonianDescription"]
 
+# A model parameter: a scalar, a per-site or per-edge array, or a value for each neighbor shell.
 ModelParameter: TypeAlias = float | np.ndarray | Mapping[int, float | np.ndarray]
-"""A model parameter: a scalar, a per-site or per-edge array, or a value for each neighbor shell."""
 
 
 class ModelHamiltonianDescription(HamiltonianDescription):
