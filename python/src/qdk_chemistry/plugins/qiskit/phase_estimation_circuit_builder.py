@@ -151,6 +151,7 @@ class QiskitStandardQpeCircuitBuilder(StandardQpeCircuitBuilder):
                 control_qubit=phase[phase_idx],
                 target_qubits=target_qubits,
                 power=power,
+                controlled_unitary=probe_circuit if power == 1 else None,
             )
 
         inverse_qft = synth_qft_full(
@@ -170,6 +171,7 @@ class QiskitStandardQpeCircuitBuilder(StandardQpeCircuitBuilder):
         target_qubits: list,
         *,
         power: int,
+        controlled_unitary: Circuit | None = None,
     ) -> None:
         """Apply the controlled unitary to the circuit.
 
@@ -179,10 +181,12 @@ class QiskitStandardQpeCircuitBuilder(StandardQpeCircuitBuilder):
             control_qubit: The control qubit.
             target_qubits: List of target qubits.
             power: The power to which the controlled unitary is raised.
+            controlled_unitary: The controlled circuit for this power, if already built.
 
         """
-        ctrl_unitary_circuit, _ = self._create_controlled_circuit(qubit_hamiltonian=qubit_hamiltonian, power=power)
-        cu_circuit = ctrl_unitary_circuit.get_qiskit_circuit()
+        if controlled_unitary is None:
+            controlled_unitary, _ = self._create_controlled_circuit(qubit_hamiltonian=qubit_hamiltonian, power=power)
+        cu_circuit = controlled_unitary.get_qiskit_circuit()
 
         mapping = [control_qubit, *target_qubits]
         circuit.compose(cu_circuit, qubits=mapping, inplace=True)
