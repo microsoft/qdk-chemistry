@@ -207,8 +207,10 @@ class SparseHamiltonianContainer : public HamiltonianContainer {
    * @param filename Path to FCIDUMP file to create/overwrite
    * @param nalpha Number of alpha electrons
    * @param nbeta Number of beta electrons
-   * @throws std::runtime_error if the Hamiltonian is unrestricted or the file
-   *         cannot be opened
+   * @throws std::runtime_error if the Hamiltonian is unrestricted, its stored
+   *         two-body records leave a permutation class partially stored or
+   *         carry disagreeing values within one (FCIDUMP readers reconstruct
+   *         all 8 permutations), or the file cannot be opened
    */
   void to_fcidump_file(const std::string& filename, size_t nalpha,
                        size_t nbeta) const override;

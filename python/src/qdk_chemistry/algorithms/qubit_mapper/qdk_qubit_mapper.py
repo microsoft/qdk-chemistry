@@ -71,8 +71,18 @@ class QdkQubitMapper(QubitMapper):
     output :class:`~qdk_chemistry.data.QubitOperator`, not for dispatch.
 
     Both restricted (RHF) and unrestricted (UHF) Hamiltonians are supported.
-    For unrestricted systems, the engine handles all four spin-channel ERI
-    blocks (aa, ab, ba, bb) independently.
+    Restricted two-body tensors with 8-fold permutation symmetry use a
+    spin-summed fast path. Tensors carrying only the 4-fold subgroup
+    ``(pq|rs) == (qp|sr) == (rs|pq)`` -- the general Hermitian two-body
+    operator, as produced by downfolding -- use the general spin-channel path,
+    which reproduces them exactly. A tensor that is Hermitian but not stored
+    with ``(pq|rs) == (rs|pq)`` raises: that swap leaves the operator
+    unchanged, so replacing it by its bra-ket average is enough. A genuinely
+    non-Hermitian tensor also raises. Cholesky containers additionally require
+    pair-symmetric three-center factors, and sparse containers require each
+    permutation class to be stored once or in full. For unrestricted systems,
+    the engine handles all four spin-channel ERI blocks (aa, ab, ba, bb)
+    independently.
 
     The two-body integrals are consumed in the native storage format of the
     Hamiltonian's container (the C++ engine dispatches on the container type):
@@ -89,7 +99,7 @@ class QdkQubitMapper(QubitMapper):
     * All other containers use the dense engine path.
 
     In all cases the result is numerically equivalent (term-by-term, to within
-    ``1e-12``) to the dense path.
+    ``1e-12``) to the dense path for integrals each container can represent.
 
     The mapper uses canonical blocked spin-orbital ordering internally:
     qubits 0..N-1 for alpha spin, qubits N..2N-1 for beta spin (where N is the
