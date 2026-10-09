@@ -371,10 +371,10 @@ def assert_prepares_state(params: dict, num_sites: int, ancilla_bits: int, targe
     ancilla_zero_prob, prepared = simulate_mps_preparation(_OPERATION, _SITE_STRUCT, params, num_sites, ancilla_bits)
     # Six rotation bits keep statevector simulation small while retaining enough accuracy
     # to detect synthesis regressions.
-    assert ancilla_zero_prob > 0.90, f"P(ancilla=0) = {ancilla_zero_prob:.4f} too low"
+    assert ancilla_zero_prob > 0.99, f"P(ancilla=0) = {ancilla_zero_prob:.4f} too low"
     target = blocked_jordan_wigner_state(target_state, params["siteToOrbitalOrder"], params["numQubitsPerSite"])
     fidelity = np.abs(np.vdot(target, prepared)) ** 2
-    assert fidelity > 0.95, f"Fidelity {fidelity:.4f} too low for num_sites={num_sites}"
+    assert fidelity > 0.97, f"Fidelity {fidelity:.4f} too low for num_sites={num_sites}"
 
 
 def logical_counts(wavefunction: Wavefunction, **settings) -> dict:
@@ -618,6 +618,7 @@ class TestGenerateGeneralPreparationData:
     def test_qualtran_tensors_produce_valid_data(self, case):
         """The Qualtran reference MPSs contract to their expected states and decompose."""
         contracted = contract_mps(make_mps(case.tensors, orthogonality_center=None))
+        # The non-zero spin reference state is published rounded to about 1e-3.
         np.testing.assert_allclose(contracted, case.expected_state, atol=1e-3)
         data = preparation_data(right_normalized_mps(case.tensors))
         assert data.num_sites == 4
@@ -659,7 +660,7 @@ class TestGenerateGeneralPreparationData:
         tensors = right_normalized_tensors(REFERENCE_MPS_TENSORS)
         assert preparation_data(make_mps(tensors)).site_to_orbital_order == [0, 1, 2, 3]
         container = make_mps(tensors, site_to_orbital_order=[2, 0, 3, 1])
-        params = preparation_data(container).to_qsharp_params(rotation_bits=6)
+        params = preparation_data(container).to_qsharp_params(rotation_bit_precision=6)
         assert params["siteToOrbitalOrder"] == [2, 0, 3, 1]
 
 
@@ -676,7 +677,7 @@ class TestGeneralStatePreparationRun:
         site_to_orbital_order = [2, 0, 3, 1]
         tensors = right_normalized_tensors(REFERENCE_MPS_TENSORS)
         wavefunction = Wavefunction(make_mps(tensors, site_to_orbital_order=site_to_orbital_order))
-        circuit = create("state_prep", "matrix_product_state", rotation_bits=8).run(wavefunction)
+        circuit = create("state_prep", "matrix_product_state", rotation_bit_precision=8).run(wavefunction)
 
         assert isinstance(circuit, Circuit)
         assert circuit.encoding == "jordan-wigner"
@@ -686,7 +687,7 @@ class TestGeneralStatePreparationRun:
         expected = preparation_data(wavefunction.get_container()).to_qsharp_params(8)
         assert factory.parameter["siteToOrbitalOrder"] == site_to_orbital_order
         assert list(factory.parameter) == list(expected)
-        for key in ("numSites", "numQubitsPerSite", "siteToOrbitalOrder", "rotationBits", "numAncillaQubits"):
+        for key in ("numSites", "numQubitsPerSite", "siteToOrbitalOrder", "rotationBitPrecision", "numAncillaQubits"):
             assert factory.parameter[key] == expected[key]
         np.testing.assert_allclose(factory.parameter["initialStateVec"], expected["initialStateVec"])
         assert len(factory.parameter["siteDecompositions"]) == 3
@@ -697,13 +698,13 @@ class TestGeneralStatePreparationRun:
             Wavefunction(right_normalized_mps(REFERENCE_MPS_TENSORS))
         )
         assert circuit._qsharp_factory.parameter["siteToOrbitalOrder"] == [0, 1, 2, 3]
-        assert circuit._qsharp_factory.parameter["rotationBits"] == 10
+        assert circuit._qsharp_factory.parameter["rotationBitPrecision"] == 10
         assert circuit.num_qubits == 8
         assert circuit.metadata.num_phase_gradient_ancillas == 0
 
     def test_shared_gradient_widens_the_register_it_declares(self):
         """Opting out of internal allocation appends a gradient the caller must own."""
-        prep = create("state_prep", "matrix_product_state", rotation_bits=6, allocate_phase_gradient=False)
+        prep = create("state_prep", "matrix_product_state", rotation_bit_precision=6, allocate_phase_gradient=False)
         circuit = prep.run(Wavefunction(right_normalized_mps(REFERENCE_MPS_TENSORS)))
         assert circuit.num_qubits == 8 + 6
         assert circuit.metadata.num_phase_gradient_ancillas == 6
@@ -740,7 +741,7 @@ class TestGeneralStatePreparationRun:
     def test_run_builds_spinless_circuit(self):
         """A spinless MPS maps each site to one qubit."""
         mps = random_mps(num_sites=3, bond_dim=2, site_dim=2, rng=np.random.default_rng(7))
-        circuit = create("state_prep", "matrix_product_state", rotation_bits=6).run(Wavefunction(mps))
+        circuit = create("state_prep", "matrix_product_state", rotation_bit_precision=6).run(Wavefunction(mps))
 
         params = circuit._qsharp_factory.parameter
         assert params["numSites"] == 3
@@ -796,11 +797,13 @@ class TestGeneralStatePreparationRun:
         mps_context = circuit._qsharp_factory.program.__dict__["_qdk_context"]
         assert base_callable.__dict__["_qdk_context"] is mps_context
 
-    @pytest.mark.parametrize("rotation_bits", [1, 63])
-    def test_rejects_unsupported_rotation_precision(self, rotation_bits):
+    @pytest.mark.parametrize("rotation_bit_precision", [0, 31])
+    def test_rejects_unsupported_rotation_precision(self, rotation_bit_precision):
         """Settings reject precision values that Q# cannot execute safely."""
         with pytest.raises(ValueError, match="out of allowed range"):
-            create("state_prep", "matrix_product_state").settings().update("rotation_bits", rotation_bits)
+            create("state_prep", "matrix_product_state").settings().update(
+                "rotation_bit_precision", rotation_bit_precision
+            )
 
     def test_dense_is_default(self):
         """Default settings and preprocessing select dense synthesis."""
@@ -833,7 +836,9 @@ class TestGeneralQSharpFidelity:
         """Random right-canonical MPSs are prepared with high fidelity."""
         mps = random_mps(num_sites=num_sites, bond_dim=bond_dim, rng=np.random.default_rng(42))
         data = preparation_data(mps)
-        assert_prepares_state(data.to_qsharp_params(rotation_bits=6), num_sites, data.ancilla_bits, contract_mps(mps))
+        assert_prepares_state(
+            data.to_qsharp_params(rotation_bit_precision=6), num_sites, data.ancilla_bits, contract_mps(mps)
+        )
 
     @pytest.mark.parametrize(("num_sites", "bond_dim"), [(2, 2), (4, 4), (5, 3)])
     def test_fidelity_random_spinless_mps(self, num_sites, bond_dim):
@@ -841,7 +846,9 @@ class TestGeneralQSharpFidelity:
         mps = random_mps(num_sites=num_sites, bond_dim=bond_dim, site_dim=2, rng=np.random.default_rng(11))
         data = preparation_data(mps)
         assert data.num_qubits_per_site == 1
-        assert_prepares_state(data.to_qsharp_params(rotation_bits=6), num_sites, data.ancilla_bits, contract_mps(mps))
+        assert_prepares_state(
+            data.to_qsharp_params(rotation_bit_precision=6), num_sites, data.ancilla_bits, contract_mps(mps)
+        )
 
     @pytest.mark.parametrize("site_dim", [2, 4])
     def test_fidelity_particle_number_blocked_mps(self, site_dim):
@@ -849,14 +856,14 @@ class TestGeneralQSharpFidelity:
         tensors = random_particle_number_tensors(4, 2, max_bond=3, site_dim=site_dim, rng=np.random.default_rng(4))
         mps = make_mps(particle_number_blocked_sites(tensors))
         data = preparation_data(mps)
-        assert_prepares_state(data.to_qsharp_params(rotation_bits=6), 4, data.ancilla_bits, contract_mps(mps))
+        assert_prepares_state(data.to_qsharp_params(rotation_bit_precision=6), 4, data.ancilla_bits, contract_mps(mps))
 
     @_QUALTRAN_CASES
     def test_fidelity_qualtran_mps(self, case):
         """The Qualtran reference MPSs are prepared with high fidelity."""
         data = preparation_data(right_normalized_mps(case.tensors))
         target_state = case.expected_state / np.linalg.norm(case.expected_state)
-        assert_prepares_state(data.to_qsharp_params(rotation_bits=6), 4, data.ancilla_bits, target_state)
+        assert_prepares_state(data.to_qsharp_params(rotation_bit_precision=6), 4, data.ancilla_bits, target_state)
 
     @pytest.mark.parametrize(
         ("field", "message"),
@@ -869,7 +876,7 @@ class TestGeneralQSharpFidelity:
         """The Givens operations reject shift flags or phases that do not match the layers and register."""
         mps = random_mps(num_sites=2, bond_dim=4, rng=np.random.default_rng(42))
         data = preparation_data(mps)
-        params = data.to_qsharp_params(rotation_bits=6)
+        params = data.to_qsharp_params(rotation_bit_precision=6)
         block_givens = params["siteDecompositions"][0]["blockGivens"]
         block_givens[field] = block_givens[field][:-1]
         # A Q# runtime failure leaves the interpreter unusable, so run it on a throwaway context.
@@ -882,14 +889,14 @@ class TestGeneralQSharpFidelity:
         data = preparation_data(
             make_mps(right_normalized_tensors(REFERENCE_MPS_TENSORS), site_to_orbital_order=site_to_orbital_order)
         )
-        params = data.to_qsharp_params(rotation_bits=6)
+        params = data.to_qsharp_params(rotation_bit_precision=6)
         assert_prepares_state(params, 4, data.ancilla_bits, REFERENCE_MPS_EXPECTED_STATE)
 
     def test_fidelity_permuted_spinless_site_order(self):
         """Spinless chain sites land on their mapped orbitals with the reordering signs."""
         mps = random_mps(num_sites=4, bond_dim=4, site_dim=2, rng=np.random.default_rng(19))
         data = preparation_data(make_mps(mps.sites, site_to_orbital_order=[3, 1, 0, 2]))
-        params = data.to_qsharp_params(rotation_bits=6)
+        params = data.to_qsharp_params(rotation_bit_precision=6)
         assert_prepares_state(params, 4, data.ancilla_bits, contract_mps(mps))
 
     @pytest.mark.parametrize(
@@ -899,9 +906,9 @@ class TestGeneralQSharpFidelity:
     def test_fidelity_follows_blocked_jordan_wigner_convention(self, tensors, site_to_orbital_order, expected):
         """Sites land on blocked Jordan-Wigner qubits with the fermionic reordering signs."""
         data = preparation_data(make_mps(tensors, site_to_orbital_order=site_to_orbital_order))
-        params = data.to_qsharp_params(rotation_bits=6)
+        params = data.to_qsharp_params(rotation_bit_precision=6)
         ancilla_zero_prob, prepared = simulate_mps_preparation(_OPERATION, _SITE_STRUCT, params, 2, data.ancilla_bits)
-        assert ancilla_zero_prob > 0.90, f"P(ancilla=0) = {ancilla_zero_prob:.4f} too low"
+        assert ancilla_zero_prob > 0.99, f"P(ancilla=0) = {ancilla_zero_prob:.4f} too low"
         target = dense_target(expected, 2 * params["numQubitsPerSite"])
         np.testing.assert_allclose(
             blocked_jordan_wigner_state(
@@ -911,7 +918,7 @@ class TestGeneralQSharpFidelity:
             atol=1e-12,
         )
         fidelity = np.abs(np.vdot(target, prepared)) ** 2
-        assert fidelity > 0.95, f"Fidelity {fidelity:.4f} too low"
+        assert fidelity > 0.97, f"Fidelity {fidelity:.4f} too low"
 
 
 class TestGeneralResourceEstimation:

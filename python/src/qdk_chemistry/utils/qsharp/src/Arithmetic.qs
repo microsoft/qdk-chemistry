@@ -14,10 +14,10 @@ import Std.Convert.IntAsBoolArray;
 /// Sanders et al. (PRX Quantum 1, 020312, 2020), Fig. 18.
 ///
 /// Resource cost:
-///   - n − 2 AND gates  → 4(n − 2) T-gates
-///   - n − 2 IAND gates → 0 T-gates (measurement-based)
+///   - n − 2 AND gates → 4(n − 2) T gates
+///   - n − 2 Adjoint AND gates → 0 T gates (measurement-based uncomputation)
 ///   - O(n) Clifford gates
-///   - n − 1 ancilla qubits (borrowed, returned to |0⟩)
+///   - n − 1 clean ancilla qubits, returned to |0⟩
 ///
 /// # Input
 /// ## c
@@ -103,7 +103,6 @@ operation AddConstant(c : Int, target : Qubit[]) : Unit {
                 X(target[i]);
             }
         }
-
-        }
     }
+}
 }

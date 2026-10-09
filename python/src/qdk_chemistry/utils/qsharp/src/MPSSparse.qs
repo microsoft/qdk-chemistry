@@ -1,5 +1,9 @@
 // Copyright (c) Microsoft Corporation. All rights reserved.
 // Licensed under the MIT License. See LICENSE.txt in the project root for license information.
+//
+// Portions of this file are adapted from code by Felix Rupprecht published at
+// https://zenodo.org/records/20393500, Copyright 2026 German Aerospace Center (DLR),
+// licensed under the Apache License, Version 2.0, and modified for QDK Chemistry.
 
 namespace QDKChemistry.Utils.MPSSparse {
 
@@ -44,7 +48,7 @@ namespace QDKChemistry.Utils.MPSSparse {
         numSites : Int,
         numQubitsPerSite : Int,
         siteToOrbitalOrder : Int[],
-        rotationBits : Int,
+        rotationBitPrecision : Int,
         numAncillaQubits : Int,
         siteDecompositions : SparseSiteSynthesis[],
     }
@@ -181,19 +185,19 @@ namespace QDKChemistry.Utils.MPSSparse {
         MakeMPSOp(
             params.numQubitsPerSite * params.numSites,
             params.numAncillaQubits,
-            params.rotationBits,
+            params.rotationBitPrecision,
             MPSSparse(params.initialStateVec, params.numSites, params.siteToOrbitalOrder, params.siteDecompositions, _, _, _)
         )
     }
 
     /// # Summary
-    /// Returns a composable operation on `[state | phaseGradient]` whose last rotationBits
+    /// Returns a composable operation on `[state | phaseGradient]` whose last rotationBitPrecision
     /// qubits are a caller-owned register prepared by `PreparePhaseGradientState`.
     function MakeMPSSparseOpWithPhaseGradient(params : MPSSparseParams) : Qubit[] => Unit {
         MakeMPSOpWithPhaseGradient(
             params.numQubitsPerSite * params.numSites,
             params.numAncillaQubits,
-            params.rotationBits,
+            params.rotationBitPrecision,
             MPSSparse(params.initialStateVec, params.numSites, params.siteToOrbitalOrder, params.siteDecompositions, _, _, _)
         )
     }
@@ -204,14 +208,14 @@ namespace QDKChemistry.Utils.MPSSparse {
         numSites : Int,
         numQubitsPerSite : Int,
         siteToOrbitalOrder : Int[],
-        rotationBits : Int,
+        rotationBitPrecision : Int,
         numAncillaQubits : Int,
         siteDecompositions : SparseSiteSynthesis[]
     ) : Unit {
         PrepareMPSCircuit(
             numQubitsPerSite * numSites,
             numAncillaQubits,
-            rotationBits,
+            rotationBitPrecision,
             MPSSparse(initialStateVec, numSites, siteToOrbitalOrder, siteDecompositions, _, _, _)
         );
     }

@@ -1,6 +1,11 @@
 // Copyright (c) Microsoft Corporation. All rights reserved.
 // Licensed under the MIT License. See LICENSE.txt in the project root for
 // license information.
+//
+// Portions of this file are adapted from code by Felix Rupprecht published at
+// https://zenodo.org/records/20393500, Copyright 2026 German Aerospace Center
+// (DLR), licensed under the Apache License, Version 2.0, and modified for QDK
+// Chemistry.
 
 /// Circuits for real unitaries given as Givens rotation layers and sign corrections.
 namespace QDKChemistry.Utils.UnitarySynthesis {

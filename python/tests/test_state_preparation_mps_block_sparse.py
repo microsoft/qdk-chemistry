@@ -72,10 +72,10 @@ def assert_prepares_state(params: dict, num_sites: int, ancilla_bits: int, targe
     Jordan-Wigner qubit basis with the site-to-orbital order in ``params``.
     """
     ancilla_zero_prob, prepared = simulate_mps_preparation(_OPERATION, _SITE_STRUCT, params, num_sites, ancilla_bits)
-    assert ancilla_zero_prob > 0.85, f"P(ancilla=0) = {ancilla_zero_prob:.4f} too low"
+    assert ancilla_zero_prob > 0.99, f"P(ancilla=0) = {ancilla_zero_prob:.4f} too low"
     target = blocked_jordan_wigner_state(target_state, params["siteToOrbitalOrder"], params["numQubitsPerSite"])
     fidelity = np.abs(np.vdot(target, prepared)) ** 2
-    assert fidelity > 0.90, f"Fidelity {fidelity:.4f} too low for num_sites={num_sites}"
+    assert fidelity > 0.97, f"Fidelity {fidelity:.4f} too low for num_sites={num_sites}"
 
 
 class TestBlockSparseQSharpFidelity:
@@ -85,12 +85,12 @@ class TestBlockSparseQSharpFidelity:
         """Test sparse state preparation fidelity on a random MPS."""
         mps = random_mps(num_sites=2, bond_dim=4, rng=np.random.default_rng(42))
         data = preparation_data(mps, "block_sparse")
-        assert_prepares_state(data.to_qsharp_params(rotation_bits=6), 2, data.ancilla_bits, contract_mps(mps))
+        assert_prepares_state(data.to_qsharp_params(rotation_bit_precision=6), 2, data.ancilla_bits, contract_mps(mps))
 
     def test_fidelity_reference_mps(self):
         """Test sparse preparation fidelity on a fixed four-site MPS."""
         data = preparation_data(right_normalized_mps(REFERENCE_MPS_TENSORS), "block_sparse")
-        params = data.to_qsharp_params(rotation_bits=6)
+        params = data.to_qsharp_params(rotation_bit_precision=6)
         assert_prepares_state(params, 4, data.ancilla_bits, REFERENCE_MPS_EXPECTED_STATE)
 
     def test_fidelity_permuted_site_order(self):
@@ -101,7 +101,7 @@ class TestBlockSparseQSharpFidelity:
             make_mps(right_normalized_tensors(REFERENCE_MPS_TENSORS), site_to_orbital_order=site_to_orbital_order),
             "block_sparse",
         )
-        params = data.to_qsharp_params(rotation_bits=6)
+        params = data.to_qsharp_params(rotation_bit_precision=6)
         assert_prepares_state(params, 4, data.ancilla_bits, REFERENCE_MPS_EXPECTED_STATE)
 
     @pytest.mark.parametrize(("num_sites", "bond_dim"), [(2, 2), (4, 4)])
@@ -110,13 +110,15 @@ class TestBlockSparseQSharpFidelity:
         mps = random_mps(num_sites=num_sites, bond_dim=bond_dim, site_dim=2, rng=np.random.default_rng(13))
         data = preparation_data(mps, "block_sparse")
         assert data.num_qubits_per_site == 1
-        assert_prepares_state(data.to_qsharp_params(rotation_bits=6), num_sites, data.ancilla_bits, contract_mps(mps))
+        assert_prepares_state(
+            data.to_qsharp_params(rotation_bit_precision=6), num_sites, data.ancilla_bits, contract_mps(mps)
+        )
 
     def test_fidelity_permuted_spinless_site_order(self):
         """Spinless chain sites land on their mapped orbitals with the reordering signs."""
         mps = random_mps(num_sites=4, bond_dim=4, site_dim=2, rng=np.random.default_rng(21))
         data = preparation_data(make_mps(mps.sites, site_to_orbital_order=[1, 3, 0, 2]), "block_sparse")
-        params = data.to_qsharp_params(rotation_bits=6)
+        params = data.to_qsharp_params(rotation_bit_precision=6)
         assert_prepares_state(params, 4, data.ancilla_bits, contract_mps(mps))
 
     @pytest.mark.parametrize("site_dim", [2, 4])
@@ -125,7 +127,7 @@ class TestBlockSparseQSharpFidelity:
         tensors = random_particle_number_tensors(4, 2, max_bond=3, site_dim=site_dim, rng=np.random.default_rng(4))
         mps = make_mps(particle_number_blocked_sites(tensors))
         data = preparation_data(mps, "block_sparse")
-        assert_prepares_state(data.to_qsharp_params(rotation_bits=6), 4, data.ancilla_bits, contract_mps(mps))
+        assert_prepares_state(data.to_qsharp_params(rotation_bit_precision=6), 4, data.ancilla_bits, contract_mps(mps))
 
     @pytest.mark.parametrize(
         ("tensors", "site_to_orbital_order", "expected"),
@@ -134,11 +136,11 @@ class TestBlockSparseQSharpFidelity:
     def test_fidelity_follows_blocked_jordan_wigner_convention(self, tensors, site_to_orbital_order, expected):
         """Sites land on blocked Jordan-Wigner qubits with the fermionic reordering signs."""
         data = preparation_data(make_mps(tensors, site_to_orbital_order=site_to_orbital_order), "block_sparse")
-        params = data.to_qsharp_params(rotation_bits=6)
+        params = data.to_qsharp_params(rotation_bit_precision=6)
         ancilla_zero_prob, prepared = simulate_mps_preparation(_OPERATION, _SITE_STRUCT, params, 2, data.ancilla_bits)
-        assert ancilla_zero_prob > 0.85, f"P(ancilla=0) = {ancilla_zero_prob:.4f} too low"
+        assert ancilla_zero_prob > 0.99, f"P(ancilla=0) = {ancilla_zero_prob:.4f} too low"
         fidelity = np.abs(np.vdot(dense_target(expected, 2 * params["numQubitsPerSite"]), prepared)) ** 2
-        assert fidelity > 0.90, f"Fidelity {fidelity:.4f} too low"
+        assert fidelity > 0.97, f"Fidelity {fidelity:.4f} too low"
 
     @pytest.mark.parametrize("num_bits", [2, 3, 4])
     def test_permutation_via_qroam_with_measurement_uncompute(self, num_bits):
@@ -383,7 +385,7 @@ class TestBlockSparseStatePreparationRun:
         site_to_orbital_order = [2, 0, 3, 1]
         tensors = right_normalized_tensors(REFERENCE_MPS_TENSORS)
         wavefunction = Wavefunction(make_mps(tensors, site_to_orbital_order=site_to_orbital_order))
-        prep = create("state_prep", "matrix_product_state", unitary_synthesis="block_sparse", rotation_bits=8)
+        prep = create("state_prep", "matrix_product_state", unitary_synthesis="block_sparse", rotation_bit_precision=8)
         circuit = prep.run(wavefunction)
 
         assert isinstance(circuit, Circuit)
@@ -396,7 +398,7 @@ class TestBlockSparseStatePreparationRun:
         assert factory.parameter["siteToOrbitalOrder"] == site_to_orbital_order
         assert circuit.num_qubits == expected["numQubitsPerSite"] * expected["numSites"]
         assert factory.parameter.keys() == expected.keys()
-        for key in ("numSites", "numQubitsPerSite", "siteToOrbitalOrder", "rotationBits", "numAncillaQubits"):
+        for key in ("numSites", "numQubitsPerSite", "siteToOrbitalOrder", "rotationBitPrecision", "numAncillaQubits"):
             assert factory.parameter[key] == expected[key]
         np.testing.assert_allclose(factory.parameter["initialStateVec"], expected["initialStateVec"])
 
@@ -405,7 +407,7 @@ class TestBlockSparseStatePreparationRun:
         wavefunction = Wavefunction(right_normalized_mps(REFERENCE_MPS_TENSORS))
         circuit = create("state_prep", "matrix_product_state", unitary_synthesis="block_sparse").run(wavefunction)
         assert circuit._qsharp_factory.parameter["siteToOrbitalOrder"] == [0, 1, 2, 3]
-        assert circuit._qsharp_factory.parameter["rotationBits"] == 10
+        assert circuit._qsharp_factory.parameter["rotationBitPrecision"] == 10
         assert circuit.metadata.num_phase_gradient_ancillas == 0
 
     def test_shared_gradient_widens_the_register_it_declares(self):
@@ -414,7 +416,7 @@ class TestBlockSparseStatePreparationRun:
             "state_prep",
             "matrix_product_state",
             unitary_synthesis="block_sparse",
-            rotation_bits=6,
+            rotation_bit_precision=6,
             allocate_phase_gradient=False,
         )
         circuit = prep.run(Wavefunction(right_normalized_mps(REFERENCE_MPS_TENSORS)))
@@ -425,9 +427,9 @@ class TestBlockSparseStatePreparationRun:
         """The generated Adaptive circuit compiles for logical resource estimation."""
         num_sites = 2
         mps = random_mps(num_sites=num_sites, bond_dim=4, rng=np.random.default_rng(42))
-        circuit = create("state_prep", "matrix_product_state", unitary_synthesis="block_sparse", rotation_bits=6).run(
-            Wavefunction(mps)
-        )
+        circuit = create(
+            "state_prep", "matrix_product_state", unitary_synthesis="block_sparse", rotation_bit_precision=6
+        ).run(Wavefunction(mps))
         logical_counts = circuit.estimate()["logicalCounts"]
         assert logical_counts["numQubits"] >= 2 * num_sites
         assert logical_counts["cczCount"] + logical_counts["tCount"] + logical_counts["rotationCount"] > 0
@@ -436,7 +438,7 @@ class TestBlockSparseStatePreparationRun:
         """A spinless MPS needs fewer qubits and Toffolis than a spatial-orbital MPS of equal bond dimension."""
         spinless = random_mps(num_sites=4, bond_dim=4, site_dim=2, rng=np.random.default_rng(42))
         spatial = random_mps(num_sites=4, bond_dim=4, rng=np.random.default_rng(42))
-        prep = create("state_prep", "matrix_product_state", unitary_synthesis="block_sparse", rotation_bits=6)
+        prep = create("state_prep", "matrix_product_state", unitary_synthesis="block_sparse", rotation_bit_precision=6)
         spinless_circuit = prep.run(Wavefunction(spinless))
         assert spinless_circuit._qsharp_factory.parameter["numQubitsPerSite"] == 1
         spinless_counts = spinless_circuit.estimate()["logicalCounts"]

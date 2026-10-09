@@ -1,30 +1,13 @@
-"""Matrix Product State (MPS) state preparation.
-
-Attribution
------------
-The unitary synthesis is based on the method described in :cite:`Rupprecht2026` and the Qualtran
-implementation by Felix Rupprecht (DLR) published on Zenodo :cite:`Rupprecht2026Zenodo` under
-Apache 2.0 license. The implementation has been rewritten for integration into QDK Chemistry.
-
-References
-----------
-    Felix Rupprecht and Sabine Wölk. (2026). Faster matrix product state preparation by
-    exploiting symmetry-induced block-sparsity.
-    https://arxiv.org/pdf/2605.28489. Zenodo: https://zenodo.org/records/20393500.
-
-    Dominic W. Berry et al. (2025). Rapid Initial-State Preparation for the Quantum Simulation of
-    Strongly Correlated Molecules. PRX Quantum 6, 020327.
-    https://doi.org/10.1103/PRXQuantum.6.020327.
-
-    William R. Clements et al. (2016). Optimal design for universal multiport interferometers.
-    Optica 3, 1460-1465. https://doi.org/10.1364/OPTICA.3.001460.
-
-"""
+"""Matrix Product State (MPS) state preparation."""
 
 # --------------------------------------------------------------------------------------------
 # Copyright (c) Microsoft Corporation. All rights reserved.
 # Licensed under the MIT License. See LICENSE.txt in the project root for license information.
 # --------------------------------------------------------------------------------------------
+
+# Portions of this file are adapted from code by Felix Rupprecht published at
+# https://zenodo.org/records/20393500, Copyright 2026 German Aerospace Center (DLR),
+# licensed under the Apache License, Version 2.0, and modified for QDK Chemistry.
 
 from __future__ import annotations
 
@@ -70,7 +53,15 @@ class MatrixProductStatePreparationSettings(Settings):
     def __init__(self):
         """Initialize the MatrixProductStatePreparationSettings."""
         super().__init__()
-        self._set_default("rotation_bits", "int", 10, "Phase gradient precision.", (2, 62))
+        self._set_default(
+            "rotation_bit_precision",
+            "int",
+            10,
+            "Size of the phase gradient register, which sets the precision of every rotation "
+            "angle. The upper bound of 30 is a sanity limit as 2^-30 is far below chemical "
+            "accuracy.",
+            (1, 30),
+        )
         self._set_default(
             "unitary_synthesis",
             "string",
@@ -105,19 +96,17 @@ class MatrixProductStatePreparation(StatePreparation):
         permuted index, a SWAP, and erasure of the old index by X-basis measurement with a phase
         fixup) and ``V_blockdiag`` is block diagonal, with each block synthesized from Givens rotation
         layers. This exploits U(1) symmetries (particle number, spin) that make MPS tensors block
-        sparse, yielding 10-30x Toffoli savings over ``"dense"``.
+        sparse. :cite:`Rupprecht2026` reports 10-30x Toffoli savings over the dense state of the art
+        for large molecular MPS; the savings shrink with the bond dimension and the block sparsity,
+        and small bonds can cost more than ``"dense"``.
 
     Sites with the ``('0', 'u', 'd', '2')`` physical basis are spatial
     orbitals in the blocked Jordan-Wigner layout. Sites
     with the ``('0', '1')`` physical basis are spinless modes in the
     Jordan-Wigner layout.
 
-    Attribution
-    -----------
-    The unitary synthesis is based on the method in :cite:`Rupprecht2026` and code
-    originally published by Felix Rupprecht on Zenodo :cite:`Rupprecht2026Zenodo`
-    under Apache 2.0 license. The implementation has been rewritten for integration
-    into QDK Chemistry.
+    The unitary synthesis is adapted from the Qualtran implementation by Felix Rupprecht
+    published on Zenodo :cite:`Rupprecht2026Zenodo` under the Apache License 2.0.
     """
 
     def __init__(self):
@@ -202,7 +191,7 @@ class MatrixProductStatePreparation(StatePreparation):
                 orbital.
 
         """
-        rotation_bits = self._settings.get("rotation_bits")
+        rotation_bit_precision = self._settings.get("rotation_bit_precision")
         unitary_synthesis = self._settings.get("unitary_synthesis")
 
         container = wavefunction.get_container()
@@ -214,7 +203,7 @@ class MatrixProductStatePreparation(StatePreparation):
             raise ValueError(f"{_DESCRIPTION} requires exactly one MPS site per molecular orbital.")
 
         data = self.generate_matrix_product_state_preparation_data(container)
-        params = data.to_qsharp_params(rotation_bits)
+        params = data.to_qsharp_params(rotation_bit_precision)
         # The MPS circuits are Adaptive-only; the default shared context targets Adaptive_RIF.
         if unitary_synthesis == "block_sparse":
             sparse = QSHARP_UTILS.MPSSparse
@@ -233,7 +222,7 @@ class MatrixProductStatePreparation(StatePreparation):
             # The caller owns the trailing gradient register, must leave the gradient in it, and
             # must exclude it from any reflection about |0>.
             qsharp_op = make_op_with_phase_gradient(params_type(**params))
-            num_gradient_ancillas = rotation_bits
+            num_gradient_ancillas = rotation_bit_precision
         # An exported circuit has no caller to own the gradient, so it always allocates its own.
         qsharp_factory = QsharpFactoryData(program=program, parameter=params)
         return Circuit(
@@ -311,14 +300,14 @@ class MatrixProductStatePreparationData:
     sites: list[DenseSiteSynthesis] | list[SparseSiteSynthesis] = field(default_factory=list)
     """Per-site decomposition data (one entry per site 1..num_sites-1)."""
 
-    def to_qsharp_params(self, rotation_bits: int) -> dict:
+    def to_qsharp_params(self, rotation_bit_precision: int) -> dict:
         """Flatten into the dict expected by ``MakeMPSSequentialCircuit`` or ``MakeMPSSparseCircuit``."""
         return {
             "initialStateVec": self.initial_state_vec,
             "numSites": self.num_sites,
             "numQubitsPerSite": self.num_qubits_per_site,
             "siteToOrbitalOrder": self.site_to_orbital_order,
-            "rotationBits": rotation_bits,
+            "rotationBitPrecision": rotation_bit_precision,
             "numAncillaQubits": self.ancilla_bits,
             "siteDecompositions": [_site_to_qsharp(site) for site in self.sites],
         }

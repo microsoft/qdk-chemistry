@@ -271,10 +271,10 @@ This instance method accepts only an ``MPSContainer`` and uses the preparer's ``
      - Description
    * - ``allocate_phase_gradient``
      - bool
-     - Whether the circuit allocates and prepares its own phase gradient register. If False, the operation takes ``rotation_bits`` trailing qubits holding a phase gradient state owned by the caller. Default is True.
-   * - ``rotation_bits``
+     - Whether the circuit allocates and prepares its own phase gradient register. If False, the operation takes ``rotation_bit_precision`` trailing qubits holding a phase gradient state owned by the caller. Default is True.
+   * - ``rotation_bit_precision``
      - int
-     - Size of the phase gradient register, which sets the precision of every rotation angle. Default is 10.
+     - Size of the phase gradient register, which sets the precision of every rotation angle. The upper bound of 30 is a sanity limit as :math:`2^{-30}` is far below chemical accuracy. Default is 10.
    * - ``unitary_synthesis``
      - str
      - Site unitary synthesis method: ``"dense"`` or ``"block_sparse"``. Default is ``"dense"``.

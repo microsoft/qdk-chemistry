@@ -513,7 +513,7 @@ def simulate_mps_preparation(
     context.eval(f"use state = Qubit[{num_state_qubits}];")
     context.eval(f"use ancilla = Qubit[{num_ancilla_qubits}];")
     context.eval(
-        f"{{ use phaseGradient = Qubit[{params['rotationBits']}]; "
+        f"{{ use phaseGradient = Qubit[{params['rotationBitPrecision']}]; "
         "within { QDKChemistry.Utils.PhaseGradient.PreparePhaseGradientState(phaseGradient); } "
         f"apply {{ {operation}({arguments}, state, ancilla, phaseGradient); }} }}"
     )

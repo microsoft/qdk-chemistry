@@ -107,7 +107,7 @@ struct DenseSiteSynthesis {
  * For site @f$i@f$ with tensor @f$M^p_{ab}@f$, the returned unitary
  * @f$U_i@f$ satisfies
  * @f$U_i(|0\rangle_p\otimes V_i|a\rangle)=\sum_{p,b}(V_{i+1}(M^{p})^{T})_{b a}
- * |p\rangle|b\rangle@f$. The bond register holds @f$\chi@f$ states
+ * |p\rangle|b\rangle@f$. The bond register holds @f$\chi@f$ states.
  *
  * Four physical states use a three-step peel: two QR factorizations split the
  * packed isometry into three independent two-block CSDs. Two physical states
@@ -122,6 +122,7 @@ struct DenseSiteSynthesis {
  * @throws std::invalid_argument If the site is complex, has an unsupported
  * physical dimension, is nonisometric, or is incompatible with the bond
  * register or successor factor.
+ * @throws std::runtime_error If a numerical factorization breaks down.
  */
 DenseSiteSynthesis dense_unitary_synthesis(
     const data::MPSSite& site, Eigen::Index ancilla_dim,
@@ -142,7 +143,9 @@ DenseSiteSynthesis dense_unitary_synthesis(
  * connected components. Within a component, rows are ordered by the first
  * column that reaches them. Each component, restricted to its rows, is
  * completed to an orthogonal block, and every unused row becomes a
- * @f$1\times 1@f$ identity block.
+ * @f$1\times 1@f$ identity block. A component whose columns are orthonormal
+ * only to the accepted tolerance is replaced by its nearest orthogonal (polar)
+ * factor before completion.
  * Column gathering places each target beside its completion columns; a
  * largest-first block reorder is composed into the row and column permutations.
  * Columns outside the input isometry are freely chosen completion columns.
@@ -150,9 +153,9 @@ DenseSiteSynthesis dense_unitary_synthesis(
  * @param site Validated real MPS site; its stored sector offsets are reused.
  * @param ancilla_dim Dimension of the bond register.
  * @throws std::invalid_argument If the site is complex, does not fit the bond
- * register, or is not an
- * isometry within
+ * register, or is not an isometry within
  * @f$\lVert M^T M-I\rVert_F\leq 10^{-8}\chi_L@f$.
+ * @throws std::runtime_error If a numerical factorization breaks down.
  */
 SparseSiteSynthesis block_sparse_unitary_synthesis(const data::MPSSite& site,
                                                    Eigen::Index ancilla_dim);
@@ -174,6 +177,7 @@ using MPSSynthesis = std::variant<std::vector<DenseSiteSynthesis>,
  * @param unitary_synthesis "dense" or "block_sparse".
  * @throws std::invalid_argument If the method is unknown, the MPS is complex,
  * a bond does not fit the register, or a synthesized site is not an isometry.
+ * @throws std::runtime_error If a numerical factorization breaks down.
  */
 MPSSynthesis matrix_product_state_synthesis(
     const data::MPSContainer& mps, Eigen::Index ancilla_dim,
