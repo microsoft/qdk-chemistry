@@ -418,3 +418,21 @@ def test_qubit_operator_system_width_is_its_qubit_count(
     builder._run_impl(Mock(_qsharp_op=object()), QubitOperator(["ZZ"], np.array([1.0])))
 
     assert widths == [(2, 1)]
+
+
+@pytest.mark.parametrize("builder_class", [QdkStandardQpeCircuitBuilder, QdkIterativeQpeCircuitBuilder])
+def test_model_unitary_is_built_once_per_power(
+    monkeypatch: pytest.MonkeyPatch,
+    builder_class: type[QdkStandardQpeCircuitBuilder | QdkIterativeQpeCircuitBuilder],
+) -> None:
+    """QPE builds a model's unitary once for each controlled power and takes the system width from it."""
+    builder = builder_class(num_bits=3)
+    unitary_builder, _ = _stub_nested(builder, monkeypatch, num_qubits=5, num_system_qubits=3)
+    widths: list[tuple[int, int]] = []
+    monkeypatch.setattr(builder, "_create_circuit_from_qsharp_op", lambda *args: widths.append(args[-2:]))
+    model = FermiHubbardModelHamiltonianDescription(LatticeGeometry.chain(3), t=1.0, u=4.0)
+
+    builder._run_impl(Mock(_qsharp_op=object()), model)
+
+    assert unitary_builder.run.call_count == 3
+    assert set(widths) == {(3, 2)}

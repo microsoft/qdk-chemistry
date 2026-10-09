@@ -96,15 +96,42 @@ class QpeCircuitBuilder(Algorithm):
 
         """
 
+    def _build_controlled_unitary(
+        self,
+        qubit_hamiltonian: HamiltonianDescription,
+        power: int,
+    ) -> tuple[Circuit, int, int]:
+        r"""Build the controlled unitary once, with the widths of its registers.
+
+        Sets the ``power`` on the unitary builder so it produces :math:`U^{\\text{power}}`
+        according to its ``power_strategy``, then maps the result to a controlled circuit.
+
+        Args:
+            qubit_hamiltonian: The Hamiltonian description the unitary builder takes.
+            power: The power to which the unitary should be raised.
+
+        Returns:
+            A tuple of (circuit, num_ancilla_qubits, num_system_qubits) where circuit implements
+            controlled-:math:`U^{\\text{power}}`, num_ancilla_qubits is the number of ancilla
+            qubits used by the unitary beyond the system qubits, and num_system_qubits is the
+            width of the system register.
+
+        """
+        unitary_builder = self._create_nested("unitary_builder")
+        unitary_builder.settings().update("power", power)
+        unitary_rep = unitary_builder.run(qubit_hamiltonian)
+        num_system_qubits = self._num_system_qubits(qubit_hamiltonian, unitary_rep)
+        circuit_mapper = self._create_nested("controlled_circuit_mapper")
+        circuit_mapper.settings().update("control_indices", [0])
+        circuit = circuit_mapper.run(unitary_rep)
+        return circuit, unitary_rep.get_num_qubits() - num_system_qubits, num_system_qubits
+
     def _create_controlled_circuit(
         self,
         qubit_hamiltonian: HamiltonianDescription,
         power: int,
     ) -> tuple[Circuit, int]:
         r"""Create the controlled circuit for the given Hamiltonian and power.
-
-        Sets the ``power`` on the unitary builder so it produces :math:`U^{\\text{power}}`
-        according to its ``power_strategy``, then maps the result to a controlled circuit.
 
         Args:
             qubit_hamiltonian: The Hamiltonian description the unitary builder takes.
@@ -116,25 +143,16 @@ class QpeCircuitBuilder(Algorithm):
             of ancilla qubits used by the unitary beyond the system qubits.
 
         """
-        unitary_builder = self._create_nested("unitary_builder")
-        unitary_builder.settings().update("power", power)
-        unitary_rep = unitary_builder.run(qubit_hamiltonian)
-        num_ancilla_qubits = unitary_rep.get_num_qubits() - self._num_system_qubits(qubit_hamiltonian, unitary_rep)
-        circuit_mapper = self._create_nested("controlled_circuit_mapper")
-        circuit_mapper.settings().update("control_indices", [0])
-        circuit = circuit_mapper.run(unitary_rep)
+        circuit, num_ancilla_qubits, _ = self._build_controlled_unitary(qubit_hamiltonian, power)
         return circuit, num_ancilla_qubits
 
-    def _num_system_qubits(
-        self,
-        qubit_hamiltonian: HamiltonianDescription,
-        unitary_rep: UnitaryRepresentation | None = None,
-    ) -> int:
+    @staticmethod
+    def _num_system_qubits(qubit_hamiltonian: HamiltonianDescription, unitary_rep: UnitaryRepresentation) -> int:
         """Return the width of the system register the unitary acts on.
 
         Args:
             qubit_hamiltonian: The Hamiltonian description the unitary builder takes.
-            unitary_rep: The unitary already built from ``qubit_hamiltonian``, if any.
+            unitary_rep: The unitary built from ``qubit_hamiltonian``.
 
         Returns:
             The number of system qubits.
@@ -142,8 +160,6 @@ class QpeCircuitBuilder(Algorithm):
         """
         if isinstance(qubit_hamiltonian, QubitOperator):
             return qubit_hamiltonian.num_qubits
-        if unitary_rep is None:
-            unitary_rep = self._create_nested("unitary_builder").run(qubit_hamiltonian)
         return unitary_rep.get_num_system_qubits()
 
     @staticmethod

@@ -114,8 +114,7 @@ class QiskitStandardQpeCircuitBuilder(StandardQpeCircuitBuilder):
         # Determine unitary ancilla qubit count from the compiled controlled-circuit.
         # The compiled Qiskit circuit may have additional decomposition ancillas
         # beyond the logical count (e.g., for multi-controlled gate synthesis).
-        probe_circuit, _ = self._create_controlled_circuit(qubit_hamiltonian=qubit_hamiltonian, power=1)
-        num_system = self._num_system_qubits(qubit_hamiltonian)
+        probe_circuit, _, num_system = self._build_controlled_unitary(qubit_hamiltonian=qubit_hamiltonian, power=1)
         num_unitary_ancilla = probe_circuit.get_qiskit_circuit().num_qubits - 1 - num_system
 
         phase = QuantumRegister(num_bits, "phase")
@@ -318,10 +317,9 @@ class QiskitIterativeQpeCircuitBuilder(IterativeQpeCircuitBuilder):
         """
         _validate_iteration_inputs(iteration, total_iterations)
         power = 2 ** (total_iterations - iteration - 1)
-        ctrl_unitary_circuit, _ = self._create_controlled_circuit(qubit_hamiltonian, power)
+        ctrl_unitary_circuit, _, num_system = self._build_controlled_unitary(qubit_hamiltonian, power)
 
         if state_preparation.get_qiskit_circuit() and ctrl_unitary_circuit.get_qiskit_circuit():
-            num_system = self._num_system_qubits(qubit_hamiltonian)
             num_state_prep = state_preparation.get_qiskit_circuit().num_qubits
             if num_state_prep != num_system:
                 raise ValueError(
