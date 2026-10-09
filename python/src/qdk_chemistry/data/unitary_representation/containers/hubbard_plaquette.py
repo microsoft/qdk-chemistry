@@ -53,7 +53,7 @@ class HubbardPlaquetteContainer(UnitaryContainer):
         constant_shift: Classical per-step scalar phase offset used only in phase-to-energy conversion.
         hopping_angle: :math:`\kappa = 2 t \delta`, shared by both tilings.
         step_reps: Number of repetitions of the body.
-        scale: Total evolution time the step count was derived for.
+        scale: Total evolution time represented, the per-step duration times ``step_reps``.
 
     Raises:
         TypeError: If ``width``, ``height``, or ``step_reps`` is not an integer.

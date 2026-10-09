@@ -382,6 +382,27 @@ class TestStepCountAndShift:
         shift = shifted.eigenvalue_from_phase(0.125) - unshifted.eigenvalue_from_phase(0.125)
         assert shift == pytest.approx(gap[0])
 
+    @pytest.mark.parametrize("power_strategy", ["repeat", "rescale"])
+    def test_powered_evolution_decodes_the_unpowered_energy(self, power_strategy):
+        """A phase of U^power decodes to the same shifted energy under either power strategy."""
+        energy, time, power = -1.3, 0.3, 3
+        container = (
+            HubbardPlaquetteTrotter(
+                order=2,
+                time=time,
+                power=power,
+                power_strategy=power_strategy,
+                num_divisions=2,
+                target_accuracy=0.0,
+                num_electrons=6,
+            )
+            .run(_model(2, u=8.0))
+            .get_container()
+        )
+        phase = (-energy * time * power / (2 * math.pi)) % 1.0
+        # (epsilon + U/2) eta - U M / 4 = 4 * 6 - 8 * 4 / 4 = 16.
+        assert container.eigenvalue_from_phase(phase) == pytest.approx(energy + 16.0)
+
 
 _BODY = {"width": 4, "height": 4, "interaction_angle": 0.1, "hopping_angle": 0.2, "step_reps": 1}
 

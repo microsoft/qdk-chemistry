@@ -312,7 +312,7 @@ class HubbardPlaquetteTrotter(TimeEvolutionBuilder):
                 constant_shift=shift * delta_time,
                 hopping_angle=2.0 * hopping * delta_time,
                 step_reps=num_divisions * power_repetitions,
-                scale=time,
+                scale=time * power_repetitions,
             )
         )
 
