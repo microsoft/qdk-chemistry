@@ -34,8 +34,8 @@ constexpr const char* kUnversionedGraphMessage =
     "by an older qdk-chemistry release, migrate it with: python -m "
     "qdk_chemistry.migrate <old_file> <new_file>.";
 
-// HDF5 stores label columns as doubles, which hold every shell up to 2^53.
-constexpr std::uint64_t kMaxEdgeLabelShell = std::uint64_t{1} << 53;
+// HDF5 stores label columns as doubles, which hold every integer up to 2^53.
+constexpr std::uint64_t kMaxEdgeLabelValue = std::uint64_t{1} << 53;
 
 static EdgeColoring color_edges(
     std::uint64_t num_sites,
@@ -60,6 +60,9 @@ static double axis_distance(const Eigen::RowVector2d& lhs,
 static std::vector<BondFlavorDefinition> prepare_flavors(
     std::vector<BondFlavorDefinition> definitions, double tolerance) {
   for (auto& definition : definitions) {
+    if (definition.flavor > kMaxEdgeLabelValue) {
+      throw std::invalid_argument("Bond-flavor IDs must be at most 2^53.");
+    }
     if (definition.shell == 0 || definition.axis.size() == 0 ||
         !definition.axis.allFinite() ||
         definition.axis.cwiseAbs().maxCoeff() == 0.0) {
@@ -97,10 +100,10 @@ static std::vector<BondFlavorDefinition> prepare_flavors(
   return definitions;
 }
 
-static std::optional<BondFlavorId> flavor_of(
+static std::optional<std::uint64_t> flavor_of(
     const std::vector<BondFlavorDefinition>& definitions, std::uint64_t shell,
     const Eigen::RowVector2d& axis, double tolerance) {
-  std::optional<BondFlavorId> flavor;
+  std::optional<std::uint64_t> flavor;
   for (const auto& definition : definitions) {
     if (definition.shell != shell ||
         axis_distance(definition.axis, axis) > tolerance) {
@@ -278,11 +281,12 @@ void LatticeGraph::_validate_edge_labels() const {
     }
   }
   if (pairs.size() != _edge_labels.size() ||
-      std::any_of(_edge_labels.begin(), _edge_labels.end(),
-                  [](const auto& item) {
-                    return item.second.shell == 0 ||
-                           item.second.shell > detail::kMaxEdgeLabelShell;
-                  })) {
+      std::any_of(
+          _edge_labels.begin(), _edge_labels.end(), [](const auto& item) {
+            return item.second.shell == 0 ||
+                   item.second.shell > detail::kMaxEdgeLabelValue ||
+                   item.second.flavor.value_or(0) > detail::kMaxEdgeLabelValue;
+          })) {
     throw std::invalid_argument("Invalid lattice edge label.");
   }
 }
@@ -778,6 +782,8 @@ static EdgeColoring color_edges(
       best_count = distinct;
       best = coloring;
     }
+    // A proper edge coloring needs at least max_degree colors.
+    if (best_count == max_degree) break;
   }
   EdgeColoring result;
   for (std::size_t pos = 0; pos < edges_in.size(); ++pos) {
@@ -1200,9 +1206,9 @@ LatticeGraph LatticeGraph::from_json(const nlohmann::json& j) {
         throw std::invalid_argument(
             "Edge labels require [i, j, shell, flavor].");
       }
-      std::optional<BondFlavorId> flavor;
+      std::optional<std::uint64_t> flavor;
       if (!entry[3].is_null()) {
-        flavor = detail::json_integer<BondFlavorId>(entry[3]);
+        flavor = detail::json_integer<std::uint64_t>(entry[3]);
       }
       if (!graph._edge_labels
                .try_emplace({detail::json_integer<std::uint64_t>(entry[0]),
@@ -1341,8 +1347,7 @@ LatticeGraph LatticeGraph::from_hdf5(H5::Group& group) {
         const double shell = labels[i + 2];
         const double flavor = labels[i + 3];
         if (!(shell >= 1.0 && shell <= 0x1p53 && shell == std::trunc(shell)) ||
-            !(flavor >= -1.0 &&
-              flavor <= std::numeric_limits<BondFlavorId>::max() &&
+            !(flavor >= -1.0 && flavor <= 0x1p53 &&
               flavor == std::trunc(flavor)) ||
             !graph._edge_labels
                  .try_emplace(
@@ -1350,8 +1355,8 @@ LatticeGraph LatticeGraph::from_hdf5(H5::Group& group) {
                       static_cast<std::uint64_t>(site_index(labels[i + 1]))},
                      static_cast<std::uint64_t>(shell),
                      flavor < 0.0 ? std::nullopt
-                                  : std::optional<BondFlavorId>(
-                                        static_cast<BondFlavorId>(flavor)))
+                                  : std::optional<std::uint64_t>(
+                                        static_cast<std::uint64_t>(flavor)))
                  .second) {
           throw std::invalid_argument(
               "Invalid or duplicate stored edge label.");

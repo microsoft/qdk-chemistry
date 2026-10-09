@@ -59,7 +59,7 @@ void bind_lattice_graph(pybind11::module &m) {
 
   py::class_<BondFlavorDefinition, py::smart_holder>(
       m, "BondFlavorDefinition", "Semantic label for a shell-axis class.")
-      .def(py::init<std::uint64_t, Eigen::RowVectorXd, BondFlavorId>(),
+      .def(py::init<std::uint64_t, Eigen::RowVectorXd, std::uint64_t>(),
            py::arg("shell"), py::arg("axis"), py::arg("flavor"), R"(
 Define a semantic label to resolve onto lattice graph edges.
 
@@ -79,23 +79,24 @@ Args:
   py::class_<EdgeLabel, py::smart_holder>(
       m, "EdgeLabel",
       "Geometric shell and optional semantic flavor of an edge.")
-      .def(
-          py::init([](std::uint64_t shell, std::optional<BondFlavorId> flavor) {
-            return EdgeLabel{shell, flavor};
-          }),
-          py::arg("shell"), py::arg("flavor") = py::none(), R"(
+      .def(py::init(
+               [](std::uint64_t shell, std::optional<std::uint64_t> flavor) {
+                 return EdgeLabel{shell, flavor};
+               }),
+           py::arg("shell"), py::arg("flavor") = py::none(), R"(
 Label one edge with its neighbor shell and optional semantic flavor.
 
 Args:
     shell (int): One-based neighbor shell index, at most ``2**53``.
-    flavor (int | None, optional): Opaque non-negative semantic label. Defaults to None.
+    flavor (int | None, optional): Opaque non-negative semantic label, at most ``2**53``. Defaults to None.
 )")
       .def_property_readonly(
           "shell", [](const EdgeLabel &self) { return self.shell; },
           "int: One-based radial shell index, at most ``2**53``.")
       .def_property_readonly(
           "flavor", [](const EdgeLabel &self) { return self.flavor; },
-          "int | None: Opaque non-negative semantic label, or None.")
+          "int | None: Opaque non-negative semantic label, at most ``2**53``, "
+          "or None.")
       .def("__eq__", [](const EdgeLabel &self,
                         const EdgeLabel &other) { return self == other; })
       .def("__repr__", [](const EdgeLabel &self) {
