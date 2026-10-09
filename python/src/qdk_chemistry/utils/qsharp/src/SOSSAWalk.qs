@@ -26,22 +26,18 @@ namespace QDKChemistry.Utils.SOSSAWalk {
     import Std.Canon.ApplyToEachCA;
     import Std.Canon.ApplyXorInPlace;
     import Std.Convert.IntAsBoolArray;
-    import Std.Convert.IntAsDouble;
     import Std.Convert.ResultArrayAsBoolArray;
     import Std.Core.Length;
     import Std.Diagnostics.Fact;
 
-    import Std.Math.AbsD;
     import Std.Math.MaxI;
-    import Std.Math.PI;
-    import Std.Math.Round;
     import Std.Measurement.MeasureEachZ;
     import Std.Measurement.MResetX;
     import Std.StatePreparation.PreparePureStateD;
     import Std.TableLookup.Select;
     import QDKChemistry.Utils.AliasSampling.ConditionalAliasSamplingPrepareWithFreeRider;
     import Std.Arithmetic.RippleCarryCGIncByLE;
-    import QDKChemistry.Utils.PhaseGradient.PreparePhaseGradientState, QDKChemistry.Utils.PhaseGradient.RyViaPhaseGradient;
+    import QDKChemistry.Utils.PhaseGradient.PreparePhaseGradientState, QDKChemistry.Utils.PhaseGradient.QuantizeRyAngle, QDKChemistry.Utils.PhaseGradient.RyViaPhaseGradient;
     import QDKChemistry.Utils.PrepSelPrep.Reflect;
     import QDKChemistry.Utils.SelectSwap.ApplyBranchPhaseFixup, QDKChemistry.Utils.SelectSwap.ComputeOptimalLambda2D, QDKChemistry.Utils.SelectSwap.SelectSwapCost2D;
     import QDKChemistry.Utils.UnaryIteration.AddressQubits;
@@ -116,6 +112,9 @@ namespace QDKChemistry.Utils.SOSSAWalk {
 
     /// Build DQ bulk rotation data: N entries, each containing all (N-1) quantized angles.
     /// Addressed by xoReg[0..⌈log₂N⌉-1] (the orbital index for one-body terms).
+    ///
+    /// The gated Givens rotation is built as the controlled CRy(2θ) = Ry(θ)·CNOT·Ry(-θ)·CNOT
+    /// from two uncontrolled Ry(θ), so each word encodes the half-angle θ.
     internal function BuildDQBulkRotationData(
         params : SelectParams,
         N : Int,
@@ -126,7 +125,7 @@ namespace QDKChemistry.Utils.SOSSAWalk {
             xo -> Flattened(
                 MappedOverRange(
                     j -> IntAsBoolArray(
-                        QuantizeGivensAngle(
+                        QuantizeRyAngle(
                             if j < Length(params.OneBodyRotationAngles[xo]) {
                                 params.OneBodyRotationAngles[xo][j]
                             } else {
@@ -153,8 +152,8 @@ namespace QDKChemistry.Utils.SOSSAWalk {
         (numBases + 1) * (1 <<< rankBits) < numRanks * (1 <<< bBits)
     }
 
-    /// Build SF bulk rotation data: all (N-1) quantized angles per entry, plus a 1-bit bEqB
-    /// flag indicating b == numBases.
+    /// Build SF bulk rotation data: all (N-1) quantized angles per entry, encoded as in
+    /// `BuildDQBulkRotationData`, plus a 1-bit bEqB flag indicating b == numBases.
     internal function BuildSFBulkRotationData(
         params : SelectParams,
         R : Int,
@@ -177,7 +176,7 @@ namespace QDKChemistry.Utils.SOSSAWalk {
             let angleBits = Flattened(
                 MappedOverRange(
                     j -> IntAsBoolArray(
-                        QuantizeGivensAngle(
+                        QuantizeRyAngle(
                             if r < R and angleIdx < Length(params.TwoBodyRotationAngles) and j < Length(params.TwoBodyRotationAngles[angleIdx]) {
                                 params.TwoBodyRotationAngles[angleIdx][j]
                             } else {
@@ -213,19 +212,6 @@ namespace QDKChemistry.Utils.SOSSAWalk {
             }
         }
         return table;
-    }
-
-    /// Quantize a Givens rotation angle for phase gradient application.
-    ///
-    /// RyViaPhaseGradient applies Ry(4π·x/2^b). The gated Givens rotation is built as the
-    /// controlled CRy(2θ) = Ry(θ)·CNOT·Ry(-θ)·CNOT from two uncontrolled Ry(θ), so each word
-    /// encodes the half-angle θ:
-    ///   4π·x/2^b = θ  →  x = 2^b · θ / (4π)  (mod 2^b)
-    internal function QuantizeGivensAngle(angle : Double, bRot : Int) : Int {
-        Fact(AbsD(angle) <= 4.0 * PI(), "QuantizeGivensAngle: angle must be finite and within [-4π, 4π]");
-        let scale = IntAsDouble(1 <<< bRot);
-        let raw = Round(scale * angle / (4.0 * PI()));
-        ((raw % (1 <<< bRot)) + (1 <<< bRot)) % (1 <<< bRot)
     }
 
     // ═══════════════════════════════════════════════════════════════════════════

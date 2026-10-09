@@ -323,7 +323,7 @@ def controlled_bond_unitary(unitary: np.ndarray, control_bit: int) -> np.ndarray
 
 
 def dense_site_circuit(synthesis: DenseSiteSynthesis, chi: int) -> np.ndarray:
-    """Unitary of the dense site circuit of ``PrepareSequentialMPS`` (Fig. 5 of Rupprecht & Wölk)."""
+    """Unitary of the dense site circuit of ``MPSSequential`` (Fig. 5 of Rupprecht & Wölk)."""
     rotation_angles, mixing_givens = synthesis.rotation_angles, synthesis.mixing_givens
     block = reconstruct_givens(synthesis.block_givens)
     if len(block) == 2 * chi:
@@ -698,6 +698,15 @@ class TestGeneralStatePreparationRun:
         )
         assert circuit._qsharp_factory.parameter["siteToOrbitalOrder"] == [0, 1, 2, 3]
         assert circuit._qsharp_factory.parameter["rotationBits"] == 10
+        assert circuit.num_qubits == 8
+        assert circuit.metadata.num_phase_gradient_ancillas == 0
+
+    def test_shared_gradient_widens_the_register_it_declares(self):
+        """Opting out of internal allocation appends a gradient the caller must own."""
+        prep = create("state_prep", "matrix_product_state", rotation_bits=6, allocate_phase_gradient=False)
+        circuit = prep.run(Wavefunction(right_normalized_mps(REFERENCE_MPS_TENSORS)))
+        assert circuit.num_qubits == 8 + 6
+        assert circuit.metadata.num_phase_gradient_ancillas == 6
 
     def test_run_requires_one_site_per_orbital(self):
         """An active-space MPS that omits molecular orbitals is rejected."""

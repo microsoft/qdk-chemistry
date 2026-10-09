@@ -251,6 +251,7 @@ The MPS must be real and right-canonical with orthogonality center at site 0, wi
 The physical basis is loaded in the blocked Jordan-Wigner layout.
 An ancilla register of :math:`\lceil \log_2 \chi \rceil` qubits carries the virtual bond of maximal dimension :math:`\chi`.
 Every site unitary acts on the qubits of its site and the ancilla register, and is synthesized by one of two methods selected with the ``unitary_synthesis`` setting, excluding site 0, which is prepared as the initial state.
+Givens decomposition converts the orthogonal factors into adjacent rotations and sign corrections for the circuit.
 A final layer of CZ gates applies the fermionic signs of reordering these modes into qubit order.
 It relies on the container's validation of adjacent bond spaces.
 The utility ``matrix_product_state_synthesis(container, ancilla_dimension, unitary_synthesis="dense")`` returns the synthesized sites in chain order, excluding site 0.
@@ -268,6 +269,9 @@ This instance method accepts only an ``MPSContainer`` and uses the preparer's ``
    * - Setting
      - Type
      - Description
+   * - ``allocate_phase_gradient``
+     - bool
+     - Whether the circuit allocates and prepares its own phase gradient register. If False, the operation takes ``rotation_bits`` trailing qubits holding a phase gradient state owned by the caller. Default is True.
    * - ``rotation_bits``
      - int
      - Size of the phase gradient register, which sets the precision of every rotation angle. Default is 10.
