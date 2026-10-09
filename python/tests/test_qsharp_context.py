@@ -15,7 +15,7 @@ from typing import TYPE_CHECKING
 import numpy as np
 import pytest
 from qdk import TargetProfile
-from qdk.qsharp import Pauli
+from qdk.qsharp import Pauli, QSharpError, Result
 
 import qdk_chemistry.utils.qsharp as qsharp_package
 from qdk_chemistry.algorithms.phase_estimation.circuit_builder.standard_builder import (
@@ -41,9 +41,11 @@ if TYPE_CHECKING:
 #: shipped staging list so that list, not a copy of it, is what the classification pins.
 _PORTABLE_MODULES = tuple(Path(name).stem for name in _BASE_PROFILE_FILES)
 
-#: Modules withheld from ``TargetProfile.Base``. Most uncompute through measurement, which
-#: Base cannot express, so they are made to fail as missing rather than compile and mislead.
+#: Modules withheld from ``TargetProfile.Base``. Most uncompute through measurement, or use
+#: classical feed-forward, which Base cannot express, so they are made to fail as missing
+#: rather than compile and mislead.
 _ADAPTIVE_ONLY_MODULES = (
+    "CombinedIterationPhaseEstimation",
     "UnaryIteration",
     "UnaryPhaseEstimation",
     "SelectSwap",
@@ -190,6 +192,16 @@ class TestTargetProfiles:
         vendored = {path.stem for path in (Path(qsharp_package.__file__).parent / "src").glob("*.qs")}
         assert vendored == set(_PORTABLE_MODULES) | set(_ADAPTIVE_ONLY_MODULES)
 
+    def test_adaptive_ri_loads_the_whole_project(self) -> None:
+        """Every non-Base profile compiles all sources, so one dynamic double breaks them all.
+
+        ``CombinedIterationPhaseEstimation`` once summed its feed-forward correction into a
+        mutable ``Double``, which Adaptive_RI rejects, taking down contexts that never touch
+        combined IQPE -- including ``target_name`` targets that infer the RI profile.
+        """
+        context = create_qsharp_context(target_profile=TargetProfile.Adaptive_RI)
+        assert hasattr(context.code.QDKChemistry.Utils, "CombinedIterationPhaseEstimation")
+
     def test_base_lowers_a_circuit_to_qir(self, base_context: qdk.Context) -> None:
         """The Base build exists to be lowered through QIR, so prove that it compiles."""
         utils = base_context.code.QDKChemistry.Utils
@@ -206,3 +218,34 @@ class TestTargetProfiles:
             numSuffixTerms=0,
         )
         assert "define" in str(base_context.compile(pauli_exp, params, [0, 1], 0, [1, 2]))
+
+
+@pytest.mark.parametrize("combined", [False, True])
+@pytest.mark.parametrize(
+    ("phase", "systems", "ancillas", "error"),
+    [
+        (0, [1], 1, None),
+        (0, [2], 1, None),
+        (2, [0], 1, None),
+        (-1, [1], 1, "phaseQubit must be within"),
+        (3, [1], 1, "phaseQubit must be within"),
+        (0, [-1], 1, "System qubit indices must be within"),
+        (0, [3], 1, "System qubit indices must be within"),
+        (0, [1, 1], 1, "System qubit indices must be unique"),
+        (1, [1], 1, "System qubit indices must be distinct"),
+        (0, [1], -1, "numAncillaQubits must be non-negative"),
+    ],
+)
+def test_iqpe_qubit_layout(combined: bool, phase: int, systems: list[int], ancillas: int, error: str | None) -> None:
+    """Both entry points support alternate layouts and reject invalid indices."""
+    unitary = "(phase, targets) => { CNOT(targets[0], targets[1]); Controlled Z([phase], targets[1]); }"
+    if combined:
+        call = f"CombinedIterationPhaseEstimation.RunFullIQPE(1, 1, _ => (), [{unitary}]"
+    else:
+        call = f"IterativePhaseEstimation.MakeIQPECircuit(_ => (), {unitary}, 0.0"
+    expression = f"QDKChemistry.Utils.{call}, {phase}, {systems}, {ancillas})"
+    if error is not None:
+        with pytest.raises(QSharpError, match=error):
+            get_qsharp_context().eval(expression)
+    else:
+        assert get_qsharp_context().eval(expression) == [Result.Zero]
