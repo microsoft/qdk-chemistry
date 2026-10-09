@@ -179,21 +179,23 @@ class LatticeGraph : public DataClass {
    *
    * Shells rank the distinct distances present on this geometry, including
    * periodic images, so a thin patch can lack a bulk-lattice shell and number
-   * the longer distances differently. Each physical connection becomes one
-   * edge of weight `weight`. Edges are colored greedily with seed
-   * `coloring_seed` and 32 trials.
+   * the longer distances differently. Each periodic image of a connection
+   * adds weight `weight` to the edge between its sites, so a site pair joined
+   * by several images of one shell and flavor gets the sum. Edges are colored
+   * greedily with seed `coloring_seed` and 32 trials.
    *
    * @param geometry Source geometry; it is not retained.
    * @param shells Positive shell indices; duplicates are ignored.
    * @param definitions Optional shell-axis flavor assignments.
-   * @param weight Finite weight of every edge.
+   * @param weight Finite weight added by every periodic image of an edge.
    * @param tolerance Positive distance and axis tolerance, less than 1, the
    *                  lattice unit length.
    * @param coloring_seed PRNG seed for greedy edge coloring. Default: 0.
    * @return Graph whose edges carry their shell and flavor.
    * @throws std::invalid_argument If a site neighbors its own periodic image,
-   *         several periodic images join one site pair, or a bond axis lies
-   *         within the tolerance of several flavor axes of its shell.
+   *         periodic images of different shells or flavors join one site
+   *         pair, or a bond axis lies within the tolerance of several flavor
+   *         axes of its shell.
    */
   static LatticeGraph from_geometry(
       const LatticeGeometry& geometry,

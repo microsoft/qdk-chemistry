@@ -222,15 +222,16 @@ Materialize selected geometric shells as labelled edges.
 
 Shells rank the distinct distances present on this geometry, including periodic
 images, so a thin patch can lack a bulk-lattice shell and number the longer
-distances differently. Each physical connection becomes one edge of weight
-``weight``; the geometry is not retained. Edges are colored greedily with
-``coloring_seed`` and 32 trials.
+distances differently. Each periodic image of a connection adds ``weight`` to
+the edge between its sites, so a site pair joined by several images of one
+shell and flavor gets the sum; the geometry is not retained. Edges are colored
+greedily with ``coloring_seed`` and 32 trials.
 
 Args:
     geometry (LatticeGeometry): Source Cartesian geometry.
     shells (list[int], optional): Positive shell indices; duplicates are ignored. Defaults to [1].
     bond_flavors (list[BondFlavorDefinition], optional): Shell-axis labels resolved onto edges. Defaults to [].
-    weight (float, optional): Finite weight of every edge. Defaults to 1.0.
+    weight (float, optional): Finite weight added by every periodic image of an edge. Defaults to 1.0.
     tolerance (float, optional): Positive distance and axis tolerance, less than 1, the lattice unit length. Defaults to 1e-9.
     coloring_seed (int, optional): PRNG seed for greedy edge coloring. Defaults to 0.
 
@@ -238,7 +239,7 @@ Returns:
     LatticeGraph: Graph whose edges carry their shell and flavor.
 
 Raises:
-    ValueError: If a site neighbors its own periodic image, several periodic images join one site pair, or a bond axis lies within the tolerance of several flavor axes of its shell.
+    ValueError: If a site neighbors its own periodic image, periodic images of different shells or flavors join one site pair, or a bond axis lies within the tolerance of several flavor axes of its shell.
 )",
       py::arg("geometry"), py::arg("shells") = std::vector<std::uint64_t>{1},
       py::arg("bond_flavors") = std::vector<BondFlavorDefinition>{},

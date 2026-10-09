@@ -39,10 +39,8 @@ ring_graph = LatticeGraph.from_geometry(ring_geometry, shells=[1, 2])
 print(
     f"Periodic ring: {ring_graph.num_edges} edges"
 )  # 6 first- and 6 second-neighbor bonds
-try:
-    LatticeGraph.from_geometry(LatticeGeometry.chain(2, periodic=True))
-except ValueError as error:
-    print(error)  # Two periodic images join sites 0 and 1.
+pair_graph = LatticeGraph.from_geometry(LatticeGeometry.chain(2, periodic=True))
+print(f"Two-site ring weight: {pair_graph.weight(0, 1)}")  # 2.0, one per periodic image
 # end-cell-periodic-geometry
 ################################################################################
 

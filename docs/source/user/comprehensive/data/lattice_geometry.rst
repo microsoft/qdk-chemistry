@@ -108,7 +108,7 @@ If the rows of ``periods`` are :math:`\boldsymbol{P}_p`, the displacements from 
    \sum_p n_p\boldsymbol{P}_p
 
 for integers :math:`n_p`, and shell ranking counts each image separately.
-A graph edge is a single bond, so :meth:`~qdk_chemistry.data.LatticeGraph.from_geometry` rejects a selection in which several images join one pair or a site neighbors its own image; for example, a periodic two-site chain joins its sites through two images.
+:meth:`~qdk_chemistry.data.LatticeGraph.from_geometry` adds the weights of images that join one pair with the same shell and flavor; for example, a periodic two-site chain joins its sites through two images, so the edge gets twice the weight. It rejects a selection in which images of different shells or flavors join one pair, or a site neighbors its own image.
 
 .. tab:: Python API
 

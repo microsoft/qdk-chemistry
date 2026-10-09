@@ -261,11 +261,24 @@ TEST_F(LatticeGraphTest, HoneycombOpenPlaquettePatches) {
               LatticeGraph::honeycomb(2, 2, true, true).adjacency_matrix()));
 }
 
-TEST_F(LatticeGraphTest, FromGeometryRejectsRepeatedPeriodicImages) {
-  // Both images of a two-site ring join the same pair.
-  EXPECT_THROW(LatticeGraph::from_geometry(LatticeGeometry::chain(2, true)),
-               std::invalid_argument);
+TEST_F(LatticeGraphTest, FromGeometrySumsRepeatedPeriodicImages) {
+  // Both images of a two-site ring join the same pair with the same label.
+  const auto pair =
+      LatticeGraph::from_geometry(LatticeGeometry::chain(2, true), {1}, {}, 1.5);
+  EXPECT_EQ(pair.num_edges(), 1);
+  EXPECT_DOUBLE_EQ(pair.weight(0, 1), 3.0);
+  EXPECT_EQ(pair.edge_labels().at({0, 1}), (EdgeLabel{1, std::nullopt}));
+  EXPECT_TRUE(
+      LatticeGraph::from_geometry(LatticeGeometry::square(2, 2, true, true))
+          .adjacency_matrix()
+          .isApprox(
+              LatticeGraph::square(2, 2, true, true).adjacency_matrix()));
   EXPECT_THROW(LatticeGraph::from_geometry(LatticeGeometry::chain(1, true)),
+               std::invalid_argument);
+  // Third-neighbor images of one pair carry different flavors.
+  EXPECT_THROW(LatticeGraph::from_geometry(
+                   LatticeGeometry::honeycomb(2, 2, true, true), {1, 3},
+                   honeycomb_flavor_ids()),
                std::invalid_argument);
   const auto ring = LatticeGraph::from_geometry(LatticeGeometry::chain(3, true),
                                                 {1}, {}, 1.5);
