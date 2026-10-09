@@ -107,7 +107,7 @@ class QdkStandardQpeCircuitBuilder(StandardQpeCircuitBuilder):
         num_system_qubits = 0
         for k in range(num_bits):
             power = 2 ** (num_bits - 1 - k)
-            circuit, num_ancilla_qubits, num_system_qubits = self._build_controlled_unitary(
+            circuit, num_ancilla_qubits, num_system_qubits = self._controlled_circuit_and_widths(
                 qubit_hamiltonian, power=power
             )
             ctrl_unitary_circuits.append(circuit)

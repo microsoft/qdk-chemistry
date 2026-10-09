@@ -126,6 +126,29 @@ class QpeCircuitBuilder(Algorithm):
         circuit = circuit_mapper.run(unitary_rep)
         return circuit, unitary_rep.get_num_qubits() - num_system_qubits, num_system_qubits
 
+    def _controlled_circuit_and_widths(
+        self,
+        qubit_hamiltonian: HamiltonianDescription,
+        power: int,
+    ) -> tuple[Circuit, int, int]:
+        r"""Build controlled-:math:`U^{\\text{power}}` with the widths of its registers.
+
+        A :class:`~qdk_chemistry.data.QubitOperator` goes through :meth:`_create_controlled_circuit`,
+        so subclasses that override it keep working; other descriptions use :meth:`_build_controlled_unitary`.
+
+        Args:
+            qubit_hamiltonian: The Hamiltonian description the unitary builder takes.
+            power: The power to which the unitary should be raised.
+
+        Returns:
+            A tuple of (circuit, num_ancilla_qubits, num_system_qubits).
+
+        """
+        if isinstance(qubit_hamiltonian, QubitOperator):
+            circuit, num_ancilla_qubits = self._create_controlled_circuit(qubit_hamiltonian, power)
+            return circuit, num_ancilla_qubits, qubit_hamiltonian.num_qubits
+        return self._build_controlled_unitary(qubit_hamiltonian, power)
+
     def _create_controlled_circuit(
         self,
         qubit_hamiltonian: HamiltonianDescription,
