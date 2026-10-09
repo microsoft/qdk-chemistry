@@ -40,20 +40,53 @@ TEST(SymmetryVocabTest, ParticleNumberValueAndAxis) {
   EXPECT_EQ(two->axis(), AxisName::ParticleNumber);
   EXPECT_EQ(two->value(), 2u);
   EXPECT_EQ(to_string(two->axis()), "particle_number");
+  EXPECT_TRUE(two->equals(ParticleNumberValue(2)));
+  EXPECT_EQ(two->hash(), ParticleNumberValue(2).hash());
+  EXPECT_FALSE(two->equals(ParticleNumberValue(3)));
+  EXPECT_FALSE(two->equals(SpinValue(2)));
 
   const auto axis = axes::particle_number(3);
   EXPECT_EQ(axis.name(), AxisName::ParticleNumber);
   EXPECT_FALSE(axis.equivalent());
-  EXPECT_TRUE(axis.admits(*two));
-  EXPECT_FALSE(axis.admits(*axes::particle_number_value(4)));
+  ASSERT_EQ(axis.labels().size(), 4u);
+  for (std::size_t number = 0; number <= 3; ++number) {
+    EXPECT_TRUE(axis.labels()[number]->equals(ParticleNumberValue(number)));
+    EXPECT_TRUE(axis.admits(ParticleNumberValue(number)));
+  }
+  EXPECT_FALSE(axis.admits(ParticleNumberValue(4)));
+  EXPECT_FALSE(axis.admits(SpinValue(2)));
+  const auto vacuum = axes::particle_number(0);
+  ASSERT_EQ(vacuum.labels().size(), 1u);
+  EXPECT_TRUE(vacuum.admits(ParticleNumberValue(0)));
 }
 
-TEST(SymmetryVocabTest, RoundTripSpinAndParticleNumberLabelJson) {
-  const SymmetryLabel label({axes::alpha(), axes::particle_number_value(3)});
-  const auto restored = SymmetryLabel::from_json(label.to_json());
-  EXPECT_EQ(restored, label);
-  EXPECT_TRUE(restored.has(AxisName::Spin));
-  EXPECT_TRUE(restored.has(AxisName::ParticleNumber));
+TEST(SymmetryVocabTest, RoundTripParticleNumberJsonAndHash) {
+  const auto value = axes::particle_number_value(3);
+  const auto json = value->to_json();
+  EXPECT_EQ(json.at("kind"), "particle_number");
+  EXPECT_EQ(json.at("number"), 3u);
+  const auto restored_value = symmetry_axis_value_from_json(json);
+  EXPECT_TRUE(restored_value->equals(*value));
+  EXPECT_EQ(restored_value->hash(), value->hash());
+
+  const auto axis = axes::particle_number(3);
+  const auto restored_axis = SymmetryAxis::from_json(axis.to_json());
+  EXPECT_EQ(*restored_axis, axis);
+  EXPECT_EQ(restored_axis->hash(), axis.hash());
+
+  const SymmetryProduct product({axes::spin(1, false), axis});
+  const auto restored_product = SymmetryProduct::from_json(product.to_json());
+  EXPECT_EQ(*restored_product, product);
+  EXPECT_EQ(restored_product->hash(), product.hash());
+
+  const SymmetryLabel label({axes::alpha(), value});
+  const auto restored_label = SymmetryLabel::from_json(label.to_json());
+  EXPECT_EQ(restored_label, label);
+  EXPECT_EQ(restored_label.hash(), label.hash());
+  EXPECT_TRUE(restored_label.has(AxisName::Spin));
+  EXPECT_TRUE(restored_label.has(AxisName::ParticleNumber));
+  std::unordered_map<SymmetryLabel, std::size_t> sectors{{label, 7u}};
+  EXPECT_EQ(sectors.at(restored_label), 7u);
 }
 
 TEST(SymmetryVocabTest, SymmetriesAxisLookup) {

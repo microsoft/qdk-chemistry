@@ -811,8 +811,8 @@ SymmetryAxis spin(unsigned two_s, bool equivalent = true);
  * @p maximum_number, inclusive.
  *
  * @param maximum_number Upper bound on the particle count (inclusive).
- * @return A fully populated @ref SymmetryAxis for the particle-number
- *         degree of freedom.
+ * @return A fully populated, non-equivalent @ref SymmetryAxis for the
+ *         particle-number degree of freedom.
  */
 SymmetryAxis particle_number(std::size_t maximum_number);
 

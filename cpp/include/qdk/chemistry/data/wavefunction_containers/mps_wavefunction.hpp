@@ -3,199 +3,301 @@
 // license information.
 
 #pragma once
+#include <array>
 #include <cstddef>
 #include <memory>
 #include <optional>
 #include <qdk/chemistry/data/configuration.hpp>
-#include <qdk/chemistry/data/orbitals.hpp>
-#include <qdk/chemistry/data/symmetry/symmetry_blocked_scalar.hpp>
 #include <qdk/chemistry/data/symmetry/symmetry_blocked_tensor.hpp>
 #include <qdk/chemistry/data/wavefunction.hpp>
 #include <string>
+#include <unordered_map>
 #include <vector>
 
 namespace qdk::chemistry::data {
 
 /**
- * @class MPSContainer
- * @brief Common interface and metadata for MPS wavefunction representations.
+ * @brief One explicit, optionally symmetry-blocked MPS site.
  *
- * Concrete subclasses define the site tensor representation and its bond-space
- * semantics. This base owns only data shared by Abelian and reduced
- * non-Abelian MPS containers.
+ * The tensor slots are (left bond, physical state, right bond). Each rank-3
+ * block is a matrix with rows (local_left * physical_extent + local_physical)
+ * and columns local_right. Missing blocks represent zero.
+ *
+ * Physical states use Configuration's binary or spin-half encoding. Symmetry
+ * labels describe explicit basis states.
+ */
+class MPSSite {
+ public:
+  /** @brief Real or complex rank-3 symmetry-blocked storage. */
+  using TensorVariant = SymmetryBlockedTensorVariant<3>;
+  /** @brief Shared immutable site tensor. */
+  using TensorPtr = std::shared_ptr<const TensorVariant>;
+  /**
+   * @brief Sector packing orders for the left, physical, and right slots.
+   *
+   * Each order lists that slot's sector labels exactly once. A sector occupies
+   * a contiguous range of basis indices, starting after the extents of all
+   * preceding sectors in the order.
+   */
+  using SectorOrders = std::array<std::vector<SymmetryLabel>, 3>;
+  /** @brief First basis index of each sector in the three tensor slots. */
+  using SectorOffsets =
+      std::array<std::unordered_map<SymmetryLabel, Eigen::Index>, 3>;
+  /** @brief Real or complex matrix used for packed dense export. */
+  using DenseMatrixVariant = ContainerTypes::MatrixVariant;
+
+  /**
+   * @brief Construct a site from blocks and index spaces.
+   * @param tensor Rank-3 blocks in the packing convention above.
+   * @param sector_orders Packing order for each of the three tensor slots;
+   * each list must contain all of that slot's sector labels exactly once.
+   * @param physical_basis One-mode configurations in flattened physical order.
+   * Defaults to (0,1) for dimension two or (0,u,d,2) for dimension four.
+   * Other dimensions require an explicit basis.
+   * @throws std::invalid_argument for incompatible shapes, orders or basis
+   * states, nonfinite entries, or equivalent-sector axes.
+   */
+  MPSSite(TensorPtr tensor, SectorOrders sector_orders,
+          std::vector<Configuration> physical_basis = {});
+
+  /** @brief Immutable symmetry-blocked site tensor. */
+  const TensorVariant& tensor() const { return *_tensor; }
+  /** @brief Packing orders for (left, physical, right). */
+  const SectorOrders& sector_orders() const { return _sector_orders; }
+  /** @brief Sector offsets implied by the packing orders. */
+  const SectorOffsets& sector_offsets() const { return _sector_offsets; }
+  /** @brief Packing order of left-bond sectors. */
+  const std::vector<SymmetryLabel>& left_sector_order() const {
+    return _sector_orders[0];
+  }
+  /** @brief Packing order of physical sectors. */
+  const std::vector<SymmetryLabel>& physical_sector_order() const {
+    return _sector_orders[1];
+  }
+  /** @brief Packing order of right-bond sectors. */
+  const std::vector<SymmetryLabel>& right_sector_order() const {
+    return _sector_orders[2];
+  }
+  /** @brief Local configurations in flattened physical-index order. */
+  const std::vector<Configuration>& physical_basis() const {
+    return _physical_basis;
+  }
+  /** @brief Total dimension of the physical space. */
+  std::size_t physical_dimension() const;
+  /** @brief Total dimension of the left bond. */
+  std::size_t left_bond_dimension() const;
+  /** @brief Total dimension of the right bond. */
+  std::size_t right_bond_dimension() const;
+  /** @brief Whether the tensor uses complex coefficients. */
+  bool is_complex() const;
+
+  /**
+   * @brief Materialize the site for dense interoperability.
+   * @return Matrix packed as (left * physical, right), with absent blocks zero.
+   */
+  DenseMatrixVariant to_dense() const;
+
+ private:
+  /** @brief Check tensor packing, sector orders, local basis, and finiteness.
+   */
+  void _validate();
+
+  TensorPtr _tensor;
+  SectorOrders _sector_orders;
+  SectorOffsets _sector_offsets;
+  std::array<std::size_t, 3> _dimensions{};
+  std::vector<Configuration> _physical_basis;
+};
+
+/**
+ * @brief Container to store MPS over an orbital or model-mode basis.
+ *
+ * Each site describes its own local basis. Particle counts, the orthogonality
+ * center, and supplied RDMs are optional. The site-to-orbital order defaults to
+ * identity. RDM indices use active-orbital order, not MPS chain order.
  */
 class MPSContainer : public WavefunctionContainer {
  public:
-  /**
-   * @brief Get the number of sites in the MPS chain.
-   * @return Number of stored MPS sites.
-   */
-  virtual std::size_t num_sites() const = 0;
+  /** @brief Shared immutable site in the chain. */
+  using SitePtr = std::shared_ptr<const MPSSite>;
+  /** @brief Symmetry-blocked occupation-count metadata. */
+  using ParticleCount = SymmetryBlockedScalar<std::size_t>;
 
   /**
-   * @brief Check whether the MPS tensors are complex-valued.
-   * @return True for a complex-valued MPS; false for a real-valued MPS.
+   * @brief Construct an MPS with optional precomputed RDMs.
+   * @param sites Sites in chain order.
+   * @param orbitals Orbital or model-mode basis for the active sites.
+   * @param total_num_particles Optional total number of particles.
+   * @param active_num_particles Optional active number of particles.
+   * @param orthogonality_center Optional, unverified orthogonality center.
+   * @param site_to_orbital_order Permutation of active-mode slots, not full
+   * orbital indices. An empty vector selects identity.
+   * @param one_rdm_spin_traced Optional spin-traced active-space 1-RDM.
+   * @param one_rdm_aa Optional alpha-alpha 1-RDM block.
+   * @param one_rdm_bb Optional beta-beta 1-RDM block.
+   * @param two_rdm_spin_traced Optional flattened spin-traced active-space
+   * 2-RDM.
+   * @param two_rdm_aaaa Optional flattened alpha-alpha-alpha-alpha 2-RDM block.
+   * @param two_rdm_aabb Optional flattened alpha-alpha-beta-beta 2-RDM block.
+   * @param two_rdm_bbbb Optional flattened beta-beta-beta-beta 2-RDM block.
+   * RDMs use the same conventions and real/complex storage as
+   * StateVectorContainer. They are supplied data, not computed from the sites.
+   * @throws std::invalid_argument for null sites/basis, incompatible bonds or
+   * scalar types, or invalid site counts, permutations or center indices.
    */
-  virtual bool is_complex() const override = 0;
+  MPSContainer(
+      std::vector<SitePtr> sites, std::shared_ptr<Orbitals> orbitals,
+      std::shared_ptr<const ParticleCount> total_num_particles = nullptr,
+      std::shared_ptr<const ParticleCount> active_num_particles = nullptr,
+      std::optional<std::size_t> orthogonality_center = std::nullopt,
+      std::vector<std::size_t> site_to_orbital_order = {},
+      const std::optional<MatrixVariant>& one_rdm_spin_traced = std::nullopt,
+      const std::optional<MatrixVariant>& one_rdm_aa = std::nullopt,
+      const std::optional<MatrixVariant>& one_rdm_bb = std::nullopt,
+      const std::optional<VectorVariant>& two_rdm_spin_traced = std::nullopt,
+      const std::optional<VectorVariant>& two_rdm_aaaa = std::nullopt,
+      const std::optional<VectorVariant>& two_rdm_aabb = std::nullopt,
+      const std::optional<VectorVariant>& two_rdm_bbbb = std::nullopt);
 
+  /** @brief Immutable sites in chain order. */
+  const std::vector<SitePtr>& sites() const { return _sites; }
   /**
-   * @brief Not supported for MPS wavefunctions.
-   * @param other Wavefunction that would be used in the overlap.
-   * @throws std::runtime_error Always.
+   * @brief Validate an open-boundary chain independently of orbital metadata.
+   * @param sites Nonempty chain of nonnull sites with one scalar type.
+   * @throws std::invalid_argument for incompatible adjacent bond spaces or
+   * outer bond dimensions other than one.
    */
-  ScalarVariant overlap(const WavefunctionContainer& other) const override;
-
+  static void validate_sites(const std::vector<SitePtr>& sites);
+  /** @brief Number of sites. */
+  std::size_t num_sites() const { return _sites.size(); }
+  /** @brief Largest total bond dimension in the stored chain. */
+  std::size_t max_bond_dimension() const;
+  /** @brief Whether the site tensors use complex coefficients. */
+  bool is_complex() const override;
   /**
-   * @brief Not supported for MPS wavefunctions.
-   * @throws std::runtime_error Always.
+   * @brief Copy the container, sharing its immutable sites and stored RDMs.
+   * @return Independent container with the same wavefunction and metadata.
    */
-  double norm() const override;
-
-  /**
-   * @brief Get the total number of particles.
-   * @return Symmetry-blocked total particle count.
-   */
-  std::shared_ptr<const SymmetryBlockedScalar<std::size_t>>
-  total_num_particles() const override {
-    return _total_num_particles;
-  }
-
-  /**
-   * @brief Get the active-space particle count.
-   * @return Symmetry-blocked active particle count.
-   */
-  std::shared_ptr<const SymmetryBlockedScalar<std::size_t>>
-  active_num_particles() const override {
-    return _active_num_particles;
-  }
-
-  /**
-   * @brief Not supported for MPS wavefunctions.
-   * @throws std::runtime_error Always.
-   */
-  std::shared_ptr<const SymmetryBlockedTensor<1>> total_orbital_occupations()
-      const override;
-
-  /**
-   * @brief Not supported for MPS wavefunctions.
-   * @throws std::runtime_error Always.
-   */
-  std::shared_ptr<const SymmetryBlockedTensor<1>> active_orbital_occupations()
-      const override;
-
-  /** @brief Clear cached derived data; currently a no-op for MPS data. */
-  void clear_caches() const override;
-
-  /**
-   * @brief Not supported for MPS wavefunctions.
-   * @throws std::runtime_error Always.
-   */
-  nlohmann::json to_json() const override;
-
-  /**
-   * @brief Get the serialization type identifier.
-   * @return String @c "mps".
-   */
+  std::unique_ptr<WavefunctionContainer> clone() const override;
+  /** @brief Return the serialization identifier "mps". */
   std::string get_container_type() const override;
-
-  /**
-   * @brief Get the orbital basis associated with the MPS.
-   * @return Shared pointer to the orbitals.
-   */
+  /** @brief Return the associated orbital or model-mode basis. */
   std::shared_ptr<Orbitals> get_orbitals() const override { return _orbitals; }
 
+  /** @brief Whether total particle-count metadata was supplied. */
+  bool has_total_num_particles() const {
+    return _total_num_particles != nullptr;
+  }
+  /** @brief Whether active particle-count metadata was supplied. */
+  bool has_active_num_particles() const {
+    return _active_num_particles != nullptr;
+  }
   /**
-   * @brief Get the single-particle sectors spanned by this container.
-   * @return A vector containing only @ref Wavefunction::DEFAULT_SECTOR.
+   * @brief Get the supplied total particle count.
+   * @return Symmetry-blocked total occupation-count metadata.
+   * @throws std::runtime_error if no count was supplied.
    */
-  std::vector<std::string> sectors() const override;
-
+  std::shared_ptr<const ParticleCount> total_num_particles() const override;
   /**
-   * @brief Resolve the orbital basis for a single-particle sector.
-   * @param name Sector name to resolve.
-   * @return Shared pointer to the orbitals for the default sector.
-   * @throws std::out_of_range if @p name is not the default sector.
+   * @brief Get the supplied active-space particle count.
+   * @return Symmetry-blocked active occupation-count metadata.
+   * @throws std::runtime_error if no count was supplied.
+   */
+  std::shared_ptr<const ParticleCount> active_num_particles() const override;
+
+  /** @brief Producer-supplied canonical center, or unspecified. */
+  std::optional<std::size_t> orthogonality_center() const {
+    return _orthogonality_center;
+  }
+  /** @brief Active-mode slots in chain order. */
+  const std::vector<std::size_t>& site_to_orbital_order() const {
+    return _site_to_orbital_order;
+  }
+  /** @brief Return the single default sector spanned by this container. */
+  std::vector<std::string> sectors() const override;
+  /**
+   * @brief Resolve the basis for a single-particle sector.
+   * @param name Sector name; only Wavefunction::DEFAULT_SECTOR is supported.
+   * @return Associated orbital or model-mode basis.
+   * @throws std::out_of_range if the requested sector is unknown.
    */
   std::shared_ptr<const Orbitals> sector_basis(
       const std::string& name) const override;
 
   /**
-   * @brief Get the orthogonality center of the MPS, if specified.
-   *
-   * Sites before the center are left-normalized and sites after it are
-   * right-normalized. Center zero denotes a right-canonical MPS, and the last
-   * site denotes a left-canonical MPS.
-   * @return Site index of the orthogonality center, or @c std::nullopt if the
-   * canonicalization state is unspecified.
+   * @brief Unsupported MPS contraction.
+   * @param other Wavefunction that would be used in the overlap.
+   * @throws std::runtime_error Always.
    */
-  std::optional<std::size_t> orthogonality_center() const {
-    return _orthogonality_center;
-  }
+  ScalarVariant overlap(const WavefunctionContainer& other) const override;
+  /** @brief Unsupported MPS norm; throws std::runtime_error. */
+  double norm() const override;
+  /** @brief Unsupported total orbital occupations; throws std::runtime_error.
+   */
+  std::shared_ptr<const SymmetryBlockedTensor<1>> total_orbital_occupations()
+      const override;
+  /** @brief Unsupported active orbital occupations; throws std::runtime_error.
+   */
+  std::shared_ptr<const SymmetryBlockedTensor<1>> active_orbital_occupations()
+      const override;
+  /** @brief No-op: retain supplied RDMs, which cannot be regenerated from
+   * sites. */
+  void clear_caches() const override;
 
+  /** @brief Serialize sites, metadata, orbitals, and stored RDMs to JSON. */
+  nlohmann::json to_json() const override;
   /**
-   * @brief Get the spin-half configurations labeling physical slices.
-   * @return Configurations in physical-slice order, shared by every site.
+   * @brief Reconstruct an MPS from its versioned JSON payload.
+   * @param json Payload emitted by to_json().
+   * @return Reconstructed container with unchanged tensor and RDM data.
+   * @throws std::exception if metadata is incompatible or storage is malformed.
    */
-  const std::vector<Configuration>& physical_basis() const {
-    return _physical_basis;
-  }
-
+  static std::unique_ptr<MPSContainer> from_json(const nlohmann::json& json);
   /**
-   * @brief Get the molecular orbital represented by each MPS site.
-   * @return Unique molecular-orbital indices in MPS chain order. The MPS may
-   * represent a subset of the associated orbital basis.
+   * @brief Serialize metadata and binary site/RDM payloads to HDF5.
+   * @param group Empty destination group.
+   * @throws std::runtime_error if HDF5 serialization fails.
    */
-  const std::vector<std::size_t>& site_to_orbital_order() const {
-    return _site_to_orbital_order;
-  }
+  void to_hdf5(H5::Group& group) const override;
+  /**
+   * @brief Reconstruct an MPS from HDF5.
+   * @param group Group written by to_hdf5().
+   * @return Reconstructed container.
+   * @throws std::exception if the data is incompatible, malformed, or
+   * unreadable.
+   */
+  static std::unique_ptr<MPSContainer> from_hdf5(H5::Group& group);
 
  protected:
-  /** @brief Hash representation-independent MPS metadata. */
+  /**
+   * @brief Hash defining tensor data and metadata, excluding cached RDMs.
+   * @param ctx Content-hash context to update.
+   */
   void hash_update(qdk::chemistry::utils::HashContext& ctx) const override;
-
   /**
-   * @brief Construct the representation-independent portion of an MPS.
-   * @param orbitals Orbital basis associated with the MPS.
-   * @param total_num_particles Symmetry-blocked total particle count.
-   * @param active_num_particles Symmetry-blocked active particle count.
-   * @param orthogonality_center Optional site containing the orthogonality
-   * center. Sites on either side must be left- and right-normalized,
-   * respectively.
-   * @param physical_basis Spin-half configurations defining the
-   *        physical-slice order shared by every site. An empty vector selects
-   *        the canonical spin-half order @c (0,u,d,2).
-   * @param site_to_orbital_order Unique molecular-orbital indices in MPS chain
-   * order. The number of sites may be smaller than the orbital basis size.
+   * @brief Select general spin handling for supplied MPS RDMs.
+   * @return Always false: equal particle counts do not establish closed-shell
+   * symmetry of the stored state.
    */
-  MPSContainer(std::shared_ptr<Orbitals> orbitals,
-               std::shared_ptr<const SymmetryBlockedScalar<std::size_t>>
-                   total_num_particles,
-               std::shared_ptr<const SymmetryBlockedScalar<std::size_t>>
-                   active_num_particles,
-               std::optional<std::size_t> orthogonality_center,
-               std::vector<Configuration> physical_basis,
-               std::vector<std::size_t> site_to_orbital_order);
-
-  /**
-   * @brief Validate representation-independent MPS invariants.
-   * @param num_sites Number of sites supplied by the concrete container.
-   * @param physical_dimension Number of physical slices at each site.
-   * @throws std::invalid_argument if there are no sites, orbitals are null,
-   * particle counts are null, physical-basis configurations are invalid, or
-   * the site-to-orbital order is not unique and in range.
-   */
-  void _validate_common(std::size_t num_sites,
-                        std::size_t physical_dimension) const;
+  bool _is_restricted_closed_shell() const override;
 
  private:
+  /** @brief Validate site/basis counts, adjacent bonds, boundaries, and
+   * ordering. */
+  void _validate() const;
+  /** @brief Serialize chain metadata without binary tensors, orbitals, or RDMs.
+   */
+  nlohmann::json _metadata_to_json() const;
+
+  std::vector<SitePtr> _sites;
   std::shared_ptr<Orbitals> _orbitals;
-  std::shared_ptr<const SymmetryBlockedScalar<std::size_t>>
-      _total_num_particles;
-  std::shared_ptr<const SymmetryBlockedScalar<std::size_t>>
-      _active_num_particles;
+  std::shared_ptr<const ParticleCount> _total_num_particles;
+  std::shared_ptr<const ParticleCount> _active_num_particles;
   std::optional<std::size_t> _orthogonality_center;
-  std::vector<Configuration> _physical_basis;
   std::vector<std::size_t> _site_to_orbital_order;
+  /** @brief Version of the MPS payload, independent of the wavefunction
+   * envelope. */
+  static constexpr const char* SERIALIZATION_VERSION = "0.1.0";
 };
 
 }  // namespace qdk::chemistry::data

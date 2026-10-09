@@ -47,18 +47,45 @@ class TestSpinValue:
 
 
 class TestParticleNumberValue:
-    """Tests for particle-number symmetry labels."""
+    """Tests for particle-number values, axes, and composite labels."""
 
     def test_axis_value_and_factory(self):
-        """Particle-number values and axes retain their integer labels."""
+        """Particle-number axes include zero and the requested maximum."""
         value = sym.axes.particle_number_value(2)
         axis = sym.axes.particle_number(3)
-
+        assert isinstance(value, sym.ParticleNumberValue)
         assert value.axis() == sym.AxisName.ParticleNumber
         assert value.value() == 2
         assert sym.axis_name_to_string(sym.AxisName.ParticleNumber) == "particle_number"
         assert axis.name() == sym.AxisName.ParticleNumber
+        assert axis.equivalent() is False
+        assert [label.value() for label in axis.labels()] == [0, 1, 2, 3]
         assert axis.admits(value)
+        assert not axis.admits(sym.axes.particle_number_value(4))
+        assert not axis.admits(sym.axes.alpha())
+        assert [label.value() for label in sym.axes.particle_number(0).labels()] == [0]
+
+    def test_equality_and_hash(self):
+        """Particle values and mixed labels support value-based dictionary keys."""
+        value = sym.ParticleNumberValue(2)
+        same = sym.axes.particle_number_value(2)
+        assert value == same
+        assert hash(value) == hash(same)
+        assert value != sym.ParticleNumberValue(3)
+        assert value != sym.SpinValue(2)
+        label = sym.SymmetryLabel([sym.axes.alpha(), value])
+        same_label = sym.SymmetryLabel([same, sym.axes.alpha()])
+        assert label == same_label
+        assert label.get(sym.AxisName.ParticleNumber).value() == 2
+        assert {label: 7}[same_label] == 7
+
+    def test_product_axis_and_hash(self):
+        """Mixed products retain particle-number axes and value-based hashes."""
+        product = sym.SymmetryProduct([sym.axes.spin(1, False), sym.axes.particle_number(3)])
+        same = sym.SymmetryProduct([sym.axes.spin(1, False), sym.axes.particle_number(3)])
+        assert same == product
+        assert hash(same) == hash(product)
+        assert product.axis(sym.AxisName.ParticleNumber).equivalent() is False
 
 
 class TestSymmetryAxis:

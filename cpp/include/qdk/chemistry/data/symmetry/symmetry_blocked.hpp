@@ -259,7 +259,7 @@ class SymmetryBlocked : public DataClass {
 
   /**
    * @brief Immutable view of all stored block keys and storage pointers.
-   * @return Const reference to the complete block map.
+   * @return Const reference to the complete block map, including aliases.
    */
   const BlockMap& blocks() const { return _blocks; }
 

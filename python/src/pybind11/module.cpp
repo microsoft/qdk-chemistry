@@ -20,6 +20,7 @@ void bind_orbitals(py::module& m);
 void bind_mps_wavefunction(py::module& m);
 void bind_hamiltonian(py::module& m);
 void bind_wavefunction(py::module& m);
+void bind_mps_wavefunction(py::module& m);
 void bind_ansatz(py::module& m);
 void bind_configuration_set(py::module& m);
 void bind_localizer(py::module& m);

@@ -2,425 +2,165 @@
 // Licensed under the MIT License. See LICENSE.txt in the project root for
 // license information.
 
-#include <algorithm>
-#include <cmath>
-#include <deque>
-#include <numeric>
-#include <qdk/chemistry/utils/unitary_synthesis.hpp>
+#include <functional>
+#include <iterator>
+#include <limits>
 #include <stdexcept>
+#include <string_view>
 #include <utility>
+#include <variant>
+#include <vector>
 
-namespace qdk::chemistry::utils::unitary_synthesis::detail {
+#include "unitary_synthesis_detail.hpp"
 
-constexpr double elimination_tolerance = 1.0e-15;
-constexpr double orthogonality_tolerance = 1.0e-8;
+namespace qdk::chemistry::utils::detail {
 
-// A rotation is stored by the lower index of its adjacent pair and its angle.
-using Rotation = std::pair<Eigen::Index, double>;
-
-void validate_isometry(const Eigen::Ref<const Eigen::MatrixXd>& matrix,
-                       const char* message) {
-  const Eigen::MatrixXd gram = matrix.transpose() * matrix;
-  const double residual =
-      (gram - Eigen::MatrixXd::Identity(matrix.cols(), matrix.cols())).norm();
-  if (residual > orthogonality_tolerance * static_cast<double>(matrix.cols())) {
-    throw std::invalid_argument(message);
-  }
-}
-
-std::vector<Eigen::Index> invert_permutation(
-    const std::vector<Eigen::Index>& permutation) {
-  std::vector<Eigen::Index> inverse(permutation.size());
-  for (std::size_t index = 0; index < permutation.size(); ++index) {
-    inverse[static_cast<std::size_t>(permutation[index])] =
-        static_cast<Eigen::Index>(index);
-  }
-  return inverse;
-}
-
-GivensDecomposition decompose_unitary_to_givens(
-    const Eigen::Ref<const Eigen::MatrixXd>& matrix) {
-  if (matrix.rows() != matrix.cols() || matrix.rows() == 0) {
+DenseSiteSynthesis dense_unitary_synthesis(
+    const data::MPSSite& site, Eigen::Index ancilla_dim,
+    const Eigen::MatrixXd& following_right_factor) {
+  validate_site(site, ancilla_dim);
+  const auto left = static_cast<Eigen::Index>(site.left_bond_dimension());
+  const auto physical = static_cast<Eigen::Index>(site.physical_dimension());
+  const auto right = static_cast<Eigen::Index>(site.right_bond_dimension());
+  if (physical != 2 && physical != 4) {
     throw std::invalid_argument(
-        "Givens decomposition requires a nonempty square matrix.");
+        "Dense site synthesis requires two or four physical states.");
   }
-  if (!matrix.allFinite()) {
+  if (following_right_factor.size() != 0) {
+    if (following_right_factor.rows() != right ||
+        following_right_factor.cols() != right ||
+        !following_right_factor.allFinite()) {
+      throw std::invalid_argument(
+          "Dense site synthesis requires a finite successor factor matching "
+          "the right bond.");
+    }
+    if (!is_isometry(following_right_factor)) {
+      throw std::invalid_argument(
+          "Dense site synthesis requires an orthogonal successor factor.");
+    }
+  } else if (following_right_factor.rows() != 0 ||
+             following_right_factor.cols() != 0) {
     throw std::invalid_argument(
-        "Givens decomposition requires finite matrix entries.");
+        "Dense site synthesis requires an empty or square successor factor.");
   }
 
-  const Eigen::Index dim = matrix.rows();
-  const Eigen::MatrixXd gram = matrix.transpose() * matrix;
-  const double residual = (gram - Eigen::MatrixXd::Identity(dim, dim)).norm();
-  if (residual > orthogonality_tolerance * static_cast<double>(dim)) {
+  // Row p * ancilla_dim + b and column a hold M^p_{ab}; to_dense packs it at
+  // row a * physical + p and column b.
+  const auto dense = std::get<Eigen::MatrixXd>(site.to_dense());
+  Eigen::MatrixXd isometry =
+      Eigen::MatrixXd::Zero(physical * ancilla_dim, left);
+  for (Eigen::Index a = 0; a < left; ++a) {
+    for (Eigen::Index p = 0; p < physical; ++p) {
+      isometry.block(p * ancilla_dim, a, right, 1) =
+          dense.row(a * physical + p).transpose();
+    }
+  }
+  if (!is_isometry(isometry)) {
     throw std::invalid_argument(
-        "Givens decomposition requires an orthogonal matrix.");
+        "Dense site synthesis requires an isometric site.");
   }
 
-  Eigen::MatrixXd work = matrix;
-  if (dim == 1) {
-    return {{}, {}, {static_cast<std::uint8_t>(work(0, 0) < 0.0)}};
+  std::vector<std::pair<Eigen::MatrixXd, Eigen::MatrixXd>> blocks;
+  if (physical == 2) {
+    blocks.emplace_back(isometry.topRows(ancilla_dim),
+                        isometry.bottomRows(ancilla_dim));
+  } else {
+    auto [b, r] =
+        decompose_qr(isometry.bottomRows(3 * ancilla_dim), ancilla_dim);
+    auto [c, s] = decompose_qr(b.bottomRows(2 * ancilla_dim), ancilla_dim);
+    blocks.emplace_back(isometry.topRows(ancilla_dim), std::move(r));
+    blocks.emplace_back(b.topRows(ancilla_dim), std::move(s));
+    blocks.emplace_back(c.topRows(ancilla_dim), c.bottomRows(ancilla_dim));
   }
+  std::vector<TwoBlockCsd> csds(blocks.size());
+  run_tasks(
+      static_cast<std::ptrdiff_t>(blocks.size()), [&](std::ptrdiff_t index) {
+        const auto step = static_cast<std::size_t>(index);
+        csds[step] = decompose_csd(blocks[step].first, blocks[step].second);
+      });
 
-  const Eigen::Index num_layers = dim == 2 ? 1 : dim;
-  std::vector<std::vector<Rotation>> upper_rotations(num_layers);
-  std::vector<std::vector<Rotation>> lower_rotations(num_layers);
-
-  // Clements elimination alternates right column rotations with left row
-  // rotations so each diagonal sweep consists of disjoint adjacent pairs.
-  for (Eigen::Index diagonal = 0; diagonal < dim - 1; ++diagonal) {
-    if (diagonal % 2 == 0) {
-      Eigen::Index slot = 0;
-      for (Eigen::Index column = diagonal; column >= 0; --column, ++slot) {
-        const Eigen::Index row = dim - 1 - slot;
-        const double adjacent = work(row, column + 1);
-        const double eliminated = work(row, column);
-        if (std::abs(eliminated) < elimination_tolerance) {
-          continue;
-        }
-        const double angle = std::atan2(eliminated, adjacent);
-        const double cosine = std::cos(angle);
-        const double sine = std::sin(angle);
-        const Eigen::VectorXd first = work.col(column);
-        const Eigen::VectorXd second = work.col(column + 1);
-        work.col(column) = cosine * first - sine * second;
-        work.col(column + 1) = sine * first + cosine * second;
-        upper_rotations[slot].emplace_back(column, angle);
-      }
-    } else {
-      Eigen::Index column = 0;
-      for (Eigen::Index row = dim - diagonal - 1; row < dim; ++row, ++column) {
-        const double adjacent = work(row - 1, column);
-        const double eliminated = work(row, column);
-        if (std::abs(eliminated) < elimination_tolerance) {
-          continue;
-        }
-        const double angle = std::atan2(eliminated, adjacent);
-        const double cosine = std::cos(angle);
-        const double sine = std::sin(angle);
-        const Eigen::RowVectorXd first = work.row(row - 1);
-        const Eigen::RowVectorXd second = work.row(row);
-        work.row(row - 1) = cosine * first + sine * second;
-        work.row(row) = -sine * first + cosine * second;
-        lower_rotations[column].emplace_back(row - 1, angle);
-      }
+  DenseSiteSynthesis result;
+  std::vector<Eigen::MatrixXd> unitaries;
+  for (const auto& csd : csds) {
+    result.rotation_angles.push_back(
+        rotation_angles(csd.d_1, csd.d_2, ancilla_dim));
+  }
+  if (csds.size() == 3) {
+    unitaries.push_back(csds[1].v * csds[0].u_2);
+    unitaries.push_back(csds[2].v * csds[1].u_2);
+  }
+  for (auto& csd : csds) {
+    unitaries.push_back(std::move(csd.u_1));
+  }
+  unitaries.push_back(std::move(csds.back().u_2));
+  if (following_right_factor.size() != 0) {
+    const auto num_blocks = static_cast<std::ptrdiff_t>(csds.size() + 1);
+    for (auto block = unitaries.end() - num_blocks; block != unitaries.end();
+         ++block) {
+      block->topRows(right) = following_right_factor * block->topRows(right);
     }
   }
+  result.right_factor = std::move(csds.front().v);
 
-  const Eigen::VectorXd diagonal = work.diagonal();
-  GivensDecomposition result;
-  result.phases.reserve(dim);
-  for (Eigen::Index index = 0; index < dim; ++index) {
-    result.phases.push_back(static_cast<std::uint8_t>(diagonal(index) < 0.0));
+  std::vector<std::reference_wrapper<const Eigen::MatrixXd>> matrices;
+  for (const auto& unitary : unitaries) {
+    matrices.push_back(std::cref(unitary));
   }
-
-  // Convert both elimination directions to the circuit convention in which
-  // every layer multiplies from the right. Commuting a left rotation through
-  // D reverses its angle exactly when the adjacent diagonal signs differ.
-  const Eigen::Index even_slots = dim / 2;
-  const Eigen::Index odd_slots = (dim - 1) / 2;
-  for (Eigen::Index layer = 0; layer < num_layers; ++layer) {
-    const bool shifted = layer % 2 == 1;
-    const Eigen::Index num_slots = shifted ? odd_slots : even_slots;
-    std::vector<double> angles(static_cast<std::size_t>(num_slots), 0.0);
-
-    const auto store_rotation = [&](Eigen::Index pair, double angle) {
-      if ((pair % 2 == 1) == shifted) {
-        angles[static_cast<std::size_t>(pair / 2)] = angle;
-      }
-    };
-
-    for (const auto& [pair, angle] : upper_rotations[layer]) {
-      store_rotation(pair, angle);
-    }
-
-    const Eigen::Index lower_column = num_layers - 1 - layer;
-    if (lower_column < static_cast<Eigen::Index>(lower_rotations.size())) {
-      const auto& rotations = lower_rotations[lower_column];
-      for (auto rotation = rotations.rbegin(); rotation != rotations.rend();
-           ++rotation) {
-        const auto [pair, angle] = *rotation;
-        const double sign =
-            diagonal(pair) * diagonal(pair + 1) > 0.0 ? 1.0 : -1.0;
-        store_rotation(pair, sign * angle);
-      }
-    }
-
-    if (std::any_of(angles.begin(), angles.end(), [](double angle) {
-          return std::abs(angle) > elimination_tolerance;
-        })) {
-      result.layer_angles.push_back(std::move(angles));
-      result.layer_shifted.push_back(static_cast<std::uint8_t>(shifted));
-    }
-  }
-
+  auto givens = decompose_unitaries_to_givens(matrices);
+  const auto terminal = givens.begin() + (physical == 4 ? 2 : 0);
+  result.mixing_givens.assign(std::make_move_iterator(givens.begin()),
+                              std::make_move_iterator(terminal));
+  result.block_givens = merge_block_givens(
+      std::vector<GivensDecomposition>(std::make_move_iterator(terminal),
+                                       std::make_move_iterator(givens.end())));
   return result;
 }
 
-GivensDecomposition decompose_block_diagonal_to_givens(
-    const std::vector<Eigen::MatrixXd>& blocks) {
-  if (blocks.empty()) {
+MPSSynthesis matrix_product_state_synthesis(
+    const data::MPSContainer& mps, Eigen::Index ancilla_dim,
+    std::string_view unitary_synthesis) {
+  if (unitary_synthesis != "dense" && unitary_synthesis != "block_sparse") {
     throw std::invalid_argument(
-        "Block-diagonal Givens decomposition requires at least one block.");
+        "MPS unitary synthesis must be 'dense' or 'block_sparse'.");
   }
-
-  struct BlockLayer {
-    bool shifted;
-    std::vector<Rotation> rotations;
-  };
-
-  Eigen::Index total_dim = 0;
-  std::vector<Eigen::Index> starts;
-  std::vector<std::deque<BlockLayer>> queues;
-  std::vector<std::uint8_t> phases;
-  starts.reserve(blocks.size());
-  queues.reserve(blocks.size());
-
-  std::size_t largest_block = 0;
-  for (std::size_t block_index = 0; block_index < blocks.size();
-       ++block_index) {
-    const auto& block = blocks[block_index];
-    starts.push_back(total_dim);
-    if (block.rows() > blocks[largest_block].rows()) {
-      largest_block = block_index;
+  const auto& sites = mps.sites();
+  validate_site(*sites.front(), ancilla_dim);
+  const auto count = sites.size() - 1;
+  if (unitary_synthesis == "dense") {
+    std::vector<DenseSiteSynthesis> results(count);
+    for (std::size_t index = count; index > 0; --index) {
+      const auto& site = *sites[index];
+      const Eigen::MatrixXd empty;
+      const auto& following =
+          index < count ? results[index].right_factor : empty;
+      results[index - 1] =
+          dense_unitary_synthesis(site, ancilla_dim, following);
     }
-
-    const auto decomposition = decompose_unitary_to_givens(block);
-    std::deque<BlockLayer> layers;
-    for (std::size_t layer = 0; layer < decomposition.layer_angles.size();
-         ++layer) {
-      const bool shifted = decomposition.layer_shifted[layer] != 0;
-      const Eigen::Index local_offset = shifted ? 1 : 0;
-      std::vector<Rotation> rotations;
-      for (std::size_t slot = 0;
-           slot < decomposition.layer_angles[layer].size(); ++slot) {
-        const double angle = decomposition.layer_angles[layer][slot];
-        if (std::abs(angle) > elimination_tolerance) {
-          rotations.emplace_back(
-              total_dim + local_offset + 2 * static_cast<Eigen::Index>(slot),
-              angle);
-        }
-      }
-      if (!rotations.empty()) {
-        layers.push_back({shifted, std::move(rotations)});
-      }
-    }
-    queues.push_back(std::move(layers));
-    phases.insert(phases.end(), decomposition.phases.begin(),
-                  decomposition.phases.end());
-    total_dim += block.rows();
+    return results;
   }
-
-  bool global_shifted = false;
-  if (!queues[largest_block].empty()) {
-    global_shifted = queues[largest_block].front().shifted ^
-                     (starts[largest_block] % 2 == 1);
-  }
-
-  GivensDecomposition result;
-  result.phases = std::move(phases);
-  const auto has_layers = [&]() {
-    return std::any_of(queues.begin(), queues.end(),
-                       [](const auto& queue) { return !queue.empty(); });
-  };
-
-  while (has_layers()) {
-    const Eigen::Index num_slots =
-        global_shifted ? (total_dim - 1) / 2 : total_dim / 2;
-    std::vector<double> angles(static_cast<std::size_t>(num_slots), 0.0);
-
-    for (std::size_t block_index = 0; block_index < queues.size();
-         ++block_index) {
-      auto& queue = queues[block_index];
-      if (queue.empty()) {
-        continue;
-      }
-      const bool aligned =
-          ((starts[block_index] + (queue.front().shifted ? 1 : 0)) % 2 ==
-           (global_shifted ? 1 : 0));
-      if (!aligned) {
-        continue;
-      }
-      for (const auto& [pair, angle] : queue.front().rotations) {
-        angles[static_cast<std::size_t>(pair / 2)] = angle;
-      }
-      queue.pop_front();
-    }
-
-    if (std::any_of(angles.begin(), angles.end(), [](double angle) {
-          return std::abs(angle) > elimination_tolerance;
-        })) {
-      result.layer_angles.push_back(std::move(angles));
-      result.layer_shifted.push_back(static_cast<std::uint8_t>(global_shifted));
-    }
-    global_shifted = !global_shifted;
-  }
-
-  return result;
+  std::vector<SparseSiteSynthesis> results(count);
+  run_tasks(static_cast<std::ptrdiff_t>(count), [&](std::ptrdiff_t index) {
+    const auto position = static_cast<std::size_t>(index);
+    const auto& site = *sites[position + 1];
+    results[position] = block_sparse_unitary_synthesis(site, ancilla_dim);
+  });
+  return results;
 }
 
-SparseSiteSynthesis decompose_sparse_site(
-    const Eigen::Ref<const Eigen::MatrixXd>& target) {
-  if (target.rows() == 0 || target.cols() == 0 ||
-      target.cols() > target.rows()) {
+void validate_site(const data::MPSSite& site, Eigen::Index ancilla_dim) {
+  if (site.is_complex()) {
     throw std::invalid_argument(
-        "Sparse site decomposition requires a nonempty matrix with rows >= "
-        "columns.");
+        "MPS site synthesis requires a real site tensor.");
   }
-  if (!target.allFinite()) {
+  const auto left = static_cast<Eigen::Index>(site.left_bond_dimension());
+  const auto physical = static_cast<Eigen::Index>(site.physical_dimension());
+  const auto right = static_cast<Eigen::Index>(site.right_bond_dimension());
+  if (ancilla_dim <= 0 || left > ancilla_dim || right > ancilla_dim ||
+      ancilla_dim > std::numeric_limits<Eigen::Index>::max() / physical) {
     throw std::invalid_argument(
-        "Sparse site decomposition requires finite matrix entries.");
+        "MPS site synthesis requires both bond dimensions to be at most the "
+        "ancilla dimension.");
   }
-  validate_isometry(target,
-                    "Sparse site decomposition requires an isometric matrix.");
-
-  const Eigen::Index dim = target.rows();
-  std::vector<Eigen::MatrixXd> rectangles;
-  std::vector<Eigen::Index> row_permutation;
-  std::vector<bool> seen_rows(static_cast<std::size_t>(dim), false);
-  std::vector<Eigen::Index> rectangle_rows;
-  std::vector<Eigen::Index> rectangle_columns;
-
-  const auto flush_rectangle = [&]() {
-    if (rectangle_rows.empty()) {
-      return;
-    }
-    Eigen::MatrixXd rectangle(rectangle_rows.size(), rectangle_columns.size());
-    for (std::size_t column = 0; column < rectangle_columns.size(); ++column) {
-      for (std::size_t row = 0; row < rectangle_rows.size(); ++row) {
-        rectangle(static_cast<Eigen::Index>(row),
-                  static_cast<Eigen::Index>(column)) =
-            target(rectangle_rows[row], rectangle_columns[column]);
-      }
-    }
-    rectangles.push_back(std::move(rectangle));
-  };
-
-  for (Eigen::Index column = 0; column < target.cols(); ++column) {
-    std::vector<Eigen::Index> nonzero_rows;
-    std::vector<Eigen::Index> new_rows;
-    for (Eigen::Index row = 0; row < dim; ++row) {
-      if (target(row, column) != 0.0) {
-        nonzero_rows.push_back(row);
-        if (!seen_rows[static_cast<std::size_t>(row)]) {
-          new_rows.push_back(row);
-        }
-      }
-    }
-
-    if (!nonzero_rows.empty() && new_rows.size() == nonzero_rows.size()) {
-      flush_rectangle();
-      rectangle_rows = new_rows;
-      rectangle_columns = {column};
-      row_permutation.insert(row_permutation.end(), new_rows.begin(),
-                             new_rows.end());
-    } else {
-      rectangle_columns.push_back(column);
-      rectangle_rows.insert(rectangle_rows.end(), new_rows.begin(),
-                            new_rows.end());
-      row_permutation.insert(row_permutation.end(), new_rows.begin(),
-                             new_rows.end());
-    }
-    for (const auto row : new_rows) {
-      seen_rows[static_cast<std::size_t>(row)] = true;
-    }
-  }
-  flush_rectangle();
-  for (Eigen::Index row = 0; row < dim; ++row) {
-    if (!seen_rows[static_cast<std::size_t>(row)]) {
-      row_permutation.push_back(row);
-    }
-  }
-
-  std::vector<Eigen::Index> column_mapping(static_cast<std::size_t>(dim));
-  std::iota(column_mapping.begin(), column_mapping.end(), 0);
-  Eigen::Index column_left = 0;
-  Eigen::Index column_right = dim;
-  Eigen::Index diagonal = 0;
-  for (const auto& rectangle : rectangles) {
-    const Eigen::Index width = rectangle.cols();
-    const Eigen::Index difference = rectangle.rows() - width;
-    if (difference > 0) {
-      for (Eigen::Index index = width; index < column_right - column_left;
-           ++index) {
-        column_mapping[static_cast<std::size_t>(column_left + index)] +=
-            difference;
-      }
-      for (Eigen::Index index = 0; index < difference; ++index) {
-        column_mapping[static_cast<std::size_t>(
-            column_right - difference + index)] = diagonal + width + index;
-      }
-      column_right -= difference;
-    }
-    column_left += width;
-    diagonal += rectangle.rows();
-  }
-  const auto column_permutation = invert_permutation(column_mapping);
-
-  std::vector<Eigen::MatrixXd> blocks;
-  blocks.reserve(rectangles.size() + static_cast<std::size_t>(dim));
-  Eigen::Index used_dim = 0;
-  for (const auto& rectangle : rectangles) {
-    if (rectangle.rows() == rectangle.cols()) {
-      blocks.push_back(rectangle);
-    } else {
-      Eigen::JacobiSVD<Eigen::MatrixXd> svd(rectangle.transpose(),
-                                            Eigen::ComputeFullV);
-      Eigen::MatrixXd block(rectangle.rows(), rectangle.rows());
-      block.leftCols(rectangle.cols()) = rectangle;
-      block.rightCols(rectangle.rows() - rectangle.cols()) =
-          svd.matrixV().rightCols(rectangle.rows() - rectangle.cols());
-      blocks.push_back(std::move(block));
-    }
-    used_dim += rectangle.rows();
-  }
-  while (used_dim < dim) {
-    blocks.push_back(Eigen::MatrixXd::Identity(1, 1));
-    ++used_dim;
-  }
-
-  std::vector<std::size_t> sorted_indices(blocks.size());
-  std::iota(sorted_indices.begin(), sorted_indices.end(), 0);
-  std::stable_sort(sorted_indices.begin(), sorted_indices.end(),
-                   [&](std::size_t lhs, std::size_t rhs) {
-                     return blocks[lhs].rows() > blocks[rhs].rows();
-                   });
-  std::vector<Eigen::Index> offsets(blocks.size());
-  Eigen::Index offset = 0;
-  for (std::size_t index = 0; index < blocks.size(); ++index) {
-    offsets[index] = offset;
-    offset += blocks[index].rows();
-  }
-  std::vector<Eigen::Index> ordering_mapping(static_cast<std::size_t>(dim));
-  Eigen::Index new_offset = 0;
-  std::vector<Eigen::MatrixXd> sorted_blocks;
-  sorted_blocks.reserve(blocks.size());
-  for (const auto index : sorted_indices) {
-    for (Eigen::Index local = 0; local < blocks[index].rows(); ++local) {
-      ordering_mapping[static_cast<std::size_t>(offsets[index] + local)] =
-          new_offset + local;
-    }
-    new_offset += blocks[index].rows();
-    sorted_blocks.push_back(std::move(blocks[index]));
-  }
-  const auto ordering_permutation = invert_permutation(ordering_mapping);
-
-  std::vector<Eigen::Index> composed(static_cast<std::size_t>(dim));
-  std::vector<Eigen::Index> final_rows(static_cast<std::size_t>(dim));
-  for (Eigen::Index index = 0; index < dim; ++index) {
-    composed[static_cast<std::size_t>(index)] =
-        column_permutation[static_cast<std::size_t>(
-            ordering_permutation[static_cast<std::size_t>(index)])];
-    final_rows[static_cast<std::size_t>(index)] =
-        row_permutation[static_cast<std::size_t>(
-            ordering_permutation[static_cast<std::size_t>(index)])];
-  }
-
-  SparseSiteSynthesis result;
-  result.column_permutation = invert_permutation(composed);
-  result.row_permutation = std::move(final_rows);
-  result.block_givens = decompose_block_diagonal_to_givens(sorted_blocks);
-  return result;
 }
 
-}  // namespace qdk::chemistry::utils::unitary_synthesis::detail
+}  // namespace qdk::chemistry::utils::detail

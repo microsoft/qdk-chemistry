@@ -1144,13 +1144,18 @@ Examples:
   wavefunction.def(
       "__repr__",
       [](const Wavefunction& w) {
+        if (w.has_container_type<MPSContainer>()) {
+          return "<qdk_chemistry.Wavefunction container=mps num_sites=" +
+                 std::to_string(w.get_container<MPSContainer>().num_sites()) +
+                 ">";
+        }
         return "<qdk_chemistry.Wavefunction size=" + std::to_string(w.size()) +
                " norm=" + std::to_string(w.norm()) + ">";
       },
       R"(
 Returns a string representation of the Wavefunction object.
 
-The representation includes the size of the wavefunction and its norm.
+The representation includes the size and norm, or the site count for an MPS.
 
 Returns:
     str: String representation of the Wavefunction object
@@ -1169,6 +1174,10 @@ Examples:
 )");
 
   wavefunction.def("__str__", [](const Wavefunction& w) {
+    if (w.has_container_type<MPSContainer>()) {
+      return "<qdk_chemistry.Wavefunction container=mps num_sites=" +
+             std::to_string(w.get_container<MPSContainer>().num_sites()) + ">";
+    }
     return "<qdk_chemistry.Wavefunction size=" + std::to_string(w.size()) +
            " norm=" + std::to_string(w.norm()) + ">";
   });
