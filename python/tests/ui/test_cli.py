@@ -29,6 +29,7 @@ from qdk_chemistry.ui.cli import (
     _deep_merge,
     _parse_set_overrides,
     cmd_data_convert,
+    cmd_utils_resolve_phase_energy,
     create_parser,
     format_output,
     main,
@@ -194,8 +195,9 @@ def test_create_parser():
     assert args.algorithm_type == "scf_solver"
 
 
-def test_resolve_phase_energy_uses_product_formula_mapping(temp_project_dir, capsys, monkeypatch):
-    """Resolve aliases using the sign and scale stored by a product-formula unitary."""
+@pytest.mark.parametrize("container_type", ["pauli_product_formula", "custom_product_formula"])
+def test_resolve_phase_energy_uses_product_formula_mapping(temp_project_dir, capsys, monkeypatch, container_type):
+    """Report the principal branch and resolve its periodic alias in the CLI."""
     project_path = temp_project_dir / "test_project"
     project_path.mkdir()
     unitary = data.UnitaryRepresentation(
@@ -208,6 +210,7 @@ def test_resolve_phase_energy_uses_product_formula_mapping(temp_project_dir, cap
     )
     filename = "evolution.unitary_representation.json"
     unitary.to_json_file(str(project_path / filename))
+    monkeypatch.setattr(PauliProductFormulaContainer, "type", property(lambda _self: container_type))
     monkeypatch.setattr(
         sys,
         "argv",
@@ -229,7 +232,9 @@ def test_resolve_phase_energy_uses_product_formula_mapping(temp_project_dir, cap
     main()
 
     result = json.loads(capsys.readouterr().out)
-    assert result["container_type"] == "pauli_product_formula"
+    assert result["container_type"] == container_type
+    assert result["branching"] == pytest.approx([-np.pi / 4.0])
+    assert result["branch_count"] == 1
     assert result["raw_energy"] == pytest.approx(-np.pi / 4.0)
     assert result["resolved_energy"] == pytest.approx(3.0 * np.pi / 4.0)
 
@@ -262,8 +267,161 @@ def test_resolve_phase_energy_uses_quantum_walk_mapping(temp_project_dir, capsys
 
     result = json.loads(capsys.readouterr().out)
     assert result["container_type"] == "lcu_walk"
+    assert result["branching"] == pytest.approx([0.0], abs=1e-12)
     assert result["raw_energy"] == pytest.approx(0.0, abs=1e-12)
     assert result["resolved_energy"] == pytest.approx(0.0, abs=1e-12)
+
+
+@pytest.mark.parametrize(("power", "max_power"), [(2, None), (3, 3), (2**16, None), (2**16 + 1, 2**16 + 1)])
+@pytest.mark.parametrize("reference_energy", [-5.8, 5.8])
+@pytest.mark.parametrize("file_format", ["json", "hdf5"])
+def test_resolve_phase_energy_selects_serialized_walk_branch(
+    temp_project_dir, capsys, monkeypatch, *, power, reference_energy, file_format, max_power
+):
+    """Within the power limit, return every saved walk branch and resolve the nearest one."""
+    project_path = temp_project_dir / "test_project"
+    project_path.mkdir()
+    builder = algorithms.create("hamiltonian_unitary_builder", "lcu", quantum_walk=True, power=power)
+    unitary = builder.run(data.QubitOperator(pauli_strings=["Z"], coefficients=[6.0]))
+    filename = f"walk.unitary_representation.{file_format}"
+    unitary.to_file(str(project_path / filename), file_format)
+    monkeypatch.setattr(
+        sys,
+        "argv",
+        [
+            "qc",
+            "util",
+            "resolve-phase-energy",
+            "--project-name",
+            "test_project",
+            "--unitary-representation-filename",
+            filename,
+            "--phase-fraction",
+            "0.1",
+            "--reference-energy",
+            str(reference_energy),
+        ]
+        + (["--max-power", str(max_power)] if max_power is not None else []),
+    )
+
+    main()
+
+    output = capsys.readouterr().out
+    result = json.loads(output)
+    expected = sorted(6.0 * np.cos(2 * np.pi * (0.1 + branch) / power) for branch in range(power))
+    nearest = sorted(expected, key=lambda energy: abs(energy - reference_energy))
+    assert result["success"] is True
+    assert result["container_type"] == "lcu_walk"
+    assert result["phase_fraction"] == 0.1
+    assert result["branching"] == pytest.approx(expected)
+    assert result["branch_count"] == power
+    assert result["raw_energy"] is None
+    assert result["resolved_energy"] == pytest.approx(nearest[0])
+
+
+def test_resolve_phase_energy_walk_reference_selects_positive_branch(temp_project_dir, capsys, monkeypatch):
+    """A positive reference must not resolve to the negative sign branch of a powered walk."""
+    project_path = temp_project_dir / "test_project"
+    project_path.mkdir()
+    builder = algorithms.create("hamiltonian_unitary_builder", "lcu", quantum_walk=True, power=2)
+    unitary = builder.run(data.QubitOperator(pauli_strings=["Z"], coefficients=[6.0]))
+    filename = "walk.unitary_representation.json"
+    unitary.to_file(str(project_path / filename), "json")
+    monkeypatch.setattr(
+        sys,
+        "argv",
+        [
+            "qc",
+            "util",
+            "resolve-phase-energy",
+            "--project-name",
+            "test_project",
+            "--unitary-representation-filename",
+            filename,
+            "--phase-fraction",
+            "0.1",
+            "--reference-energy",
+            "5.8",
+        ],
+    )
+
+    main()
+
+    result = json.loads(capsys.readouterr().out)
+    assert result["branching"] == pytest.approx([-5.7063390977, 5.7063390977])
+    assert result["raw_energy"] is None
+    assert result["resolved_energy"] == pytest.approx(5.7063390977)
+
+
+@pytest.mark.parametrize("max_power", [-1, -2])
+def test_resolve_phase_energy_rejects_invalid_power_limit(max_power):
+    """Reject negative limits before loading a representation."""
+    with pytest.raises(ValueError, match="--max-power must be a nonnegative integer"):
+        cmd_utils_resolve_phase_energy(argparse.Namespace(max_power=max_power))
+
+
+@pytest.mark.parametrize(("power", "max_power"), [(4, 3), (65537, None), (10**12, None)])
+def test_resolve_phase_energy_rejects_excessive_power(temp_project_dir, monkeypatch, power, max_power):
+    """Reject excessive powers before enumerating any branches."""
+    (temp_project_dir / "test_project").mkdir()
+    unitary = data.UnitaryRepresentation(LCUWalkContainer(block_encoding=None, power=power))
+    monkeypatch.setattr("qdk_chemistry.ui.cli.load_data_object", lambda *_args: unitary)
+    monkeypatch.setattr(
+        LCUWalkContainer, "eigenvalue_branches_from_phase", lambda *_args: pytest.fail("Must reject before searching")
+    )
+    args = create_parser().parse_args(
+        [
+            "util",
+            "resolve-phase-energy",
+            "--project-name",
+            "test_project",
+            "--unitary-representation-filename",
+            "walk.unitary_representation.json",
+            "--phase-fraction",
+            "0.1",
+            "--reference-energy",
+            "5.8",
+        ]
+        + (["--max-power", str(max_power)] if max_power is not None else [])
+    )
+    with pytest.raises(ValueError, match=f"Walk power {power} exceeds --max-power"):
+        cmd_utils_resolve_phase_energy(args)
+
+
+@pytest.mark.parametrize("max_power", [0, 65536])
+def test_resolve_phase_energy_handles_empty_candidates(temp_project_dir, monkeypatch, capsys, max_power):
+    """Empty candidates are valid only when energy computation is explicitly disabled."""
+    project_path = temp_project_dir / "test_project"
+    project_path.mkdir()
+    unitary = data.UnitaryRepresentation(LCUWalkContainer(block_encoding=None, power=1 if max_power else 10**12))
+    monkeypatch.setattr("qdk_chemistry.ui.cli.load_data_object", lambda *_args: unitary)
+    monkeypatch.setattr(
+        LCUWalkContainer,
+        "eigenvalue_branches_from_phase",
+        lambda *_args: () if max_power else pytest.fail("Energy search must be skipped"),
+    )
+    monkeypatch.setattr(
+        LCUWalkContainer,
+        "energy_period",
+        property(lambda _self: None if max_power else pytest.fail("Energy search must be skipped")),
+    )
+    args = argparse.Namespace(
+        unitary_representation_filename="walk.unitary_representation.json",
+        project_name="test_project",
+        phase_fraction=0.1,
+        reference_energy=5.8,
+        max_power=max_power,
+    )
+
+    if max_power:
+        with pytest.raises(ValueError, match="returned no candidate energies"):
+            cmd_utils_resolve_phase_energy(args)
+    else:
+        cmd_utils_resolve_phase_energy(args)
+        result = json.loads(capsys.readouterr().out)
+        assert result["success"] is True
+        assert result["branching"] == []
+        assert result["raw_energy"] is result["resolved_energy"] is result["branch_count"] is None
 
 
 def test_resolve_phase_energy_rejects_raw_block_encoding(temp_project_dir, capsys, monkeypatch):

@@ -86,6 +86,25 @@ def test_prepend_state_prep_circuit_requires_qsharp_operations() -> None:
         builder._prepend_state_prep(state_prep, evolution, num_qubits=1)
 
 
+@pytest.mark.parametrize("total_time", [0.75, 0.875])
+def test_euler_evolution_accumulates_time(total_time: float) -> None:
+    """Full steps and a residual step contribute to the phase-inversion time."""
+    h0 = QubitOperator(["Z"], np.array([0.0]))
+    h1 = QubitOperator(["Z"], np.array([0.3]))
+    hamiltonian = DrivenQubitHamiltonian(h0, h1, drive=_constant_drive)
+    builder = EulerEvolutionCircuitBuilder()
+    builder.settings().set(
+        "evolution_builder",
+        AlgorithmRef("hamiltonian_unitary_builder", "trotter", num_divisions=1, order=1),
+    )
+    builder.settings().set("dt", 0.25)
+
+    container = builder._build_time_dependent_evolution(hamiltonian, total_time).get_container()
+    phase = (-0.3 * total_time / (2 * np.pi)) % 1.0
+    assert container.scale == pytest.approx(total_time)
+    assert container.eigenvalue_from_phase(phase) == pytest.approx(0.3)
+
+
 def test_euler_integrator_eigenvalue_remains_constant() -> None:
     """Run an example EulerIntegrator workflow."""
     partition = FlatPartition(strategy="commuting", groups=[[0]])

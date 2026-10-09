@@ -133,7 +133,7 @@ class TestTrotter:
         assert isinstance(sparse_container, PauliProductFormulaContainer)
         assert sparse_container.num_qubits == 2
         assert sparse_container.step_reps == (12 if power_strategy == "repeat" else 4)
-        assert sparse_container.scale == (0.2 if power_strategy == "repeat" else 0.2 * 3)
+        assert sparse_container.scale == pytest.approx(0.2 * 3)
         assert list(sparse_container.step_terms) == list(dense_container.step_terms)
 
     @pytest.mark.parametrize("sparse", [False, True])
@@ -636,6 +636,36 @@ class TestTrotter:
             rtol=float_comparison_relative_tolerance,
             atol=float_comparison_absolute_tolerance,
         )
+
+    @pytest.mark.parametrize("power_strategy", ["repeat", "rescale"])
+    @pytest.mark.parametrize("fuse_group_boundaries", [False, True])
+    def test_eigenvalue_from_phase_roundtrip_with_power(self, power_strategy, fuse_group_boundaries):
+        """A powered representation inverts against its total evolution time, before and after serialization."""
+        t = 0.7
+        power = 3
+        energy = 0.5
+        # The circuit represents e^{-iH(t*power)}, so the measured phase carries the total time.
+        phi = (-energy * t * power / (2 * np.pi)) % 1.0
+        hamiltonian = QubitOperator(pauli_strings=["X", "Z"], coefficients=[1.0, 0.5])
+        builder = Trotter(
+            order=2,
+            num_divisions=2,
+            time=t,
+            power=power,
+            power_strategy=power_strategy,
+            fuse_group_boundaries=fuse_group_boundaries,
+        )
+        container = builder.run(hamiltonian).get_container()
+        restored = PauliProductFormulaContainer.from_json(container.to_json())
+
+        assert np.isclose(container.scale, t * power, rtol=float_comparison_relative_tolerance)
+        for inverted in (container, restored):
+            assert np.isclose(
+                inverted.eigenvalue_from_phase(phi),
+                energy,
+                rtol=float_comparison_relative_tolerance,
+                atol=float_comparison_absolute_tolerance,
+            )
 
 
 class TestTrotterAccuracyAware:
