@@ -151,8 +151,8 @@ namespace QDKChemistry.Utils.HubbardPlaquette {
         }
     }
 
-    /// Routes every four-cycle of a tiling onto adjacent modes: the swap count and, if `listSwaps`, the adjacent swaps.
-    internal function RoutingSwaps(blocks : Int[][], count : Int, listSwaps : Bool) : (Int, Int[]) {
+    /// The mode order, as the mode at each position, that puts every four-cycle of a tiling on adjacent positions.
+    internal function TilingOrder(blocks : Int[][], count : Int) : Int[] {
         // Interleaving the diagonals embeds the FFFT's butterfly path (both diagonals, then the
         // surviving pair) in the line, so every butterfly acts on adjacent modes and no basis
         // change carries a Jordan-Wigner string. Unused modes follow in order.
@@ -169,11 +169,32 @@ namespace QDKChemistry.Utils.HubbardPlaquette {
                 set target += [mode];
             }
         }
+        return target;
+    }
+
+    /// The Jordan-Wigner mode order, which is where every evolution starts and ends.
+    internal function IdentityOrder(count : Int) : Int[] {
+        mutable order = [];
+        for mode in 0..count - 1 {
+            set order += [mode];
+        }
+        return order;
+    }
+
+    /// Rearranges the modes from the `current` order to the `target` order, each one listing the mode
+    /// at every position: the swap count and, if `listSwaps`, the adjacent swaps.
+    internal function RoutingSwaps(current : Int[], target : Int[], listSwaps : Bool) : (Int, Int[]) {
+        let count = Length(current);
+        Fact(Length(target) == count, "RoutingSwaps needs two orders of the same modes.");
+        mutable targetPosition = [0, size = count];
+        for position in 0..count - 1 {
+            set targetPosition w/= target[position] <- position;
+        }
 
         // order[position] is where the mode currently at that position must end up.
         mutable order = [0, size = count];
         for position in 0..count - 1 {
-            set order w/= target[position] <- position;
+            set order w/= position <- targetPosition[current[position]];
         }
 
         // Every adjacent swap removes one inversion, so the swap count is the inversion count.
@@ -213,47 +234,57 @@ namespace QDKChemistry.Utils.HubbardPlaquette {
         return (inversions, swaps);
     }
 
+    /// Applies the fermionic swaps that rearrange the modes from the `current` order to the `target` order.
+    internal operation RouteModes(current : Int[], target : Int[], systems : Qubit[]) : Unit is Adj {
+        let (swapCount, swaps) = RoutingSwaps(current, target, not IsResourceEstimating());
+        if IsResourceEstimating() {
+            // Every routing swap is the same Clifford pair on a different pair of modes, so the
+            // estimator only needs how many there are. Emitting one and repeating its cost keeps
+            // the O(sites^1.5) gates out of the trace.
+            if swapCount > 0 {
+                within {
+                    RepeatEstimates(swapCount);
+                } apply {
+                    SWAP(systems[0], systems[1]);
+                    CZ(systems[0], systems[1]);
+                }
+            }
+        } else {
+            for position in swaps {
+                SWAP(systems[position], systems[position + 1]);
+                CZ(systems[position], systems[position + 1]);
+            }
+        }
+    }
+
     /// # Summary
     /// One hopping tiling: every plaquette's fswap, ffft, then its momentum-basis phase.
+    ///
+    /// # Description
+    /// The modes arrive in `order`, listing the mode at each position, and leave in it.
     internal operation HoppingLayer(
         kappa : Double,
         blocks : Int[][],
+        order : Int[],
         systems : Qubit[],
         maxBatchSize : Int
     ) : Unit is Adj + Ctl {
-        HoppingLayerWithLegacyCosts(kappa, blocks, systems, maxBatchSize, false);
+        HoppingLayerWithLegacyCosts(kappa, blocks, order, systems, maxBatchSize, false);
     }
 
     internal operation HoppingLayerWithLegacyCosts(
         kappa : Double,
         blocks : Int[][],
+        order : Int[],
         systems : Qubit[],
         maxBatchSize : Int,
         forceLegacyCosts : Bool
     ) : Unit is Adj + Ctl {
-        // A zero angle skips the routing, basis change and adders, which an interaction-only model
-        // would pay for nothing.
-        if kappa != 0.0 {
+        // A zero angle or an empty tiling skips the routing, basis change and adders, which would
+        // be paid for nothing.
+        if kappa != 0.0 and Length(blocks) > 0 {
             within {
-                let (swapCount, swaps) = RoutingSwaps(blocks, Length(systems), not IsResourceEstimating());
-                if IsResourceEstimating() {
-                    // Every routing swap is the same Clifford pair on a different pair of
-                    // modes, so the estimator only needs how many there are. Emitting one
-                    // and repeating its cost keeps the O(sites^1.5) gates out of the trace.
-                    if swapCount > 0 {
-                        within {
-                            RepeatEstimates(swapCount);
-                        } apply {
-                            SWAP(systems[0], systems[1]);
-                            CZ(systems[0], systems[1]);
-                        }
-                    }
-                } else {
-                    for position in swaps {
-                        SWAP(systems[position], systems[position + 1]);
-                        CZ(systems[position], systems[position + 1]);
-                    }
-                }
+                RouteModes(order, TilingOrder(blocks, Length(systems)), systems);
                 for index in 0..Length(blocks) - 1 {
                     let base = 4 * index;
                     TwoModeFFFT(base + 1, base + 0, systems);
@@ -343,18 +374,20 @@ namespace QDKChemistry.Utils.HubbardPlaquette {
         }
     }
 
-    /// One PIG body, I^(1/2) G I^(1/2), followed by the given pink layer.
+    /// One PIG body, I^(1/2) G I^(1/2), followed by the given pink layer, on modes in `order`.
     internal operation PlaquetteStepWithPinkAngle(
         params : HubbardPlaquetteParams,
         pinkAngle : Double,
+        order : Int[],
         systems : Qubit[]
     ) : Unit is Adj + Ctl {
-        PlaquetteStepWithPinkAngleAndLegacyCosts(params, pinkAngle, systems, false);
+        PlaquetteStepWithPinkAngleAndLegacyCosts(params, pinkAngle, order, systems, false);
     }
 
     internal operation PlaquetteStepWithPinkAngleAndLegacyCosts(
         params : HubbardPlaquetteParams,
         pinkAngle : Double,
+        order : Int[],
         systems : Qubit[],
         forceLegacyCosts : Bool
     ) : Unit is Adj + Ctl {
@@ -368,7 +401,7 @@ namespace QDKChemistry.Utils.HubbardPlaquette {
             params.maxBatchSize,
             forceLegacyCosts
         );
-        HoppingLayerWithLegacyCosts(params.hoppingAngle, gold, systems, params.maxBatchSize, forceLegacyCosts);
+        HoppingLayerWithLegacyCosts(params.hoppingAngle, gold, order, systems, params.maxBatchSize, forceLegacyCosts);
         InteractionLayerWithLegacyCosts(
             params.interactionAngle / 2.0,
             sites,
@@ -381,21 +414,23 @@ namespace QDKChemistry.Utils.HubbardPlaquette {
         if UsesLegacyCostsWithOverride(forceLegacyCosts) and params.interactionAngle != 0.0 {
             R(PauliI, 2.0 * params.interactionAngle * IntAsDouble(sites), systems[0]);
         }
-        HoppingLayerWithLegacyCosts(pinkAngle, pink, systems, params.maxBatchSize, forceLegacyCosts);
+        HoppingLayerWithLegacyCosts(pinkAngle, pink, order, systems, params.maxBatchSize, forceLegacyCosts);
     }
 
-    /// One interior second-order Trotter body, I^(1/2) G I^(1/2) P.
+    /// One interior second-order Trotter body, I^(1/2) G I^(1/2) P, on modes in `order`.
     internal operation PlaquetteStep(
         params : HubbardPlaquetteParams,
+        order : Int[],
         systems : Qubit[]
     ) : Unit is Adj + Ctl {
-        PlaquetteStepWithPinkAngle(params, params.hoppingAngle, systems);
+        PlaquetteStepWithPinkAngle(params, params.hoppingAngle, order, systems);
     }
 
     /// TEMPORARY (legacy parity): resource estimates count the legacy circuit's conventional-model
     /// terms. These differ from the simulated symmetric model by a particle-number-dependent phase,
-    /// which is global only inside a fixed-particle-number sector. Remove this function and every
-    /// branch on it to revert.
+    /// which is global only inside a fixed-particle-number sector. They also count the legacy
+    /// routing, which moves the modes from row-major order on every hopping layer instead of
+    /// keeping them in pink order. Remove this function and every branch on it to revert.
     internal function UsesLegacyCosts() : Bool {
         return UsesLegacyCostsWithOverride(false);
     }
@@ -414,6 +449,12 @@ namespace QDKChemistry.Utils.HubbardPlaquette {
     /// "PIG" ordering of Eqs. (16a)-(16b) in
     /// :cite:`Apel2026`, which merges the more expensive hopping layers; it deviates from
     /// Eq. (D2) of :cite:`Campbell2022`, which puts the interaction outermost instead.
+    ///
+    /// The modes are routed into pink order once at the start and back once at the end, so
+    /// pink plaquettes are always local and only the gold layers route, from pink order. Both
+    /// orders keep the spin-up modes ahead of their spin-down partners, so the on-site pairs
+    /// stay one register half apart. The legacy costs instead keep the modes in row-major
+    /// order and route both tilings from it on every layer.
     ///
     /// # Input
     /// ## params
@@ -441,39 +482,57 @@ namespace QDKChemistry.Utils.HubbardPlaquette {
     ) : Unit is Adj + Ctl {
         if params.repetitions > 0 {
             let pink = PlaquetteSection(params.width, params.height, true);
-            HoppingLayerWithLegacyCosts(
-                params.hoppingAngle / 2.0,
-                pink,
-                systems,
-                params.maxBatchSize,
-                forceLegacyCosts
-            );
+            let identity = IdentityOrder(Length(systems));
+            // A hopping-free model has no plaquette to keep local, so it skips the routing. The
+            // legacy costs keep the register in row-major order, so every hopping layer routes.
+            let routeOnce = params.hoppingAngle != 0.0 and not UsesLegacyCostsWithOverride(forceLegacyCosts);
+            let order = routeOnce ? TilingOrder(pink, Length(systems)) | identity;
+            within {
+                RouteModes(identity, order, systems);
+            } apply {
+                HoppingLayerWithLegacyCosts(
+                    params.hoppingAngle / 2.0,
+                    pink,
+                    order,
+                    systems,
+                    params.maxBatchSize,
+                    forceLegacyCosts
+                );
 
-            if params.repetitions > 1 {
-                if IsResourceEstimating() {
-                    within {
-                        RepeatEstimates(params.repetitions - 1);
-                    } apply {
-                        PlaquetteStepWithPinkAngleAndLegacyCosts(
-                            params,
-                            params.hoppingAngle,
-                            systems,
-                            forceLegacyCosts
-                        );
-                    }
-                } else {
-                    for _ in 1..params.repetitions - 1 {
-                        PlaquetteStepWithPinkAngleAndLegacyCosts(
-                            params,
-                            params.hoppingAngle,
-                            systems,
-                            forceLegacyCosts
-                        );
+                if params.repetitions > 1 {
+                    if IsResourceEstimating() {
+                        within {
+                            RepeatEstimates(params.repetitions - 1);
+                        } apply {
+                            PlaquetteStepWithPinkAngleAndLegacyCosts(
+                                params,
+                                params.hoppingAngle,
+                                order,
+                                systems,
+                                forceLegacyCosts
+                            );
+                        }
+                    } else {
+                        for _ in 1..params.repetitions - 1 {
+                            PlaquetteStepWithPinkAngleAndLegacyCosts(
+                                params,
+                                params.hoppingAngle,
+                                order,
+                                systems,
+                                forceLegacyCosts
+                            );
+                        }
                     }
                 }
-            }
 
-            PlaquetteStepWithPinkAngleAndLegacyCosts(params, params.hoppingAngle / 2.0, systems, forceLegacyCosts);
+                PlaquetteStepWithPinkAngleAndLegacyCosts(
+                    params,
+                    params.hoppingAngle / 2.0,
+                    order,
+                    systems,
+                    forceLegacyCosts
+                );
+            }
         }
     }
 

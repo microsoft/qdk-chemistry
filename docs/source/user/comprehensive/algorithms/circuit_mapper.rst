@@ -220,7 +220,8 @@ Hubbard plaquette mapper
 .. rubric:: Factory name: ``"hubbard_plaquette"``
 
 :class:`~qdk_chemistry.algorithms.controlled_circuit_mapper.ControlledHubbardPlaquetteMapper` maps the ``HubbardPlaquetteContainer`` from the ``"hubbard_plaquette"`` :doc:`HamiltonianUnitaryBuilder <hamiltonian_unitary_builder>` to a singly-controlled Q# circuit.
-Each layer of the plaquette step is a tower of same-angle :math:`R_z` rotations, which the mapper synthesizes with Hamming-weight phasing: an adder tree writes the tower's Hamming weight into a scratch register, and a few place-value rotations on that register replace the per-term rotations.
+Each layer of the plaquette step is a tower of same-angle :math:`R_z` rotations, which the mapper synthesizes with Hamming-weight phasing :cite:`Kan2025`: an adder tree writes the tower's Hamming weight into a scratch register, and a few place-value rotations on that register replace the per-term rotations.
+The adder tree pays for itself from 8 terms, so a shorter tower keeps one rotation per term.
 
 .. rubric:: Settings
 

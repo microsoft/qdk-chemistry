@@ -12,7 +12,7 @@ import h5py
 import numpy as np
 import pytest
 import scipy.linalg
-from qdk.test_utils import dump_operation_on_state
+import scipy.sparse.linalg
 
 from qdk_chemistry.algorithms import create
 from qdk_chemistry.algorithms.hamiltonian_unitary_builder.time_evolution.hubbard_plaquette_trotter import (
@@ -24,15 +24,13 @@ from qdk_chemistry.data import (
     Circuit,
     FermiHubbardModelHamiltonianDescription,
     LatticeGeometry,
-    LatticeGraph,
     MajoranaMapping,
     SettingTypeMismatch,
     UnitaryRepresentation,
 )
 from qdk_chemistry.data.circuit import QsharpFactoryData
 from qdk_chemistry.data.unitary_representation.containers.hubbard_plaquette import HubbardPlaquetteContainer
-from qdk_chemistry.utils.model_hamiltonians import create_hubbard_hamiltonian
-from qdk_chemistry.utils.pauli_matrix import pauli_to_dense_matrix
+from qdk_chemistry.utils.pauli_matrix import pauli_to_dense_matrix, pauli_to_sparse_matrix
 from qdk_chemistry.utils.qsharp import QSHARP_UTILS, get_qsharp_context
 
 _PLAQUETTE = "QDKChemistry.Utils.HubbardPlaquette"
@@ -50,12 +48,13 @@ def _model(
 def _reference_hamiltonian(model: FermiHubbardModelHamiltonianDescription, *, symmetric: bool = True) -> np.ndarray:
     """Return the dense Jordan-Wigner matrix of the 2x2 ``model``, or of its particle-hole symmetric form.
 
-    The 2x2 torus joins each pair through two periodic images, so ``LatticeGraph.square`` doubles
-    those bonds, as ``materialize()`` does.
+    The 2x2 torus joins each pair through two periodic images, whose hoppings ``materialize()`` sums.
     """
     t, u, epsilon = (model.parameters[name] for name in ("t", "u", "epsilon"))
-    lattice = LatticeGraph.square(2, 2, periodic_x=True, periodic_y=True)
-    hamiltonian = create_hubbard_hamiltonian(lattice, epsilon=-0.5 * u if symmetric else epsilon, t=t, U=u)
+    reference = FermiHubbardModelHamiltonianDescription(
+        model.lattice, t=t, u=u, epsilon=-0.5 * u if symmetric else epsilon
+    )
+    hamiltonian = reference.materialize()
     mapped = create("qubit_mapper").run(hamiltonian, mapping=MajoranaMapping.jordan_wigner(8))
     labels, coefficients = zip(*mapped.get_real_coefficients(tolerance=1e-14), strict=True)
     dense = pauli_to_dense_matrix(list(labels), list(coefficients))
@@ -70,11 +69,35 @@ def _operation(name: str, args: str, *, controlled: bool = False, namespace: str
 
 
 def _apply(operation: str, state: np.ndarray) -> np.ndarray:
-    """Return the state ``operation`` produces from a real-amplitude ``state``."""
+    """Return the state ``operation`` produces from a real-amplitude ``state``.
+
+    This dumps the whole machine rather than using ``dump_operation_on_state``, whose ``DumpRegister``
+    rejects states with nonzero amplitudes below its zero cutoff as not separable, which the 16-qubit
+    evolutions reach. Every helper qubit is released by then, so the machine is the register.
+    """
+    context = get_qsharp_context()
+    if not hasattr(context.code, "_PlaquetteTestDumpMachine"):
+        context.eval(
+            "operation _PlaquetteTestDumpMachine(op : (Qubit[] => Unit), numQubits : Int, initial : Double[]) : Unit {"
+            " use qubits = Qubit[numQubits];"
+            " Std.StatePreparation.PreparePureStateD(initial, qubits);"
+            " op(qubits);"
+            " Std.Diagnostics.DumpMachine();"
+            " ResetAll(qubits); }"
+        )
     num_qubits = round(math.log2(len(state)))
-    return np.asarray(
-        dump_operation_on_state(operation, num_qubits, state.tolist(), context=get_qsharp_context()), dtype=complex
+    run = context.run(
+        context.code._PlaquetteTestDumpMachine,
+        1,
+        context.eval(operation),
+        num_qubits,
+        state.tolist(),
+        save_events=True,
     )
+    result = np.zeros(len(state), dtype=complex)
+    for index, amplitude in run[0]["events"][-1].state_dump().get_dict().items():
+        result[index] = amplitude
+    return result
 
 
 def _random_state(num_qubits: int, seed: int, support: int | None = None) -> np.ndarray:
@@ -204,7 +227,7 @@ class TestPlaquetteCircuit:
 
     @pytest.mark.parametrize(("width", "height"), [(2, 2), (4, 4), (4, 6), (6, 6), (8, 8)])
     def test_tilings_cover_the_lattice_and_route_locally(self, width, height):
-        """Tilings are vertex disjoint, cover each bond once, and gold routes onto adjacent modes."""
+        """Tilings are vertex disjoint, cover each bond once, and gold routes from pink order onto adjacent modes."""
         sites = width * height
         pink, gold = (QSHARP_UTILS.HubbardPlaquette.PlaquetteSection(width, height, flag) for flag in (True, False))
         for tiling in (pink, gold):
@@ -221,14 +244,72 @@ class TestPlaquetteCircuit:
         assert len(bonds) == len(set(bonds)), "a bond may not appear in both tilings"
         assert set(bonds) == horizontal | vertical
 
-        # Replay the swaps: each plaquette must land contiguous and interleaved for its FFFT.
-        _, swaps = QSHARP_UTILS.HubbardPlaquette.RoutingSwaps(gold, 2 * sites, True)
+        # Each plaquette must land contiguous and interleaved for its FFFT, and pink order must keep
+        # every on-site pair one register half apart for the interaction layer.
+        pink_order, gold_order = (
+            QSHARP_UTILS.HubbardPlaquette.TilingOrder(tiling, 2 * sites) for tiling in (pink, gold)
+        )
+        for tiling, order in ((pink, pink_order), (gold, gold_order)):
+            for index, cycle in enumerate(tiling):
+                assert order[4 * index : 4 * index + 4] == [cycle[0], cycle[2], cycle[1], cycle[3]]
+        assert [mode + sites for mode in pink_order[:sites]] == pink_order[sites:]
+
+        # Replay the swaps: into pink order once, then from pink order to gold order.
         routed = list(range(2 * sites))
-        for position in swaps:
-            assert 0 <= position < 2 * sites - 1
-            routed[position], routed[position + 1] = routed[position + 1], routed[position]
-        for index, cycle in enumerate(gold):
-            assert routed[4 * index : 4 * index + 4] == [cycle[0], cycle[2], cycle[1], cycle[3]]
+        for start, target in ((list(routed), pink_order), (pink_order, gold_order)):
+            _, swaps = QSHARP_UTILS.HubbardPlaquette.RoutingSwaps(start, target, True)
+            for position in swaps:
+                assert 0 <= position < 2 * sites - 1
+                routed[position], routed[position + 1] = routed[position + 1], routed[position]
+            assert routed == target
+
+    def test_gold_layer_evolution_is_exact(self):
+        """At 4x2 the routed gold layer is nonempty, and the evolution is the exact PIG product of its pieces."""
+        width, height, t, u, time, reps = 4, 2, 1.0, 4.0, 0.3, 2
+        sites, step = width * height, time / reps
+
+        def hopping(tiling: list[list[int]]) -> scipy.sparse.csr_matrix:
+            labels = []
+            for cycle in tiling:
+                for index in range(4):
+                    low, high = sorted((cycle[index], cycle[(index + 1) % 4]))
+                    for axis in "XY":
+                        labels.append("I" * low + axis + "Z" * (high - low - 1) + axis + "I" * (2 * sites - high - 1))
+            return pauli_to_sparse_matrix(labels, np.full(len(labels), -0.5 * t))
+
+        pink, gold = (
+            hopping(QSHARP_UTILS.HubbardPlaquette.PlaquetteSection(width, height, flag)) for flag in (True, False)
+        )
+        pairs = ["I" * s + "Z" + "I" * (sites - 1) + "Z" + "I" * (sites - s - 1) for s in range(sites)]
+        interaction = pauli_to_sparse_matrix(pairs, np.full(sites, 0.25 * u))
+        body = [(interaction, 0.5), (gold, 1.0), (interaction, 0.5)]
+        layers = [(pink, 0.5), *([*body, (pink, 1.0)] * (reps - 1)), *body, (pink, 0.5)]
+
+        state = _random_state(2 * sites, seed=13, support=32)
+        expected = state.astype(complex)
+        for hamiltonian, fraction in layers:
+            expected = scipy.sparse.linalg.expm_multiply(-1j * fraction * step * hamiltonian, expected)
+        params = (
+            f"{_PLAQUETTE}.HubbardPlaquetteParams({width}, {height}, {0.25 * u * step}, {2 * t * step}, {reps}, -1)"
+        )
+        actual = _apply(_operation("RepPlaquetteExp", params + ", {qs}"), state)
+        assert np.allclose(actual, expected, atol=1e-8)
+
+    def test_hamming_weight_phasing_matches_plain_rotations(self):
+        """At 4x2 every tower reaches the break-even, and phasing it under control matches plain rotations."""
+        state = _random_state(17, seed=11, support=32)
+        hwp, plain = (
+            _apply(
+                _operation(
+                    "RepPlaquetteExp",
+                    f"{_PLAQUETTE}.HubbardPlaquetteParams(4, 2, 0.3, 0.4, 2, {cap}), {{qs}}",
+                    controlled=True,
+                ),
+                state,
+            )
+            for cap in (-1, 1)
+        )
+        assert np.allclose(hwp, plain, atol=1e-10)
 
     @pytest.mark.parametrize(("t", "u"), [(1.0, 0.0), (0.0, 4.0)])
     def test_single_term_evolution_is_exact(self, t, u):
@@ -330,6 +411,17 @@ class TestBenchmarkResources:
         below = _benchmark_counts(4, max_batch_size=1)
         assert below["cczCount"] + below["ccixCount"] == 0
         assert below["numQubits"] < uncapped["numQubits"]
+
+    @pytest.mark.parametrize(("cap", "uses_adders"), [(7, False), (8, True)])
+    def test_adder_trees_start_at_eight_terms(self, cap, uses_adders):
+        """Batches of 7 equal-angle rotations stay plain rotations, and batches of 8 take an adder tree."""
+        params = QSHARP_UTILS.HubbardPlaquette.HubbardPlaquetteParams(
+            width=4, height=4, interactionAngle=0.1, hoppingAngle=0.2, repetitions=1, maxBatchSize=cap
+        )
+        counts = get_qsharp_context().logical_counts(
+            QSHARP_UTILS.HubbardPlaquette.MakeRepControlledPlaquetteExpCircuit, params, 0, list(range(1, 33))
+        )
+        assert (counts.get("cczCount", 0) + counts.get("ccixCount", 0) > 0) == uses_adders
 
 
 class TestStepCountAndShift:
