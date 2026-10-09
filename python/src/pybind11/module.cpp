@@ -19,6 +19,7 @@ void bind_element_data(py::module& m);
 void bind_orbitals(py::module& m);
 void bind_hamiltonian(py::module& m);
 void bind_wavefunction(py::module& m);
+void bind_mps_wavefunction(py::module& m);
 void bind_ansatz(py::module& m);
 void bind_configuration_set(py::module& m);
 void bind_localizer(py::module& m);
@@ -96,6 +97,7 @@ PYBIND11_MODULE(_core, m) {
   bind_configuration(data);
   bind_configuration_set(data);
   bind_wavefunction(data);
+  bind_mps_wavefunction(data);
   bind_ansatz(data);
   bind_stability_result(data);
   bind_nuclear_gradients(data);
