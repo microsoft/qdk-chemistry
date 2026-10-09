@@ -40,11 +40,9 @@ class MPSSite {
    * preceding sectors in the order.
    */
   using SectorOrders = std::array<std::vector<SymmetryLabel>, 3>;
-  /** @brief Validated flattened dimensions and sector offsets of a site. */
-  struct TensorLayout {
-    std::array<Eigen::Index, 3> dimensions{};
-    std::array<std::unordered_map<SymmetryLabel, Eigen::Index>, 3> offsets;
-  };
+  /** @brief First basis index of each sector in the three tensor slots. */
+  using SectorOffsets =
+      std::array<std::unordered_map<SymmetryLabel, Eigen::Index>, 3>;
   /** @brief Real or complex matrix used for packed dense export. */
   using DenseMatrixVariant = ContainerTypes::MatrixVariant;
 
@@ -66,8 +64,8 @@ class MPSSite {
   const TensorVariant& tensor() const { return *_tensor; }
   /** @brief Packing orders for (left, physical, right). */
   const SectorOrders& sector_orders() const { return _sector_orders; }
-  /** @brief Immutable packing layout computed at construction. */
-  const TensorLayout& tensor_layout() const { return _tensor_layout; }
+  /** @brief Sector offsets implied by the packing orders. */
+  const SectorOffsets& sector_offsets() const { return _sector_offsets; }
   /** @brief Packing order of left-bond sectors. */
   const std::vector<SymmetryLabel>& left_sector_order() const {
     return _sector_orders[0];
@@ -106,7 +104,8 @@ class MPSSite {
 
   TensorPtr _tensor;
   SectorOrders _sector_orders;
-  TensorLayout _tensor_layout;
+  SectorOffsets _sector_offsets;
+  std::array<std::size_t, 3> _dimensions{};
   std::vector<Configuration> _physical_basis;
 };
 

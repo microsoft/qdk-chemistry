@@ -163,7 +163,7 @@ using MPSSynthesis = std::variant<std::vector<DenseSiteSynthesis>,
 /**
  * @brief Synthesize the sites after site zero of a validated MPS container.
  *
- * Site zero is prepared separately as the initial state. General synthesis
+ * Site zero is prepared separately as the initial state. Dense synthesis
  * absorbs each successor's right factor into its predecessor, processing sites
  * from right to left. Only site one's right factor remains for the initial
  * state. Block-sparse sites are independent and synthesized concurrently.
@@ -171,11 +171,11 @@ using MPSSynthesis = std::variant<std::vector<DenseSiteSynthesis>,
  *
  * @param mps Container whose construction validates bond compatibility.
  * @param ancilla_dim Dimension of the bond register.
- * @param unitary_synthesis "general" or "block_sparse".
+ * @param unitary_synthesis "dense" or "block_sparse".
  * @throws std::invalid_argument If the method is unknown, the MPS is complex,
  * a bond does not fit the register, or a synthesized site is not an isometry.
  */
-MPSSynthesis decompose_mps(const data::MPSContainer& mps,
-                           Eigen::Index ancilla_dim,
-                           std::string_view unitary_synthesis = "general");
+MPSSynthesis matrix_product_state_synthesis(
+    const data::MPSContainer& mps, Eigen::Index ancilla_dim,
+    std::string_view unitary_synthesis = "dense");
 }  // namespace qdk::chemistry::utils::detail

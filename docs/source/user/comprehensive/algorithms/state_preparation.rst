@@ -246,40 +246,18 @@ Matrix Product State
 
 .. rubric:: Factory name: ``"matrix_product_state"``
 
-This method prepares a matrix product state (MPS) stored in an :class:`~qdk_chemistry.data.MPSContainer` one site at a time, following :cite:`Berry2025`.
-A site with the physical basis ``('0', 'u', 'd', '2')`` is a spatial orbital and is loaded onto the α and β qubits of that orbital in the blocked Jordan-Wigner layout (all α modes, then all β modes).
-A site with the physical basis ``('0', '1')`` is a single spinless mode and is loaded onto one qubit in the Jordan-Wigner layout.
+This method prepares a matrix product state (MPS) stored in an :class:`~qdk_chemistry.data.MPSContainer` following :cite:`Berry2025` and :cite:`Rupprecht2026`.
+The MPS must be real and right-canonical with orthogonality center at site 0, with open boundaries, and either the physical basis ``('0', 'u', 'd', '2')`` on every site or the physical basis ``('0', '1')`` on every site.
+The physical basis is loaded in the blocked Jordan-Wigner layout.
 An ancilla register of :math:`\lceil \log_2 \chi \rceil` qubits carries the virtual bond of maximal dimension :math:`\chi`.
-Every site unitary acts on the qubits of its site and the ancilla register, and is synthesized by one of two methods selected with the ``unitary_synthesis`` setting.
-MPS basis states are read with the modes of each site created in chain order, α before β, the usual DMRG convention.
-A final layer of CZ gates applies the fermionic signs of reordering these modes into qubit order, so the circuit matches the library's blocked Jordan-Wigner encoding.
-
-.. rubric:: General unitary synthesis
-
-With ``unitary_synthesis="general"`` every site unitary acts on the full ancilla register.
-It is factored as in Appendix B of :cite:`Rupprecht2026` and synthesized from Givens rotation layers whose angles are loaded with QROM and applied through phase gradient rotations.
-A site with four physical states needs three uniformly controlled rotations and two mixing unitaries, while a site with two physical states needs one rotation and no mixing unitaries.
-The cost depends only on the bond dimensions, so it can be estimated without decomposing the site tensors (see ``fast_resource_estimation``).
-
-.. rubric:: Block-sparse unitary synthesis
-
-With ``unitary_synthesis="block_sparse"`` the method exploits the block sparsity that particle-number and spin symmetries induce in the site tensors, following :cite:`Rupprecht2026`.
-Each site unitary is factored as :math:`P_{\mathrm{row}} V P_{\mathrm{col}}`, where :math:`V` is block diagonal and :math:`P_{\mathrm{row}}` and :math:`P_{\mathrm{col}}` are permutations.
-Each permutation loads the permuted index into a fresh register with a table lookup and swaps it with the original register.
-The register then holds the inverse image of the new index, which is erased by measurement: it is measured in the X basis and the resulting signs are undone with a phase lookup, so the erasure costs :math:`O(\sqrt{N})` Toffoli gates for :math:`N` basis states instead of a second lookup.
-Each block of :math:`V` is synthesized from Givens rotation layers, so the cost is governed by the symmetry block sizes rather than the full bond dimension.
-
-.. rubric:: Requirements
-
-The MPS must be real and right-canonical with orthogonality center at site 0, with open boundaries, one site per molecular orbital (active spaces with inactive orbitals are not supported), and either the physical basis ``('0', 'u', 'd', '2')`` on every site or the physical basis ``('0', '1')`` on every site.
-
-The utility ``decompose_mps(container, ancilla_dimension, unitary_synthesis)`` returns site decompositions in chain order, excluding site 0, which is prepared as the initial state.
+Every site unitary acts on the qubits of its site and the ancilla register, and is synthesized by one of two methods selected with the ``unitary_synthesis`` setting, excluding site 0, which is prepared as the initial state.
+A final layer of CZ gates applies the fermionic signs of reordering these modes into qubit order.
 It relies on the container's validation of adjacent bond spaces.
+The utility ``matrix_product_state_synthesis(container, ancilla_dimension, unitary_synthesis="dense")`` returns the synthesized sites in chain order, excluding site 0.
 Single-site synthesis is available through ``dense_unitary_synthesis(site, ancilla_dimension, following_right_factor)`` and ``block_sparse_unitary_synthesis(site, ancilla_dimension)``, both taking an ``MPSSite``.
-Site construction validates tensor packing, finiteness, and sector orders and retains the flattened dimensions and sector offsets for reuse.
-Bare-site inputs share the container's bond-space validation through ``MPSContainer.validate_sites``; preparation additionally checks the supported physical basis, and synthesis checks the bond register and isometry.
-Preparation exports only site 0 as a dense matrix. General synthesis fills its padded isometry directly from the site blocks; block-sparse synthesis reads the blocks without materializing absent sectors.
-General synthesis processes sites from right to left to absorb successor factors; block-sparse sites are synthesized independently.
+They return the native ``DenseSiteSynthesis`` and ``SparseSiteSynthesis`` objects of ``qdk_chemistry.utils.unitary_synthesis``, which Q# structs of the same names mirror field by field.
+To obtain preparation data without building a circuit, call ``preparer.generate_matrix_product_state_preparation_data(mps_container)``.
+This instance method accepts only an ``MPSContainer`` and uses the preparer's ``unitary_synthesis`` setting.
 
 .. rubric:: Settings
 
@@ -295,10 +273,7 @@ General synthesis processes sites from right to left to absorb successor factors
      - Size of the phase gradient register, which sets the precision of every rotation angle. Default is 10.
    * - ``unitary_synthesis``
      - str
-     - Site unitary synthesis method: ``"general"`` or ``"block_sparse"``. Default is ``"general"``.
-   * - ``fast_resource_estimation``
-     - bool
-     - Replace the site decompositions with placeholder data that has the same gate structure. The circuit then supports resource estimation only and does not prepare the state, but it avoids densifying and decomposing large site tensors. The qubit count is exact. For the ``('0', '1')`` basis the Toffoli count is an upper bound, because sites whose bonds are smaller than the ancilla register, typically near the chain ends, need fewer Givens layers. Requires ``unitary_synthesis="general"``. Default is ``False``.
+     - Site unitary synthesis method: ``"dense"`` or ``"block_sparse"``. Default is ``"dense"``.
 
 Related classes
 ---------------

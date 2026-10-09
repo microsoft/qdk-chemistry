@@ -20,7 +20,7 @@ struct FullSvd {
   Eigen::MatrixXd v;
 };
 
-FullSvd full_svd(const Eigen::Ref<const Eigen::MatrixXd>& matrix);
+FullSvd decompose_svd(const Eigen::Ref<const Eigen::MatrixXd>& matrix);
 
 std::vector<GivensDecomposition> decompose_unitaries_to_givens(
     const std::vector<std::reference_wrapper<const Eigen::MatrixXd>>& matrices);
@@ -37,7 +37,7 @@ void for_each_nonzero_entry(const data::MPSSite& site, Eigen::Index ancilla_dim,
                             const Visit& visit) {
   const auto& tensor =
       std::get<data::SymmetryBlockedTensor<3, double>>(site.tensor());
-  const auto& offsets = site.tensor_layout().offsets;
+  const auto& offsets = site.sector_offsets();
   for (const auto& [labels, block] : tensor.blocks()) {
     const auto left_offset = offsets[0].at(labels[0]);
     const auto physical_offset = offsets[1].at(labels[1]);

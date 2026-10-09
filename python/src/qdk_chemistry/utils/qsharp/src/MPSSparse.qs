@@ -18,30 +18,40 @@ namespace QDKChemistry.Utils.MPSSparse {
     import QDKChemistry.Utils.MPSSequential.ApplyMPSFermionicOrderSigns;
     import GivensDecomposition.*;
 
-    export MPSSparse, MakeMPSSparseCircuit, PermutationViaQROAM, SparseUnitaryDecomposition;
+    export MPSSparse, MPSSparseParams, MakeMPSSparseOp, MakeMPSSparseCircuit, PermutationViaQROAM, SparseSiteSynthesis;
 
     /// # Summary
-    /// Decomposition data for a single sparse MPS site unitary
-    /// U = P_row · V_blockdiag · P_col.
+    /// Circuit data for one block-sparse MPS site unitary, mirroring the C++
+    /// `qdk::chemistry::utils::detail::SparseSiteSynthesis`.
+    ///
+    /// # Description
+    /// The site unitary is U = P_r · B · P_c, where P_c|c⟩ = |columnPermutation[c]⟩,
+    /// P_r|v⟩ = |rowPermutation[v]⟩, and B is block diagonal. Basis state
+    /// physical · ancillaDim + bond of the joint site and bond register has that index.
     ///
     /// # Input
-    /// ## colPermTargets
-    /// Int[N]: column permutation targets. Basis state physical · ancillaDim + bond of the
-    /// joint site and bond register is index physical · ancillaDim + bond.
-    /// ## rowPermTargets
-    /// Int[N]: row permutation targets, indexed like `colPermTargets`.
-    /// ## blockLayerAngles
-    /// Double[numLayers][numAngles]: Givens angles for block-diagonal V.
-    /// ## blockLayerShifted
-    /// Bool[numLayers]: whether each Givens layer is shifted.
-    /// ## blockPhases
-    /// Bool[dim]: phase corrections for block-diagonal V.
-    struct SparseUnitaryDecomposition {
-        colPermTargets : Int[],
-        rowPermTargets : Int[],
-        blockLayerAngles : Double[][],
-        blockLayerShifted : Bool[],
-        blockPhases : Bool[],
+    /// ## columnPermutation
+    /// Int[N]: image of each basis state under P_c.
+    /// ## rowPermutation
+    /// Int[N]: image of each basis state under P_r.
+    /// ## blockGivens
+    /// Givens data of the block-diagonal B.
+    struct SparseSiteSynthesis {
+        columnPermutation : Int[],
+        rowPermutation : Int[],
+        blockGivens : GivensDecomposition,
+    }
+
+    /// # Summary
+    /// Parameters of a composable MPS sparse state preparation.
+    struct MPSSparseParams {
+        initialStateVec : Double[],
+        numSites : Int,
+        numQubitsPerSite : Int,
+        siteToOrbitalOrder : Int[],
+        rotationBits : Int,
+        numAncillaQubits : Int,
+        siteDecompositions : SparseSiteSynthesis[],
     }
 
     // =============================================================================
@@ -136,7 +146,7 @@ namespace QDKChemistry.Utils.MPSSparse {
         numSites : Int,
         siteToOrbitalOrder : Int[],
         rotationBits : Int,
-        siteDecompositions : SparseUnitaryDecomposition[],
+        siteDecompositions : SparseSiteSynthesis[],
         state : Qubit[],
         ancilla : Qubit[]
     ) : Unit {
@@ -166,36 +176,48 @@ namespace QDKChemistry.Utils.MPSSparse {
             phaseGradient
         );
 
-        // Apply the sparse site unitaries U = P_row · V_blockdiag · P_col.
+        // Apply the sparse site unitaries U = P_r · B · P_c.
         for siteIdx in 0..numSites - 2 {
-            let decomp = siteDecompositions[siteIdx];
+            let synthesis = siteDecompositions[siteIdx];
             // The little-endian joint register holds the bond in its low qubits, so its value
             // physical * ancillaDim + bond is the row index of the site isometry.
             let target = ancilla + MPSSiteQubits(state, numSites, siteToOrbitalOrder[siteIdx + 1]);
             let totalBits = Length(target);
-            let (colPermData, colInvPermData) = PermutationData(decomp.colPermTargets, totalBits);
-            let (rowPermData, rowInvPermData) = PermutationData(decomp.rowPermTargets, totalBits);
-            let blockData = Mapped(
-                layer -> QuantizeGivensAngles(layer, 1 <<< (totalBits - 1), rotationBits),
-                decomp.blockLayerAngles
-            );
+            let (colPermData, colInvPermData) = PermutationData(synthesis.columnPermutation, totalBits);
+            let (rowPermData, rowInvPermData) = PermutationData(synthesis.rowPermutation, totalBits);
+            let blockGivens = QuantizeGivensDecomposition(synthesis.blockGivens, 1 <<< (totalBits - 1), rotationBits);
 
             PermutationViaQROAM(colPermData, colInvPermData, target);
             // The Givens layers act on the most-significant-first view of the joint register.
-            ApplyRealUnitaryViaGivens(
-                blockData,
-                decomp.blockLayerShifted,
-                decomp.blockPhases,
-                Reversed(target),
-                phaseGradient,
-                angleReg
-            );
+            ApplyRealUnitaryViaGivens(blockGivens, Reversed(target), phaseGradient, angleReg);
             PermutationViaQROAM(rowPermData, rowInvPermData, target);
         }
         ApplyMPSFermionicOrderSigns(siteToOrbitalOrder, state);
 
         // Undo phase gradient state
         Adjoint PreparePhaseGradientState(phaseGradient);
+    }
+
+    /// # Summary
+    /// Returns a composable operation that prepares the MPS on a numQubitsPerSite·numSites-qubit
+    /// register.
+    function MakeMPSSparseOp(params : MPSSparseParams) : Qubit[] => Unit {
+        (state) => {
+            Fact(
+                Length(state) == params.numQubitsPerSite * params.numSites,
+                "State register size must equal the number of qubits per MPS site times the number of sites."
+            );
+            use ancilla = Qubit[params.numAncillaQubits];
+            MPSSparse(
+                params.initialStateVec,
+                params.numSites,
+                params.siteToOrbitalOrder,
+                params.rotationBits,
+                params.siteDecompositions,
+                state,
+                ancilla
+            );
+        }
     }
 
     /// Circuit wrapper for resource estimation - allocates qubits internally.
@@ -206,7 +228,7 @@ namespace QDKChemistry.Utils.MPSSparse {
         siteToOrbitalOrder : Int[],
         rotationBits : Int,
         numAncillaQubits : Int,
-        siteDecompositions : SparseUnitaryDecomposition[]
+        siteDecompositions : SparseSiteSynthesis[]
     ) : Unit {
         use state = Qubit[numQubitsPerSite * numSites];
         use ancilla = Qubit[numAncillaQubits];

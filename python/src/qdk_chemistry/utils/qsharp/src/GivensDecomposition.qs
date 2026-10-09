@@ -8,10 +8,69 @@ import Std.Arrays.*;
 import Std.Canon.*;
 import Std.Diagnostics.*;
 import Std.ResourceEstimation.*;
+import QDKChemistry.Utils.Arithmetic.AddConstant;
 import QDKChemistry.Utils.SelectSwap.SelectSwap;
 import QDKChemistry.Utils.PhaseGradient.RyViaPhaseGradient;
 
-export ApplyRealUnitaryViaGivens, ApplyControlledRealUnitaryViaGivens, QuantizeGivensAngles, QuantizeRyAngles, ApplyMultiplexedRy, ApplyControlledMultiplexedRy;
+export GivensDecomposition, QuantizedGivensDecomposition, QuantizeGivensDecomposition, ApplyRealUnitaryViaGivens, ApplyControlledRealUnitaryViaGivens, QuantizeGivensAngles, QuantizeRyAngles, ApplyMultiplexedRy, ApplyControlledMultiplexedRy;
+
+// =============================================================================
+// Givens decomposition data
+// =============================================================================
+
+/// # Summary
+/// Givens representation U = D · L_{m-1} ⋯ L_0 of a real orthogonal matrix, mirroring the
+/// C++ `qdk::chemistry::utils::detail::GivensDecomposition`.
+///
+/// # Description
+/// Layer L_j rotates adjacent basis states by G(θ) = [[cos θ, -sin θ], [sin θ, cos θ]]. It
+/// acts on the pairs (0, 1), (2, 3), …, or on (1, 2), (3, 4), … when it is shifted. D is a
+/// diagonal sign matrix.
+///
+/// # Input
+/// ## layerAngles
+/// Double[numLayers][numPairs]: rotation angles θ of each layer, by increasing pair index.
+/// ## layerShifted
+/// Bool[numLayers]: whether each layer acts on the odd-starting pairs.
+/// ## phases
+/// Bool[dim]: whether each basis state receives a minus sign from D.
+struct GivensDecomposition {
+    layerAngles : Double[][],
+    layerShifted : Bool[],
+    phases : Bool[],
+}
+
+/// # Summary
+/// `GivensDecomposition` with the angles of each layer quantized into a Select table.
+///
+/// # Input
+/// ## layers
+/// Bool[numLayers][numAddresses][rotationBits]: `layers[i][k]` holds the k-th angle θ of
+/// layer i as the rotationBits-bit integer x with θ = 2π·x/2^rotationBits.
+/// ## layerShifted
+/// Bool[numLayers]: whether each layer acts on the odd-starting pairs.
+/// ## phases
+/// Bool[dim]: whether each basis state receives a minus sign. An empty array applies no
+/// signs.
+struct QuantizedGivensDecomposition {
+    layers : Bool[][][],
+    layerShifted : Bool[],
+    phases : Bool[],
+}
+
+/// # Summary
+/// Quantizes the angles of every layer of a `GivensDecomposition` with `QuantizeGivensAngles`.
+function QuantizeGivensDecomposition(
+    givens : GivensDecomposition,
+    numAddresses : Int,
+    rotationBits : Int
+) : QuantizedGivensDecomposition {
+    new QuantizedGivensDecomposition {
+        layers = Mapped(angles -> QuantizeGivensAngles(angles, numAddresses, rotationBits), givens.layerAngles),
+        layerShifted = givens.layerShifted,
+        phases = givens.phases,
+    }
+}
 
 // =============================================================================
 // Multiplexed Ry rotations (QROM-loaded angles + phase gradient)
@@ -66,110 +125,6 @@ operation ApplyControlledMultiplexedRy(
         Controlled SelectSwap([control], (-1, data, address, angleReg));
     } apply {
         RyViaPhaseGradient(activeQubit, angleReg, phaseGradient);
-    }
-}
-
-// =============================================================================
-// Classical constant addition (Sanders et al. Fig. 18)
-// =============================================================================
-
-/// # Summary
-/// Adds a classical constant `c` to a little-endian quantum register in place.
-///
-/// # Description
-/// Implements |x⟩ → |x + c (mod 2^n)⟩ using the ripple-carry structure from
-/// Sanders et al. (PRX Quantum 1, 020312, 2020), Fig. 18.
-///
-/// Resource cost:
-///   - n − 2 AND gates  → 4(n − 2) T-gates
-///   - n − 2 IAND gates → 0 T-gates (measurement-based)
-///   - O(n) Clifford gates
-///   - n − 1 ancilla qubits (borrowed, returned to |0⟩)
-///
-/// # Input
-/// ## c
-/// The classical integer to add.
-/// ## target
-/// Register in little-endian format (target[0] = LSB). Length n.
-///
-/// # References
-/// - Sanders, Y.R., et al. "Compilation of Fault-Tolerant Quantum Heuristics
-///   for Combinatorial Optimization." PRX Quantum 1, 020312 (2020).
-operation AddConstant(c : Int, target : Qubit[]) : Unit {
-    let n = Length(target);
-    let cMod = ((c % (1 <<< n)) + (1 <<< n)) % (1 <<< n);
-    let cBits = IntAsBoolArray(cMod, n); // LE: cBits[0] = LSB
-
-    if n == 1 {
-        if cBits[0] {
-            X(target[0]);
-        }
-    } elif n == 2 {
-        // 2-bit: no Toffolis needed. Use Clifford-only circuit.
-        if cBits[1] {
-            if cBits[0] {
-                // +3 = -1 mod 4: decrement
-                X(target[0]);
-                CNOT(target[0], target[1]);
-            } else {
-                // +2: flip MSB
-                X(target[1]);
-            }
-        } else {
-            if cBits[0] {
-                // +1: increment
-                CNOT(target[0], target[1]);
-                X(target[0]);
-            }
-            // +0: identity
-        }
-    } else {
-        use ancillas = Qubit[n - 1];
-
-        // --- Forward pass: compute carry bits ---
-        if cBits[0] {
-            CNOT(target[0], ancillas[0]);
-        }
-
-        for i in 1..n - 2 {
-            let j = i - 1;
-            CNOT(ancillas[j], target[i]);
-            if cBits[i] {
-                X(ancillas[j]);
-            }
-            AND(ancillas[j], target[i], ancillas[i]);
-            if cBits[i] {
-                X(ancillas[j]);
-            }
-            CNOT(ancillas[j], ancillas[i]);
-        }
-
-        // --- MSB: XOR final carry ---
-        CNOT(ancillas[n - 2], target[n - 1]);
-
-        // --- Reverse pass: uncompute ancillas ---
-        for i in n - 2..-1..1 {
-            let j = i - 1;
-            CNOT(ancillas[j], ancillas[i]);
-            if cBits[i] {
-                X(ancillas[j]);
-            }
-            Adjoint AND(ancillas[j], target[i], ancillas[i]);
-            if cBits[i] {
-                X(ancillas[j]);
-            }
-        }
-
-        if cBits[0] {
-            CNOT(target[0], ancillas[0]);
-        }
-
-        // --- Final XOR: add constant bits ---
-        for i in 0..n - 1 {
-            if cBits[i] {
-                X(target[i]);
-            }
-        }
     }
 }
 
@@ -325,15 +280,9 @@ operation ApplyPhasePolynomial(phases : Bool[], register : Qubit[]) : Unit {
 /// - Clements et al. (arXiv:1603.08788): https://arxiv.org/abs/1603.08788
 ///
 /// # Input
-/// ## layerAngleData
-/// Bool[numLayers][numAngles][rotationBits]: angle data for each Givens layer.
-/// layerAngleData[i][k] is the angle for the k-th pair of layer i, encoded as a
-/// rotationBits-bit integer x such that θ = 4π·x/2^rotationBits.
-/// ## layerIsShifted
-/// Bool[numLayers]: whether each layer is shifted (Berry eq. 24).
-/// ## phaseFlips
-/// Bool[dim]: phase correction. phaseFlips[i] is true if state |i⟩ gets Z.
-/// Empty array means no phase correction needed.
+/// ## givens
+/// Quantized Givens layers and sign corrections of the unitary. Empty `phases` apply no
+/// signs.
 /// ## target
 /// Target register in MSB (Most Significant Bit)-first format
 /// (target[0] = MSB, target[n-1] = LSB (Least Significant Bit)).
@@ -343,15 +292,16 @@ operation ApplyPhasePolynomial(phases : Bool[], register : Qubit[]) : Unit {
 /// ## angleReg
 /// Clean register that receives each loaded angle.
 operation ApplyRealUnitaryViaGivens(
-    layerAngleData : Bool[][][],
-    layerIsShifted : Bool[],
-    phaseFlips : Bool[],
+    givens : QuantizedGivensDecomposition,
     target : Qubit[],
     phaseGradient : Qubit[],
     angleReg : Qubit[]
 ) : Unit {
     let n = Length(target);
-    Fact(Length(layerIsShifted) == Length(layerAngleData), "Givens data needs one shift flag per layer.");
+    let layers = givens.layers;
+    let layerIsShifted = givens.layerShifted;
+    let phaseFlips = givens.phases;
+    Fact(Length(layerIsShifted) == Length(layers), "Givens data needs one shift flag per layer.");
     Fact(IsEmpty(phaseFlips) or Length(phaseFlips) == 1 <<< n, "Givens phase data needs one entry per basis state of the target register.");
     // Active qubit = LSB of state = target[n-1].
     // Address = higher bits = target[0..n-2], reversed for Select (LSB-first).
@@ -360,14 +310,14 @@ operation ApplyRealUnitaryViaGivens(
 
     // All layers have the same circuit structure (same register sizes), only data differs.
     // Cache by shifted/non-shifted variant to avoid re-tracing ~1000 identical layers.
-    for i in 0..Length(layerAngleData) - 1 {
+    for i in 0..Length(layers) - 1 {
         let variant = n * 2 + (if layerIsShifted[i] { 1 } else { 0 });
         if BeginEstimateCaching("GivensLayer", variant) {
             // Reversed(target) gives LE (little-endian) view: index 0 = LSB of state value
             if layerIsShifted[i] {
                 AddConstant(-1, Reversed(target));
             }
-            ApplyMultiplexedRy(layerAngleData[i], address, activeQubit, phaseGradient, angleReg);
+            ApplyMultiplexedRy(layers[i], address, activeQubit, phaseGradient, angleReg);
             if layerIsShifted[i] {
                 AddConstant(1, Reversed(target));
             }
@@ -392,12 +342,9 @@ operation ApplyRealUnitaryViaGivens(
 /// The phase correction is controlled as well.
 ///
 /// # Input
-/// ## layerAngleData
-/// Bool[numLayers][numAngles][rotationBits]: angle data for each Givens layer.
-/// ## layerIsShifted
-/// Bool[numLayers]: whether each layer is shifted.
-/// ## phaseFlips
-/// Bool[dim]: phase correction. Empty array means no correction.
+/// ## givens
+/// Quantized Givens layers and sign corrections of the unitary. Empty `phases` apply no
+/// signs.
 /// ## target
 /// Target register.
 /// ## phaseGradient
@@ -407,27 +354,28 @@ operation ApplyRealUnitaryViaGivens(
 /// ## angleReg
 /// Clean register that receives each loaded angle.
 operation ApplyControlledRealUnitaryViaGivens(
-    layerAngleData : Bool[][][],
-    layerIsShifted : Bool[],
-    phaseFlips : Bool[],
+    givens : QuantizedGivensDecomposition,
     target : Qubit[],
     phaseGradient : Qubit[],
     control : Qubit,
     angleReg : Qubit[]
 ) : Unit {
     let n = Length(target);
-    Fact(Length(layerIsShifted) == Length(layerAngleData), "Givens data needs one shift flag per layer.");
+    let layers = givens.layers;
+    let layerIsShifted = givens.layerShifted;
+    let phaseFlips = givens.phases;
+    Fact(Length(layerIsShifted) == Length(layers), "Givens data needs one shift flag per layer.");
     Fact(IsEmpty(phaseFlips) or Length(phaseFlips) == 1 <<< n, "Givens phase data needs one entry per basis state of the target register.");
     let activeQubit = target[n - 1];
     let address = Reversed(target[0..n - 2]);
 
-    for i in 0..Length(layerAngleData) - 1 {
+    for i in 0..Length(layers) - 1 {
         let variant = n * 2 + (if layerIsShifted[i] { 1 } else { 0 });
         if BeginEstimateCaching("ControlledGivensLayer", variant) {
             if layerIsShifted[i] {
                 AddConstant(-1, Reversed(target));
             }
-            ApplyControlledMultiplexedRy(layerAngleData[i], address, control, activeQubit, phaseGradient, angleReg);
+            ApplyControlledMultiplexedRy(layers[i], address, control, activeQubit, phaseGradient, angleReg);
             if layerIsShifted[i] {
                 AddConstant(1, Reversed(target));
             }
