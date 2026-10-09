@@ -5,6 +5,8 @@
 # Licensed under the MIT License. See LICENSE.txt in the project root for license information.
 # --------------------------------------------------------------------------------------------
 
+import json
+
 import numpy as np
 import pytest
 
@@ -16,7 +18,16 @@ from qdk_chemistry.data import (
     LatticeGraph,
     ModelHamiltonianDescription,
 )
+from qdk_chemistry.data.hamiltonian_description import model_hamiltonian
 from qdk_chemistry.utils.model_hamiltonians import create_hubbard_hamiltonian
+
+
+class _ShellModelDescription(ModelHamiltonianDescription):
+    """A model whose parameters can be arrays or per-shell values."""
+
+    @property
+    def kind(self) -> str:
+        return "shell_test"
 
 
 @pytest.fixture
@@ -44,7 +55,7 @@ def test_holds_lattice_and_float_parameters(model: FermiHubbardModelHamiltonianD
 def test_file_round_trip(model: FermiHubbardModelHamiltonianDescription, tmp_path, format_type: str) -> None:
     """The lattice and parameters survive a JSON or HDF5 round trip."""
     suffix = "json" if format_type == "json" else "h5"
-    path = tmp_path / f"model.fermi_hubbard_model_hamiltonian_description.{suffix}"
+    path = tmp_path / f"model.model_hamiltonian_description.{suffix}"
     model.to_file(path, format_type)
 
     restored = FermiHubbardModelHamiltonianDescription.from_file(path, format_type)
@@ -71,3 +82,82 @@ def test_materialize_calls_create_hubbard_hamiltonian(model: FermiHubbardModelHa
     assert isinstance(hamiltonian, Hamiltonian)
     np.testing.assert_allclose(hamiltonian.get_one_body_integrals()[0], expected.get_one_body_integrals()[0])
     np.testing.assert_allclose(hamiltonian.get_two_body_integrals()[0], expected.get_two_body_integrals()[0])
+
+
+def test_materialize_doubles_hopping_through_two_periodic_images() -> None:
+    """A periodic direction of length 2 joins each neighbor pair through two images."""
+    model = FermiHubbardModelHamiltonianDescription(
+        LatticeGeometry.square(2, 2, periodic_x=True, periodic_y=True), t=1.0, u=4.0
+    )
+    expected = create_hubbard_hamiltonian(
+        LatticeGraph.square(2, 2, periodic_x=True, periodic_y=True), epsilon=0.0, t=1.0, U=4.0
+    )
+
+    np.testing.assert_allclose(model.materialize().get_one_body_integrals()[0], expected.get_one_body_integrals()[0])
+
+
+def test_base_raises_for_what_a_model_must_provide() -> None:
+    """The base has no kind and cannot materialize."""
+    base = ModelHamiltonianDescription(LatticeGeometry.chain(2), {"t": 1.0})
+
+    with pytest.raises(NotImplementedError, match="must implement materialize"):
+        base.materialize()
+    with pytest.raises(NotImplementedError, match="must implement kind"):
+        _ = base.kind
+
+
+def test_from_json_dispatches_on_kind(model: FermiHubbardModelHamiltonianDescription) -> None:
+    """The base loader rebuilds the recorded model and rejects an unknown kind."""
+    data = model.to_json()
+    restored = ModelHamiltonianDescription.from_json(data)
+
+    assert data["kind"] == "fermi_hubbard"
+    assert type(restored) is FermiHubbardModelHamiltonianDescription
+    assert restored.content_hash() == model.content_hash()
+    with pytest.raises(ValueError, match="Unknown ModelHamiltonianDescription kind: 'shell_test'"):
+        ModelHamiltonianDescription.from_json(_ShellModelDescription(LatticeGeometry.chain(2), {"t": 1.0}).to_json())
+
+
+def test_array_and_shell_parameters_are_frozen() -> None:
+    """Arrays become read-only float copies and shell mappings become read-only and ordered by shell."""
+    epsilon = np.array([0.1, 0.2, 0.3])
+    model = _ShellModelDescription(LatticeGeometry.chain(3), {"epsilon": epsilon, "j": {2: 0.5, 1: np.array([1, 2])}})
+    epsilon[0] = 9.0
+
+    stored = model.parameters["epsilon"]
+    assert isinstance(stored, np.ndarray)
+    np.testing.assert_array_equal(stored, [0.1, 0.2, 0.3])
+    with pytest.raises(ValueError, match="read-only"):
+        stored[0] = 1.0
+    shells = model.parameters["j"]
+    assert list(shells) == [1, 2]
+    assert shells[1].dtype == np.float64
+    with pytest.raises(TypeError):
+        shells[3] = 1.0  # type: ignore[index]
+    assert "epsilon=array(3,), j={1: array(2,), 2: 0.5}" in model.get_summary()
+
+
+def test_hash_distinguishes_parameter_forms() -> None:
+    """A float, an array and a shell mapping of the same value hash differently."""
+    lattice = LatticeGeometry.chain(3)
+
+    def content_hash(value: model_hamiltonian.ModelParameter) -> str:
+        return _ShellModelDescription(lattice, {"j": value}).content_hash()
+
+    forms = [1.0, np.array([1.0]), np.array([1.0, 1.0]), {1: 1.0}, {2: 1.0}, {1: np.array([1.0])}]
+    assert len({content_hash(value) for value in forms}) == len(forms)
+    assert content_hash({2: 0.5, 1: 1.0}) == content_hash({1: 1.0, 2: 0.5})
+    assert content_hash(np.array([1, 2])) == content_hash(np.array([1.0, 2.0]))
+
+
+def test_array_and_shell_parameters_round_trip_through_json() -> None:
+    """Arrays serialize as lists and shell mappings as objects keyed by shell."""
+    model = _ShellModelDescription(
+        LatticeGeometry.chain(3), {"epsilon": np.array([0.1, 0.2, 0.3]), "j": {2: 0.5, 1: np.array([1.0, 2.0])}}
+    )
+    data = json.loads(json.dumps(model.to_json()))
+
+    assert data["parameters"] == {"epsilon": [0.1, 0.2, 0.3], "j": {"1": [1.0, 2.0], "2": 0.5}}
+    parameters = {name: model_hamiltonian._decode_parameter(value) for name, value in data["parameters"].items()}
+    restored = _ShellModelDescription(LatticeGeometry.from_json(json.dumps(data["lattice"])), parameters)
+    assert restored.content_hash() == model.content_hash()

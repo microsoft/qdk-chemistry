@@ -5,6 +5,8 @@
 # Licensed under the MIT License. See LICENSE.txt in the project root for license information.
 # --------------------------------------------------------------------------------------------
 
+from typing import cast
+
 from qdk_chemistry._core.data import Hamiltonian, LatticeGeometry, LatticeGraph
 from qdk_chemistry._core.utils.model_hamiltonians import create_hubbard_hamiltonian
 from qdk_chemistry.data.hamiltonian_description.model_hamiltonian import ModelHamiltonianDescription
@@ -22,16 +24,6 @@ class FermiHubbardModelHamiltonianDescription(ModelHamiltonianDescription):
           + U \sum_i n_{i\uparrow} n_{i\downarrow}
     """
 
-    @staticmethod
-    def data_type_name() -> str:
-        """Return the wire-format identifier for a Fermi-Hubbard model description.
-
-        Returns:
-            ``"fermi_hubbard_model_hamiltonian_description"``.
-
-        """
-        return "fermi_hubbard_model_hamiltonian_description"
-
     def __init__(self, lattice: LatticeGeometry, t: float, u: float, epsilon: float = 0.0) -> None:
         """Initialize a Fermi-Hubbard model description.
 
@@ -42,7 +34,12 @@ class FermiHubbardModelHamiltonianDescription(ModelHamiltonianDescription):
             epsilon: The on-site orbital energy.
 
         """
-        super().__init__(lattice, {"t": t, "u": u, "epsilon": epsilon})
+        super().__init__(lattice, {"t": float(t), "u": float(u), "epsilon": float(epsilon)})
+
+    @property
+    def kind(self) -> str:
+        """Return ``"fermi_hubbard"``."""
+        return "fermi_hubbard"
 
     def materialize(self) -> Hamiltonian:
         """Build the Fermi-Hubbard Hamiltonian with ``create_hubbard_hamiltonian``.
@@ -53,7 +50,7 @@ class FermiHubbardModelHamiltonianDescription(ModelHamiltonianDescription):
         """
         return create_hubbard_hamiltonian(
             LatticeGraph.from_geometry(self.lattice),
-            epsilon=self.parameters["epsilon"],
-            t=self.parameters["t"],
-            U=self.parameters["u"],
+            epsilon=cast("float", self.parameters["epsilon"]),
+            t=cast("float", self.parameters["t"]),
+            U=cast("float", self.parameters["u"]),
         )

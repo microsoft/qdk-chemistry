@@ -14,18 +14,6 @@ class HamiltonianDescription(DataClass):
     """Abstract class for a Hamiltonian description that a Hamiltonian unitary builder takes.
 
     :class:`~qdk_chemistry.data.QubitOperator` and :class:`~qdk_chemistry.data.ModelHamiltonianDescription`
-    are Hamiltonian descriptions; a plugin subclasses this class to add its own.
+    are Hamiltonian descriptions; a plugin subclasses this class to add its own. Each subclass declares
+    its own wire format, so this class has none.
     """
-
-    @staticmethod
-    def data_type_name() -> str:
-        """Return the wire-format identifier for Hamiltonian descriptions.
-
-        Returns:
-            ``"hamiltonian_description"``.
-
-        """
-        return "hamiltonian_description"
-
-    # Serialization version for this class
-    _serialization_version = "0.1.0"
