@@ -183,7 +183,7 @@ To accomplish this, the :class:`~qdk_chemistry.algorithms.phase_estimation.circu
 
    Default: :class:`~qdk_chemistry.data.AlgorithmRef` to ``"hamiltonian_unitary_builder"`` with method ``"trotter"``
 
-   The unitary builder (typically :doc:`HamiltonianUnitaryBuilder <hamiltonian_unitary_builder>`) produces a :class:`~qdk_chemistry.data.UnitaryRepresentation` of the target operator from a :class:`~qdk_chemistry.data.QubitOperator`.
+   The unitary builder (typically :doc:`HamiltonianUnitaryBuilder <hamiltonian_unitary_builder>`) produces a :class:`~qdk_chemistry.data.UnitaryRepresentation` of the target operator from a :class:`~qdk_chemistry.data.HamiltonianDescription`.
    The builder is configured with the desired time-evolution strategy and time parameter (``time`` setting).
 
 **Nested Algorithm 2: Controlled Circuit Mapper**

@@ -336,7 +336,7 @@ Related classes
 ---------------
 
 - :class:`~qdk_chemistry.data.QpeResult`: Output data class containing phase, energy, and alias information
-- :class:`~qdk_chemistry.data.QubitOperator`: Input qubit Hamiltonian
+- :class:`~qdk_chemistry.data.HamiltonianDescription`: Input Hamiltonian, such as a :class:`~qdk_chemistry.data.QubitOperator` or a :class:`~qdk_chemistry.data.ModelHamiltonianDescription`
 - :class:`~qdk_chemistry.data.Circuit`: State-preparation circuit from :doc:`StatePreparation <state_preparation>`
 - :class:`~qdk_chemistry.data.UnitaryRepresentation`: Output of :doc:`HamiltonianUnitaryBuilder <hamiltonian_unitary_builder>`
 - :class:`~qdk_chemistry.data.CircuitExecutorData`: Measurement results from :doc:`CircuitExecutor <circuit_executor>`
