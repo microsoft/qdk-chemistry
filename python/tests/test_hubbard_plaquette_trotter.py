@@ -6,6 +6,7 @@
 # --------------------------------------------------------------------------------------------
 
 import math
+from collections.abc import Mapping
 
 import h5py
 import numpy as np
@@ -297,19 +298,23 @@ def _benchmark_counts(size: int, max_batch_size: int = -1) -> dict[str, int]:
     return {key: int(counts.get(key, 0)) for key in _COUNT_KEYS}
 
 
+def _assert_counts_match_the_pins(counts: Mapping[str, float], size: int) -> None:
+    """Exact, except rotations get rel=1e-4 for cross-platform synthesis drift."""
+    mismatches = {
+        key: (counts.get(key, 0), pinned)
+        for key, pinned in zip(_COUNT_KEYS, _BENCHMARK_COUNTS[size], strict=True)
+        if counts.get(key, 0) != pytest.approx(pinned, rel=1e-4 if key.startswith("rotation") else 0)
+    }
+    assert not mismatches, f"L={size} (actual, pinned): {mismatches}"
+
+
 class TestBenchmarkResources:
     """Pin the logical cost the 2D Hubbard estimation notebook reports."""
 
     @pytest.mark.parametrize("size", [2, 4])
     def test_counts_match_the_pins(self, size):
-        """Exact, except rotations get rel=1e-4 for cross-platform synthesis drift."""
-        counts = _benchmark_counts(size)
-        mismatches = {
-            key: (counts[key], pinned)
-            for key, pinned in zip(_COUNT_KEYS, _BENCHMARK_COUNTS[size], strict=True)
-            if counts[key] != pytest.approx(pinned, rel=1e-4 if key.startswith("rotation") else 0)
-        }
-        assert not mismatches, f"L={size} (actual, pinned): {mismatches}"
+        """``test_estimation_hubbard_2d`` holds the notebook's own output to the same pins."""
+        _assert_counts_match_the_pins(_benchmark_counts(size), size)
 
     def test_batch_cap_trades_qubits_for_rotations(self):
         """A cap of 8 keeps the adder tree on fewer qubits; a cap of 1 turns phasing off."""
