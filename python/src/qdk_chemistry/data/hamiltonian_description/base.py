@@ -11,9 +11,11 @@ __all__: list[str] = ["HamiltonianDescription"]
 
 
 class HamiltonianDescription(DataClass):
-    """Abstract class for a Hamiltonian description that a Hamiltonian unitary builder takes.
+    """Abstract base for data classes that describe a Hamiltonian.
 
     :class:`~qdk_chemistry.data.QubitOperator` and :class:`~qdk_chemistry.data.ModelHamiltonianDescription`
-    are Hamiltonian descriptions; a plugin subclasses this class to add its own. Each subclass declares
-    its own wire format, so this class has none.
+    are examples; a plugin subclasses this class to add its own. Algorithms such as
+    :class:`~qdk_chemistry.algorithms.HamiltonianUnitaryBuilder` and
+    :class:`~qdk_chemistry.algorithms.PhaseEstimation` take one. Each subclass declares its own wire format,
+    so this class has none.
     """

@@ -2,7 +2,7 @@ Hamiltonian Unitary Builder
 ===========================
 
 The :class:`~qdk_chemistry.algorithms.HamiltonianUnitaryBuilder` algorithm in QDK/Chemistry constructs a unitary based on the Hamiltonian, such as time simulation unitary :math:`U(t) = e^{-iHt}` or block-encoded unitary :math:`U = \frac{H}{\|H\|}`.
-Following QDK/Chemistry's :doc:`algorithm design principles <../design/index>`, it takes a :class:`~qdk_chemistry.data.HamiltonianDescription` (a :class:`~qdk_chemistry.data.QubitOperator` or a :class:`~qdk_chemistry.data.ModelHamiltonianDescription`) and produces a :class:`~qdk_chemistry.data.UnitaryRepresentation` as output.
+Following QDK/Chemistry's :doc:`algorithm design principles <../design/index>`, it takes a :class:`~qdk_chemistry.data.HamiltonianDescription` (for example a :class:`~qdk_chemistry.data.QubitOperator` or a :class:`~qdk_chemistry.data.ModelHamiltonianDescription`) and produces a :class:`~qdk_chemistry.data.UnitaryRepresentation` as output.
 
 Overview
 --------
