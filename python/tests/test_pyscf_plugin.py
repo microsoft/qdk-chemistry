@@ -2384,8 +2384,24 @@ class TestPyscfPlugin:
         assert scf_ecp.mol.multiplicity == 2
         assert scf_ecp.mol.nelectron == 19
 
-    def test_hamiltonian_to_scf_preserves_x2c_hamiltonian(self):
+    @pytest.mark.parametrize("constructor", ["qdk", "qdk_cholesky"])
+    @pytest.mark.parametrize("relativity", ["sf-x2c", "sf-x2c-contracted"])
+    def test_hamiltonian_to_scf_preserves_x2c_hamiltonian(self, constructor: str, relativity: str) -> None:
         """Preserve the X2C one-body operator and scalar core when converting to PySCF."""
+        solver = algorithms.create("scf_solver", "qdk", enable_gdm=False)
+        _, wavefunction = solver.run(create_water_structure(), 0, 1, "sto-3g")
+        hamiltonian = algorithms.create("hamiltonian_constructor", constructor, relativity=relativity).run(
+            wavefunction.get_orbitals()
+        )
+        occ_a, occ_b = wavefunction.get_total_orbital_occupations()
+        mf = hamiltonian_to_scf(hamiltonian, occ_a, occ_b)
+        coeff = spin_channel_matrix(wavefunction.get_orbitals().coefficients(), axes.alpha())
+        h1, _ = hamiltonian.get_one_body_integrals()
+        np.testing.assert_allclose(coeff.T @ mf.get_hcore() @ coeff, h1, rtol=0.0, atol=scf_energy_tolerance)
+        assert mf.energy_nuc() == hamiltonian.get_core_energy()
+
+    def test_hamiltonian_to_scf_preserves_scf_optimized_x2c_hamiltonian(self) -> None:
+        """Preserve the X2C one-body operator and scalar core from X2C-optimized SCF orbitals."""
         solver = algorithms.create("scf_solver", "qdk", relativity="sf-x2c", enable_gdm=False)
         _, wavefunction = solver.run(create_water_structure(), 0, 1, "sto-3g")
         hamiltonian = algorithms.create("hamiltonian_constructor", "qdk", relativity="sf-x2c").run(
@@ -3139,3 +3155,45 @@ class TestQDKChemistryPySCFBasisConversion:
         assert mol1.nao == mol2.nao
         assert mol1.nelectron == mol2.nelectron
         assert np.isclose(energy1, energy2, rtol=float_comparison_relative_tolerance, atol=scf_energy_tolerance)
+
+        # PySCF's local ECP term (l = -1) is OrbitalType.UL in QDK, in both conversion directions.
+        mol3 = basis_to_pyscf_mol(qdk_native_basis)
+        assert [component[0] for component in mol3._ecp["Ag"][1]] == [component[0] for component in mol1._ecp["Ag"][1]]
+        scf3 = pyscf.scf.RHF(mol3)
+        scf3.verbose = 0
+        assert np.isclose(
+            scf3.kernel(), energy1, rtol=float_comparison_relative_tolerance, atol=10 * scf_energy_tolerance
+        )
+
+        assert {shell.orbital_type for shell in qdk_basis.get_ecp_shells()} == {
+            shell.orbital_type for shell in qdk_native_basis.get_ecp_shells()
+        }
+        qdk_energy_converted, _ = qdk_scf.run(structure, 0, 1, qdk_basis)
+        assert np.isclose(
+            qdk_energy_converted, qdk_energy, rtol=float_comparison_relative_tolerance, atol=10 * scf_energy_tolerance
+        )
+
+    def test_zero_local_ecp_roundtrip(self):
+        """Test an ECP without a local term (Br cc-pVDZ-PP) in both conversion directions."""
+        mol = pyscf.gto.M(
+            atom="H 0 0 0; Br 0 0 1.414",
+            basis={"H": "cc-pvdz", "Br": "cc-pvdz-pp"},
+            ecp={"Br": "cc-pvdz-pp"},
+            verbose=0,
+        )
+        reference = pyscf.scf.RHF(mol)
+        reference.verbose = 0
+        energy = reference.kernel()
+        structure = Structure(symbols=["H", "Br"], coordinates=mol.atom_coords())
+
+        qdk_basis = pyscf_mol_to_qdk_basis(mol, structure)
+        assert OrbitalType.UL not in {shell.orbital_type for shell in qdk_basis.get_ecp_shells()}
+
+        roundtrip = pyscf.scf.RHF(basis_to_pyscf_mol(qdk_basis))
+        roundtrip.verbose = 0
+        assert np.isclose(
+            roundtrip.kernel(), energy, rtol=float_comparison_relative_tolerance, atol=scf_energy_tolerance
+        )
+
+        qdk_energy, _ = algorithms.create("scf_solver", "qdk").run(structure, 0, 1, qdk_basis)
+        assert np.isclose(qdk_energy, energy, rtol=float_comparison_relative_tolerance, atol=10 * scf_energy_tolerance)

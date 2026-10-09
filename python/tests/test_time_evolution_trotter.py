@@ -5,16 +5,27 @@
 # Licensed under the MIT License. See LICENSE.txt in the project root for license information.
 # --------------------------------------------------------------------------------------------
 
+from itertools import permutations
+
 import numpy as np
 import pytest
 import scipy
 
 from qdk_chemistry.algorithms.hamiltonian_unitary_builder.time_evolution.trotter import Trotter
-from qdk_chemistry.data import FlatPartition, QubitOperator, UnitaryRepresentation
+from qdk_chemistry.algorithms.hamiltonian_unitary_builder.time_evolution.trotter_error import trotter_steps_commutator
+from qdk_chemistry.data import (
+    FlatPartition,
+    LatticeGeometry,
+    LatticeGraph,
+    LayeredPartition,
+    QubitOperator,
+    UnitaryRepresentation,
+)
 from qdk_chemistry.data.unitary_representation.containers.pauli_product_formula import (
     ExponentiatedPauliTerm,
     PauliProductFormulaContainer,
 )
+from qdk_chemistry.utils.model_hamiltonians import create_kitaev_hamiltonian, kitaev_honeycomb_bond_flavors
 from qdk_chemistry.utils.pauli_commutation import (
     commutator_bound_first_order,
     commutator_bound_higher_order,
@@ -104,6 +115,61 @@ class TestTrotter:
             rtol=float_comparison_relative_tolerance,
         )
 
+    @pytest.mark.parametrize("order", [1, 2, 4, 6])
+    @pytest.mark.parametrize("power_strategy", ["repeat", "rescale"])
+    def test_sparse_terms_preserve_trotter_decomposition(self, order, power_strategy):
+        """Sparse input preserves public formula terms and symbolic power metadata."""
+        dense = QubitOperator(["IX", "ZZ"], np.array([2.0, 1.0]))
+        sparse = QubitOperator.from_sparse_terms(
+            2,
+            [{0: "X"}, {0: "Z", 1: "Z"}],
+            np.array([2.0, 1.0]),
+        )
+        builder = Trotter(order=order, num_divisions=4, time=0.2, power=3, power_strategy=power_strategy)
+
+        dense_container = builder.run(dense).get_container()
+        sparse_container = builder.run(sparse).get_container()
+
+        assert isinstance(sparse_container, PauliProductFormulaContainer)
+        assert sparse_container.num_qubits == 2
+        assert sparse_container.step_reps == (12 if power_strategy == "repeat" else 4)
+        assert sparse_container.scale == (0.2 if power_strategy == "repeat" else 0.2 * 3)
+        assert list(sparse_container.step_terms) == list(dense_container.step_terms)
+
+    @pytest.mark.parametrize("sparse", [False, True])
+    def test_fourth_order_angle_rounding_matches_across_storage(self, sparse):
+        """Dense and sparse storage share one multiplication order, so angles match bit for bit."""
+        coefficients = np.array([0.8, -0.4])
+        hamiltonian = (
+            QubitOperator.from_sparse_terms(1, [{0: "X"}, {0: "Z"}], coefficients)
+            if sparse
+            else QubitOperator(["X", "Z"], coefficients)
+        )
+        terms = Trotter(order=4, time=-0.7, num_divisions=3).run(hamiltonian).get_container().step_terms
+        u = 1 / (4 - 4 ** (1 / 3))
+        middle = 1 - 4 * u
+        fractions = [
+            0.5 * u,
+            u,
+            0.5 * u + 0.5 * u,
+            u,
+            0.5 * u + 0.5 * middle,
+            middle,
+            0.5 * middle + 0.5 * u,
+            u,
+            0.5 * u + 0.5 * u,
+            u,
+            0.5 * u,
+        ]
+        dt = -0.7 / 3
+        expected = [
+            ExponentiatedPauliTerm({0: "X" if i % 2 == 0 else "Z"}, float(coefficients[i % 2]) * (dt * fraction))
+            for i, fraction in enumerate(fractions)
+        ]
+        assert [(term.pauli_term, term.angle.hex()) for term in terms] == [
+            (term.pauli_term, term.angle.hex()) for term in expected
+        ]
+
     def test_single_step_no_merge_without_partition(self):
         """Test that without term_partition, duplicate terms are not merged."""
         pauli_strings = ["XII", "IXI", "XII"]
@@ -127,7 +193,7 @@ class TestTrotter:
         builder = Trotter()
         hamiltonian = QubitOperator(pauli_strings=["X", "Z"], coefficients=[1.0, 0.5])
 
-        terms = builder._decompose_trotter_step(hamiltonian, time=2.0)
+        terms = builder._decompose_grouped_trotter_step(hamiltonian, time=2.0)[0]
 
         assert len(terms) == 2
 
@@ -142,7 +208,7 @@ class TestTrotter:
             coefficients=[1e-15, 1.0],
         )
 
-        terms = builder._decompose_trotter_step(hamiltonian, time=1.0, atol=1e-12)
+        terms = builder._decompose_grouped_trotter_step(hamiltonian, time=1.0, atol=1e-12)[0]
 
         assert len(terms) == 1
         assert terms[0].pauli_term == {0: "Z"}
@@ -156,7 +222,7 @@ class TestTrotter:
         )
 
         with pytest.raises(ValueError, match="Non-Hermitian"):
-            builder._decompose_trotter_step(hamiltonian, time=1.0)
+            builder._decompose_grouped_trotter_step(hamiltonian, time=1.0)
 
     def test_not_implemented_order(self):
         """Test that unsupported Trotter orders raise NotImplementedError."""
@@ -253,7 +319,7 @@ class TestTrotter:
         builder = Trotter(order=2)
         hamiltonian = QubitOperator(pauli_strings=["X", "Z"], coefficients=[3.0, 0.5])
 
-        terms = builder._decompose_trotter_step(hamiltonian, time=2.0)
+        terms = builder._decompose_grouped_trotter_step(hamiltonian, time=2.0)[0]
 
         assert len(terms) == 3
 
@@ -269,7 +335,7 @@ class TestTrotter:
             coefficients=[1e-15, 1.0],
         )
 
-        terms = builder._decompose_trotter_step(hamiltonian, time=1.0, atol=1e-12)
+        terms = builder._decompose_grouped_trotter_step(hamiltonian, time=1.0, atol=1e-12)[0]
 
         assert len(terms) == 1
         assert terms[0].pauli_term == {0: "Z"}
@@ -499,7 +565,7 @@ class TestTrotter:
             coefficients=[1e-15, 1.0],
         )
 
-        terms = builder._decompose_trotter_step(hamiltonian, time=1.0, atol=1e-12)
+        terms = builder._decompose_grouped_trotter_step(hamiltonian, time=1.0, atol=1e-12)[0]
 
         # All terms should be Z only (X filtered out).
         # After Suzuki recursion and schedule reduction, the total rotation
@@ -909,6 +975,122 @@ class TestNoPartitionFallback:
 
 class TestPartitionGrouping:
     """Tests for Trotter behavior when term_partition groups commuting terms."""
+
+    @pytest.mark.parametrize("sparse", [False, True])
+    def test_empty_layers_do_not_affect_group_order(self, sparse):
+        """Both storages discard empty layers before stably sorting groups by layer count."""
+        partition = LayeredPartition(strategy="commuting", groups=(((0,), (), ()), ((1,), (2,)), ((),)))
+        coefficients = np.ones(3)
+        hamiltonian = (
+            QubitOperator.from_sparse_terms(3, [{0: "X"}, {1: "Y"}, {2: "Z"}], coefficients, term_partition=partition)
+            if sparse
+            else QubitOperator(["IIX", "IYI", "ZII"], coefficients, term_partition=partition)
+        )
+        terms = Trotter(time=1.0).run(hamiltonian).get_container().step_terms
+        assert [term.pauli_term for term in terms] == [{0: "X"}, {1: "Y"}, {2: "Z"}]
+
+    @pytest.mark.parametrize("order", [2, 4])
+    def test_minimize_pauli_exponentials_requires_a_strict_reduction(self, order):
+        """Ties keep the declared order; unequal groups reach the fewest Pauli factors over all group orders."""
+
+        def step_terms(hamiltonian: QubitOperator, minimize: bool) -> list[ExponentiatedPauliTerm]:
+            builder = Trotter(order=order, time=1.0, minimize_pauli_exponentials=minimize)
+            return builder.run(hamiltonian).get_container().step_terms
+
+        tied = QubitOperator.from_sparse_terms(
+            3,
+            [{0: "X"}, {1: "Y"}, {2: "Z"}],
+            np.ones(3),
+            term_partition=LayeredPartition(strategy="commuting", groups=(((0,),), ((1,),), ((2,),))),
+        )
+        assert step_terms(tied, True) == step_terms(tied, False)
+
+        larger_first = QubitOperator.from_sparse_terms(
+            4,
+            [{0: "X"}, {1: "X"}, {2: "Z"}, {3: "Y"}],
+            np.ones(4),
+            term_partition=LayeredPartition(strategy="commuting", groups=(((0, 1),), ((2,),), ((3,),))),
+        )
+        assert len(step_terms(larger_first, True)) < len(step_terms(larger_first, False))
+
+        def unequal(groups) -> QubitOperator:
+            return QubitOperator.from_sparse_terms(
+                6,
+                [{0: "X"}, {1: "X"}, {2: "X"}, {3: "Z"}, {4: "Y"}, {5: "Y"}],
+                np.ones(6),
+                term_partition=LayeredPartition(strategy="commuting", groups=groups),
+            )
+
+        declared = (((0, 1, 2),), ((3,),), ((4, 5),))
+        minimized = len(step_terms(unequal(declared), True))
+        assert minimized == min(len(step_terms(unequal(groups), False)) for groups in permutations(declared))
+        assert minimized < len(step_terms(unequal(declared), False))
+
+    @pytest.mark.parametrize(
+        ("partition", "reference_partition"),
+        [
+            (None, None),
+            (
+                FlatPartition(strategy="commuting", groups=[[0], [1], [2]]),
+                FlatPartition(strategy="commuting", groups=[[0], [1]]),
+            ),
+            (
+                LayeredPartition(strategy="commuting", groups=(((0,), (2,)), ((1,),))),
+                LayeredPartition(strategy="commuting", groups=(((0,),), ((1,),))),
+            ),
+        ],
+    )
+    def test_filtered_terms_do_not_change_the_schedule(self, partition, reference_partition):
+        """A below-threshold term adds no group or layer, so it cannot move the Strang center or the group order."""
+        with_roundoff = QubitOperator(["IX", "IZ", "YI"], np.array([1.0, 0.5, 1e-17]), term_partition=partition)
+        reference = QubitOperator(["IX", "IZ"], np.array([1.0, 0.5]), term_partition=reference_partition)
+
+        def formula(hamiltonian: QubitOperator) -> tuple:
+            container = Trotter(order=2, time=1.0, num_divisions=2).run(hamiltonian).get_container()
+            terms = [(dict(t.pauli_term), t.angle) for t in container.step_terms]
+            return terms, container.step_reps, container.layer_offsets
+
+        assert formula(with_roundoff) == formula(reference)
+
+    def test_kitaev_rotation_roundoff_keeps_the_identity_basis_schedule(self):
+        """Roundoff entries of a rotated isotropic Kitaev model leave the order-4 formula unchanged."""
+        geometry = LatticeGeometry.honeycomb_plaquettes(3, 3)
+        graph = LatticeGraph.from_geometry(geometry, shells=[1], bond_flavors=kitaev_honeycomb_bond_flavors())
+        rotation = np.array(
+            [
+                [1 / np.sqrt(6), 1 / np.sqrt(6), -2 / np.sqrt(6)],
+                [-1 / np.sqrt(2), 1 / np.sqrt(2), 0.0],
+                [1 / np.sqrt(3), 1 / np.sqrt(3), 1 / np.sqrt(3)],
+            ]
+        )
+        builder = Trotter(order=4, time=1.0, num_divisions=3)
+        identity = create_kitaev_hamiltonian(graph, 0.0, 0.0, 0.0, j=1.0)
+        rotated = create_kitaev_hamiltonian(graph, 0.0, 0.0, 0.0, j=1.0, spin_basis_transform=rotation)
+
+        assert len(rotated.coefficients) > len(identity.coefficients)
+        assert (
+            builder.run(rotated).get_container().num_pauli_exponentials
+            == builder.run(identity).get_container().num_pauli_exponentials
+        )
+
+    def test_automatic_steps_bound_the_minimized_order(self):
+        """Second-order automatic steps use the commutator bound of the reordered terms."""
+        labels = ["ZX", "XZ", "ZZ", "XY", "ZY"]
+        coefficients = np.array([1.44, 0.9, 0.44, 1.5, 1.15])
+        partition = FlatPartition(strategy="commuting", groups=[[0, 1], [2, 3], [4]])
+        hamiltonian = QubitOperator(labels, coefficients, term_partition=partition)
+        builder = Trotter(order=2, time=1.0, target_accuracy=1e-3, minimize_pauli_exponentials=True)
+        container = builder.run(hamiltonian).get_container()
+
+        # The largest group moves to the center, so the second group leads.
+        emitted = [2, 3, 4, 0, 1]
+        expected_terms = [Trotter._pauli_label_to_map(labels[i]) for i in emitted]
+        assert [term.pauli_term for term in container.step_terms[:5]] == expected_terms
+        steps = trotter_steps_commutator(
+            QubitOperator([labels[i] for i in emitted], coefficients[emitted]), 1.0, 1e-3, order=2
+        )
+        assert steps > trotter_steps_commutator(QubitOperator(labels, coefficients), 1.0, 1e-3, order=2)
+        assert container.step_reps == steps
 
     def test_flat_partition_groups_commuting_terms(self):
         """Test that a FlatPartition groups commuting terms into parallelizable layers."""

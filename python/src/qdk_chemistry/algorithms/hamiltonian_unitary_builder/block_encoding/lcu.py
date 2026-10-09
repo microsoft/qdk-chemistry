@@ -26,6 +26,7 @@ from qdk_chemistry.data import (
     UnitaryRepresentation,
     Wavefunction,
 )
+from qdk_chemistry.data.qubit_operator.containers.pauli_decomposition import PauliDecompositionContainer
 from qdk_chemistry.data.unitary_representation.containers.block_encoding import (
     ControlledOperation,
     LCUContainer,
@@ -118,7 +119,7 @@ class LCUBuilder(HamiltonianUnitaryBuilder):
         quantum_walk: bool = self._settings.get("quantum_walk")
 
         container_type = qubit_hamiltonian.get_container_type()
-        if container_type != "pauli_decomposition":
+        if not isinstance(qubit_hamiltonian.get_container(), PauliDecompositionContainer):
             raise ValueError(
                 f"LCU block encoding requires a Pauli decomposition qubit operator; "
                 f"got the {container_type!r} representation."
@@ -127,14 +128,15 @@ class LCUBuilder(HamiltonianUnitaryBuilder):
         if not qubit_hamiltonian.is_hermitian():
             raise ValueError("LCU block encoding requires a Hermitian Hamiltonian.")
 
-        coefficients = qubit_hamiltonian.coefficients
-        num_terms = len(coefficients)
-        if num_terms == 0:
-            raise ValueError("LCU block encoding requires a non-empty Hamiltonian.")
+        real_terms = qubit_hamiltonian.get_real_coefficients()
+        if not real_terms:
+            raise ValueError("LCU block encoding requires a non-empty Hamiltonian after coefficient filtering.")
+        num_terms = len(real_terms)
         num_prepare_ancillas = int(np.ceil(np.log2(num_terms)))
 
-        prepare_wfn = self._build_prepare(qubit_hamiltonian, num_prepare_ancillas, self._settings.get("tolerance"))
-        select = self._build_select(qubit_hamiltonian, num_prepare_ancillas)
+        l1_norm = sum(abs(coefficient) for _, coefficient in real_terms)
+        prepare_wfn = self._build_prepare(real_terms, l1_norm, num_prepare_ancillas, self._settings.get("tolerance"))
+        select = self._build_select(real_terms, qubit_hamiltonian.num_qubits, num_prepare_ancillas)
 
         lcu_container = LCUContainer(
             power=power,
@@ -143,7 +145,7 @@ class LCUBuilder(HamiltonianUnitaryBuilder):
         )
 
         container = (
-            LCUWalkContainer(block_encoding=lcu_container, power=power, scale=qubit_hamiltonian.schatten_norm)
+            LCUWalkContainer(block_encoding=lcu_container, power=power, scale=l1_norm)
             if quantum_walk
             else lcu_container
         )
@@ -151,7 +153,9 @@ class LCUBuilder(HamiltonianUnitaryBuilder):
         return UnitaryRepresentation(container=container)
 
     @staticmethod
-    def _build_prepare(qubit_hamiltonian: QubitOperator, num_prepare_ancillas: int, tolerance: float) -> "Wavefunction":
+    def _build_prepare(
+        real_terms: list[tuple[str, float]], l1_norm: float, num_prepare_ancillas: int, tolerance: float
+    ) -> "Wavefunction":
         """Compute the prepare wavefunction from Hamiltonian coefficients.
 
         Normalizes the absolute Hamiltonian coefficients by the L1 norm and
@@ -161,17 +165,16 @@ class LCUBuilder(HamiltonianUnitaryBuilder):
         trivial 0-mode wavefunction.
 
         Args:
-            qubit_hamiltonian: The qubit operator whose coefficients define the amplitudes.
+            real_terms: Retained Pauli labels and real coefficients defining the amplitudes.
+            l1_norm: Retained coefficients' L1 norm used to normalize the amplitudes.
             num_prepare_ancillas: Number of qubits in the prepare ancillary register.
-            tolerance: Minimum allowable L1 norm; raises if the norm is below
-                this threshold.
+            tolerance: Minimum allowable L1 norm; raises if the norm is below this threshold.
 
         Returns:
             Wavefunction: A wavefunction over the ancilla register whose amplitudes
             encode the normalized coefficients (0-mode for single-term case).
 
         """
-        l1_norm = qubit_hamiltonian.schatten_norm
         if l1_norm < tolerance:
             raise ValueError("L1 norm is too small, cannot build LCU block encoding.")
 
@@ -180,7 +183,7 @@ class LCUBuilder(HamiltonianUnitaryBuilder):
             container = StateVectorContainer([1.0], [Configuration.from_bitstring("")], orbitals)
             return Wavefunction(container)
 
-        coefficients = np.array([c for _, c in qubit_hamiltonian.get_real_coefficients()])
+        coefficients = np.array([c for _, c in real_terms])
         abs_coeffs = np.abs(coefficients)
         amplitudes = np.sqrt(abs_coeffs / l1_norm)
 
@@ -199,15 +202,15 @@ class LCUBuilder(HamiltonianUnitaryBuilder):
         return Wavefunction(container)
 
     @staticmethod
-    def _build_select(qubit_hamiltonian: QubitOperator, num_prepare_ancillas: int) -> Select:
+    def _build_select(real_terms: list[tuple[str, float]], num_system_qubits: int, num_prepare_ancillas: int) -> Select:
         """Compute SELECT controlled operations and phases from Hamiltonian terms.
 
         Builds a list of controlled Pauli-string operations (one per Hamiltonian term)
         and an array of sign phases extracted from the real coefficients.
 
         Args:
-            qubit_hamiltonian: The qubit operator whose Pauli strings and coefficients
-                define the controlled operations.
+            real_terms: Retained Pauli labels and real coefficients defining the controlled operations.
+            num_system_qubits: Register width of the Hamiltonian.
             num_prepare_ancillas: Number of qubits in the prepare ancillary register.
 
         Returns:
@@ -215,11 +218,9 @@ class LCUBuilder(HamiltonianUnitaryBuilder):
                 and qubit layout.
 
         """
-        real_coeffs = qubit_hamiltonian.get_real_coefficients()
-        pauli_strings = [label for label, _ in real_coeffs]
-        coefficients = np.array([coeff for _, coeff in real_coeffs])
+        pauli_strings = [label for label, _ in real_terms]
+        coefficients = np.array([coeff for _, coeff in real_terms])
         num_terms = len(coefficients)
-        num_system_qubits = qubit_hamiltonian.num_qubits
         phases = np.where(coefficients >= 0, 1, -1)
 
         controlled_ops = [

@@ -11,12 +11,14 @@ Exposed classes are:
 - :class:`Ansatz`: Quantum chemical ansatz combining a Hamiltonian and wavefunction for energy calculations.
 - :class:`AOType`: Enumeration of basis set types (STO-3G, 6-31G, etc.).
 - :class:`BasisSet`: Gaussian basis set definitions for quantum calculations.
+- :class:`BondFlavorDefinition`: Mapping from one shell-axis class to an opaque semantic flavor ID.
 - :class:`CanonicalFourCenterHamiltonianContainer`: Container for four-center two-electron integrals in canonical form.
 - :class:`CholeskyHamiltonianContainer`: Container for Hamiltonians represented using Cholesky-decomposed integrals.
 - :class:`Circuit`: Quantum circuit information.
 - :class:`Configuration`: Electronic configuration state information.
 - :class:`ConfigurationSet`: Collection of electronic configurations with associated orbital information.
 - :class:`DataClass`: Base data class.
+- :class:`EdgeLabel`: Geometric shell and optional semantic flavor of a lattice graph edge.
 - :class:`ElectronicStructureSettings`: Specialized settings for electronic structure calculations.
 - :class:`Element`: Represents a chemical element with its properties.
 - :class:`EnergyExpectationResult`: Result for Hamiltonian energy expectation value and variance.
@@ -24,6 +26,7 @@ Exposed classes are:
 - :class:`Hamiltonian`: Quantum mechanical Hamiltonian operator representation.
 - :class:`HamiltonianContainer`: Abstract base class for different Hamiltonian storage formats.
 - :class:`HamiltonianType`: Enumeration of Hamiltonian types (Hermitian, NonHermitian).
+- :class:`LatticeGeometry`: Immutable two-dimensional geometry of a built-in lattice.
 - :class:`LatticeGraph`: Lattice graph defining the connectivity and geometry of a model Hamiltonian.
 - :class:`MajoranaMapping`: Majorana-to-Pauli mapping data class for fermion-to-qubit encodings.
 - :class:`MeasurementData`: Measurement bitstring data and metadata for QubitOperator objects.
@@ -75,16 +78,19 @@ from qdk_chemistry._core.data import (
     Ansatz,
     AOType,
     BasisSet,
+    BondFlavorDefinition,
     CanonicalFourCenterHamiltonianContainer,
     CholeskyHamiltonianContainer,
     Configuration,
     ConfigurationSet,
+    EdgeLabel,
     ElectronicStructureSettings,
     Element,
     FactorizedHamiltonianContainer,
     Hamiltonian,
     HamiltonianContainer,
     HamiltonianType,
+    LatticeGeometry,
     LatticeGraph,
     MajoranaMapping,
     ModelOrbitals,
@@ -145,6 +151,7 @@ __all__ = [
     "AmplitudeType",
     "Ansatz",
     "BasisSet",
+    "BondFlavorDefinition",
     "CanonicalFourCenterHamiltonianContainer",
     "CholeskyHamiltonianContainer",
     "Circuit",
@@ -154,6 +161,7 @@ __all__ = [
     "DataClass",
     "DrivenContainer",
     "DrivenQubitHamiltonian",
+    "EdgeLabel",
     "ElectronicStructureSettings",
     "Element",
     "EnergyExpectationResult",
@@ -163,6 +171,7 @@ __all__ = [
     "Hamiltonian",
     "HamiltonianContainer",
     "HamiltonianType",
+    "LatticeGeometry",
     "LatticeGraph",
     "LayeredPartition",
     "MajoranaMapping",

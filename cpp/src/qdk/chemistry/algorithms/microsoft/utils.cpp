@@ -13,7 +13,9 @@
 #include <qdk/chemistry/scf/util/gpu/cuda_helper.h>
 #endif
 
+#include <algorithm>
 #include <libint2.hpp>
+#include <map>
 #include <qdk/chemistry/utils/logger.hpp>
 #include <stdexcept>
 #include <string>
@@ -235,6 +237,13 @@ qdk::chemistry::data::BasisSet convert_basis_set_to_qdk(
   }
 
   // Collect ECP shells
+  // The backend stores each atom's local ECP term at its highest angular
+  // momentum.
+  std::map<size_t, uint64_t> local_am;
+  for (const auto& ecp_shell : basis_set.ecp_shells) {
+    auto& am = local_am[ecp_shell.atom_index];
+    am = std::max(am, ecp_shell.angular_momentum);
+  }
   std::vector<qdk::chemistry::data::Shell> qdk_ecp_shells;
   for (const auto& ecp_shell : basis_set.ecp_shells) {
     Eigen::VectorXd exponents(ecp_shell.contraction);
@@ -248,10 +257,13 @@ qdk::chemistry::data::BasisSet convert_basis_set_to_qdk(
     std::memcpy(rpowers.data(), ecp_shell.rpowers,
                 rpowers.size() * sizeof(int));
 
-    qdk_ecp_shells.emplace_back(ecp_shell.atom_index,
-                                static_cast<qdk::chemistry::data::OrbitalType>(
-                                    ecp_shell.angular_momentum),
-                                exponents, coefficients, rpowers);
+    const auto orbital_type =
+        ecp_shell.angular_momentum == local_am[ecp_shell.atom_index]
+            ? qdk::chemistry::data::OrbitalType::UL
+            : static_cast<qdk::chemistry::data::OrbitalType>(
+                  ecp_shell.angular_momentum);
+    qdk_ecp_shells.emplace_back(ecp_shell.atom_index, orbital_type, exponents,
+                                coefficients, rpowers);
   }
 
   // Handle ECP (Effective Core Potential) information if present
@@ -351,9 +363,37 @@ nlohmann::ordered_json convert_to_json(
 
   // Handle ECP
   std::vector<nlohmann::ordered_json> json_ecp_shells;
-  if (basis_set.has_ecp_shells()) {
-    for (const auto& ecp_shell : basis_set.get_ecp_shells()) {
-      json_ecp_shells.push_back(convert_to_json(ecp_shell));
+  for (size_t atom = 0; atom < basis_set.get_num_atoms(); ++atom) {
+    const auto& ecp_shells = basis_set.get_ecp_shells_for_atom(atom);
+    if (ecp_shells.empty()) {
+      continue;
+    }
+    // The backend takes each atom's highest ECP angular momentum as its local
+    // term, so UL goes one above the atom's other channels.
+    int local_am = 0;
+    bool has_local = false;
+    for (const auto& ecp_shell : ecp_shells) {
+      if (ecp_shell.orbital_type == qdk::chemistry::data::OrbitalType::UL) {
+        has_local = true;
+      } else {
+        local_am =
+            std::max(local_am, static_cast<int>(ecp_shell.orbital_type) + 1);
+      }
+    }
+    for (const auto& ecp_shell : ecp_shells) {
+      auto record = convert_to_json(ecp_shell);
+      if (ecp_shell.orbital_type == qdk::chemistry::data::OrbitalType::UL) {
+        record["am"] = local_am;
+      }
+      json_ecp_shells.push_back(record);
+    }
+    // A zero local term keeps the atom's highest channel non-local.
+    if (!has_local) {
+      json_ecp_shells.push_back({{"atom", atom},
+                                 {"am", local_am},
+                                 {"exp", std::vector<double>{1.0}},
+                                 {"coeff", std::vector<double>{0.0}},
+                                 {"rpowers", std::vector<int>{2}}});
     }
   }
 
@@ -505,8 +545,13 @@ qcs::Relativity parse_relativity(const std::string& label) {
       return entry.relativity;
     }
   }
+  std::string supported;
+  for (const auto& entry : kRelativityLabels) {
+    supported +=
+        (supported.empty() ? "'" : ", '") + std::string(entry.label) + "'";
+  }
   throw std::invalid_argument("Unsupported relativistic treatment '" + label +
-                              "'");
+                              "'. Supported: " + supported);
 }
 
 }  // namespace qdk::chemistry::utils::microsoft

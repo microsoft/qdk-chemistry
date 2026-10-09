@@ -1223,12 +1223,13 @@ class TestX2CHamiltonian:
     """Test Hamiltonians produced by the spin-free X2C relativistic treatments."""
 
     def test_shared_settings(self):
-        """Verify canonical and Cholesky constructors expose the relativity setting."""
+        """Verify canonical and Cholesky constructors share relativistic settings."""
         for name in ("qdk", "qdk_cholesky"):
             constructor = algorithms.create("hamiltonian_constructor", name)
             assert constructor.settings().get("relativity") == ""
-            for relativity in ("sf-x2c", "sf-x2c-contracted"):
+            for relativity in ("sf-x2c", "sf-x2c-contracted", ""):
                 constructor.settings().set("relativity", relativity)
+                assert constructor.settings().get("relativity") == relativity
 
     def test_cholesky_storage(self, x2c_hamiltonian, x2c_cholesky_hamiltonian):
         """Verify spin-free X2C can be combined with Cholesky ERI storage."""
@@ -1249,7 +1250,7 @@ class TestX2CHamiltonian:
         )
         orbitals = Orbitals(np.eye(6), np.zeros(6), np.eye(6), basis)
         for relativity in ("sf-x2c", "sf-x2c-contracted"):
-            with pytest.raises(ValueError, match="currently supports spherical AOs only"):
+            with pytest.raises(ValueError, match="Spin-free X2C currently supports spherical AOs only"):
                 create_x2c_constructor(relativity=relativity).run(orbitals)
 
     def test_has_integrals(self, x2c_hamiltonian):
@@ -1266,7 +1267,7 @@ class TestX2CHamiltonian:
         assert not h.is_unrestricted()
 
     def test_unrestricted_reference(self, x2c_unrestricted_hamiltonian):
-        """Verify unrestricted X2C reference integrals."""
+        """Verify unrestricted X2C against exact-QDK-input PySCF references."""
         hamiltonian = x2c_unrestricted_hamiltonian
         assert hamiltonian.is_unrestricted()
         one_body_alpha, one_body_beta = hamiltonian.get_one_body_integrals()
@@ -1295,7 +1296,7 @@ class TestX2CHamiltonian:
         np.testing.assert_allclose(h1, h1.T, atol=1e-12)
 
     def test_two_body_unchanged_from_nr(self, x2c_hamiltonian):
-        """Verify the one-electron X2C approximation leaves two-electron integrals unchanged."""
+        """Verify the X2C-1e approximation leaves two-electron integrals unchanged."""
         h_nr, h_x2c = x2c_hamiltonian
         eri_nr, _, _ = h_nr.get_two_body_integrals()
         eri_x2c, _, _ = h_x2c.get_two_body_integrals()

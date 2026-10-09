@@ -607,7 +607,7 @@ def orbitals_to_scf_from_n_electrons_and_multiplicity(
     return orbitals_to_scf(orbitals, alpha_occ, beta_occ, scf_type, method)
 
 
-def hamiltonian_to_scf(hamiltonian: Hamiltonian, alpha_occ: np.ndarray, beta_occ: np.ndarray) -> pyscf.scf.RHF:
+def hamiltonian_to_scf(hamiltonian: Hamiltonian, alpha_occ: np.ndarray, beta_occ: np.ndarray) -> pyscf.scf.hf.SCF:
     """Convert a QDK/Chemistry Hamiltonian object to a PySCF mean-field reference.
 
     The conversion respects the :class:`~qdk_chemistry.data.Hamiltonian` object's stored one-electron integrals
@@ -637,7 +637,7 @@ def hamiltonian_to_scf(hamiltonian: Hamiltonian, alpha_occ: np.ndarray, beta_occ
         active-space effective Hamiltonians with folded core contributions are not supported.
 
         For an interface using electron count and multiplicity, see
-        ``hamiltonian_to_scf_from_n_electrons_and_multiplicity``.
+        :func:`hamiltonian_to_scf_from_n_electrons_and_multiplicity`.
 
     Examples:
         >>> import numpy as np
@@ -744,7 +744,7 @@ def hamiltonian_to_scf_from_n_electrons_and_multiplicity(
     hamiltonian: Hamiltonian,
     n_electrons: int,
     multiplicity: int = 1,
-) -> pyscf.scf.RHF:
+) -> pyscf.scf.hf.SCF:
     """Convert QDK/Chemistry Hamiltonian to PySCF SCF object using electron count and spin multiplicity.
 
     This is a convenience wrapper around :func:`hamiltonian_to_scf` that automatically constructs

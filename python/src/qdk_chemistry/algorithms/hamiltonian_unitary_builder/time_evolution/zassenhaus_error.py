@@ -12,12 +12,14 @@ decompositions.
 
 from __future__ import annotations
 
+import functools
 import math
 from collections import defaultdict
 from typing import TYPE_CHECKING
 
 import numpy as np
 
+from qdk_chemistry.data.qubit_operator.containers.pauli_decomposition import PauliDecompositionContainer
 from qdk_chemistry.utils.pauli_commutation import commutator
 from qdk_chemistry.utils.zassenhaus_generation import zassenhaus_commutator_plan
 
@@ -93,15 +95,17 @@ def zassenhaus_steps_naive(
     # include 'order + 1' so the bound can use the first omitted exponent without
     # regenerating the plan.
     container_type = hamiltonian.get_container_type()
-    if container_type != "pauli_decomposition":
+    if not isinstance(hamiltonian.get_container(), PauliDecompositionContainer):
         raise ValueError(
             f"Zassenhaus step estimation requires a Pauli decomposition qubit operator; "
             f"got the {container_type!r} representation."
         )
 
-    real_terms = hamiltonian.get_real_coefficients(tolerance=weight_threshold)
-    one_norm = sum(abs(coeff) for _, coeff in real_terms)
-    num_real_terms = len(real_terms)
+    # Only magnitudes and the term count enter the bound, so skip building Pauli labels.
+    magnitudes = [abs(complex(coeff).real) for coeff in hamiltonian.coefficients]
+    magnitudes = [magnitude for magnitude in magnitudes if magnitude > weight_threshold]
+    one_norm = sum(magnitudes)
+    num_real_terms = len(magnitudes)
     coefficient_sum = zassenhaus_coefficient_sum(
         order=order,
         num_terms=num_real_terms,
@@ -195,15 +199,28 @@ def zassenhaus_coefficient_sum(
 
     omitted_order = order + 1
     if commutator_exponents is None:
-        commutator_exponents, _ = zassenhaus_commutator_plan(
-            tuple(range(num_terms)),
-            max_order=omitted_order,
-        )
+        sums = _distinct_term_coefficient_sums(omitted_order)
+        return float(sum(b * math.comb(num_terms, k) for k, b in enumerate(sums, start=2)))
 
     if omitted_order not in commutator_exponents:
         raise ValueError(f"commutator_exponents must include Zassenhaus exponent C_{omitted_order} for order {order}.")
 
     return float(sum(abs(coeff) for coeff in commutator_exponents[omitted_order].values()))
+
+
+@functools.cache
+def _distinct_term_coefficient_sums(omitted_order: int) -> tuple[float, ...]:
+    """Return ``b_k`` for ``k = 2..omitted_order``, so ``C_{omitted_order}`` over ``m`` terms sums to ``Σ b_k C(m, k)``.
+
+    Each commutator in the exponent involves at most ``omitted_order`` distinct terms, and its coefficient depends
+    only on their relative order, so every ``k``-subset of the ``m`` terms contributes the same ``b_k``.
+    """
+    sums: list[float] = []
+    for k in range(2, omitted_order + 1):
+        exponents, _ = zassenhaus_commutator_plan(tuple(range(k)), max_order=omitted_order)
+        total = sum(abs(coeff) for coeff in exponents.get(omitted_order, {}).values())
+        sums.append(total - sum(b * math.comb(k, j) for j, b in enumerate(sums, start=2)))
+    return tuple(sums)
 
 
 def _combine_hamiltonian_terms(
@@ -236,7 +253,7 @@ def zassenhaus_omitted_commutator_norm(
     symbolic Zassenhaus coefficients.
     """
     container_type = hamiltonian.get_container_type()
-    if container_type != "pauli_decomposition":
+    if not isinstance(hamiltonian.get_container(), PauliDecompositionContainer):
         raise ValueError(
             f"The Zassenhaus omitted-commutator norm requires a Pauli decomposition qubit operator; "
             f"got the {container_type!r} representation."

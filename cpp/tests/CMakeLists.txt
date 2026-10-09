@@ -87,6 +87,7 @@ function(add_gtest_executable test_source)
     gtest_discover_tests(${test_name}
         DISCOVERY_MODE PRE_TEST
         DISCOVERY_TIMEOUT 60
+        PROPERTIES ENVIRONMENT "QDK_CTEST_SANDBOX=1"
     )
 
     # Set properties for better organization

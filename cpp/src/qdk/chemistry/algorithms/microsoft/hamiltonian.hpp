@@ -46,7 +46,8 @@ build_one_body_ao(const data::BasisSet& basis_set,
 std::shared_ptr<data::Hamiltonian> construct_canonical_hamiltonian(
     std::shared_ptr<data::Orbitals> orbitals,
     const std::shared_ptr<qdk::chemistry::scf::BasisSet>& internal_basis_set,
-    const Eigen::MatrixXd& one_body_ao, const std::string& eri_method);
+    const Eigen::MatrixXd& one_body_ao, const std::string& eri_method,
+    bool eri_use_atomics);
 
 }  // namespace detail
 
@@ -64,6 +65,10 @@ class CanonicalHamiltonianSettings : public HamiltonianSettings {
                 "on-the-fly, 'incore' stores all integrals in memory",
                 data::ListConstraint<std::string>{
                     {std::vector<std::string>{"direct", "incore"}}});
+    set_default("eri_use_atomics", false,
+                "Use atomic accumulation (one shared buffer) instead of "
+                "per-thread private buffers during the AO->active-MO ERI "
+                "transformation.");
   }
   ~CanonicalHamiltonianSettings() override = default;
 };

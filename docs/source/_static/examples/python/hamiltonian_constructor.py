@@ -86,7 +86,7 @@ x2c_cholesky_hamiltonian = x2c_cholesky_constructor.run(orbitals)
 # start-cell-list-implementations
 from qdk_chemistry.algorithms import registry
 
-print(registry.available("hamiltonian_constructor"))
+print(sorted(registry.available("hamiltonian_constructor")))
 # ['qdk', 'qdk_cholesky']
 # end-cell-list-implementations
 ################################################################################

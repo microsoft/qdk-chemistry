@@ -5,7 +5,9 @@
 # Licensed under the MIT License. See LICENSE.txt in the project root for license information.
 # --------------------------------------------------------------------------------------------
 
+import copy
 import json
+import pickle
 
 import h5py
 import numpy as np
@@ -17,6 +19,24 @@ from qdk_chemistry.data.unitary_representation.containers.pauli_product_formula 
 )
 
 from .reference_tolerances import float_comparison_absolute_tolerance, float_comparison_relative_tolerance
+
+_PAULIS = {"X": np.array([[0, 1], [1, 0]]), "Y": np.array([[0, -1j], [1j, 0]]), "Z": np.diag([1, -1])}
+
+
+def _formula_unitary(container: PauliProductFormulaContainer) -> np.ndarray:
+    """Multiply out the formula, expanding its repetitions; exp(-i angle P) = cos(angle) I - i sin(angle) P."""
+
+    def product(terms) -> np.ndarray:
+        unitary = np.eye(2**container.num_qubits, dtype=complex)
+        for term in terms:
+            pauli = np.eye(1)
+            for qubit in reversed(range(container.num_qubits)):
+                pauli = np.kron(pauli, _PAULIS.get(term.pauli_term.get(qubit, "I"), np.eye(2)))
+            unitary = (np.cos(term.angle) * np.eye(len(pauli)) - 1j * np.sin(term.angle) * pauli) @ unitary
+        return unitary
+
+    repeated = np.linalg.matrix_power(product(container.step_terms), container.step_reps)
+    return product(container.suffix_terms) @ repeated @ product(container.prefix_terms)
 
 
 @pytest.fixture
@@ -67,6 +87,42 @@ class TestPauliProductFormulaContainer:
         assert container.num_qubits == 2
         assert container.step_reps == 4
         assert len(container.step_terms) == 3
+
+    def test_stored_terms_are_read_only(self):
+        """Stored term sequences and Pauli maps cannot change after their layout is validated."""
+        layer = [ExponentiatedPauliTerm({0: "X"}, 0.5), ExponentiatedPauliTerm({1: "Z"}, 0.25)]
+        container = PauliProductFormulaContainer(layer, 1, 2, layer_offsets=(0, 2))
+
+        with pytest.raises(AttributeError, match="append"):
+            container.suffix_terms.append(layer[0])  # type: ignore[attr-defined]
+        with pytest.raises(TypeError, match="item assignment"):
+            container.step_terms[1].pauli_term[0] = "Z"  # type: ignore[index]
+        assert container.step_terms[1].pauli_term == {1: "Z"}
+
+    def test_stored_terms_share_one_copy_per_source_map(self):
+        """Terms that share a source map share one read-only copy across all segments."""
+        x, z = {0: "X"}, {1: "Z"}
+        container = PauliProductFormulaContainer(
+            [ExponentiatedPauliTerm(x, 0.5), ExponentiatedPauliTerm(z, 0.25), ExponentiatedPauliTerm(x, 0.5)],
+            2,
+            2,
+            prefix_terms=[ExponentiatedPauliTerm(x, 0.25)],
+            suffix_terms=[ExponentiatedPauliTerm(z, 0.125)],
+        )
+        stored = [*container.prefix_terms, *container.step_terms, *container.suffix_terms]
+        assert len({id(term.pauli_term) for term in stored}) == 2
+        assert [dict(term.pauli_term) for term in stored] == [x, x, z, x, z]
+
+        # Sources freed mid-construction must not alias a later map through a reused id.
+        fresh = PauliProductFormulaContainer((ExponentiatedPauliTerm({q: "Y"}, 0.1) for q in range(64)), 1, 64)
+        assert [dict(term.pauli_term) for term in fresh.step_terms] == [{q: "Y"} for q in range(64)]
+
+    def test_stored_terms_pickle_and_copy(self, container):
+        """Read-only stored terms still pickle and deep-copy."""
+        term = container.step_terms[2]
+
+        assert pickle.loads(pickle.dumps(term)) == term
+        assert copy.deepcopy(term) == term
 
     @pytest.mark.parametrize("step_reps", [0, -1])
     def test_non_positive_step_reps_raises(self, step_terms, step_reps):
@@ -147,6 +203,27 @@ class TestPauliProductFormulaContainer:
         assert restored.step_reps == container.step_reps
         assert len(restored.step_terms) == len(container.step_terms)
 
+    @pytest.mark.parametrize("file_format", ["json", "hdf5"])
+    @pytest.mark.parametrize("with_endpoints", [False, True])
+    def test_serialization_preserves_term_order_and_hash(self, container, file_format, tmp_path, with_endpoints):
+        """Restore numeric Pauli keys and order, including double-digit HDF5 term indices."""
+        container = PauliProductFormulaContainer(
+            [ExponentiatedPauliTerm(container.step_terms[i % 3].pauli_term, i * 0.1) for i in range(13)],
+            container.step_reps,
+            container.num_qubits,
+            container.scale,
+            prefix_terms=container.step_terms[:1] if with_endpoints else (),
+            suffix_terms=container.step_terms[-1:] if with_endpoints else (),
+            group_offsets=tuple(range(14)) if with_endpoints else None,
+            layer_offsets=tuple(range(16)) if with_endpoints else None,
+        )
+        filename = tmp_path / f"formula.pauli_product_formula_container.{file_format}"
+        container.to_file(filename, file_format)
+        restored = PauliProductFormulaContainer.from_file(filename, file_format)
+        assert restored.to_json() == container.to_json()
+        assert restored.content_hash() == container.content_hash()
+        assert all(isinstance(key, int) for term in restored.step_terms for key in term.pauli_term)
+
     def test_combine_no_adjacent_identical(self):
         """Test combine when no adjacent terms share the same Pauli string."""
         a = PauliProductFormulaContainer(
@@ -219,3 +296,66 @@ class TestPauliProductFormulaContainer:
         assert "Number of qubits: 2" in summary
         assert "Number of step terms: 3" in summary
         assert "Step repetitions: 4" in summary
+
+    def test_legacy_hash_and_reordering_scale_are_unchanged(self):
+        """Ordinary formulas keep their baseline hash and scale when reordered."""
+        original = PauliProductFormulaContainer([ExponentiatedPauliTerm({0: "X"}, 0.5)], 4, 2, scale=1.7)
+        assert original.content_hash() == "c2b1c5b0979d3d48"  # da61805e2 baseline
+        assert original.reorder_terms([0]).content_hash() == original.content_hash()
+
+    @pytest.mark.parametrize("inverse_reps", [1, 4])
+    def test_combine_with_inverse_cancels(self, container, inverse_reps):
+        """Fuse a formula with its inverse, including complete cancellation."""
+        inverse = PauliProductFormulaContainer(
+            [ExponentiatedPauliTerm(term.pauli_term, -term.angle) for term in reversed(container.step_terms)],
+            inverse_reps,
+            2,
+            scale=container.scale,
+        )
+        result = container.combine(inverse)
+        assert result.step_reps == 1
+        assert result.scale == container.scale
+        assert result.step_terms == container.step_terms * (4 - inverse_reps)
+
+    @pytest.mark.parametrize("repetitions", [3, 10**9])
+    @pytest.mark.parametrize("cancel", [False, True])
+    def test_group_boundary_fusion_stays_compact(self, cancel: bool, repetitions: int) -> None:
+        """Fuse reordered commuting boundaries without storing each repetition or changing the evolution."""
+        left = [ExponentiatedPauliTerm({0: "X"}, 0.125), ExponentiatedPauliTerm({1: "X"}, 0.25)]
+        middle = [ExponentiatedPauliTerm({0: "Z"}, 0.3)]
+        right = [ExponentiatedPauliTerm(t.pauli_term, -t.angle if cancel else t.angle) for t in reversed(left)]
+        formula = PauliProductFormulaContainer(
+            left + middle + right, repetitions, 2, group_offsets=(0, 2, 3, 5), layer_offsets=(0, 2, 3, 5)
+        )
+        fused = formula.fuse_boundaries(atol=0.0)
+        assert fused.num_pauli_exponentials == 5 * repetitions - (4 if cancel else 2) * (repetitions - 1)
+        assert fused.num_stored_terms <= 8
+        assert fused.prefix_terms == tuple(left)
+        assert fused.suffix_terms == tuple(middle + right)
+        assert fused.combine(fused, atol=0.0).num_stored_terms <= 8
+        if repetitions < 10**9:  # Only small repetition counts can be multiplied out.
+            fused_unitary = _formula_unitary(fused)
+            np.testing.assert_allclose(
+                fused_unitary, _formula_unitary(formula), atol=float_comparison_absolute_tolerance
+            )
+            np.testing.assert_allclose(
+                _formula_unitary(fused.combine(fused, atol=0.0)),
+                fused_unitary @ fused_unitary,
+                atol=float_comparison_absolute_tolerance,
+            )
+
+    def test_combine_different_bodies_includes_endpoints(self) -> None:
+        """The general flatten-and-merge fallback preserves both formulas' endpoints."""
+        x, y, z = [ExponentiatedPauliTerm({0: axis}, 0.125) for axis in "XYZ"]
+        phase = ExponentiatedPauliTerm({}, 0.125)
+        inverse_y = ExponentiatedPauliTerm(y.pauli_term, -y.angle)
+        first = PauliProductFormulaContainer(
+            [x, z], 2, 1, prefix_terms=[phase], suffix_terms=[y], layer_offsets=(0, 1, 2, 3, 4)
+        )
+        second = PauliProductFormulaContainer(
+            [x], 3, 1, prefix_terms=[inverse_y], suffix_terms=[phase], layer_offsets=(0, 1, 2, 3)
+        )
+        combined = first.combine(second)
+        assert combined.step_reps == 1
+        assert combined.prefix_terms == combined.suffix_terms == ()
+        assert combined.step_terms == (phase, x, z, x, z, ExponentiatedPauliTerm(x.pauli_term, 0.375), phase)

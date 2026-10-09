@@ -49,31 +49,48 @@ jobs:
           build-parallel: 32
           uarch: x86-64-v3
           python-version: '3.10'
-          cpp-test-threads: 2
-          python-test-threads: 2
+          cpp-omp-threads: 4
+          cpp-test-workers: 12
+          python-omp-threads: 4
+          python-test-workers: 8
         - os-name: Linux
           runner: [self-hosted, 1ES.Pool=1es-gh-Dads_v5-pool-wus2, 1ES.ImageOverride=Ubuntu24.04Nightly, 'JobId=qdk_chemistry-linux-py3.13-${{ github.run_id }}-${{ github.run_number }}-${{ github.run_attempt }}']
           build-parallel: 32
           uarch: x86-64-v3
           python-version: '3.13'
-          cpp-test-threads: 4
-          python-test-threads: 4
+          cpp-omp-threads: 4
+          cpp-test-workers: 12
+          python-omp-threads: 4
+          python-test-workers: 8
           enable-coverage: true
         - os-name: Linux
           runner: [self-hosted, 1ES.Pool=1es-gh-Dads_v5-pool-wus2, 1ES.ImageOverride=Ubuntu24.04Nightly, 'JobId=qdk_chemistry-linux-py3.14-${{ github.run_id }}-${{ github.run_number }}-${{ github.run_attempt }}']
           build-parallel: 32
           uarch: x86-64-v3
           python-version: '3.14'
-          cpp-test-threads: 4
-          python-test-threads: 4
+          cpp-omp-threads: 4
+          cpp-test-workers: 12
+          python-omp-threads: 4
+          python-test-workers: 8
           build-documentation: true
+        - os-name: Linux-arm64
+          runner: [self-hosted, 1ES.Pool=1es-gh-Dpds_v5-arm-pool, 1ES.ImageOverride=ubuntu-24.04-arm, 'JobId=qdk_chemistry-linux-arm64-py3.13-${{ github.run_id }}-${{ github.run_number }}-${{ github.run_attempt }}']
+          build-parallel: 32
+          uarch: armv8-a
+          python-version: '3.13'
+          cpp-omp-threads: 4
+          cpp-test-workers: 12
+          python-omp-threads: 4
+          python-test-workers: 8
         - os-name: macOS
           runner: macos-26-xlarge
           build-parallel: 5
           uarch: native
           python-version: '3.13'
-          cpp-test-threads: 4
-          python-test-threads: 4
+          cpp-omp-threads: 4
+          cpp-test-workers: 3
+          python-omp-threads: 2
+          python-test-workers: 3
     env:
       BUILD_DIR: cpp/build
       QSHARP_PYTHON_TELEMETRY: 'false'
@@ -84,29 +101,6 @@ jobs:
       QDK_UARCH: ${{ matrix.uarch }}
       ENABLE_COVERAGE: ${{ matrix.enable-coverage }}
     steps:
-    - name: Free up disk space (Linux)
-      if: matrix.os-name == 'Linux'
-      run: |
-        echo "=== Disk space before cleanup ==="
-        df -h
-
-        # Remove unnecessary large packages commonly present on GitHub runners
-        sudo rm -rf /usr/share/dotnet || true
-        sudo rm -rf /usr/local/lib/android || true
-        sudo rm -rf /opt/ghc || true
-        sudo rm -rf /opt/hostedtoolcache/go || true
-        sudo rm -rf /opt/hostedtoolcache/Ruby || true
-
-        # Clean apt cache
-        sudo apt-get clean || true
-
-        echo "=== Disk space after cleanup ==="
-        df -h
-
-        echo "Workspace path: ${{ github.workspace }}"
-        echo "Space available:"
-        df -h "${{ github.workspace }}"
-
     - name: Checkout repository
       uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       with:
@@ -126,7 +120,7 @@ jobs:
         cache-dependency-path: python/pyproject.toml
 
     - name: Install Linux system packages
-      if: matrix.os-name == 'Linux'
+      if: runner.os == 'Linux'
       run: |
         # Wait for any existing apt/dpkg processes to finish (e.g., unattended-upgrades)
         MAX_WAIT_SECONDS=300
@@ -258,7 +252,7 @@ jobs:
           -DCMAKE_BUILD_TYPE=RelWithDebInfo \
           -DCMAKE_INSTALL_PREFIX="$CMAKE_INSTALL_PREFIX" \
           -DQDK_UARCH="$QDK_UARCH" \
-          -DQDK_ENABLE_OPENMP=${{ matrix.os-name == 'Linux' && 'ON' || 'OFF' }} \
+          -DQDK_ENABLE_OPENMP=${{ runner.os == 'Linux' && 'ON' || 'OFF' }} \
           -DQDK_CHEMISTRY_ENABLE_COVERAGE=${{ matrix.enable-coverage && 'ON' || 'OFF' }} \
           -DBUILD_TESTING=ON \
           -DMACIS_ENABLE_TESTS=ON
@@ -268,7 +262,8 @@ jobs:
 
     - name: Run C++ tests
       env:
-        OMP_NUM_THREADS: ${{ matrix.cpp-test-threads }}
+        OMP_NUM_THREADS: ${{ matrix.cpp-omp-threads }}
+        CTEST_WORKERS: ${{ matrix.cpp-test-workers }}
       run: |
         mkdir -p test-results
         cd "$BUILD_DIR"
@@ -276,9 +271,9 @@ jobs:
         echo "=== Running C++ Tests ==="
         set +e
         if [ "$QDK_UARCH" == "native" ]; then # Exclude particular test on macOS builds
-          ctest --output-on-failure --verbose --timeout 300 --output-junit ${{ github.workspace }}/test-results/ctest_results.xml -E "MACIS_SERIAL_TEST|AtomInitGuessEnergyConvergence"
+          ctest -j "$CTEST_WORKERS" --output-on-failure --verbose --timeout 400 --output-junit ${{ github.workspace }}/test-results/ctest_results.xml -E "MACIS_SERIAL_TEST|AtomInitGuessEnergyConvergence"
         else
-          ctest --output-on-failure --verbose --timeout 300 --output-junit ${{ github.workspace }}/test-results/ctest_results.xml -E "MACIS_SERIAL_TEST"
+          ctest -j "$CTEST_WORKERS" --output-on-failure --verbose --timeout 400 --output-junit ${{ github.workspace }}/test-results/ctest_results.xml -E "MACIS_SERIAL_TEST"
         fi
 
         CTEST_EXIT_CODE=$?
@@ -328,14 +323,21 @@ jobs:
         # Register the Jupyter kernel for notebook tests
         python -m ipykernel install --user --name python3 --display-name "Python 3"
 
-    - name: Run Python tests & generate coverage report
+    - name: Run Python tests
+      timeout-minutes: 90
       env:
-        OMP_NUM_THREADS: ${{ matrix.python-test-threads }}
+        OMP_NUM_THREADS: ${{ matrix.python-omp-threads }}
+        PYTHON_TEST_WORKERS: ${{ matrix.python-test-workers }}
         QDK_CHEMISTRY_RUN_SLOW_TESTS: ${{ ((github.event_name == 'workflow_dispatch' && inputs.run_slow_tests) || github.event_name == 'merge_group') && '1' || '0' }}
       working-directory: python
       run: |
         set -e
         mkdir -p ../test-results
+
+        XDIST_ARGS=()
+        if [ "$PYTHON_TEST_WORKERS" -gt 1 ]; then
+          XDIST_ARGS=(-n "$PYTHON_TEST_WORKERS" --dist=loadscope)
+        fi
 
         COV_ARGS=()
         if [ "$ENABLE_COVERAGE" = "true" ]; then
@@ -350,6 +352,7 @@ jobs:
         set +e
         set -o pipefail
         pytest \
+          "${XDIST_ARGS[@]}" \
           "${COV_ARGS[@]}" \
           --junitxml=../test-results/pytest_report.xml \
           -v \
@@ -366,6 +369,18 @@ jobs:
         if [ $PYTEST_EXIT_CODE -ne 0 ]; then
           exit 1
         fi
+
+    # test-with-qdk-branch reuses this exact build (Linux/x86-64-v3/Python 3.13, the only leg it hardcodes)
+    # instead of independently repeating the same C++ deps + C++ + Python build itself. Gated on the same
+    # workflow_dispatch input that triggers test-with-qdk-branch, so regular push/PR runs (which never consume
+    # this artifact) don't pay for the extra upload.
+    - name: Upload install dir (for test-with-qdk-branch)
+      if: matrix.os-name == 'Linux' && matrix.python-version == '3.13' && github.event_name == 'workflow_dispatch' && inputs.test_with_qdk_branch
+      uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+      with:
+        name: qdk-chemistry-install-linux-x86-64-v3-py3.13
+        path: ${{ github.workspace }}/install
+        retention-days: 1
 
     - name: Generate C++ coverage report
       if: matrix.enable-coverage
@@ -468,10 +483,21 @@ jobs:
 
         cat "$report" >> "$GITHUB_STEP_SUMMARY"
 
+    - name: Retain coverage XML for benchmarks
+      if: always() && matrix.enable-coverage && github.event_name == 'workflow_dispatch'
+      uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+      with:
+        name: cobertura-xml-linux-py${{ matrix.python-version }}
+        path: |
+          coverage-reports/cpp_coverage.cobertura.xml
+          coverage-reports/pybind11_coverage.cobertura.xml
+          coverage-reports/python_coverage.xml
+        retention-days: 7
+
     # Fork PRs are skipped by the action itself (no write access), not by this condition.
     - name: Upload C++ code coverage
       if: matrix.enable-coverage && (github.event_name == 'pull_request' || github.event_name == 'push')
-      uses: actions/upload-code-coverage@d8e329117199404bba6fc81efe8093dc7c015e34 # v1.4.2
+      uses: actions/upload-code-coverage@bfa741d815a28cb064a8e3a0837e577457a017d5 # v1.4.3
       with:
         file: coverage-reports/cpp_coverage.cobertura.xml
         language: C++
@@ -480,7 +506,7 @@ jobs:
 
     - name: Upload Pybind11 code coverage
       if: matrix.enable-coverage && (github.event_name == 'pull_request' || github.event_name == 'push')
-      uses: actions/upload-code-coverage@d8e329117199404bba6fc81efe8093dc7c015e34 # v1.4.2
+      uses: actions/upload-code-coverage@bfa741d815a28cb064a8e3a0837e577457a017d5 # v1.4.3
       with:
         file: coverage-reports/pybind11_coverage.cobertura.xml
         language: C++
@@ -489,7 +515,7 @@ jobs:
 
     - name: Upload Python code coverage
       if: matrix.enable-coverage && (github.event_name == 'pull_request' || github.event_name == 'push')
-      uses: actions/upload-code-coverage@d8e329117199404bba6fc81efe8093dc7c015e34 # v1.4.2
+      uses: actions/upload-code-coverage@bfa741d815a28cb064a8e3a0837e577457a017d5 # v1.4.3
       with:
         file: coverage-reports/python_coverage.xml
         language: Python
@@ -518,6 +544,14 @@ jobs:
           exit $MAKE_EXIT_CODE
         fi
 
+    - name: Upload JUnit test results
+      if: always()
+      uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+      with:
+        name: junit-${{ matrix.os-name }}-py${{ matrix.python-version }}
+        path: test-results/*.xml
+        retention-days: 7
+
   coverage-windows:
     name: ${{ matrix.compiler }} - Build & test (Windows)
     runs-on: [self-hosted, 1ES.Pool=1es-gh-Dads_v5-pool-wus2, 1ES.ImageOverride=windows-2025-1espt, 'JobId=qdk_chemistry-win-${{ strategy.job-index }}-${{ github.run_id }}-${{ github.run_number }}-${{ github.run_attempt }}']
@@ -529,6 +563,9 @@ jobs:
     env:
       VCPKG_TRIPLET: x64-windows-static-md
       QDK_UARCH: x86-64-v3
+      CTEST_WORKERS: '12'
+      OMP_NUM_THREADS: '4'
+      PYTHON_TEST_WORKERS: '8'
       # Bump to force a rebuild of the cached dependencies.
       DEPS_CACHE_VERSION: v2
     steps:
@@ -673,13 +710,11 @@ jobs:
 
     - name: Run C++ tests
       shell: pwsh
-      env:
-        OMP_NUM_THREADS: '2'
       run: |
         Push-Location "cpp/build-${{ matrix.compiler }}"
         # Skip the vendored libint2's own tests: they build the dependency at
         # test time rather than exercising qdk. MACIS_SERIAL_TEST is excluded as on Linux.
-        ctest --output-on-failure --verbose --timeout 400 `
+        ctest -j $env:CTEST_WORKERS --output-on-failure --verbose --timeout 400 `
           --output-junit ctest_results.xml `
           -E "MACIS_SERIAL_TEST|libint2/unit|libint2/eritest"
         $code = $LASTEXITCODE
@@ -719,15 +754,30 @@ jobs:
 
     - name: Run Python tests
       shell: pwsh
+      timeout-minutes: 90
       env:
-        OMP_NUM_THREADS: '2'
         QDK_CHEMISTRY_RUN_SLOW_TESTS: ${{ ((github.event_name == 'workflow_dispatch' && inputs.run_slow_tests) || github.event_name == 'merge_group') && '1' || '0' }}
       run: |
+        New-Item -ItemType Directory -Force -Path test-results | Out-Null
         Push-Location python
-        pytest -v --tb=short
+        $xdistArgs = @()
+        if ([int]$env:PYTHON_TEST_WORKERS -gt 1) {
+          $xdistArgs = @("-n", $env:PYTHON_TEST_WORKERS, "--dist=loadscope")
+        }
+        pytest @xdistArgs --junitxml=..\test-results\pytest_report.xml -v --tb=short
         $code = $LASTEXITCODE
         Pop-Location
         if ($code -ne 0) { throw "pytest failed ($code)" }
+
+    - name: Upload JUnit test results
+      if: always()
+      uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+      with:
+        name: junit-windows-x64-${{ matrix.compiler }}
+        path: |
+          cpp\build-${{ matrix.compiler }}\ctest_results.xml
+          test-results\pytest_report.xml
+        retention-days: 7
 
   coverage-windows-arm64:
     name: ${{ matrix.compiler }} - Build & test (Windows ARM64)
@@ -742,6 +792,9 @@ jobs:
         compiler: [msvc, clang-cl]
     env:
       VCPKG_TRIPLET: arm64-windows-static-md
+      CTEST_WORKERS: '12'
+      OMP_NUM_THREADS: '4'
+      PYTHON_TEST_WORKERS: '8'
       # Leave QDK_UARCH unset: MSVC has no generic ARM64 /arch value, and
       # clang-cl auto-detects armv8-a.
       # Bump to force a rebuild of the cached dependencies.
@@ -925,12 +978,10 @@ jobs:
     - name: Run C++ tests
       shell: pwsh
       timeout-minutes: 75
-      env:
-        OMP_NUM_THREADS: '2'
       run: |
         Push-Location "cpp/build-${{ matrix.compiler }}"
         # Same exclusions as the x86_64 Windows job.
-        ctest --output-on-failure --verbose --timeout 400 `
+        ctest -j $env:CTEST_WORKERS --output-on-failure --verbose --timeout 400 `
           --output-junit ctest_results.xml `
           -E "MACIS_SERIAL_TEST|libint2/unit"
         $code = $LASTEXITCODE
@@ -972,38 +1023,41 @@ jobs:
       shell: pwsh
       timeout-minutes: 90
       env:
-        OMP_NUM_THREADS: '2'
         QDK_CHEMISTRY_RUN_SLOW_TESTS: ${{ ((github.event_name == 'workflow_dispatch' && inputs.run_slow_tests) || github.event_name == 'merge_group') && '1' || '0' }}
       run: |
+        New-Item -ItemType Directory -Force -Path test-results | Out-Null
         Push-Location python
-        pytest -v --tb=short
+        $xdistArgs = @()
+        if ([int]$env:PYTHON_TEST_WORKERS -gt 1) {
+          $xdistArgs = @("-n", $env:PYTHON_TEST_WORKERS, "--dist=loadscope")
+        }
+        pytest @xdistArgs --junitxml=..\test-results\pytest_report.xml -v --tb=short
         $code = $LASTEXITCODE
         Pop-Location
         if ($code -ne 0) { throw "pytest failed ($code)" }
 
+    - name: Upload JUnit test results
+      if: always()
+      uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+      with:
+        name: junit-windows-arm64-${{ matrix.compiler }}
+        path: |
+          cpp\build-${{ matrix.compiler }}\ctest_results.xml
+          test-results\pytest_report.xml
+        retention-days: 7
+
   test-with-qdk-branch:
     name: Full Test with QDK Branch
-    if: ${{ github.event_name == 'workflow_dispatch' && inputs.test_with_qdk_branch }}
+    needs: coverage
+    if: ${{ github.event_name == 'workflow_dispatch' && inputs.test_with_qdk_branch && needs.coverage.result == 'success' }}
     runs-on: [self-hosted, 1ES.Pool=1es-gh-Dads_v5-pool-wus2, 1ES.ImageOverride=Ubuntu24.04Nightly]
     env:
-      BUILD_DIR: cpp/build
       QSHARP_PYTHON_TELEMETRY: 'false'
       CMAKE_INSTALL_PREFIX: ${{ github.workspace }}/install
-      CPP_DEPS_PREFIX: ${{ github.workspace }}/cpp_deps_install
-      CTEST_OUTPUT_ON_FAILURE: 1
-      CMAKE_BUILD_PARALLEL_LEVEL: 32
-      QDK_UARCH: x86-64-v3
+      OMP_NUM_THREADS: '4'
+      PYTHON_TEST_WORKERS: '8'
       QDK_BRANCH: main
     steps:
-    - name: Free up disk space
-      run: |
-        sudo rm -rf /usr/share/dotnet || true
-        sudo rm -rf /usr/local/lib/android || true
-        sudo rm -rf /opt/ghc || true
-        sudo rm -rf /opt/hostedtoolcache/go || true
-        sudo rm -rf /opt/hostedtoolcache/Ruby || true
-        sudo apt-get clean || true
-
     - name: Checkout repository
       uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       with:
@@ -1022,7 +1076,9 @@ jobs:
         cache: pip
         cache-dependency-path: python/pyproject.toml
 
-    - name: Install Linux system packages
+    # This job does not build C++/Python itself -- these packages are only needed to satisfy the built
+    # qdk_chemistry extension's runtime shared-library dependencies (OpenBLAS/HDF5/libgfortran).
+    - name: Install Linux runtime packages
       run: |
         MAX_WAIT_SECONDS=300
         WAIT_INTERVAL_SECONDS=5
@@ -1039,64 +1095,25 @@ jobs:
 
         sudo apt-get update
         sudo apt-get install -y \
-          build-essential \
-          ninja-build \
-          cmake \
-          libeigen3-dev \
-          libboost-all-dev \
           libhdf5-dev \
           libopenblas-dev \
-          libgfortran5 \
-          pkg-config
+          libgfortran5
 
-    - name: Cache C++ dependency install
-      id: cache-cpp-deps
-      uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+    # Reuses the coverage job's own Linux/x86-64-v3/Python-3.13 build (dependencies + C++ + Python install)
+    # Adds the "install qdk from branch" override and re-runs the Python test suite against it.
+    - name: Download coverage build (Linux x86-64-v3, Python 3.13)
+      uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
       with:
-        path: |
-          ${{ env.CPP_DEPS_PREFIX }}
-        key: >-
-          cpp-deps-Linux-x86-64-v3-
-          ${{ hashFiles('cpp/manifest/qdk-chemistry/cgmanifest.json', 'external/macis/manifest/cgmanifest.json', '.devcontainer/scripts/install_cpp_dependencies.sh') }}
+        name: qdk-chemistry-install-linux-x86-64-v3-py3.13
+        path: ${{ github.workspace }}/install
 
-    - name: Add C++ deps prefix to CMake search path
+    # actions/download-artifact doesn't preserve the executable bit, so install/bin/* (e.g. pytest) needs it
+    # restored before it can be run.
+    - name: Restore executable permissions
+      run: chmod -R +x "${{ github.workspace }}/install/bin"
+
+    - name: Test pre-installed qdk_chemistry package
       run: |
-        echo "CMAKE_PREFIX_PATH=${{ env.CPP_DEPS_PREFIX }}:${{ env.CMAKE_INSTALL_PREFIX }}:${CMAKE_PREFIX_PATH}" >> $GITHUB_ENV
-        echo "LD_LIBRARY_PATH=${{ env.CPP_DEPS_PREFIX }}/lib:${LD_LIBRARY_PATH}" >> $GITHUB_ENV
-        echo "PATH=${{ env.CPP_DEPS_PREFIX }}/bin:${PATH}" >> $GITHUB_ENV
-
-    - name: Install C++ dependencies
-      if: steps.cache-cpp-deps.outputs.cache-hit != 'true'
-      env:
-        INSTALL_PREFIX: ${{ env.CPP_DEPS_PREFIX }}
-        BUILD_DIR: ${{ github.workspace }}/cpp_deps_build
-        KEEP_BUILD_DIR: 1
-      run: |
-        bash ${{ github.workspace }}/.devcontainer/scripts/install_cpp_dependencies.sh \
-          ${{ github.workspace }}/cpp/manifest/qdk-chemistry/cgmanifest.json \
-          ${{ github.workspace }}/external/macis/manifest/cgmanifest.json
-
-    - name: Configure and build C++
-      run: |
-        cmake -S cpp -B "$BUILD_DIR" \
-          -GNinja \
-          -DCMAKE_TOOLCHAIN_FILE="${{ github.workspace }}/.pipelines/toolchains/linux.cmake" \
-          -DCMAKE_BUILD_TYPE=Release \
-          -DCMAKE_INSTALL_PREFIX="$CMAKE_INSTALL_PREFIX" \
-          -DQDK_UARCH="$QDK_UARCH" \
-          -DQDK_ENABLE_OPENMP=ON \
-          -DBUILD_TESTING=OFF
-        cmake --build "$BUILD_DIR"
-
-    - name: Install C++ library
-      run: cmake --install "$BUILD_DIR" --prefix "$CMAKE_INSTALL_PREFIX"
-
-    - name: Install Python package
-      working-directory: python
-      env:
-        CMAKE_BUILD_TYPE: Release
-      run: |
-        python -m pip install --prefix=${{ github.workspace }}/install -C build-dir="build/{wheel_tag}" -v .[test]
         python -c "import qdk_chemistry; print('qdk_chemistry version:', qdk_chemistry.__version__)"
         python -m ipykernel install --user --name python3 --display-name "Python 3"
 
@@ -1104,19 +1121,20 @@ jobs:
       run: |
         git clone --depth 1 --branch "${QDK_BRANCH}" https://github.com/microsoft/qdk.git "${{ runner.temp }}/qdk"
         echo "QDK commit: $(git -C "${{ runner.temp }}/qdk" rev-parse HEAD)"
-        pip install --force-reinstall --no-deps "${{ runner.temp }}/qdk/source/qdk_package"
+        python -m pip install --prefix="$CMAKE_INSTALL_PREFIX" --force-reinstall --no-deps "${{ runner.temp }}/qdk/source/qdk_package"
         echo "Installed qdk from branch: ${QDK_BRANCH}"
+        python -c "import os, pathlib, qdk; path = pathlib.Path(qdk.__file__).resolve(); prefix = pathlib.Path(os.environ['CMAKE_INSTALL_PREFIX']).resolve(); print('Imported qdk from:', path); assert path.is_relative_to(prefix), f'qdk did not load from {prefix}'"
         python -m pip show qdk
 
     - name: Run Python tests
+      timeout-minutes: 90
       env:
-        OMP_NUM_THREADS: 4
         QDK_CHEMISTRY_RUN_SLOW_TESTS: ${{ ((github.event_name == 'workflow_dispatch' && inputs.run_slow_tests) || github.event_name == 'merge_group') && '1' || '0' }}
       working-directory: python
       run: |
         set -e
         mkdir -p ../test-results
-        pytest \
+        pytest -n "$PYTHON_TEST_WORKERS" --dist=loadscope \
           --junitxml=../test-results/pytest_report.xml \
           -v \
           --tb=short
@@ -1127,3 +1145,4 @@ jobs:
       with:
         name: qdk-branch-test-results
         path: test-results/
+        retention-days: 7

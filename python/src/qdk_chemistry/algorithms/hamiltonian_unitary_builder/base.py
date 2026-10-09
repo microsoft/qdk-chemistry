@@ -6,6 +6,7 @@
 # --------------------------------------------------------------------------------------------
 
 from abc import abstractmethod
+from collections.abc import Container
 
 import numpy as np
 
@@ -191,23 +192,30 @@ class TimeEvolutionBuilder(HamiltonianUnitaryBuilder):
                 fermion_mode_order=fmo,
             )
 
+        return [[_make(layer) for layer in group] for group in self._partition_indices(partition)]
+
+    @staticmethod
+    def _partition_indices(
+        partition: TermPartition, active: Container[int] | None = None
+    ) -> list[list[tuple[int, ...]]]:
+        """Return nonempty index layers, with groups stably ordered by layer count.
+
+        Indices outside ``active`` are dropped first, so filtered terms cannot add layers or groups.
+        """
         if isinstance(partition, LayeredPartition):
             layered_groups = partition.groups
         elif isinstance(partition, FlatPartition):
-            layered_groups = tuple((g,) for g in partition.groups)
+            layered_groups = tuple((g,) for g in partition.groups if g)
         else:
             raise TypeError(
                 f"Unsupported TermPartition subtype: {type(partition).__name__}. "
                 "Expected FlatPartition or LayeredPartition."
             )
 
-        groups: list[list[QubitOperator]] = [
-            [_make(layer) for layer in group_layers if layer] for group_layers in layered_groups
-        ]
-
-        groups = [g for g in groups if g]
-        groups.sort(key=len)
-        return groups
+        if active is not None:
+            layered_groups = tuple(tuple(tuple(i for i in layer if i in active) for layer in g) for g in layered_groups)
+        groups = [[layer for layer in layers if layer] for layers in layered_groups]
+        return sorted((group for group in groups if group), key=len)
 
     def _exponentiate_commuting(
         self,

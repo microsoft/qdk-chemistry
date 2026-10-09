@@ -18,6 +18,8 @@ googleapis-common-protos==1.75.0 ; sys_platform == 'linux'
     # via opentelemetry-exporter-otlp-proto-grpc
 grpcio==1.80.0 ; sys_platform == 'linux'
     # via opentelemetry-exporter-otlp-proto-grpc
+importlib-metadata==9.0.1 ; python_full_version < '3.10.2'
+    # via build
 macholib==1.16.4 ; sys_platform == 'darwin'
     # via delocate
 numpy==2.2.6 ; python_full_version < '3.11'
@@ -78,5 +80,7 @@ typing-extensions==4.15.0 ; python_full_version < '3.11' or sys_platform == 'dar
     #   opentelemetry-sdk
     #   opentelemetry-semantic-conventions
     #   scikit-build-core
-urllib3==2.7.0
+urllib3==2.8.0
     # via -r requirements.in
+zipp==4.1.1 ; python_full_version < '3.10.2'
+    # via importlib-metadata
