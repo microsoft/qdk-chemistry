@@ -13,11 +13,19 @@ import scipy
 
 from qdk_chemistry.algorithms.hamiltonian_unitary_builder.time_evolution.trotter import Trotter
 from qdk_chemistry.algorithms.hamiltonian_unitary_builder.time_evolution.trotter_error import trotter_steps_commutator
-from qdk_chemistry.data import FlatPartition, LayeredPartition, QubitOperator, UnitaryRepresentation
+from qdk_chemistry.data import (
+    FlatPartition,
+    LatticeGeometry,
+    LatticeGraph,
+    LayeredPartition,
+    QubitOperator,
+    UnitaryRepresentation,
+)
 from qdk_chemistry.data.unitary_representation.containers.pauli_product_formula import (
     ExponentiatedPauliTerm,
     PauliProductFormulaContainer,
 )
+from qdk_chemistry.utils.model_hamiltonians import create_kitaev_hamiltonian, kitaev_honeycomb_bond_flavors
 from qdk_chemistry.utils.pauli_commutation import (
     commutator_bound_first_order,
     commutator_bound_higher_order,
@@ -1017,6 +1025,53 @@ class TestPartitionGrouping:
         minimized = len(step_terms(unequal(declared), True))
         assert minimized == min(len(step_terms(unequal(groups), False)) for groups in permutations(declared))
         assert minimized < len(step_terms(unequal(declared), False))
+
+    @pytest.mark.parametrize(
+        ("partition", "reference_partition"),
+        [
+            (None, None),
+            (
+                FlatPartition(strategy="commuting", groups=[[0], [1], [2]]),
+                FlatPartition(strategy="commuting", groups=[[0], [1]]),
+            ),
+            (
+                LayeredPartition(strategy="commuting", groups=(((0,), (2,)), ((1,),))),
+                LayeredPartition(strategy="commuting", groups=(((0,),), ((1,),))),
+            ),
+        ],
+    )
+    def test_filtered_terms_do_not_change_the_schedule(self, partition, reference_partition):
+        """A below-threshold term adds no group or layer, so it cannot move the Strang center or the group order."""
+        with_roundoff = QubitOperator(["IX", "IZ", "YI"], np.array([1.0, 0.5, 1e-17]), term_partition=partition)
+        reference = QubitOperator(["IX", "IZ"], np.array([1.0, 0.5]), term_partition=reference_partition)
+
+        def formula(hamiltonian: QubitOperator) -> tuple:
+            container = Trotter(order=2, time=1.0, num_divisions=2).run(hamiltonian).get_container()
+            terms = [(dict(t.pauli_term), t.angle) for t in container.step_terms]
+            return terms, container.step_reps, container.layer_offsets
+
+        assert formula(with_roundoff) == formula(reference)
+
+    def test_kitaev_rotation_roundoff_keeps_the_identity_basis_schedule(self):
+        """Roundoff entries of a rotated isotropic Kitaev model leave the order-4 formula unchanged."""
+        geometry = LatticeGeometry.honeycomb_plaquettes(3, 3)
+        graph = LatticeGraph.from_geometry(geometry, shells=[1], bond_flavors=kitaev_honeycomb_bond_flavors())
+        rotation = np.array(
+            [
+                [1 / np.sqrt(6), 1 / np.sqrt(6), -2 / np.sqrt(6)],
+                [-1 / np.sqrt(2), 1 / np.sqrt(2), 0.0],
+                [1 / np.sqrt(3), 1 / np.sqrt(3), 1 / np.sqrt(3)],
+            ]
+        )
+        builder = Trotter(order=4, time=1.0, num_divisions=3)
+        identity = create_kitaev_hamiltonian(graph, 0.0, 0.0, 0.0, j=1.0)
+        rotated = create_kitaev_hamiltonian(graph, 0.0, 0.0, 0.0, j=1.0, spin_basis_transform=rotation)
+
+        assert len(rotated.coefficients) > len(identity.coefficients)
+        assert (
+            builder.run(rotated).get_container().num_pauli_exponentials
+            == builder.run(identity).get_container().num_pauli_exponentials
+        )
 
     def test_automatic_steps_bound_the_minimized_order(self):
         """Second-order automatic steps use the commutator bound of the reordered terms."""
