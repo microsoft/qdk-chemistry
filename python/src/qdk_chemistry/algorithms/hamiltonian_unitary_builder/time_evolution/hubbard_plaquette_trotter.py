@@ -125,7 +125,7 @@ class HubbardPlaquetteTrotter(TimeEvolutionBuilder):
         """Return ``hamiltonian_unitary_builder`` as the algorithm type name."""
         return "hamiltonian_unitary_builder"
 
-    def _input_type(self) -> type:
+    def _input_type(self) -> type[FermiHubbardModelHamiltonianDescription]:
         """Return :class:`~qdk_chemistry.data.FermiHubbardModelHamiltonianDescription`, the model this evolves."""
         return FermiHubbardModelHamiltonianDescription
 
