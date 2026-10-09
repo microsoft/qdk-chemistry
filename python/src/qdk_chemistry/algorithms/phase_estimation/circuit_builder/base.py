@@ -6,6 +6,7 @@
 # --------------------------------------------------------------------------------------------
 
 from abc import abstractmethod
+from typing import Any
 
 from qdk_chemistry.algorithms.base import Algorithm, AlgorithmFactory
 from qdk_chemistry.data import (
@@ -16,6 +17,7 @@ from qdk_chemistry.data import (
     Settings,
     UnitaryRepresentation,
 )
+from qdk_chemistry.utils.qsharp import QSHARP_UTILS
 
 __all__: list[str] = [
     "IterativeQpeCircuitBuilder",
@@ -184,6 +186,35 @@ class QpeCircuitBuilder(Algorithm):
         if isinstance(qubit_hamiltonian, QubitOperator):
             return qubit_hamiltonian.num_qubits
         return unitary_rep.get_num_system_qubits()
+
+    @staticmethod
+    def _shared_register(controlled_unitary_circuits: list[Circuit]) -> tuple[list[Any], Any, int]:
+        """Resolve the phase gradient register the controlled unitaries request through their metadata.
+
+        A controlled unitary that declares phase gradient ancillas expects those qubits at the end of its targets,
+        prepared by its caller and left prepared. Every declaration is the binary phase gradient, whose state does not
+        depend on any angle, so phase estimation prepares one register around all the controlled unitaries.
+
+        Args:
+            controlled_unitary_circuits: The controlled unitaries, each carrying a Q# operation.
+
+        Returns:
+            The operations to apply, the shared register preparation, and the shared register size.
+
+        Raises:
+            ValueError: If the circuits ask for registers of different widths, which one register cannot serve.
+
+        """
+        ops = [circuit._qsharp_op for circuit in controlled_unitary_circuits]  # noqa: SLF001
+        requests = {circuit.metadata.num_phase_gradient_ancillas for circuit in controlled_unitary_circuits}
+        if requests == {0} or not requests:
+            return ops, QSHARP_UTILS.PrepSelPrep.NoOpPrepare, 0
+        if len(requests) > 1:
+            raise ValueError(
+                "The controlled unitaries of one phase estimation must all request the same phase gradient "
+                f"register. Got widths {sorted(requests)}."
+            )
+        return ops, QSHARP_UTILS.PhaseGradient.PreparePhaseGradientState, requests.pop()
 
     @staticmethod
     def _validate_state_prep_width(state_preparation: Circuit, num_qubits_passed: int) -> None:
