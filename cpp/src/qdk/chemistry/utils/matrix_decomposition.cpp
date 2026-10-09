@@ -30,10 +30,8 @@ using Rotation = std::pair<Eigen::Index, double>;
 
 }  // namespace
 
-// Full SVD M = U diag(s) V^T with complete orthogonal U and V, computed by
-// LAPACK's QR-iteration driver. Eigen 3.4's divide-and-conquer SVD can return
-// non-finite factors or crash for spectra with many exact zeros, which the
-// zero-padded site blocks routinely have.
+// singular value decomposition M = U · diag(s) · Vᵀ. with complete orthogonal U
+// and V.
 FullSvd decompose_svd(const Eigen::Ref<const Eigen::MatrixXd>& matrix) {
   const auto rows = static_cast<std::int64_t>(matrix.rows());
   const auto cols = static_cast<std::int64_t>(matrix.cols());
@@ -41,19 +39,19 @@ FullSvd decompose_svd(const Eigen::Ref<const Eigen::MatrixXd>& matrix) {
   FullSvd result{Eigen::MatrixXd(rows, rows),
                  Eigen::VectorXd(std::min(rows, cols)),
                  Eigen::MatrixXd(cols, cols)};
-  Eigen::MatrixXd v_transpose(cols, cols);
   const auto info = lapack::gesvd(
       lapack::Job::AllVec, lapack::Job::AllVec, rows, cols, work.data(),
       std::max<std::int64_t>(1, rows), result.singular_values.data(),
-      result.u.data(), std::max<std::int64_t>(1, rows), v_transpose.data(),
+      result.u.data(), std::max<std::int64_t>(1, rows), result.v.data(),
       std::max<std::int64_t>(1, cols));
   if (info != 0) {
     throw std::runtime_error("Unitary synthesis SVD did not converge.");
   }
-  result.v = v_transpose.transpose();
+  result.v.transposeInPlace();
   return result;
 }
 
+// QR decomposition M = Q · R with complete Q and upper-triangular R.
 std::pair<Eigen::MatrixXd, Eigen::MatrixXd> decompose_qr(
     const Eigen::Ref<const Eigen::MatrixXd>& matrix, Eigen::Index num_columns) {
   Eigen::HouseholderQR<Eigen::MatrixXd> qr(matrix);
@@ -66,13 +64,11 @@ std::pair<Eigen::MatrixXd, Eigen::MatrixXd> decompose_qr(
   return {std::move(q), std::move(r)};
 }
 
-// Two-block CSD of equally sized m x k blocks, m >= k, whose vertical stack is
-// an isometry. U_1 and U_2 are complete m x m orthogonal factors.
+// two-block cosine–sine decomposition. [A; B] = diag(U₁, U₂) · [D₁; D₂] · V,
+// with D₁² + D₂² = I.
 TwoBlockCsd decompose_csd(const Eigen::Ref<const Eigen::MatrixXd>& a,
                           const Eigen::Ref<const Eigen::MatrixXd>& b) {
   FullSvd upper = decompose_svd(a);
-  // In the right basis of A the lower block has orthogonal columns with norms
-  // sqrt(1 - d_1^2); its polar factor completes U_2 without reordering D_2.
   const FullSvd lower = decompose_svd(b * upper.v);
   TwoBlockCsd result;
   result.u_1 = std::move(upper.u);
@@ -87,8 +83,8 @@ TwoBlockCsd decompose_csd(const Eigen::Ref<const Eigen::MatrixXd>& a,
   return result;
 }
 
-// Ry angles 2 atan2(d', d) of a cosine-sine pair, zero-padded to the bond
-// register. atan2 keeps full precision where asin(d') is ill-conditioned.
+// Ry angles 2 atan2(d', d) of a cosine-sine pair, zero-padded to the
+// ancilla_dim
 std::vector<double> rotation_angles(const Eigen::VectorXd& d,
                                     const Eigen::VectorXd& d_prime,
                                     Eigen::Index ancilla_dim) {
@@ -102,12 +98,11 @@ std::vector<double> rotation_angles(const Eigen::VectorXd& d,
 }
 
 // Decomposes square orthogonal matrices into parallel Givens layers with the
-// Clements double-sided elimination schedule. Alternating sweeps eliminate
+// Clements double-sided elimination schedule (Clements et al. Optica 3, 1460
+// (2016), arXiv:1603.08788, Fig. 2 and the supplementary algorithm), restricted
+// to real rotations and a diagonal sign matrix. Alternating sweeps eliminate
 // entries with right column rotations and left row rotations; the left
-// rotations are then commuted through the final diagonal sign matrix, so
-// applying the layers in increasing index order followed by the phase signs
-// reconstructs each matrix as D L_{m-1} ... L_0 with m <= dim layers.
-// Matrices are decomposed concurrently, largest first.
+// rotations are then commuted through the final diagonal sign matrix.
 std::vector<GivensDecomposition> decompose_unitaries_to_givens(
     const std::vector<std::reference_wrapper<const Eigen::MatrixXd>>&
         matrices) {
@@ -125,9 +120,7 @@ std::vector<GivensDecomposition> decompose_unitaries_to_givens(
     const Eigen::MatrixXd& matrix = matrices[position].get();
     auto& result = results[position];
     const Eigen::Index dim = matrix.rows();
-    // Every matrix is a completion or product of factors of a validated
-    // isometry, so it is orthogonal up to rounding unless a numerical routine
-    // broke down.
+
     if (!is_isometry(matrix)) {
       throw std::runtime_error(
           "Unitary synthesis produced a non-orthogonal factor.");
@@ -156,7 +149,7 @@ std::vector<GivensDecomposition> decompose_unitaries_to_givens(
             continue;
           }
           const double angle = std::atan2(eliminated, adjacent);
-          // Both columns are already zero below this row.
+
           work.topRows(row + 1).applyOnTheRight(
               column, column + 1,
               Eigen::JacobiRotation<double>(std::cos(angle), std::sin(angle)));
