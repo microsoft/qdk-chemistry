@@ -11,6 +11,7 @@
 #include <qdk/chemistry/data/symmetry/symmetry_blocked_tensor.hpp>
 #include <qdk/chemistry/data/wavefunction.hpp>
 #include <string>
+#include <unordered_map>
 #include <vector>
 
 namespace qdk::chemistry::data {
@@ -31,15 +32,25 @@ class MPSSite {
   using TensorVariant = SymmetryBlockedTensorVariant<3>;
   /** @brief Shared immutable site tensor. */
   using TensorPtr = std::shared_ptr<const TensorVariant>;
-  /** @brief Sector packing orders for the left, physical, and right slots. */
+  /**
+   * @brief Sector packing orders for the left, physical, and right slots.
+   *
+   * Each order lists that slot's sector labels exactly once. A sector occupies
+   * a contiguous range of basis indices, starting after the extents of all
+   * preceding sectors in the order.
+   */
   using SectorOrders = std::array<std::vector<SymmetryLabel>, 3>;
+  /** @brief First basis index of each sector in the three tensor slots. */
+  using SectorOffsets =
+      std::array<std::unordered_map<SymmetryLabel, Eigen::Index>, 3>;
   /** @brief Real or complex matrix used for packed dense export. */
   using DenseMatrixVariant = ContainerTypes::MatrixVariant;
 
   /**
    * @brief Construct a site from blocks and index spaces.
    * @param tensor Rank-3 blocks in the packing convention above.
-   * @param sector_orders Packing order for each of the three tensor slots.
+   * @param sector_orders Packing order for each of the three tensor slots;
+   * each list must contain all of that slot's sector labels exactly once.
    * @param physical_basis One-mode configurations in flattened physical order.
    * Defaults to (0,1) for dimension two or (0,u,d,2) for dimension four.
    * Other dimensions require an explicit basis.
@@ -53,6 +64,8 @@ class MPSSite {
   const TensorVariant& tensor() const { return *_tensor; }
   /** @brief Packing orders for (left, physical, right). */
   const SectorOrders& sector_orders() const { return _sector_orders; }
+  /** @brief Sector offsets implied by the packing orders. */
+  const SectorOffsets& sector_offsets() const { return _sector_offsets; }
   /** @brief Packing order of left-bond sectors. */
   const std::vector<SymmetryLabel>& left_sector_order() const {
     return _sector_orders[0];
@@ -87,16 +100,12 @@ class MPSSite {
  private:
   /** @brief Check tensor packing, sector orders, local basis, and finiteness.
    */
-  void _validate() const;
-  /**
-   * @brief Sum sector extents for one index slot.
-   * @param slot Slot index: left (0), physical (1), or right (2).
-   * @return Total dimension of the selected index space.
-   */
-  std::size_t _dimension(std::size_t slot) const;
+  void _validate();
 
   TensorPtr _tensor;
   SectorOrders _sector_orders;
+  SectorOffsets _sector_offsets;
+  std::array<std::size_t, 3> _dimensions{};
   std::vector<Configuration> _physical_basis;
 };
 
@@ -152,6 +161,13 @@ class MPSContainer : public WavefunctionContainer {
 
   /** @brief Immutable sites in chain order. */
   const std::vector<SitePtr>& sites() const { return _sites; }
+  /**
+   * @brief Validate an open-boundary chain independently of orbital metadata.
+   * @param sites Nonempty chain of nonnull sites with one scalar type.
+   * @throws std::invalid_argument for incompatible adjacent bond spaces or
+   * outer bond dimensions other than one.
+   */
+  static void validate_sites(const std::vector<SitePtr>& sites);
   /** @brief Number of sites. */
   std::size_t num_sites() const { return _sites.size(); }
   /** @brief Largest total bond dimension in the stored chain. */

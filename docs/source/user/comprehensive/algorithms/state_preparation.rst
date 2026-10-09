@@ -239,10 +239,51 @@ where :math:`\tilde{p}` is the target distribution discretized to :math:`\mu` bi
      - int
      - Number of bits :math:`\mu` of precision for the alias table's keep probabilities. Each prepared probability is within :math:`1/(L 2^{\mu})` of the target for :math:`L` coefficients. The upper bound of 30 is a sanity limit as :math:`2^{-30}` is far below chemical accuracy. Default is 10.
 
+.. _matrix-product-state:
+
+Matrix Product State
+~~~~~~~~~~~~~~~~~~~~
+
+.. rubric:: Factory name: ``"matrix_product_state"``
+
+This method prepares a matrix product state (MPS) stored in an :class:`~qdk_chemistry.data.MPSContainer` following :cite:`Berry2025` and :cite:`Rupprecht2026`.
+The MPS must be real and right-canonical with orthogonality center at site 0, with open boundaries, and either the physical basis ``('0', 'u', 'd', '2')`` on every site or the physical basis ``('0', '1')`` on every site.
+The physical basis is loaded in the blocked Jordan-Wigner layout.
+An ancilla register of :math:`\lceil \log_2 \chi \rceil` qubits carries the virtual bond of maximal dimension :math:`\chi`.
+Every site unitary acts on the qubits of its site and the ancilla register, and is synthesized by one of two methods selected with the ``unitary_synthesis`` setting, excluding site 0, which is prepared as the initial state.
+Givens decomposition converts the orthogonal factors into adjacent rotations and sign corrections for the circuit.
+A final layer of CZ gates applies the fermionic signs of reordering these modes into qubit order.
+It relies on the container's validation of adjacent bond spaces.
+The utility ``matrix_product_state_synthesis(container, ancilla_dimension, unitary_synthesis="dense")`` returns the synthesized sites in chain order, excluding site 0.
+Single-site synthesis is available through ``dense_unitary_synthesis(site, ancilla_dimension, following_right_factor)`` and ``block_sparse_unitary_synthesis(site, ancilla_dimension)``, both taking an ``MPSSite``.
+They return the native ``DenseSiteSynthesis`` and ``SparseSiteSynthesis`` objects bound from C++ in ``qdk_chemistry._core.utils.unitary_synthesis``, which Q# structs of the same names mirror field by field.
+To obtain preparation data without building a circuit, call ``preparer.generate_matrix_product_state_preparation_data(mps_container)``.
+This instance method accepts only an ``MPSContainer`` and uses the preparer's ``unitary_synthesis`` setting.
+
+.. rubric:: Settings
+
+.. list-table::
+   :header-rows: 1
+   :widths: 25 25 50
+
+   * - Setting
+     - Type
+     - Description
+   * - ``allocate_phase_gradient``
+     - bool
+     - Whether the circuit allocates and prepares its own phase gradient register. If False, the operation takes ``rotation_bit_precision`` trailing qubits holding a phase gradient state owned by the caller. Default is True.
+   * - ``rotation_bit_precision``
+     - int
+     - Size of the phase gradient register, which sets the precision of every rotation angle. The upper bound of 30 is a sanity limit as :math:`2^{-30}` is far below chemical accuracy. Default is 10.
+   * - ``unitary_synthesis``
+     - str
+     - Site unitary synthesis method: ``"dense"`` or ``"block_sparse"``. Default is ``"dense"``.
+
 Related classes
 ---------------
 
 - :class:`~qdk_chemistry.data.Wavefunction`: Input wavefunction for circuit construction
+- :class:`~qdk_chemistry.data.MPSContainer`: Matrix product state input for the MPS-based methods
 - :class:`~qdk_chemistry.data.Circuit`: Output circuit that prepares the wavefunction on qubits
 
 Further reading
