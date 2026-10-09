@@ -47,6 +47,7 @@ if TYPE_CHECKING:
 
 __all__: list[str] = [
     "MatrixProductStatePreparation",
+    "MatrixProductStatePreparationData",
 ]
 
 _DESCRIPTION = "MPS state preparation"
