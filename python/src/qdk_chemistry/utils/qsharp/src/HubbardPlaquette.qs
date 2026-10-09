@@ -415,9 +415,6 @@ namespace QDKChemistry.Utils.HubbardPlaquette {
     /// :cite:`Apel2026`, which merges the more expensive hopping layers; it deviates from
     /// Eq. (D2) of :cite:`Campbell2022`, which puts the interaction outermost instead.
     ///
-    /// The catalysts are prepared by the caller and left prepared, so phase estimation can
-    /// prepare them once for every query.
-    ///
     /// # Input
     /// ## params
     /// The lattice shape and the layer angles.
