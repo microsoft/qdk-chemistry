@@ -139,7 +139,7 @@ class Zassenhaus(TimeEvolutionBuilder):
         if term_grouper is not None:
             self._settings.set("term_grouper", term_grouper)
 
-    def _input_type(self) -> type:
+    def _input_type(self) -> type[QubitOperator]:
         """Return :class:`~qdk_chemistry.data.QubitOperator`, the input Zassenhaus evolves."""
         return QubitOperator
 

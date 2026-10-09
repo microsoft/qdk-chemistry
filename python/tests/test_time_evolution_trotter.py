@@ -5,6 +5,7 @@
 # Licensed under the MIT License. See LICENSE.txt in the project root for license information.
 # --------------------------------------------------------------------------------------------
 
+import warnings
 from itertools import permutations
 
 import numpy as np
@@ -970,6 +971,48 @@ class TestHamiltonianDescription:
         model = FermiHubbardModelHamiltonianDescription(LatticeGeometry.chain(2), t=1.0, u=4.0)
         with pytest.raises(TypeError, match="takes a QubitOperator, got FermiHubbardModelHamiltonianDescription"):
             Trotter(time=0.1).run(model)
+
+    def test_builder_without_a_declared_type_warns_for_other_inputs(self):
+        """A builder that declares no input type still runs, and warns when the input is not a description."""
+
+        class _UndeclaredTrotter(Trotter):
+            def _input_type(self):
+                return None
+
+            def _run_impl(self, qubit_hamiltonian):
+                if isinstance(qubit_hamiltonian, dict):
+                    qubit_hamiltonian = QubitOperator(
+                        pauli_strings=list(qubit_hamiltonian), coefficients=list(qubit_hamiltonian.values())
+                    )
+                return super()._run_impl(qubit_hamiltonian)
+
+        builder = _UndeclaredTrotter(time=0.1)
+        with warnings.catch_warnings():
+            warnings.simplefilter("error", DeprecationWarning)
+            builder.run(QubitOperator(pauli_strings=["Z"], coefficients=[1.0]))
+        with pytest.warns(DeprecationWarning, match="will require a HamiltonianDescription"):
+            unitary = builder.run({"Z": 1.0})
+        assert isinstance(unitary, UnitaryRepresentation)
+
+    def test_rejects_an_input_type_that_is_not_a_description(self):
+        """A declared input type must be a HamiltonianDescription subclass."""
+
+        class _IntTrotter(Trotter):
+            def _input_type(self):
+                return int
+
+        with pytest.raises(TypeError, match="must return a HamiltonianDescription subclass"):
+            _IntTrotter(time=0.1).run(QubitOperator(pauli_strings=["Z"], coefficients=[1.0]))
+
+    def test_rejects_a_result_that_is_not_a_unitary(self):
+        """A builder must return a UnitaryRepresentation."""
+
+        class _IdentityTrotter(Trotter):
+            def _run_impl(self, qubit_hamiltonian):
+                return qubit_hamiltonian
+
+        with pytest.raises(TypeError, match="returned a QubitOperator, not a UnitaryRepresentation"):
+            _IdentityTrotter(time=0.1).run(QubitOperator(pauli_strings=["Z"], coefficients=[1.0]))
 
 
 class TestNoPartitionFallback:

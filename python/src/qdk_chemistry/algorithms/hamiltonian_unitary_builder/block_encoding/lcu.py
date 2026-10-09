@@ -101,7 +101,7 @@ class LCUBuilder(HamiltonianUnitaryBuilder):
         self._settings.set("power", power)
         self._settings.set("quantum_walk", quantum_walk)
 
-    def _input_type(self) -> type:
+    def _input_type(self) -> type[QubitOperator]:
         """Return :class:`~qdk_chemistry.data.QubitOperator`, the input LCU block-encodes."""
         return QubitOperator
 

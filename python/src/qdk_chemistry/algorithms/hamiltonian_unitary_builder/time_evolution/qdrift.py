@@ -215,7 +215,7 @@ class QDrift(TimeEvolutionBuilder):
         self._settings.set("merge_duplicate_terms", merge_duplicate_terms)
         self._settings.set("commutation_type", commutation_type)
 
-    def _input_type(self) -> type:
+    def _input_type(self) -> type[QubitOperator]:
         """Return :class:`~qdk_chemistry.data.QubitOperator`, the input qDRIFT evolves."""
         return QubitOperator
 
