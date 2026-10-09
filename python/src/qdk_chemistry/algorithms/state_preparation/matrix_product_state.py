@@ -34,7 +34,7 @@ from typing import TYPE_CHECKING
 import numpy as np
 
 from qdk_chemistry.data import Configuration, MPSContainer, MPSSite, Settings, Wavefunction
-from qdk_chemistry.data.circuit import Circuit, QsharpFactoryData
+from qdk_chemistry.data.circuit import Circuit, CircuitMetadata, QsharpFactoryData
 from qdk_chemistry.utils.qsharp import QSHARP_UTILS
 from qdk_chemistry.utils.unitary_synthesis import DenseSiteSynthesis, matrix_product_state_synthesis
 
@@ -77,6 +77,12 @@ class MatrixProductStatePreparationSettings(Settings):
             "Site unitary synthesis: 'dense' factors every site unitary over the full bond, and "
             "'block_sparse' factors it into permutations and a block-diagonal unitary.",
             _UNITARY_SYNTHESIS_METHODS,
+        )
+        self._set_default(
+            "allocate_phase_gradient",
+            "bool",
+            True,
+            "Whether to allocate and initialize the phase gradient register internally.",
         )
 
 
@@ -149,11 +155,11 @@ class MatrixProductStatePreparation(StatePreparation):
         if mps.is_complex:
             raise ValueError(f"{_DESCRIPTION} currently supports only real-valued MPS tensors.")
         mps_sites = mps.sites
-        _validate_physical_basis(mps_sites)
+        self._validate_physical_basis(mps_sites)
         unitary_synthesis = self._settings.get("unitary_synthesis")
         # With a left bond of dimension one the packed matrix is (physical, right).
         first_site = mps_sites[0].to_dense()
-        ancilla_bits = _ancilla_bits(mps.max_bond_dimension)
+        ancilla_bits = self._ancilla_bits(mps.max_bond_dimension)
         ancilla_dim = 1 << ancilla_bits
         syntheses = matrix_product_state_synthesis(mps, ancilla_dim, unitary_synthesis)
         if unitary_synthesis == "dense" and syntheses:
@@ -173,7 +179,7 @@ class MatrixProductStatePreparation(StatePreparation):
             initial_state_vec=(vector / norm).tolist(),
             site_to_orbital_order=mps.site_to_orbital_order,
             num_sites=mps.num_sites,
-            num_qubits_per_site=_qubits_per_site(mps_sites),
+            num_qubits_per_site=self._qubits_per_site(mps_sites),
             ancilla_bits=ancilla_bits,
             sites=syntheses,
         )
@@ -211,19 +217,63 @@ class MatrixProductStatePreparation(StatePreparation):
         # The MPS circuits are Adaptive-only; the default shared context targets Adaptive_RIF.
         if unitary_synthesis == "block_sparse":
             sparse = QSHARP_UTILS.MPSSparse
-            program, params_type, make_op = sparse.MakeMPSSparseCircuit, sparse.MPSSparseParams, sparse.MakeMPSSparseOp
+            program, params_type = sparse.MakeMPSSparseCircuit, sparse.MPSSparseParams
+            make_op, make_op_with_phase_gradient = sparse.MakeMPSSparseOp, sparse.MakeMPSSparseOpWithPhaseGradient
         else:
             sequential = QSHARP_UTILS.MPSSequential
-            program = sequential.MakeMPSSequentialCircuit
-            params_type, make_op = sequential.MPSSequentialParams, sequential.MakeMPSSequentialOp
+            program, params_type = sequential.MakeMPSSequentialCircuit, sequential.MPSSequentialParams
+            make_op = sequential.MakeMPSSequentialOp
+            make_op_with_phase_gradient = sequential.MakeMPSSequentialOpWithPhaseGradient
+        num_qubits = data.num_qubits_per_site * data.num_sites
+        if self._settings.get("allocate_phase_gradient"):
+            qsharp_op = make_op(params_type(**params))
+            num_gradient_ancillas = 0
+        else:
+            # The caller owns the trailing gradient register, must leave the gradient in it, and
+            # must exclude it from any reflection about |0>.
+            qsharp_op = make_op_with_phase_gradient(params_type(**params))
+            num_gradient_ancillas = rotation_bits
+        # An exported circuit has no caller to own the gradient, so it always allocates its own.
         qsharp_factory = QsharpFactoryData(program=program, parameter=params)
-        qsharp_op = make_op(params_type(**params))
         return Circuit(
             qsharp_factory=qsharp_factory,
             qsharp_op=qsharp_op,
             encoding="jordan-wigner",
-            num_qubits=data.num_qubits_per_site * data.num_sites,
+            num_qubits=num_qubits + num_gradient_ancillas,
+            metadata=CircuitMetadata(num_phase_gradient_ancillas=num_gradient_ancillas),
         )
+
+    @staticmethod
+    def _validate_physical_basis(sites: Sequence[MPSSite]) -> None:
+        """Require a physical dimension and basis order supported by the Q# operations.
+
+        Args:
+            sites: MPS sites to check.
+
+        Raises:
+            ValueError: If the sites do not share one physical dimension, the dimension is not two or
+                four, or a site does not order its basis as ``('0', '1')`` or ``('0', 'u', 'd', '2')``.
+
+        """
+        dimensions = {site.physical_dimension for site in sites}
+        if len(dimensions) > 1:
+            raise ValueError("MPS state preparation requires the same physical dimension on every site.")
+        (dimension,) = dimensions
+        if dimension not in _PHYSICAL_BASES:
+            raise ValueError(_DIMENSION_ERROR)
+        if any(site.physical_basis != _PHYSICAL_BASES[dimension] for site in sites):
+            labels = ", ".join(f"'{label}'" for label in _PHYSICAL_BASIS_LABELS[dimension])
+            raise ValueError(f"MPS state preparation requires physical basis ordering ({labels}).")
+
+    @staticmethod
+    def _qubits_per_site(sites: Sequence[MPSSite]) -> int:
+        """Return one for the ``('0', '1')`` basis and two for the ``('0', 'u', 'd', '2')`` basis."""
+        return (sites[0].physical_dimension - 1).bit_length()
+
+    @staticmethod
+    def _ancilla_bits(max_bond: int) -> int:
+        """Return ``ceil(log2(max bond dimension))``, and at least one, the width of the bond register."""
+        return max(1, (max_bond - 1).bit_length())
 
 
 # ---------------------------------------------------------------------------
@@ -294,40 +344,3 @@ def _site_to_qsharp(site: DenseSiteSynthesis | SparseSiteSynthesis) -> dict:
         "rowPermutation": site.row_permutation,
         "blockGivens": _givens_to_qsharp(site.block_givens),
     }
-
-
-# ---------------------------------------------------------------------------
-# Validation and encoding helpers
-# ---------------------------------------------------------------------------
-
-
-def _validate_physical_basis(sites: Sequence[MPSSite]) -> None:
-    """Require a physical dimension and basis order supported by the Q# operations.
-
-    Args:
-        sites: MPS sites to check.
-
-    Raises:
-        ValueError: If the sites do not share one physical dimension, the dimension is not two or
-            four, or a site does not order its basis as ``('0', '1')`` or ``('0', 'u', 'd', '2')``.
-
-    """
-    dimensions = {site.physical_dimension for site in sites}
-    if len(dimensions) > 1:
-        raise ValueError("MPS state preparation requires the same physical dimension on every site.")
-    (dimension,) = dimensions
-    if dimension not in _PHYSICAL_BASES:
-        raise ValueError(_DIMENSION_ERROR)
-    if any(site.physical_basis != _PHYSICAL_BASES[dimension] for site in sites):
-        labels = ", ".join(f"'{label}'" for label in _PHYSICAL_BASIS_LABELS[dimension])
-        raise ValueError(f"MPS state preparation requires physical basis ordering ({labels}).")
-
-
-def _qubits_per_site(sites: Sequence[MPSSite]) -> int:
-    """Return one for the ``('0', '1')`` basis and two for the ``('0', 'u', 'd', '2')`` basis."""
-    return (sites[0].physical_dimension - 1).bit_length()
-
-
-def _ancilla_bits(max_bond: int) -> int:
-    """Return ``ceil(log2(max bond dimension))``, and at least one, the width of the bond register."""
-    return max(1, (max_bond - 1).bit_length())

@@ -16,9 +16,9 @@ namespace QDKChemistry.Utils.MPSSparse {
     import QDKChemistry.Utils.QROMStatePrep.QROMStatePrepare;
     import QDKChemistry.Utils.MPSSequential.MPSSiteQubits;
     import QDKChemistry.Utils.MPSSequential.ApplyMPSFermionicOrderSigns;
-    import GivensDecomposition.*;
+    import QDKChemistry.Utils.UnitarySynthesis.*;
 
-    export MPSSparse, MPSSparseParams, MakeMPSSparseOp, MakeMPSSparseCircuit, PermutationViaQROAM, SparseSiteSynthesis;
+    export MPSSparse, MPSSparseParams, MakeMPSSparseOp, MakeMPSSparseOpWithPhaseGradient, MakeMPSSparseCircuit, PermutationViaQROAM, SparseSiteSynthesis;
 
     /// # Summary
     /// Circuit data for one block-sparse MPS site unitary, mirroring the C++
@@ -136,7 +136,8 @@ namespace QDKChemistry.Utils.MPSSparse {
     /// `state` is a Jordan-Wigner register with one mode per orbital for the ('0', '1')
     /// physical basis, or the blocked layout of the α modes of all orbitals followed by their
     /// β modes for the ('0', 'u', 'd', '2') basis. `siteToOrbitalOrder` gives the orbital that
-    /// holds each chain site.
+    /// holds each chain site. `phaseGradient` is prepared by `PreparePhaseGradientState` and
+    /// left in that state; its length is the number of bits of every quantized rotation angle.
     ///
     /// References:
     ///   Rupprecht & Woelk (2026). Faster matrix product state preparation by
@@ -145,20 +146,17 @@ namespace QDKChemistry.Utils.MPSSparse {
         initialStateVec : Double[],
         numSites : Int,
         siteToOrbitalOrder : Int[],
-        rotationBits : Int,
         siteDecompositions : SparseSiteSynthesis[],
         state : Qubit[],
-        ancilla : Qubit[]
+        ancilla : Qubit[],
+        phaseGradient : Qubit[]
     ) : Unit {
         Fact(Length(siteDecompositions) == numSites - 1, "MPS sparse preparation needs one decomposition per site after the first.");
         Fact(
             Length(state) == numSites or Length(state) == 2 * numSites,
             "The state register must hold one or two qubits per MPS site."
         );
-
-        // Initialize phase gradient register
-        use phaseGradient = Qubit[rotationBits];
-        PreparePhaseGradientState(phaseGradient);
+        let rotationBits = Length(phaseGradient);
 
         // Single shared angle register
         use angleReg = Qubit[rotationBits];
@@ -193,14 +191,11 @@ namespace QDKChemistry.Utils.MPSSparse {
             PermutationViaQROAM(rowPermData, rowInvPermData, target);
         }
         ApplyMPSFermionicOrderSigns(siteToOrbitalOrder, state);
-
-        // Undo phase gradient state
-        Adjoint PreparePhaseGradientState(phaseGradient);
     }
 
     /// # Summary
     /// Returns a composable operation that prepares the MPS on a numQubitsPerSite·numSites-qubit
-    /// register.
+    /// register, allocating and preparing its own phase gradient register.
     function MakeMPSSparseOp(params : MPSSparseParams) : Qubit[] => Unit {
         (state) => {
             Fact(
@@ -208,14 +203,42 @@ namespace QDKChemistry.Utils.MPSSparse {
                 "State register size must equal the number of qubits per MPS site times the number of sites."
             );
             use ancilla = Qubit[params.numAncillaQubits];
+            use phaseGradient = Qubit[params.rotationBits];
+            within {
+                PreparePhaseGradientState(phaseGradient);
+            } apply {
+                MPSSparse(
+                    params.initialStateVec,
+                    params.numSites,
+                    params.siteToOrbitalOrder,
+                    params.siteDecompositions,
+                    state,
+                    ancilla,
+                    phaseGradient
+                );
+            }
+        }
+    }
+
+    /// # Summary
+    /// Returns a composable operation on `[state | phaseGradient]` whose last rotationBits
+    /// qubits are a caller-owned register prepared by `PreparePhaseGradientState`.
+    function MakeMPSSparseOpWithPhaseGradient(params : MPSSparseParams) : Qubit[] => Unit {
+        let n = params.numQubitsPerSite * params.numSites;
+        (qs) => {
+            Fact(
+                Length(qs) == n + params.rotationBits,
+                "The register must hold the MPS state followed by the phase gradient."
+            );
+            use ancilla = Qubit[params.numAncillaQubits];
             MPSSparse(
                 params.initialStateVec,
                 params.numSites,
                 params.siteToOrbitalOrder,
-                params.rotationBits,
                 params.siteDecompositions,
-                state,
-                ancilla
+                qs[0..n - 1],
+                ancilla,
+                qs[n...]
             );
         }
     }
@@ -232,15 +255,20 @@ namespace QDKChemistry.Utils.MPSSparse {
     ) : Unit {
         use state = Qubit[numQubitsPerSite * numSites];
         use ancilla = Qubit[numAncillaQubits];
-        MPSSparse(
-            initialStateVec,
-            numSites,
-            siteToOrbitalOrder,
-            rotationBits,
-            siteDecompositions,
-            state,
-            ancilla
-        );
+        use phaseGradient = Qubit[rotationBits];
+        within {
+            PreparePhaseGradientState(phaseGradient);
+        } apply {
+            MPSSparse(
+                initialStateVec,
+                numSites,
+                siteToOrbitalOrder,
+                siteDecompositions,
+                state,
+                ancilla,
+                phaseGradient
+            );
+        }
         ResetAll(state + ancilla);
     }
 

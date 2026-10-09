@@ -406,6 +406,20 @@ class TestBlockSparseStatePreparationRun:
         circuit = create("state_prep", "matrix_product_state", unitary_synthesis="block_sparse").run(wavefunction)
         assert circuit._qsharp_factory.parameter["siteToOrbitalOrder"] == [0, 1, 2, 3]
         assert circuit._qsharp_factory.parameter["rotationBits"] == 10
+        assert circuit.metadata.num_phase_gradient_ancillas == 0
+
+    def test_shared_gradient_widens_the_register_it_declares(self):
+        """Opting out of internal allocation appends a gradient the caller must own."""
+        prep = create(
+            "state_prep",
+            "matrix_product_state",
+            unitary_synthesis="block_sparse",
+            rotation_bits=6,
+            allocate_phase_gradient=False,
+        )
+        circuit = prep.run(Wavefunction(right_normalized_mps(REFERENCE_MPS_TENSORS)))
+        assert circuit.num_qubits == 8 + 6
+        assert circuit.metadata.num_phase_gradient_ancillas == 6
 
     def test_resource_estimate(self):
         """The generated Adaptive circuit compiles for logical resource estimation."""

@@ -16,16 +16,14 @@ namespace QDKChemistry.Utils.QROMStatePrep {
     import Std.Arrays.Reversed;
     import Std.Canon.ApplyPauliFromBitString;
     import Std.Convert.IntAsBoolArray;
-    import Std.Convert.IntAsDouble;
     import Std.Math.ArcCos;
     import Std.Math.MinD;
     import Std.Math.MinI;
-    import Std.Math.PI;
-    import Std.Math.Round;
     import Std.Math.Sqrt;
+    import QDKChemistry.Utils.PhaseGradient.ApplyMultiplexedRy;
     import QDKChemistry.Utils.PhaseGradient.PreparePhaseGradientState;
+    import QDKChemistry.Utils.PhaseGradient.QuantizeRyAngle;
     import QDKChemistry.Utils.PhaseGradient.RyViaPhaseGradient;
-    import QDKChemistry.Utils.SelectSwap.SelectSwap;
     import Std.TableLookup.Select;
 
     /// Parameters for QROM-based state preparation.
@@ -41,12 +39,8 @@ namespace QDKChemistry.Utils.QROMStatePrep {
     /// Compute the SBM rotation angles as quantized integers in a binary heap.
     ///
     /// Builds a probability tree p_i = Σ_{leaves(i)} |α_j|² and converts
-    /// each node to a quantized Ry angle:
-    ///   θ_i = arccos(√(p_left / p_i))
-    ///   quantized_i = Round(2^b · θ / (2π)) mod 2^b
-    ///
-    /// RyViaPhaseGradient applies Ry(4π·x/2^b), so to get Ry(2θ) we need
-    /// x = 2^b · θ / (2π).
+    /// each node to the `QuantizeRyAngle` word of Ry(2θ_i), with
+    ///   θ_i = arccos(√(p_left / p_i)).
     ///
     /// # Output
     /// Int array of length 2^nQubits, indexed as a binary heap (root at index 1).
@@ -75,7 +69,6 @@ namespace QDKChemistry.Utils.QROMStatePrep {
         }
 
         // Compute quantized angles.
-        let scale = IntAsDouble(1 <<< bRot);
         mutable angles = Repeated(0, nCoeffs);
 
         for level in 0..nQubits - 1 {
@@ -91,9 +84,7 @@ namespace QDKChemistry.Utils.QROMStatePrep {
                     set angle = ArcCos(cosVal);
                 }
 
-                // Quantize: x = 2^b · θ / (2π), so Ry(4π·x/2^b) = Ry(2θ).
-                let xInt = Round(scale * angle / (2.0 * PI())) % (1 <<< bRot);
-                set angles w/= node <- xInt;
+                set angles w/= node <- QuantizeRyAngle(2.0 * angle, bRot);
             }
         }
 
@@ -179,11 +170,7 @@ namespace QDKChemistry.Utils.QROMStatePrep {
                 let numAngles = 1 <<< level;
                 let data = ComputeQROMData(angleTree, startIdx, numAngles, bRot);
 
-                within {
-                    SelectSwap(-1, data, address, angleReg);
-                } apply {
-                    RyViaPhaseGradient(targetQubit, angleReg, phaseGradient);
-                }
+                ApplyMultiplexedRy(data, address, targetQubit, phaseGradient, angleReg);
             }
         }
 

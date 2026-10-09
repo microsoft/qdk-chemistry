@@ -495,7 +495,7 @@ def simulate_mps_preparation(
 
     Args:
         operation: Fully qualified Q# operation with signature
-            ``(initialStateVec, numSites, siteToOrbitalOrder, rotationBits, siteDecompositions, state, ancilla)``.
+            ``(initialStateVec, numSites, siteToOrbitalOrder, siteDecompositions, state, ancilla, phaseGradient)``.
         site_struct: Fully qualified Q# struct of one site decomposition.
         params: Parameters produced by ``to_qsharp_params``.
         num_sites: Number of MPS sites.
@@ -506,13 +506,17 @@ def simulate_mps_preparation(
         qubit basis, qubit 0 most significant (see :func:`blocked_jordan_wigner_state`).
 
     """
-    parameter_names = ("initialStateVec", "numSites", "siteToOrbitalOrder", "rotationBits", "siteDecompositions")
+    parameter_names = ("initialStateVec", "numSites", "siteToOrbitalOrder", "siteDecompositions")
     arguments = ", ".join(_to_qsharp_literal(params[name], site_struct) for name in parameter_names)
     num_state_qubits = params["numQubitsPerSite"] * num_sites
     context = get_qsharp_context()
     context.eval(f"use state = Qubit[{num_state_qubits}];")
     context.eval(f"use ancilla = Qubit[{num_ancilla_qubits}];")
-    context.eval(f"{operation}({arguments}, state, ancilla)")
+    context.eval(
+        f"{{ use phaseGradient = Qubit[{params['rotationBits']}]; "
+        "within { QDKChemistry.Utils.PhaseGradient.PreparePhaseGradientState(phaseGradient); } "
+        f"apply {{ {operation}({arguments}, state, ancilla, phaseGradient); }} }}"
+    )
     dump = context.dump_machine()
     context.eval("ResetAll(state + ancilla);")
 
@@ -529,7 +533,7 @@ def simulate_mps_preparation(
     return ancilla_zero_probability, amplitudes / np.sqrt(ancilla_zero_probability)
 
 
-_GIVENS_STRUCT = "GivensDecomposition.GivensDecomposition"
+_GIVENS_STRUCT = "QDKChemistry.Utils.UnitarySynthesis.GivensDecomposition"
 _GIVENS_FIELDS = {"layerAngles", "layerShifted", "phases"}
 
 
