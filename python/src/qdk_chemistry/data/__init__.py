@@ -125,11 +125,9 @@ from qdk_chemistry.data.circuit import Circuit
 from qdk_chemistry.data.circuit_executor_data import CircuitExecutorData
 from qdk_chemistry.data.enums.fermion_mode_order import FermionModeOrder
 from qdk_chemistry.data.estimator_data import EnergyExpectationResult, MeasurementData
-from qdk_chemistry.data.hamiltonian_description import HamiltonianDescription
-from qdk_chemistry.data.model_hamiltonian_description import (
-    FermiHubbardModelHamiltonianDescription,
-    ModelHamiltonianDescription,
-)
+from qdk_chemistry.data.hamiltonian_description.base import HamiltonianDescription
+from qdk_chemistry.data.hamiltonian_description.fermi_hubbard import FermiHubbardModelHamiltonianDescription
+from qdk_chemistry.data.hamiltonian_description.model_hamiltonian import ModelHamiltonianDescription
 from qdk_chemistry.data.noise_models import QuantumErrorProfile
 from qdk_chemistry.data.qpe_result import QpeResult
 

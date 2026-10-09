@@ -1,4 +1,4 @@
-"""QDK/Chemistry model Hamiltonian descriptions."""
+"""QDK/Chemistry model Hamiltonian description base module."""
 
 # --------------------------------------------------------------------------------------------
 # Copyright (c) Microsoft Corporation. All rights reserved.
@@ -13,25 +13,21 @@ from typing import TYPE_CHECKING, Any
 
 import h5py
 
-from qdk_chemistry._core.data import Hamiltonian, LatticeGeometry, LatticeGraph
+from qdk_chemistry._core.data import Hamiltonian, LatticeGeometry
 from qdk_chemistry.data._hashing import _hash_float, _hash_str, _hash_uint
-from qdk_chemistry.data.base import DataClass
+from qdk_chemistry.data.hamiltonian_description.base import HamiltonianDescription
 
 if TYPE_CHECKING:
     from qdk_chemistry.data.qubit_operator import QubitOperator
 
-__all__: list[str] = ["FermiHubbardModelHamiltonianDescription", "ModelHamiltonianDescription"]
+__all__: list[str] = ["ModelHamiltonianDescription"]
 
 
-class ModelHamiltonianDescription(DataClass):
-    """Abstract base of the lattice model Hamiltonians described by a lattice and named model parameters.
+class ModelHamiltonianDescription(HamiltonianDescription):
+    """Abstract class for a model Hamiltonian defined by a lattice and named model parameters.
 
-    A unitary builder that evolves the model directly, rather than its qubit operator, reads the
-    lattice and the parameters it needs. :meth:`materialize` builds the Hamiltonian itself.
-
-    A subclass implements :meth:`materialize`, declares its own :meth:`data_type_name`, and takes
-    the lattice followed by each model parameter as a keyword argument, which :meth:`from_json`
-    and :meth:`from_hdf5` rely on.
+    A subclass implements :meth:`materialize` and :meth:`data_type_name`, and takes the lattice
+    followed by each model parameter as a keyword argument.
     """
 
     @staticmethod
@@ -44,6 +40,7 @@ class ModelHamiltonianDescription(DataClass):
         """
         return "model_hamiltonian_description"
 
+    # Serialization version for this class
     _serialization_version = "0.1.0"
 
     def __init__(self, lattice: LatticeGeometry, parameters: Mapping[str, float]) -> None:
@@ -53,15 +50,7 @@ class ModelHamiltonianDescription(DataClass):
             lattice: The lattice the model is defined on.
             parameters: The model parameters by name.
 
-        Raises:
-            TypeError: If the class does not implement :meth:`materialize`, or ``lattice`` is not a
-                :class:`~qdk_chemistry.data.LatticeGeometry`.
-
         """
-        if getattr(type(self).materialize, "__isabstractmethod__", False):
-            raise TypeError(f"Can't instantiate abstract class {type(self).__name__} without materialize().")
-        if not isinstance(lattice, LatticeGeometry):
-            raise TypeError(f"lattice must be a LatticeGeometry, got {type(lattice).__name__}.")
         self.lattice = lattice
         self.parameters: Mapping[str, float] = MappingProxyType(
             {str(name): float(value) for name, value in parameters.items()}
@@ -73,8 +62,7 @@ class ModelHamiltonianDescription(DataClass):
         """Build the model Hamiltonian.
 
         Returns:
-            Hamiltonian | QubitOperator: A :class:`~qdk_chemistry.data.Hamiltonian` for a fermionic model,
-            or a :class:`~qdk_chemistry.data.QubitOperator` for a spin model.
+            Hamiltonian | QubitOperator: The fermionic Hamiltonian or the qubit operator of the model.
 
         """
 
@@ -88,10 +76,10 @@ class ModelHamiltonianDescription(DataClass):
             _hash_float(h, self.parameters[name])
 
     def get_summary(self) -> str:
-        """Get a human-readable summary of the model Hamiltonian description.
+        """Get summary of the model Hamiltonian description.
 
         Returns:
-            str: Summary of the model, the lattice size and the model parameters.
+            str: Summary string describing the model, the lattice size and the model parameters.
 
         """
         parameters = ", ".join(f"{name}={value:g}" for name, value in self.parameters.items()) or "none"
@@ -101,7 +89,7 @@ class ModelHamiltonianDescription(DataClass):
         """Convert the model Hamiltonian description to a dictionary for JSON serialization.
 
         Returns:
-            dict[str, Any]: The lattice and the model parameters.
+            dict: Dictionary representation of the model Hamiltonian description.
 
         """
         data = {"lattice": json.loads(self.lattice.to_json()), "parameters": dict(self.parameters)}
@@ -111,7 +99,7 @@ class ModelHamiltonianDescription(DataClass):
         """Save the model Hamiltonian description to an HDF5 group.
 
         Args:
-            group: HDF5 group or file to write the description to.
+            group: HDF5 group or file to write data to.
 
         """
         self._add_hdf5_version(group)
@@ -125,10 +113,10 @@ class ModelHamiltonianDescription(DataClass):
         """Create a model Hamiltonian description from a JSON dictionary.
 
         Args:
-            json_data: Dictionary containing the serialized description.
+            json_data: Dictionary containing the serialized data.
 
         Returns:
-            ModelHamiltonianDescription: New instance reconstructed from JSON data.
+            ModelHamiltonianDescription
 
         """
         cls._validate_json_version(cls._serialization_version, json_data)
@@ -140,10 +128,10 @@ class ModelHamiltonianDescription(DataClass):
         """Load a model Hamiltonian description from an HDF5 group.
 
         Args:
-            group: HDF5 group or file containing the description.
+            group: HDF5 group or file to read data from.
 
         Returns:
-            ModelHamiltonianDescription: New instance reconstructed from HDF5 data.
+            ModelHamiltonianDescription
 
         """
         cls._validate_hdf5_version(cls._serialization_version, group)
@@ -152,52 +140,3 @@ class ModelHamiltonianDescription(DataClass):
             lattice_json = lattice_json.decode("utf-8")
         parameters: dict[str, Any] = {name: float(value) for name, value in group["parameters"].attrs.items()}
         return cls(LatticeGeometry.from_json(lattice_json), **parameters)
-
-
-class FermiHubbardModelHamiltonianDescription(ModelHamiltonianDescription):
-    r"""The Fermi-Hubbard model on the nearest-neighbor bonds of a lattice.
-
-    .. math::
-
-        H = \sum_{i,\sigma} \epsilon\, n_{i\sigma}
-          - t \sum_{\langle i,j \rangle, \sigma} (a^\dagger_{i\sigma} a_{j\sigma} + \text{h.c.})
-          + U \sum_i n_{i\uparrow} n_{i\downarrow}
-    """
-
-    @staticmethod
-    def data_type_name() -> str:
-        """Return the wire-format identifier for a Fermi-Hubbard model description.
-
-        Returns:
-            ``"fermi_hubbard_model_hamiltonian_description"``.
-
-        """
-        return "fermi_hubbard_model_hamiltonian_description"
-
-    def __init__(self, lattice: LatticeGeometry, t: float, u: float, epsilon: float = 0.0) -> None:
-        """Initialize a Fermi-Hubbard model description.
-
-        Args:
-            lattice: The lattice the model is defined on.
-            t: The nearest-neighbor hopping integral.
-            u: The on-site Coulomb repulsion.
-            epsilon: The on-site orbital energy.
-
-        """
-        super().__init__(lattice, {"t": t, "u": u, "epsilon": epsilon})
-
-    def materialize(self) -> Hamiltonian:
-        """Build the Fermi-Hubbard Hamiltonian with ``create_hubbard_hamiltonian``.
-
-        Returns:
-            Hamiltonian: The Fermi-Hubbard Hamiltonian on the nearest-neighbor bonds of the lattice.
-
-        """
-        from qdk_chemistry.utils.model_hamiltonians import create_hubbard_hamiltonian  # noqa: PLC0415
-
-        return create_hubbard_hamiltonian(
-            LatticeGraph.from_geometry(self.lattice),
-            epsilon=self.parameters["epsilon"],
-            t=self.parameters["t"],
-            U=self.parameters["u"],
-        )

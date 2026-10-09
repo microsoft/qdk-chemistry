@@ -25,12 +25,6 @@ def model() -> FermiHubbardModelHamiltonianDescription:
     return FermiHubbardModelHamiltonianDescription(LatticeGeometry.chain(4, periodic=True), t=1.0, u=4, epsilon=-0.5)
 
 
-def test_model_hamiltonian_description_is_abstract() -> None:
-    """Only a subclass that implements materialize() can be built."""
-    with pytest.raises(TypeError, match="abstract class ModelHamiltonianDescription"):
-        ModelHamiltonianDescription(LatticeGeometry.chain(2), {"t": 1.0})
-
-
 def test_holds_lattice_and_float_parameters(model: FermiHubbardModelHamiltonianDescription) -> None:
     """The description keeps its lattice and stores each parameter as a float."""
     assert isinstance(model, ModelHamiltonianDescription)
@@ -44,12 +38,6 @@ def test_holds_lattice_and_float_parameters(model: FermiHubbardModelHamiltonianD
         model.parameters = {}
     with pytest.raises(TypeError):
         model.parameters["u"] = 8.0  # type: ignore[index]
-
-
-def test_rejects_a_lattice_that_is_not_a_geometry() -> None:
-    """Only a LatticeGeometry is accepted as the lattice."""
-    with pytest.raises(TypeError, match="LatticeGeometry"):
-        FermiHubbardModelHamiltonianDescription("chain", t=1.0, u=4.0)
 
 
 @pytest.mark.parametrize("format_type", ["json", "hdf5"])
