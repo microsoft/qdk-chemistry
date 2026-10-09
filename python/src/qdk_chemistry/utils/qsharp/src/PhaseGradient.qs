@@ -99,11 +99,8 @@ namespace QDKChemistry.Utils.PhaseGradient {
         }
     }
 
-    /// # Summary
-    /// Returns the `bits`-bit word x for which `RyViaPhaseGradient` applies Ry(angle).
-    ///
-    /// # Description
-    /// Ry(4π·x/2^b) = Ry(angle) gives x = Round(2^b · angle / (4π)) mod 2^b.
+    /// Returns the `bits`-bit word x = Round(2^b · angle / (4π)) mod 2^b for which
+    /// `RyViaPhaseGradient` applies Ry(angle).
     function QuantizeRyAngle(angle : Double, bits : Int) : Int {
         Fact(AbsD(angle) <= 4.0 * PI(), "QuantizeRyAngle: angle must be finite and within [-4π, 4π]");
         let scale = 1 <<< bits;
@@ -111,30 +108,14 @@ namespace QDKChemistry.Utils.PhaseGradient {
         ((raw % scale) + scale) % scale
     }
 
-    /// # Summary
     /// Quantizes each angle with `QuantizeRyAngle` into a `SelectSwap` table of `bits`-bit words.
     function QuantizeRyAngles(angles : Double[], bits : Int) : Bool[][] {
         Mapped(angle -> IntAsBoolArray(QuantizeRyAngle(angle, bits), bits), angles)
     }
 
-    /// # Summary
-    /// Applies Ry(4π·data[a]/2^b) to `targetQubit` for each address state |a⟩.
-    ///
-    /// # Description
-    /// Loads the addressed word into `angleReg` with `SelectSwap`, rotates through the phase
-    /// gradient, and unloads the word.
-    ///
-    /// # Input
-    /// ## data
-    /// Bool[N][b]: words from `QuantizeRyAngles`.
-    /// ## address
-    /// Little-endian address register with at least ⌈log₂ N⌉ qubits.
-    /// ## targetQubit
-    /// The qubit to apply the Y-rotation to.
-    /// ## phaseGradient
-    /// The phase gradient ancilla register (b qubits), pre-initialized.
-    /// ## angleReg
-    /// Clean b-qubit register that receives the loaded word.
+    /// Applies Ry(4π·data[a]/2^b) to `targetQubit` for each state |a⟩ of the little-endian
+    /// `address`, loading the word from `QuantizeRyAngles` into the clean b-qubit `angleReg`
+    /// with `SelectSwap`.
     operation ApplyMultiplexedRy(
         data : Bool[][],
         address : Qubit[],
@@ -149,13 +130,10 @@ namespace QDKChemistry.Utils.PhaseGradient {
         }
     }
 
-    /// # Summary
     /// `ApplyMultiplexedRy` that rotates only when every qubit of `controls` is |1⟩.
     ///
-    /// # Description
-    /// Only the lookup is controlled: otherwise the angle register stays zero and the
-    /// rotation is the identity. This is cheaper than `Controlled ApplyMultiplexedRy`, which
-    /// also controls the adder.
+    /// Only the lookup is controlled, since a zero angle register already gives the identity.
+    /// This is cheaper than `Controlled ApplyMultiplexedRy`, which also controls the adder.
     operation ApplyControlledMultiplexedRy(
         data : Bool[][],
         address : Qubit[],

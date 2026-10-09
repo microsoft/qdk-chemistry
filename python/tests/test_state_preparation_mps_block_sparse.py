@@ -12,6 +12,7 @@ the full Q# circuit (state preparation fidelity via statevector simulation).
 import numpy as np
 import pytest
 
+from qdk_chemistry._core.utils.unitary_synthesis import block_sparse_unitary_synthesis, matrix_product_state_synthesis
 from qdk_chemistry.algorithms import create
 from qdk_chemistry.algorithms.state_preparation.matrix_product_state import (
     MatrixProductStatePreparationData,
@@ -19,7 +20,6 @@ from qdk_chemistry.algorithms.state_preparation.matrix_product_state import (
 from qdk_chemistry.data import Circuit, Configuration, MPSContainer, MPSSite, Orbitals, Wavefunction
 from qdk_chemistry.data import symmetry as sym
 from qdk_chemistry.utils.qsharp import QSHARP_UTILS, get_qsharp_context
-from qdk_chemistry.utils.unitary_synthesis import block_sparse_unitary_synthesis, matrix_product_state_synthesis
 
 from .mps_test_helpers import (
     JORDAN_WIGNER_CONVENTION_CASES,

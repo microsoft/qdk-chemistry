@@ -16,17 +16,17 @@ from typing import TYPE_CHECKING
 
 import numpy as np
 
+from qdk_chemistry._core.utils.unitary_synthesis import DenseSiteSynthesis, matrix_product_state_synthesis
 from qdk_chemistry.data import Configuration, MPSContainer, MPSSite, Settings, Wavefunction
 from qdk_chemistry.data.circuit import Circuit, CircuitMetadata, QsharpFactoryData
 from qdk_chemistry.utils.qsharp import QSHARP_UTILS
-from qdk_chemistry.utils.unitary_synthesis import DenseSiteSynthesis, matrix_product_state_synthesis
 
 from .state_preparation import StatePreparation
 
 if TYPE_CHECKING:
     from collections.abc import Sequence
 
-    from qdk_chemistry.utils.unitary_synthesis import GivensDecomposition, SparseSiteSynthesis
+    from qdk_chemistry._core.utils.unitary_synthesis import GivensDecomposition, SparseSiteSynthesis
 
 __all__: list[str] = [
     "MatrixProductStatePreparation",
@@ -276,10 +276,9 @@ class MatrixProductStatePreparationData:
     """All data needed to drive the Q# MPS preparation operations.
 
     Produced by :meth:`MatrixProductStatePreparation.generate_matrix_product_state_preparation_data` and consumed by
-    :meth:`MatrixProductStatePreparation._run_impl`. The sites are the C++ synthesis results:
-    :class:`~qdk_chemistry.utils.unitary_synthesis.DenseSiteSynthesis` for the ``MPSSequential``
-    Q# operations or :class:`~qdk_chemistry.utils.unitary_synthesis.SparseSiteSynthesis` for the
-    ``MPSSparse`` Q# operation. Q# structs of the same names mirror them field by field.
+    :meth:`~qdk_chemistry.algorithms.StatePreparation.run`. The sites are the C++ synthesis results:
+    ``DenseSiteSynthesis`` for the ``MPSSequential`` Q# operations or ``SparseSiteSynthesis`` for
+    the ``MPSSparse`` Q# operation. Q# structs of the same names mirror them field by field.
     """
 
     num_sites: int

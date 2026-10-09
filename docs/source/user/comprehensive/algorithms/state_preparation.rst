@@ -256,7 +256,7 @@ A final layer of CZ gates applies the fermionic signs of reordering these modes 
 It relies on the container's validation of adjacent bond spaces.
 The utility ``matrix_product_state_synthesis(container, ancilla_dimension, unitary_synthesis="dense")`` returns the synthesized sites in chain order, excluding site 0.
 Single-site synthesis is available through ``dense_unitary_synthesis(site, ancilla_dimension, following_right_factor)`` and ``block_sparse_unitary_synthesis(site, ancilla_dimension)``, both taking an ``MPSSite``.
-They return the native ``DenseSiteSynthesis`` and ``SparseSiteSynthesis`` objects of ``qdk_chemistry.utils.unitary_synthesis``, which Q# structs of the same names mirror field by field.
+They return the native ``DenseSiteSynthesis`` and ``SparseSiteSynthesis`` objects bound from C++ in ``qdk_chemistry._core.utils.unitary_synthesis``, which Q# structs of the same names mirror field by field.
 To obtain preparation data without building a circuit, call ``preparer.generate_matrix_product_state_preparation_data(mps_container)``.
 This instance method accepts only an ``MPSContainer`` and uses the preparer's ``unitary_synthesis`` setting.
 
