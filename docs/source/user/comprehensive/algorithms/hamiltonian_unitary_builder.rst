@@ -9,7 +9,6 @@ Overview
 
 Building unitary from Hamiltonian — such as the Hamiltonian simulation unitary :math:`U(t) = e^{-iHt}` or block encoding unitary :math:`U = \frac{H}{\|H\|}` — is a central subroutine in many quantum algorithms.
 The :class:`~qdk_chemistry.algorithms.HamiltonianUnitaryBuilder` provides a unified interface for methods that construct this operator from a :class:`~qdk_chemistry.data.QubitOperator`.
-:class:`~qdk_chemistry.data.QubitOperator` and :class:`~qdk_chemistry.data.ModelHamiltonianDescription` are both :class:`~qdk_chemistry.data.HamiltonianDescription` types; a builder that names the one it evolves raises :class:`TypeError` for the other, and the built-in builders all evolve a :class:`~qdk_chemistry.data.QubitOperator`.
 
 QDK/Chemistry currently provides two families of implementations for this task: Trotter-Suzuki product formulas and block encoding.
 
@@ -31,7 +30,7 @@ Input requirements
 The :class:`~qdk_chemistry.algorithms.HamiltonianUnitaryBuilder` requires the following inputs:
 
 HamiltonianDescription
-   A :class:`~qdk_chemistry.data.HamiltonianDescription`, such as a :class:`~qdk_chemistry.data.QubitOperator` containing the Pauli-string representation of the Hamiltonian, a :class:`~qdk_chemistry.data.ModelHamiltonianDescription` like :class:`~qdk_chemistry.data.FermiHubbardModelHamiltonianDescription` holding a lattice and the model parameters, or a type a plugin registers with ``HamiltonianDescription.register``, whichever the builder evolves.
+   A :class:`~qdk_chemistry.data.HamiltonianDescription`, such as a :class:`~qdk_chemistry.data.QubitOperator` containing the Pauli-string representation of the Hamiltonian or a :class:`~qdk_chemistry.data.ModelHamiltonianDescription` like :class:`~qdk_chemistry.data.FermiHubbardModelHamiltonianDescription` holding a lattice and the model parameters.
    A :class:`~qdk_chemistry.data.QubitOperator` can be obtained from the :doc:`QubitMapper <qubit_mapper>` algorithm, constructed from a :doc:`model Hamiltonian <../model_hamiltonians>`, or built directly.
 
 .. rubric:: Creating a builder
