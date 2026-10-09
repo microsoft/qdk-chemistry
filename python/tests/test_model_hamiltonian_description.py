@@ -137,6 +137,13 @@ def test_array_and_shell_parameters_are_frozen() -> None:
     assert "epsilon=array(3,), j={1: array(2,), 2: 0.5}" in model.get_summary()
 
 
+@pytest.mark.parametrize("shell", [0, -1, 1.5, True, "1"])
+def test_rejects_shells_that_are_not_positive_integers(shell: object) -> None:
+    """Shell keys are kept as given, so anything but a positive integer is rejected."""
+    with pytest.raises(ValueError, match="j shell indices must be positive integers"):
+        _ShellModelDescription(LatticeGeometry.chain(3), {"j": {shell: 1.0}})
+
+
 def test_hash_distinguishes_parameter_forms() -> None:
     """A float, an array and a shell mapping of the same value hash differently."""
     lattice = LatticeGeometry.chain(3)

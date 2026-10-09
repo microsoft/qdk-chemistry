@@ -7,6 +7,7 @@
 
 import json
 from collections.abc import Mapping
+from numbers import Integral
 from types import MappingProxyType
 from typing import TYPE_CHECKING, Any, TypeAlias
 
@@ -57,7 +58,7 @@ class ModelHamiltonianDescription(HamiltonianDescription):
         """
         self.lattice = lattice
         self.parameters: Mapping[str, ModelParameter] = MappingProxyType(
-            {str(name): _freeze_parameter(value) for name, value in parameters.items()}
+            {str(name): _freeze_parameter(str(name), value) for name, value in parameters.items()}
         )
         super().__init__()
 
@@ -176,9 +177,12 @@ def _freeze_value(value: float | np.ndarray) -> float | np.ndarray:
     return array
 
 
-def _freeze_parameter(value: ModelParameter) -> ModelParameter:
-    """Return an immutable copy of a parameter, with any shell mapping keyed and sorted by integer shell."""
+def _freeze_parameter(name: str, value: ModelParameter) -> ModelParameter:
+    """Return an immutable copy of a parameter, with any shell mapping sorted by shell."""
     if isinstance(value, Mapping):
+        for shell in value:
+            if isinstance(shell, bool) or not isinstance(shell, Integral) or shell < 1:
+                raise ValueError(f"{name} shell indices must be positive integers; got {shell!r}.")
         shells = {int(shell): _freeze_value(shell_value) for shell, shell_value in value.items()}
         return MappingProxyType(dict(sorted(shells.items())))
     return _freeze_value(value)
