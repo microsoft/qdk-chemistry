@@ -239,17 +239,19 @@ class HubbardPlaquetteTrotter(TimeEvolutionBuilder):
             -t \left( a^\dagger_m a_n + a^\dagger_n a_m \right)
             = -\frac{t}{2} \left( X_m Z_{m+1} \cdots Z_{n-1} X_n + Y_m Z_{m+1} \cdots Z_{n-1} Y_n \right).
 
-        To avoid the Jordan-Wigner :math:`Z` strings, each hopping layer first uses a network of
-        fermionic swaps to route the four modes of every plaquette into a contiguous block.
-        Interacting fermionic sites become adjacent in the Jordan-Wigner ordering, thus localizing the hopping term.
+        To avoid the Jordan-Wigner :math:`Z` strings, a network of fermionic swaps routes the four modes
+        of every plaquette into a contiguous block, which makes the hopping term local in the Jordan-Wigner
+        ordering. The modes are routed into pink order once at the start and back once at the end, so
+        only the gold layers route, from pink order and back.
         Two radix-two fermionic Fourier butterflies then
         transform its four-cycle hopping matrix, whose spectrum is
         :math:`\mathrm{diag}(2t, 0, -2t, 0)`, into a single adjacent two-mode hopping term.
         The resulting equal-angle :math:`XX` and :math:`YY`
         rotations can be batched by Hamming-weight phasing, after which the Fourier
-        butterflies and routing are uncomputed.
-        Each hopping layer is therefore an fswap routing, a basis change, two nonzero eigenvalue phases,
-        and the inverse basis change and routing, with every plaquette of the tiling handled in parallel.
+        butterflies are uncomputed.
+        Each hopping layer is therefore a basis change, two nonzero eigenvalue phases, and the inverse
+        basis change, with every plaquette of the tiling handled in parallel; a gold layer adds its fswap
+        routing around them.
 
         Thus, over a total evolution time :math:`T` split into :math:`r` steps of duration
         :math:`\delta = T/r`, the plaquette Trotterization gives:
@@ -396,7 +398,9 @@ class HubbardPlaquetteTrotter(TimeEvolutionBuilder):
         This constant is derived for the "IPG" factor ordering (interaction outermost), while the circuit
         this builder emits uses the "PIG" ordering based on Sec. 4.8.2 of :cite:`Apel2026`.
         The pure-hopping block ``[[H_h^p, H_h^g], .]`` is replaced by a mixed interaction-hopping block,
-        which is reported to make the constant slightly larger than the IPG one. That difference is neglected.
+        which is reported to make the constant slightly larger than the IPG one. This builder keeps Campbell's
+        IPG constant; at the Table 6 points of :cite:`Apel2026` this gives the same step count as their PIG
+        estimate or one more.
 
         Here::
 

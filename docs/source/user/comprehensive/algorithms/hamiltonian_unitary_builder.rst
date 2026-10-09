@@ -221,6 +221,7 @@ The hopping term splits into two layers of disjoint four-site plaquettes, :math:
 The interaction is taken in its particle-hole symmetric form :math:`U \sum_i (n_{i\uparrow} - 1/2)(n_{i\downarrow} - 1/2)`, whose Jordan-Wigner image is pure :math:`ZZ`.
 Each second-order step is the symmetric product :math:`P^{1/2} I^{1/2} G I^{1/2} P^{1/2}`, the "PIG" ordering of :cite:`Apel2026`.
 The half-angle pink layers of neighbouring steps merge into one full-angle layer, so a repeated evolution emits a single half-angle pink layer only at each end.
+The modes are likewise routed into pink order once at each end, so every pink plaquette stays local and only the gold layers route.
 Setting ``num_electrons`` records the scalar offset to the described model, with its on-site energy :math:`\epsilon` and interaction :math:`U \sum_i n_{i\uparrow} n_{i\downarrow}`, so that phase estimation reports that model's energy.
 
 The output is a ``HubbardPlaquetteContainer`` that stores the angles and step count rather than individual Pauli terms.
