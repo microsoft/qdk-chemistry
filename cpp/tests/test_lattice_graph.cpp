@@ -274,6 +274,11 @@ TEST_F(LatticeGraphTest, FromGeometrySumsRepeatedPeriodicImages) {
           .isApprox(LatticeGraph::square(2, 2, true, true).adjacency_matrix()));
   EXPECT_THROW(LatticeGraph::from_geometry(LatticeGeometry::chain(1, true)),
                std::invalid_argument);
+  // Summing the two images of the largest finite weight overflows.
+  EXPECT_THROW(
+      LatticeGraph::from_geometry(LatticeGeometry::chain(2, true), {1}, {},
+                                  std::numeric_limits<double>::max()),
+      std::invalid_argument);
   // Third-neighbor images of one pair carry different flavors.
   EXPECT_THROW(
       LatticeGraph::from_geometry(LatticeGeometry::honeycomb(2, 2, true, true),

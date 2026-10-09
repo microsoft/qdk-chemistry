@@ -194,8 +194,8 @@ class LatticeGraph : public DataClass {
    * @return Graph whose edges carry their shell and flavor.
    * @throws std::invalid_argument If a site neighbors its own periodic image,
    *         periodic images of different shells or flavors join one site
-   *         pair, or a bond axis lies within the tolerance of several flavor
-   *         axes of its shell.
+   *         pair, the summed weight of an edge is not finite, or a bond axis
+   *         lies within the tolerance of several flavor axes of its shell.
    */
   static LatticeGraph from_geometry(
       const LatticeGeometry& geometry,
@@ -294,7 +294,11 @@ class LatticeGraph : public DataClass {
    *
    * @param n        Number of sites.
    * @param periodic If true, add an edge between the first and last site
-   *                 (ring topology). Requires n > 2. Default: false.
+   *                 (ring topology). Requires n > 2; for smaller n no wrap
+   *                 bond is added. For a two-site ring that counts both
+   *                 periodic images, use
+   *                 from_geometry(LatticeGeometry::chain(2, true)).
+   *                 Default: false.
    * @param t        Uniform hopping weight for every edge. Default: 1.0.
    * @param dfs_ordering If true, relabel sites in Hamiltonian-path order found
    *                     by depth-first search. Default: false.

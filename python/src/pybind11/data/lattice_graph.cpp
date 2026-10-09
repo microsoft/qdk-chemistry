@@ -239,7 +239,7 @@ Returns:
     LatticeGraph: Graph whose edges carry their shell and flavor.
 
 Raises:
-    ValueError: If a site neighbors its own periodic image, periodic images of different shells or flavors join one site pair, or a bond axis lies within the tolerance of several flavor axes of its shell.
+    ValueError: If a site neighbors its own periodic image, periodic images of different shells or flavors join one site pair, the summed weight of an edge is not finite, or a bond axis lies within the tolerance of several flavor axes of its shell.
 )",
       py::arg("geometry"), py::arg("shells") = std::vector<std::uint64_t>{1},
       py::arg("bond_flavors") = std::vector<BondFlavorDefinition>{},
@@ -403,7 +403,9 @@ With periodic boundary condition:
 Args:
     n (int): Number of sites.
     periodic (bool, optional): If True, add an edge between the first and
-        last site (ring topology). Requires n > 2. Defaults to False.
+        last site (ring topology). Requires n > 2; for smaller n no wrap bond
+        is added, so use ``from_geometry(LatticeGeometry.chain(2, periodic=True))``
+        for a two-site ring that counts both images. Defaults to False.
     t (float, optional): Hopping weight for all edges. Defaults to 1.0.
 
 Returns:

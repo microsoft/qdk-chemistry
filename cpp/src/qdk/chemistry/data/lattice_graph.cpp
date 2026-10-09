@@ -395,6 +395,10 @@ LatticeGraph LatticeGraph::from_geometry(
   Eigen::SparseMatrix<double> adjacency(n, n);
   adjacency.setFromTriplets(triplets.begin(), triplets.end());
   adjacency.makeCompressed();
+  // Repeated periodic images add their weights, which can overflow.
+  if (!adjacency.coeffs().allFinite()) {
+    throw std::invalid_argument("Connection weight must be finite.");
+  }
   // Color every labelled pair, including zero-weight pairs kept in the
   // topology. Match the native sparse-adjacency traversal before shuffled
   // trials.
