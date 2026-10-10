@@ -709,10 +709,13 @@ class TestHammingWeightPhasing:
     """Equal-angle towers of a declared layer are phased through Hamming-weight registers on the vacuum."""
 
     def test_default_setting_and_payload(self) -> None:
-        """The cap defaults to no cap and travels with the declared layers in the factory payload."""
+        """The cap defaults to 1, leaving phasing off, and travels with the declared layers in the payload."""
         mapper = registry.create("controlled_circuit_mapper", "cswap_pauli_sequence")
-        assert mapper.settings().get("max_hamming_weight_phasing_batch_size") == -1
+        assert mapper.settings().get("max_hamming_weight_phasing_batch_size") == 1
         unitary = _diagonal_spin_chain(0.0)
+        default = mapper.run(unitary)._qsharp_factory
+        assert default is not None
+        assert default.parameter["maxBatchSize"] == 1
         factory = _cswap_with_cap(unitary, 8)._qsharp_factory
         assert factory is not None
         payload = factory.parameter
@@ -739,8 +742,8 @@ class TestHammingWeightPhasing:
     def test_phasing_starts_at_eight_equal_angles_and_saves_rotations(self) -> None:
         """Towers of 8 ZZ terms are phased, cutting rotations; a cap below 8 restores the plain circuit."""
         unitary = _diagonal_spin_chain(0.0)
-        default, plain = (_cswap_with_cap(unitary, cap) for cap in (-1, 1))
-        application = default.get_qre_application()
+        uncapped, plain = (_cswap_with_cap(unitary, cap) for cap in (-1, 1))
+        application = uncapped.get_qre_application()
         phased = get_qsharp_context().logical_counts(application.entry_expr, *application.args)
         application = plain.get_qre_application()
         unphased = get_qsharp_context().logical_counts(application.entry_expr, *application.args)

@@ -127,6 +127,8 @@ an adder tree writes the group's Hamming weight into a scratch register, and a f
 place-value rotations on that register replace the per-term controlled rotations. The adder tree
 pays for itself from 8 terms, so a smaller group, a zero angle, or an angle that differs in any
 bit keeps one controlled rotation per term. Formulas without ``layer_offsets`` are never phased.
+Phasing is off by default; set ``max_hamming_weight_phasing_batch_size`` to ``-1`` or to a cap of
+at least 8 to enable it.
 
 .. rubric:: Settings
 
@@ -139,7 +141,7 @@ bit keeps one controlled rotation per term. Formulas without ``layer_offsets`` a
      - Description
    * - ``max_hamming_weight_phasing_batch_size``
      - int
-     - Largest group of equal-angle rotations in a layer phased through one Hamming-weight register. Batches are phased one after another, so a smaller cap lowers the peak ancilla count at the cost of one extra set of place-value rotations per batch. A cap below 8, such as 1, turns phasing off, so every term is its own rotation. When set to -1 (default), there is no cap.
+     - Largest group of equal-angle rotations in a layer phased through one Hamming-weight register. Batches are phased one after another, so a smaller cap lowers the peak ancilla count at the cost of one extra set of place-value rotations per batch. A cap below 8, such as the default 1, turns phasing off, so every term is its own rotation. When set to -1, there is no cap.
 
 .. _cswap-pauli-sequence-mapper:
 
@@ -208,7 +210,8 @@ register uses the same Hamming-weight phasing :cite:`Kan2025` as the
 evolution is uncontrolled, the adder tree and its place-value rotations need no control of their
 own; the swap sandwich supplies it. The vacuum-annihilating grouper does not declare layers, so its
 output keeps one rotation per term; diagonal formulas taken directly from the unitary builder,
-such as an Ising chain without a transverse field, keep their layers.
+such as an Ising chain without a transverse field, keep their layers. As in the Pauli sequence
+mapper, phasing is off by default.
 
 .. rubric:: Settings
 
@@ -221,7 +224,7 @@ such as an Ising chain without a transverse field, keep their layers.
      - Description
    * - ``max_hamming_weight_phasing_batch_size``
      - int
-     - Largest group of equal-angle rotations in a layer phased through one Hamming-weight register. A cap below 8, such as 1, turns phasing off. When set to -1 (default), there is no cap.
+     - Largest group of equal-angle rotations in a layer phased through one Hamming-weight register. A cap below 8, such as the default 1, turns phasing off. When set to -1, there is no cap.
    * - ``vacuum_preservation_tolerance``
      - float
      - Absolute tolerance on the total amplitude the full evolution may leak out of the vacuum (default ``1e-9``).

@@ -101,7 +101,7 @@ class ControlledSwapPauliSequenceMapperSettings(ControlledPauliSequenceMapperSet
     Attributes:
         max_hamming_weight_phasing_batch_size: Largest tower of equal-angle rotations in a declared
             layer phased through a single Hamming-weight register, or ``-1`` for no cap. A cap below
-            8 (e.g. ``1``) turns Hamming-weight phasing off. Defaults to ``-1``.
+            8 (e.g. ``1``) turns Hamming-weight phasing off. Defaults to ``1`` (phasing off).
         vacuum_preservation_tolerance: Absolute tolerance on the amplitude leaked out of the vacuum,
             aggregated over every flipped-qubit set, all body repetitions, and both endpoints.
 
@@ -159,7 +159,7 @@ class ControlledSwapPauliSequenceMapper(ControlledCircuitMapper):
     share a rotation angle form a tower once at least 8 of them agree, and each tower is
     synthesized with Hamming-weight phasing :cite:`Kan2025` on the vacuum register instead of one
     rotation per term. ``max_hamming_weight_phasing_batch_size`` caps the tower phased through one
-    register; a cap below 8 turns phasing off.
+    register; a cap below 8, such as the default ``1``, turns phasing off.
 
     Notes:
         * Applies to particle-conserving Hamiltonians.
