@@ -13,6 +13,7 @@ from unittest.mock import Mock
 
 import numpy as np
 import pytest
+from qdk.test_utils import dump_operation_on_state
 
 from qdk_chemistry.algorithms.phase_estimation.circuit_builder.iterative_builder import (
     QdkIterativeQpeCircuitBuilder,
@@ -31,7 +32,7 @@ from qdk_chemistry.data import (
 )
 from qdk_chemistry.data.circuit import QsharpFactoryData
 from qdk_chemistry.data.unitary_representation.containers.base import UnitaryContainer
-from qdk_chemistry.utils.qsharp import QSHARP_UTILS
+from qdk_chemistry.utils.qsharp import QSHARP_UTILS, get_qsharp_context
 
 
 @dataclass(frozen=True)
@@ -341,6 +342,49 @@ class TestStandardQpeCircuitBuilder:
                 state_preparation=two_qubit_circuit_problem.state_prep,
                 qubit_hamiltonian=two_qubit_circuit_problem.hamiltonian,
             )
+
+    @pytest.mark.parametrize("compute_capacity", [0, -2])
+    def test_invalid_compute_capacity_raises_error(
+        self, two_qubit_circuit_problem: CircuitBuilderProblem, compute_capacity: int
+    ) -> None:
+        """Validate that compute_capacity must be -1 or positive."""
+        builder = QdkStandardQpeCircuitBuilder(num_bits=2, compute_capacity=compute_capacity)
+
+        with pytest.raises(ValueError, match="compute_capacity must be -1 or a positive integer"):
+            builder.run(
+                state_preparation=two_qubit_circuit_problem.state_prep,
+                qubit_hamiltonian=two_qubit_circuit_problem.hamiltonian,
+            )
+
+    @pytest.mark.parametrize("compute_capacity", [-1, 2])
+    def test_compute_capacity_reaches_qsharp(
+        self, two_qubit_circuit_problem: CircuitBuilderProblem, compute_capacity: int
+    ) -> None:
+        """Validate that compute_capacity is forwarded to the Q# circuit factory."""
+        builder = QdkStandardQpeCircuitBuilder(num_bits=2, compute_capacity=compute_capacity)
+        builder.settings().set(
+            "unitary_builder",
+            AlgorithmRef("hamiltonian_unitary_builder", "trotter", time=two_qubit_circuit_problem.evolution_time),
+        )
+
+        (circuit,) = builder.run(
+            state_preparation=two_qubit_circuit_problem.state_prep,
+            qubit_hamiltonian=two_qubit_circuit_problem.hamiltonian,
+        )
+
+        assert circuit._qsharp_factory.parameter["computeCapacity"] == compute_capacity
+
+    def test_sine_phase_state_amplitudes(self) -> None:
+        """The sine window puts sin(pi (t + 1) / (2^b + 1)) on the register value t, ancillas[0] the MSB."""
+        num_bits = 3
+        builder = QdkStandardQpeCircuitBuilder(num_bits=num_bits)
+        builder.settings().set("phase_state", "sine")
+        state = np.array(
+            dump_operation_on_state(builder._phase_state_op(num_bits), num_bits, context=get_qsharp_context())
+        )
+
+        expected = np.sin(np.pi * (np.arange(2**num_bits) + 1) / (2**num_bits + 1))
+        np.testing.assert_allclose(state, expected / np.linalg.norm(expected), atol=1e-10)
 
     def test_raises_error_for_qasm_only_state_prep(self) -> None:
         """Validate that passing a QASM-only state prep (no Q# op) raises RuntimeError."""
