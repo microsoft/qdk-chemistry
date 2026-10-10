@@ -26,6 +26,8 @@ from qdk_chemistry.data import (
     Structure,
     Wavefunction,
 )
+from qdk_chemistry.data.unitary_representation.containers.pauli_product_formula import PauliProductFormulaContainer
+from qdk_chemistry.utils.qsharp import get_qsharp_context
 
 
 def create_sparse_wavefunction(num_qubits: int, indices: list[int], amplitudes: list[float]) -> Wavefunction:
@@ -430,3 +432,74 @@ def create_random_wavefunction(
 
     orbitals = create_test_orbitals(n_orbitals)
     return Wavefunction(StateVectorContainer(coeffs, configs, orbitals))
+
+
+def apply_controlled_operation(operation, state: np.ndarray) -> np.ndarray:
+    """Return the state a ``(control, systems)`` Q# operation produces from a real-amplitude ``state``.
+
+    Qubit 0 is the control and the most significant bit of the basis index; the rest are the systems.
+    The whole machine is dumped instead of using ``DumpRegister``, which rejects states with nonzero
+    amplitudes below its zero cutoff as not separable. Every helper qubit is released by then.
+    """
+    context = get_qsharp_context()
+    if not hasattr(context.code, "_ControlledTestDumpMachine"):
+        context.eval(
+            "operation _ControlledTestDumpMachine("
+            "op : ((Qubit, Qubit[]) => Unit), numQubits : Int, initial : Double[]) : Unit {"
+            " use qubits = Qubit[numQubits];"
+            " Std.StatePreparation.PreparePureStateD(initial, qubits);"
+            " op(qubits[0], qubits[1...]);"
+            " Std.Diagnostics.DumpMachine();"
+            " ResetAll(qubits); }"
+        )
+    num_qubits = round(math.log2(len(state)))
+    run = context.run(
+        context.code._ControlledTestDumpMachine, 1, operation, num_qubits, state.tolist(), save_events=True
+    )
+    result = np.zeros(len(state), dtype=complex)
+    for index, amplitude in run[0]["events"][-1].state_dump().get_dict().items():
+        result[index] = amplitude
+    return result
+
+
+def controlled_product_formula_state(container: PauliProductFormulaContainer, state: np.ndarray) -> np.ndarray:
+    r"""Apply the controlled product formula of ``container`` to ``state`` exactly, term by term.
+
+    The layout is that of :func:`apply_controlled_operation`. Each factor uses
+    :math:`e^{-i\theta P} = \cos\theta - i\sin\theta P` on the control-one half only.
+    """
+    num_qubits = round(math.log2(len(state)))
+    indices = np.arange(len(state))
+    controlled = (indices >> (num_qubits - 1)) & 1 == 1
+    terms = [*container.prefix_terms, *container.step_terms * container.step_reps, *container.suffix_terms]
+    result = state.astype(complex)
+    for term in terms:
+        flip = parity_mask = num_y = 0
+        for qubit, axis in term.pauli_term.items():
+            bit = 1 << (num_qubits - 2 - qubit)
+            flip |= bit if axis in "XY" else 0
+            parity_mask |= bit if axis in "YZ" else 0
+            num_y += axis == "Y"
+        parity = np.zeros(len(state), dtype=int)
+        for position in range(num_qubits):
+            if parity_mask >> position & 1:
+                parity ^= (indices >> position) & 1
+        pauli = np.zeros_like(result)
+        pauli[indices ^ flip] = 1j**num_y * (1 - 2 * parity) * result
+        rotated = np.cos(term.angle) * result - 1j * np.sin(term.angle) * pauli
+        result = np.where(controlled, rotated, result)
+    return result
+
+
+def random_sparse_state(num_qubits: int, support: int, seed: int) -> np.ndarray:
+    """Return a normalized real state on ``support`` random basis states."""
+    rng = np.random.default_rng(seed)
+    state = np.zeros(2**num_qubits)
+    state[rng.choice(len(state), size=support, replace=False)] = rng.normal(size=support)
+    return state / np.linalg.norm(state)
+
+
+def assert_states_match_up_to_global_phase(actual: np.ndarray, expected: np.ndarray, atol: float) -> None:
+    """Assert two normalized states agree once the global phase of ``actual`` is aligned to ``expected``."""
+    overlap = np.vdot(actual, expected)
+    np.testing.assert_allclose(actual * overlap / abs(overlap), expected, atol=atol, rtol=0)

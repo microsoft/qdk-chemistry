@@ -38,11 +38,18 @@ from qdk_chemistry.data.unitary_representation.containers.pauli_product_formula 
     PauliProductFormulaContainer,
 )
 from qdk_chemistry.plugins.qiskit import QDK_CHEMISTRY_HAS_QISKIT
-from qdk_chemistry.utils.model_hamiltonians import create_ising_hamiltonian
+from qdk_chemistry.utils.model_hamiltonians import create_heisenberg_hamiltonian, create_ising_hamiltonian
 from qdk_chemistry.utils.qsharp import create_qsharp_context, get_qsharp_context, use_qsharp_context
 
 from .reference_tolerances import float_comparison_absolute_tolerance, float_comparison_relative_tolerance
-from .test_helpers import create_nontrivial_test_hamiltonian, create_test_orbitals
+from .test_helpers import (
+    apply_controlled_operation,
+    assert_states_match_up_to_global_phase,
+    controlled_product_formula_state,
+    create_nontrivial_test_hamiltonian,
+    create_test_orbitals,
+    random_sparse_state,
+)
 
 if QDK_CHEMISTRY_HAS_QISKIT:
     from qiskit import QuantumCircuit
@@ -676,3 +683,66 @@ class TestVacuumAnnihilatingAcrossFermionToQubitMappings:
         mapper.settings().set("control_indices", [unitary.get_num_qubits()])
 
         assert isinstance(mapper.run(unitary), Circuit)
+
+
+def _diagonal_spin_chain(field: float) -> UnitaryRepresentation:
+    """Return two Trotter steps of a 16-site XXZ ring with no XY coupling, so it preserves the vacuum.
+
+    Each bond color is a tower of 8 equal-angle ZZ terms, and a nonzero ``field`` adds a tower of 16 Z terms.
+    """
+    hamiltonian = create_heisenberg_hamiltonian(
+        LatticeGraph.chain(16, periodic=True), jx=0.0, jy=0.0, jz=1.0, hx=0.0, hy=0.0, hz=field
+    )
+    trotter = registry.create("hamiltonian_unitary_builder", "trotter")
+    trotter.settings().update({"order": 1, "num_divisions": 2, "time": 0.6})
+    return trotter.run(hamiltonian)
+
+
+def _cswap_with_cap(unitary: UnitaryRepresentation, cap: int) -> Circuit:
+    """Map ``unitary`` with control 0 and the given Hamming-weight phasing batch cap."""
+    return registry.create(
+        "controlled_circuit_mapper", "cswap_pauli_sequence", max_hamming_weight_phasing_batch_size=cap
+    ).run(unitary)
+
+
+class TestHammingWeightPhasing:
+    """Equal-angle towers of a declared layer are phased through Hamming-weight registers on the vacuum."""
+
+    def test_default_setting_and_payload(self) -> None:
+        """The cap defaults to no cap and travels with the declared layers in the factory payload."""
+        mapper = registry.create("controlled_circuit_mapper", "cswap_pauli_sequence")
+        assert mapper.settings().get("max_hamming_weight_phasing_batch_size") == -1
+        unitary = _diagonal_spin_chain(0.0)
+        factory = _cswap_with_cap(unitary, 8)._qsharp_factory
+        assert factory is not None
+        payload = factory.parameter
+        assert list(payload) == ["evolution", "layerOffsets", "maxBatchSize", "vacuumPhase", "control", "systems"]
+        assert payload["layerOffsets"] == list(unitary.get_container().layer_offsets)
+        assert payload["maxBatchSize"] == 8
+
+    @pytest.mark.parametrize("cap", [0, -2])
+    def test_invalid_cap_raises(self, cap: int) -> None:
+        """A cap must be -1 or positive."""
+        with pytest.raises(ValueError, match="max_hamming_weight_phasing_batch_size must be -1 or a positive"):
+            _cswap_with_cap(_diagonal_spin_chain(0.0), cap)
+
+    @pytest.mark.parametrize(("field", "cap"), [(0.0, -1), (0.4, -1), (0.4, 12), (0.4, 1)])
+    def test_diagonal_spin_chain_matches_the_controlled_trotter_product(self, field: float, cap: int) -> None:
+        """Phased, split and plain towers all give the controlled Trotter product up to a global phase."""
+        unitary = _diagonal_spin_chain(field)
+        container = unitary.get_container()
+        circuit = _cswap_with_cap(unitary, cap)
+        state = random_sparse_state(container.num_qubits + 1, 16, seed=cap + 2)
+        actual = apply_controlled_operation(circuit._qsharp_op, state)
+        assert_states_match_up_to_global_phase(actual, controlled_product_formula_state(container, state), 1e-10)
+
+    def test_phasing_starts_at_eight_equal_angles_and_saves_rotations(self) -> None:
+        """Towers of 8 ZZ terms are phased, cutting rotations; a cap below 8 restores the plain circuit."""
+        unitary = _diagonal_spin_chain(0.0)
+        default, plain = (_cswap_with_cap(unitary, cap) for cap in (-1, 1))
+        application = default.get_qre_application()
+        phased = get_qsharp_context().logical_counts(application.entry_expr, *application.args)
+        application = plain.get_qre_application()
+        unphased = get_qsharp_context().logical_counts(application.entry_expr, *application.args)
+        assert phased["cczCount"] + phased["ccixCount"] > unphased["cczCount"] + unphased["ccixCount"]
+        assert phased["rotationCount"] < unphased["rotationCount"]

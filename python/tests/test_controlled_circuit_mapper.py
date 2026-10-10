@@ -5,6 +5,7 @@
 # Licensed under the MIT License. See LICENSE.txt in the project root for license information.
 # --------------------------------------------------------------------------------------------
 
+import itertools
 import json
 
 import numpy as np
@@ -21,7 +22,9 @@ except ImportError:
 from qdk_chemistry.algorithms import create
 from qdk_chemistry.algorithms.controlled_circuit_mapper.controlled_pauli_sequence_mapper import (
     ControlledPauliSequenceMapper,
+    ControlledPauliSequenceMapperSettings,
 )
+from qdk_chemistry.data import LatticeGraph
 from qdk_chemistry.data.circuit import Circuit
 from qdk_chemistry.data.unitary_representation.base import UnitaryRepresentation
 from qdk_chemistry.data.unitary_representation.containers.pauli_product_formula import (
@@ -29,9 +32,16 @@ from qdk_chemistry.data.unitary_representation.containers.pauli_product_formula 
     PauliProductFormulaContainer,
 )
 from qdk_chemistry.plugins.qiskit import QDK_CHEMISTRY_HAS_QISKIT
+from qdk_chemistry.utils.model_hamiltonians import create_heisenberg_hamiltonian, create_ising_hamiltonian
 from qdk_chemistry.utils.qsharp import get_qsharp_context
 
 from .reference_tolerances import float_comparison_absolute_tolerance, float_comparison_relative_tolerance
+from .test_helpers import (
+    apply_controlled_operation,
+    assert_states_match_up_to_global_phase,
+    controlled_product_formula_state,
+    random_sparse_state,
+)
 
 if QDK_CHEMISTRY_HAS_QISKIT:
     from qiskit.quantum_info import Operator
@@ -370,3 +380,148 @@ def test_identity_terms_share_one_control_phase_per_layer() -> None:
         logical = get_qsharp_context().logical_counts(application.entry_expr, *application.args)
         counts.append((logical["rotationCount"], logical["rotationDepth"]))
     assert counts[0] == counts[1]
+
+
+#: Absolute tolerance on simulated amplitudes after a few hundred gates.
+_STATE_TOLERANCE = 1e-10
+
+
+def _trotter(hamiltonian, *, steps: int = 1) -> UnitaryRepresentation:
+    """Return the first-order Trotter evolution of ``hamiltonian``, which declares its disjoint layers."""
+    builder = create("hamiltonian_unitary_builder", "trotter")
+    builder.settings().update({"order": 1, "num_divisions": steps, "time": 0.3 * steps})
+    return builder.run(hamiltonian)
+
+
+def _map_with_cap(unitary: UnitaryRepresentation, cap: int) -> Circuit:
+    """Map ``unitary`` with control 0 and the given Hamming-weight phasing batch cap."""
+    return create("controlled_circuit_mapper", "pauli_sequence", max_hamming_weight_phasing_batch_size=cap).run(unitary)
+
+
+def _logical_counts(circuit: Circuit) -> dict[str, int]:
+    """Return the logical resource counts of ``circuit``."""
+    application = circuit.get_qre_application()
+    return dict(get_qsharp_context().logical_counts(application.entry_expr, *application.args))
+
+
+def _toffolis(counts: dict[str, int]) -> int:
+    """Return the Toffoli-class gates of ``counts``, which only the Hamming-weight adder trees use here."""
+    return counts.get("cczCount", 0) + counts.get("ccixCount", 0)
+
+
+def _z_layers(angles: list[list[float]]) -> UnitaryRepresentation:
+    """Return single-Z terms on fresh qubits, one declared layer per row of ``angles``."""
+    terms, offsets, qubit = [], [0], 0
+    for layer in angles:
+        for angle in layer:
+            terms.append(ExponentiatedPauliTerm({qubit: "Z"}, angle))
+            qubit += 1
+        offsets.append(len(terms))
+    return UnitaryRepresentation(PauliProductFormulaContainer(terms, 1, qubit, layer_offsets=offsets))
+
+
+class TestHammingWeightPhasing:
+    """Equal-angle towers of a declared layer are phased through Hamming-weight registers."""
+
+    def test_default_setting_and_payload(self) -> None:
+        """The cap defaults to no cap and reaches the Q# factory and operation."""
+        mapper = create("controlled_circuit_mapper", "pauli_sequence")
+        assert isinstance(mapper.settings(), ControlledPauliSequenceMapperSettings)
+        assert mapper.settings().get("max_hamming_weight_phasing_batch_size") == -1
+        circuit = _map_with_cap(_z_layers([[0.1] * 8]), 4)
+        assert circuit._qsharp_factory is not None
+        assert list(circuit._qsharp_factory.parameter) == [
+            "params",
+            "layerOffsets",
+            "maxBatchSize",
+            "control",
+            "systems",
+        ]
+        assert circuit._qsharp_factory.parameter["maxBatchSize"] == 4
+
+    @pytest.mark.parametrize("cap", [0, -2])
+    def test_invalid_cap_raises(self, cap: int) -> None:
+        """A cap must be -1 or positive."""
+        with pytest.raises(ValueError, match="max_hamming_weight_phasing_batch_size must be -1 or a positive"):
+            _map_with_cap(_z_layers([[0.1] * 8]), cap)
+
+    @pytest.mark.parametrize(
+        ("name", "hamiltonian", "support"),
+        [
+            # The 8-site field layer is an X tower; its 4-bond layers stay plain rotations.
+            ("transverse-ising", create_ising_hamiltonian(LatticeGraph.chain(8, periodic=True), j=1.0, h=0.5), 512),
+            # Each bond color of the 16-site ring is a tower of 8 ZZ terms.
+            ("ising-bonds", create_ising_hamiltonian(LatticeGraph.chain(16, periodic=True), j=1.0, h=0.0), 16),
+            # XX, YY and ZZ towers of 8, each mapped onto Z by its own basis change.
+            (
+                "heisenberg",
+                create_heisenberg_hamiltonian(
+                    LatticeGraph.chain(16, periodic=True), jx=1.0, jy=1.0, jz=0.7, hx=0.0, hy=0.0, hz=0.0
+                ),
+                2,
+            ),
+        ],
+    )
+    @pytest.mark.parametrize("cap", [-1, 1])
+    def test_spin_chain_matches_the_controlled_trotter_product(self, name, hamiltonian, support, cap) -> None:
+        """Phased and plain towers both apply exactly the controlled product of their rotations."""
+        unitary = _trotter(hamiltonian, steps=2)
+        container = unitary.get_container()
+        assert any(b - a >= 8 for a, b in itertools.pairwise(container.layer_offsets)), name
+        circuit = _map_with_cap(unitary, cap)
+        state = random_sparse_state(container.num_qubits + 1, support, seed=len(name))
+        assert_states_match_up_to_global_phase(
+            apply_controlled_operation(circuit._qsharp_op, state),
+            controlled_product_formula_state(container, state),
+            _STATE_TOLERANCE,
+        )
+        counts = _logical_counts(circuit)
+        assert (_toffolis(counts) > 0) == (cap == -1)
+
+    def test_phasing_starts_at_eight_equal_angles(self) -> None:
+        """Open Ising chains of 15 and 17 sites have bond layers of 7 and 8 equal-angle terms."""
+        for sites, phased in ((15, False), (17, True)):
+            unitary = _trotter(create_ising_hamiltonian(LatticeGraph.chain(sites), j=1.0, h=0.0))
+            container = unitary.get_container()
+            assert {b - a for a, b in itertools.pairwise(container.layer_offsets)} == {sites // 2}
+            default, plain = (_logical_counts(_map_with_cap(unitary, cap)) for cap in (-1, 1))
+            assert _toffolis(plain) == 0
+            if phased:
+                assert _toffolis(default) > 0
+                assert default["rotationCount"] < plain["rotationCount"]
+            else:
+                assert default == plain
+
+    def test_only_exactly_equal_angles_share_a_tower(self) -> None:
+        """Interleaved angles are grouped by value, and nearly equal angles are not grouped at all."""
+        tower, other = 0.2, -0.35
+        interleaved = _z_layers([[tower, other] * 7 + [tower]])
+        separated = _z_layers([[tower] * 8, [other] * 7])
+        assert (
+            _logical_counts(_map_with_cap(interleaved, -1))["rotationCount"]
+            == (_logical_counts(_map_with_cap(separated, -1))["rotationCount"])
+        )
+        assert _toffolis(_logical_counts(_map_with_cap(interleaved, -1))) > 0
+        nearly_equal = _z_layers([[tower + 1e-9 * k for k in range(8)]])
+        assert _toffolis(_logical_counts(_map_with_cap(nearly_equal, -1))) == 0
+
+    @pytest.mark.parametrize("cap", [-1, 12, 8, 7, 1])
+    def test_batch_cap_splits_a_tower_exactly(self, cap: int) -> None:
+        """A 16-term tower phased whole, as 12 + 4, as 8 + 8, or not at all applies the same unitary."""
+        unitary = _z_layers([[0.37] * 16])
+        circuit = _map_with_cap(unitary, cap)
+        container = unitary.get_container()
+        state = random_sparse_state(container.num_qubits + 1, 16, seed=cap + 2)
+        assert_states_match_up_to_global_phase(
+            apply_controlled_operation(circuit._qsharp_op, state),
+            controlled_product_formula_state(container, state),
+            _STATE_TOLERANCE,
+        )
+        counts = _logical_counts(circuit)
+        assert (_toffolis(counts) > 0) == (cap == -1 or cap >= 8)
+
+    def test_smaller_batches_use_fewer_qubits(self) -> None:
+        """Splitting a tower releases each batch's adder scratch before the next allocates."""
+        unitary = _z_layers([[0.37] * 32])
+        whole, halves = (_logical_counts(_map_with_cap(unitary, cap)) for cap in (-1, 16))
+        assert halves["numQubits"] < whole["numQubits"]
