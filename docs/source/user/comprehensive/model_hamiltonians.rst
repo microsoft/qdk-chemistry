@@ -161,10 +161,12 @@ In Python, a :class:`~qdk_chemistry.data.FermiHubbardModelHamiltonianDescription
 It is a :class:`~qdk_chemistry.data.ModelHamiltonianDescription`, so it can be serialized and handed to algorithms that take a :class:`~qdk_chemistry.data.HamiltonianDescription`.
 Its ``materialize()`` method calls ``create_hubbard_hamiltonian`` on the nearest-neighbor bonds of the lattice:
 
-.. literalinclude:: ../../_static/examples/python/model_hamiltonians.py
-   :language: python
-   :start-after: # start-cell-hubbard-description
-   :end-before: # end-cell-hubbard-description
+.. tab:: Python API
+
+   .. literalinclude:: ../../_static/examples/python/model_hamiltonians.py
+      :language: python
+      :start-after: # start-cell-hubbard-description
+      :end-before: # end-cell-hubbard-description
 
 .. _model-ppp:
 
