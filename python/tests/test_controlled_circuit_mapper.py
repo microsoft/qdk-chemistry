@@ -424,11 +424,16 @@ class TestHammingWeightPhasing:
     """Equal-angle towers of a declared layer are phased through Hamming-weight registers."""
 
     def test_default_setting_and_payload(self) -> None:
-        """The cap defaults to no cap and reaches the Q# factory and operation."""
+        """The cap defaults to 1, leaving phasing off, and reaches the Q# factory and operation."""
         mapper = create("controlled_circuit_mapper", "pauli_sequence")
         assert isinstance(mapper.settings(), ControlledPauliSequenceMapperSettings)
-        assert mapper.settings().get("max_hamming_weight_phasing_batch_size") == -1
-        circuit = _map_with_cap(_z_layers([[0.1] * 8]), 4)
+        assert mapper.settings().get("max_hamming_weight_phasing_batch_size") == 1
+        tower = _z_layers([[0.1] * 8])
+        default = mapper.run(tower)
+        assert default._qsharp_factory is not None
+        assert default._qsharp_factory.parameter["maxBatchSize"] == 1
+        assert _toffolis(_logical_counts(default)) == 0
+        circuit = _map_with_cap(tower, 4)
         assert circuit._qsharp_factory is not None
         assert list(circuit._qsharp_factory.parameter) == [
             "params",
@@ -484,13 +489,13 @@ class TestHammingWeightPhasing:
             unitary = _trotter(create_ising_hamiltonian(LatticeGraph.chain(sites), j=1.0, h=0.0))
             container = unitary.get_container()
             assert {b - a for a, b in itertools.pairwise(container.layer_offsets)} == {sites // 2}
-            default, plain = (_logical_counts(_map_with_cap(unitary, cap)) for cap in (-1, 1))
+            uncapped, plain = (_logical_counts(_map_with_cap(unitary, cap)) for cap in (-1, 1))
             assert _toffolis(plain) == 0
             if phased:
-                assert _toffolis(default) > 0
-                assert default["rotationCount"] < plain["rotationCount"]
+                assert _toffolis(uncapped) > 0
+                assert uncapped["rotationCount"] < plain["rotationCount"]
             else:
-                assert default == plain
+                assert uncapped == plain
 
     def test_only_exactly_equal_angles_share_a_tower(self) -> None:
         """Interleaved angles are grouped by value, and nearly equal angles are not grouped at all."""

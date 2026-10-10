@@ -24,7 +24,7 @@ class ControlledPauliSequenceMapperSettings(ControlledCircuitMapperSettings):
         max_hamming_weight_phasing_batch_size: Largest tower of equal-angle rotations in a declared
             layer phased through a single Hamming-weight register, or ``-1`` for no cap. A cap below
             8 (e.g. ``1``) turns Hamming-weight phasing off, so every term is its own rotation.
-            Defaults to ``-1``.
+            Defaults to ``1``, which leaves phasing off until a cap of at least 8 or ``-1`` is set.
 
     """
 
@@ -34,11 +34,11 @@ class ControlledPauliSequenceMapperSettings(ControlledCircuitMapperSettings):
         self._set_default(
             "max_hamming_weight_phasing_batch_size",
             "int",
-            -1,
+            1,
             "Largest tower of equal-angle rotations in a declared layer phased through a single "
             "Hamming-weight register. A shorter batch releases its adder-tree scratch sooner, so the "
             "peak ancilla count follows the batch rather than the whole tower, at the cost of one "
-            "extra set of place-value rotations per batch. A cap below 8 (e.g. 1) turns "
+            "extra set of place-value rotations per batch. A cap below 8, such as the default 1, turns "
             "Hamming-weight phasing off, so every term is its own rotation. Set to -1 for no cap.",
         )
 
@@ -86,7 +86,7 @@ class ControlledPauliSequenceMapper(ControlledCircuitMapper):
     phasing :cite:`Kan2025`: an adder tree writes the Hamming weight of the rotated qubits into a
     scratch register, and one controlled rotation per place value replaces the per-term
     rotations. ``max_hamming_weight_phasing_batch_size`` caps the tower phased through one
-    register; a cap below 8 turns phasing off.
+    register; a cap below 8, such as the default ``1``, turns phasing off.
 
     Notes:
         * Currently supports only single-control-qubit scenarios.
