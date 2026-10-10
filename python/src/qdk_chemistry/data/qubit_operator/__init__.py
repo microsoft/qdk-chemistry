@@ -13,7 +13,7 @@ from typing import TYPE_CHECKING, Any
 import numpy as np
 
 from qdk_chemistry.data._hashing import _hash_str
-from qdk_chemistry.data.base import DataClass
+from qdk_chemistry.data.hamiltonian_description.base import HamiltonianDescription
 from qdk_chemistry.data.qubit_operator.containers.base import QubitOperatorContainer
 from qdk_chemistry.data.qubit_operator.containers.pauli_decomposition import PauliDecompositionContainer
 from qdk_chemistry.data.qubit_operator.containers.sparse_pauli_decomposition import SparsePauliDecompositionContainer
@@ -34,7 +34,7 @@ __all__ = [
 ]
 
 
-class QubitOperator(DataClass):
+class QubitOperator(HamiltonianDescription):
     """Data class wrapping a concrete qubit operator container.
 
     For backward compatibility, Pauli decomposition operators may also be initialized

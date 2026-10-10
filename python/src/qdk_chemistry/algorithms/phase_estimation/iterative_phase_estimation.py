@@ -21,9 +21,9 @@ import numpy as np
 
 from qdk_chemistry.data import (
     Circuit,
+    HamiltonianDescription,
     QpeResult,
     QuantumErrorProfile,
-    QubitOperator,
 )
 from qdk_chemistry.utils import Logger
 
@@ -73,7 +73,7 @@ class IterativePhaseEstimation(PhaseEstimation):
     def _run_impl(
         self,
         state_preparation: Circuit,
-        qubit_hamiltonian: QubitOperator,
+        qubit_hamiltonian: HamiltonianDescription,
         *,
         noise: QuantumErrorProfile | None = None,
     ) -> QpeResult:
@@ -81,7 +81,7 @@ class IterativePhaseEstimation(PhaseEstimation):
 
         Args:
             state_preparation: The state preparation circuit.
-            qubit_hamiltonian: The qubit Hamiltonian for which to estimate the phase.
+            qubit_hamiltonian: The Hamiltonian description the unitary builder takes.
             noise: The quantum error profile to simulate noise, defaults to None.
 
         Returns:

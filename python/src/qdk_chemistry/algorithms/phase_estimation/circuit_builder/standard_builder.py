@@ -11,7 +11,7 @@ qubits and the inverse QFT, enabling standalone resource estimation and circuit 
 # Licensed under the MIT License. See LICENSE.txt in the project root for license information.
 # --------------------------------------------------------------------------------------------
 
-from qdk_chemistry.data import AlgorithmRef, Circuit, QubitOperator
+from qdk_chemistry.data import AlgorithmRef, Circuit, HamiltonianDescription
 from qdk_chemistry.data.circuit import QsharpFactoryData
 from qdk_chemistry.utils import Logger
 from qdk_chemistry.utils.qsharp import QSHARP_UTILS
@@ -76,7 +76,7 @@ class QdkStandardQpeCircuitBuilder(StandardQpeCircuitBuilder):
     def _run_impl(
         self,
         state_preparation: Circuit,
-        qubit_hamiltonian: QubitOperator,
+        qubit_hamiltonian: HamiltonianDescription,
     ) -> list[Circuit]:
         """Build the standard QPE circuit.
 
@@ -85,7 +85,7 @@ class QdkStandardQpeCircuitBuilder(StandardQpeCircuitBuilder):
 
         Args:
             state_preparation: The circuit that prepares the initial state.
-            qubit_hamiltonian: The qubit Hamiltonian for which to build the circuit.
+            qubit_hamiltonian: The Hamiltonian description the unitary builder takes.
 
         Returns:
             A single-element list containing the standard QPE circuit.
@@ -99,16 +99,17 @@ class QdkStandardQpeCircuitBuilder(StandardQpeCircuitBuilder):
         if num_bits <= 0:
             raise ValueError(f"num_bits must be a positive integer. Got {num_bits}.")
 
-        num_system_qubits = qubit_hamiltonian.num_qubits
-
         # Build one controlled circuit per ancilla with power=2^k,
         # respecting the unitary builder's power_strategy (e.g. "rescale").
         # ancillas[0] = MSB controls U^(2^(n-1)), ancillas[n-1] = LSB controls U^1.
         ctrl_unitary_circuits = []
         num_ancilla_qubits = 0
+        num_system_qubits = 0
         for k in range(num_bits):
             power = 2 ** (num_bits - 1 - k)
-            circuit, num_ancilla_qubits = self._create_controlled_circuit(qubit_hamiltonian, power=power)
+            circuit, num_ancilla_qubits, num_system_qubits = self._controlled_circuit_and_widths(
+                qubit_hamiltonian, power=power
+            )
             ctrl_unitary_circuits.append(circuit)
 
         if state_preparation._qsharp_op and all(c._qsharp_op for c in ctrl_unitary_circuits):  # noqa: SLF001

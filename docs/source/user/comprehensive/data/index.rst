@@ -68,6 +68,9 @@ The following table summarizes the available data classes in QDK/Chemistry and t
    * - :doc:`LatticeGraph <lattice_graph>`
      - Explicit weighted connectivity with optional shell and flavor labels
      - Geometry selection, Factory methods, User input
+   * - ``ModelHamiltonianDescription``
+     - Lattice model Hamiltonian given as a lattice and model parameters, built with ``materialize()``
+     - User input
    * - :doc:`MajoranaMapping <majorana_mapping>`
      - Fermion-to-qubit encoding (Majorana-to-Pauli table)
      - Factory methods, User input

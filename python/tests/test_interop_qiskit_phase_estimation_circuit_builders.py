@@ -135,6 +135,30 @@ class TestQiskitStandardQpeCircuitBuilder:
         assert qc.num_qubits == four_qubit_circuit_problem.num_bits + four_qubit_circuit_problem.num_system_qubits
         assert qc.num_clbits == four_qubit_circuit_problem.num_bits
 
+    def test_builder_builds_each_power_once(self, two_qubit_circuit_problem: CircuitBuilderProblem) -> None:
+        """The power-1 circuit that sizes the registers is reused, and an overriding subclass sees every power."""
+        recorded_powers: list[int] = []
+
+        class _PowerRecordingBuilder(QiskitStandardQpeCircuitBuilder):
+            def _create_controlled_circuit(self, qubit_hamiltonian: QubitOperator, power: int) -> tuple[Circuit, int]:
+                recorded_powers.append(power)
+                return super()._create_controlled_circuit(qubit_hamiltonian, power)
+
+        builder = _PowerRecordingBuilder(
+            num_bits=3,
+            controlled_circuit_mapper=AlgorithmRef("controlled_circuit_mapper", "pauli_sequence"),
+            unitary_builder=AlgorithmRef(
+                "hamiltonian_unitary_builder", "trotter", time=two_qubit_circuit_problem.evolution_time
+            ),
+        )
+
+        builder.run(
+            state_preparation=two_qubit_circuit_problem.state_prep,
+            qubit_hamiltonian=two_qubit_circuit_problem.hamiltonian,
+        )
+
+        assert recorded_powers == [1, 2, 4]
+
     def test_builder_raises_invalid_num_bits_error(self, two_qubit_circuit_problem: CircuitBuilderProblem) -> None:
         """Validate that QiskitStandardQpeCircuitBuilder raises ValueError for invalid num_bits."""
         builder = QiskitStandardQpeCircuitBuilder(num_bits=0)  # Invalid number of bits
@@ -310,4 +334,26 @@ class TestQiskitIterativeQpeCircuitBuilder:
             builder.run(
                 state_preparation=two_qubit_circuit_problem.state_prep,
                 qubit_hamiltonian=two_qubit_circuit_problem.hamiltonian,
+            )
+
+    def test_builder_rejects_state_prep_width_mismatch(
+        self,
+        two_qubit_circuit_problem: CircuitBuilderProblem,
+        four_qubit_circuit_problem: CircuitBuilderProblem,
+    ) -> None:
+        """A state preparation narrower than the unitary's system register is rejected, not padded with ancillas."""
+        builder = QiskitIterativeQpeCircuitBuilder(num_bits=four_qubit_circuit_problem.num_bits)
+        builder.settings().set(
+            "controlled_circuit_mapper",
+            AlgorithmRef("controlled_circuit_mapper", "pauli_sequence"),
+        )
+        builder.settings().set(
+            "unitary_builder",
+            AlgorithmRef("hamiltonian_unitary_builder", "trotter", time=four_qubit_circuit_problem.evolution_time),
+        )
+
+        with pytest.raises(ValueError, match="unitary's system register"):
+            builder.run(
+                state_preparation=two_qubit_circuit_problem.state_prep,
+                qubit_hamiltonian=four_qubit_circuit_problem.hamiltonian,
             )
