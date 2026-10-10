@@ -49,7 +49,6 @@ _ADAPTIVE_ONLY_MODULES = (
     "SelectSwap",
     "AliasSamplingStatePrep",
     "QROMStatePrep",
-    "PhaseGradient",
     "SOSSAWalk",
 )
 
@@ -207,12 +206,20 @@ class TestTargetProfiles:
         )
         assert "define" in str(base_context.compile(pauli_exp, params, [0, 1], 0, [1, 2]))
 
-    def test_base_lowers_the_plaquette_evolution(self, base_context: qdk.Context) -> None:
-        """A 4x4 lattice batches enough rotations to lower the Hamming-weight adder too."""
+    @pytest.mark.parametrize("use_phase_gradient", [True, False])
+    def test_base_lowers_the_plaquette_evolution(self, base_context: qdk.Context, use_phase_gradient: bool) -> None:
+        """A 4x4 lattice batches enough rotations to lower the Hamming-weight adder, through either rotation mode."""
         plaquette = base_context.code.QDKChemistry.Utils.HubbardPlaquette
         params = plaquette.HubbardPlaquetteParams(
-            width=4, height=4, interactionAngle=0.1, hoppingAngle=0.2, repetitions=1, maxBatchSize=-1
+            width=4,
+            height=4,
+            interactionAngle=0.1,
+            hoppingAngle=0.2,
+            repetitions=1,
+            maxBatchSize=-1,
+            usePhaseGradient=use_phase_gradient,
+            rotationBitPrecision=10,
         )
         qir = str(base_context.compile(plaquette.MakeRepControlledPlaquetteExpCircuit, params, 0, list(range(1, 33))))
-        # The adder's Toffolis are the only source of T gates in this circuit.
+        # The adder's Toffolis lower to T gates in either mode.
         assert "__quantum__qis__t__" in qir
