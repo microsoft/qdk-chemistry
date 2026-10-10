@@ -14,7 +14,11 @@ from qdk_chemistry.data.unitary_representation.base import UnitaryRepresentation
 from qdk_chemistry.data.unitary_representation.containers.pauli_product_formula import PauliProductFormulaContainer
 from qdk_chemistry.utils.qsharp import QSHARP_UTILS
 
-from .base import ControlledCircuitMapper, ControlledCircuitMapperSettings
+from .base import ControlledCircuitMapper
+from .controlled_pauli_sequence_mapper import (
+    ControlledPauliSequenceMapperSettings,
+    _max_hamming_weight_phasing_batch_size,
+)
 
 __all__: list[str] = [
     "ControlledSwapPauliSequenceMapper",
@@ -91,10 +95,13 @@ def _vacuum_eigenphase(terms: list[tuple[Mapping[int, str], float]], atol: float
     return -math.fsum(diagonal)
 
 
-class ControlledSwapPauliSequenceMapperSettings(ControlledCircuitMapperSettings):
+class ControlledSwapPauliSequenceMapperSettings(ControlledPauliSequenceMapperSettings):
     """Settings for the :class:`ControlledSwapPauliSequenceMapper`.
 
     Attributes:
+        max_hamming_weight_phasing_batch_size: Largest tower of equal-angle rotations in a declared
+            layer phased through a single Hamming-weight register, or ``-1`` for no cap. A cap below
+            8 (e.g. ``1``) turns Hamming-weight phasing off. Defaults to ``-1``.
         vacuum_preservation_tolerance: Absolute tolerance on the amplitude leaked out of the vacuum,
             aggregated over every flipped-qubit set, all body repetitions, and both endpoints.
 
@@ -148,6 +155,12 @@ class ControlledSwapPauliSequenceMapper(ControlledCircuitMapper):
     say ``XX, Z0, YY, I`` for :math:`H = \tfrac12(XX + YY) + \tfrac12(I - Z_0)`, leaks half the
     vacuum amplitude.
 
+    **Hamming-weight phasing.** When the formula declares disjoint layers, terms of a layer that
+    share a rotation angle form a tower once at least 8 of them agree, and each tower is
+    synthesized with Hamming-weight phasing :cite:`Kan2025` on the vacuum register instead of one
+    rotation per term. ``max_hamming_weight_phasing_batch_size`` caps the tower phased through one
+    register; a cap below 8 turns phasing off.
+
     Notes:
         * Applies to particle-conserving Hamiltonians.
         * The requirement is on the mapped operator, not the encoding: after qubit tapering the
@@ -186,6 +199,7 @@ class ControlledSwapPauliSequenceMapper(ControlledCircuitMapper):
             ValueError: If the unitary container type is not supported.
             ValueError: If multiple control qubits are provided.
             ValueError: If the product formula ordering is not vacuum preserving.
+            ValueError: If ``max_hamming_weight_phasing_batch_size`` is neither -1 nor positive.
 
         """
         unitary_container = unitary.get_container()
@@ -199,12 +213,15 @@ class ControlledSwapPauliSequenceMapper(ControlledCircuitMapper):
         if len(control_indices) != 1:
             raise ValueError("ControlledSwapPauliSequenceMapper currently only supports a single control qubit.")
 
+        max_batch_size = _max_hamming_weight_phasing_batch_size(self._settings)
         target_indices = self._get_target_indices(unitary)
 
         vacuum_phase = self._vacuum_phase(unitary_container)
 
         controlled_evo_params = QSHARP_UTILS.ControlledSwapPauliExp.RepControlledSwapPauliExpParams(
             evolution=QSHARP_UTILS.PauliExp.RepPauliExpParams(**_pauli_evolution_parameters(unitary_container)),
+            layerOffsets=list(unitary_container.layer_offsets or ()),
+            maxBatchSize=max_batch_size,
             vacuumPhase=vacuum_phase,
             control=control_indices[0],
             systems=target_indices,

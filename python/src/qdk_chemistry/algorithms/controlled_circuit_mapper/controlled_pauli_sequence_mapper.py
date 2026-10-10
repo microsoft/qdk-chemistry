@@ -6,14 +6,62 @@
 # --------------------------------------------------------------------------------------------
 
 from qdk_chemistry.algorithms.circuit_mapper.pauli_sequence_mapper import _pauli_evolution_parameters
+from qdk_chemistry.data import Settings
 from qdk_chemistry.data.circuit import Circuit, QsharpFactoryData
 from qdk_chemistry.data.unitary_representation.base import UnitaryRepresentation
 from qdk_chemistry.data.unitary_representation.containers.pauli_product_formula import PauliProductFormulaContainer
 from qdk_chemistry.utils.qsharp import QSHARP_UTILS
 
-from .base import ControlledCircuitMapper
+from .base import ControlledCircuitMapper, ControlledCircuitMapperSettings
 
-__all__: list[str] = ["ControlledPauliSequenceMapper"]
+__all__: list[str] = ["ControlledPauliSequenceMapper", "ControlledPauliSequenceMapperSettings"]
+
+
+class ControlledPauliSequenceMapperSettings(ControlledCircuitMapperSettings):
+    r"""Settings for :class:`ControlledPauliSequenceMapper`.
+
+    Attributes:
+        max_hamming_weight_phasing_batch_size: Largest tower of equal-angle rotations in a declared
+            layer phased through a single Hamming-weight register, or ``-1`` for no cap. A cap below
+            8 (e.g. ``1``) turns Hamming-weight phasing off, so every term is its own rotation.
+            Defaults to ``-1``.
+
+    """
+
+    def __init__(self):
+        """Initialize the settings, adding the Hamming-weight phasing batch cap."""
+        super().__init__()
+        self._set_default(
+            "max_hamming_weight_phasing_batch_size",
+            "int",
+            -1,
+            "Largest tower of equal-angle rotations in a declared layer phased through a single "
+            "Hamming-weight register. A shorter batch releases its adder-tree scratch sooner, so the "
+            "peak ancilla count follows the batch rather than the whole tower, at the cost of one "
+            "extra set of place-value rotations per batch. A cap below 8 (e.g. 1) turns "
+            "Hamming-weight phasing off, so every term is its own rotation. Set to -1 for no cap.",
+        )
+
+
+def _max_hamming_weight_phasing_batch_size(settings: Settings) -> int:
+    """Return the validated Hamming-weight phasing batch cap.
+
+    Args:
+        settings: Settings holding ``max_hamming_weight_phasing_batch_size``.
+
+    Returns:
+        The cap, ``-1`` meaning no cap.
+
+    Raises:
+        ValueError: If the cap is neither -1 nor positive.
+
+    """
+    max_batch_size = int(settings.get("max_hamming_weight_phasing_batch_size"))
+    if max_batch_size != -1 and max_batch_size < 1:
+        raise ValueError(
+            f"max_hamming_weight_phasing_batch_size must be -1 or a positive integer. Got {max_batch_size}."
+        )
+    return max_batch_size
 
 
 class ControlledPauliSequenceMapper(ControlledCircuitMapper):
@@ -33,6 +81,13 @@ class ControlledPauliSequenceMapper(ControlledCircuitMapper):
     rotation rounds per layer. The declared boundaries are used without regrouping;
     formulas without layer metadata retain term-by-term controlled evolution.
 
+    Within a declared layer, terms that share a rotation angle form a tower once at least 8 of
+    them agree, the break-even of the adder tree. Each tower is synthesized with Hamming-weight
+    phasing :cite:`Kan2025`: an adder tree writes the Hamming weight of the rotated qubits into a
+    scratch register, and one controlled rotation per place value replaces the per-term
+    rotations. ``max_hamming_weight_phasing_batch_size`` caps the tower phased through one
+    register; a cap below 8 turns phasing off.
+
     Notes:
         * Currently supports only single-control-qubit scenarios.
         * Requires a ``PauliProductFormulaContainer`` for the time evolution unitary.
@@ -42,6 +97,7 @@ class ControlledPauliSequenceMapper(ControlledCircuitMapper):
     def __init__(self):
         """Initialize the PauliSequenceMapper."""
         super().__init__()
+        self._settings = ControlledPauliSequenceMapperSettings()
 
     def name(self) -> str:
         """Return the algorithm name."""
@@ -66,6 +122,7 @@ class ControlledPauliSequenceMapper(ControlledCircuitMapper):
         Raises:
             ValueError: If the unitary container type is not supported.
             ValueError: If multiple control qubits are provided.
+            ValueError: If ``max_hamming_weight_phasing_batch_size`` is neither -1 nor positive.
 
         """
         unitary_container = unitary.get_container()
@@ -79,6 +136,7 @@ class ControlledPauliSequenceMapper(ControlledCircuitMapper):
         if len(control_indices) != 1:
             raise ValueError("PauliSequenceMapper currently only supports a single control qubit.")
 
+        max_batch_size = _max_hamming_weight_phasing_batch_size(self._settings)
         target_indices = self._get_target_indices(unitary)
 
         evo_params = QSHARP_UTILS.PauliExp.RepPauliExpParams(**_pauli_evolution_parameters(unitary_container))
@@ -89,11 +147,14 @@ class ControlledPauliSequenceMapper(ControlledCircuitMapper):
             parameter={
                 "params": evo_params,
                 "layerOffsets": layer_offsets,
+                "maxBatchSize": max_batch_size,
                 "control": control_indices[0],
                 "systems": target_indices,
             },
         )
 
-        controlled_unitary_op = QSHARP_UTILS.ControlledPauliExp.MakeRepControlledPauliExpOp(evo_params, layer_offsets)
+        controlled_unitary_op = QSHARP_UTILS.ControlledPauliExp.MakeRepControlledPauliExpOp(
+            evo_params, layer_offsets, max_batch_size
+        )
 
         return Circuit(qsharp_factory=qsharp_factory, qsharp_op=controlled_unitary_op)

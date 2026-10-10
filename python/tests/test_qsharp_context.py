@@ -205,7 +205,28 @@ class TestTargetProfiles:
             numPrefixTerms=0,
             numSuffixTerms=0,
         )
-        assert "define" in str(base_context.compile(pauli_exp, params, [0, 1], 0, [1, 2]))
+        assert "define" in str(base_context.compile(pauli_exp, params, [0, 1], -1, 0, [1, 2]))
+
+    def test_base_lowers_hamming_weight_phased_layers(self, base_context: qdk.Context) -> None:
+        """A layer of 8 equal-angle rotations lowers its adder tree in both Pauli-sequence circuits."""
+        utils = base_context.code.QDKChemistry.Utils
+        params = utils.PauliExp.RepPauliExpParams(
+            pauliIndices=[[i] for i in range(8)],
+            pauliOps=[[Pauli.Z]] * 8,
+            pauliCoefficients=[0.25] * 8,
+            repetitions=2,
+            numPrefixTerms=0,
+            numSuffixTerms=0,
+        )
+        systems = list(range(1, 9))
+        controlled = utils.ControlledPauliExp.MakeRepControlledPauliExpCircuit
+        cswap = utils.ControlledSwapPauliExp.MakeRepControlledSwapPauliExpCircuit
+        for make, vacuum_phase in ((controlled, ()), (cswap, (0.0,))):
+            phased, plain = (
+                str(base_context.compile(make, params, [0, 8], cap, *vacuum_phase, 0, systems)) for cap in (-1, 1)
+            )
+            # The adder's Toffolis add T gates that the plain rotations do not need.
+            assert phased.count("__quantum__qis__t__") > plain.count("__quantum__qis__t__")
 
     def test_base_lowers_the_plaquette_evolution(self, base_context: qdk.Context) -> None:
         """A 4x4 lattice batches enough rotations to lower the Hamming-weight adder too."""

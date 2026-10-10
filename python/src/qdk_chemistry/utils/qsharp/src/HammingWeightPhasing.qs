@@ -7,7 +7,9 @@ namespace QDKChemistry.Utils.HammingWeightPhasing {
     import Std.Arrays.All;
     import Std.Arrays.Chunks;
     import Std.Arrays.Mapped;
+    import Std.Arrays.Sorted;
     import Std.Arrays.Tail;
+    import Std.Arrays.Where;
     import Std.Convert.IntAsDouble;
     import Std.Diagnostics.Fact;
     import Std.Intrinsic.AND;
@@ -248,5 +250,88 @@ namespace QDKChemistry.Utils.HammingWeightPhasing {
     /// rotations it saves.
     internal function UsesHammingWeightPhasing(count : Int) : Bool {
         return count >= 8;
+    }
+
+    /// # Summary
+    /// How many of `count` equal-angle terms to phase through Hamming-weight registers.
+    ///
+    /// # Description
+    /// `HammingWeightPhase` splits a tower into batches of `HammingWeightBatchSize` terms and gives
+    /// any batch below the break-even its own rotations. This returns the length of the leading part
+    /// of the tower whose every batch reaches the break-even, so a caller can rotate the short
+    /// remainder together with its other plain terms. It is 0 when no batch reaches the break-even.
+    ///
+    /// # Input
+    /// ## count
+    /// Number of equal-angle terms.
+    /// ## maxBatchSize
+    /// Largest tower phased through a single register, or -1 for no cap.
+    internal function HammingWeightPhasedCount(count : Int, maxBatchSize : Int) : Int {
+        if count <= 0 {
+            return 0;
+        }
+        let batchSize = HammingWeightBatchSize(count, maxBatchSize);
+        if not UsesHammingWeightPhasing(batchSize) {
+            return 0;
+        }
+        let remainder = count % batchSize;
+        return remainder == 0 or UsesHammingWeightPhasing(remainder) ? count | count - remainder;
+    }
+
+    /// # Summary
+    /// Groups terms with equal rotation angles into towers for `HammingWeightPhase`.
+    ///
+    /// # Description
+    /// Angles are compared exactly, and zero angles are never grouped. Each group contributes the
+    /// first `HammingWeightPhasedCount` of its terms as one tower, and the rest stay plain terms, so
+    /// a group shorter than the break-even of `UsesHammingWeightPhasing` is left untouched. Sorting
+    /// keeps the grouping at O(n log n) for wide layers.
+    ///
+    /// # Input
+    /// ## angles
+    /// The rotation angle of each term.
+    /// ## maxBatchSize
+    /// Largest tower phased through a single register, or -1 for no cap.
+    ///
+    /// # Output
+    /// The positions of the plain terms in their input order, and the ascending positions of each tower.
+    internal function EqualAngleTowers(angles : Double[], maxBatchSize : Int) : (Int[], Int[][]) {
+        let count = Length(angles);
+        // Sort (angle, position) pairs: a comparator capturing `angles` breaks Base-profile lowering.
+        mutable keyed : (Double, Int)[] = [];
+        for position in 0..count - 1 {
+            set keyed += [(angles[position], position)];
+        }
+        mutable order = [];
+        for (_, position) in Sorted(AngleThenPosition, keyed) {
+            set order += [position];
+        }
+        mutable plain = [true, size = count];
+        mutable towers : Int[][] = [];
+        mutable start = 0;
+        while start < count {
+            let angle = angles[order[start]];
+            mutable stop = start + 1;
+            while stop < count and angles[order[stop]] == angle {
+                set stop += 1;
+            }
+            let phased = angle == 0.0 ? 0 | HammingWeightPhasedCount(stop - start, maxBatchSize);
+            if phased > 0 {
+                let tower = order[start..start + phased - 1];
+                set towers += [tower];
+                for position in tower {
+                    set plain w/= position <- false;
+                }
+            }
+            set start = stop;
+        }
+        return (Where(isPlain -> isPlain, plain), towers);
+    }
+
+    /// Orders `(angle, position)` pairs by angle, then position.
+    function AngleThenPosition(left : (Double, Int), right : (Double, Int)) : Bool {
+        let (leftAngle, leftPosition) = left;
+        let (rightAngle, rightPosition) = right;
+        leftAngle < rightAngle or (leftAngle == rightAngle and leftPosition <= rightPosition)
     }
 }

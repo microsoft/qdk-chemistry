@@ -89,6 +89,8 @@ You can discover available implementations programmatically:
       :end-before: # end-cell-list-implementations
 
 
+.. _pauli-sequence-mapper:
+
 Pauli sequence mapper
 ~~~~~~~~~~~~~~~~~~~~~
 
@@ -115,6 +117,29 @@ exponential is completed separately.
 This can reduce logical rotation depth without extra ancillas or a different
 mapper selection. Shared-control CNOTs remain serial in a two-qubit-gate model,
 so the rotation-depth improvement is not a guarantee of constant total gate depth.
+
+.. rubric:: Hamming-weight phasing
+
+Within each declared layer, the mapper groups terms with exactly equal angles, such as the
+uniform bonds of an Ising or Heisenberg lattice. Each group of at least 8 terms is phased under
+control with Hamming-weight phasing :cite:`Kan2025`. Each term is mapped to a single :math:`Z`,
+an adder tree writes the group's Hamming weight into a scratch register, and a few controlled
+place-value rotations on that register replace the per-term controlled rotations. The adder tree
+pays for itself from 8 terms, so a smaller group, a zero angle, or an angle that differs in any
+bit keeps one controlled rotation per term. Formulas without ``layer_offsets`` are never phased.
+
+.. rubric:: Settings
+
+.. list-table::
+   :header-rows: 1
+   :widths: 25 15 60
+
+   * - Setting
+     - Type
+     - Description
+   * - ``max_hamming_weight_phasing_batch_size``
+     - int
+     - Largest group of equal-angle rotations in a layer phased through one Hamming-weight register. Batches are phased one after another, so a smaller cap lowers the peak ancilla count at the cost of one extra set of place-value rotations per batch. A cap below 8, such as 1, turns phasing off, so every term is its own rotation. When set to -1 (default), there is no cap.
 
 .. _cswap-pauli-sequence-mapper:
 
@@ -173,6 +198,33 @@ ordering is not vacuum preserving, rather than returning a wrong result.
 
    Compact formulas support nonempty ``prefix_terms`` and ``suffix_terms``; each executes once around the repeated body inside the same CSWAP sandwich.
    The prefix, body, and suffix are independently validated for vacuum preservation, sharing one leakage tolerance across repetition counts ``1``, ``step_reps``, and ``1``.
+
+.. rubric:: Hamming-weight phasing
+
+When the product formula declares ``layer_offsets``, the uncontrolled evolution on the vacuum
+register uses the same Hamming-weight phasing :cite:`Kan2025` as the
+:ref:`Pauli sequence mapper <pauli-sequence-mapper>`: within each layer, a group of at least
+8 terms with exactly equal angles is phased through one Hamming-weight register. Because this
+evolution is uncontrolled, the adder tree and its place-value rotations need no control of their
+own; the swap sandwich supplies it. The vacuum-annihilating grouper does not declare layers, so its
+output keeps one rotation per term; diagonal formulas taken directly from the unitary builder,
+such as an Ising chain without a transverse field, keep their layers.
+
+.. rubric:: Settings
+
+.. list-table::
+   :header-rows: 1
+   :widths: 25 15 60
+
+   * - Setting
+     - Type
+     - Description
+   * - ``max_hamming_weight_phasing_batch_size``
+     - int
+     - Largest group of equal-angle rotations in a layer phased through one Hamming-weight register. A cap below 8, such as 1, turns phasing off. When set to -1 (default), there is no cap.
+   * - ``vacuum_preservation_tolerance``
+     - float
+     - Absolute tolerance on the total amplitude the full evolution may leak out of the vacuum (default ``1e-9``).
 
 .. rubric:: Worked example
 
