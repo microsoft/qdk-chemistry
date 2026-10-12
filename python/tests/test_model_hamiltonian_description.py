@@ -7,6 +7,7 @@
 
 import json
 
+import h5py
 import numpy as np
 import pytest
 
@@ -168,3 +169,41 @@ def test_array_and_shell_parameters_round_trip_through_json() -> None:
     parameters = {name: model_hamiltonian._decode_parameter(value) for name, value in data["parameters"].items()}
     restored = _ShellModelDescription(LatticeGeometry.from_json(json.dumps(data["lattice"])), parameters)
     assert restored.content_hash() == model.content_hash()
+
+
+@pytest.mark.parametrize("format_type", ["json", "hdf5"])
+@pytest.mark.parametrize("shape", [(0, 2), (2, 0, 3)])
+def test_empty_array_parameters_keep_their_shape(shape: tuple[int, ...], format_type: str, tmp_path) -> None:
+    """An empty multidimensional array keeps its shape and hash, directly and per shell."""
+    model = _ShellModelDescription(LatticeGeometry.chain(3), {"v": np.zeros(shape), "j": {1: np.zeros(shape), 2: 0.5}})
+    if format_type == "json":
+        data = json.loads(json.dumps(model.to_json()))
+    else:
+        path = tmp_path / "model.h5"
+        with h5py.File(path, "w") as file:
+            model.to_hdf5(file)
+        with h5py.File(path, "r") as file:
+            data = json.loads(file.attrs["model_hamiltonian_description"])
+
+    assert data["parameters"]["v"] == {"shape": list(shape), "data": []}
+    parameters = {name: model_hamiltonian._decode_parameter(value) for name, value in data["parameters"].items()}
+    restored = _ShellModelDescription(LatticeGeometry.from_json(json.dumps(data["lattice"])), parameters)
+    assert restored.parameters["v"].shape == shape
+    assert restored.parameters["j"][1].shape == shape
+    assert restored.content_hash() == model.content_hash()
+
+
+@pytest.mark.parametrize(
+    "encoded",
+    [
+        {"shape": [-1, 2], "data": []},
+        {"shape": "2", "data": []},
+        {"shape": [2, 2], "data": [1.0]},
+        {"shape": [1], "data": [[1.0]]},
+        {"1": {"shape": [0, True], "data": []}},
+    ],
+)
+def test_rejects_malformed_shaped_arrays(encoded: dict) -> None:
+    """A shaped array needs non-negative integer extents and a flat list of matching length."""
+    with pytest.raises(ValueError, match="Array"):
+        model_hamiltonian._decode_parameter(encoded)

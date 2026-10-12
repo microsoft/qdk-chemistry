@@ -6,6 +6,7 @@
 # --------------------------------------------------------------------------------------------
 
 import json
+import math
 from collections.abc import Mapping
 from numbers import Integral
 from types import MappingProxyType
@@ -214,18 +215,45 @@ def _describe_parameter(value: ModelParameter) -> str:
 
 
 def _encode_parameter(value: ModelParameter) -> Any:
-    """Encode a parameter as a JSON number, nested list, or object keyed by shell."""
+    """Encode a parameter as a JSON number, nested list, shaped array, or object keyed by shell.
+
+    An empty array with more than one dimension is written as ``{"shape": [...], "data": []}``,
+    because a nested list cannot record the extents that follow a zero extent.
+    """
     if isinstance(value, Mapping):
         return {str(shell): _encode_parameter(v) for shell, v in value.items()}
     if isinstance(value, np.ndarray):
+        if value.size == 0 and value.ndim > 1:
+            return {"shape": list(value.shape), "data": []}
         return value.tolist()
+    return value
+
+
+def _is_shaped_array(value: Any) -> bool:
+    """Return whether an encoded value is an array written with its shape."""
+    return isinstance(value, dict) and set(value) == {"shape", "data"}
+
+
+def _decode_value(value: Any) -> float | np.ndarray:
+    """Decode a scalar, a nested list, or a shaped array written by :func:`_encode_parameter`."""
+    if _is_shaped_array(value):
+        shape, data = value["shape"], value["data"]
+        if not isinstance(shape, list) or any(
+            isinstance(extent, bool) or not isinstance(extent, int) or extent < 0 for extent in shape
+        ):
+            raise ValueError(f"Array shape must be a list of non-negative integers; got {shape!r}.")
+        size = math.prod(shape)
+        array = np.asarray(data, dtype=float) if isinstance(data, list) else None
+        if array is None or array.ndim != 1 or array.size != size:
+            raise ValueError(f"Array data for shape {shape} must be a flat list of {size} values; got {data!r}.")
+        return array.reshape(shape)
+    if isinstance(value, list):
+        return np.asarray(value, dtype=float)
     return value
 
 
 def _decode_parameter(value: Any) -> ModelParameter:
     """Decode a parameter written by :func:`_encode_parameter`."""
-    if isinstance(value, dict):
-        return {int(shell): np.asarray(v, dtype=float) if isinstance(v, list) else v for shell, v in value.items()}
-    if isinstance(value, list):
-        return np.asarray(value, dtype=float)
-    return value
+    if isinstance(value, dict) and not _is_shaped_array(value):
+        return {int(shell): _decode_value(v) for shell, v in value.items()}
+    return _decode_value(value)
