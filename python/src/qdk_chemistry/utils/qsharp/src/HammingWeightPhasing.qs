@@ -244,11 +244,12 @@ namespace QDKChemistry.Utils.HammingWeightPhasing {
     }
 
     /// Whether a tower of `count` equal-angle rotations is phased through a Hamming-weight
-    /// register: from 8 terms. Phasing trades the tower's `count` rotations for
-    /// floor(log2(count)) + 1 place-value rotations, paid with count - popcount(count) Toffolis
-    /// and as many scratch qubits. A synthesized rotation costs several Toffolis' worth of T
-    /// gates, so phasing already lowers the T count from 3 terms; 8 is a conservative cutoff
-    /// that spares short towers the scratch qubits, not a T-count break-even.
+    /// register.
+    ///
+    /// Phasing replaces the `count` rotations with floor(log2(count)) + 1 place-value rotations.
+    /// It costs count - popcount(count) Toffolis and as many scratch qubits.
+    /// Towers shorter than 8 are not phased, which spares them the scratch qubits.
+    /// This cutoff is conservative, since phasing already lowers the T count from 3 terms.
     internal function UsesHammingWeightPhasing(count : Int) : Bool {
         return count >= 8;
     }

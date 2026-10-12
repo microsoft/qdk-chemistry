@@ -221,8 +221,6 @@ Hubbard plaquette mapper
 
 :class:`~qdk_chemistry.algorithms.controlled_circuit_mapper.ControlledHubbardPlaquetteMapper` maps the ``HubbardPlaquetteContainer`` from the ``"hubbard_plaquette"`` :doc:`HamiltonianUnitaryBuilder <hamiltonian_unitary_builder>` to a singly-controlled Q# circuit.
 Each layer of the plaquette step is a tower of same-angle :math:`R_z` rotations, which the mapper synthesizes with Hamming-weight phasing :cite:`Kan2025`: an adder tree writes the tower's Hamming weight into a scratch register, and a few place-value rotations on that register replace the per-term rotations.
-A tower of 8 or more terms is phased, and a shorter tower keeps one rotation per term.
-A synthesized rotation costs several Toffolis' worth of T gates, so phasing already lowers the T count from 3 terms; 8 is a conservative cutoff that spares short towers the adder tree's scratch qubits, not a T-count break-even.
 
 .. rubric:: Settings
 
@@ -235,7 +233,7 @@ A synthesized rotation costs several Toffolis' worth of T gates, so phasing alre
      - Description
    * - ``max_hamming_weight_phasing_batch_size``
      - int
-     - Largest tower of same-angle rotations phased through one Hamming-weight register. It trades scratch qubits for rotations: batches are phased one after another, so a smaller cap lowers the peak ancilla count at the cost of one extra set of place-value rotations per batch, while the Toffoli count stays about the same. A cap below 8, such as 1, turns phasing off, so every term is its own rotation. When set to -1 (default), there is no cap.
+     - Largest tower of same-angle rotations phased through one Hamming-weight register. A smaller cap needs fewer scratch qubits but more rotations; the Toffoli count stays about the same. Towers shorter than 8 are never phased, which spares them the adder tree's scratch qubits. This cutoff is conservative, since phasing already lowers the T count from 3 terms. A cap below 8, such as 1, therefore turns phasing off. When set to -1 (default), there is no cap.
 
 Related classes
 ---------------

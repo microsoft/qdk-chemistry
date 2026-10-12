@@ -20,12 +20,14 @@ class ControlledHubbardPlaquetteMapperSettings(ControlledCircuitMapperSettings):
 
     Attributes:
         max_hamming_weight_phasing_batch_size: Largest tower of equal-angle rotations phased
-            through a single Hamming-weight register, or ``-1`` for no cap. The cap trades
-            scratch qubits for rotations: a smaller cap lowers the peak ancilla count and adds
-            place-value rotations, while the Toffoli count stays about the same. Towers shorter
-            than 8 are never phased; 8 is a conservative cutoff that spares short towers the
-            scratch qubits, not a T-count break-even. A cap below 8 (e.g. ``1``) therefore turns
-            Hamming-weight phasing off, so every term is its own rotation. Defaults to ``-1``.
+            through one Hamming-weight register, or ``-1`` for no cap.
+            A smaller cap needs fewer scratch qubits but more rotations; the Toffoli count stays
+            about the same.
+            Towers shorter than 8 are never phased, which spares them the adder tree's scratch
+            qubits.
+            This cutoff is conservative, since phasing already lowers the T count from 3 terms.
+            A cap below 8, such as ``1``, therefore turns phasing off.
+            Defaults to ``-1``.
 
     """
 
@@ -36,13 +38,12 @@ class ControlledHubbardPlaquetteMapperSettings(ControlledCircuitMapperSettings):
             "max_hamming_weight_phasing_batch_size",
             "int",
             -1,
-            "Largest tower of equal-angle rotations phased through a single Hamming-weight "
-            "register. It trades scratch qubits for rotations: a shorter batch releases its "
-            "adder-tree scratch sooner, so the peak ancilla count follows the batch rather than "
-            "the whole lattice, at the cost of one extra set of place-value rotations per batch; "
-            "the Toffoli count stays about the same. Towers shorter than 8 are never phased, a "
-            "conservative cutoff rather than a T-count break-even, so a cap below 8 (e.g. 1) turns "
-            "Hamming-weight phasing off and every term is its own rotation. Set to -1 for no cap.",
+            "Largest tower of equal-angle rotations phased through one Hamming-weight register. "
+            "A smaller cap needs fewer scratch qubits but more rotations; the Toffoli count stays "
+            "about the same. Towers shorter than 8 are never phased, which spares them the adder "
+            "tree's scratch qubits. This cutoff is conservative, since phasing already lowers the "
+            "T count from 3 terms. A cap below 8, such as 1, therefore turns phasing off. "
+            "Set to -1 for no cap.",
         )
 
 
