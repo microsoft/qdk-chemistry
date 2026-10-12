@@ -193,6 +193,8 @@ class HubbardPlaquetteTrotter(TimeEvolutionBuilder):
     Setting ``container_type`` to ``"pauli_product_formula"`` emits a
     :class:`~qdk_chemistry.data.PauliProductFormulaContainer` for the Pauli-sequence mappers instead. Prefer the
     ``"cswap_pauli_sequence"`` mapper for it: ``"pauli_sequence"`` controls every swap and butterfly rotation too.
+    The ``num_electrons`` shift then becomes an identity term in the circuit, so the phase-estimation window must
+    cover the described model's energy rather than the particle-hole symmetric one.
 
     The plaquette decomposition, its error constant, and the exact four-mode plaquette
     evolution are Campbell's :cite:`Campbell2022`. The factor ordering and the step-count

@@ -228,7 +228,7 @@ By default the output is a ``HubbardPlaquetteContainer`` that stores the angles 
 It is consumed by the :ref:`"hubbard_plaquette" controlled circuit mapper <hubbard-plaquette-mapper>`, :class:`~qdk_chemistry.algorithms.controlled_circuit_mapper.ControlledHubbardPlaquetteMapper`.
 
 Setting ``container_type`` to ``"pauli_product_formula"`` instead emits every fermionic swap, Fourier butterfly and phase as a Pauli exponential, for the ``"pauli_sequence"`` and :ref:`"cswap_pauli_sequence" <cswap-pauli-sequence-mapper>` mappers.
-The ``num_electrons`` shift then becomes an identity term, so the phase-estimation window has to cover the shifted energy.
+The ``num_electrons`` shift then becomes an identity term in the circuit, so the phase-estimation window must cover the described model's energy rather than the particle-hole symmetric one.
 Prefer ``"cswap_pauli_sequence"``, which applies the formula uncontrolled; ``"pauli_sequence"`` controls every swap and butterfly rotation as well, so it is costlier and mainly useful for compatibility.
 
 The number of steps can be set directly (``num_divisions``) or estimated from ``target_accuracy`` with Campbell's error constant for the related IPG ordering :cite:`Campbell2022`.
