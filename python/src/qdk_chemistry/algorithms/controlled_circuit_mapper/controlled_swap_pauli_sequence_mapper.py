@@ -209,7 +209,8 @@ class ControlledSwapPauliSequenceMapper(ControlledCircuitMapper):
             ValueError: If the unitary container type is not supported.
             ValueError: If multiple control qubits are provided.
             ValueError: If the product formula ordering is not vacuum preserving.
-            ValueError: If ``max_hamming_weight_phasing_batch_size`` is neither -1 nor positive.
+            ValueError: If Hamming-weight phasing is on and ``max_hamming_weight_phasing_batch_size``
+                is neither -1 nor positive.
 
         """
         unitary_container = unitary.get_container()

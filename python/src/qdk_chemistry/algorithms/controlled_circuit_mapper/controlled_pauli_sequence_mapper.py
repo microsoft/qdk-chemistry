@@ -61,20 +61,21 @@ class ControlledPauliSequenceMapperSettings(ControlledCircuitMapperSettings):
 
 
 def _max_hamming_weight_phasing_batch_size(settings: Settings) -> int:
-    """Return the validated Hamming-weight phasing batch cap.
+    """Return the Hamming-weight phasing batch cap, validated only when phasing is on.
 
     Args:
-        settings: Settings holding ``max_hamming_weight_phasing_batch_size``.
+        settings: Settings holding ``use_hamming_weight_phasing`` and
+            ``max_hamming_weight_phasing_batch_size``.
 
     Returns:
-        The cap, ``-1`` meaning no cap.
+        The cap, ``-1`` meaning no cap. With phasing off it is never read, so it is returned unchecked.
 
     Raises:
-        ValueError: If the cap is neither -1 nor positive.
+        ValueError: If phasing is on and the cap is neither -1 nor positive.
 
     """
     max_batch_size = int(settings.get("max_hamming_weight_phasing_batch_size"))
-    if max_batch_size != -1 and max_batch_size < 1:
+    if bool(settings.get("use_hamming_weight_phasing")) and max_batch_size != -1 and max_batch_size < 1:
         raise ValueError(
             f"max_hamming_weight_phasing_batch_size must be -1 or a positive integer. Got {max_batch_size}."
         )
@@ -139,7 +140,8 @@ class ControlledPauliSequenceMapper(ControlledCircuitMapper):
         Raises:
             ValueError: If the unitary container type is not supported.
             ValueError: If multiple control qubits are provided.
-            ValueError: If ``max_hamming_weight_phasing_batch_size`` is neither -1 nor positive.
+            ValueError: If Hamming-weight phasing is on and ``max_hamming_weight_phasing_batch_size``
+                is neither -1 nor positive.
 
         """
         unitary_container = unitary.get_container()

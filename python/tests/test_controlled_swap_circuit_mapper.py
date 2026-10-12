@@ -749,6 +749,14 @@ class TestHammingWeightPhasing:
         with pytest.raises(ValueError, match="max_hamming_weight_phasing_batch_size must be -1 or a positive"):
             _cswap(_diagonal_spin_chain(0.0), phasing=True, cap=cap)
 
+    def test_batch_cap_is_ignored_when_phasing_is_off(self) -> None:
+        """With phasing off the cap is never read, so a cap that would otherwise be rejected is accepted."""
+        unitary = _diagonal_spin_chain(0.0)
+        circuit = _cswap(unitary, phasing=False, cap=0)
+        assert circuit._qsharp_factory is not None
+        assert circuit._qsharp_factory.parameter["useHammingWeightPhasing"] is False
+        assert _counts(circuit) == _counts(_cswap(unitary, phasing=False))
+
     @pytest.mark.parametrize(
         ("field", "phasing", "cap"),
         [(0.0, True, -1), (0.4, True, -1), (0.4, True, 12), (0.4, True, 1), (0.4, False, -1)],
