@@ -196,7 +196,6 @@ nitpick_ignore_regex = [
     (r"cpp:identifier", r"nlohmann.*"),
     (r"cpp:identifier", r"qcs.*"),
     (r"cpp:identifier", r".*::value"),
-    (r"cpp:identifier", r"ScalarVariant"),
     (r"cpp:identifier", r"fmt::format_string.*"),
     (r"cpp:identifier", r"spdlog.*"),
     # constants:: symbols imported via `using namespace codata_XXXX` inside
@@ -225,6 +224,10 @@ nitpick_ignore_regex = [
     (r"py:class", r"qdk_chemistry._core.data.DataClass"),
     (r"py:class", r"qdk_chemistry._core\.data\.PauliOperatorExpression"),
     (r"py:class", r"qdk_chemistry._core\.data\.MajoranaMapping"),
+    (
+        r"py:class",
+        r"qdk_chemistry\._core\.utils\.unitary_synthesis\.(DenseSiteSynthesis|SparseSiteSynthesis)",
+    ),
     (r"py:class", r"_CoreMajoranaMapping"),
     (r"py:class", r"^TaperingSpecification$"),
     (r"py:class", r"qdk_chemistry\.data\.tapering\.TaperingSpecification"),

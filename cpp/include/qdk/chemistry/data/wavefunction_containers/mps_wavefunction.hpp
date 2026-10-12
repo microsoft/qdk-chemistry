@@ -111,6 +111,9 @@ class MPSSite {
  */
 class MPSContainer : public WavefunctionContainer {
  public:
+  using MatrixVariant = ContainerTypes::MatrixVariant;
+  using VectorVariant = ContainerTypes::VectorVariant;
+  using ScalarVariant = ContainerTypes::ScalarVariant;
   /** @brief Shared immutable site in the chain. */
   using SitePtr = std::shared_ptr<const MPSSite>;
   /** @brief Symmetry-blocked occupation-count metadata. */
