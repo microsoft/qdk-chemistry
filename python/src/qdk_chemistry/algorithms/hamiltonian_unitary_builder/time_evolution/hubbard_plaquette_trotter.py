@@ -251,10 +251,6 @@ class HubbardPlaquetteTrotter(TimeEvolutionBuilder):
         """Return ``hamiltonian_unitary_builder`` as the algorithm type name."""
         return "hamiltonian_unitary_builder"
 
-    def _input_type(self) -> type[FermiHubbardModelHamiltonianDescription]:
-        """Return :class:`~qdk_chemistry.data.FermiHubbardModelHamiltonianDescription`, the model this evolves."""
-        return FermiHubbardModelHamiltonianDescription
-
     def _lattice_geometry(self, lattice: LatticeGeometry) -> tuple[int, int]:
         """Return the width and height of a periodic square lattice that the plaquettes tile.
 
@@ -399,10 +395,16 @@ class HubbardPlaquetteTrotter(TimeEvolutionBuilder):
             with ``container_type`` set to ``"pauli_product_formula"``, a ``PauliProductFormulaContainer``.
 
         Raises:
+            TypeError: If *model* is not a ``FermiHubbardModelHamiltonianDescription``.
             ValueError: If the order is not 2, the lattice is not a periodic square lattice, or
                 ``num_electrons`` is neither -1 nor a valid electron count for the lattice.
 
         """
+        if not isinstance(model, FermiHubbardModelHamiltonianDescription):
+            raise TypeError(
+                f"The {self.name()!r} builder takes a FermiHubbardModelHamiltonianDescription, "
+                f"got {type(model).__name__}."
+            )
         order = self._settings.get("order")
         if order != 2:
             raise ValueError(f"HubbardPlaquetteTrotter supports order 2 only, got {order}.")
