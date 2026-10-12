@@ -277,12 +277,12 @@ each library; they are all declared in [`vcpkg.json`](vcpkg.json), so a single
 | Dependency | Description | Requirements | Source Location | Ubuntu / Debian | Redhat | Windows |
 |------------|-------------|--------------------|-----------------|-----------------|---------|-----------------|
 | Python 3 | Python interpreter and package tools | Version 3.10+ | [source](https://www.python.org/) | `apt install python3 python3-pip python3-venv` | `dnf install python3 python3-pip` | `winget install --id Python.Python.3.12 -e -s winget` |
-| CMake | Build system manager | Version > 3.15 | [source](https://github.com/Kitware/CMake) | `apt install cmake` | `dnf install cmake` | VS Build Tools |
+| CMake | Build system manager | Version 3.28+ | [source](https://github.com/Kitware/CMake) | `apt install cmake` | `dnf install cmake` | VS Build Tools |
 | Ninja | Build tool used for the Windows builds | N/A | [source](https://github.com/ninja-build/ninja) | `apt install ninja-build` | `dnf install ninja-build` | VS Build Tools |
 | Eigen | C++ linear algebra templates | Version > 3.4.0 | [source](https://libeigen.gitlab.io/) | `apt install libeigen3-dev` | `dnf install eigen3-devel` | `eigen3` |
 | LAPACK | C library for linear algebra. See [this note](#note-on-lapack-usage) for further information | N/A | e.g. [source](https://github.com/OpenMathLib/OpenBLAS) | e.g. `apt install libopenblas-dev` | e.g. `dnf install openblas-devel`| `openblas` |
 | HDF5 | A portable data file library | Version > 1.12 + C++ bindings | [source](https://www.hdfgroup.org/download-hdf5/) | `apt install libhdf5-serial-dev` | `dnf install hdf5-devel`| `hdf5[cpp]` |
-| Boost | A collection of useful C++ libraries | Version > 1.80 | [source](https://github.com/boostorg/wiki/wiki/Getting-Started%3A-Overview) | `apt install libboost-all-dev` | `dnf install boost-devel` | `boost-headers`, `boost-container-hash`, `boost-dynamic-bitset`, `boost-sort` |
+| Boost | A collection of useful C++ libraries | Version > 1.80 (1.85+ with MSVC), including the compiled Locale, Random, and Regex libraries | [source](https://github.com/boostorg/wiki/wiki/Getting-Started%3A-Overview) | `apt install libboost-all-dev` | `dnf install boost-devel` | `boost-headers`, `boost-container`, `boost-container-hash`, `boost-dynamic-bitset`, `boost-hana`, `boost-interval`, `boost-locale`, `boost-multiprecision`, `boost-numeric-conversion`, `boost-random`, `boost-range`, `boost-regex`, `boost-sort`, `boost-spirit` |
 
 See [Python dependencies](#python-dependencies) for a list of dependencies installed by `pip`.
 
@@ -323,10 +323,14 @@ These dependencies are automatically downloaded and built by the CMake build sys
 | Libecpint | A C++ library for molecular integrals involving [effective core potentials](https://en.wikipedia.org/wiki/Pseudopotential) | v1.0.7 | [source](https://github.com/robashaw/libecpint) | `apt install libecpint-dev` | N/A | N/A |
 | GauXC | A C++ library for molecular integrals on numerical grids | v1.0 | [source](https://github.com/wavefunction91/gauxc) | N/A | N/A | N/A |
 | MACIS | A C++ library for configuration interaction methods | N/A | [source](https://github.com/wavefunction91/macis) | N/A | N/A | N/A |
+| SeQuant | A C++ library for symbolic tensor algebra in many-body methods | 5fcefae | [source](https://github.com/ValeevGroup/SeQuant) | N/A | N/A | N/A |
+| BTAS | A C++ tensor library, used as SeQuant's numerical backend | 52aadfe | [source](https://github.com/BTAS/btas) | N/A | N/A | N/A |
 
 **NOTE**: As Libint and GauXC exhibit very long build times, it is **strongly encouraged** that these dependencies are separately installed to avoid excessive build costs. See the [Libint2](https://github.com/evaleev/libint) and [GauXC](https://github.com/wavefunction91/gauxc) project documentation for build instructions.
 
 **NOTE**: The source code of MACIS is included in the `external` directory of QDK/Chemistry. `MACIS` carries its own set of dependencies which are automatically managed by the `MACIS` build system. While building `MACIS` and its dependencies can be time consuming, it is strongly encouraged to allow the QDK/Chemistry build system handle this dependency to ensure proper interaction of up- and down-stream components.
+
+**NOTE**: SeQuant is always built from source at its pinned revision, with BTAS as its numerical backend. BTAS uses the BLAS++/LAPACK++ libraries that `MACIS` brings in.
 
 ### Note on LAPACK Usage
 
