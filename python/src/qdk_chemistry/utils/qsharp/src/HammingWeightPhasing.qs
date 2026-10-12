@@ -248,8 +248,8 @@ namespace QDKChemistry.Utils.HammingWeightPhasing {
     ///
     /// Phasing replaces the `count` rotations with floor(log2(count)) + 1 place-value rotations.
     /// It costs count - popcount(count) Toffolis and as many scratch qubits.
-    /// Towers shorter than 8 are not phased, which spares them the scratch qubits.
-    /// This cutoff is conservative, since phasing already lowers the T count from 3 terms.
+    /// Only towers of 8 or more terms are phased, since only there are the saved rotations worth
+    /// the extra Toffolis and scratch qubits.
     internal function UsesHammingWeightPhasing(count : Int) : Bool {
         return count >= 8;
     }

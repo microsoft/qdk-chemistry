@@ -23,9 +23,8 @@ class ControlledHubbardPlaquetteMapperSettings(ControlledCircuitMapperSettings):
             through one Hamming-weight register, or ``-1`` for no cap.
             A smaller cap needs fewer scratch qubits but more rotations; the Toffoli count stays
             about the same.
-            Towers shorter than 8 are never phased, which spares them the adder tree's scratch
-            qubits.
-            This cutoff is conservative, since phasing already lowers the T count from 3 terms.
+            Only towers of 8 or more terms are phased, since only there are the saved rotations
+            worth the extra Toffolis and scratch qubits.
             A cap below 8, such as ``1``, therefore turns phasing off.
             Defaults to ``-1``.
 
@@ -40,10 +39,9 @@ class ControlledHubbardPlaquetteMapperSettings(ControlledCircuitMapperSettings):
             -1,
             "Largest tower of equal-angle rotations phased through one Hamming-weight register. "
             "A smaller cap needs fewer scratch qubits but more rotations; the Toffoli count stays "
-            "about the same. Towers shorter than 8 are never phased, which spares them the adder "
-            "tree's scratch qubits. This cutoff is conservative, since phasing already lowers the "
-            "T count from 3 terms. A cap below 8, such as 1, therefore turns phasing off. "
-            "Set to -1 for no cap.",
+            "about the same. Only towers of 8 or more terms are phased, since only there are the "
+            "saved rotations worth the extra Toffolis and scratch qubits. A cap below 8, such as 1, "
+            "therefore turns phasing off. Set to -1 for no cap.",
         )
 
 
