@@ -438,7 +438,7 @@ class TestPauliProductFormulaOutput:
         )
 
 
-# Logical counts of the benchmark circuit in examples/estimation_hubbard_2d.ipynb.
+# Logical counts of the benchmark circuit in examples/resource_estimation/estimation_hubbard_2d.ipynb.
 # TEMPORARY (legacy parity): they include the legacy circuit's extra work, so L=2 still has Toffolis.
 _COUNT_KEYS = ("numQubits", "rotationCount", "rotationDepth", "tCount", "cczCount", "ccixCount", "measurementCount")
 _BENCHMARK_COUNTS = {

@@ -29,6 +29,7 @@ The table below summarizes which [optional extras](https://github.com/microsoft/
 | `resource_estimation/estimation_ising_2d.ipynb` | `pip install 'qdk-chemistry[jupyter,qre]'` |
 | `resource_estimation/estimation_spin_liquids.ipynb` | `pip install 'qdk-chemistry[jupyter,qre]'` |
 | `resource_estimation/estimation_magnets.ipynb` | `pip install 'qdk-chemistry[jupyter,qre]'` |
+| `resource_estimation/estimation_hubbard_2d.ipynb` | `pip install 'qdk-chemistry[jupyter,qre]'` |
 | `extended_hubbard.ipynb` | `pip install 'qdk-chemistry[jupyter,plugins,qre]'` |
 | `factory_list.ipynb` | `pip install 'qdk-chemistry[jupyter,plugins]'` |
 | `interoperability/pennylane/` | `pip install pennylane` |
@@ -75,6 +76,7 @@ Download or clone the full `examples/` directory structure to run the examples.
 - `resource_estimation/estimation_ising_2d.ipynb`: Jupyter notebook demonstrating quantum resource estimation for simulating a 2D Ising model Hamiltonian.
 - `resource_estimation/estimation_spin_liquids.ipynb`: Jupyter notebook demonstrating quantum resource estimation for simulating an extended Kitaev honeycomb model.
 - `resource_estimation/estimation_magnets.ipynb`: Jupyter notebook demonstrating quantum resource estimation for quantum phase estimation of a J1–J2 Heisenberg model.
+- `resource_estimation/estimation_hubbard_2d.ipynb`: Jupyter notebook demonstrating quantum resource estimation for quantum phase estimation of a periodic 2D Fermi-Hubbard model with plaquette Trotterization.
 - `extended_hubbard.ipynb`: Jupyter notebook modeling cyclobutadiene with the Extended Hubbard model and estimating its energy with quantum phase estimation.
 
 ## Companion datasets and assets
