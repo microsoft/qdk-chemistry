@@ -332,8 +332,8 @@ namespace QDKChemistry.Utils.HubbardPlaquette {
     /// XX and YY commute, so CNOT, H, CNOT sends XX to Z on the first qubit and YY to -Z on the
     /// second, and X removes that sign. The tiling then becomes one tower of twice as many
     /// equal-angle Z rotations, which with Hamming-weight phasing saves a place-value rotation
-    /// over separate XX and YY towers. Below the break-even each pair takes its own two
-    /// rotations, and a batch cap short enough to put every batch below the break-even has the
+    /// over separate XX and YY towers. Below the phasing cutoff each pair takes its own two
+    /// rotations, and a batch cap short enough to put every batch below the cutoff has the
     /// same effect, so the basis change is skipped rather than paid for nothing.
     internal operation HoppingPhases(angle : Double, pairs : Qubit[][], maxBatchSize : Int) : Unit is Adj + Ctl {
         HoppingPhasesWithLegacyCosts(angle, pairs, maxBatchSize, false);

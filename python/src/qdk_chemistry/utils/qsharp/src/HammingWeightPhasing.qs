@@ -112,7 +112,7 @@ namespace QDKChemistry.Utils.HammingWeightPhasing {
     }
 
     /// Applies exp(-i theta P_t) for every term P_t, phasing the batch through a Hamming-weight
-    /// register once it reaches the measured break-even size.
+    /// register once it reaches the cutoff of `UsesHammingWeightPhasing`.
     ///
     /// Each term is first rotated onto a single Z on its last qubit, so the batch becomes
     /// `count` equal-angle rotations exp(-i theta Z). Their product is
@@ -123,7 +123,7 @@ namespace QDKChemistry.Utils.HammingWeightPhasing {
     /// whose Methods diagonalize every
     /// plaquette and every on-site pair into a layer of same-angle R_z gates and synthesize that
     /// layer collectively with HWP. Each place-value rotation is a synthesized `Rz`. Below the
-    /// break-even size each term is applied as its own rotation instead.
+    /// cutoff each term is applied as its own rotation instead.
     ///
     /// A tower longer than `maxBatchSize` is split into consecutive batches of at most that many
     /// terms, each phased through its own Hamming-weight register. The phases are additive over
@@ -186,7 +186,7 @@ namespace QDKChemistry.Utils.HammingWeightPhasing {
     /// estimate is usually better off spending the qubits to save the rotations. The default is
     /// no cap, which reproduces the uncapped construction exactly.
     ///
-    /// A cap below the break-even of `UsesHammingWeightPhasing` leaves every batch too short to
+    /// A cap below the cutoff of `UsesHammingWeightPhasing` leaves every batch too short to
     /// phase through a register, so the whole tower falls back to one rotation per term.
     ///
     /// # Input
@@ -244,8 +244,11 @@ namespace QDKChemistry.Utils.HammingWeightPhasing {
     }
 
     /// Whether a tower of `count` equal-angle rotations is phased through a Hamming-weight
-    /// register: not below the measured break-even of 8, where the adder tree costs more than the
-    /// rotations it saves.
+    /// register: from 8 terms. Phasing trades the tower's `count` rotations for
+    /// floor(log2(count)) + 1 place-value rotations, paid with count - popcount(count) Toffolis
+    /// and as many scratch qubits. A synthesized rotation costs several Toffolis' worth of T
+    /// gates, so phasing already lowers the T count from 3 terms; 8 is a conservative cutoff
+    /// that spares short towers the scratch qubits, not a T-count break-even.
     internal function UsesHammingWeightPhasing(count : Int) : Bool {
         return count >= 8;
     }

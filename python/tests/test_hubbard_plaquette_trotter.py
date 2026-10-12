@@ -155,7 +155,7 @@ class TestHammingWeightPhasing:
         ],
     )
     def test_hopping_tower(self, num_pairs, controlled, name):
-        """exp(i a (XX + YY)) on every pair, below and above the eight-rotation break-even."""
+        """exp(i a (XX + YY)) on every pair, below and above the eight-rotation cutoff."""
         angle = 3 * np.pi / 32
         xx_plus_yy = np.kron([[0, 1], [1, 0]], [[0, 1], [1, 0]]) + np.kron([[0, -1j], [1j, 0]], [[0, -1j], [1j, 0]])
         pair_gate = scipy.linalg.expm(1j * angle * xx_plus_yy)
@@ -326,7 +326,7 @@ class TestPlaquetteCircuit:
         assert np.allclose(actual, expected, atol=1e-8)
 
     def test_hamming_weight_phasing_matches_plain_rotations(self):
-        """At 4x2 every tower reaches the break-even, and phasing it under control matches plain rotations."""
+        """At 4x2 every tower reaches the cutoff, and phasing it under control matches plain rotations."""
         state = _random_state(17, seed=11, support=32)
         hwp, plain = (
             _apply(
