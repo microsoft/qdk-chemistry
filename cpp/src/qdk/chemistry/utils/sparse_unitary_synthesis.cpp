@@ -183,27 +183,29 @@ RowGathering gather_rows(const data::MPSSite& site, Eigen::Index ancilla_dim,
 
 void complete_blocks(std::vector<ColumnGroup>& groups, Eigen::Index left) {
   const double tolerance = orthogonality_tolerance * static_cast<double>(left);
-  run_tasks(
-      static_cast<std::ptrdiff_t>(groups.size()), [&](std::ptrdiff_t index) {
-        auto& group = groups[static_cast<std::size_t>(index)];
-        const Eigen::Index size = group.block.rows();
-        const auto width = static_cast<Eigen::Index>(group.columns.size());
-        auto rectangle = group.block.leftCols(width);
-        const double block_residual = isometry_residual(rectangle);
-        group.residual = block_residual * block_residual;
-        if (!(block_residual <= tolerance)) {
-          return;
-        }
-        const bool project = !is_isometry(rectangle);
-        if (size == width && !project) {
-          return;
-        }
-        const auto svd = decompose_svd(rectangle.transpose());
-        if (project) {
-          rectangle = svd.v.leftCols(width) * svd.u.transpose();
-        }
-        group.block.rightCols(size - width) = svd.v.rightCols(size - width);
-      });
+#ifdef _OPENMP
+#pragma omp parallel for schedule(dynamic, 1)
+#endif
+  for (std::size_t index = 0; index < groups.size(); ++index) {
+    auto& group = groups[index];
+    const Eigen::Index size = group.block.rows();
+    const auto width = static_cast<Eigen::Index>(group.columns.size());
+    auto rectangle = group.block.leftCols(width);
+    const double block_residual = isometry_residual(rectangle);
+    group.residual = block_residual * block_residual;
+    if (!(block_residual <= tolerance)) {
+      continue;
+    }
+    const bool project = !is_isometry(rectangle);
+    if (size == width && !project) {
+      continue;
+    }
+    const auto svd = singular_value_decomposition(rectangle.transpose());
+    if (project) {
+      rectangle = svd.v.leftCols(width) * svd.u.transpose();
+    }
+    group.block.rightCols(size - width) = svd.v.rightCols(size - width);
+  }
   double residual = 0.0;
   for (const auto& group : groups) {
     residual += group.residual;
@@ -285,7 +287,7 @@ GivensDecomposition synthesize_completed_blocks(
   for (const auto group_index : order) {
     blocks.push_back(std::cref(groups[group_index].block));
   }
-  auto decompositions = decompose_unitaries_to_givens(blocks);
+  auto decompositions = givens_decomposition(blocks);
   decompositions.resize(decompositions.size() + num_unused_rows,
                         GivensDecomposition{{}, {}, {0}});
   return merge_block_givens(decompositions);

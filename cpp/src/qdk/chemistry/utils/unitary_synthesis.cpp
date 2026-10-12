@@ -66,18 +66,20 @@ DenseSiteSynthesis dense_unitary_synthesis(
                         isometry.bottomRows(ancilla_dim));
   } else {
     auto [b, r] =
-        decompose_qr(isometry.bottomRows(3 * ancilla_dim), ancilla_dim);
-    auto [c, s] = decompose_qr(b.bottomRows(2 * ancilla_dim), ancilla_dim);
+        qr_decomposition(isometry.bottomRows(3 * ancilla_dim), ancilla_dim);
+    auto [c, s] = qr_decomposition(b.bottomRows(2 * ancilla_dim), ancilla_dim);
     blocks.emplace_back(isometry.topRows(ancilla_dim), std::move(r));
     blocks.emplace_back(b.topRows(ancilla_dim), std::move(s));
     blocks.emplace_back(c.topRows(ancilla_dim), c.bottomRows(ancilla_dim));
   }
   std::vector<TwoBlockCsd> csds(blocks.size());
-  run_tasks(
-      static_cast<std::ptrdiff_t>(blocks.size()), [&](std::ptrdiff_t index) {
-        const auto step = static_cast<std::size_t>(index);
-        csds[step] = decompose_csd(blocks[step].first, blocks[step].second);
-      });
+#ifdef _OPENMP
+#pragma omp parallel for schedule(dynamic, 1)
+#endif
+  for (std::size_t step = 0; step < blocks.size(); ++step) {
+    csds[step] =
+        cosine_sine_decomposition(blocks[step].first, blocks[step].second);
+  }
 
   DenseSiteSynthesis result;
   std::vector<Eigen::MatrixXd> unitaries;
@@ -106,7 +108,7 @@ DenseSiteSynthesis dense_unitary_synthesis(
   for (const auto& unitary : unitaries) {
     matrices.push_back(std::cref(unitary));
   }
-  auto givens = decompose_unitaries_to_givens(matrices);
+  auto givens = givens_decomposition(matrices);
   const auto terminal = givens.begin() + (physical == 4 ? 2 : 0);
   result.mixing_givens.assign(std::make_move_iterator(givens.begin()),
                               std::make_move_iterator(terminal));
@@ -139,11 +141,10 @@ MPSSynthesis matrix_product_state_synthesis(
     return results;
   }
   std::vector<SparseSiteSynthesis> results(count);
-  run_tasks(static_cast<std::ptrdiff_t>(count), [&](std::ptrdiff_t index) {
-    const auto position = static_cast<std::size_t>(index);
+  for (std::size_t position = 0; position < count; ++position) {
     const auto& site = *sites[position + 1];
     results[position] = block_sparse_unitary_synthesis(site, ancilla_dim);
-  });
+  }
   return results;
 }
 

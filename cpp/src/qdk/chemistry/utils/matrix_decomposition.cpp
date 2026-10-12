@@ -13,7 +13,6 @@
 #include <deque>
 #include <functional>
 #include <lapack.hh>
-#include <numeric>
 #include <stdexcept>
 #include <utility>
 #include <vector>
@@ -32,7 +31,8 @@ using Rotation = std::pair<Eigen::Index, double>;
 
 // singular value decomposition M = U · diag(s) · Vᵀ. with complete orthogonal U
 // and V.
-FullSvd decompose_svd(const Eigen::Ref<const Eigen::MatrixXd>& matrix) {
+FullSvd singular_value_decomposition(
+    const Eigen::Ref<const Eigen::MatrixXd>& matrix) {
   const auto rows = static_cast<std::int64_t>(matrix.rows());
   const auto cols = static_cast<std::int64_t>(matrix.cols());
   Eigen::MatrixXd work = matrix;
@@ -52,7 +52,7 @@ FullSvd decompose_svd(const Eigen::Ref<const Eigen::MatrixXd>& matrix) {
 }
 
 // QR decomposition M = Q · R with complete Q and upper-triangular R.
-std::pair<Eigen::MatrixXd, Eigen::MatrixXd> decompose_qr(
+std::pair<Eigen::MatrixXd, Eigen::MatrixXd> qr_decomposition(
     const Eigen::Ref<const Eigen::MatrixXd>& matrix, Eigen::Index num_columns) {
   Eigen::HouseholderQR<Eigen::MatrixXd> qr(matrix);
   Eigen::MatrixXd q =
@@ -66,10 +66,11 @@ std::pair<Eigen::MatrixXd, Eigen::MatrixXd> decompose_qr(
 
 // two-block cosine–sine decomposition. [A; B] = diag(U₁, U₂) · [D₁; D₂] · V,
 // with D₁² + D₂² = I.
-TwoBlockCsd decompose_csd(const Eigen::Ref<const Eigen::MatrixXd>& a,
-                          const Eigen::Ref<const Eigen::MatrixXd>& b) {
-  FullSvd upper = decompose_svd(a);
-  const FullSvd lower = decompose_svd(b * upper.v);
+TwoBlockCsd cosine_sine_decomposition(
+    const Eigen::Ref<const Eigen::MatrixXd>& a,
+    const Eigen::Ref<const Eigen::MatrixXd>& b) {
+  FullSvd upper = singular_value_decomposition(a);
+  const FullSvd lower = singular_value_decomposition(b * upper.v);
   TwoBlockCsd result;
   result.u_1 = std::move(upper.u);
   result.d_1 = std::move(upper.singular_values);
@@ -103,20 +104,14 @@ std::vector<double> rotation_angles(const Eigen::VectorXd& d,
 // to real rotations and a diagonal sign matrix. Alternating sweeps eliminate
 // entries with right column rotations and left row rotations; the left
 // rotations are then commuted through the final diagonal sign matrix.
-std::vector<GivensDecomposition> decompose_unitaries_to_givens(
+std::vector<GivensDecomposition> givens_decomposition(
     const std::vector<std::reference_wrapper<const Eigen::MatrixXd>>&
         matrices) {
-  // Largest first so concurrent workers stay balanced.
-  std::vector<std::size_t> order(matrices.size());
-  std::iota(order.begin(), order.end(), 0);
-  std::stable_sort(
-      order.begin(), order.end(), [&](std::size_t lhs, std::size_t rhs) {
-        return matrices[lhs].get().rows() > matrices[rhs].get().rows();
-      });
   std::vector<GivensDecomposition> results(matrices.size());
-  run_tasks(static_cast<std::ptrdiff_t>(order.size()), [&](std::ptrdiff_t
-                                                               index) {
-    const auto position = order[static_cast<std::size_t>(index)];
+#ifdef _OPENMP
+#pragma omp parallel for schedule(dynamic, 1)
+#endif
+  for (std::size_t position = 0; position < matrices.size(); ++position) {
     const Eigen::MatrixXd& matrix = matrices[position].get();
     auto& result = results[position];
     const Eigen::Index dim = matrix.rows();
@@ -129,7 +124,7 @@ std::vector<GivensDecomposition> decompose_unitaries_to_givens(
     Eigen::MatrixXd work = matrix;
     if (dim == 1) {
       result = {{}, {}, {static_cast<std::uint8_t>(work(0, 0) < 0.0)}};
-      return;
+      continue;
     }
 
     const Eigen::Index num_layers = dim == 2 ? 1 : dim;
@@ -143,6 +138,7 @@ std::vector<GivensDecomposition> decompose_unitaries_to_givens(
         Eigen::Index slot = 0;
         for (Eigen::Index column = diagonal; column >= 0; --column, ++slot) {
           const Eigen::Index row = dim - 1 - slot;
+          // rotating it against its right-hand neighbour in the same row
           const double adjacent = work(row, column + 1);
           const double eliminated = work(row, column);
           if (std::abs(eliminated) < elimination_tolerance) {
@@ -191,26 +187,17 @@ std::vector<GivensDecomposition> decompose_unitaries_to_givens(
       const Eigen::Index num_slots = shifted ? odd_slots : even_slots;
       std::vector<double> angles(static_cast<std::size_t>(num_slots), 0.0);
 
-      const auto store_rotation = [&](Eigen::Index pair, double angle) {
-        if ((pair % 2 == 1) == shifted) {
-          angles[static_cast<std::size_t>(pair / 2)] = angle;
-        }
-      };
-
       for (const auto& [pair, angle] : upper_rotations[layer]) {
-        store_rotation(pair, angle);
+        angles[static_cast<std::size_t>(pair / 2)] = angle;
       }
 
-      const Eigen::Index lower_column = num_layers - 1 - layer;
-      if (lower_column < static_cast<Eigen::Index>(lower_rotations.size())) {
-        const auto& rotations = lower_rotations[lower_column];
-        for (auto rotation = rotations.rbegin(); rotation != rotations.rend();
-             ++rotation) {
-          const auto [pair, angle] = *rotation;
-          const double sign =
-              diagonal(pair) * diagonal(pair + 1) > 0.0 ? 1.0 : -1.0;
-          store_rotation(pair, sign * angle);
-        }
+      const auto& rotations = lower_rotations[num_layers - 1 - layer];
+      for (auto rotation = rotations.rbegin(); rotation != rotations.rend();
+           ++rotation) {
+        const auto [pair, angle] = *rotation;
+        const double sign =
+            diagonal(pair) * diagonal(pair + 1) > 0.0 ? 1.0 : -1.0;
+        angles[static_cast<std::size_t>(pair / 2)] = sign * angle;
       }
 
       if (std::any_of(angles.begin(), angles.end(), [](double angle) {
@@ -220,11 +207,11 @@ std::vector<GivensDecomposition> decompose_unitaries_to_givens(
         result.layer_shifted.push_back(static_cast<std::uint8_t>(shifted));
       }
     }
-  });
+  }
   return results;
 }
 
-// Merges the Givens decompositions of nonempty diagonal blocks, which occupy
+// Merges the Givens decompositions of diagonal blocks, which occupy
 // consecutive diagonal ranges in input order, into global adjacent-pair layers
 // of the block-diagonal matrix. Global layers alternate parity, starting
 // aligned with the largest block, and each block contributes its next layer to

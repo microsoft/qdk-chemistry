@@ -32,13 +32,7 @@ class MPSSite {
   using TensorVariant = SymmetryBlockedTensorVariant<3>;
   /** @brief Shared immutable site tensor. */
   using TensorPtr = std::shared_ptr<const TensorVariant>;
-  /**
-   * @brief Sector packing orders for the left, physical, and right slots.
-   *
-   * Each order lists that slot's sector labels exactly once. A sector occupies
-   * a contiguous range of basis indices, starting after the extents of all
-   * preceding sectors in the order.
-   */
+  /** @brief Sector packing orders for the left, physical, and right slots. */
   using SectorOrders = std::array<std::vector<SymmetryLabel>, 3>;
   /** @brief First basis index of each sector in the three tensor slots. */
   using SectorOffsets =
@@ -49,8 +43,7 @@ class MPSSite {
   /**
    * @brief Construct a site from blocks and index spaces.
    * @param tensor Rank-3 blocks in the packing convention above.
-   * @param sector_orders Packing order for each of the three tensor slots;
-   * each list must contain all of that slot's sector labels exactly once.
+   * @param sector_orders Packing order for each of the three tensor slots.
    * @param physical_basis One-mode configurations in flattened physical order.
    * Defaults to (0,1) for dimension two or (0,u,d,2) for dimension four.
    * Other dimensions require an explicit basis.
@@ -162,7 +155,7 @@ class MPSContainer : public WavefunctionContainer {
   /** @brief Immutable sites in chain order. */
   const std::vector<SitePtr>& sites() const { return _sites; }
   /**
-   * @brief Validate an open-boundary chain independently of orbital metadata.
+   * @brief Validate the sites.
    * @param sites Nonempty chain of nonnull sites with one scalar type.
    * @throws std::invalid_argument for incompatible adjacent bond spaces or
    * outer bond dimensions other than one.
