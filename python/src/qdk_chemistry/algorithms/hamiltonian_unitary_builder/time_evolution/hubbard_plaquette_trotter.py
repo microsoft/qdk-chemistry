@@ -16,13 +16,158 @@ from qdk_chemistry.algorithms.hamiltonian_unitary_builder.base import TimeEvolut
 from qdk_chemistry.data import FermiHubbardModelHamiltonianDescription, LatticeGeometry
 from qdk_chemistry.data.unitary_representation.base import UnitaryRepresentation
 from qdk_chemistry.data.unitary_representation.containers.hubbard_plaquette import HubbardPlaquetteContainer
+from qdk_chemistry.data.unitary_representation.containers.pauli_product_formula import (
+    ExponentiatedPauliTerm,
+    PauliProductFormulaContainer,
+)
 from qdk_chemistry.utils import Logger
-from qdk_chemistry.utils.qsharp import get_qsharp_context
+from qdk_chemistry.utils.qsharp import QSHARP_UTILS, get_qsharp_context
 
 __all__: list[str] = [
     "HubbardPlaquetteTrotter",
     "HubbardPlaquetteTrotterSettings",
 ]
+
+_Layer = list[ExponentiatedPauliTerm]
+
+# SWAP CZ = -i exp(i pi/4 XX) exp(i pi/4 YY) exp(i pi/4 Z_p) exp(i pi/4 Z_{p+1}), so each factor e^{-i theta P}
+# takes theta = -pi/4.
+_FSWAP_ANGLE = -0.25 * math.pi
+# The magnitude of the half angle in TwoModeFFFT of HubbardPlaquette.qs.
+_BUTTERFLY_ANGLE = 0.125 * math.pi
+
+
+def _adjoint(layers: list[_Layer]) -> list[_Layer]:
+    """Return the inverse of ``layers``: layers and terms reversed, every angle negated."""
+    return [
+        [ExponentiatedPauliTerm(term.pauli_term, -term.angle) for term in reversed(layer)] for layer in reversed(layers)
+    ]
+
+
+def _fswap_layers(swaps: list[int]) -> list[_Layer]:
+    r"""Return the fermionic swaps ``SWAP CZ`` on positions ``(p, p + 1)`` as Pauli exponentials.
+
+    :math:`\mathrm{SWAP}\,\mathrm{CZ} = -i\,e^{i\pi/4 (XX + YY)}\,e^{i\pi/4 (Z_p + Z_{p+1})}`, and its two factors
+    commute. The scalar :math:`-i` is dropped: every routing is followed by its adjoint, whose :math:`+i` cancels
+    it, so the product formula equals the Q# circuit exactly, also under control. Consecutive swaps on disjoint
+    pairs commute, so each run of them shares one ``XX``, one ``YY`` and one ``Z`` layer.
+    """
+    runs: list[list[int]] = []
+    occupied: set[int] = set()
+    for position in swaps:
+        if not runs or {position, position + 1} & occupied:
+            runs.append([])
+            occupied = set()
+        runs[-1].append(position)
+        occupied |= {position, position + 1}
+    layers = []
+    for positions in runs:
+        for axis in "XY":
+            layers.append([ExponentiatedPauliTerm({p: axis, p + 1: axis}, _FSWAP_ANGLE) for p in positions])
+        layers.append([ExponentiatedPauliTerm({q: "Z"}, _FSWAP_ANGLE) for p in positions for q in (p, p + 1)])
+    return layers
+
+
+def _butterfly_layers(num_blocks: int) -> list[_Layer]:
+    """Return ``TwoModeFFFT(4i + 1, 4i)`` and ``TwoModeFFFT(4i + 2, 4i + 3)`` for every block ``i``.
+
+    ``TwoModeFFFT(a, b)`` applies ``exp(i h X_lo Y_hi)`` and then ``exp(-i h Y_lo X_hi)``, with ``h = pi/8`` when
+    ``a < b`` and ``-pi/8`` otherwise. The two factors commute and the butterflies act on disjoint pairs, so every
+    ``XY`` factor shares one layer and every ``YX`` factor the next.
+    """
+    xy, yx = [], []
+    for base in range(0, 4 * num_blocks, 4):
+        for low, half in ((base, -_BUTTERFLY_ANGLE), (base + 2, _BUTTERFLY_ANGLE)):
+            xy.append(ExponentiatedPauliTerm({low: "X", low + 1: "Y"}, -half))
+            yx.append(ExponentiatedPauliTerm({low: "Y", low + 1: "X"}, half))
+    return [xy, yx]
+
+
+def _hopping_layers(kappa: float, blocks: list[list[int]], order: list[int]) -> list[_Layer]:
+    """Mirror ``HoppingLayer``: route ``order`` onto the tiling, then butterflies, phases and the inverse basis change.
+
+    The phases ``exp(i kappa/2 XX) exp(i kappa/2 YY)`` act on the middle pair of every routed plaquette.
+    """
+    if kappa == 0.0 or not blocks:
+        return []
+    target = QSHARP_UTILS.HubbardPlaquette.TilingOrder(blocks, len(order))
+    _, swaps = QSHARP_UTILS.HubbardPlaquette.RoutingSwaps(order, target, True)
+    basis = [*_fswap_layers(swaps), *_butterfly_layers(len(blocks))]
+    pairs = [(4 * index + 1, 4 * index + 2) for index in range(len(blocks))]
+    phases = [[ExponentiatedPauliTerm({a: axis, b: axis}, -0.5 * kappa) for a, b in pairs] for axis in "XY"]
+    return [*basis, *phases, *_adjoint(basis)]
+
+
+def _interaction_layers(angle: float, sites: int) -> list[_Layer]:
+    """Mirror ``InteractionLayer``: ``exp(-i angle Z_s Z_{s+M})`` on every on-site pair, skipped at a zero angle."""
+    if angle == 0.0:
+        return []
+    return [[ExponentiatedPauliTerm({site: "Z", site + sites: "Z"}, angle) for site in range(sites)]]
+
+
+def _plaquette_product_formula(
+    width: int,
+    height: int,
+    interaction_angle: float,
+    hopping_angle: float,
+    phase: float,
+    step_reps: int,
+    scale: float,
+) -> PauliProductFormulaContainer:
+    """Spell ``RepPlaquetteExp`` of HubbardPlaquette.qs out as Pauli exponentials in disjoint layers.
+
+    Every fermionic swap, Fourier butterfly and phase becomes Pauli exponentials, in the same order as the Q# gates.
+    The TEMPORARY legacy resource costs are not reproduced. The steps with a full-angle pink layer form the repeated
+    body; the routing, the step ending in a half-angle pink layer, the other half-angle pink layer and
+    ``exp(-i phase)`` stay outside it.
+
+    Args:
+        width: Number of lattice columns.
+        height: Number of lattice rows.
+        interaction_angle: The ``Z_s Z_{s+M}`` angle of one full interaction layer.
+        hopping_angle: The hopping angle ``kappa`` of one full tiling layer.
+        phase: The total scalar phase, applied as one identity term.
+        step_reps: The number of second-order steps.
+        scale: The evolution time used for eigenvalue-phase conversion.
+
+    Returns:
+        The product formula, with ``layer_offsets`` delimiting its disjoint layers.
+
+    """
+    sites = width * height
+    pink, gold = (QSHARP_UTILS.HubbardPlaquette.PlaquetteSection(width, height, flag) for flag in (True, False))
+    identity = list(range(2 * sites))
+    # As in Q#, a hopping-free model skips the routing into pink order.
+    order = QSHARP_UTILS.HubbardPlaquette.TilingOrder(pink, 2 * sites) if hopping_angle != 0.0 else identity
+    route = _fswap_layers(QSHARP_UTILS.HubbardPlaquette.RoutingSwaps(identity, order, True)[1])
+
+    def step(pink_angle: float) -> list[_Layer]:
+        half_interaction = _interaction_layers(0.5 * interaction_angle, sites)
+        gold_layer = _hopping_layers(hopping_angle, gold, order)
+        return [*half_interaction, *gold_layer, *half_interaction, *_hopping_layers(pink_angle, pink, order)]
+
+    scalar = [[ExponentiatedPauliTerm({}, phase)]] if phase != 0.0 else []
+    prefix = [*scalar, *route, *_hopping_layers(0.5 * hopping_angle, pink, order)]
+    last = step(0.5 * hopping_angle)
+    if step_reps > 1:
+        sections = (prefix, step(hopping_angle), [*last, *_adjoint(route)])
+    else:
+        sections = (prefix, last, _adjoint(route))
+
+    offsets = [0]
+    for layers in sections:
+        for layer in layers:
+            offsets.append(offsets[-1] + len(layer))
+    prefix_terms, step_terms, suffix_terms = ([term for layer in layers for term in layer] for layers in sections)
+    return PauliProductFormulaContainer(
+        step_terms,
+        max(step_reps - 1, 1),
+        2 * sites,
+        scale,
+        prefix_terms=prefix_terms,
+        suffix_terms=suffix_terms,
+        layer_offsets=offsets if len(offsets) > 1 else None,
+    )
 
 
 class HubbardPlaquetteTrotterSettings(TimeEvolutionSettings):
@@ -52,6 +197,15 @@ class HubbardPlaquetteTrotterSettings(TimeEvolutionSettings):
             -1,
             "Electron count for the scalar shift to the estimated energy; -1 leaves it unshifted.",
         )
+        self._set_default(
+            "container_type",
+            "string",
+            "hubbard_plaquette",
+            "Output container: 'hubbard_plaquette' stores the angles for the 'hubbard_plaquette' controlled "
+            "circuit mapper; 'pauli_product_formula' spells every fermionic swap, butterfly and phase out as Pauli "
+            "exponentials for the Pauli-sequence controlled circuit mappers.",
+            ["hubbard_plaquette", "pauli_product_formula"],
+        )
 
 
 class HubbardPlaquetteTrotter(TimeEvolutionBuilder):
@@ -70,6 +224,10 @@ class HubbardPlaquetteTrotter(TimeEvolutionBuilder):
     Setting ``num_electrons`` records that offset so the phase-to-energy conversion reports the described
     model's energy.
 
+    By default the output is a ``HubbardPlaquetteContainer``. Setting ``container_type`` to
+    ``"pauli_product_formula"`` emits the same circuit as a :class:`~qdk_chemistry.data.PauliProductFormulaContainer`
+    instead, for the ``"pauli_sequence"`` and ``"cswap_pauli_sequence"`` controlled circuit mappers.
+
     The plaquette decomposition, its error constant, and the exact four-mode plaquette
     evolution are Campbell's :cite:`Campbell2022`. The factor ordering and the step-count
     rule follow the later compilation of the same algorithm in :cite:`Apel2026`.
@@ -85,6 +243,7 @@ class HubbardPlaquetteTrotter(TimeEvolutionBuilder):
         num_divisions: int = 0,
         power: int = 1,
         power_strategy: str = "repeat",
+        container_type: str = "hubbard_plaquette",
     ):
         """Initialize the builder.
 
@@ -97,6 +256,7 @@ class HubbardPlaquetteTrotter(TimeEvolutionBuilder):
             num_divisions: Number of Trotter steps. Max of this and the auto value is used.
             power: The power to raise the unitary to. Defaults to 1.
             power_strategy: Strategy for ``U^power``: ``"rescale"`` or ``"repeat"``.
+            container_type: Output container, ``"hubbard_plaquette"`` or ``"pauli_product_formula"``.
 
         Raises:
             ValueError: If *order* is anything other than 2.
@@ -113,6 +273,7 @@ class HubbardPlaquetteTrotter(TimeEvolutionBuilder):
         settings.set("order", order)
         settings.set("target_accuracy", target_accuracy)
         settings.set("num_divisions", num_divisions)
+        settings.set("container_type", container_type)
         if num_electrons is not None:
             settings.set("num_electrons", num_electrons)
         self._settings = settings
@@ -269,7 +430,8 @@ class HubbardPlaquetteTrotter(TimeEvolutionBuilder):
             model: The Fermi-Hubbard model on a periodic square lattice.
 
         Returns:
-            UnitaryRepresentation: The segmented plaquette product formula.
+            UnitaryRepresentation: The segmented plaquette product formula, as a ``HubbardPlaquetteContainer`` or,
+            with ``container_type`` set to ``"pauli_product_formula"``, a ``PauliProductFormulaContainer``.
 
         Raises:
             ValueError: If the order is not 2, the lattice is not a periodic square lattice, or
@@ -305,7 +467,21 @@ class HubbardPlaquetteTrotter(TimeEvolutionBuilder):
         time, power_repetitions = self._resolve_power()
         num_divisions = self._step_count(hopping, interaction, width, height, time)
         delta_time = time / num_divisions
+        step_reps = num_divisions * power_repetitions
 
+        if self._settings.get("container_type") == "pauli_product_formula":
+            # A product formula has no classical offset, so the shift becomes a scalar exponential.
+            return UnitaryRepresentation(
+                container=_plaquette_product_formula(
+                    width,
+                    height,
+                    interaction_angle=pair_angle * delta_time,
+                    hopping_angle=2.0 * hopping * delta_time,
+                    phase=shift * delta_time * step_reps,
+                    step_reps=step_reps,
+                    scale=time * power_repetitions,
+                )
+            )
         return UnitaryRepresentation(
             container=HubbardPlaquetteContainer(
                 width=width,
@@ -313,7 +489,7 @@ class HubbardPlaquetteTrotter(TimeEvolutionBuilder):
                 interaction_angle=pair_angle * delta_time,
                 constant_shift=shift * delta_time,
                 hopping_angle=2.0 * hopping * delta_time,
-                step_reps=num_divisions * power_repetitions,
+                step_reps=step_reps,
                 scale=time * power_repetitions,
             )
         )

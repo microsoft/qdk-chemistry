@@ -12,7 +12,7 @@ The :class:`~qdk_chemistry.algorithms.HamiltonianUnitaryBuilder` provides a unif
 
 QDK/Chemistry currently provides two families of implementations for this task: product formulas (Trotter-Suzuki, Zassenhaus, and a plaquette Trotterization specialized to the Fermi-Hubbard model) and block encoding.
 
-The resulting :class:`~qdk_chemistry.data.UnitaryRepresentation` objects wrap a ``PauliProductFormulaContainer`` (Trotter-Suzuki and Zassenhaus), a ``HubbardPlaquetteContainer`` (plaquette Trotterization), or a block-encoding container (``LCUContainer``, ``LCUWalkContainer`` for the LCU quantum walk, or ``SOSSABlockEncodingContainer``).
+The resulting :class:`~qdk_chemistry.data.UnitaryRepresentation` objects wrap a ``PauliProductFormulaContainer`` (Trotter-Suzuki and Zassenhaus), a ``HubbardPlaquetteContainer`` (plaquette Trotterization, by default), or a block-encoding container (``LCUContainer``, ``LCUWalkContainer`` for the LCU quantum walk, or ``SOSSABlockEncodingContainer``).
 
 
 Using the HamiltonianUnitaryBuilder
@@ -224,8 +224,14 @@ The half-angle pink layers of neighbouring steps merge into one full-angle layer
 The modes are likewise routed into pink order once at each end, so every pink plaquette stays local and only the gold layers route.
 Setting ``num_electrons`` records the scalar offset to the described model, with its on-site energy :math:`\epsilon` and interaction :math:`U \sum_i n_{i\uparrow} n_{i\downarrow}`, so that phase estimation reports that model's energy.
 
-The output is a ``HubbardPlaquetteContainer`` that stores the angles and step count rather than individual Pauli terms.
+By default the output is a ``HubbardPlaquetteContainer`` that stores the angles and step count rather than individual Pauli terms.
 It is consumed by the :ref:`"hubbard_plaquette" controlled circuit mapper <hubbard-plaquette-mapper>`, :class:`~qdk_chemistry.algorithms.controlled_circuit_mapper.ControlledHubbardPlaquetteMapper`.
+
+Setting ``container_type`` to ``"pauli_product_formula"`` emits the same circuit as a ``PauliProductFormulaContainer`` instead.
+Every fermionic swap, Fourier butterfly and phase becomes a Pauli exponential, and ``layer_offsets`` groups them into disjoint layers.
+The ``"pauli_sequence"`` and :ref:`"cswap_pauli_sequence" <cswap-pauli-sequence-mapper>` controlled circuit mappers consume it; the evolution conserves particle number, so the controlled-SWAP mapper applies.
+A product formula has no classical offset, so the ``num_electrons`` shift becomes an identity term.
+Phase estimation then has to resolve the shifted energy itself, :math:`|E t| < \pi` for an evolution time :math:`t`.
 
 The number of steps can be set directly (``num_divisions``) or estimated from ``target_accuracy`` with Campbell's error constant for the related IPG ordering :cite:`Campbell2022`.
 
@@ -250,6 +256,9 @@ The number of steps can be set directly (``num_divisions``) or estimated from ``
    * - ``num_divisions``
      - int
      - Explicit number of plaquette Trotter steps. When set to 0 (default), determined from ``target_accuracy``; otherwise the larger of the two is used.
+   * - ``container_type``
+     - str
+     - Output container: ``"hubbard_plaquette"`` (default) or ``"pauli_product_formula"``.
 
 
 Consuming term partitions

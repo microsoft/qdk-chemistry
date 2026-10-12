@@ -6,7 +6,8 @@
 # --------------------------------------------------------------------------------------------
 
 import math
-from collections.abc import Mapping
+from collections.abc import Callable, Mapping
+from typing import Any
 
 import h5py
 import numpy as np
@@ -17,6 +18,7 @@ import scipy.sparse.linalg
 from qdk_chemistry.algorithms import create
 from qdk_chemistry.algorithms.hamiltonian_unitary_builder.time_evolution.hubbard_plaquette_trotter import (
     HubbardPlaquetteTrotter,
+    _plaquette_product_formula,
 )
 from qdk_chemistry.algorithms.state_preparation import identity_state_prep
 from qdk_chemistry.data import (
@@ -68,28 +70,36 @@ def _operation(name: str, args: str, *, controlled: bool = False, namespace: str
     return f"qs => {{ {namespace}.{name}({args.format(qs='qs')}); }}"
 
 
-def _apply(operation: str, state: np.ndarray) -> np.ndarray:
+def _apply(operation: str | Callable[..., Any], state: np.ndarray, *, split_control: bool = False) -> np.ndarray:
     """Return the state ``operation`` produces from a real-amplitude ``state``.
+
+    ``operation`` is either Q# source or a Q# callable of type ``Qubit[] => Unit``. With ``split_control`` it is
+    a ``(Qubit, Qubit[]) => Unit`` callable, such as a controlled circuit mapper's, and the most significant
+    qubit is its control.
 
     This dumps the whole machine rather than using ``dump_operation_on_state``, whose ``DumpRegister``
     rejects states with nonzero amplitudes below its zero cutoff as not separable, which the 16-qubit
     evolutions reach. Every helper qubit is released by then, so the machine is the register.
     """
     context = get_qsharp_context()
-    if not hasattr(context.code, "_PlaquetteTestDumpMachine"):
-        context.eval(
-            "operation _PlaquetteTestDumpMachine(op : (Qubit[] => Unit), numQubits : Int, initial : Double[]) : Unit {"
-            " use qubits = Qubit[numQubits];"
-            " Std.StatePreparation.PreparePureStateD(initial, qubits);"
-            " op(qubits);"
-            " Std.Diagnostics.DumpMachine();"
-            " ResetAll(qubits); }"
-        )
+    if not hasattr(context.code, "_PlaquetteTestDumpControlled"):
+        for name, signature, call in (
+            ("_PlaquetteTestDumpMachine", "Qubit[]", "qubits"),
+            ("_PlaquetteTestDumpControlled", "(Qubit, Qubit[])", "qubits[0], qubits[1...]"),
+        ):
+            context.eval(
+                f"operation {name}(op : ({signature} => Unit), numQubits : Int, initial : Double[]) : Unit {{"
+                " use qubits = Qubit[numQubits];"
+                " Std.StatePreparation.PreparePureStateD(initial, qubits);"
+                f" op({call});"
+                " Std.Diagnostics.DumpMachine();"
+                " ResetAll(qubits); }"
+            )
     num_qubits = round(math.log2(len(state)))
     run = context.run(
-        context.code._PlaquetteTestDumpMachine,
+        context.code._PlaquetteTestDumpControlled if split_control else context.code._PlaquetteTestDumpMachine,
         1,
-        context.eval(operation),
+        context.eval(operation) if isinstance(operation, str) else operation,
         num_qubits,
         state.tolist(),
         save_events=True,
@@ -173,15 +183,33 @@ class TestPhaseEstimationAccuracy:
     """QPE over the plaquette evolution recovers the exact 2x2 ground energy."""
 
     @pytest.mark.parametrize(
-        ("method", "power_strategy", "t", "u", "num_divisions", "energy"),
+        ("method", "power_strategy", "t", "u", "num_divisions", "energy", "mapper"),
         [
-            pytest.param("qdk_iterative", "repeat", 1.0, 0.0, 1, -8.0, id="iterative-hopping-only"),
-            pytest.param("qdk_iterative", "repeat", 0.5, 2.0, 4, -4.8284271247, id="iterative-weak-coupling"),
-            pytest.param("qdk_iterative", "repeat", 1.0, 4.0, 8, -9.6568542495, id="iterative-strong-coupling"),
-            pytest.param("qdk_standard", "rescale", 1.0, 4.0, 8, -9.6568542495, id="standard-rescaled"),
+            pytest.param(
+                "qdk_iterative", "repeat", 1.0, 0.0, 1, -8.0, "hubbard_plaquette", id="iterative-hopping-only"
+            ),
+            pytest.param(
+                "qdk_iterative", "repeat", 0.5, 2.0, 4, -4.8284271247, "hubbard_plaquette", id="iterative-weak-coupling"
+            ),
+            pytest.param(
+                "qdk_iterative",
+                "repeat",
+                1.0,
+                4.0,
+                8,
+                -9.6568542495,
+                "hubbard_plaquette",
+                id="iterative-strong-coupling",
+            ),
+            pytest.param(
+                "qdk_standard", "rescale", 1.0, 4.0, 8, -9.6568542495, "hubbard_plaquette", id="standard-rescaled"
+            ),
+            pytest.param(
+                "qdk_iterative", "repeat", 1.0, 4.0, 2, -9.6568542495, "pauli_sequence", id="iterative-product-formula"
+            ),
         ],
     )
-    def test_recovers_the_ground_energy(self, method, power_strategy, t, u, num_divisions, energy):
+    def test_recovers_the_ground_energy(self, method, power_strategy, t, u, num_divisions, energy, mapper):
         num_bits = 4
         values, vectors = np.linalg.eigh(_reference_hamiltonian(_model(2, t=t, u=u)))
         assert values[0] == pytest.approx(energy, abs=1e-9)
@@ -203,6 +231,7 @@ class TestPhaseEstimationAccuracy:
             num_divisions=num_divisions,
             power_strategy=power_strategy,
             target_accuracy=0.0,
+            container_type="hubbard_plaquette" if mapper == "hubbard_plaquette" else "pauli_product_formula",
         )
         shots = {"shots_per_bit": 15} if method == "qdk_iterative" else {"shots": 3}
         qpe = create(
@@ -214,7 +243,7 @@ class TestPhaseEstimationAccuracy:
                 method,
                 num_bits=num_bits,
                 unitary_builder=unitary_builder,
-                controlled_circuit_mapper=AlgorithmRef("controlled_circuit_mapper", "hubbard_plaquette"),
+                controlled_circuit_mapper=AlgorithmRef("controlled_circuit_mapper", mapper),
             ),
             circuit_executor=AlgorithmRef("circuit_executor", "qdk_full_state_simulator", seed=42),
         )
@@ -340,6 +369,57 @@ class TestPlaquetteCircuit:
         phases[: len(state) - 2 ** (2 * sites)] = 1.0
         expected = phases * _apply(normal, state)
         assert abs(np.vdot(expected, _apply(forced, state))) == pytest.approx(1.0, abs=1e-12)
+
+
+class TestPauliProductFormulaOutput:
+    """The product formula output spells the plaquette circuit out for the Pauli-sequence mappers."""
+
+    @pytest.mark.parametrize(
+        ("width", "interaction_angle", "hopping_angle", "reps"),
+        [(4, 0.3, 0.4, 1), (4, 0.3, 0.4, 3), (4, 0.3, 0.0, 2), (2, 0.0, 0.4, 2)],
+    )
+    def test_matches_the_plaquette_circuit(self, width, interaction_angle, hopping_angle, reps):
+        """Pauli exponentials in place of every fswap, butterfly and phase reproduce ``RepPlaquetteExp`` exactly.
+
+        The builder rejects 4x2, whose routed gold layer is nonempty, so this calls the generator directly.
+        """
+        formula = _plaquette_product_formula(
+            width,
+            2,
+            interaction_angle=interaction_angle,
+            hopping_angle=hopping_angle,
+            phase=0.0,
+            step_reps=reps,
+            scale=1.0,
+        )
+        circuit = create("circuit_mapper", "pauli_sequence").run(UnitaryRepresentation(container=formula))
+        params = f"{_PLAQUETTE}.HubbardPlaquetteParams({width}, 2, {interaction_angle}, {hopping_angle}, {reps}, -1)"
+        state = _random_state(4 * width, seed=13, support=32)
+        expected = _apply(_operation("RepPlaquetteExp", params + ", {qs}"), state)
+        assert np.allclose(_apply(circuit._qsharp_op, state), expected, atol=1e-8)
+
+    @pytest.mark.parametrize("mapper", ["pauli_sequence", "cswap_pauli_sequence"])
+    def test_controlled_mappers_apply_the_shifted_evolution(self, mapper):
+        """Under control the product formula is the plaquette evolution times the electron-count shift phase."""
+        settings = {"order": 2, "time": 0.3, "num_divisions": 2, "target_accuracy": 0.0, "num_electrons": 6}
+        model = _model(2, u=4.0, epsilon=0.7)
+        plaquette = HubbardPlaquetteTrotter(**settings).run(model).get_container()
+        formula = HubbardPlaquetteTrotter(container_type="pauli_product_formula", **settings).run(model)
+        assert formula.get_container().scale == plaquette.scale
+        assert plaquette.constant_shift != 0.0
+
+        params = (
+            f"{_PLAQUETTE}.HubbardPlaquetteParams(2, 2, {plaquette.interaction_angle}, {plaquette.hopping_angle}, "
+            f"{plaquette.step_reps}, -1), {{qs}}"
+        )
+        state = _random_state(9, seed=3)
+        expected = _apply(_operation("RepPlaquetteExp", params, controlled=True), state)
+        expected[256:] *= np.exp(-1j * plaquette.constant_shift * plaquette.step_reps)
+        circuit = create("controlled_circuit_mapper", mapper, control_indices=[0]).run(formula)
+        # Both control branches are populated, so a unit overlap allows only a global phase.
+        assert abs(np.vdot(expected, _apply(circuit._qsharp_op, state, split_control=True))) == pytest.approx(
+            1.0, abs=1e-9
+        )
 
 
 # Logical counts of the benchmark circuit in examples/estimation_hubbard_2d.ipynb.
@@ -562,6 +642,12 @@ class TestContainerAndValidation:
                 SettingTypeMismatch,
                 "num_electrons",
                 id="num-electrons-float",
+            ),
+            pytest.param(
+                lambda: HubbardPlaquetteTrotter(order=2, container_type="qubit_operator"),
+                ValueError,
+                "container_type",
+                id="container-type",
             ),
             pytest.param(
                 lambda: HubbardPlaquetteContainer(**{**_BODY, "width": 2}),
