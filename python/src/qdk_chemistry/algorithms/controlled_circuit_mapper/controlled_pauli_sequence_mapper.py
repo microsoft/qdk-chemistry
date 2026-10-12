@@ -22,8 +22,11 @@ class ControlledPauliSequenceMapperSettings(ControlledCircuitMapperSettings):
 
     Attributes:
         max_hamming_weight_phasing_batch_size: Largest tower of equal-angle rotations in a declared
-            layer phased through a single Hamming-weight register, or ``-1`` for no cap. A cap below
-            8 (e.g. ``1``) turns Hamming-weight phasing off, so every term is its own rotation.
+            layer phased through one Hamming-weight register, or ``-1`` for no cap.
+            A smaller cap needs fewer scratch qubits but more rotations.
+            Only towers of 8 or more terms are phased, since only there are the saved rotations
+            worth the extra Toffolis and scratch qubits.
+            A cap below 8, such as ``1``, therefore turns phasing off.
             Defaults to ``1``, which leaves phasing off until a cap of at least 8 or ``-1`` is set.
 
     """
@@ -35,11 +38,11 @@ class ControlledPauliSequenceMapperSettings(ControlledCircuitMapperSettings):
             "max_hamming_weight_phasing_batch_size",
             "int",
             1,
-            "Largest tower of equal-angle rotations in a declared layer phased through a single "
-            "Hamming-weight register. A shorter batch releases its adder-tree scratch sooner, so the "
-            "peak ancilla count follows the batch rather than the whole tower, at the cost of one "
-            "extra set of place-value rotations per batch. A cap below 8, such as the default 1, turns "
-            "Hamming-weight phasing off, so every term is its own rotation. Set to -1 for no cap.",
+            "Largest tower of equal-angle rotations in a declared layer phased through one "
+            "Hamming-weight register. A smaller cap needs fewer scratch qubits but more rotations. "
+            "Only towers of 8 or more terms are phased, "
+            "since only there are the saved rotations worth the extra Toffolis and scratch qubits. "
+            "A cap below 8, such as the default 1, therefore turns phasing off. Set to -1 for no cap.",
         )
 
 
@@ -82,10 +85,10 @@ class ControlledPauliSequenceMapper(ControlledCircuitMapper):
     formulas without layer metadata retain term-by-term controlled evolution.
 
     Within a declared layer, terms that share a rotation angle form a tower once at least 8 of
-    them agree, the break-even of the adder tree. Each tower is synthesized with Hamming-weight
-    phasing :cite:`Kan2025`: an adder tree writes the Hamming weight of the rotated qubits into a
-    scratch register, and one controlled rotation per place value replaces the per-term
-    rotations. ``max_hamming_weight_phasing_batch_size`` caps the tower phased through one
+    them agree. Each tower is synthesized with Hamming-weight phasing :cite:`Kan2025`: an adder
+    tree writes the Hamming weight of the rotated qubits into a scratch register, and one
+    controlled rotation per place value replaces the per-term rotations.
+    ``max_hamming_weight_phasing_batch_size`` caps the tower phased through one
     register; a cap below 8, such as the default ``1``, turns phasing off.
 
     Notes:
