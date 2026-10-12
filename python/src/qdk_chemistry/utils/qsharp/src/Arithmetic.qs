@@ -6,6 +6,7 @@
 namespace QDKChemistry.Utils.Arithmetic {
 
     import Std.Convert.IntAsBoolArray;
+    import Std.Intrinsic.AND;
 
     /// Applies |x⟩ → |x + c mod 2^n⟩ to the little-endian `target` with the ripple-carry
     /// adder of Sanders et al. (PRX Quantum 1, 020312, 2020), Fig. 18.

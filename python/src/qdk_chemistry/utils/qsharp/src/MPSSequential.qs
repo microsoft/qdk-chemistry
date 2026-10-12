@@ -151,7 +151,9 @@ namespace QDKChemistry.Utils.MPSSequential {
     /// with a bond register `ancilla` allocated here.
     ///
     /// Quantized rotations return `ancilla` to |0⟩ only up to rotation quantization error, so
-    /// it is reset before release in both directions.
+    /// it is reset before release in both directions. The operation and its adjoint are
+    /// therefore inverse only up to that error, which is of the same order as the preparation
+    /// error in `state`.
     operation PrepareMPSOnRegister(
         numStateQubits : Int,
         numAncillaQubits : Int,
