@@ -19,27 +19,38 @@ class ControlledHubbardPlaquetteMapperSettings(ControlledCircuitMapperSettings):
     r"""Settings for :class:`ControlledHubbardPlaquetteMapper`.
 
     Attributes:
+        use_hamming_weight_phasing: Whether to phase each tower of equal-angle rotations through a
+            Hamming-weight register.
+            When ``False``, every term is its own rotation.
+            Defaults to ``True``.
         max_hamming_weight_phasing_batch_size: Largest tower of equal-angle rotations phased
             through one Hamming-weight register, or ``-1`` for no cap.
             A smaller cap needs fewer scratch qubits but more rotations.
-            Only towers of 8 or more terms are phased, since only there are the saved rotations
-            worth the extra Toffolis and scratch qubits.
-            A cap below 8, such as ``1``, therefore turns phasing off.
+            Every batch is phased as given, so use a cap of at least 8: shorter batches save too
+            few rotations to be worth the extra Toffolis and scratch qubits.
+            Ignored when ``use_hamming_weight_phasing`` is ``False``.
             Defaults to ``-1``.
 
     """
 
     def __init__(self):
-        """Initialize the settings, adding the Hamming-weight phasing batch cap."""
+        """Initialize the settings, adding the Hamming-weight phasing switch and batch cap."""
         super().__init__()
+        self._set_default(
+            "use_hamming_weight_phasing",
+            "bool",
+            True,
+            "Whether to phase each tower of equal-angle rotations through a Hamming-weight register. "
+            "When False, every term is its own rotation.",
+        )
         self._set_default(
             "max_hamming_weight_phasing_batch_size",
             "int",
             -1,
             "Largest tower of equal-angle rotations phased through one Hamming-weight register. "
-            "A smaller cap needs fewer scratch qubits but more rotations. Only towers of 8 or more "
-            "terms are phased, since only there are the saved rotations worth the extra Toffolis "
-            "and scratch qubits. A cap below 8, such as 1, therefore turns phasing off. "
+            "A smaller cap needs fewer scratch qubits but more rotations. Every batch is phased as "
+            "given, so use a cap of at least 8: shorter batches save too few rotations to be worth "
+            "the extra Toffolis and scratch qubits. Ignored when use_hamming_weight_phasing is False. "
             "Set to -1 for no cap.",
         )
 
@@ -87,14 +98,15 @@ class ControlledHubbardPlaquetteMapper(ControlledCircuitMapper):
                 f"max_hamming_weight_phasing_batch_size must be -1 or a positive integer. Got {max_batch_size}."
             )
 
-        # Only the lattice shape, the layer angles and the batch cap cross the boundary; the
-        # tilings and spin pairings are derived in Q# from the shape.
+        # Only the lattice shape, the layer angles and the phasing settings cross the boundary;
+        # the tilings and spin pairings are derived in Q# from the shape.
         params = QSHARP_UTILS.HubbardPlaquette.HubbardPlaquetteParams(
             width=container.width,
             height=container.height,
             interactionAngle=container.interaction_angle,
             hoppingAngle=container.hopping_angle,
             repetitions=container.step_reps,
+            useHammingWeightPhasing=bool(self._settings.get("use_hamming_weight_phasing")),
             maxBatchSize=max_batch_size,
         )
         targets = self._get_target_indices(evolution)

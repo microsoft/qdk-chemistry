@@ -124,17 +124,26 @@ class TestHammingWeightPhasing:
     """Batched phase towers apply the same unitary as their separate rotations."""
 
     @pytest.mark.parametrize(
-        ("count", "cap", "controlled"),
-        [(12, -1, False), (16, 8, False), (12, 8, False), (10, 5, False), (12, 8, True)],
+        ("count", "use_hwp", "cap", "controlled"),
+        [
+            (12, True, -1, False),
+            (16, True, 8, False),
+            (12, True, 8, False),
+            (10, True, 5, False),
+            (12, True, 8, True),
+            (2, True, -1, True),
+            (3, True, 1, True),
+            (12, False, -1, True),
+        ],
     )
-    def test_z_tower(self, count, cap, controlled):
-        """exp(-i a sum_j Z_j) under any batch split, with or without control."""
+    def test_z_tower(self, count, use_hwp, cap, controlled):
+        """exp(-i a sum_j Z_j) under any batch split, however short, with or without phasing and control."""
         angle = 3 * np.pi / 32
-        state = _random_state(count + controlled, seed=count + cap, support=24)
+        state = _random_state(count + controlled, seed=count + cap, support=24 if count > 4 else None)
         weights = np.array([(index % 2**count).bit_count() for index in range(len(state))])
         phases = np.exp(-1j * angle * (count - 2 * weights))
         phases[: len(state) - 2**count] = 1.0  # The control, when present, is the most significant qubit.
-        args = f"{angle}, [[PauliZ], size = {count}], Std.Arrays.Chunks(1, {{qs}}), {cap}"
+        args = f"{angle}, [[PauliZ], size = {count}], Std.Arrays.Chunks(1, {{qs}}), {str(use_hwp).lower()}, {cap}"
         actual = _apply(_operation("HammingWeightPhase", args, controlled=controlled, namespace=_HWP), state)
         assert np.allclose(actual, phases * state, atol=1e-10)
 
@@ -146,16 +155,17 @@ class TestHammingWeightPhasing:
         assert QSHARP_UTILS.HammingWeightPhasing.HammingWeightBatchSize(count, cap) == expected
 
     @pytest.mark.parametrize(
-        ("num_pairs", "controlled", "name"),
+        ("num_pairs", "use_hwp", "controlled", "name"),
         [
-            (2, False, "HoppingPhases"),
-            (5, False, "HoppingPhases"),
-            (4, True, "HoppingPhases"),
-            (8, False, "HoppingPhasesWithForcedLegacyCostsForTest"),
+            (2, True, False, "HoppingPhases"),
+            (5, True, False, "HoppingPhases"),
+            (4, True, True, "HoppingPhases"),
+            (4, False, True, "HoppingPhases"),
+            (8, True, False, "HoppingPhasesWithForcedLegacyCostsForTest"),
         ],
     )
-    def test_hopping_tower(self, num_pairs, controlled, name):
-        """exp(i a (XX + YY)) on every pair, below and above the eight-rotation cutoff."""
+    def test_hopping_tower(self, num_pairs, use_hwp, controlled, name):
+        """exp(i a (XX + YY)) on every pair, with and without Hamming-weight phasing."""
         angle = 3 * np.pi / 32
         xx_plus_yy = np.kron([[0, 1], [1, 0]], [[0, 1], [1, 0]]) + np.kron([[0, -1j], [1j, 0]], [[0, -1j], [1j, 0]])
         pair_gate = scipy.linalg.expm(1j * angle * xx_plus_yy)
@@ -165,18 +175,18 @@ class TestHammingWeightPhasing:
         for pair in range(num_pairs):
             target = expected[-1].reshape(4**pair, 4, -1)
             expected[-1] = np.einsum("ij,ajb->aib", pair_gate, target).reshape(-1)
-        args = f"{angle}, Std.Arrays.Chunks(2, {{qs}}), -1"
+        args = f"{angle}, Std.Arrays.Chunks(2, {{qs}}), {str(use_hwp).lower()}, -1"
         actual = _apply(_operation(name, args, controlled=controlled), state)
         assert np.allclose(actual, expected.reshape(-1), atol=1e-10)
 
     @pytest.mark.parametrize("angle", [np.pi / 8, -13 * np.pi / 32])
     def test_interaction_tower(self, angle):
-        """exp(-i a sum_s Z_s Z_{s+M}) over eight sites, which takes the batched path."""
+        """exp(-i a sum_s Z_s Z_{s+M}) over eight sites, phased through a Hamming-weight register."""
         sites = 8
         state = _random_state(2 * sites, seed=5, support=24)
         spins = 1 - 2 * ((np.arange(len(state))[:, None] >> np.arange(2 * sites - 1, -1, -1)) & 1)
         phases = np.exp(-1j * angle * (spins[:, :sites] * spins[:, sites:]).sum(axis=1))
-        actual = _apply(_operation("InteractionLayer", f"{angle}, {sites}, {{qs}}, -1"), state)
+        actual = _apply(_operation("InteractionLayer", f"{angle}, {sites}, {{qs}}, true, -1"), state)
         assert np.allclose(actual, phases * state, atol=1e-10)
 
 
@@ -320,26 +330,28 @@ class TestPlaquetteCircuit:
         for hamiltonian, fraction in layers:
             expected = scipy.sparse.linalg.expm_multiply(-1j * fraction * step * hamiltonian, expected)
         params = (
-            f"{_PLAQUETTE}.HubbardPlaquetteParams({width}, {height}, {0.25 * u * step}, {2 * t * step}, {reps}, -1)"
+            f"{_PLAQUETTE}.HubbardPlaquetteParams({width}, {height}, {0.25 * u * step}, {2 * t * step}, {reps}, "
+            "true, -1)"
         )
         actual = _apply(_operation("RepPlaquetteExp", params + ", {qs}"), state)
         assert np.allclose(actual, expected, atol=1e-8)
 
     def test_hamming_weight_phasing_matches_plain_rotations(self):
-        """At 4x2 every tower reaches the cutoff, and phasing it under control matches plain rotations."""
+        """At 4x2, phasing every tower under control, whole or in short batches, matches plain rotations."""
         state = _random_state(17, seed=11, support=32)
-        hwp, plain = (
+        plain, *phased = (
             _apply(
                 _operation(
                     "RepPlaquetteExp",
-                    f"{_PLAQUETTE}.HubbardPlaquetteParams(4, 2, 0.3, 0.4, 2, {cap}), {{qs}}",
+                    f"{_PLAQUETTE}.HubbardPlaquetteParams(4, 2, 0.3, 0.4, 2, {phasing}), {{qs}}",
                     controlled=True,
                 ),
                 state,
             )
-            for cap in (-1, 1)
+            for phasing in ("false, -1", "true, -1", "true, 3")
         )
-        assert np.allclose(hwp, plain, atol=1e-10)
+        for actual in phased:
+            assert np.allclose(actual, plain, atol=1e-10)
 
     @pytest.mark.parametrize(("t", "u"), [(1.0, 0.0), (0.0, 4.0)])
     def test_single_term_evolution_is_exact(self, t, u):
@@ -348,7 +360,8 @@ class TestPlaquetteCircuit:
         step = HubbardPlaquetteTrotter(order=2, time=time, num_divisions=1, target_accuracy=0.0)
         c = step.run(_model(2, t=t, u=u)).get_container()
         params = (
-            f"{_PLAQUETTE}.HubbardPlaquetteParams(2, 2, {c.interaction_angle}, {c.hopping_angle}, {c.step_reps}, -1)"
+            f"{_PLAQUETTE}.HubbardPlaquetteParams(2, 2, {c.interaction_angle}, {c.hopping_angle}, {c.step_reps}, "
+            "true, -1)"
         )
         propagator = scipy.linalg.expm(-1j * time * _reference_hamiltonian(_model(2, t=t, u=u)))
         state = _random_state(8, seed=7)
@@ -359,7 +372,7 @@ class TestPlaquetteCircuit:
     def test_forced_legacy_evolution_adds_the_particle_number_phase(self, controlled):
         """The legacy cost path is the normal one times exp(-i (U N / 2 - U M / 4) t)."""
         time, u, sites = 0.05, 4.0, 4
-        params = f"{_PLAQUETTE}.HubbardPlaquetteParams(2, 2, {0.25 * u * time}, {2.0 * time}, 1, -1), {{qs}}"
+        params = f"{_PLAQUETTE}.HubbardPlaquetteParams(2, 2, {0.25 * u * time}, {2.0 * time}, 1, true, -1), {{qs}}"
         normal, forced = (
             _operation(name, params, controlled=controlled)
             for name in ("RepPlaquetteExp", "RepPlaquetteExpWithForcedLegacyCostsForTest")
@@ -394,7 +407,9 @@ class TestPauliProductFormulaOutput:
             scale=1.0,
         )
         circuit = create("circuit_mapper", "pauli_sequence").run(UnitaryRepresentation(container=formula))
-        params = f"{_PLAQUETTE}.HubbardPlaquetteParams({width}, 2, {interaction_angle}, {hopping_angle}, {reps}, -1)"
+        params = (
+            f"{_PLAQUETTE}.HubbardPlaquetteParams({width}, 2, {interaction_angle}, {hopping_angle}, {reps}, true, -1)"
+        )
         state = _random_state(4 * width, seed=13, support=32)
         expected = _apply(_operation("RepPlaquetteExp", params + ", {qs}"), state)
         assert np.allclose(_apply(circuit._qsharp_op, state), expected, atol=1e-8)
@@ -411,7 +426,7 @@ class TestPauliProductFormulaOutput:
 
         params = (
             f"{_PLAQUETTE}.HubbardPlaquetteParams(2, 2, {plaquette.interaction_angle}, {plaquette.hopping_angle}, "
-            f"{plaquette.step_reps}, -1), {{qs}}"
+            f"{plaquette.step_reps}, true, -1), {{qs}}"
         )
         state = _random_state(9, seed=3)
         expected = _apply(_operation("RepPlaquetteExp", params, controlled=True), state)
@@ -427,12 +442,12 @@ class TestPauliProductFormulaOutput:
 # TEMPORARY (legacy parity): they include the legacy circuit's extra work, so L=2 still has Toffolis.
 _COUNT_KEYS = ("numQubits", "rotationCount", "rotationDepth", "tCount", "cczCount", "ccixCount", "measurementCount")
 _BENCHMARK_COUNTS = {
-    2: (25, 2224986, 1483458, 697995, 610582, 0, 610592),
+    2: (25, 2661176, 2094100, 697995, 959506, 0, 959516),
     4: (73, 729063, 551326, 758427, 710540, 0, 710550),
 }
 
 
-def _benchmark_counts(size: int, max_batch_size: int = -1) -> dict[str, int]:
+def _benchmark_counts(size: int, max_batch_size: int = -1, *, use_hwp: bool = True) -> dict[str, int]:
     """Return the logical counts of the notebook's 10-bit sine-window QPE on an LxL lattice."""
     num_bits, energy_budget = 10, 0.0051 * size * size
     qpe_budget = 2.0 / 3.0 * energy_budget  # The optimal split of Campbell arXiv:2012.09238v4, App. F.
@@ -451,7 +466,10 @@ def _benchmark_counts(size: int, max_batch_size: int = -1) -> dict[str, int]:
             target_accuracy=energy_budget - qpe_budget,
         ),
         controlled_circuit_mapper=AlgorithmRef(
-            "controlled_circuit_mapper", "hubbard_plaquette", max_hamming_weight_phasing_batch_size=max_batch_size
+            "controlled_circuit_mapper",
+            "hubbard_plaquette",
+            use_hamming_weight_phasing=use_hwp,
+            max_hamming_weight_phasing_batch_size=max_batch_size,
         ),
     )
     model = _model(size, t=1.0, u=8.0)
@@ -479,7 +497,7 @@ class TestBenchmarkResources:
         _assert_counts_match_the_pins(_benchmark_counts(size), size)
 
     def test_batch_cap_trades_qubits_for_rotations(self):
-        """A cap of 8 keeps the adder tree on fewer qubits; a cap of 1 turns phasing off."""
+        """A cap of 8 keeps the adder tree on fewer qubits, and turning phasing off drops it."""
         uncapped = _benchmark_counts(4)
         # TEMPORARY (legacy parity): the legacy tower spans all 32 modes, so 32 is the cap that splits nothing.
         assert _benchmark_counts(4, max_batch_size=32) == uncapped
@@ -489,15 +507,22 @@ class TestBenchmarkResources:
         assert capped["rotationCount"] > uncapped["rotationCount"]
         assert capped["cczCount"] > 0
 
-        below = _benchmark_counts(4, max_batch_size=1)
-        assert below["cczCount"] + below["ccixCount"] == 0
-        assert below["numQubits"] < uncapped["numQubits"]
+        plain = _benchmark_counts(4, use_hwp=False)
+        assert plain["cczCount"] + plain["ccixCount"] == 0
+        assert plain["numQubits"] < uncapped["numQubits"]
+        assert plain["rotationCount"] > capped["rotationCount"]
 
-    @pytest.mark.parametrize(("cap", "uses_adders"), [(7, False), (8, True)])
-    def test_adder_trees_start_at_eight_terms(self, cap, uses_adders):
-        """Batches of 7 equal-angle rotations stay plain rotations, and batches of 8 take an adder tree."""
+    @pytest.mark.parametrize(("use_hwp", "cap", "uses_adders"), [(False, -1, False), (True, 2, True)])
+    def test_short_batches_are_phased(self, use_hwp, cap, uses_adders):
+        """Phasing takes an adder tree even for batches of 2, and turning it off leaves plain rotations."""
         params = QSHARP_UTILS.HubbardPlaquette.HubbardPlaquetteParams(
-            width=4, height=4, interactionAngle=0.1, hoppingAngle=0.2, repetitions=1, maxBatchSize=cap
+            width=4,
+            height=4,
+            interactionAngle=0.1,
+            hoppingAngle=0.2,
+            repetitions=1,
+            useHammingWeightPhasing=use_hwp,
+            maxBatchSize=cap,
         )
         counts = get_qsharp_context().logical_counts(
             QSHARP_UTILS.HubbardPlaquette.MakeRepControlledPlaquetteExpCircuit, params, 0, list(range(1, 33))
@@ -509,7 +534,13 @@ class TestBenchmarkResources:
         context = create_qsharp_context(TargetProfile.Base)
         plaquette = context.code.QDKChemistry.Utils.HubbardPlaquette
         params = plaquette.HubbardPlaquetteParams(
-            width=4, height=4, interactionAngle=0.1, hoppingAngle=0.2, repetitions=1, maxBatchSize=-1
+            width=4,
+            height=4,
+            interactionAngle=0.1,
+            hoppingAngle=0.2,
+            repetitions=1,
+            useHammingWeightPhasing=True,
+            maxBatchSize=-1,
         )
         qir = str(context.compile(plaquette.MakeRepControlledPlaquetteExpCircuit, params, 0, list(range(1, 33))))
         # The adder's Toffolis are the only source of T gates in this circuit.
