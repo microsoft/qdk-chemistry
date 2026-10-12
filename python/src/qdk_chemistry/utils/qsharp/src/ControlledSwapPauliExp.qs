@@ -17,17 +17,18 @@ namespace QDKChemistry.Utils.ControlledSwapPauliExp {
 
     /// Applies the producer's disjoint layers without changing their boundaries.
     ///
-    /// Within a layer, terms that share a rotation angle form towers once at least 8 of them
-    /// agree, and each tower is phased through a Hamming-weight register :cite:`Kan2025` instead
-    /// of one rotation per term. The other terms keep their order and their own rotations.
+    /// With `useHammingWeightPhasing`, the terms of a layer that share a rotation angle form a
+    /// tower, however few they are, and each tower is phased through Hamming-weight registers
+    /// :cite:`Kan2025` instead of one rotation per term. Zero-angle terms keep their own rotations.
     internal operation PauliLayers(
         params : RepPauliExpParams,
         layerOffsets : Int[],
+        useHammingWeightPhasing : Bool,
         maxBatchSize : Int,
         systems : Qubit[]
     ) : Unit is Adj + Ctl {
         for layer in 0..Length(layerOffsets) - 2 {
-            let (plainTerms, towers) = LayerRotationTowers(params, layerOffsets[layer], layerOffsets[layer + 1] - 1, maxBatchSize);
+            let (plainTerms, towers) = LayerRotationTowers(params, layerOffsets[layer], layerOffsets[layer + 1] - 1, useHammingWeightPhasing);
             for term in plainTerms {
                 Exp(params.pauliOps[term], -params.pauliCoefficients[term], Subarray(params.pauliIndices[term], systems));
             }
@@ -36,6 +37,7 @@ namespace QDKChemistry.Utils.ControlledSwapPauliExp {
                     params.pauliCoefficients[tower[0]],
                     Mapped(term -> params.pauliOps[term], tower),
                     Mapped(term -> Subarray(params.pauliIndices[term], systems), tower),
+                    useHammingWeightPhasing,
                     maxBatchSize
                 );
             }
@@ -43,32 +45,33 @@ namespace QDKChemistry.Utils.ControlledSwapPauliExp {
     }
 
     /// `RepPauliExp` over declared disjoint layers, phasing equal-angle towers through
-    /// Hamming-weight registers; empty `layerOffsets` falls back to `RepPauliExp`.
+    /// Hamming-weight registers; without phasing or declared layers it is `RepPauliExp`.
     internal operation RepPauliLayersExp(
         params : RepPauliExpParams,
         layerOffsets : Int[],
+        useHammingWeightPhasing : Bool,
         maxBatchSize : Int,
         systems : Qubit[]
     ) : Unit is Adj + Ctl {
-        if Length(layerOffsets) == 0 {
+        if not useHammingWeightPhasing or Length(layerOffsets) == 0 {
             RepPauliExp(params, systems);
         } else {
             let first = IndexOf(offset -> offset == params.numPrefixTerms, layerOffsets);
             let last = IndexOf(offset -> offset == Length(params.pauliCoefficients) - params.numSuffixTerms, layerOffsets);
             let stepOffsets = layerOffsets[first..last];
-            PauliLayers(params, layerOffsets[0..first], maxBatchSize, systems);
+            PauliLayers(params, layerOffsets[0..first], useHammingWeightPhasing, maxBatchSize, systems);
             if IsResourceEstimating() {
                 within {
                     RepeatEstimates(params.repetitions);
                 } apply {
-                    PauliLayers(params, stepOffsets, maxBatchSize, systems);
+                    PauliLayers(params, stepOffsets, useHammingWeightPhasing, maxBatchSize, systems);
                 }
             } else {
                 for _ in 1..params.repetitions {
-                    PauliLayers(params, stepOffsets, maxBatchSize, systems);
+                    PauliLayers(params, stepOffsets, useHammingWeightPhasing, maxBatchSize, systems);
                 }
             }
-            PauliLayers(params, layerOffsets[last...], maxBatchSize, systems);
+            PauliLayers(params, layerOffsets[last...], useHammingWeightPhasing, maxBatchSize, systems);
         }
     }
 
@@ -85,14 +88,17 @@ namespace QDKChemistry.Utils.ControlledSwapPauliExp {
     /// # Parameters
     /// - `evolution`: Sparse evolution, including repetition and one-time boundary terms.
     /// - `layerOffsets`: Declared disjoint-layer boundaries; empty means term-by-term evolution.
+    /// - `useHammingWeightPhasing`: Whether to phase each declared layer's equal-angle rotations
+    ///   through Hamming-weight registers.
     /// - `maxBatchSize`: Largest tower of equal-angle rotations in a declared layer phased through
-    ///   one Hamming-weight register, or -1 for no cap. A cap below 8 turns phasing off.
+    ///   one Hamming-weight register, or -1 for no cap.
     /// - `vacuumPhase`: The phase `phi_0` of the full evolution on the vacuum.
     /// - `control`: The control qubit.
     /// - `systems`: System qubits indexed by the sparse evolution.
     operation RepControlledSwapPauliExp(
         evolution : RepPauliExpParams,
         layerOffsets : Int[],
+        useHammingWeightPhasing : Bool,
         maxBatchSize : Int,
         vacuumPhase : Double,
         control : Qubit,
@@ -104,7 +110,7 @@ namespace QDKChemistry.Utils.ControlledSwapPauliExp {
                 Controlled SWAP([control], (systems[i], vacuum[i]));
             }
         } apply {
-            RepPauliLayersExp(evolution, layerOffsets, maxBatchSize, vacuum);
+            RepPauliLayersExp(evolution, layerOffsets, useHammingWeightPhasing, maxBatchSize, vacuum);
         }
         // Skipped when negligible so a vacuum-annihilating evolution costs no extra rotation.
         if AbsD(vacuumPhase) > 1e-12 {
@@ -117,6 +123,7 @@ namespace QDKChemistry.Utils.ControlledSwapPauliExp {
     struct RepControlledSwapPauliExpParams {
         evolution : RepPauliExpParams,
         layerOffsets : Int[],
+        useHammingWeightPhasing : Bool,
         maxBatchSize : Int,
         vacuumPhase : Double,
         control : Int,
@@ -127,6 +134,7 @@ namespace QDKChemistry.Utils.ControlledSwapPauliExp {
     operation MakeRepControlledSwapPauliExpCircuit(
         evolution : RepPauliExpParams,
         layerOffsets : Int[],
+        useHammingWeightPhasing : Bool,
         maxBatchSize : Int,
         vacuumPhase : Double,
         control : Int,
@@ -145,6 +153,7 @@ namespace QDKChemistry.Utils.ControlledSwapPauliExp {
         RepControlledSwapPauliExp(
             evolution,
             layerOffsets,
+            useHammingWeightPhasing,
             maxBatchSize,
             vacuumPhase,
             qs[control],
@@ -157,6 +166,7 @@ namespace QDKChemistry.Utils.ControlledSwapPauliExp {
         RepControlledSwapPauliExp(
             params.evolution,
             params.layerOffsets,
+            params.useHammingWeightPhasing,
             params.maxBatchSize,
             params.vacuumPhase,
             _,

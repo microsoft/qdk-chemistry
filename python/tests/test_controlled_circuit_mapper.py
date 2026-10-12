@@ -393,9 +393,14 @@ def _trotter(hamiltonian, *, steps: int = 1) -> UnitaryRepresentation:
     return builder.run(hamiltonian)
 
 
-def _map_with_cap(unitary: UnitaryRepresentation, cap: int) -> Circuit:
-    """Map ``unitary`` with control 0 and the given Hamming-weight phasing batch cap."""
-    return create("controlled_circuit_mapper", "pauli_sequence", max_hamming_weight_phasing_batch_size=cap).run(unitary)
+def _map(unitary: UnitaryRepresentation, *, phasing: bool, cap: int = -1) -> Circuit:
+    """Map ``unitary`` with control 0, Hamming-weight phasing on or off, and the given batch cap."""
+    return create(
+        "controlled_circuit_mapper",
+        "pauli_sequence",
+        use_hamming_weight_phasing=phasing,
+        max_hamming_weight_phasing_batch_size=cap,
+    ).run(unitary)
 
 
 def _logical_counts(circuit: Circuit) -> dict[str, int]:
@@ -423,32 +428,38 @@ def _z_layers(angles: list[list[float]]) -> UnitaryRepresentation:
 class TestHammingWeightPhasing:
     """Equal-angle towers of a declared layer are phased through Hamming-weight registers."""
 
-    def test_default_setting_and_payload(self) -> None:
-        """The cap defaults to 1, leaving phasing off, and reaches the Q# factory and operation."""
+    def test_default_settings_and_payload(self) -> None:
+        """Phasing defaults to off with no cap, and both settings reach the Q# factory and operation."""
         mapper = create("controlled_circuit_mapper", "pauli_sequence")
         assert isinstance(mapper.settings(), ControlledPauliSequenceMapperSettings)
-        assert mapper.settings().get("max_hamming_weight_phasing_batch_size") == 1
+        assert mapper.settings().get("use_hamming_weight_phasing") is False
+        assert mapper.settings().get("max_hamming_weight_phasing_batch_size") == -1
         tower = _z_layers([[0.1] * 8])
         default = mapper.run(tower)
         assert default._qsharp_factory is not None
-        assert default._qsharp_factory.parameter["maxBatchSize"] == 1
+        assert default._qsharp_factory.parameter["useHammingWeightPhasing"] is False
+        assert default._qsharp_factory.parameter["maxBatchSize"] == -1
         assert _toffolis(_logical_counts(default)) == 0
-        circuit = _map_with_cap(tower, 4)
+        # The cap is ignored while phasing is off.
+        assert _logical_counts(_map(tower, phasing=False, cap=4)) == _logical_counts(default)
+        circuit = _map(tower, phasing=True, cap=4)
         assert circuit._qsharp_factory is not None
         assert list(circuit._qsharp_factory.parameter) == [
             "params",
             "layerOffsets",
+            "useHammingWeightPhasing",
             "maxBatchSize",
             "control",
             "systems",
         ]
+        assert circuit._qsharp_factory.parameter["useHammingWeightPhasing"] is True
         assert circuit._qsharp_factory.parameter["maxBatchSize"] == 4
 
     @pytest.mark.parametrize("cap", [0, -2])
     def test_invalid_cap_raises(self, cap: int) -> None:
         """A cap must be -1 or positive."""
         with pytest.raises(ValueError, match="max_hamming_weight_phasing_batch_size must be -1 or a positive"):
-            _map_with_cap(_z_layers([[0.1] * 8]), cap)
+            _map(_z_layers([[0.1] * 8]), phasing=True, cap=cap)
 
     @pytest.mark.parametrize(
         ("name", "hamiltonian", "support"),
@@ -467,13 +478,13 @@ class TestHammingWeightPhasing:
             ),
         ],
     )
-    @pytest.mark.parametrize("cap", [-1, 1])
-    def test_spin_chain_matches_the_controlled_trotter_product(self, name, hamiltonian, support, cap) -> None:
+    @pytest.mark.parametrize("phasing", [True, False])
+    def test_spin_chain_matches_the_controlled_trotter_product(self, name, hamiltonian, support, phasing) -> None:
         """Phased and plain towers both apply exactly the controlled product of their rotations."""
         unitary = _trotter(hamiltonian, steps=2)
         container = unitary.get_container()
         assert any(b - a >= 8 for a, b in itertools.pairwise(container.layer_offsets)), name
-        circuit = _map_with_cap(unitary, cap)
+        circuit = _map(unitary, phasing=phasing)
         state = random_sparse_state(container.num_qubits + 1, support, seed=len(name))
         assert_states_match_up_to_global_phase(
             apply_controlled_operation(circuit._qsharp_op, state),
@@ -481,21 +492,21 @@ class TestHammingWeightPhasing:
             _STATE_TOLERANCE,
         )
         counts = _logical_counts(circuit)
-        assert (_toffolis(counts) > 0) == (cap == -1)
+        assert (_toffolis(counts) > 0) == phasing
 
-    def test_phasing_starts_at_eight_equal_angles(self) -> None:
-        """Open Ising chains of 15 and 17 sites have bond layers of 7 and 8 equal-angle terms."""
-        for sites, phased in ((15, False), (17, True)):
-            unitary = _trotter(create_ising_hamiltonian(LatticeGraph.chain(sites), j=1.0, h=0.0))
-            container = unitary.get_container()
-            assert {b - a for a, b in itertools.pairwise(container.layer_offsets)} == {sites // 2}
-            uncapped, plain = (_logical_counts(_map_with_cap(unitary, cap)) for cap in (-1, 1))
-            assert _toffolis(plain) == 0
-            if phased:
-                assert _toffolis(uncapped) > 0
-                assert uncapped["rotationCount"] < plain["rotationCount"]
-            else:
-                assert uncapped == plain
+    def test_short_towers_are_phased_as_given(self) -> None:
+        """An open 5-site Ising chain has bond layers of only 2 equal-angle terms, which are still phased."""
+        unitary = _trotter(create_ising_hamiltonian(LatticeGraph.chain(5), j=1.0, h=0.0))
+        container = unitary.get_container()
+        assert {b - a for a, b in itertools.pairwise(container.layer_offsets)} == {2}
+        state = random_sparse_state(container.num_qubits + 1, 16, seed=5)
+        expected = controlled_product_formula_state(container, state)
+        for phasing in (True, False):
+            circuit = _map(unitary, phasing=phasing)
+            assert_states_match_up_to_global_phase(
+                apply_controlled_operation(circuit._qsharp_op, state), expected, _STATE_TOLERANCE
+            )
+            assert (_toffolis(_logical_counts(circuit)) > 0) == phasing
 
     def test_only_exactly_equal_angles_share_a_tower(self) -> None:
         """Interleaved angles are grouped by value, and nearly equal angles are not grouped at all."""
@@ -503,18 +514,19 @@ class TestHammingWeightPhasing:
         interleaved = _z_layers([[tower, other] * 7 + [tower]])
         separated = _z_layers([[tower] * 8, [other] * 7])
         assert (
-            _logical_counts(_map_with_cap(interleaved, -1))["rotationCount"]
-            == (_logical_counts(_map_with_cap(separated, -1))["rotationCount"])
+            _logical_counts(_map(interleaved, phasing=True))["rotationCount"]
+            == (_logical_counts(_map(separated, phasing=True))["rotationCount"])
         )
-        assert _toffolis(_logical_counts(_map_with_cap(interleaved, -1))) > 0
+        assert _toffolis(_logical_counts(_map(interleaved, phasing=True))) > 0
+        # Every nearly equal angle is its own one-term tower, which needs no adder.
         nearly_equal = _z_layers([[tower + 1e-9 * k for k in range(8)]])
-        assert _toffolis(_logical_counts(_map_with_cap(nearly_equal, -1))) == 0
+        assert _toffolis(_logical_counts(_map(nearly_equal, phasing=True))) == 0
 
-    @pytest.mark.parametrize("cap", [-1, 12, 8, 7, 1])
-    def test_batch_cap_splits_a_tower_exactly(self, cap: int) -> None:
-        """A 16-term tower phased whole, as 12 + 4, as 8 + 8, or not at all applies the same unitary."""
+    @pytest.mark.parametrize(("phasing", "cap"), [(True, -1), (True, 12), (True, 8), (True, 7), (True, 1), (False, -1)])
+    def test_batch_cap_splits_a_tower_exactly(self, phasing: bool, cap: int) -> None:
+        """A 16-term tower phased whole, in batches of any size, or not at all applies the same unitary."""
         unitary = _z_layers([[0.37] * 16])
-        circuit = _map_with_cap(unitary, cap)
+        circuit = _map(unitary, phasing=phasing, cap=cap)
         container = unitary.get_container()
         state = random_sparse_state(container.num_qubits + 1, 16, seed=cap + 2)
         assert_states_match_up_to_global_phase(
@@ -523,10 +535,11 @@ class TestHammingWeightPhasing:
             _STATE_TOLERANCE,
         )
         counts = _logical_counts(circuit)
-        assert (_toffolis(counts) > 0) == (cap == -1 or cap >= 8)
+        # Every batch is phased as given; only one-term batches need no adder.
+        assert (_toffolis(counts) > 0) == (phasing and cap != 1)
 
     def test_smaller_batches_use_fewer_qubits(self) -> None:
         """Splitting a tower releases each batch's adder scratch before the next allocates."""
         unitary = _z_layers([[0.37] * 32])
-        whole, halves = (_logical_counts(_map_with_cap(unitary, cap)) for cap in (-1, 16))
+        whole, halves = (_logical_counts(_map(unitary, phasing=True, cap=cap)) for cap in (-1, 16))
         assert halves["numQubits"] < whole["numQubits"]

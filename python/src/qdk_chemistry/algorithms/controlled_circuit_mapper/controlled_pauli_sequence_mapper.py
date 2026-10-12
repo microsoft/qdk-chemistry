@@ -21,28 +21,42 @@ class ControlledPauliSequenceMapperSettings(ControlledCircuitMapperSettings):
     r"""Settings for :class:`ControlledPauliSequenceMapper`.
 
     Attributes:
+        use_hamming_weight_phasing: Whether to phase each tower of equal-angle rotations in a declared
+            layer through a Hamming-weight register.
+            When ``False``, every term is its own rotation.
+            Every group of equal angles is phased, however short, so turn this on only when layers
+            hold many equal angles.
+            Defaults to ``False``.
         max_hamming_weight_phasing_batch_size: Largest tower of equal-angle rotations in a declared
             layer phased through one Hamming-weight register, or ``-1`` for no cap.
             A smaller cap needs fewer scratch qubits but more rotations.
-            Only towers of 8 or more terms are phased, since only there are the saved rotations
-            worth the extra Toffolis and scratch qubits.
-            A cap below 8, such as ``1``, therefore turns phasing off.
-            Defaults to ``1``, which leaves phasing off until a cap of at least 8 or ``-1`` is set.
+            Every batch is phased as given, so use a cap of at least 8: shorter batches save too
+            few rotations to be worth the extra Toffolis and scratch qubits.
+            Ignored when ``use_hamming_weight_phasing`` is ``False``.
+            Defaults to ``-1``.
 
     """
 
     def __init__(self):
-        """Initialize the settings, adding the Hamming-weight phasing batch cap."""
+        """Initialize the settings, adding the Hamming-weight phasing switch and batch cap."""
         super().__init__()
+        self._set_default(
+            "use_hamming_weight_phasing",
+            "bool",
+            False,
+            "Whether to phase each tower of equal-angle rotations in a declared layer through a "
+            "Hamming-weight register. When False, every term is its own rotation. Every group of "
+            "equal angles is phased, however short, so turn this on only when layers hold many equal angles.",
+        )
         self._set_default(
             "max_hamming_weight_phasing_batch_size",
             "int",
-            1,
+            -1,
             "Largest tower of equal-angle rotations in a declared layer phased through one "
             "Hamming-weight register. A smaller cap needs fewer scratch qubits but more rotations. "
-            "Only towers of 8 or more terms are phased, "
-            "since only there are the saved rotations worth the extra Toffolis and scratch qubits. "
-            "A cap below 8, such as the default 1, therefore turns phasing off. Set to -1 for no cap.",
+            "Every batch is phased as given, so use a cap of at least 8: shorter batches save too "
+            "few rotations to be worth the extra Toffolis and scratch qubits. Ignored when "
+            "use_hamming_weight_phasing is False. Set to -1 for no cap.",
         )
 
 
@@ -84,12 +98,12 @@ class ControlledPauliSequenceMapper(ControlledCircuitMapper):
     rotation rounds per layer. The declared boundaries are used without regrouping;
     formulas without layer metadata retain term-by-term controlled evolution.
 
-    Within a declared layer, terms that share a rotation angle form a tower once at least 8 of
-    them agree. Each tower is synthesized with Hamming-weight phasing :cite:`Kan2025`: an adder
-    tree writes the Hamming weight of the rotated qubits into a scratch register, and one
-    controlled rotation per place value replaces the per-term rotations.
-    ``max_hamming_weight_phasing_batch_size`` caps the tower phased through one
-    register; a cap below 8, such as the default ``1``, turns phasing off.
+    With ``use_hamming_weight_phasing``, terms of a declared layer that share a rotation angle form
+    a tower, however few they are. Each tower is synthesized with Hamming-weight phasing
+    :cite:`Kan2025`: an adder tree writes the Hamming weight of the rotated qubits into a scratch
+    register, and one controlled rotation per place value replaces the per-term rotations.
+    ``max_hamming_weight_phasing_batch_size`` caps the tower phased through one register.
+    Phasing is off by default.
 
     Notes:
         * Currently supports only single-control-qubit scenarios.
@@ -139,6 +153,7 @@ class ControlledPauliSequenceMapper(ControlledCircuitMapper):
         if len(control_indices) != 1:
             raise ValueError("PauliSequenceMapper currently only supports a single control qubit.")
 
+        use_hamming_weight_phasing = bool(self._settings.get("use_hamming_weight_phasing"))
         max_batch_size = _max_hamming_weight_phasing_batch_size(self._settings)
         target_indices = self._get_target_indices(unitary)
 
@@ -150,6 +165,7 @@ class ControlledPauliSequenceMapper(ControlledCircuitMapper):
             parameter={
                 "params": evo_params,
                 "layerOffsets": layer_offsets,
+                "useHammingWeightPhasing": use_hamming_weight_phasing,
                 "maxBatchSize": max_batch_size,
                 "control": control_indices[0],
                 "systems": target_indices,
@@ -157,7 +173,7 @@ class ControlledPauliSequenceMapper(ControlledCircuitMapper):
         )
 
         controlled_unitary_op = QSHARP_UTILS.ControlledPauliExp.MakeRepControlledPauliExpOp(
-            evo_params, layer_offsets, max_batch_size
+            evo_params, layer_offsets, use_hamming_weight_phasing, max_batch_size
         )
 
         return Circuit(qsharp_factory=qsharp_factory, qsharp_op=controlled_unitary_op)

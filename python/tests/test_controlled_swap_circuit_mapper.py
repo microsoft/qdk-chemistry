@@ -698,54 +698,77 @@ def _diagonal_spin_chain(field: float) -> UnitaryRepresentation:
     return trotter.run(hamiltonian)
 
 
-def _cswap_with_cap(unitary: UnitaryRepresentation, cap: int) -> Circuit:
-    """Map ``unitary`` with control 0 and the given Hamming-weight phasing batch cap."""
+def _cswap(unitary: UnitaryRepresentation, *, phasing: bool, cap: int = -1) -> Circuit:
+    """Map ``unitary`` with control 0, Hamming-weight phasing on or off, and the given batch cap."""
     return registry.create(
-        "controlled_circuit_mapper", "cswap_pauli_sequence", max_hamming_weight_phasing_batch_size=cap
+        "controlled_circuit_mapper",
+        "cswap_pauli_sequence",
+        use_hamming_weight_phasing=phasing,
+        max_hamming_weight_phasing_batch_size=cap,
     ).run(unitary)
+
+
+def _counts(circuit: Circuit) -> dict[str, int]:
+    """Return the logical resource counts of ``circuit``."""
+    application = circuit.get_qre_application()
+    return dict(get_qsharp_context().logical_counts(application.entry_expr, *application.args))
 
 
 class TestHammingWeightPhasing:
     """Equal-angle towers of a declared layer are phased through Hamming-weight registers on the vacuum."""
 
-    def test_default_setting_and_payload(self) -> None:
-        """The cap defaults to 1, leaving phasing off, and travels with the declared layers in the payload."""
+    def test_default_settings_and_payload(self) -> None:
+        """Phasing defaults to off with no cap, and both settings travel with the declared layers."""
         mapper = registry.create("controlled_circuit_mapper", "cswap_pauli_sequence")
-        assert mapper.settings().get("max_hamming_weight_phasing_batch_size") == 1
+        assert mapper.settings().get("use_hamming_weight_phasing") is False
+        assert mapper.settings().get("max_hamming_weight_phasing_batch_size") == -1
         unitary = _diagonal_spin_chain(0.0)
         default = mapper.run(unitary)._qsharp_factory
         assert default is not None
-        assert default.parameter["maxBatchSize"] == 1
-        factory = _cswap_with_cap(unitary, 8)._qsharp_factory
+        assert default.parameter["useHammingWeightPhasing"] is False
+        assert default.parameter["maxBatchSize"] == -1
+        factory = _cswap(unitary, phasing=True, cap=8)._qsharp_factory
         assert factory is not None
         payload = factory.parameter
-        assert list(payload) == ["evolution", "layerOffsets", "maxBatchSize", "vacuumPhase", "control", "systems"]
+        assert list(payload) == [
+            "evolution",
+            "layerOffsets",
+            "useHammingWeightPhasing",
+            "maxBatchSize",
+            "vacuumPhase",
+            "control",
+            "systems",
+        ]
         assert payload["layerOffsets"] == list(unitary.get_container().layer_offsets)
+        assert payload["useHammingWeightPhasing"] is True
         assert payload["maxBatchSize"] == 8
 
     @pytest.mark.parametrize("cap", [0, -2])
     def test_invalid_cap_raises(self, cap: int) -> None:
         """A cap must be -1 or positive."""
         with pytest.raises(ValueError, match="max_hamming_weight_phasing_batch_size must be -1 or a positive"):
-            _cswap_with_cap(_diagonal_spin_chain(0.0), cap)
+            _cswap(_diagonal_spin_chain(0.0), phasing=True, cap=cap)
 
-    @pytest.mark.parametrize(("field", "cap"), [(0.0, -1), (0.4, -1), (0.4, 12), (0.4, 1)])
-    def test_diagonal_spin_chain_matches_the_controlled_trotter_product(self, field: float, cap: int) -> None:
+    @pytest.mark.parametrize(
+        ("field", "phasing", "cap"),
+        [(0.0, True, -1), (0.4, True, -1), (0.4, True, 12), (0.4, True, 1), (0.4, False, -1)],
+    )
+    def test_diagonal_spin_chain_matches_the_controlled_trotter_product(
+        self, field: float, phasing: bool, cap: int
+    ) -> None:
         """Phased, split and plain towers all give the controlled Trotter product up to a global phase."""
         unitary = _diagonal_spin_chain(field)
         container = unitary.get_container()
-        circuit = _cswap_with_cap(unitary, cap)
+        circuit = _cswap(unitary, phasing=phasing, cap=cap)
         state = random_sparse_state(container.num_qubits + 1, 16, seed=cap + 2)
         actual = apply_controlled_operation(circuit._qsharp_op, state)
         assert_states_match_up_to_global_phase(actual, controlled_product_formula_state(container, state), 1e-10)
 
-    def test_phasing_starts_at_eight_equal_angles_and_saves_rotations(self) -> None:
-        """Towers of 8 ZZ terms are phased, cutting rotations; a cap below 8 restores the plain circuit."""
+    def test_phasing_saves_rotations(self) -> None:
+        """Towers of 8 ZZ terms are phased with adder Toffolis and fewer rotations; off restores the plain circuit."""
         unitary = _diagonal_spin_chain(0.0)
-        uncapped, plain = (_cswap_with_cap(unitary, cap) for cap in (-1, 1))
-        application = uncapped.get_qre_application()
-        phased = get_qsharp_context().logical_counts(application.entry_expr, *application.args)
-        application = plain.get_qre_application()
-        unphased = get_qsharp_context().logical_counts(application.entry_expr, *application.args)
-        assert phased["cczCount"] + phased["ccixCount"] > unphased["cczCount"] + unphased["ccixCount"]
-        assert phased["rotationCount"] < unphased["rotationCount"]
+        phased, plain = (_counts(_cswap(unitary, phasing=phasing)) for phasing in (True, False))
+        assert phased["cczCount"] + phased["ccixCount"] > plain["cczCount"] + plain["ccixCount"]
+        assert phased["rotationCount"] < plain["rotationCount"]
+        # The cap is ignored while phasing is off.
+        assert _counts(_cswap(unitary, phasing=False, cap=8)) == plain

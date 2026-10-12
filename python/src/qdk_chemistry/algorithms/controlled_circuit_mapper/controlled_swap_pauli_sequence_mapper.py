@@ -99,13 +99,19 @@ class ControlledSwapPauliSequenceMapperSettings(ControlledPauliSequenceMapperSet
     """Settings for the :class:`ControlledSwapPauliSequenceMapper`.
 
     Attributes:
+        use_hamming_weight_phasing: Whether to phase each tower of equal-angle rotations in a declared
+            layer through a Hamming-weight register.
+            When ``False``, every term is its own rotation.
+            Every group of equal angles is phased, however short, so turn this on only when layers
+            hold many equal angles.
+            Defaults to ``False``.
         max_hamming_weight_phasing_batch_size: Largest tower of equal-angle rotations in a declared
             layer phased through one Hamming-weight register, or ``-1`` for no cap.
             A smaller cap needs fewer scratch qubits but more rotations.
-            Only towers of 8 or more terms are phased, since only there are the saved rotations
-            worth the extra Toffolis and scratch qubits.
-            A cap below 8, such as ``1``, therefore turns phasing off.
-            Defaults to ``1`` (phasing off).
+            Every batch is phased as given, so use a cap of at least 8: shorter batches save too
+            few rotations to be worth the extra Toffolis and scratch qubits.
+            Ignored when ``use_hamming_weight_phasing`` is ``False``.
+            Defaults to ``-1``.
         vacuum_preservation_tolerance: Absolute tolerance on the amplitude leaked out of the vacuum,
             aggregated over every flipped-qubit set, all body repetitions, and both endpoints.
 
@@ -159,11 +165,11 @@ class ControlledSwapPauliSequenceMapper(ControlledCircuitMapper):
     say ``XX, Z0, YY, I`` for :math:`H = \tfrac12(XX + YY) + \tfrac12(I - Z_0)`, leaks half the
     vacuum amplitude.
 
-    **Hamming-weight phasing.** When the formula declares disjoint layers, terms of a layer that
-    share a rotation angle form a tower once at least 8 of them agree, and each tower is
-    synthesized with Hamming-weight phasing :cite:`Kan2025` on the vacuum register instead of one
-    rotation per term. ``max_hamming_weight_phasing_batch_size`` caps the tower phased through one
-    register; a cap below 8, such as the default ``1``, turns phasing off.
+    **Hamming-weight phasing.** With ``use_hamming_weight_phasing`` and declared disjoint layers,
+    terms of a layer that share a rotation angle form a tower, however few they are, and each
+    tower is synthesized with Hamming-weight phasing :cite:`Kan2025` on the vacuum register instead
+    of one rotation per term. ``max_hamming_weight_phasing_batch_size`` caps the tower phased
+    through one register. Phasing is off by default.
 
     Notes:
         * Applies to particle-conserving Hamiltonians.
@@ -217,6 +223,7 @@ class ControlledSwapPauliSequenceMapper(ControlledCircuitMapper):
         if len(control_indices) != 1:
             raise ValueError("ControlledSwapPauliSequenceMapper currently only supports a single control qubit.")
 
+        use_hamming_weight_phasing = bool(self._settings.get("use_hamming_weight_phasing"))
         max_batch_size = _max_hamming_weight_phasing_batch_size(self._settings)
         target_indices = self._get_target_indices(unitary)
 
@@ -225,6 +232,7 @@ class ControlledSwapPauliSequenceMapper(ControlledCircuitMapper):
         controlled_evo_params = QSHARP_UTILS.ControlledSwapPauliExp.RepControlledSwapPauliExpParams(
             evolution=QSHARP_UTILS.PauliExp.RepPauliExpParams(**_pauli_evolution_parameters(unitary_container)),
             layerOffsets=list(unitary_container.layer_offsets or ()),
+            useHammingWeightPhasing=use_hamming_weight_phasing,
             maxBatchSize=max_batch_size,
             vacuumPhase=vacuum_phase,
             control=control_indices[0],
