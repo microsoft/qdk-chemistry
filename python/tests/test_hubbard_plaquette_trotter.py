@@ -734,3 +734,14 @@ class TestContainerAndValidation:
     def test_rejects_unsupported_inputs(self, build, error, match):
         with pytest.raises(error, match=match):
             build()
+
+    def test_batch_cap_is_ignored_when_phasing_is_off(self):
+        """With phasing off the cap is never read, so a cap that would otherwise be rejected is accepted."""
+        circuit = create(
+            "controlled_circuit_mapper",
+            "hubbard_plaquette",
+            control_indices=[0],
+            use_hamming_weight_phasing=False,
+            max_hamming_weight_phasing_batch_size=0,
+        ).run(UnitaryRepresentation(container=HubbardPlaquetteContainer(**_BODY)))
+        assert not circuit._qsharp_factory.parameter["params"].useHammingWeightPhasing

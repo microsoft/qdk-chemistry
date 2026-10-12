@@ -82,7 +82,8 @@ class ControlledHubbardPlaquetteMapper(ControlledCircuitMapper):
 
         Raises:
             ValueError: If the unitary container type is not supported, if more than one control qubit is
-                requested, or if ``max_hamming_weight_phasing_batch_size`` is neither -1 nor positive.
+                requested, or if Hamming-weight phasing is on and ``max_hamming_weight_phasing_batch_size``
+                is neither -1 nor positive.
 
         """
         container = evolution.get_container()
@@ -93,7 +94,8 @@ class ControlledHubbardPlaquetteMapper(ControlledCircuitMapper):
             raise ValueError("The plaquette mapper currently only supports a single control qubit.")
 
         max_batch_size = int(self._settings.get("max_hamming_weight_phasing_batch_size"))
-        if max_batch_size != -1 and max_batch_size < 1:
+        use_hamming_weight_phasing = bool(self._settings.get("use_hamming_weight_phasing"))
+        if use_hamming_weight_phasing and max_batch_size != -1 and max_batch_size < 1:
             raise ValueError(
                 f"max_hamming_weight_phasing_batch_size must be -1 or a positive integer. Got {max_batch_size}."
             )
@@ -106,7 +108,7 @@ class ControlledHubbardPlaquetteMapper(ControlledCircuitMapper):
             interactionAngle=container.interaction_angle,
             hoppingAngle=container.hopping_angle,
             repetitions=container.step_reps,
-            useHammingWeightPhasing=bool(self._settings.get("use_hamming_weight_phasing")),
+            useHammingWeightPhasing=use_hamming_weight_phasing,
             maxBatchSize=max_batch_size,
         )
         targets = self._get_target_indices(evolution)
