@@ -91,9 +91,20 @@ def _finite(angle: float) -> float:
     return angle
 
 
-def _read_only_copies(terms: Sequence[ExponentiatedPauliTerm]) -> tuple[ExponentiatedPauliTerm, ...]:
-    """Copy terms with read-only Pauli maps, so validated group and layer offsets stay true."""
-    return tuple(ExponentiatedPauliTerm(MappingProxyType(dict(t.pauli_term)), t.angle) for t in terms)
+def _read_only_copies(
+    terms: Sequence[ExponentiatedPauliTerm], copies: dict[int, tuple[Mapping[int, str], Mapping[int, str]]]
+) -> tuple[ExponentiatedPauliTerm, ...]:
+    """Copy terms with read-only Pauli maps, so validated group and layer offsets stay true.
+
+    Terms sharing a source map share one copy. ``copies`` keeps each source alive, so its ``id`` cannot be reused.
+    """
+
+    def copy(source: Mapping[int, str]) -> Mapping[int, str]:
+        if id(source) not in copies:
+            copies[id(source)] = (source, MappingProxyType(dict(source)))
+        return copies[id(source)][1]
+
+    return tuple(ExponentiatedPauliTerm(copy(t.pauli_term), t.angle) for t in terms)
 
 
 def _slice_layer_offsets(offsets: Sequence[int], start: int, stop: int) -> tuple[int, ...]:
@@ -214,9 +225,10 @@ class PauliProductFormulaContainer(UnitaryContainer):
         if step_reps <= 0:
             raise ValueError(f"step_reps must be a positive integer, got {step_reps}.")
 
-        self.step_terms = _read_only_copies(step_terms)
-        self.prefix_terms = _read_only_copies(prefix_terms)
-        self.suffix_terms = _read_only_copies(suffix_terms)
+        copies: dict[int, tuple[Mapping[int, str], Mapping[int, str]]] = {}
+        self.step_terms = _read_only_copies(step_terms, copies)
+        self.prefix_terms = _read_only_copies(prefix_terms, copies)
+        self.suffix_terms = _read_only_copies(suffix_terms, copies)
         self.group_offsets = None if group_offsets is None else tuple(group_offsets)
         if self.group_offsets is not None:
             _validate_groups(self.step_terms, self.group_offsets)

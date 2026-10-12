@@ -320,7 +320,7 @@ class Trotter(TimeEvolutionBuilder):
             if abs(coefficient) > atol
         }
         groups: list[list[tuple[int, ...]]] = (
-            self._partition_indices(partition) if partition is not None else [[(i,)] for i in range(len(coefficients))]
+            self._partition_indices(partition, maps) if partition is not None else [[(i,)] for i in maps]
         )
         if not maps:
             Logger.warn("No coefficients above the tolerance; returning empty term list.")

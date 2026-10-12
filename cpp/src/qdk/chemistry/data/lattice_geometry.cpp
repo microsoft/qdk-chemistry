@@ -21,15 +21,14 @@
 #include "json_serialization.hpp"
 
 namespace qdk::chemistry::data {
-namespace {
 
-bool same_distance(double lhs, double rhs, double tolerance) {
+static bool same_distance(double lhs, double rhs, double tolerance) {
   return std::abs(lhs - rhs) <=
          tolerance * std::max(std::abs(lhs), std::abs(rhs));
 }
 
-Eigen::RowVector2d canonical_axis(const Eigen::RowVector2d& displacement,
-                                  double distance, double tolerance) {
+static Eigen::RowVector2d canonical_axis(const Eigen::RowVector2d& displacement,
+                                         double distance, double tolerance) {
   Eigen::RowVector2d axis = displacement / distance;
   if (axis.x() < -tolerance ||
       (std::abs(axis.x()) <= tolerance && axis.y() < 0.0)) {
@@ -38,8 +37,9 @@ Eigen::RowVector2d canonical_axis(const Eigen::RowVector2d& displacement,
   return axis;
 }
 
-void validate_dimensions(const std::string& name, std::uint64_t nx,
-                         std::uint64_t ny, bool periodic_x, bool periodic_y) {
+static void validate_dimensions(const std::string& name, std::uint64_t nx,
+                                std::uint64_t ny, bool periodic_x,
+                                bool periodic_y) {
   if (nx == 0 || ny == 0) {
     throw std::invalid_argument(name + ": nx and ny must be > 0.");
   }
@@ -50,8 +50,6 @@ void validate_dimensions(const std::string& name, std::uint64_t nx,
     throw std::invalid_argument(name + ": periodic_y requires ny > 1.");
   }
 }
-
-}  // namespace
 
 LatticeGeometry::LatticeGeometry(Eigen::MatrixXd positions,
                                  std::optional<Eigen::MatrixXd> periods,

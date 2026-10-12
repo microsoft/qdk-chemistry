@@ -26,7 +26,9 @@ The table below summarizes which [optional extras](https://github.com/microsoft/
 | `qpe_stretched_n2.ipynb` | `pip install 'qdk-chemistry[jupyter,qiskit-extras,qre]'` |
 | `state_prep_energy.ipynb` | `pip install 'qdk-chemistry[jupyter,qiskit-extras]'` |
 | `time_evolve_and_measure.ipynb` | `pip install 'qdk-chemistry[jupyter]'` |
-| `estimation_ising_2d.ipynb` | `pip install 'qdk-chemistry[jupyter,qre]'` |
+| `resource_estimation/estimation_ising_2d.ipynb` | `pip install 'qdk-chemistry[jupyter,qre]'` |
+| `resource_estimation/estimation_spin_liquids.ipynb` | `pip install 'qdk-chemistry[jupyter,qre]'` |
+| `resource_estimation/estimation_magnets.ipynb` | `pip install 'qdk-chemistry[jupyter,qre]'` |
 | `extended_hubbard.ipynb` | `pip install 'qdk-chemistry[jupyter,plugins,qre]'` |
 | `factory_list.ipynb` | `pip install 'qdk-chemistry[jupyter,plugins]'` |
 | `interoperability/pennylane/` | `pip install pennylane` |
@@ -70,7 +72,9 @@ Download or clone the full `examples/` directory structure to run the examples.
 - `qpe_stretched_n2.ipynb`: Jupyter notebook demonstrating multi-reference quantum chemistry state preparation and iterative quantum phase estimation
 - `state_prep_energy.ipynb`: Jupyter notebook demonstrating quantum state preparation and energy calculation using quantum simulators.
 - `time_evolve_and_measure.ipynb`: Jupyter notebook simulating the time-dependent Hamiltonian and measuring an observable's expectation value.
-- `estimation_ising_2d.ipynb`: Jupyter notebook demonstrating quantum resource estimation for simulating a 2D Ising model Hamiltonian.
+- `resource_estimation/estimation_ising_2d.ipynb`: Jupyter notebook demonstrating quantum resource estimation for simulating a 2D Ising model Hamiltonian.
+- `resource_estimation/estimation_spin_liquids.ipynb`: Jupyter notebook demonstrating quantum resource estimation for simulating an extended Kitaev honeycomb model.
+- `resource_estimation/estimation_magnets.ipynb`: Jupyter notebook demonstrating quantum resource estimation for quantum phase estimation of a J1–J2 Heisenberg model.
 - `extended_hubbard.ipynb`: Jupyter notebook modeling cyclobutadiene with the Extended Hubbard model and estimating its energy with quantum phase estimation.
 
 ## Companion datasets and assets

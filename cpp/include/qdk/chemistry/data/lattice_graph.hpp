@@ -32,7 +32,8 @@ using EdgeColoring = std::map<std::pair<std::uint64_t, std::uint64_t>, int>;
 struct EdgeLabel {
   /// One-based neighbor shell, at most 2^53 so that HDF5 stores it exactly.
   std::uint64_t shell;
-  std::optional<BondFlavorId> flavor;
+  /// Opaque semantic flavor ID, if any, at most 2^53 like the shell.
+  std::optional<std::uint64_t> flavor;
   bool operator==(const EdgeLabel&) const = default;
 };
 
@@ -43,7 +44,7 @@ using EdgeLabels = std::map<std::pair<std::uint64_t, std::uint64_t>, EdgeLabel>;
 struct BondFlavorDefinition {
   std::uint64_t shell;
   Eigen::RowVectorXd axis;
-  BondFlavorId flavor;
+  std::uint64_t flavor;
 };
 
 // ---- Free coloring functions ------------------------------------------------
@@ -138,7 +139,8 @@ class LatticeGraph : public DataClass {
    *                    by (i, j) with i < j whichever direction stores it, or
    *                    empty for an unlabelled graph.
    * @throws std::invalid_argument If nonempty edge_labels do not label exactly
-   *         the stored pairs with shells from 1 to 2^53.
+   *         the stored pairs with shells from 1 to 2^53 and flavors at most
+   *         2^53.
    */
   LatticeGraph(const std::map<std::pair<std::uint64_t, std::uint64_t>, double>&
                    edge_weights,
