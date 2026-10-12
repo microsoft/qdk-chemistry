@@ -227,11 +227,8 @@ Setting ``num_electrons`` records the scalar offset to the described model, with
 By default the output is a ``HubbardPlaquetteContainer`` that stores the angles and step count rather than individual Pauli terms.
 It is consumed by the :ref:`"hubbard_plaquette" controlled circuit mapper <hubbard-plaquette-mapper>`, :class:`~qdk_chemistry.algorithms.controlled_circuit_mapper.ControlledHubbardPlaquetteMapper`.
 
-Setting ``container_type`` to ``"pauli_product_formula"`` emits the same circuit as a ``PauliProductFormulaContainer`` instead.
-Every fermionic swap, Fourier butterfly and phase becomes a Pauli exponential, and ``layer_offsets`` groups them into disjoint layers.
-The ``"pauli_sequence"`` and :ref:`"cswap_pauli_sequence" <cswap-pauli-sequence-mapper>` controlled circuit mappers consume it; the evolution conserves particle number, so the controlled-SWAP mapper applies.
-A product formula has no classical offset, so the ``num_electrons`` shift becomes an identity term.
-Phase estimation then has to resolve the shifted energy itself, :math:`|E t| < \pi` for an evolution time :math:`t`.
+Setting ``container_type`` to ``"pauli_product_formula"`` instead emits every fermionic swap, Fourier butterfly and phase as a Pauli exponential, for the ``"pauli_sequence"`` and :ref:`"cswap_pauli_sequence" <cswap-pauli-sequence-mapper>` mappers.
+The ``num_electrons`` shift then becomes an identity term, so the phase-estimation window has to cover the shifted energy.
 
 The number of steps can be set directly (``num_divisions``) or estimated from ``target_accuracy`` with Campbell's error constant for the related IPG ordering :cite:`Campbell2022`.
 

@@ -30,27 +30,18 @@ __all__: list[str] = [
 
 _Layer = list[ExponentiatedPauliTerm]
 
-# SWAP CZ = -i exp(i pi/4 XX) exp(i pi/4 YY) exp(i pi/4 Z_p) exp(i pi/4 Z_{p+1}), so each factor e^{-i theta P}
-# takes theta = -pi/4.
-_FSWAP_ANGLE = -0.25 * math.pi
-# The magnitude of the half angle in TwoModeFFFT of HubbardPlaquette.qs.
-_BUTTERFLY_ANGLE = 0.125 * math.pi
-
 
 def _adjoint(layers: list[_Layer]) -> list[_Layer]:
-    """Return the inverse of ``layers``: layers and terms reversed, every angle negated."""
+    """Invert ``layers``: reverse the layers and their terms and negate every angle."""
     return [
         [ExponentiatedPauliTerm(term.pauli_term, -term.angle) for term in reversed(layer)] for layer in reversed(layers)
     ]
 
 
 def _fswap_layers(swaps: list[int]) -> list[_Layer]:
-    r"""Return the fermionic swaps ``SWAP CZ`` on positions ``(p, p + 1)`` as Pauli exponentials.
+    r"""Spell each fermionic swap on ``(p, p + 1)`` out as :math:`e^{i\pi/4 (XX + YY)} e^{i\pi/4 (Z_p + Z_{p+1})}`.
 
-    :math:`\mathrm{SWAP}\,\mathrm{CZ} = -i\,e^{i\pi/4 (XX + YY)}\,e^{i\pi/4 (Z_p + Z_{p+1})}`, and its two factors
-    commute. The scalar :math:`-i` is dropped: every routing is followed by its adjoint, whose :math:`+i` cancels
-    it, so the product formula equals the Q# circuit exactly, also under control. Consecutive swaps on disjoint
-    pairs commute, so each run of them shares one ``XX``, one ``YY`` and one ``Z`` layer.
+    That is ``SWAP CZ`` up to :math:`-i`, which the adjoint routing cancels. Runs of disjoint swaps share layers.
     """
     runs: list[list[int]] = []
     occupied: set[int] = set()
@@ -60,49 +51,27 @@ def _fswap_layers(swaps: list[int]) -> list[_Layer]:
             occupied = set()
         runs[-1].append(position)
         occupied |= {position, position + 1}
+    angle = -0.25 * math.pi
     layers = []
     for positions in runs:
-        for axis in "XY":
-            layers.append([ExponentiatedPauliTerm({p: axis, p + 1: axis}, _FSWAP_ANGLE) for p in positions])
-        layers.append([ExponentiatedPauliTerm({q: "Z"}, _FSWAP_ANGLE) for p in positions for q in (p, p + 1)])
+        layers += [[ExponentiatedPauliTerm({p: axis, p + 1: axis}, angle) for p in positions] for axis in "XY"]
+        layers.append([ExponentiatedPauliTerm({q: "Z"}, angle) for p in positions for q in (p, p + 1)])
     return layers
 
 
-def _butterfly_layers(num_blocks: int) -> list[_Layer]:
-    """Return ``TwoModeFFFT(4i + 1, 4i)`` and ``TwoModeFFFT(4i + 2, 4i + 3)`` for every block ``i``.
-
-    ``TwoModeFFFT(a, b)`` applies ``exp(i h X_lo Y_hi)`` and then ``exp(-i h Y_lo X_hi)``, with ``h = pi/8`` when
-    ``a < b`` and ``-pi/8`` otherwise. The two factors commute and the butterflies act on disjoint pairs, so every
-    ``XY`` factor shares one layer and every ``YX`` factor the next.
-    """
-    xy, yx = [], []
-    for base in range(0, 4 * num_blocks, 4):
-        for low, half in ((base, -_BUTTERFLY_ANGLE), (base + 2, _BUTTERFLY_ANGLE)):
-            xy.append(ExponentiatedPauliTerm({low: "X", low + 1: "Y"}, -half))
-            yx.append(ExponentiatedPauliTerm({low: "Y", low + 1: "X"}, half))
-    return [xy, yx]
-
-
 def _hopping_layers(kappa: float, blocks: list[list[int]], order: list[int]) -> list[_Layer]:
-    """Mirror ``HoppingLayer``: route ``order`` onto the tiling, then butterflies, phases and the inverse basis change.
-
-    The phases ``exp(i kappa/2 XX) exp(i kappa/2 YY)`` act on the middle pair of every routed plaquette.
-    """
+    """Mirror ``HoppingLayer``: route onto the tiling, apply the butterflies and phases, then undo the basis change."""
     if kappa == 0.0 or not blocks:
         return []
     target = QSHARP_UTILS.HubbardPlaquette.TilingOrder(blocks, len(order))
-    _, swaps = QSHARP_UTILS.HubbardPlaquette.RoutingSwaps(order, target, True)
-    basis = [*_fswap_layers(swaps), *_butterfly_layers(len(blocks))]
-    pairs = [(4 * index + 1, 4 * index + 2) for index in range(len(blocks))]
-    phases = [[ExponentiatedPauliTerm({a: axis, b: axis}, -0.5 * kappa) for a, b in pairs] for axis in "XY"]
+    basis = _fswap_layers(QSHARP_UTILS.HubbardPlaquette.RoutingSwaps(order, target, True)[1])
+    # TwoModeFFFT(4i + 1, 4i) and TwoModeFFFT(4i + 2, 4i + 3) are exp(i h X_lo Y_hi) exp(-i h Y_lo X_hi), h = -+pi/8.
+    halves = {low: (0.125 if low % 4 else -0.125) * math.pi for low in range(0, 4 * len(blocks), 2)}
+    basis.append([ExponentiatedPauliTerm({low: "X", low + 1: "Y"}, -half) for low, half in halves.items()])
+    basis.append([ExponentiatedPauliTerm({low: "Y", low + 1: "X"}, half) for low, half in halves.items()])
+    middles = [(4 * index + 1, 4 * index + 2) for index in range(len(blocks))]
+    phases = [[ExponentiatedPauliTerm({a: axis, b: axis}, -0.5 * kappa) for a, b in middles] for axis in "XY"]
     return [*basis, *phases, *_adjoint(basis)]
-
-
-def _interaction_layers(angle: float, sites: int) -> list[_Layer]:
-    """Mirror ``InteractionLayer``: ``exp(-i angle Z_s Z_{s+M})`` on every on-site pair, skipped at a zero angle."""
-    if angle == 0.0:
-        return []
-    return [[ExponentiatedPauliTerm({site: "Z", site + sites: "Z"}, angle) for site in range(sites)]]
 
 
 def _plaquette_product_formula(
@@ -116,10 +85,7 @@ def _plaquette_product_formula(
 ) -> PauliProductFormulaContainer:
     """Spell ``RepPlaquetteExp`` of HubbardPlaquette.qs out as Pauli exponentials in disjoint layers.
 
-    Every fermionic swap, Fourier butterfly and phase becomes Pauli exponentials, in the same order as the Q# gates.
-    The TEMPORARY legacy resource costs are not reproduced. The steps with a full-angle pink layer form the repeated
-    body; the routing, the step ending in a half-angle pink layer, the other half-angle pink layer and
-    ``exp(-i phase)`` stay outside it.
+    The TEMPORARY legacy resource costs are not reproduced. The steps with a full-angle pink layer are repeated.
 
     Args:
         width: Number of lattice columns.
@@ -140,19 +106,21 @@ def _plaquette_product_formula(
     # As in Q#, a hopping-free model skips the routing into pink order.
     order = QSHARP_UTILS.HubbardPlaquette.TilingOrder(pink, 2 * sites) if hopping_angle != 0.0 else identity
     route = _fswap_layers(QSHARP_UTILS.HubbardPlaquette.RoutingSwaps(identity, order, True)[1])
-
-    def step(pink_angle: float) -> list[_Layer]:
-        half_interaction = _interaction_layers(0.5 * interaction_angle, sites)
-        gold_layer = _hopping_layers(hopping_angle, gold, order)
-        return [*half_interaction, *gold_layer, *half_interaction, *_hopping_layers(pink_angle, pink, order)]
+    half_interaction = (
+        [[ExponentiatedPauliTerm({s: "Z", s + sites: "Z"}, 0.5 * interaction_angle) for s in range(sites)]]
+        if interaction_angle != 0.0
+        else []
+    )
+    middle = [*half_interaction, *_hopping_layers(hopping_angle, gold, order), *half_interaction]
+    half_pink = _hopping_layers(0.5 * hopping_angle, pink, order)
 
     scalar = [[ExponentiatedPauliTerm({}, phase)]] if phase != 0.0 else []
-    prefix = [*scalar, *route, *_hopping_layers(0.5 * hopping_angle, pink, order)]
-    last = step(0.5 * hopping_angle)
+    prefix = [*scalar, *route, *half_pink]
+    last, unroute = [*middle, *half_pink], _adjoint(route)
     if step_reps > 1:
-        sections = (prefix, step(hopping_angle), [*last, *_adjoint(route)])
+        sections = (prefix, [*middle, *_hopping_layers(hopping_angle, pink, order)], [*last, *unroute])
     else:
-        sections = (prefix, last, _adjoint(route))
+        sections = (prefix, last, unroute)
 
     offsets = [0]
     for layers in sections:
@@ -201,9 +169,7 @@ class HubbardPlaquetteTrotterSettings(TimeEvolutionSettings):
             "container_type",
             "string",
             "hubbard_plaquette",
-            "Output container: 'hubbard_plaquette' stores the angles for the 'hubbard_plaquette' controlled "
-            "circuit mapper; 'pauli_product_formula' spells every fermionic swap, butterfly and phase out as Pauli "
-            "exponentials for the Pauli-sequence controlled circuit mappers.",
+            "Output container: 'hubbard_plaquette', or 'pauli_product_formula' for the Pauli-sequence mappers.",
             ["hubbard_plaquette", "pauli_product_formula"],
         )
 
@@ -224,9 +190,8 @@ class HubbardPlaquetteTrotter(TimeEvolutionBuilder):
     Setting ``num_electrons`` records that offset so the phase-to-energy conversion reports the described
     model's energy.
 
-    By default the output is a ``HubbardPlaquetteContainer``. Setting ``container_type`` to
-    ``"pauli_product_formula"`` emits the same circuit as a :class:`~qdk_chemistry.data.PauliProductFormulaContainer`
-    instead, for the ``"pauli_sequence"`` and ``"cswap_pauli_sequence"`` controlled circuit mappers.
+    Setting ``container_type`` to ``"pauli_product_formula"`` emits a
+    :class:`~qdk_chemistry.data.PauliProductFormulaContainer` for the Pauli-sequence mappers instead.
 
     The plaquette decomposition, its error constant, and the exact four-mode plaquette
     evolution are Campbell's :cite:`Campbell2022`. The factor ordering and the step-count
