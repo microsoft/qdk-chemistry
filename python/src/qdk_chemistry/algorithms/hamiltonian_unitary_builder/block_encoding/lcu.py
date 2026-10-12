@@ -101,10 +101,6 @@ class LCUBuilder(HamiltonianUnitaryBuilder):
         self._settings.set("power", power)
         self._settings.set("quantum_walk", quantum_walk)
 
-    def _input_type(self) -> type[QubitOperator]:
-        """Return :class:`~qdk_chemistry.data.QubitOperator`, the input LCU block-encodes."""
-        return QubitOperator
-
     def _run_impl(self, qubit_hamiltonian: QubitOperator) -> UnitaryRepresentation:
         """Construct the unitary representation using LCU block encoding.
 
@@ -119,6 +115,10 @@ class LCUBuilder(HamiltonianUnitaryBuilder):
             UnitaryRepresentation: The unitary representation wrapping the built LCUContainer.
 
         """
+        if not isinstance(qubit_hamiltonian, QubitOperator):
+            raise TypeError(
+                f"The {self.name()!r} builder takes a QubitOperator, got {type(qubit_hamiltonian).__name__}."
+            )
         power: int = self._settings.get("power")
         quantum_walk: bool = self._settings.get("quantum_walk")
 

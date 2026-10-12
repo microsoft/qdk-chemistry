@@ -215,10 +215,6 @@ class QDrift(TimeEvolutionBuilder):
         self._settings.set("merge_duplicate_terms", merge_duplicate_terms)
         self._settings.set("commutation_type", commutation_type)
 
-    def _input_type(self) -> type[QubitOperator]:
-        """Return :class:`~qdk_chemistry.data.QubitOperator`, the input qDRIFT evolves."""
-        return QubitOperator
-
     def _run_impl(self, qubit_hamiltonian: QubitOperator) -> UnitaryRepresentation:
         r"""Construct the unitary representation using qDRIFT randomized sampling.
 
@@ -235,6 +231,10 @@ class QDrift(TimeEvolutionBuilder):
             UnitaryRepresentation: The unitary representation built by qDRIFT sampling.
 
         """
+        if not isinstance(qubit_hamiltonian, QubitOperator):
+            raise TypeError(
+                f"The {self.name()!r} builder takes a QubitOperator, got {type(qubit_hamiltonian).__name__}."
+            )
         effective_time, power_repetitions = self._resolve_power()
         time: float = effective_time
         seed: int = self._settings.get("seed")
