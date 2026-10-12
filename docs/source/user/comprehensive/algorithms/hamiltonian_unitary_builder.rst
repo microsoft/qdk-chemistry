@@ -216,6 +216,8 @@ Hubbard plaquette Trotterization
 The plaquette builder Trotterizes the Fermi-Hubbard model with uniform hopping :math:`t` and on-site interaction :math:`U` on a two-dimensional square lattice, two spin orbitals per site.
 Unlike the other builders, it takes a :class:`~qdk_chemistry.data.FermiHubbardModelHamiltonianDescription` rather than a :class:`~qdk_chemistry.data.QubitOperator`, and builds the Hamiltonian from its lattice and its parameters ``t``, ``u`` and ``epsilon``.
 The lattice has to be periodic in both directions, with both sides even and at least four, or 2x2, because only then do the two plaquette tilings cover every bond exactly once.
+Its geometry has to be the one :meth:`LatticeGeometry.square(width, height, periodic_x=True, periodic_y=True) <qdk_chemistry.data.LatticeGeometry.square>` builds: unit-spaced sites numbered ``y * width + x``, with period vectors ``(width, 0)`` and ``(0, height)``.
+A translated, scaled, rotated or renumbered square lattice is rejected.
 
 The hopping term splits into two layers of disjoint four-site plaquettes, :math:`P` and :math:`G`, each of which is evolved exactly :cite:`Campbell2022`.
 The interaction is taken in its particle-hole symmetric form :math:`U \sum_i (n_{i\uparrow} - 1/2)(n_{i\downarrow} - 1/2)`, whose Jordan-Wigner image is pure :math:`ZZ`.
