@@ -233,7 +233,7 @@ Each layer of the plaquette step is a tower of same-angle :math:`R_z` rotations,
      - Description
    * - ``max_hamming_weight_phasing_batch_size``
      - int
-     - Largest tower of same-angle rotations phased through one Hamming-weight register. A smaller cap needs fewer scratch qubits but more rotations; the Toffoli count stays about the same. Only towers of 8 or more terms are phased, since only there are the saved rotations worth the extra Toffolis and scratch qubits. A cap below 8, such as 1, therefore turns phasing off. When set to -1 (default), there is no cap.
+     - Largest tower of same-angle rotations phased through one Hamming-weight register. A smaller cap needs fewer scratch qubits but more rotations. Only towers of 8 or more terms are phased, since only there are the saved rotations worth the extra Toffolis and scratch qubits. A cap below 8, such as 1, therefore turns phasing off. When set to -1 (default), there is no cap.
 
 Related classes
 ---------------

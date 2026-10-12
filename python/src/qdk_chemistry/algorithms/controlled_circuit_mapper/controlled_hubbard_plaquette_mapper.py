@@ -21,8 +21,7 @@ class ControlledHubbardPlaquetteMapperSettings(ControlledCircuitMapperSettings):
     Attributes:
         max_hamming_weight_phasing_batch_size: Largest tower of equal-angle rotations phased
             through one Hamming-weight register, or ``-1`` for no cap.
-            A smaller cap needs fewer scratch qubits but more rotations; the Toffoli count stays
-            about the same.
+            A smaller cap needs fewer scratch qubits but more rotations.
             Only towers of 8 or more terms are phased, since only there are the saved rotations
             worth the extra Toffolis and scratch qubits.
             A cap below 8, such as ``1``, therefore turns phasing off.
@@ -38,10 +37,10 @@ class ControlledHubbardPlaquetteMapperSettings(ControlledCircuitMapperSettings):
             "int",
             -1,
             "Largest tower of equal-angle rotations phased through one Hamming-weight register. "
-            "A smaller cap needs fewer scratch qubits but more rotations; the Toffoli count stays "
-            "about the same. Only towers of 8 or more terms are phased, since only there are the "
-            "saved rotations worth the extra Toffolis and scratch qubits. A cap below 8, such as 1, "
-            "therefore turns phasing off. Set to -1 for no cap.",
+            "A smaller cap needs fewer scratch qubits but more rotations. Only towers of 8 or more "
+            "terms are phased, since only there are the saved rotations worth the extra Toffolis "
+            "and scratch qubits. A cap below 8, such as 1, therefore turns phasing off. "
+            "Set to -1 for no cap.",
         )
 
 

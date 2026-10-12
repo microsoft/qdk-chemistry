@@ -172,11 +172,10 @@ namespace QDKChemistry.Utils.HammingWeightPhasing {
     /// The tower length phased through one Hamming-weight register, given the cap.
     ///
     /// # Description
-    /// A batch of `n` terms costs one adder tree: roughly `n` Toffolis and, more importantly,
-    /// `n - popcount(n)` scratch qubits held for as long as the weight is needed. Splitting a
-    /// tower into batches lets the scratch of one batch be released before the next allocates,
-    /// so the peak ancilla count follows the batch rather than the whole tower, while the
-    /// Toffoli count stays essentially the same. The price is the place-value rotations, which
+    /// A batch of `n` terms costs one adder tree, which holds `n - popcount(n)` scratch qubits
+    /// for as long as the weight is needed. Splitting a tower into batches lets the scratch of
+    /// one batch be released before the next allocates, so the peak ancilla count follows the
+    /// batch rather than the whole tower. The price is the place-value rotations, which
     /// are paid once per batch instead of once per tower.
     ///
     /// It is therefore a qubit-for-rotations knob, and the useful setting depends on the device:
