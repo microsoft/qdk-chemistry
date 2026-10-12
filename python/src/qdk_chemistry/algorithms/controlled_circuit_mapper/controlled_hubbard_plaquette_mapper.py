@@ -19,23 +19,16 @@ class ControlledHubbardPlaquetteMapperSettings(ControlledCircuitMapperSettings):
     r"""Settings for :class:`ControlledHubbardPlaquetteMapper`.
 
     Attributes:
-        hamming_weight_phasing: Whether to phase each tower of equal-angle rotations through a Hamming-weight
-            register. Defaults to ``True``.
         max_hamming_weight_phasing_batch_size: Largest tower of equal-angle rotations phased
-            through a single Hamming-weight register, or ``-1`` for no cap. Defaults to ``-1``.
+            through a single Hamming-weight register, or ``-1`` for no cap. A cap below 8 (e.g.
+            ``1``) turns Hamming-weight phasing off, so every term is its own rotation.
+            Defaults to ``-1``.
 
     """
 
     def __init__(self):
-        """Initialize the settings, adding the Hamming-weight phasing switch and batch cap."""
+        """Initialize the settings, adding the Hamming-weight phasing batch cap."""
         super().__init__()
-        self._set_default(
-            "hamming_weight_phasing",
-            "bool",
-            True,
-            "Phase each tower of equal-angle rotations through a Hamming-weight register. When False, every "
-            "term is its own rotation.",
-        )
         self._set_default(
             "max_hamming_weight_phasing_batch_size",
             "int",
@@ -43,8 +36,8 @@ class ControlledHubbardPlaquetteMapperSettings(ControlledCircuitMapperSettings):
             "Largest tower of equal-angle rotations phased through a single Hamming-weight "
             "register. A shorter batch releases its adder-tree scratch sooner, so the peak "
             "ancilla count follows the batch rather than the whole lattice, at the cost of one "
-            "extra set of place-value rotations per batch. Batches below 8 terms stay plain "
-            "rotations. Set to -1 for no cap.",
+            "extra set of place-value rotations per batch. A cap below 8 (e.g. 1) turns "
+            "Hamming-weight phasing off, so every term is its own rotation. Set to -1 for no cap.",
         )
 
 
@@ -90,9 +83,6 @@ class ControlledHubbardPlaquetteMapper(ControlledCircuitMapper):
             raise ValueError(
                 f"max_hamming_weight_phasing_batch_size must be -1 or a positive integer. Got {max_batch_size}."
             )
-        if not self._settings.get("hamming_weight_phasing"):
-            # Single-term batches are below the break-even, so Q# applies every term as its own rotation.
-            max_batch_size = 1
 
         # Only the lattice shape, the layer angles and the batch cap cross the boundary; the
         # tilings and spin pairings are derived in Q# from the shape.

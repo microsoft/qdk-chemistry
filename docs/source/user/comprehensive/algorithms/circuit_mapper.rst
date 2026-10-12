@@ -232,12 +232,9 @@ The adder tree pays for itself from 8 terms, so a shorter tower keeps one rotati
    * - Setting
      - Type
      - Description
-   * - ``hamming_weight_phasing``
-     - bool
-     - Phase each tower of same-angle rotations through a Hamming-weight register. When False, every term is its own rotation. Default is True.
    * - ``max_hamming_weight_phasing_batch_size``
      - int
-     - Largest tower of same-angle rotations phased through one Hamming-weight register. Batches are phased one after another, so a smaller cap lowers the peak ancilla count at the cost of one extra set of place-value rotations per batch. A batch below 8 terms keeps one rotation per term. When set to -1 (default), there is no cap.
+     - Largest tower of same-angle rotations phased through one Hamming-weight register. Batches are phased one after another, so a smaller cap lowers the peak ancilla count at the cost of one extra set of place-value rotations per batch. A cap below 8, such as 1, turns phasing off, so every term is its own rotation. When set to -1 (default), there is no cap.
 
 Related classes
 ---------------
