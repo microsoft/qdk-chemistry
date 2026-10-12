@@ -151,8 +151,18 @@ namespace QDKChemistry.Utils.HubbardPlaquette {
         }
     }
 
-    /// The mode order, as the mode at each position, that puts every four-cycle of a tiling on adjacent positions.
-    internal function TilingOrder(blocks : Int[][], count : Int) : Int[] {
+    /// # Summary
+    /// The mode order that puts every four-cycle of a tiling on adjacent positions.
+    ///
+    /// # Input
+    /// ## blocks
+    /// The four-cycles of a tiling, as returned by `PlaquetteSection`.
+    /// ## count
+    /// Total number of fermionic modes.
+    ///
+    /// # Output
+    /// The mode at each position: each cycle `[a, b, c, d]` as `a, c, b, d`, then the unused modes in order.
+    function TilingOrder(blocks : Int[][], count : Int) : Int[] {
         // Interleaving the diagonals embeds the FFFT's butterfly path (both diagonals, then the
         // surviving pair) in the line, so every butterfly acts on adjacent modes and no basis
         // change carries a Jordan-Wigner string. Unused modes follow in order.
@@ -181,9 +191,21 @@ namespace QDKChemistry.Utils.HubbardPlaquette {
         return order;
     }
 
-    /// Rearranges the modes from the `current` order to the `target` order, each one listing the mode
-    /// at every position: the swap count and, if `listSwaps`, the adjacent swaps.
-    internal function RoutingSwaps(current : Int[], target : Int[], listSwaps : Bool) : (Int, Int[]) {
+    /// # Summary
+    /// The adjacent fermionic swaps that rearrange the modes from one order to another.
+    ///
+    /// # Input
+    /// ## current
+    /// The mode at each position before routing.
+    /// ## target
+    /// The mode at each position after routing.
+    /// ## listSwaps
+    /// Whether to list the swaps, or only count them.
+    ///
+    /// # Output
+    /// The swap count and, if `listSwaps`, the swaps in order of application, each as the lower position
+    /// `p` of the pair `(p, p + 1)`.
+    function RoutingSwaps(current : Int[], target : Int[], listSwaps : Bool) : (Int, Int[]) {
         let count = Length(current);
         Fact(Length(target) == count, "RoutingSwaps needs two orders of the same modes.");
         mutable targetPosition = [0, size = count];

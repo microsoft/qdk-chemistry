@@ -431,7 +431,7 @@ _BENCHMARK_COUNTS = {
 }
 
 
-def _benchmark_counts(size: int, max_batch_size: int = -1) -> dict[str, int]:
+def _benchmark_counts(size: int, **mapper_settings) -> dict[str, int]:
     """Return the logical counts of the notebook's 10-bit sine-window QPE on an LxL lattice."""
     num_bits, energy_budget = 10, 0.0051 * size * size
     qpe_budget = 2.0 / 3.0 * energy_budget  # The optimal split of Campbell arXiv:2012.09238v4, App. F.
@@ -449,9 +449,7 @@ def _benchmark_counts(size: int, max_batch_size: int = -1) -> dict[str, int]:
             power_strategy="rescale",
             target_accuracy=energy_budget - qpe_budget,
         ),
-        controlled_circuit_mapper=AlgorithmRef(
-            "controlled_circuit_mapper", "hubbard_plaquette", max_hamming_weight_phasing_batch_size=max_batch_size
-        ),
+        controlled_circuit_mapper=AlgorithmRef("controlled_circuit_mapper", "hubbard_plaquette", **mapper_settings),
     )
     model = _model(size, t=1.0, u=8.0)
     factory = builder.run(identity_state_prep(num_qubits=2 * size * size), model)[0]._qsharp_factory
@@ -478,19 +476,20 @@ class TestBenchmarkResources:
         _assert_counts_match_the_pins(_benchmark_counts(size), size)
 
     def test_batch_cap_trades_qubits_for_rotations(self):
-        """A cap of 8 keeps the adder tree on fewer qubits; a cap of 1 turns phasing off."""
+        """A cap of 8 keeps the adder tree on fewer qubits; switching phasing off drops the adder trees."""
         uncapped = _benchmark_counts(4)
         # TEMPORARY (legacy parity): the legacy tower spans all 32 modes, so 32 is the cap that splits nothing.
-        assert _benchmark_counts(4, max_batch_size=32) == uncapped
+        assert _benchmark_counts(4, max_hamming_weight_phasing_batch_size=32) == uncapped
 
-        capped = _benchmark_counts(4, max_batch_size=8)
+        capped = _benchmark_counts(4, max_hamming_weight_phasing_batch_size=8)
         assert capped["numQubits"] < uncapped["numQubits"]
         assert capped["rotationCount"] > uncapped["rotationCount"]
         assert capped["cczCount"] > 0
 
-        below = _benchmark_counts(4, max_batch_size=1)
-        assert below["cczCount"] + below["ccixCount"] == 0
-        assert below["numQubits"] < uncapped["numQubits"]
+        off = _benchmark_counts(4, hamming_weight_phasing=False, max_hamming_weight_phasing_batch_size=8)
+        assert off == _benchmark_counts(4, max_hamming_weight_phasing_batch_size=1)
+        assert off["cczCount"] + off["ccixCount"] == 0
+        assert off["numQubits"] < capped["numQubits"]
 
     @pytest.mark.parametrize(("cap", "uses_adders"), [(7, False), (8, True)])
     def test_adder_trees_start_at_eight_terms(self, cap, uses_adders):
