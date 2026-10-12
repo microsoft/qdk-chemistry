@@ -14,6 +14,7 @@ import numpy as np
 import pytest
 import scipy.linalg
 import scipy.sparse.linalg
+from qdk import TargetProfile
 
 from qdk_chemistry.algorithms import create
 from qdk_chemistry.algorithms.hamiltonian_unitary_builder.time_evolution.hubbard_plaquette_trotter import (
@@ -33,7 +34,7 @@ from qdk_chemistry.data import (
 from qdk_chemistry.data.circuit import QsharpFactoryData
 from qdk_chemistry.data.unitary_representation.containers.hubbard_plaquette import HubbardPlaquetteContainer
 from qdk_chemistry.utils.pauli_matrix import pauli_to_dense_matrix, pauli_to_sparse_matrix
-from qdk_chemistry.utils.qsharp import QSHARP_UTILS, get_qsharp_context
+from qdk_chemistry.utils.qsharp import QSHARP_UTILS, create_qsharp_context, get_qsharp_context
 
 _PLAQUETTE = "QDKChemistry.Utils.HubbardPlaquette"
 _HWP = "QDKChemistry.Utils.HammingWeightPhasing"
@@ -502,6 +503,17 @@ class TestBenchmarkResources:
             QSHARP_UTILS.HubbardPlaquette.MakeRepControlledPlaquetteExpCircuit, params, 0, list(range(1, 33))
         )
         assert (counts.get("cczCount", 0) + counts.get("ccixCount", 0) > 0) == uses_adders
+
+    def test_base_profile_lowers_the_adder_tree(self):
+        """A 4x4 lattice batches enough rotations to lower the Hamming-weight adder to Base QIR too."""
+        context = create_qsharp_context(TargetProfile.Base)
+        plaquette = context.code.QDKChemistry.Utils.HubbardPlaquette
+        params = plaquette.HubbardPlaquetteParams(
+            width=4, height=4, interactionAngle=0.1, hoppingAngle=0.2, repetitions=1, maxBatchSize=-1
+        )
+        qir = str(context.compile(plaquette.MakeRepControlledPlaquetteExpCircuit, params, 0, list(range(1, 33))))
+        # The adder's Toffolis are the only source of T gates in this circuit.
+        assert "__quantum__qis__t__" in qir
 
 
 class TestStepCountAndShift:
