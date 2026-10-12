@@ -215,11 +215,7 @@ def _describe_parameter(value: ModelParameter) -> str:
 
 
 def _encode_parameter(value: ModelParameter) -> Any:
-    """Encode a parameter as a JSON number, nested list, shaped array, or object keyed by shell.
-
-    An empty array with more than one dimension is written as ``{"shape": [...], "data": []}``,
-    because a nested list cannot record the extents that follow a zero extent.
-    """
+    """Encode a parameter as a JSON number, nested list, shaped array, or object keyed by shell."""
     if isinstance(value, Mapping):
         return {str(shell): _encode_parameter(v) for shell, v in value.items()}
     if isinstance(value, np.ndarray):
