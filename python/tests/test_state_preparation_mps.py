@@ -17,6 +17,7 @@ from collections.abc import Sequence
 import numpy as np
 import pytest
 from qdk.qsharp import QSharpError
+from qdk.test_utils import dump_operation_on_state
 
 from qdk_chemistry._core.utils.unitary_synthesis import (
     DenseSiteSynthesis,
@@ -1129,6 +1130,30 @@ class TestQSharpPreparation:
         assert ancilla_zero_prob > 0.99, f"P(ancilla=0) = {ancilla_zero_prob:.4f} too low"
         fidelity = np.abs(np.vdot(target, prepared)) ** 2
         assert fidelity > 0.97, f"Fidelity {fidelity:.4f} too low"
+
+    @_METHODS
+    def test_circuit_operation_is_adjointable(self, method):
+        """The circuit operation prepares the MPS, and its adjoint returns the register to |0>.
+
+        The operation resets its bond register, so the simulator seed is fixed.
+        """
+        mps, target = _random_case(3, 4, 4, 42)
+        context = create_qsharp_context()
+        with use_qsharp_context(context):
+            context.set_quantum_seed(7)
+            prep = create("state_prep", "matrix_product_state", unitary_synthesis=method, rotation_bit_precision=6)
+            circuit = prep.run(Wavefunction(mps))
+            context.eval(
+                "function ApplyThenAdjoint(op : Qubit[] => Unit is Adj) : Qubit[] => Unit "
+                "{ qs => { op(qs); Adjoint op(qs); } }"
+            )
+            prepared = dump_operation_on_state(circuit._qsharp_op, circuit.num_qubits, context=context)
+            restored = dump_operation_on_state(
+                context.code.ApplyThenAdjoint(circuit._qsharp_op), circuit.num_qubits, context=context
+            )
+
+        assert np.abs(np.vdot(target, prepared)) ** 2 > 0.97
+        assert np.abs(restored[0]) ** 2 > 0.97
 
     @_METHODS
     @pytest.mark.parametrize(

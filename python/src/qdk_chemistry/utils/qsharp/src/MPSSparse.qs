@@ -69,7 +69,7 @@ namespace QDKChemistry.Utils.MPSSparse {
         permTargets : Bool[][],
         invPermTargets : Bool[][],
         target : Qubit[]
-    ) : Unit {
+    ) : Unit is Adj {
         let n = Length(target);
         let N = Length(permTargets);
         let nRequired = Ceiling(Lg(IntAsDouble(N)));
@@ -90,7 +90,7 @@ namespace QDKChemistry.Utils.MPSSparse {
         newSite : Qubit[],
         phaseGradient : Qubit[],
         angleReg : Qubit[]
-    ) : Unit {
+    ) : Unit is Adj {
         // The little-endian joint register holds the bond in its low qubits, so its value
         // physical * ancillaDim + bond is the row index of the site isometry.
         let target = ancilla + newSite;
@@ -114,12 +114,12 @@ namespace QDKChemistry.Utils.MPSSparse {
         state : Qubit[],
         ancilla : Qubit[],
         phaseGradient : Qubit[]
-    ) : Unit {
+    ) : Unit is Adj {
         PrepareMPS(initialStateVec, numSites, siteToOrbitalOrder, siteDecompositions, ApplySparseSite, state, ancilla, phaseGradient);
     }
 
     /// Returns a composable `MPSSparse` operation; see `MakeMPSOp`.
-    function MakeMPSSparseOp(params : MPSSparseParams) : Qubit[] => Unit {
+    function MakeMPSSparseOp(params : MPSSparseParams) : Qubit[] => Unit is Adj {
         MakeMPSOp(
             params.numQubitsPerSite * params.numSites,
             params.numAncillaQubits,
@@ -129,7 +129,7 @@ namespace QDKChemistry.Utils.MPSSparse {
     }
 
     /// Returns a composable `MPSSparse` operation; see `MakeMPSOpWithPhaseGradient`.
-    function MakeMPSSparseOpWithPhaseGradient(params : MPSSparseParams) : Qubit[] => Unit {
+    function MakeMPSSparseOpWithPhaseGradient(params : MPSSparseParams) : Qubit[] => Unit is Adj {
         MakeMPSOpWithPhaseGradient(
             params.numQubitsPerSite * params.numSites,
             params.numAncillaQubits,

@@ -2,6 +2,7 @@
 // Licensed under the MIT License. See LICENSE.txt in the project root for
 // license information.
 
+#include <exception>
 #include <functional>
 #include <iterator>
 #include <limits>
@@ -73,12 +74,24 @@ DenseSiteSynthesis dense_unitary_synthesis(
     blocks.emplace_back(c.topRows(ancilla_dim), c.bottomRows(ancilla_dim));
   }
   std::vector<TwoBlockCsd> csds(blocks.size());
+  // An exception must not escape an OpenMP region, so each iteration keeps its
+  // own and the first is rethrown after the loop.
+  std::vector<std::exception_ptr> errors(blocks.size());
 #ifdef _OPENMP
 #pragma omp parallel for schedule(dynamic, 1)
 #endif
   for (std::size_t step = 0; step < blocks.size(); ++step) {
-    csds[step] =
-        cosine_sine_decomposition(blocks[step].first, blocks[step].second);
+    try {
+      csds[step] =
+          cosine_sine_decomposition(blocks[step].first, blocks[step].second);
+    } catch (...) {
+      errors[step] = std::current_exception();
+    }
+  }
+  for (const auto& error : errors) {
+    if (error) {
+      std::rethrow_exception(error);
+    }
   }
 
   DenseSiteSynthesis result;

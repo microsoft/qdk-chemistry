@@ -67,40 +67,43 @@ namespace QDKChemistry.Utils.UnitarySynthesis {
     /// Applies D = diag((-1)^{f(x)}) on a little-endian register, with `phases[x]` = f(x).
     ///
     /// The Möbius transform over GF(2) gives f(x) = ⊕_S c_S ∏_{i∈S} x_i, and each nonzero c_S
-    /// becomes a Z, CZ, CCZ, … gate on the qubits in S.
-    operation ApplyPhasePolynomial(phases : Bool[], register : Qubit[]) : Unit {
-        let n = Length(register);
-        let dim = Length(phases);
+    /// becomes a Z, CZ, CCZ, … gate on the qubits in S. D is its own inverse.
+    operation ApplyPhasePolynomial(phases : Bool[], register : Qubit[]) : Unit is Adj {
+        body (...) {
+            let n = Length(register);
+            let dim = Length(phases);
 
-        // In-place Möbius butterfly; bitmask s encodes the subset S.
-        mutable coeffs = phases;
-        mutable step = 1;
-        while step < dim {
-            for j in 0..dim - 1 {
-                if (j / step) % 2 == 1 {
-                    set coeffs w/= j <- coeffs[j] != coeffs[j - step];
-                }
-            }
-            set step = step * 2;
-        }
-
-        for s in 1..dim - 1 {
-            if coeffs[s] {
-                mutable qubits : Qubit[] = [];
-                for bit in 0..n - 1 {
-                    if (s >>> bit) &&& 1 == 1 {
-                        set qubits += [register[bit]];
+            // In-place Möbius butterfly; bitmask s encodes the subset S.
+            mutable coeffs = phases;
+            mutable step = 1;
+            while step < dim {
+                for j in 0..dim - 1 {
+                    if (j / step) % 2 == 1 {
+                        set coeffs w/= j <- coeffs[j] != coeffs[j - step];
                     }
                 }
-                if Length(qubits) == 1 {
-                    Z(qubits[0]);
-                } elif Length(qubits) == 2 {
-                    Controlled Z([qubits[0]], qubits[1]);
-                } else {
-                    Controlled Z(qubits[0..Length(qubits) - 2], qubits[Length(qubits) - 1]);
+                set step = step * 2;
+            }
+
+            for s in 1..dim - 1 {
+                if coeffs[s] {
+                    mutable qubits : Qubit[] = [];
+                    for bit in 0..n - 1 {
+                        if (s >>> bit) &&& 1 == 1 {
+                            set qubits += [register[bit]];
+                        }
+                    }
+                    if Length(qubits) == 1 {
+                        Z(qubits[0]);
+                    } elif Length(qubits) == 2 {
+                        Controlled Z([qubits[0]], qubits[1]);
+                    } else {
+                        Controlled Z(qubits[0..Length(qubits) - 2], qubits[Length(qubits) - 1]);
+                    }
                 }
             }
         }
+        adjoint self;
     }
 
     /// Applies the real unitary U = D · L_{m-1} ⋯ L_0 of `givens` to `target`, controlled on
@@ -121,7 +124,7 @@ namespace QDKChemistry.Utils.UnitarySynthesis {
         target : Qubit[],
         phaseGradient : Qubit[],
         angleReg : Qubit[]
-    ) : Unit {
+    ) : Unit is Adj {
         let n = Length(target);
         let layers = givens.layers;
         let layerIsShifted = givens.layerShifted;

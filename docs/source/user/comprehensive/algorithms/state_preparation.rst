@@ -249,7 +249,7 @@ Matrix Product State
 This method prepares a matrix product state (MPS) stored in an :class:`~qdk_chemistry.data.MPSContainer` following :cite:`Berry2025` and :cite:`Rupprecht2026`.
 The MPS must be real and right-canonical with orthogonality center at site 0, with open boundaries, and either the physical basis ``('0', 'u', 'd', '2')`` on every site or the physical basis ``('0', '1')`` on every site.
 The physical basis is loaded in the blocked Jordan-Wigner layout.
-An ancilla register of :math:`\lceil \log_2 \chi \rceil` qubits carries the virtual bond of maximal dimension :math:`\chi`.
+An ancilla register of :math:`\max(1, \lceil \log_2 \chi \rceil)` qubits carries the virtual bond of maximal dimension :math:`\chi`.
 Every site unitary acts on the qubits of its site and the ancilla register, and is synthesized by one of two methods selected with the ``unitary_synthesis`` setting, excluding site 0, which is prepared as the initial state.
 Givens decomposition converts the orthogonal factors into adjacent rotations and sign corrections for the circuit.
 A final layer of CZ gates applies the fermionic signs of reordering these modes into qubit order.

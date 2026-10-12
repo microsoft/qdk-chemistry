@@ -11,6 +11,7 @@
 #include <cmath>
 #include <cstdint>
 #include <deque>
+#include <exception>
 #include <functional>
 #include <lapack.hh>
 #include <stdexcept>
@@ -98,114 +99,132 @@ std::vector<double> rotation_angles(const Eigen::VectorXd& d,
   return angles;
 }
 
-// Decomposes square orthogonal matrices into parallel Givens layers with the
+namespace {
+
+// Decomposes a square orthogonal matrix into parallel Givens layers with the
 // Clements double-sided elimination schedule (Clements et al. Optica 3, 1460
 // (2016), arXiv:1603.08788, Fig. 2 and the supplementary algorithm), restricted
 // to real rotations and a diagonal sign matrix. Alternating sweeps eliminate
 // entries with right column rotations and left row rotations; the left
 // rotations are then commuted through the final diagonal sign matrix.
+GivensDecomposition decompose_orthogonal(const Eigen::MatrixXd& matrix) {
+  const Eigen::Index dim = matrix.rows();
+  if (!is_isometry(matrix)) {
+    throw std::runtime_error(
+        "Unitary synthesis produced a non-orthogonal factor.");
+  }
+
+  Eigen::MatrixXd work = matrix;
+  if (dim == 1) {
+    return {{}, {}, {static_cast<std::uint8_t>(work(0, 0) < 0.0)}};
+  }
+
+  GivensDecomposition result;
+
+  const Eigen::Index num_layers = dim == 2 ? 1 : dim;
+  std::vector<std::vector<Rotation>> upper_rotations(num_layers);
+  std::vector<std::vector<Rotation>> lower_rotations(num_layers);
+
+  // Clements elimination alternates right column rotations with left row
+  // rotations so each diagonal sweep consists of disjoint adjacent pairs.
+  for (Eigen::Index diagonal = 0; diagonal < dim - 1; ++diagonal) {
+    if (diagonal % 2 == 0) {
+      Eigen::Index slot = 0;
+      for (Eigen::Index column = diagonal; column >= 0; --column, ++slot) {
+        const Eigen::Index row = dim - 1 - slot;
+        // rotating it against its right-hand neighbour in the same row
+        const double adjacent = work(row, column + 1);
+        const double eliminated = work(row, column);
+        if (std::abs(eliminated) < elimination_tolerance) {
+          continue;
+        }
+        const double angle = std::atan2(eliminated, adjacent);
+
+        work.topRows(row + 1).applyOnTheRight(
+            column, column + 1,
+            Eigen::JacobiRotation<double>(std::cos(angle), std::sin(angle)));
+        upper_rotations[slot].emplace_back(column, angle);
+      }
+    } else {
+      Eigen::Index column = 0;
+      for (Eigen::Index row = dim - diagonal - 1; row < dim; ++row, ++column) {
+        const double adjacent = work(row - 1, column);
+        const double eliminated = work(row, column);
+        if (std::abs(eliminated) < elimination_tolerance) {
+          continue;
+        }
+        const double angle = std::atan2(eliminated, adjacent);
+        // Both rows are already zero left of this column.
+        work.rightCols(dim - column)
+            .applyOnTheLeft(row - 1, row,
+                            Eigen::JacobiRotation<double>(std::cos(angle),
+                                                          std::sin(angle)));
+        lower_rotations[column].emplace_back(row - 1, angle);
+      }
+    }
+  }
+
+  const Eigen::VectorXd diagonal = work.diagonal();
+  result.phases.reserve(dim);
+  for (Eigen::Index index = 0; index < dim; ++index) {
+    result.phases.push_back(static_cast<std::uint8_t>(diagonal(index) < 0.0));
+  }
+
+  // Convert both elimination directions to the circuit convention in which
+  // every layer multiplies from the right. Commuting a left rotation through
+  // D reverses its angle exactly when the adjacent diagonal signs differ.
+  const Eigen::Index even_slots = dim / 2;
+  const Eigen::Index odd_slots = (dim - 1) / 2;
+  for (Eigen::Index layer = 0; layer < num_layers; ++layer) {
+    const bool shifted = layer % 2 == 1;
+    const Eigen::Index num_slots = shifted ? odd_slots : even_slots;
+    std::vector<double> angles(static_cast<std::size_t>(num_slots), 0.0);
+
+    for (const auto& [pair, angle] : upper_rotations[layer]) {
+      angles[static_cast<std::size_t>(pair / 2)] = angle;
+    }
+
+    const auto& rotations = lower_rotations[num_layers - 1 - layer];
+    for (auto rotation = rotations.rbegin(); rotation != rotations.rend();
+         ++rotation) {
+      const auto [pair, angle] = *rotation;
+      const double sign =
+          diagonal(pair) * diagonal(pair + 1) > 0.0 ? 1.0 : -1.0;
+      angles[static_cast<std::size_t>(pair / 2)] = sign * angle;
+    }
+
+    if (std::any_of(angles.begin(), angles.end(), [](double angle) {
+          return std::abs(angle) > elimination_tolerance;
+        })) {
+      result.layer_angles.push_back(std::move(angles));
+      result.layer_shifted.push_back(static_cast<std::uint8_t>(shifted));
+    }
+  }
+  return result;
+}
+
+}  // namespace
+
 std::vector<GivensDecomposition> givens_decomposition(
     const std::vector<std::reference_wrapper<const Eigen::MatrixXd>>&
         matrices) {
   std::vector<GivensDecomposition> results(matrices.size());
+  // An exception must not escape an OpenMP region, so each iteration keeps its
+  // own and the first is rethrown after the loop.
+  std::vector<std::exception_ptr> errors(matrices.size());
 #ifdef _OPENMP
 #pragma omp parallel for schedule(dynamic, 1)
 #endif
   for (std::size_t position = 0; position < matrices.size(); ++position) {
-    const Eigen::MatrixXd& matrix = matrices[position].get();
-    auto& result = results[position];
-    const Eigen::Index dim = matrix.rows();
-
-    if (!is_isometry(matrix)) {
-      throw std::runtime_error(
-          "Unitary synthesis produced a non-orthogonal factor.");
+    try {
+      results[position] = decompose_orthogonal(matrices[position].get());
+    } catch (...) {
+      errors[position] = std::current_exception();
     }
-
-    Eigen::MatrixXd work = matrix;
-    if (dim == 1) {
-      result = {{}, {}, {static_cast<std::uint8_t>(work(0, 0) < 0.0)}};
-      continue;
-    }
-
-    const Eigen::Index num_layers = dim == 2 ? 1 : dim;
-    std::vector<std::vector<Rotation>> upper_rotations(num_layers);
-    std::vector<std::vector<Rotation>> lower_rotations(num_layers);
-
-    // Clements elimination alternates right column rotations with left row
-    // rotations so each diagonal sweep consists of disjoint adjacent pairs.
-    for (Eigen::Index diagonal = 0; diagonal < dim - 1; ++diagonal) {
-      if (diagonal % 2 == 0) {
-        Eigen::Index slot = 0;
-        for (Eigen::Index column = diagonal; column >= 0; --column, ++slot) {
-          const Eigen::Index row = dim - 1 - slot;
-          // rotating it against its right-hand neighbour in the same row
-          const double adjacent = work(row, column + 1);
-          const double eliminated = work(row, column);
-          if (std::abs(eliminated) < elimination_tolerance) {
-            continue;
-          }
-          const double angle = std::atan2(eliminated, adjacent);
-
-          work.topRows(row + 1).applyOnTheRight(
-              column, column + 1,
-              Eigen::JacobiRotation<double>(std::cos(angle), std::sin(angle)));
-          upper_rotations[slot].emplace_back(column, angle);
-        }
-      } else {
-        Eigen::Index column = 0;
-        for (Eigen::Index row = dim - diagonal - 1; row < dim;
-             ++row, ++column) {
-          const double adjacent = work(row - 1, column);
-          const double eliminated = work(row, column);
-          if (std::abs(eliminated) < elimination_tolerance) {
-            continue;
-          }
-          const double angle = std::atan2(eliminated, adjacent);
-          // Both rows are already zero left of this column.
-          work.rightCols(dim - column)
-              .applyOnTheLeft(row - 1, row,
-                              Eigen::JacobiRotation<double>(std::cos(angle),
-                                                            std::sin(angle)));
-          lower_rotations[column].emplace_back(row - 1, angle);
-        }
-      }
-    }
-
-    const Eigen::VectorXd diagonal = work.diagonal();
-    result.phases.reserve(dim);
-    for (Eigen::Index index = 0; index < dim; ++index) {
-      result.phases.push_back(static_cast<std::uint8_t>(diagonal(index) < 0.0));
-    }
-
-    // Convert both elimination directions to the circuit convention in which
-    // every layer multiplies from the right. Commuting a left rotation through
-    // D reverses its angle exactly when the adjacent diagonal signs differ.
-    const Eigen::Index even_slots = dim / 2;
-    const Eigen::Index odd_slots = (dim - 1) / 2;
-    for (Eigen::Index layer = 0; layer < num_layers; ++layer) {
-      const bool shifted = layer % 2 == 1;
-      const Eigen::Index num_slots = shifted ? odd_slots : even_slots;
-      std::vector<double> angles(static_cast<std::size_t>(num_slots), 0.0);
-
-      for (const auto& [pair, angle] : upper_rotations[layer]) {
-        angles[static_cast<std::size_t>(pair / 2)] = angle;
-      }
-
-      const auto& rotations = lower_rotations[num_layers - 1 - layer];
-      for (auto rotation = rotations.rbegin(); rotation != rotations.rend();
-           ++rotation) {
-        const auto [pair, angle] = *rotation;
-        const double sign =
-            diagonal(pair) * diagonal(pair + 1) > 0.0 ? 1.0 : -1.0;
-        angles[static_cast<std::size_t>(pair / 2)] = sign * angle;
-      }
-
-      if (std::any_of(angles.begin(), angles.end(), [](double angle) {
-            return std::abs(angle) > elimination_tolerance;
-          })) {
-        result.layer_angles.push_back(std::move(angles));
-        result.layer_shifted.push_back(static_cast<std::uint8_t>(shifted));
-      }
+  }
+  for (const auto& error : errors) {
+    if (error) {
+      std::rethrow_exception(error);
     }
   }
   return results;

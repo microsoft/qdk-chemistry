@@ -12,7 +12,7 @@ namespace QDKChemistry.Utils.Arithmetic {
     ///
     /// Costs n − 2 AND gates (4(n − 2) T gates) and n − 1 clean ancillas; the AND gates are
     /// uncomputed by measurement.
-    operation AddConstant(c : Int, target : Qubit[]) : Unit {
+    operation AddConstant(c : Int, target : Qubit[]) : Unit is Adj {
         let n = Length(target);
         let cMod = ((c % (1 <<< n)) + (1 <<< n)) % (1 <<< n);
         let cBits = IntAsBoolArray(cMod, n); // LE: cBits[0] = LSB

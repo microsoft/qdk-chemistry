@@ -9,6 +9,7 @@
 
 #include <algorithm>
 #include <cmath>
+#include <exception>
 #include <numeric>
 #include <stdexcept>
 #include <utility>
@@ -183,28 +184,40 @@ RowGathering gather_rows(const data::MPSSite& site, Eigen::Index ancilla_dim,
 
 void complete_blocks(std::vector<ColumnGroup>& groups, Eigen::Index left) {
   const double tolerance = orthogonality_tolerance * static_cast<double>(left);
+  // An exception must not escape an OpenMP region, so each iteration keeps its
+  // own and the first is rethrown after the loop.
+  std::vector<std::exception_ptr> errors(groups.size());
 #ifdef _OPENMP
 #pragma omp parallel for schedule(dynamic, 1)
 #endif
   for (std::size_t index = 0; index < groups.size(); ++index) {
-    auto& group = groups[index];
-    const Eigen::Index size = group.block.rows();
-    const auto width = static_cast<Eigen::Index>(group.columns.size());
-    auto rectangle = group.block.leftCols(width);
-    const double block_residual = isometry_residual(rectangle);
-    group.residual = block_residual * block_residual;
-    if (!(block_residual <= tolerance)) {
-      continue;
+    try {
+      auto& group = groups[index];
+      const Eigen::Index size = group.block.rows();
+      const auto width = static_cast<Eigen::Index>(group.columns.size());
+      auto rectangle = group.block.leftCols(width);
+      const double block_residual = isometry_residual(rectangle);
+      group.residual = block_residual * block_residual;
+      if (!(block_residual <= tolerance)) {
+        continue;
+      }
+      const bool project = !is_isometry(rectangle);
+      if (size == width && !project) {
+        continue;
+      }
+      const auto svd = singular_value_decomposition(rectangle.transpose());
+      if (project) {
+        rectangle = svd.v.leftCols(width) * svd.u.transpose();
+      }
+      group.block.rightCols(size - width) = svd.v.rightCols(size - width);
+    } catch (...) {
+      errors[index] = std::current_exception();
     }
-    const bool project = !is_isometry(rectangle);
-    if (size == width && !project) {
-      continue;
+  }
+  for (const auto& error : errors) {
+    if (error) {
+      std::rethrow_exception(error);
     }
-    const auto svd = singular_value_decomposition(rectangle.transpose());
-    if (project) {
-      rectangle = svd.v.leftCols(width) * svd.u.transpose();
-    }
-    group.block.rightCols(size - width) = svd.v.rightCols(size - width);
   }
   double residual = 0.0;
   for (const auto& group : groups) {
