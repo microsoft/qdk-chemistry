@@ -59,6 +59,7 @@ _ADAPTIVE_ONLY_MODULES = (
     "IsometrySynthesis",
     "MPSSequential",
     "MPSSparse",
+    "MPSConstantDepth",
 )
 
 

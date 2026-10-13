@@ -287,6 +287,54 @@ Its sites are the synthesis data of the mapper's circuits, which the Q# structs 
      - AlgorithmRef
      - Circuit mapper that synthesizes every site isometry. It must be the ``"unitary_synthesis"`` circuit mapper, whose ``method`` setting is ``"dense"`` or ``"block_sparse"``. Its ``rotation_bit_precision`` and ``allocate_phase_gradient`` settings are unused, as all sites share this preparer's phase gradient register. Default is ``AlgorithmRef("circuit_mapper", "unitary_synthesis")``, the dense method.
 
+.. _constant-depth-matrix-product-state:
+
+Constant-Depth Matrix Product State
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+.. rubric:: Factory name: ``"constant_depth_matrix_product_state"``
+
+This method implements Protocol 1 of Smith et al. :cite:`Smith2024`, which prepares a class of MPS with a circuit depth independent of the number of sites by using mid-circuit measurements and feed-forward.
+The chain is split into fragments of ``fragment_size`` consecutive sites.
+Every fragment is prepared in parallel with the ``"dense"`` site isometries of the :ref:`matrix product state <matrix-product-state>` method.
+Each fragment except the first starts from a Bell pair on its left bond, and Bell measurements fuse adjacent bonds.
+Each measurement leaves a random Pauli defect :math:`B` on its bond.
+The defect is pushed through the following fragments, :math:`B\,T^m = \sum_n W_{mn} T^n H`, where :math:`T` is the fragment tensor and :math:`H` is a Pauli on its right bond.
+The last fragment absorbs the defects because its right bond is trivial.
+One layer of physical corrections :math:`W^\mathsf{T}`, selected from the measurement record, completes the state.
+The circuit depth therefore grows with ``fragment_size`` but not with the number of sites, provided that classical feed-forward is free.
+
+The input requirements are the same as for the matrix product state method, with the following additional restrictions from :cite:`Smith2024`:
+
+- Every Pauli defect on every fused bond must be pushable through the next fragment (Theorem 2 of :cite:`Smith2024`). This holds for the GHZ, cluster and AKLT states and the :math:`\mathbb{Z}_2` family of :cite:`Smith2024`, but not for generic MPS, which are rejected with an error.
+- Defects are pushed toward the end of the chain, the mirror image of the convention in :cite:`Smith2024`. A tensor :math:`A` from the paper corresponds to the right-canonical tensor with the left and right bonds of :math:`A` swapped.
+- Bonds between fragments must have power-of-two dimension.
+
+Protocol 2 of :cite:`Smith2024` for non-normal MPS is not implemented.
+The operation measures qubits, so it is not adjointable and cannot be used with algorithms that require an adjointable state preparation.
+Each fragment uses its own phase gradient register so that the fragments run in parallel.
+The final CZ layer of fermionic signs, needed for the ``('0', 'u', 'd', '2')`` basis or a non-identity site-to-orbital order, does not have constant depth.
+To obtain preparation data without building a circuit, call ``preparer.generate_constant_depth_preparation_data(mps_container)``.
+
+.. rubric:: Settings
+
+.. list-table::
+   :header-rows: 1
+   :widths: 25 25 50
+
+   * - Setting
+     - Type
+     - Description
+   * - ``fragment_size``
+     - int
+     - Number of consecutive sites in each fragment, at least one. The last fragment holds the remaining sites. Default is 2.
+   * - ``rotation_bit_precision``
+     - int
+     - Size of each phase gradient register, which sets the precision of every rotation angle. The upper bound of 30 is a sanity limit as :math:`2^{-30}` is far below chemical accuracy. Default is 10.
+   * - ``unitary_synthesis``
+     - AlgorithmRef
+     - Circuit mapper that synthesizes every site isometry and correction. It must be the ``"unitary_synthesis"`` circuit mapper with ``method`` set to ``"dense"``. Its ``rotation_bit_precision`` and ``allocate_phase_gradient`` settings are unused, as every fragment allocates a phase gradient register of this preparer's ``rotation_bit_precision``. Default is ``AlgorithmRef("circuit_mapper", "unitary_synthesis")``.
+
 Related classes
 ---------------
 

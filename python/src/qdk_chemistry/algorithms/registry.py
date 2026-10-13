@@ -969,6 +969,7 @@ def _register_python_algorithms():
     from qdk_chemistry.algorithms.qubit_mapper import QdkQubitMapper  # noqa: PLC0415
     from qdk_chemistry.algorithms.qubit_mapper.sum_of_squares import SumOfSquaresQubitMapper  # noqa: PLC0415
     from qdk_chemistry.algorithms.state_preparation import (  # noqa: PLC0415
+        ConstantDepthMatrixProductStatePreparation,
         MatrixProductStatePreparation,
         SparseIsometryStatePreparation,
     )
@@ -991,6 +992,7 @@ def _register_python_algorithms():
     register(lambda: DensePureStatePreparation())
     register(lambda: SparseIsometryStatePreparation())
     register(lambda: MatrixProductStatePreparation())
+    register(lambda: ConstantDepthMatrixProductStatePreparation())
     register(lambda: DenseMatrixSolver())
     register(lambda: SparseMatrixSolver())
     register(lambda: QdkQubitMapper())
