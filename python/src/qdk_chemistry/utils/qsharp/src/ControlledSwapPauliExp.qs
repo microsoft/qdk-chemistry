@@ -15,11 +15,7 @@ namespace QDKChemistry.Utils.ControlledSwapPauliExp {
     import Std.ResourceEstimation.IsResourceEstimating;
     import Std.ResourceEstimation.RepeatEstimates;
 
-    /// Applies the producer's disjoint layers without changing their boundaries.
-    ///
-    /// With `useHammingWeightPhasing`, the terms of a layer that share a rotation angle form a
-    /// tower, however few they are, and each tower is phased through Hamming-weight registers
-    /// :cite:`Kan2025` instead of one rotation per term. Zero-angle terms keep their own rotations.
+    /// Applies the declared layers, phasing equal-angle towers as in `ControlledPauliLayers`.
     internal operation PauliLayers(
         params : RepPauliExpParams,
         layerOffsets : Int[],
@@ -44,8 +40,7 @@ namespace QDKChemistry.Utils.ControlledSwapPauliExp {
         }
     }
 
-    /// `RepPauliExp` over declared disjoint layers, phasing equal-angle towers through
-    /// Hamming-weight registers; without phasing or declared layers it is `RepPauliExp`.
+    /// `RepPauliExp` with Hamming-weight phasing per declared layer; plain `RepPauliExp` without phasing or layers.
     internal operation RepPauliLayersExp(
         params : RepPauliExpParams,
         layerOffsets : Int[],
@@ -88,10 +83,8 @@ namespace QDKChemistry.Utils.ControlledSwapPauliExp {
     /// # Parameters
     /// - `evolution`: Sparse evolution, including repetition and one-time boundary terms.
     /// - `layerOffsets`: Declared disjoint-layer boundaries; empty means term-by-term evolution.
-    /// - `useHammingWeightPhasing`: Whether to phase each declared layer's equal-angle rotations
-    ///   through Hamming-weight registers.
-    /// - `maxBatchSize`: Largest tower of equal-angle rotations in a declared layer phased through
-    ///   one Hamming-weight register, or -1 for no cap.
+    /// - `useHammingWeightPhasing`: Whether to phase equal-angle rotations through Hamming-weight registers.
+    /// - `maxBatchSize`: Largest Hamming-weight phasing batch, or -1 for no cap.
     /// - `vacuumPhase`: The phase `phi_0` of the full evolution on the vacuum.
     /// - `control`: The control qubit.
     /// - `systems`: System qubits indexed by the sparse evolution.

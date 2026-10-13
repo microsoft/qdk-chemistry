@@ -247,12 +247,8 @@ namespace QDKChemistry.Utils.HammingWeightPhasing {
     }
 
     /// # Summary
-    /// Groups terms with equal rotation angles into towers for `HammingWeightPhase`.
-    ///
-    /// # Description
-    /// Angles are compared exactly. Every group of equal nonzero angles becomes one tower, however
-    /// short, and `HammingWeightPhase` splits it into batches; zero-angle terms stay plain. Sorting
-    /// keeps the grouping at O(n log n) for wide layers.
+    /// Groups terms with exactly equal nonzero angles into towers for `HammingWeightPhase`.
+    /// Zero-angle terms stay plain.
     ///
     /// # Input
     /// ## angles

@@ -120,14 +120,11 @@ so the rotation-depth improvement is not a guarantee of constant total gate dept
 
 .. rubric:: Hamming-weight phasing
 
-With ``use_hamming_weight_phasing``, the mapper groups the terms of each declared layer that
-share exactly the same angle, such as the uniform bonds of an Ising or Heisenberg lattice, into
-towers and phases each tower under control with Hamming-weight phasing :cite:`Kan2025`. Each term
-is mapped to a single :math:`Z`, an adder tree writes the tower's Hamming weight into a scratch
-register, and a few controlled place-value rotations on that register replace the per-term
-controlled rotations. Every group of equal angles is phased, however short, so turn phasing on
-only when layers hold many equal angles. A zero angle keeps its own controlled rotation, and
-formulas without ``layer_offsets`` are never phased. Phasing is off by default.
+With ``use_hamming_weight_phasing``, terms of a declared layer with exactly equal nonzero angles,
+such as the uniform bonds of an Ising or Heisenberg lattice, are phased together with
+Hamming-weight phasing :cite:`Kan2025`: an adder tree writes their Hamming weight into scratch
+qubits, and a few controlled rotations on it replace the per-term rotations. Formulas without
+``layer_offsets`` are never phased. Phasing is off by default.
 
 .. rubric:: Settings
 
@@ -140,10 +137,10 @@ formulas without ``layer_offsets`` are never phased. Phasing is off by default.
      - Description
    * - ``use_hamming_weight_phasing``
      - bool
-     - Whether to phase each tower of equal-angle rotations in a layer through a Hamming-weight register. When False, every term is its own rotation. Every group of equal angles is phased, however short, so turn this on only when layers hold many equal angles. Default is False.
+     - Whether to phase each layer's equal-angle rotations through Hamming-weight registers. Pays off only when layers hold many equal angles. Default is False.
    * - ``max_hamming_weight_phasing_batch_size``
      - int
-     - Largest tower of equal-angle rotations in a layer phased through one Hamming-weight register. A smaller cap needs fewer scratch qubits but more rotations. Every batch is phased as given, so use a cap of at least 8: shorter batches save too few rotations to be worth the extra Toffolis and scratch qubits. Ignored when ``use_hamming_weight_phasing`` is False. When set to -1 (default), there is no cap.
+     - Largest batch phased through one register; -1 (default) means no cap. A smaller cap needs fewer scratch qubits but more rotations; use at least 8, as smaller batches save too few rotations. Ignored when phasing is off.
 
 .. _cswap-pauli-sequence-mapper:
 
@@ -205,15 +202,10 @@ ordering is not vacuum preserving, rather than returning a wrong result.
 
 .. rubric:: Hamming-weight phasing
 
-With ``use_hamming_weight_phasing`` and declared ``layer_offsets``, the uncontrolled evolution on
-the vacuum register uses the same Hamming-weight phasing :cite:`Kan2025` as the
-:ref:`Pauli sequence mapper <pauli-sequence-mapper>`: within each layer, a tower of terms with
-exactly equal angles is phased through Hamming-weight registers. Because this
-evolution is uncontrolled, the adder tree and its place-value rotations need no control of their
-own; the swap sandwich supplies it. The vacuum-annihilating grouper does not declare layers, so its
-output keeps one rotation per term; diagonal formulas taken directly from the unitary builder,
-such as an Ising chain without a transverse field, keep their layers. As in the Pauli sequence
-mapper, phasing is off by default.
+With ``use_hamming_weight_phasing``, the evolution on the vacuum register is phased as in the
+:ref:`Pauli sequence mapper <pauli-sequence-mapper>`, but uncontrolled, since the swap sandwich
+supplies the control. The vacuum-annihilating grouper declares no ``layer_offsets``, so its output
+is never phased.
 
 .. rubric:: Settings
 
@@ -226,10 +218,10 @@ mapper, phasing is off by default.
      - Description
    * - ``use_hamming_weight_phasing``
      - bool
-     - Whether to phase each tower of equal-angle rotations in a layer through a Hamming-weight register. When False, every term is its own rotation. Every group of equal angles is phased, however short, so turn this on only when layers hold many equal angles. Default is False.
+     - Whether to phase each layer's equal-angle rotations through Hamming-weight registers. Pays off only when layers hold many equal angles. Default is False.
    * - ``max_hamming_weight_phasing_batch_size``
      - int
-     - Largest tower of equal-angle rotations in a layer phased through one Hamming-weight register. A smaller cap needs fewer scratch qubits but more rotations. Every batch is phased as given, so use a cap of at least 8: shorter batches save too few rotations to be worth the extra Toffolis and scratch qubits. Ignored when ``use_hamming_weight_phasing`` is False. When set to -1 (default), there is no cap.
+     - Largest batch phased through one register; -1 (default) means no cap. A smaller cap needs fewer scratch qubits but more rotations; use at least 8, as smaller batches save too few rotations. Ignored when phasing is off.
    * - ``vacuum_preservation_tolerance``
      - float
      - Absolute tolerance on the total amplitude the full evolution may leak out of the vacuum (default ``1e-9``).

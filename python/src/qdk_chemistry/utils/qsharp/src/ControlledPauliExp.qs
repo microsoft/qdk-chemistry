@@ -28,9 +28,8 @@ namespace QDKChemistry.Utils.ControlledPauliExp {
         phase
     }
 
-    /// Splits the terms in `first..last` into plain terms, in their order and including identity
-    /// terms, and towers of equal-angle rotations for Hamming-weight phasing. See
-    /// `EqualAngleTowers`. Without phasing, every term is plain.
+    /// Splits terms `first..last` into plain terms and equal-angle towers (see `EqualAngleTowers`).
+    /// Without phasing, every term is plain.
     function LayerRotationTowers(
         params : RepPauliExpParams,
         first : Int,
@@ -50,11 +49,8 @@ namespace QDKChemistry.Utils.ControlledPauliExp {
     }
 
     /// Applies the producer's disjoint layers without changing their boundaries.
-    ///
-    /// With `useHammingWeightPhasing`, the terms of a layer that share a rotation angle form a
-    /// tower, however few they are, and each tower is phased through Hamming-weight registers
-    /// :cite:`Kan2025` instead of one controlled rotation per term. `maxBatchSize` caps the terms
-    /// per register; see `HammingWeightBatchSize`.
+    /// With `useHammingWeightPhasing`, each layer's equal-angle rotations are phased together
+    /// :cite:`Kan2025`, at most `maxBatchSize` per register.
     operation ControlledPauliLayers(
         params : RepPauliExpParams,
         layerOffsets : Int[],
@@ -140,10 +136,8 @@ namespace QDKChemistry.Utils.ControlledPauliExp {
     /// # Parameters
     /// - `params`: The sparse repeated Pauli evolution parameters.
     /// - `layerOffsets`: Declared disjoint-layer boundaries; empty means term-by-term evolution.
-    /// - `useHammingWeightPhasing`: Whether to phase each declared layer's equal-angle rotations
-    ///   through Hamming-weight registers.
-    /// - `maxBatchSize`: Largest tower of equal-angle rotations in a declared layer phased through
-    ///   one Hamming-weight register, or -1 for no cap.
+    /// - `useHammingWeightPhasing`: Whether to phase equal-angle rotations through Hamming-weight registers.
+    /// - `maxBatchSize`: Largest Hamming-weight phasing batch, or -1 for no cap.
     /// - `control`: The control qubit.
     /// - `systems`: The system qubits the evolution acts on.
     operation RepControlledPauliExp(
