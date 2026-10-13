@@ -31,6 +31,7 @@ using qdk::chemistry::utils::detail::dense_unitary_synthesis;
 using qdk::chemistry::utils::detail::DenseSiteSynthesis;
 using qdk::chemistry::utils::detail::GivensDecomposition;
 using qdk::chemistry::utils::detail::matrix_product_state_synthesis;
+using qdk::chemistry::utils::detail::orthogonal_givens_decomposition;
 using qdk::chemistry::utils::detail::SparseSiteSynthesis;
 
 namespace detail {
@@ -637,6 +638,28 @@ TEST(UnitarySynthesisTest, ContainerDispatchSkipsInitialSite) {
   EXPECT_THROW(matrix_product_state_synthesis(invalid, 2, "dense"),
                std::invalid_argument);
   EXPECT_THROW(matrix_product_state_synthesis(invalid, 2, "block_sparse"),
+               std::invalid_argument);
+}
+
+TEST(UnitarySynthesisTest, DecomposesOrthogonalMatrices) {
+  for (const Eigen::Index dim : {1, 2, 3, 4, 8, 16}) {
+    for (const std::uint32_t seed : {3U, 11U}) {
+      const Eigen::MatrixXd target =
+          random_orthogonal(dim, seed + static_cast<std::uint32_t>(dim));
+      EXPECT_TRUE(reconstruct(orthogonal_givens_decomposition(target))
+                      .isApprox(target, 1.0e-11));
+    }
+  }
+  const Eigen::MatrixXd identity = Eigen::MatrixXd::Identity(4, 4);
+  const GivensDecomposition trivial = orthogonal_givens_decomposition(identity);
+  EXPECT_TRUE(trivial.layer_angles.empty());
+  EXPECT_TRUE(reconstruct(trivial).isApprox(identity));
+
+  EXPECT_THROW(orthogonal_givens_decomposition(Eigen::MatrixXd(0, 0)),
+               std::invalid_argument);
+  EXPECT_THROW(orthogonal_givens_decomposition(Eigen::MatrixXd::Identity(4, 2)),
+               std::invalid_argument);
+  EXPECT_THROW(orthogonal_givens_decomposition(2.0 * identity),
                std::invalid_argument);
 }
 

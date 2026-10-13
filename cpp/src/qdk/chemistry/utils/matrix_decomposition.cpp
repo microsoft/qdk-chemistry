@@ -230,6 +230,19 @@ std::vector<GivensDecomposition> givens_decomposition(
   return results;
 }
 
+GivensDecomposition orthogonal_givens_decomposition(
+    const Eigen::MatrixXd& matrix) {
+  if (matrix.size() == 0 || matrix.rows() != matrix.cols()) {
+    throw std::invalid_argument(
+        "Givens decomposition requires a nonempty square matrix.");
+  }
+  if (!is_isometry(matrix)) {
+    throw std::invalid_argument(
+        "Givens decomposition requires an orthogonal matrix.");
+  }
+  return decompose_orthogonal(matrix);
+}
+
 // Merges the Givens decompositions of diagonal blocks, which occupy
 // consecutive diagonal ranges in input order, into global adjacent-pair layers
 // of the block-diagonal matrix. Global layers alternate parity, starting

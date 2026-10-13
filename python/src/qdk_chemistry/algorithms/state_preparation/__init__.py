@@ -12,6 +12,9 @@ import warnings
 from typing import Any
 
 from qdk_chemistry.algorithms.state_preparation.alias_sampling import AliasSamplingStatePreparation
+from qdk_chemistry.algorithms.state_preparation.constant_depth_matrix_product_state import (
+    ConstantDepthMatrixProductStatePreparation,
+)
 from qdk_chemistry.algorithms.state_preparation.dense_pure_state import DensePureStatePreparation
 from qdk_chemistry.algorithms.state_preparation.identity import identity_state_prep
 from qdk_chemistry.algorithms.state_preparation.matrix_product_state import MatrixProductStatePreparation
@@ -29,6 +32,7 @@ from qdk_chemistry.algorithms.state_preparation.state_preparation import (
 # working, but is intentionally omitted from ``__all__`` so ``import *`` does not pull it in.
 __all__ = [
     "AliasSamplingStatePreparation",
+    "ConstantDepthMatrixProductStatePreparation",
     "DensePureStatePreparation",
     "MatrixProductStatePreparation",
     "QROMStatePreparation",

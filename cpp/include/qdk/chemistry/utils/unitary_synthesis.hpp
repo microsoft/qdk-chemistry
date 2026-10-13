@@ -119,6 +119,21 @@ DenseSiteSynthesis dense_unitary_synthesis(
 SparseSiteSynthesis block_sparse_unitary_synthesis(const data::MPSSite& site,
                                                    Eigen::Index ancilla_dim);
 
+/**
+ * @brief Decompose a real orthogonal matrix into parallel Givens rotation
+ * layers.
+ *
+ * Uses the Clements double-sided elimination schedule (Clements et al., Optica
+ * 3, 1460 (2016)) that also synthesizes the site unitaries.
+ *
+ * @param matrix Nonempty square real orthogonal matrix.
+ * @return Givens layers and signs that reproduce @p matrix.
+ * @throws std::invalid_argument If the matrix is empty, not square, or not
+ * orthogonal within @f$\lVert U^T U-I\rVert_F\leq 10^{-8}n@f$.
+ */
+GivensDecomposition orthogonal_givens_decomposition(
+    const Eigen::MatrixXd& matrix);
+
 using MPSSynthesis = std::variant<std::vector<DenseSiteSynthesis>,
                                   std::vector<SparseSiteSynthesis>>;
 

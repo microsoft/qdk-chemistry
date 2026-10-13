@@ -168,6 +168,26 @@ Raises:
       py::arg("site"), py::arg("ancilla_dimension"));
 
   unitary_synthesis.def(
+      "orthogonal_givens_decomposition",
+      [](const Eigen::MatrixXd& matrix) {
+        py::gil_scoped_release release;
+        return synthesis::orthogonal_givens_decomposition(matrix);
+      },
+      R"(
+Decompose a real orthogonal matrix into parallel Givens rotation layers.
+
+Args:
+    matrix (numpy.ndarray): Nonempty square real orthogonal matrix.
+
+Returns:
+    GivensDecomposition: Givens layers and signs that reproduce the matrix.
+
+Raises:
+    ValueError: If the matrix is empty, not square, or not orthogonal.
+)",
+      py::arg("matrix"));
+
+  unitary_synthesis.def(
       "matrix_product_state_synthesis",
       [](const data::MPSContainer& mps, Eigen::Index ancilla_dimension,
          const std::string& method) {
