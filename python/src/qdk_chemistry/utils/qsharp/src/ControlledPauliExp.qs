@@ -4,13 +4,13 @@
 
 namespace QDKChemistry.Utils.ControlledPauliExp {
 
-    import QDKChemistry.Utils.HammingWeightPhasing.EqualAngleTowers;
     import QDKChemistry.Utils.HammingWeightPhasing.HammingWeightPhase;
     import QDKChemistry.Utils.PauliExp.RepPauliExp;
     import QDKChemistry.Utils.PauliExp.RepPauliExpParams;
     import Std.Arrays.IndexOf;
     import Std.Arrays.Mapped;
     import Std.Arrays.MappedOverRange;
+    import Std.Arrays.Sorted;
     import Std.Arrays.Subarray;
     import Std.Canon.MapPauliAxis;
     import Std.Math.Max;
@@ -28,8 +28,8 @@ namespace QDKChemistry.Utils.ControlledPauliExp {
         phase
     }
 
-    /// Splits terms `first..last` into plain terms and equal-angle towers (see `EqualAngleTowers`).
-    /// Without phasing, every term is plain.
+    /// Splits terms `first..last` into plain terms, in input order, and towers of terms with exactly
+    /// equal nonzero angles. Without phasing, every term is plain.
     function LayerRotationTowers(
         params : RepPauliExpParams,
         first : Int,
@@ -39,13 +39,30 @@ namespace QDKChemistry.Utils.ControlledPauliExp {
         if not useHammingWeightPhasing {
             return (MappedOverRange(term -> term, first..last), []);
         }
-        // An identity term takes angle 0, which never joins a tower.
-        let angles = MappedOverRange(
-            term -> Length(params.pauliIndices[term]) > 0 ? params.pauliCoefficients[term] | 0.0,
-            first..last
+        // Sort (angle, term) pairs; an identity term takes angle 0, which stays plain.
+        // The comparator captures nothing: a capturing one breaks Base-profile lowering.
+        let sorted = Sorted(
+            ((leftAngle, leftTerm), (rightAngle, rightTerm)) -> leftAngle < rightAngle or (leftAngle == rightAngle and leftTerm <= rightTerm),
+            MappedOverRange(term -> (Length(params.pauliIndices[term]) > 0 ? params.pauliCoefficients[term] | 0.0, term), first..last)
         );
-        let (plain, towers) = EqualAngleTowers(angles);
-        (Mapped(position -> first + position, plain), Mapped(tower -> Mapped(position -> first + position, tower), towers))
+        let angles = Mapped((angle, _) -> angle, sorted);
+        let terms = Mapped((_, term) -> term, sorted);
+        mutable plain : Int[] = [];
+        mutable towers : Int[][] = [];
+        mutable start = 0;
+        while start < Length(terms) {
+            mutable stop = start + 1;
+            while stop < Length(terms) and angles[stop] == angles[start] {
+                set stop += 1;
+            }
+            if angles[start] == 0.0 {
+                set plain += terms[start..stop - 1];
+            } else {
+                set towers += [terms[start..stop - 1]];
+            }
+            set start = stop;
+        }
+        (plain, towers)
     }
 
     /// Applies the producer's disjoint layers without changing their boundaries.

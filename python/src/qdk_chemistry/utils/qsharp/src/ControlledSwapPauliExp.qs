@@ -40,36 +40,6 @@ namespace QDKChemistry.Utils.ControlledSwapPauliExp {
         }
     }
 
-    /// `RepPauliExp` with Hamming-weight phasing per declared layer; plain `RepPauliExp` without phasing or layers.
-    internal operation RepPauliLayersExp(
-        params : RepPauliExpParams,
-        layerOffsets : Int[],
-        useHammingWeightPhasing : Bool,
-        maxBatchSize : Int,
-        systems : Qubit[]
-    ) : Unit is Adj + Ctl {
-        if not useHammingWeightPhasing or Length(layerOffsets) == 0 {
-            RepPauliExp(params, systems);
-        } else {
-            let first = IndexOf(offset -> offset == params.numPrefixTerms, layerOffsets);
-            let last = IndexOf(offset -> offset == Length(params.pauliCoefficients) - params.numSuffixTerms, layerOffsets);
-            let stepOffsets = layerOffsets[first..last];
-            PauliLayers(params, layerOffsets[0..first], useHammingWeightPhasing, maxBatchSize, systems);
-            if IsResourceEstimating() {
-                within {
-                    RepeatEstimates(params.repetitions);
-                } apply {
-                    PauliLayers(params, stepOffsets, useHammingWeightPhasing, maxBatchSize, systems);
-                }
-            } else {
-                for _ in 1..params.repetitions {
-                    PauliLayers(params, stepOffsets, useHammingWeightPhasing, maxBatchSize, systems);
-                }
-            }
-            PauliLayers(params, layerOffsets[last...], useHammingWeightPhasing, maxBatchSize, systems);
-        }
-    }
-
     /// Controls sparse Pauli evolution using a CSWAP sandwich.
     ///
     /// For an n-qubit system, this uses one additional n-qubit vacuum register and
@@ -103,7 +73,26 @@ namespace QDKChemistry.Utils.ControlledSwapPauliExp {
                 Controlled SWAP([control], (systems[i], vacuum[i]));
             }
         } apply {
-            RepPauliLayersExp(evolution, layerOffsets, useHammingWeightPhasing, maxBatchSize, vacuum);
+            if not useHammingWeightPhasing or Length(layerOffsets) == 0 {
+                RepPauliExp(evolution, vacuum);
+            } else {
+                let first = IndexOf(offset -> offset == evolution.numPrefixTerms, layerOffsets);
+                let last = IndexOf(offset -> offset == Length(evolution.pauliCoefficients) - evolution.numSuffixTerms, layerOffsets);
+                let stepOffsets = layerOffsets[first..last];
+                PauliLayers(evolution, layerOffsets[0..first], useHammingWeightPhasing, maxBatchSize, vacuum);
+                if IsResourceEstimating() {
+                    within {
+                        RepeatEstimates(evolution.repetitions);
+                    } apply {
+                        PauliLayers(evolution, stepOffsets, useHammingWeightPhasing, maxBatchSize, vacuum);
+                    }
+                } else {
+                    for _ in 1..evolution.repetitions {
+                        PauliLayers(evolution, stepOffsets, useHammingWeightPhasing, maxBatchSize, vacuum);
+                    }
+                }
+                PauliLayers(evolution, layerOffsets[last...], useHammingWeightPhasing, maxBatchSize, vacuum);
+            }
         }
         // Skipped when negligible so a vacuum-annihilating evolution costs no extra rotation.
         if AbsD(vacuumPhase) > 1e-12 {

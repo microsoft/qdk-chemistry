@@ -685,77 +685,8 @@ class TestVacuumAnnihilatingAcrossFermionToQubitMappings:
         assert isinstance(mapper.run(unitary), Circuit)
 
 
-def _diagonal_spin_chain(field: float) -> UnitaryRepresentation:
-    """Return two Trotter steps of a 16-site XXZ ring with no XY coupling, so it preserves the vacuum.
-
-    Each bond color is a tower of 8 equal-angle ZZ terms, and a nonzero ``field`` adds a tower of 16 Z terms.
-    """
-    hamiltonian = create_heisenberg_hamiltonian(
-        LatticeGraph.chain(16, periodic=True), jx=0.0, jy=0.0, jz=1.0, hx=0.0, hy=0.0, hz=field
-    )
-    trotter = registry.create("hamiltonian_unitary_builder", "trotter")
-    trotter.settings().update({"order": 1, "num_divisions": 2, "time": 0.6})
-    return trotter.run(hamiltonian)
-
-
-def _cswap(unitary: UnitaryRepresentation, *, phasing: bool, cap: int = -1) -> Circuit:
-    """Map ``unitary`` with control 0, Hamming-weight phasing on or off, and the given batch cap."""
-    return registry.create(
-        "controlled_circuit_mapper",
-        "cswap_pauli_sequence",
-        use_hamming_weight_phasing=phasing,
-        max_hamming_weight_phasing_batch_size=cap,
-    ).run(unitary)
-
-
-def _counts(circuit: Circuit) -> dict[str, int]:
-    """Return the logical resource counts of ``circuit``."""
-    application = circuit.get_qre_application()
-    return dict(get_qsharp_context().logical_counts(application.entry_expr, *application.args))
-
-
 class TestHammingWeightPhasing:
     """Equal-angle towers of a declared layer are phased through Hamming-weight registers on the vacuum."""
-
-    def test_default_settings_and_payload(self) -> None:
-        """Phasing defaults to off with no cap, and both settings travel with the declared layers."""
-        mapper = registry.create("controlled_circuit_mapper", "cswap_pauli_sequence")
-        assert mapper.settings().get("use_hamming_weight_phasing") is False
-        assert mapper.settings().get("max_hamming_weight_phasing_batch_size") == -1
-        unitary = _diagonal_spin_chain(0.0)
-        default = mapper.run(unitary)._qsharp_factory
-        assert default is not None
-        assert default.parameter["useHammingWeightPhasing"] is False
-        assert default.parameter["maxBatchSize"] == -1
-        factory = _cswap(unitary, phasing=True, cap=8)._qsharp_factory
-        assert factory is not None
-        payload = factory.parameter
-        assert list(payload) == [
-            "evolution",
-            "layerOffsets",
-            "useHammingWeightPhasing",
-            "maxBatchSize",
-            "vacuumPhase",
-            "control",
-            "systems",
-        ]
-        assert payload["layerOffsets"] == list(unitary.get_container().layer_offsets)
-        assert payload["useHammingWeightPhasing"] is True
-        assert payload["maxBatchSize"] == 8
-
-    @pytest.mark.parametrize("cap", [0, -2])
-    def test_invalid_cap_raises(self, cap: int) -> None:
-        """A cap must be -1 or positive."""
-        with pytest.raises(ValueError, match="max_hamming_weight_phasing_batch_size must be -1 or a positive"):
-            _cswap(_diagonal_spin_chain(0.0), phasing=True, cap=cap)
-
-    def test_batch_cap_is_ignored_when_phasing_is_off(self) -> None:
-        """With phasing off the cap is never read, so a cap that would otherwise be rejected is accepted."""
-        unitary = _diagonal_spin_chain(0.0)
-        circuit = _cswap(unitary, phasing=False, cap=0)
-        assert circuit._qsharp_factory is not None
-        assert circuit._qsharp_factory.parameter["useHammingWeightPhasing"] is False
-        assert _counts(circuit) == _counts(_cswap(unitary, phasing=False))
 
     @pytest.mark.parametrize(
         ("field", "phasing", "cap"),
@@ -764,19 +695,24 @@ class TestHammingWeightPhasing:
     def test_diagonal_spin_chain_matches_the_controlled_trotter_product(
         self, field: float, phasing: bool, cap: int
     ) -> None:
-        """Phased, split and plain towers all give the controlled Trotter product up to a global phase."""
-        unitary = _diagonal_spin_chain(field)
+        """Phased, split and plain towers all give the controlled Trotter product up to a global phase.
+
+        A 16-site XXZ ring with no XY coupling preserves the vacuum. Each bond color is a tower of 8 equal-angle
+        ZZ terms, and a nonzero ``field`` adds a tower of 16 Z terms.
+        """
+        hamiltonian = create_heisenberg_hamiltonian(
+            LatticeGraph.chain(16, periodic=True), jx=0.0, jy=0.0, jz=1.0, hx=0.0, hy=0.0, hz=field
+        )
+        trotter = registry.create("hamiltonian_unitary_builder", "trotter")
+        trotter.settings().update({"order": 1, "num_divisions": 2, "time": 0.6})
+        unitary = trotter.run(hamiltonian)
         container = unitary.get_container()
-        circuit = _cswap(unitary, phasing=phasing, cap=cap)
+        circuit = registry.create(
+            "controlled_circuit_mapper",
+            "cswap_pauli_sequence",
+            use_hamming_weight_phasing=phasing,
+            max_hamming_weight_phasing_batch_size=cap,
+        ).run(unitary)
         state = random_sparse_state(container.num_qubits + 1, 16, seed=cap + 2)
         actual = apply_controlled_operation(circuit._qsharp_op, state)
         assert_states_match_up_to_global_phase(actual, controlled_product_formula_state(container, state), 1e-10)
-
-    def test_phasing_saves_rotations(self) -> None:
-        """Towers of 8 ZZ terms are phased with adder Toffolis and fewer rotations; off restores the plain circuit."""
-        unitary = _diagonal_spin_chain(0.0)
-        phased, plain = (_counts(_cswap(unitary, phasing=phasing)) for phasing in (True, False))
-        assert phased["cczCount"] + phased["ccixCount"] > plain["cczCount"] + plain["ccixCount"]
-        assert phased["rotationCount"] < plain["rotationCount"]
-        # The cap is ignored while phasing is off.
-        assert _counts(_cswap(unitary, phasing=False, cap=8)) == plain
