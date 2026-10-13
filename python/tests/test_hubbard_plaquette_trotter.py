@@ -496,8 +496,8 @@ class TestPauliProductFormulaOutput:
 # which turns the place-value rotations of every tower into one rotation and Toffolis.
 _COUNT_KEYS = ("numQubits", "rotationCount", "rotationDepth", "tCount", "cczCount", "ccixCount", "measurementCount")
 _BENCHMARK_COUNTS = {
-    2: (51, 131709, 131417, 698049, 3925470, 0, 3925480),
-    4: (87, 24549, 24257, 758481, 1421400, 0, 1421410),
+    2: (34, 131632, 131433, 697995, 1177641, 0, 1177651),
+    4: (78, 24549, 24274, 758427, 592250, 0, 592260),
 }
 
 #: Rotation synthesis rounds transcendental angles, so the rotation counts drift by a few units
