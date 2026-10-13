@@ -13,8 +13,12 @@ namespace QDKChemistry.Utils.IterativePhaseEstimation {
     /// - `phaseQubit`: The index of the phase qubit (ancilla used for phase readout).
     /// - `systems`: An array of indices representing the system qubits.
     /// - `numAncillaQubits`: Number of ancilla qubits needed by the controlled unitary (0 if none).
-    /// - `prepareSharedOp`: Prepares the shared register around the controlled unitary.
-    /// - `numSharedAncillas`: Size of the shared register, placed at the end of the targets.
+    /// - `prepareSharedOp`: Prepares the shared register around the state preparation and the
+    ///   controlled unitary.
+    /// - `numSharedAncillas`: Size of the shared register, placed after the unitary's ancillas.
+    /// - `statePrepUsesShared`: Append the shared register to the system qubits `statePrep` acts on.
+    /// - `unitaryUsesShared`: Append the shared register to the controlled unitary's targets.
+    ///   Each consumer leaves the register prepared.
     struct IterativePhaseEstimationParams {
         statePrep : Qubit[] => Unit,
         repControlledUnitary : (Qubit, Qubit[]) => Unit,
@@ -24,6 +28,8 @@ namespace QDKChemistry.Utils.IterativePhaseEstimation {
         numAncillaQubits : Int,
         prepareSharedOp : Qubit[] => Unit is Adj + Ctl,
         numSharedAncillas : Int,
+        statePrepUsesShared : Bool,
+        unitaryUsesShared : Bool,
     }
 
     /// Runs the iterative Quantum Phase Estimation (IQPE) circuit based on the provided parameters.
@@ -32,28 +38,32 @@ namespace QDKChemistry.Utils.IterativePhaseEstimation {
     /// # Returns
     /// - `Result[]`: The result of measuring the phase qubit after the IQPE circuit is executed.
     operation RunIQPE(params : IterativePhaseEstimationParams) : Result[] {
+        // Fully qualified: importing `Fact` here makes Base-profile partial evaluation panic.
+        Std.Diagnostics.Fact(
+            params.numSharedAncillas > 0 or not (params.statePrepUsesShared or params.unitaryUsesShared),
+            "consuming shared ancillas requires a non-empty shared register"
+        );
         use qs = Qubit[Length(params.systems) + 1 + params.numAncillaQubits + params.numSharedAncillas];
         let phaseQubit = qs[params.phaseQubit];
         let systems = Subarray(params.systems, qs);
         let ancillaStart = 1 + Length(params.systems);
         let ancillas = qs[ancillaStart..ancillaStart + params.numAncillaQubits - 1];
         let shared = qs[ancillaStart + params.numAncillaQubits...];
-        let allTargets = systems + ancillas + shared;
-
-        params.statePrep(systems);
+        let unitaryTargets = systems + ancillas + (params.unitaryUsesShared ? shared | []);
 
         within {
-            H(phaseQubit);
+            params.prepareSharedOp(shared);
         } apply {
-            Rz(params.accumulatePhase, phaseQubit);
+            params.statePrep(params.statePrepUsesShared ? systems + shared | systems);
             within {
-                params.prepareSharedOp(shared);
+                H(phaseQubit);
             } apply {
-                params.repControlledUnitary(phaseQubit, allTargets);
+                Rz(params.accumulatePhase, phaseQubit);
+                params.repControlledUnitary(phaseQubit, unitaryTargets);
             }
         }
         let result = MResetZ(phaseQubit);
-        ResetAll(allTargets);
+        ResetAll(systems + ancillas + shared);
         return [result];
     }
 
@@ -65,8 +75,11 @@ namespace QDKChemistry.Utils.IterativePhaseEstimation {
     /// - `phaseQubit`: The index of the phase qubit (ancilla used for phase readout).
     /// - `systems`: An array of indices representing the system qubits.
     /// - `numAncillaQubits`: Number of ancilla qubits needed by the controlled unitary (0 if none).
-    /// - `prepareSharedOp`: Prepares the shared register around the controlled unitary.
-    /// - `numSharedAncillas`: Size of the shared register, placed at the end of the targets.
+    /// - `prepareSharedOp`: Prepares the shared register around the state preparation and the
+    ///   controlled unitary.
+    /// - `numSharedAncillas`: Size of the shared register, placed after the unitary's ancillas.
+    /// - `statePrepUsesShared`: Append the shared register to the system qubits `statePrep` acts on.
+    /// - `unitaryUsesShared`: Append the shared register to the controlled unitary's targets.
     /// # Returns
     /// The result of measuring the phase qubit after the IQPE circuit is executed.
     operation MakeIQPECircuit(
@@ -78,6 +91,8 @@ namespace QDKChemistry.Utils.IterativePhaseEstimation {
         numAncillaQubits : Int,
         prepareSharedOp : Qubit[] => Unit is Adj + Ctl,
         numSharedAncillas : Int,
+        statePrepUsesShared : Bool,
+        unitaryUsesShared : Bool,
     ) : Result[] {
         return RunIQPE(new IterativePhaseEstimationParams {
             statePrep = statePrep,
@@ -87,7 +102,9 @@ namespace QDKChemistry.Utils.IterativePhaseEstimation {
             systems = systems,
             numAncillaQubits = numAncillaQubits,
             prepareSharedOp = prepareSharedOp,
-            numSharedAncillas = numSharedAncillas
+            numSharedAncillas = numSharedAncillas,
+            statePrepUsesShared = statePrepUsesShared,
+            unitaryUsesShared = unitaryUsesShared
         });
     }
 }

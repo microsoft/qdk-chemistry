@@ -13,6 +13,7 @@ import numpy as np
 import pytest
 
 from qdk_chemistry.algorithms.phase_estimation.standard_phase_estimation import StandardPhaseEstimation
+from qdk_chemistry.algorithms.state_preparation.qrom_state_prep import QROMStatePreparation
 from qdk_chemistry.data import (
     AlgorithmRef,
     Circuit,
@@ -28,6 +29,7 @@ from .reference_tolerances import (
     qpe_energy_tolerance,
     qpe_phase_fraction_tolerance,
 )
+from .test_helpers import create_dense_wavefunction
 
 _SEED = 42
 
@@ -284,6 +286,18 @@ def test_standard_phase_estimation_extracts_phase_and_energy(
         rtol=float_comparison_relative_tolerance,
         atol=qpe_energy_tolerance,
     )
+
+
+def test_standard_phase_estimation_shares_the_gradient_with_the_state_preparation(
+    two_qubit_phase_problem: PhaseEstimationProblem,
+) -> None:
+    """A QROM state preparation rotates through the gradient QPE prepares, though no controlled unitary does."""
+    state_prep = QROMStatePreparation(rotation_bit_precision=8, allocate_phase_gradient=False).run(
+        create_dense_wavefunction([1.0 / np.sqrt(2.0), 0.0, 0.0, 1.0 / np.sqrt(2.0)])
+    )
+    result = _run_standard(replace(two_qubit_phase_problem, state_prep=state_prep))
+
+    assert result.bitstring_msb_first == two_qubit_phase_problem.expected_bitstring
 
 
 @pytest.mark.parametrize("builder_name", _builder_params)

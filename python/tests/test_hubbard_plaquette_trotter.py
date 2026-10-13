@@ -662,7 +662,7 @@ class TestSharedPhaseGradient:
         ]
         builder = create("qpe_circuit_builder", "qdk_standard", num_bits=2)
         with pytest.raises(ValueError, match="same phase gradient register"):
-            builder._shared_register(circuits)
+            builder._shared_register(identity_state_prep(num_qubits=32), circuits)
 
     @pytest.mark.parametrize("method", ["qdk_standard", "qdk_iterative"])
     @pytest.mark.parametrize("use_phase_gradient", [True, False], ids=["phase_gradient", "rz_ladder"])
@@ -694,6 +694,8 @@ class TestSharedPhaseGradient:
             assert parameters["numSharedAncillas"] == expected
             prepared = parameters["prepareSharedOp"] is not QSHARP_UTILS.PrepSelPrep.NoOpPrepare
             assert prepared == use_phase_gradient
+            assert parameters["unitaryUsesShared"] == use_phase_gradient
+            assert parameters["statePrepUsesShared"] is False
 
 
 class TestStepCountAndShift:
