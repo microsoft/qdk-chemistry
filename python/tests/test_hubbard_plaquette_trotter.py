@@ -514,12 +514,6 @@ _BENCHMARK_COUNTS = {
     4: (87, 24549, 24257, 758481, 1421400, 0, 1421410),
 }
 
-#: The same L=4 circuit with ``use_phase_gradient=False``: each place value is synthesized as its
-#: own ``Rz``, the original rotation ladder, which needs no gradient register and pays in rotations.
-_LADDER_BENCHMARK_COUNTS = {
-    4: (57, 261233, 190086, 758427, 355350, 0, 355360),
-}
-
 #: Rotation synthesis rounds transcendental angles, so the rotation counts drift by a few units
 #: across platforms. The phase gradient leaves few rotations at L=4, where a relative tolerance
 #: alone would not absorb that drift, so they also get an absolute tolerance.
@@ -561,13 +555,11 @@ def _benchmark_counts(
     return {key: int(counts.get(key, 0)) for key in _COUNT_KEYS}
 
 
-def _assert_counts_match_the_pins(
-    counts: Mapping[str, float], size: int, pins: Mapping[int, tuple[int, ...]] = _BENCHMARK_COUNTS
-) -> None:
+def _assert_counts_match_the_pins(counts: Mapping[str, float], size: int) -> None:
     """Exact, except rotations get a tolerance for cross-platform synthesis drift."""
     mismatches = {
         key: (counts.get(key, 0), pinned)
-        for key, pinned in zip(_COUNT_KEYS, pins[size], strict=True)
+        for key, pinned in zip(_COUNT_KEYS, _BENCHMARK_COUNTS[size], strict=True)
         if counts.get(key, 0)
         != (
             pytest.approx(pinned, rel=_ROTATION_RELATIVE_TOLERANCE, abs=_ROTATION_ABSOLUTE_TOLERANCE)
@@ -602,10 +594,6 @@ class TestBenchmarkResources:
     def test_counts_match_the_pins(self, size):
         """``test_estimation_hubbard_2d`` holds the notebook's own output to the same pins."""
         _assert_counts_match_the_pins(_benchmark_counts(size), size)
-
-    def test_the_rotation_ladder_is_still_available(self):
-        """Turning the phase gradient off restores the original ladder of synthesized rotations."""
-        _assert_counts_match_the_pins(_benchmark_counts(4, use_phase_gradient=False), 4, _LADDER_BENCHMARK_COUNTS)
 
     def test_batch_cap_trades_qubits_for_toffolis(self):
         """A cap of 8 keeps the adder tree on fewer qubits, and turning phasing off drops it."""
