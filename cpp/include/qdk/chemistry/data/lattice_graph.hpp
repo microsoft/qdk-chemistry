@@ -32,7 +32,8 @@ using EdgeColoring = std::map<std::pair<std::uint64_t, std::uint64_t>, int>;
 struct EdgeLabel {
   /// One-based neighbor shell, at most 2^53 so that HDF5 stores it exactly.
   std::uint64_t shell;
-  std::optional<BondFlavorId> flavor;
+  /// Opaque semantic flavor ID, if any, at most 2^53 like the shell.
+  std::optional<std::uint64_t> flavor;
   bool operator==(const EdgeLabel&) const = default;
 };
 
@@ -43,7 +44,7 @@ using EdgeLabels = std::map<std::pair<std::uint64_t, std::uint64_t>, EdgeLabel>;
 struct BondFlavorDefinition {
   std::uint64_t shell;
   Eigen::RowVectorXd axis;
-  BondFlavorId flavor;
+  std::uint64_t flavor;
 };
 
 // ---- Free coloring functions ------------------------------------------------
@@ -138,7 +139,8 @@ class LatticeGraph : public DataClass {
    *                    by (i, j) with i < j whichever direction stores it, or
    *                    empty for an unlabelled graph.
    * @throws std::invalid_argument If nonempty edge_labels do not label exactly
-   *         the stored pairs with shells from 1 to 2^53.
+   *         the stored pairs with shells from 1 to 2^53 and flavors at most
+   *         2^53.
    */
   LatticeGraph(const std::map<std::pair<std::uint64_t, std::uint64_t>, double>&
                    edge_weights,
@@ -177,21 +179,23 @@ class LatticeGraph : public DataClass {
    *
    * Shells rank the distinct distances present on this geometry, including
    * periodic images, so a thin patch can lack a bulk-lattice shell and number
-   * the longer distances differently. Each physical connection becomes one
-   * edge of weight `weight`. Edges are colored greedily with seed
-   * `coloring_seed` and 32 trials.
+   * the longer distances differently. Each periodic image of a connection
+   * adds weight `weight` to the edge between its sites, so a site pair joined
+   * by several images of one shell and flavor gets the sum. Edges are colored
+   * greedily with seed `coloring_seed` and 32 trials.
    *
    * @param geometry Source geometry; it is not retained.
    * @param shells Positive shell indices; duplicates are ignored.
    * @param definitions Optional shell-axis flavor assignments.
-   * @param weight Finite weight of every edge.
+   * @param weight Finite weight added by every periodic image of an edge.
    * @param tolerance Positive distance and axis tolerance, less than 1, the
    *                  lattice unit length.
    * @param coloring_seed PRNG seed for greedy edge coloring. Default: 0.
    * @return Graph whose edges carry their shell and flavor.
    * @throws std::invalid_argument If a site neighbors its own periodic image,
-   *         several periodic images join one site pair, or a bond axis lies
-   *         within the tolerance of several flavor axes of its shell.
+   *         periodic images of different shells or flavors join one site
+   *         pair, the summed weight of an edge is not finite, or a bond axis
+   *         lies within the tolerance of several flavor axes of its shell.
    */
   static LatticeGraph from_geometry(
       const LatticeGeometry& geometry,
@@ -290,7 +294,11 @@ class LatticeGraph : public DataClass {
    *
    * @param n        Number of sites.
    * @param periodic If true, add an edge between the first and last site
-   *                 (ring topology). Requires n > 2. Default: false.
+   *                 (ring topology). Requires n > 2; for smaller n no wrap
+   *                 bond is added. For a two-site ring that counts both
+   *                 periodic images, use
+   *                 from_geometry(LatticeGeometry::chain(2, true)).
+   *                 Default: false.
    * @param t        Uniform hopping weight for every edge. Default: 1.0.
    * @param dfs_ordering If true, relabel sites in Hamiltonian-path order found
    *                     by depth-first search. Default: false.

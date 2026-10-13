@@ -277,11 +277,15 @@ class SOSSABlockEncodingContainer(BlockEncodingContainer):
         sampling widens the reflected inner register and ``qrom_phase_gradient`` adds a
         gradient register, so the mapper's ``Circuit.num_qubits`` is authoritative.
         """
-        meta = self.metadata
         layout = self.layout
-        num_system = 2 * meta.num_spatial_orbitals
+        num_system = self.num_system_qubits
         num_ancilla = layout.outer_prep_bits + layout.inner_prep_bits + 2
         return num_system + num_ancilla
+
+    @property
+    def num_system_qubits(self) -> int:
+        """Number of system qubits, two spin-orbitals per spatial orbital."""
+        return 2 * self.metadata.num_spatial_orbitals
 
     @property
     def type(self) -> str:

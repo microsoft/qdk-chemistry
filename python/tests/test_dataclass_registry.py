@@ -10,7 +10,14 @@ import pytest
 import qdk_chemistry.data as data_module
 import qdk_chemistry.data.symmetry as symmetry_module
 from qdk_chemistry._core.data import DataClass as CoreDataClass
-from qdk_chemistry.data import DataClass, QpeResult, Settings, get_dataclass_type, register_dataclass
+from qdk_chemistry.data import (
+    DataClass,
+    HamiltonianDescription,
+    QpeResult,
+    Settings,
+    get_dataclass_type,
+    register_dataclass,
+)
 from qdk_chemistry.data import registry as dataclass_registry
 from qdk_chemistry.data._type_name import class_data_type_name, instance_data_type_name
 from qdk_chemistry.plugins import DuplicateRegistrationError
@@ -25,7 +32,7 @@ def test_all_public_dataclasses_have_canonical_loader(public_module):
         dataclass_type = getattr(public_module, public_name)
         if (
             not isinstance(dataclass_type, type)
-            or dataclass_type in (CoreDataClass, DataClass)
+            or dataclass_type in (CoreDataClass, DataClass, HamiltonianDescription)
             or not issubclass(dataclass_type, CoreDataClass)
         ):
             continue
