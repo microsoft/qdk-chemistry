@@ -172,7 +172,47 @@ namespace QDKChemistry.Utils.HammingWeightPhasing {
         catalyst : Qubit[]
     ) : Unit is Adj + Ctl {
         body (...) {
-            Controlled HammingWeightPhase([], (theta, pauliOps, targets, useHammingWeightPhasing, maxBatchSize, catalyst));
+            let count = Length(targets);
+            Fact(Length(pauliOps) == count, "HammingWeightPhase needs one axis list per term.");
+            if not useHammingWeightPhasing {
+                for t in 0..count - 1 {
+                    Exp(pauliOps[t], -theta, targets[t]);
+                }
+            } elif count > 0 {
+                let batchSize = HammingWeightBatchSize(count, maxBatchSize);
+                let opBatches = Chunks(batchSize, pauliOps);
+                let targetBatches = Chunks(batchSize, targets);
+                for index in 0..Length(targetBatches) - 1 {
+                    let batch = targetBatches[index];
+                    let size = Length(batch);
+                    let inputs = Mapped(term -> Tail(term), batch);
+                    let (schedule, finalBits, _) = HammingWeightSchedule(size);
+                    Fact(All(bit -> bit >= 0, finalBits), "Every place value of the Hamming weight must hold a bit.");
+                    let places = Length(finalBits);
+                    use scratch = Qubit[Length(schedule)];
+                    let work = inputs + scratch;
+                    within {
+                        ComputeHammingWeight(opBatches[index], batch, schedule, work);
+                    } apply {
+                        let weight = Mapped(bit -> work[bit], finalBits);
+                        if Length(catalyst) == 0 {
+                            for j in 0..places - 1 {
+                                Rz(2.0 * theta * IntAsDouble(1 <<< j), weight[j]);
+                            }
+                            // The ladder's angles sum to 2·theta·(2^places - 1).
+                            R(PauliI, 2.0 * theta * IntAsDouble(size - ((1 <<< places) - 1)), inputs[0]);
+                        } else {
+                            Fact(Length(catalyst) >= places, "The catalyst needs a qubit per place value of the weight.");
+                            // Adding the weight phases the catalyst except where the sum wraps, which the carry-out restores.
+                            RippleCarryCGIncByLEWithCarryAction(
+                                R1(2.0 * theta * IntAsDouble(1 <<< places), _),
+                                weight,
+                                catalyst[0..places - 1]
+                            );
+                        }
+                    }
+                }
+            }
         }
         controlled (controls, ...) {
             let count = Length(targets);
