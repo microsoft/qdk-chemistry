@@ -632,20 +632,6 @@ class TestBenchmarkResources:
         assert "__quantum__qis__t__" in qir
 
 
-def _plaquette_controlled(*, use_phase_gradient: bool = True) -> Circuit:
-    """Return the controlled plaquette circuit the mapper builds for a 4 x 4 container."""
-    container = HubbardPlaquetteContainer(width=4, height=4, interaction_angle=0.3, hopping_angle=0.2, step_reps=1)
-    mapper = create(
-        "controlled_circuit_mapper",
-        "hubbard_plaquette",
-        control_indices=[0],
-        use_hamming_weight_phasing=True,
-        use_phase_gradient=use_phase_gradient,
-        rotation_bit_precision=_GRADIENT_BITS,
-    )
-    return mapper.run(UnitaryRepresentation(container=container))
-
-
 class TestSharedPhaseGradient:
     """Phase estimation prepares the plaquette phase gradient once and shares it across queries."""
 
@@ -662,9 +648,21 @@ class TestSharedPhaseGradient:
 
     def test_mismatched_gradient_requests_are_rejected(self):
         """One register cannot serve two widths, and silently dropping one would emit a broken circuit."""
+        container = HubbardPlaquetteContainer(width=4, height=4, interaction_angle=0.3, hopping_angle=0.2, step_reps=1)
+        circuits = [
+            create(
+                "controlled_circuit_mapper",
+                "hubbard_plaquette",
+                control_indices=[0],
+                use_hamming_weight_phasing=True,
+                use_phase_gradient=use_phase_gradient,
+                rotation_bit_precision=_GRADIENT_BITS,
+            ).run(UnitaryRepresentation(container=container))
+            for use_phase_gradient in (True, False)
+        ]
         builder = create("qpe_circuit_builder", "qdk_standard", num_bits=2)
         with pytest.raises(ValueError, match="same phase gradient register"):
-            builder._shared_register([_plaquette_controlled(), _plaquette_controlled(use_phase_gradient=False)])
+            builder._shared_register(circuits)
 
     @pytest.mark.parametrize("method", ["qdk_standard", "qdk_iterative"])
     @pytest.mark.parametrize("use_phase_gradient", [True, False], ids=["phase_gradient", "rz_ladder"])
