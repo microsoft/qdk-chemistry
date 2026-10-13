@@ -15,6 +15,7 @@ import scipy.linalg
 from qdk_chemistry.algorithms import create
 from qdk_chemistry.algorithms.hamiltonian_unitary_builder.time_evolution.zassenhaus import Zassenhaus
 from qdk_chemistry.algorithms.hamiltonian_unitary_builder.time_evolution.zassenhaus_error import (
+    zassenhaus_coefficient_sum,
     zassenhaus_steps_commutator,
     zassenhaus_steps_naive,
 )
@@ -27,6 +28,7 @@ from qdk_chemistry.data import (
     Structure,
     UnitaryRepresentation,
 )
+from qdk_chemistry.data.qubit_operator.containers.sparse_pauli_decomposition import SparsePauliTerms
 from qdk_chemistry.data.unitary_representation.containers.pauli_product_formula import ExponentiatedPauliTerm
 from qdk_chemistry.utils import Logger
 from qdk_chemistry.utils.pauli_matrix import pauli_to_dense_matrix
@@ -197,6 +199,24 @@ class TestZassenhausStepEstimation:
         # Verify computed steps bounds the actual operator-norm error
         steps = zassenhaus_steps_commutator(h_anticommuting, 0.7, 0.01, order=1)
         assert self._first_order_product_formula_error(h_anticommuting, time=0.7, steps=steps) <= 0.01
+
+    @pytest.mark.parametrize(("order", "num_terms"), [(1, 7), (2, 7), (3, 6), (4, 6)])
+    def test_coefficient_sum_matches_the_expanded_plan(self, order, num_terms):
+        """The closed form in the term count reproduces the explicitly expanded omitted exponent."""
+        exponents, _ = zassenhaus_commutator_plan(tuple(range(num_terms)), max_order=order + 1)
+        expanded = zassenhaus_coefficient_sum(order=order, num_terms=num_terms, commutator_exponents=exponents)
+        assert zassenhaus_coefficient_sum(order=order, num_terms=num_terms) == pytest.approx(
+            expanded, rel=float_comparison_relative_tolerance
+        )
+
+    def test_naive_bound_on_sparse_operator_builds_no_labels(self, monkeypatch):
+        """Only filtered magnitudes and their count enter the naive bound, so no Pauli label is built."""
+        sparse = QubitOperator.from_sparse_terms(
+            10**6, [{0: "X"}, {999_999: "Z"}, {5: "Y"}], np.array([1.0, -1.0, 1e-13])
+        )
+        monkeypatch.setattr(SparsePauliTerms, "__getitem__", lambda *_: pytest.fail("built a Pauli label"))
+        dense = QubitOperator(pauli_strings=["X", "Z"], coefficients=[1.0, 1.0])
+        assert zassenhaus_steps_naive(sparse, 1.0, 0.1, order=2) == zassenhaus_steps_naive(dense, 1.0, 0.1, order=2)
 
 
 class TestZassenhausTimeEvolution:

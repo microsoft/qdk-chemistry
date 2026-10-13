@@ -212,6 +212,32 @@ so half of the vacuum amplitude leaks. Keeping the partners together instead giv
       :start-after: # start-cell-cswap
       :end-before: # end-cell-cswap
 
+.. _hubbard-plaquette-mapper:
+
+Hubbard plaquette mapper
+~~~~~~~~~~~~~~~~~~~~~~~~
+
+.. rubric:: Factory name: ``"hubbard_plaquette"``
+
+:class:`~qdk_chemistry.algorithms.controlled_circuit_mapper.ControlledHubbardPlaquetteMapper` maps the ``HubbardPlaquetteContainer`` from the ``"hubbard_plaquette"`` :doc:`HamiltonianUnitaryBuilder <hamiltonian_unitary_builder>` to a singly-controlled Q# circuit.
+Each layer of the plaquette step is a tower of same-angle :math:`R_z` rotations, which the mapper synthesizes with Hamming-weight phasing :cite:`Kan2025`: an adder tree writes the tower's Hamming weight into a scratch register, and a few place-value rotations on that register replace the per-term rotations.
+
+.. rubric:: Settings
+
+.. list-table::
+   :header-rows: 1
+   :widths: 25 15 60
+
+   * - Setting
+     - Type
+     - Description
+   * - ``use_hamming_weight_phasing``
+     - bool
+     - Whether to phase each tower of same-angle rotations through a Hamming-weight register. When False, every term is its own rotation. Default is True.
+   * - ``max_hamming_weight_phasing_batch_size``
+     - int
+     - Largest tower of same-angle rotations phased through one Hamming-weight register. A smaller cap needs fewer scratch qubits but more rotations. Every batch is phased as given, so use a cap of at least 8: shorter batches save too few rotations to be worth the extra Toffolis and scratch qubits. Ignored when ``use_hamming_weight_phasing`` is False. When set to -1 (default), there is no cap.
+
 Related classes
 ---------------
 
