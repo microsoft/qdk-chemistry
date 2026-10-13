@@ -66,22 +66,22 @@ E_scf, wfn_scf = create("scf_solver").run(
     structure, charge=0, spin_multiplicity=1, basis_or_guess="sto-3g"
 )
 
-# 2. Fermionic Hamiltonian, then a qubit Hamiltonian (core energy excluded,
-#    so the all-zero state satisfies H|0...0> = 0)
+# 2. Fermionic Hamiltonian, then a qubit Hamiltonian. The vacuum is an eigenstate;
+#    a constant energy contributes a phase that the CSWAP mapper corrects.
 hamiltonian = create("hamiltonian_constructor").run(wfn_scf.get_orbitals())
 n_spin_orbitals = 2 * hamiltonian.get_orbitals().get_num_molecular_orbitals()
 qubit_ham = create("qubit_mapper").run(
     hamiltonian, MajoranaMapping.jordan_wigner(n_spin_orbitals)
 )
 
-# 3. Group Pauli strings that flip the same qubits. These are the strings coming
-#    from the same fermionic term, whose amplitudes cancel on |0...0>. Without
-#    this step Trotterization interleaves them and the vacuum leaks.
+# 3. Keep cancelling Pauli combinations in one commuting evolution group.
+#    Existing compatible groups/layers are preserved; otherwise they are repaired
+#    and disjoint Pauli layers are supplied for the circuit mapper.
 term_grouper = create("term_grouper", "vacuum_annihilating")
 grouped_ham = term_grouper.run(qubit_ham)
 
-# 4. Trotterize. The builder honours the grouping, so each group is exponentiated
-#    as one contiguous block and the product formula still fixes |0...0>.
+# 4. Trotterize. The builder retains the disjoint layers inside each commuting
+#    group, whose complete evolution preserves the vacuum up to its known phase.
 trotter = create("hamiltonian_unitary_builder", "trotter", order=1, time=0.1)
 evolution = trotter.run(grouped_ham)
 
@@ -93,6 +93,7 @@ cswap_mapper = create(
     "controlled_circuit_mapper",
     "cswap_pauli_sequence",
     control_indices=[0],
+    use_hamming_weight_phasing=True,
 )
 circuit = cswap_mapper.run(evolution)
 print("Controlled evolution circuit generated via the CSWAP sandwich")

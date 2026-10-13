@@ -86,7 +86,7 @@ class ControlledPauliSequenceMapper(ControlledCircuitMapper):
 
     When the formula declares disjoint layers, their controlled rotations share two
     rotation rounds per layer. The declared boundaries are used without regrouping;
-    formulas without layer metadata retain term-by-term controlled evolution.
+    formulas without layer metadata retain term-by-term controlled evolution when phasing is disabled.
 
     With ``use_hamming_weight_phasing``, each declared layer's equal-angle rotations are phased
     together with Hamming-weight phasing :cite:`Kan2025`. Phasing is off by default.
@@ -126,6 +126,7 @@ class ControlledPauliSequenceMapper(ControlledCircuitMapper):
             ValueError: If the unitary container type is not supported.
             ValueError: If multiple control qubits are provided.
             ValueError: If phasing is on and the batch cap is neither -1 nor positive.
+            ValueError: If phasing is on but the formula has no declared disjoint layers.
 
         """
         unitary_container = unitary.get_container()
@@ -140,6 +141,11 @@ class ControlledPauliSequenceMapper(ControlledCircuitMapper):
             raise ValueError("PauliSequenceMapper currently only supports a single control qubit.")
 
         use_hamming_weight_phasing = bool(self._settings.get("use_hamming_weight_phasing"))
+        if use_hamming_weight_phasing and unitary_container.layer_offsets is None:
+            raise ValueError(
+                "use_hamming_weight_phasing requires declared disjoint layers (layer_offsets). "
+                "Supply a layered product formula or disable Hamming-weight phasing."
+            )
         max_batch_size = _max_hamming_weight_phasing_batch_size(self._settings)
         target_indices = self._get_target_indices(unitary)
 

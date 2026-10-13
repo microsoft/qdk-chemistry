@@ -198,6 +198,7 @@ class ControlledSwapPauliSequenceMapper(ControlledCircuitMapper):
             ValueError: If multiple control qubits are provided.
             ValueError: If the product formula ordering is not vacuum preserving.
             ValueError: If phasing is on and the batch cap is neither -1 nor positive.
+            ValueError: If phasing is on but the formula has no declared disjoint layers.
 
         """
         unitary_container = unitary.get_container()
@@ -212,6 +213,11 @@ class ControlledSwapPauliSequenceMapper(ControlledCircuitMapper):
             raise ValueError("ControlledSwapPauliSequenceMapper currently only supports a single control qubit.")
 
         use_hamming_weight_phasing = bool(self._settings.get("use_hamming_weight_phasing"))
+        if use_hamming_weight_phasing and unitary_container.layer_offsets is None:
+            raise ValueError(
+                "use_hamming_weight_phasing requires declared disjoint layers (layer_offsets). "
+                "Supply a layered product formula or disable Hamming-weight phasing."
+            )
         max_batch_size = _max_hamming_weight_phasing_batch_size(self._settings)
         target_indices = self._get_target_indices(unitary)
 

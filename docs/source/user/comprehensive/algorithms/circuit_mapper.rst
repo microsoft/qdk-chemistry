@@ -124,7 +124,9 @@ With ``use_hamming_weight_phasing``, terms of a declared layer with exactly equa
 such as the uniform bonds of an Ising or Heisenberg lattice, are phased together with
 Hamming-weight phasing :cite:`Kan2025`: an adder tree writes their Hamming weight into scratch
 qubits, and a few controlled rotations on it replace the per-term rotations. Formulas without
-``layer_offsets`` are never phased. Phasing is off by default.
+``layer_offsets`` raise :class:`ValueError` when phasing is requested; supply a layered formula
+or disable phasing. Phasing is off by default, and unlayered formulas retain ordinary evolution
+when it is disabled.
 
 .. rubric:: Settings
 
@@ -184,13 +186,29 @@ fermionic term are exponentiated as one contiguous block:
    \approx \prod_i e^{-it P_i}|0\ldots0\rangle = |0\ldots0\rangle .
 
 The :ref:`vacuum-annihilating term grouper <algorithms-term-grouper>` (factory name
-``"vacuum_annihilating"``) produces that ordering. A Pauli factor *flips* a qubit when it
-exchanges :math:`|0\rangle` and :math:`|1\rangle`, which :math:`X` and :math:`Y` do and
-:math:`I` and :math:`Z` do not. Terms flipping the same qubits are the only ones that can
-cancel, so the grouper walks them in order and closes a group as soon as the accumulated
-amplitude :math:`\sum_j c_j i^{n_Y^{(j)}}` vanishes — each emitted group therefore annihilates
-the vacuum outright. Groups are restricted to one :math:`Y`-count parity so that their members
-commute and can be exponentiated term by term.
+``"vacuum_annihilating"``) returns a :class:`~qdk_chemistry.data.LayeredPartition` whose outer
+groups commute and preserve the vacuum up to a phase, with disjoint-support Pauli layers inside
+each group. A Pauli factor *flips* a qubit when it exchanges :math:`|0\rangle` and
+:math:`|1\rangle`, which :math:`X` and :math:`Y` do and :math:`I` and :math:`Z` do not.
+Only terms flipping the same qubits can cancel. Within a single :math:`Y`-count parity they
+also commute, so exact zero-sum cuts of :math:`\sum_j c_j i^{n_Y^{(j)}}` form cancellation
+blocks. Compatible blocks can share an outer group, but no block is split between independently
+weighted Trotter groups. Diagonal I/Z terms contribute the allowed vacuum phase.
+
+An existing compatible :class:`~qdk_chemistry.data.LayeredPartition` is preserved exactly.
+When cancellation partners span incompatible old groups, the grouper repairs those boundaries
+while retaining compatible groups and each supplied layer whole or as an ordered fragment.
+For flat or unpartitioned inputs, it derives disjoint layers from full Pauli supports, including
+Z parity strings. A cancellation block may span layers: an XX layer can excite the vacuum and
+its matching YY layer restore it, provided both belong to the same commuting outer group.
+Repartitioning changes neither terms nor coefficients, but it can change a finite-step Trotter
+approximation and therefore its error bound.
+
+The grouper's ``tolerance`` is a coefficient-residual budget for each flipped-set/Y-parity
+component, shared across its output groups. It is not a circuit-leakage bound after time scaling,
+repetition, or coefficient filtering. Grouping for vacuum preservation is also not grouping for
+measurement: use a suitable :doc:`expectation estimator <expectation_estimator>` and a
+qubit-wise commuting partition for simultaneous Pauli-basis measurements.
 
 The mapper validates its input product formula and raises a :class:`ValueError` when the
 ordering is not vacuum preserving, rather than returning a wrong result.
@@ -204,8 +222,14 @@ ordering is not vacuum preserving, rather than returning a wrong result.
 
 With ``use_hamming_weight_phasing``, the evolution on the vacuum register is phased as in the
 :ref:`Pauli sequence mapper <pauli-sequence-mapper>`, but uncontrolled, since the swap sandwich
-supplies the control. The vacuum-annihilating grouper declares no ``layer_offsets``, so its output
-is never phased.
+supplies the control.
+
+The :ref:`vacuum-annihilating term grouper <algorithms-term-grouper>` supports this HWP pipeline:
+it returns a :class:`~qdk_chemistry.data.LayeredPartition`, preserving compatible incoming layers
+or constructing disjoint layers when needed. The :doc:`Trotter builder <hamiltonian_unitary_builder>`
+propagates those layers as ``layer_offsets``, so both controlled Pauli-sequence mappers can phase
+their exactly equal, nonzero-angle terms. Small or nonuniform layers may offer little benefit.
+Requesting phasing on a formula without this metadata raises :class:`ValueError`.
 
 .. rubric:: Settings
 
