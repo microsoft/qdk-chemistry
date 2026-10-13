@@ -107,9 +107,12 @@ Alias resolution is relevant for **time-evolution-based QPE** (Trotter) where th
 For qubitization a single walk phase determines one energy, but a walk raised to a power :math:`p > 1`
 can fold several energies onto one phase. Obtain those candidates with ``eigenvalue_branches_from_phase``
 and resolve the ambiguity explicitly before using ``from_phase_fraction`` with a scalar converter.
-In the CLI, ``--max-power`` (default: ``65536``) rejects larger walk powers before searching;
-all branches are returned for allowed powers. Raising the limit permits more time and memory use.
-``--max-power 0`` skips energy computation and returns an empty branch list and null energy fields and branch count.
+In the CLI, ``--max-power`` (default: ``65536``) rejects a larger stored ``power`` on any container
+before searching; containers without this attribute need no power check. Raising the limit permits more time
+and memory use. ``--max-branches`` (default: ``32``) limits the displayed principal-window candidates to those
+nearest the reference, sorted by energy, while ``branch_count`` reports the total number of candidates.
+Resolution uses every candidate, independently of the display limit. Both limits must be positive;
+``resolved_energy`` may lie outside the principal window when a periodic alias is selected.
 
 Phase estimation measures a phase :math:`\varphi \in [0, 1)`, but the underlying energy eigenvalue can be negative, positive, or arbitrarily large.
 Different energy values that differ by integer multiples of :math:`2\pi / t` all map to the same phase.

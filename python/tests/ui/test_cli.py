@@ -273,12 +273,13 @@ def test_resolve_phase_energy_uses_quantum_walk_mapping(temp_project_dir, capsys
 
 
 @pytest.mark.parametrize(("power", "max_power"), [(2, None), (3, 3), (2**16, None), (2**16 + 1, 2**16 + 1)])
+@pytest.mark.parametrize("max_branches", [None, 1, 64])
 @pytest.mark.parametrize("reference_energy", [-5.8, 5.8])
 @pytest.mark.parametrize("file_format", ["json", "hdf5"])
 def test_resolve_phase_energy_selects_serialized_walk_branch(
-    temp_project_dir, capsys, monkeypatch, *, power, reference_energy, file_format, max_power
+    temp_project_dir, capsys, monkeypatch, *, power, reference_energy, file_format, max_power, max_branches
 ):
-    """Within the power limit, return every saved walk branch and resolve the nearest one."""
+    """Bound the displayed candidates without losing the nearest branch or total count."""
     project_path = temp_project_dir / "test_project"
     project_path.mkdir()
     builder = algorithms.create("hamiltonian_unitary_builder", "lcu", quantum_walk=True, power=power)
@@ -301,7 +302,8 @@ def test_resolve_phase_energy_selects_serialized_walk_branch(
             "--reference-energy",
             str(reference_energy),
         ]
-        + (["--max-power", str(max_power)] if max_power is not None else []),
+        + (["--max-power", str(max_power)] if max_power is not None else [])
+        + (["--max-branches", str(max_branches)] if max_branches is not None else []),
     )
 
     main()
@@ -313,7 +315,8 @@ def test_resolve_phase_energy_selects_serialized_walk_branch(
     assert result["success"] is True
     assert result["container_type"] == "lcu_walk"
     assert result["phase_fraction"] == 0.1
-    assert result["branching"] == pytest.approx(expected)
+    limit = 32 if max_branches is None else max_branches
+    assert result["branching"] == pytest.approx(sorted(nearest[:limit]))
     assert result["branch_count"] == power
     assert result["raw_energy"] is None
     assert result["resolved_energy"] == pytest.approx(nearest[0])
@@ -353,21 +356,39 @@ def test_resolve_phase_energy_walk_reference_selects_positive_branch(temp_projec
     assert result["resolved_energy"] == pytest.approx(5.7063390977)
 
 
-@pytest.mark.parametrize("max_power", [-1, -2])
+@pytest.mark.parametrize("max_power", [0, -1, -2])
 def test_resolve_phase_energy_rejects_invalid_power_limit(max_power):
-    """Reject negative limits before loading a representation."""
-    with pytest.raises(ValueError, match="--max-power must be a nonnegative integer"):
+    """Reject nonpositive limits before loading a representation."""
+    with pytest.raises(ValueError, match="--max-power must be a positive integer"):
         cmd_utils_resolve_phase_energy(argparse.Namespace(max_power=max_power))
 
 
+@pytest.mark.parametrize("max_branches", [0, -1])
+def test_resolve_phase_energy_rejects_invalid_branch_limit(max_branches):
+    """Reject nonpositive display limits before loading a representation."""
+    with pytest.raises(ValueError, match="--max-branches must be a positive integer"):
+        cmd_utils_resolve_phase_energy(argparse.Namespace(max_power=65536, max_branches=max_branches))
+
+
 @pytest.mark.parametrize(("power", "max_power"), [(4, 3), (65537, None), (10**12, None)])
-def test_resolve_phase_energy_rejects_excessive_power(temp_project_dir, monkeypatch, power, max_power):
-    """Reject excessive powers before enumerating any branches."""
+@pytest.mark.parametrize("container_kind", ["walk", "custom"])
+def test_resolve_phase_energy_rejects_excessive_power(temp_project_dir, monkeypatch, power, max_power, container_kind):
+    """Reject excessive powers for any encoding before enumerating its branches."""
     (temp_project_dir / "test_project").mkdir()
-    unitary = data.UnitaryRepresentation(LCUWalkContainer(block_encoding=None, power=power))
+    if container_kind == "walk":
+        container = LCUWalkContainer(block_encoding=None, power=power)
+    else:
+
+        class PoweredFormula(PauliProductFormulaContainer):
+            @property
+            def power(self) -> int:
+                return power
+
+        container = PoweredFormula([], 1, 1)
+    unitary = data.UnitaryRepresentation(container)
     monkeypatch.setattr("qdk_chemistry.ui.cli.load_data_object", lambda *_args: unitary)
     monkeypatch.setattr(
-        LCUWalkContainer, "eigenvalue_branches_from_phase", lambda *_args: pytest.fail("Must reject before searching")
+        type(container), "eigenvalue_branches_from_phase", lambda *_args: pytest.fail("Must reject before searching")
     )
     args = create_parser().parse_args(
         [
@@ -384,44 +405,28 @@ def test_resolve_phase_energy_rejects_excessive_power(temp_project_dir, monkeypa
         ]
         + (["--max-power", str(max_power)] if max_power is not None else [])
     )
-    with pytest.raises(ValueError, match=f"Walk power {power} exceeds --max-power"):
+    with pytest.raises(ValueError, match=f"Unitary power {power} exceeds --max-power"):
         cmd_utils_resolve_phase_energy(args)
 
 
-@pytest.mark.parametrize("max_power", [0, 65536])
-def test_resolve_phase_energy_handles_empty_candidates(temp_project_dir, monkeypatch, capsys, max_power):
-    """Empty candidates are valid only when energy computation is explicitly disabled."""
+def test_resolve_phase_energy_rejects_empty_candidates(temp_project_dir, monkeypatch):
+    """An invalid empty inverse gets a clear error rather than an indexing failure."""
     project_path = temp_project_dir / "test_project"
     project_path.mkdir()
-    unitary = data.UnitaryRepresentation(LCUWalkContainer(block_encoding=None, power=1 if max_power else 10**12))
+    unitary = data.UnitaryRepresentation(LCUWalkContainer(block_encoding=None))
     monkeypatch.setattr("qdk_chemistry.ui.cli.load_data_object", lambda *_args: unitary)
-    monkeypatch.setattr(
-        LCUWalkContainer,
-        "eigenvalue_branches_from_phase",
-        lambda *_args: () if max_power else pytest.fail("Energy search must be skipped"),
-    )
-    monkeypatch.setattr(
-        LCUWalkContainer,
-        "energy_period",
-        property(lambda _self: None if max_power else pytest.fail("Energy search must be skipped")),
-    )
+    monkeypatch.setattr(LCUWalkContainer, "eigenvalue_branches_from_phase", lambda *_args: ())
     args = argparse.Namespace(
         unitary_representation_filename="walk.unitary_representation.json",
         project_name="test_project",
         phase_fraction=0.1,
         reference_energy=5.8,
-        max_power=max_power,
+        max_power=65536,
+        max_branches=32,
     )
 
-    if max_power:
-        with pytest.raises(ValueError, match="returned no candidate energies"):
-            cmd_utils_resolve_phase_energy(args)
-    else:
+    with pytest.raises(ValueError, match="returned no candidate energies"):
         cmd_utils_resolve_phase_energy(args)
-        result = json.loads(capsys.readouterr().out)
-        assert result["success"] is True
-        assert result["branching"] == []
-        assert result["raw_energy"] is result["resolved_energy"] is result["branch_count"] is None
 
 
 def test_resolve_phase_energy_rejects_raw_block_encoding(temp_project_dir, capsys, monkeypatch):
