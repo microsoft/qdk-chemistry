@@ -123,8 +123,8 @@ so the rotation-depth improvement is not a guarantee of constant total gate dept
 With ``use_hamming_weight_phasing``, terms of a declared layer with exactly equal nonzero angles,
 such as the uniform bonds of an Ising or Heisenberg lattice, are phased together with
 Hamming-weight phasing :cite:`Kan2025`: an adder tree writes their Hamming weight into scratch
-qubits, and a few controlled rotations on it replace the per-term rotations. Formulas without
-``layer_offsets`` are never phased. Phasing is off by default.
+qubits, and a few controlled rotations on it replace the per-term rotations. Phasing a formula
+without ``layer_offsets`` raises a :class:`ValueError`. Phasing is off by default.
 
 .. rubric:: Settings
 
@@ -205,7 +205,7 @@ ordering is not vacuum preserving, rather than returning a wrong result.
 With ``use_hamming_weight_phasing``, the evolution on the vacuum register is phased as in the
 :ref:`Pauli sequence mapper <pauli-sequence-mapper>`, but uncontrolled, since the swap sandwich
 supplies the control. The vacuum-annihilating grouper declares no ``layer_offsets``, so its output
-is never phased.
+cannot be phased.
 
 .. rubric:: Settings
 

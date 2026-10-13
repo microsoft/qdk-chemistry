@@ -17,7 +17,7 @@ from qdk_chemistry.utils.qsharp import QSHARP_UTILS
 from .base import ControlledCircuitMapper
 from .controlled_pauli_sequence_mapper import (
     ControlledPauliSequenceMapperSettings,
-    _max_hamming_weight_phasing_batch_size,
+    _hamming_weight_phasing_parameters,
 )
 
 __all__: list[str] = [
@@ -198,6 +198,7 @@ class ControlledSwapPauliSequenceMapper(ControlledCircuitMapper):
             ValueError: If multiple control qubits are provided.
             ValueError: If the product formula ordering is not vacuum preserving.
             ValueError: If phasing is on and the batch cap is neither -1 nor positive.
+            ValueError: If phasing is on and the formula declares no ``layer_offsets``.
 
         """
         unitary_container = unitary.get_container()
@@ -211,15 +212,16 @@ class ControlledSwapPauliSequenceMapper(ControlledCircuitMapper):
         if len(control_indices) != 1:
             raise ValueError("ControlledSwapPauliSequenceMapper currently only supports a single control qubit.")
 
-        use_hamming_weight_phasing = bool(self._settings.get("use_hamming_weight_phasing"))
-        max_batch_size = _max_hamming_weight_phasing_batch_size(self._settings)
+        use_hamming_weight_phasing, max_batch_size, layer_offsets = _hamming_weight_phasing_parameters(
+            self._settings, unitary_container
+        )
         target_indices = self._get_target_indices(unitary)
 
         vacuum_phase = self._vacuum_phase(unitary_container)
 
         controlled_evo_params = QSHARP_UTILS.ControlledSwapPauliExp.RepControlledSwapPauliExpParams(
             evolution=QSHARP_UTILS.PauliExp.RepPauliExpParams(**_pauli_evolution_parameters(unitary_container)),
-            layerOffsets=list(unitary_container.layer_offsets or ()),
+            layerOffsets=layer_offsets,
             useHammingWeightPhasing=use_hamming_weight_phasing,
             maxBatchSize=max_batch_size,
             vacuumPhase=vacuum_phase,

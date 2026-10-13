@@ -50,25 +50,35 @@ class ControlledPauliSequenceMapperSettings(ControlledCircuitMapperSettings):
         )
 
 
-def _max_hamming_weight_phasing_batch_size(settings: Settings) -> int:
-    """Return the Hamming-weight phasing batch cap, validated only when phasing is on.
+def _hamming_weight_phasing_parameters(
+    settings: Settings, container: PauliProductFormulaContainer
+) -> tuple[bool, int, list[int]]:
+    """Return the phasing switch, batch cap and layer offsets, validated only when phasing is on.
 
     Args:
         settings: The mapper settings.
+        container: The product formula to map.
 
     Returns:
-        The cap, ``-1`` meaning no cap.
+        Whether phasing is on, the cap (``-1`` meaning no cap) and the declared layer offsets.
 
     Raises:
         ValueError: If phasing is on and the cap is neither -1 nor positive.
+        ValueError: If phasing is on and the formula declares no ``layer_offsets``.
 
     """
+    use_phasing = bool(settings.get("use_hamming_weight_phasing"))
     max_batch_size = int(settings.get("max_hamming_weight_phasing_batch_size"))
-    if bool(settings.get("use_hamming_weight_phasing")) and max_batch_size != -1 and max_batch_size < 1:
+    layer_offsets = list(container.layer_offsets or ())
+    if use_phasing and max_batch_size != -1 and max_batch_size < 1:
         raise ValueError(
             f"max_hamming_weight_phasing_batch_size must be -1 or a positive integer. Got {max_batch_size}."
         )
-    return max_batch_size
+    if use_phasing and not layer_offsets:
+        raise ValueError(
+            "use_hamming_weight_phasing needs a product formula with layer_offsets, but this formula declares none."
+        )
+    return use_phasing, max_batch_size, layer_offsets
 
 
 class ControlledPauliSequenceMapper(ControlledCircuitMapper):
@@ -126,6 +136,7 @@ class ControlledPauliSequenceMapper(ControlledCircuitMapper):
             ValueError: If the unitary container type is not supported.
             ValueError: If multiple control qubits are provided.
             ValueError: If phasing is on and the batch cap is neither -1 nor positive.
+            ValueError: If phasing is on and the formula declares no ``layer_offsets``.
 
         """
         unitary_container = unitary.get_container()
@@ -139,12 +150,12 @@ class ControlledPauliSequenceMapper(ControlledCircuitMapper):
         if len(control_indices) != 1:
             raise ValueError("PauliSequenceMapper currently only supports a single control qubit.")
 
-        use_hamming_weight_phasing = bool(self._settings.get("use_hamming_weight_phasing"))
-        max_batch_size = _max_hamming_weight_phasing_batch_size(self._settings)
+        use_hamming_weight_phasing, max_batch_size, layer_offsets = _hamming_weight_phasing_parameters(
+            self._settings, unitary_container
+        )
         target_indices = self._get_target_indices(unitary)
 
         evo_params = QSHARP_UTILS.PauliExp.RepPauliExpParams(**_pauli_evolution_parameters(unitary_container))
-        layer_offsets = list(unitary_container.layer_offsets or ())
 
         qsharp_factory = QsharpFactoryData(
             program=QSHARP_UTILS.ControlledPauliExp.MakeRepControlledPauliExpCircuit,
