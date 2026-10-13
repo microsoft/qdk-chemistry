@@ -7,7 +7,11 @@
 
 import numpy as np
 from qdk_chemistry import algorithms
-from qdk_chemistry.data import LatticeGeometry, LatticeGraph
+from qdk_chemistry.data import (
+    FermiHubbardModelHamiltonianDescription,
+    LatticeGeometry,
+    LatticeGraph,
+)
 from qdk_chemistry.utils.model_hamiltonians import (
     create_heisenberg_hamiltonian,
     create_hubbard_hamiltonian,
@@ -59,6 +63,19 @@ hamiltonian = create_hubbard_hamiltonian(lattice, epsilon=0.0, t=1.0, U=4.0)
 
 print(f"Has two-body integrals: {hamiltonian.has_two_body_integrals()}")
 # end-cell-create-hubbard-2d
+################################################################################
+
+################################################################################
+# start-cell-hubbard-description
+# Describe the same model by its lattice geometry and parameters, then build it
+description = FermiHubbardModelHamiltonianDescription(
+    LatticeGeometry.square(4, 4, periodic_x=True, periodic_y=True), t=1.0, u=4.0
+)
+hamiltonian = description.materialize()
+
+print(f"Model parameters: {dict(description.parameters)}")
+print(f"Has two-body integrals: {hamiltonian.has_two_body_integrals()}")
+# end-cell-hubbard-description
 ################################################################################
 
 ################################################################################

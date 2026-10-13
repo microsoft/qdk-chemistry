@@ -148,6 +148,11 @@ class LCUWalkContainer(QuantumWalkContainer):
         return self._block_encoding.num_qubits
 
     @property
+    def num_system_qubits(self) -> int:
+        """Number of system qubits (same as the block encoding)."""
+        return self._block_encoding.num_system_qubits
+
+    @property
     def type(self) -> str:
         """Get the type of the unitary container.
 
