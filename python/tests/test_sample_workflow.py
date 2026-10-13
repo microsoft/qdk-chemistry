@@ -136,7 +136,7 @@ def test_estimation_hubbard_2d():
     ``test_hubbard_plaquette_trotter.py`` checks the same pins against its own construction on every
     run, so this test catches the notebook drifting away from that construction.
     """
-    notebook_path = EXAMPLES_DIR / "benchmark" / "estimation_hubbard_2d.ipynb"
+    notebook_path = EXAMPLES_DIR / "resource_estimation" / "estimation_hubbard_2d.ipynb"
     assert notebook_path.exists(), f"Notebook not found: {notebook_path}"
     executed = _execute_notebook_skip_visualizations(notebook_path)
     code_cells = [cell for cell in executed.cells if cell.cell_type == "code"]

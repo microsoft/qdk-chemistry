@@ -143,16 +143,21 @@ class QiskitStandardQpeCircuitBuilder(StandardQpeCircuitBuilder):
             qc.h(phase[idx])
 
         target_qubits = list(system) + (list(unitary_ancilla) if unitary_ancilla else [])
+        # Reuse the power-1 probe only when no subclass overrides the append hook.
+        append_hook = type(self)._append_controlled_unitary  # noqa: SLF001
+        uses_default_append = append_hook is QiskitStandardQpeCircuitBuilder._append_controlled_unitary
         for phase_idx in range(num_bits):
             power = 2**phase_idx
-            self._append_controlled_unitary(
-                circuit=qc,
-                qubit_hamiltonian=qubit_hamiltonian,
-                control_qubit=phase[phase_idx],
-                target_qubits=target_qubits,
-                power=power,
-                controlled_unitary=probe_circuit if power == 1 else None,
-            )
+            if power == 1 and uses_default_append:
+                qc.compose(probe_circuit.get_qiskit_circuit(), qubits=[phase[phase_idx], *target_qubits], inplace=True)
+            else:
+                self._append_controlled_unitary(
+                    circuit=qc,
+                    qubit_hamiltonian=qubit_hamiltonian,
+                    control_qubit=phase[phase_idx],
+                    target_qubits=target_qubits,
+                    power=power,
+                )
 
         inverse_qft = synth_qft_full(
             num_bits, do_swaps=self._settings.get("qft_do_swaps"), inverse=True, name="Inverse QFT"
@@ -171,7 +176,6 @@ class QiskitStandardQpeCircuitBuilder(StandardQpeCircuitBuilder):
         target_qubits: list,
         *,
         power: int,
-        controlled_unitary: Circuit | None = None,
     ) -> None:
         """Apply the controlled unitary to the circuit.
 
@@ -181,12 +185,10 @@ class QiskitStandardQpeCircuitBuilder(StandardQpeCircuitBuilder):
             control_qubit: The control qubit.
             target_qubits: List of target qubits.
             power: The power to which the controlled unitary is raised.
-            controlled_unitary: The controlled circuit for this power, if already built.
 
         """
-        if controlled_unitary is None:
-            controlled_unitary, _ = self._create_controlled_circuit(qubit_hamiltonian=qubit_hamiltonian, power=power)
-        cu_circuit = controlled_unitary.get_qiskit_circuit()
+        ctrl_unitary_circuit, _, _ = self._controlled_circuit_and_widths(qubit_hamiltonian, power)
+        cu_circuit = ctrl_unitary_circuit.get_qiskit_circuit()
 
         mapping = [control_qubit, *target_qubits]
         circuit.compose(cu_circuit, qubits=mapping, inplace=True)

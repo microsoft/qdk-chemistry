@@ -28,9 +28,8 @@ class HubbardPlaquetteContainer(UnitaryContainer):
     on-site interaction and :math:`P`, :math:`G` are the pink and gold hopping tilings.
     Each tiling is a set of vertex-disjoint four-cycles, so Q# applies every plaquette of a
     tiling in parallel: a basis change, a tower of equal-angle rotations, and the inverse
-    basis change. A tower of at least 8 rotations is phased through a Hamming-weight
-    register :cite:`Kan2025`, whose batch size the ``hubbard_plaquette`` controlled circuit
-    mapper caps.
+    basis change. Each tower is phased through a Hamming-weight register :cite:`Kan2025`,
+    which the ``hubbard_plaquette`` controlled circuit mapper can turn off or cap in batch size.
 
     Every angle below is a :math:`\theta` entering as :math:`e^{-i\theta P}` for its Pauli
     word :math:`P`. For the Fermi-Hubbard parameters hopping :math:`t` and on-site interaction

@@ -2,7 +2,7 @@ Hamiltonian Unitary Builder
 ===========================
 
 The :class:`~qdk_chemistry.algorithms.HamiltonianUnitaryBuilder` algorithm in QDK/Chemistry constructs a unitary based on the Hamiltonian, such as time simulation unitary :math:`U(t) = e^{-iHt}` or block-encoded unitary :math:`U = \frac{H}{\|H\|}`.
-Following QDK/Chemistry's :doc:`algorithm design principles <../design/index>`, it takes a :class:`~qdk_chemistry.data.HamiltonianDescription` (a :class:`~qdk_chemistry.data.QubitOperator` or a :class:`~qdk_chemistry.data.ModelHamiltonianDescription`) and produces a :class:`~qdk_chemistry.data.UnitaryRepresentation` as output.
+Following QDK/Chemistry's :doc:`algorithm design principles <../design/index>`, it takes a :class:`~qdk_chemistry.data.HamiltonianDescription` (for example a :class:`~qdk_chemistry.data.QubitOperator` or a :class:`~qdk_chemistry.data.ModelHamiltonianDescription`) and produces a :class:`~qdk_chemistry.data.UnitaryRepresentation` as output.
 
 Overview
 --------
@@ -12,7 +12,7 @@ The :class:`~qdk_chemistry.algorithms.HamiltonianUnitaryBuilder` provides a unif
 
 QDK/Chemistry currently provides two families of implementations for this task: product formulas (Trotter-Suzuki, Zassenhaus, and a plaquette Trotterization specialized to the Fermi-Hubbard model) and block encoding.
 
-The resulting :class:`~qdk_chemistry.data.UnitaryRepresentation` objects wrap a ``PauliProductFormulaContainer`` (Trotter-Suzuki and Zassenhaus), a ``HubbardPlaquetteContainer`` (plaquette Trotterization), or a block-encoding container (``LCUContainer``, ``LCUWalkContainer`` for the LCU quantum walk, or ``SOSSABlockEncodingContainer``).
+The resulting :class:`~qdk_chemistry.data.UnitaryRepresentation` objects wrap a ``PauliProductFormulaContainer`` (Trotter-Suzuki and Zassenhaus), a ``HubbardPlaquetteContainer`` (plaquette Trotterization, by default), or a block-encoding container (``LCUContainer``, ``LCUWalkContainer`` for the LCU quantum walk, or ``SOSSABlockEncodingContainer``).
 
 
 Using the HamiltonianUnitaryBuilder
@@ -216,6 +216,8 @@ Hubbard plaquette Trotterization
 The plaquette builder Trotterizes the Fermi-Hubbard model with uniform hopping :math:`t` and on-site interaction :math:`U` on a two-dimensional square lattice, two spin orbitals per site.
 Unlike the other builders, it takes a :class:`~qdk_chemistry.data.FermiHubbardModelHamiltonianDescription` rather than a :class:`~qdk_chemistry.data.QubitOperator`, and builds the Hamiltonian from its lattice and its parameters ``t``, ``u`` and ``epsilon``.
 The lattice has to be periodic in both directions, with both sides even and at least four, or 2x2, because only then do the two plaquette tilings cover every bond exactly once.
+Its geometry has to be the one :meth:`LatticeGeometry.square(width, height, periodic_x=True, periodic_y=True) <qdk_chemistry.data.LatticeGeometry.square>` builds: unit-spaced sites numbered ``y * width + x``, with period vectors ``(width, 0)`` and ``(0, height)``.
+A translated, scaled, rotated or renumbered square lattice is rejected.
 
 The hopping term splits into two layers of disjoint four-site plaquettes, :math:`P` and :math:`G`, each of which is evolved exactly :cite:`Campbell2022`.
 The interaction is taken in its particle-hole symmetric form :math:`U \sum_i (n_{i\uparrow} - 1/2)(n_{i\downarrow} - 1/2)`, whose Jordan-Wigner image is pure :math:`ZZ`.
@@ -224,8 +226,12 @@ The half-angle pink layers of neighbouring steps merge into one full-angle layer
 The modes are likewise routed into pink order once at each end, so every pink plaquette stays local and only the gold layers route.
 Setting ``num_electrons`` records the scalar offset to the described model, with its on-site energy :math:`\epsilon` and interaction :math:`U \sum_i n_{i\uparrow} n_{i\downarrow}`, so that phase estimation reports that model's energy.
 
-The output is a ``HubbardPlaquetteContainer`` that stores the angles and step count rather than individual Pauli terms.
+By default the output is a ``HubbardPlaquetteContainer`` that stores the angles and step count rather than individual Pauli terms.
 It is consumed by the :ref:`"hubbard_plaquette" controlled circuit mapper <hubbard-plaquette-mapper>`, :class:`~qdk_chemistry.algorithms.controlled_circuit_mapper.ControlledHubbardPlaquetteMapper`.
+
+Setting ``container_type`` to ``"pauli_product_formula"`` instead emits every fermionic swap, Fourier butterfly and phase as a Pauli exponential, for the ``"pauli_sequence"`` and :ref:`"cswap_pauli_sequence" <cswap-pauli-sequence-mapper>` mappers.
+The ``num_electrons`` shift then becomes an identity term in the circuit, so the phase-estimation window must cover the described model's energy rather than the particle-hole symmetric one.
+Prefer ``"cswap_pauli_sequence"``, which applies the formula uncontrolled; ``"pauli_sequence"`` controls every swap and butterfly rotation as well, so it is costlier and mainly useful for compatibility.
 
 The number of steps can be set directly (``num_divisions``) or estimated from ``target_accuracy`` with Campbell's error constant for the related IPG ordering :cite:`Campbell2022`.
 
@@ -250,6 +256,9 @@ The number of steps can be set directly (``num_divisions``) or estimated from ``
    * - ``num_divisions``
      - int
      - Explicit number of plaquette Trotter steps. When set to 0 (default), determined from ``target_accuracy``; otherwise the larger of the two is used.
+   * - ``container_type``
+     - str
+     - Output container: ``"hubbard_plaquette"`` (default) or ``"pauli_product_formula"``.
 
 
 Consuming term partitions

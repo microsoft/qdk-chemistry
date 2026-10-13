@@ -5,10 +5,7 @@
 namespace QDKChemistry.Utils.HubbardPlaquette {
 
     import QDKChemistry.Utils.CircuitComposition.MaxInt;
-    import QDKChemistry.Utils.HammingWeightPhasing.HammingWeightBatchSize;
     import QDKChemistry.Utils.HammingWeightPhasing.HammingWeightPhase;
-    import QDKChemistry.Utils.HammingWeightPhasing.UsesHammingWeightPhasing;
-    import QDKChemistry.Utils.HammingWeightPhasing.TowerGradientSize;
     import QDKChemistry.Utils.PhaseGradient.PreparePhaseGradientState;
     import Std.Arrays.Flattened;
     import Std.Arrays.Mapped;
@@ -31,11 +28,14 @@ namespace QDKChemistry.Utils.HubbardPlaquette {
         hoppingAngle : Double,
         /// Number of repetitions of the body.
         repetitions : Int,
+        /// Whether to phase each tower of equal-angle rotations through a Hamming-weight register.
+        useHammingWeightPhasing : Bool,
         /// Largest tower phased through a single Hamming-weight register, or -1 for no cap.
         /// See `HammingWeightBatchSize` for what the cap buys and what it costs.
         maxBatchSize : Int,
         /// Whether the Hamming-weight place values are rotated through a shared binary phase
-        /// gradient, or each synthesized as its own `Rz` (the original rotation ladder).
+        /// gradient, or each synthesized as its own `Rz` (the original rotation ladder). Unused
+        /// without Hamming-weight phasing.
         usePhaseGradient : Bool,
         /// Width of the phase gradient register the Hamming-weight rotations are applied through;
         /// unused without the phase gradient.
@@ -121,6 +121,7 @@ namespace QDKChemistry.Utils.HubbardPlaquette {
         angle : Double,
         sites : Int,
         systems : Qubit[],
+        useHammingWeightPhasing : Bool,
         maxBatchSize : Int,
         gradient : Qubit[]
     ) : Unit is Adj + Ctl {
@@ -130,14 +131,25 @@ namespace QDKChemistry.Utils.HubbardPlaquette {
                 angle,
                 [[PauliZ, PauliZ], size = sites],
                 StridedGroups(sites, 2, 1, sites, systems),
+                useHammingWeightPhasing,
                 maxBatchSize,
                 gradient
             );
         }
     }
 
-    /// The mode order, as the mode at each position, that puts every four-cycle of a tiling on adjacent positions.
-    internal function TilingOrder(blocks : Int[][], count : Int) : Int[] {
+    /// # Summary
+    /// The mode order that puts every four-cycle of a tiling on adjacent positions.
+    ///
+    /// # Input
+    /// ## blocks
+    /// The four-cycles of a tiling, as returned by `PlaquetteSection`.
+    /// ## count
+    /// Total number of fermionic modes.
+    ///
+    /// # Output
+    /// The mode at each position: each cycle `[a, b, c, d]` as `a, c, b, d`, then the unused modes in order.
+    function TilingOrder(blocks : Int[][], count : Int) : Int[] {
         // Interleaving the diagonals embeds the FFFT's butterfly path (both diagonals, then the
         // surviving pair) in the line, so every butterfly acts on adjacent modes and no basis
         // change carries a Jordan-Wigner string. Unused modes follow in order.
@@ -166,9 +178,21 @@ namespace QDKChemistry.Utils.HubbardPlaquette {
         return order;
     }
 
-    /// Rearranges the modes from the `current` order to the `target` order, each one listing the mode
-    /// at every position: the swap count and, if `listSwaps`, the adjacent swaps.
-    internal function RoutingSwaps(current : Int[], target : Int[], listSwaps : Bool) : (Int, Int[]) {
+    /// # Summary
+    /// The adjacent fermionic swaps that rearrange the modes from one order to another.
+    ///
+    /// # Input
+    /// ## current
+    /// The mode at each position before routing.
+    /// ## target
+    /// The mode at each position after routing.
+    /// ## listSwaps
+    /// Whether to list the swaps, or only count them.
+    ///
+    /// # Output
+    /// The swap count and, if `listSwaps`, the swaps in order of application, each as the lower position
+    /// `p` of the pair `(p, p + 1)`.
+    function RoutingSwaps(current : Int[], target : Int[], listSwaps : Bool) : (Int, Int[]) {
         let count = Length(current);
         Fact(Length(target) == count, "RoutingSwaps needs two orders of the same modes.");
         mutable targetPosition = [0, size = count];
@@ -252,6 +276,7 @@ namespace QDKChemistry.Utils.HubbardPlaquette {
         blocks : Int[][],
         order : Int[],
         systems : Qubit[],
+        useHammingWeightPhasing : Bool,
         maxBatchSize : Int,
         gradient : Qubit[]
     ) : Unit is Adj + Ctl {
@@ -271,6 +296,7 @@ namespace QDKChemistry.Utils.HubbardPlaquette {
                 HoppingPhases(
                     kappa / 2.0,
                     StridedGroups(Length(blocks), 2, 4, 1, systems[1...]),
+                    useHammingWeightPhasing,
                     maxBatchSize,
                     gradient
                 );
@@ -285,19 +311,17 @@ namespace QDKChemistry.Utils.HubbardPlaquette {
     /// XX and YY commute, so CNOT, H, CNOT sends XX to Z on the first qubit and YY to -Z on the
     /// second, and X removes that sign. The tiling then becomes one tower of twice as many
     /// equal-angle Z rotations, which with Hamming-weight phasing saves a place-value rotation
-    /// over separate XX and YY towers. Below the break-even each pair takes its own two
-    /// rotations, and a batch cap short enough to put every batch below the break-even has the
-    /// same effect, so the basis change is skipped rather than paid for nothing.
+    /// over separate XX and YY towers. Without Hamming-weight phasing each pair takes its own
+    /// two rotations, so the basis change is skipped rather than paid for nothing.
     internal operation HoppingPhases(
         angle : Double,
         pairs : Qubit[][],
+        useHammingWeightPhasing : Bool,
         maxBatchSize : Int,
         gradient : Qubit[]
     ) : Unit is Adj + Ctl {
         let count = 2 * Length(pairs);
-        // Every batch is at most this long, so this decides the path for the whole tower.
-        let phasesBatch = count > 0 and UsesHammingWeightPhasing(HammingWeightBatchSize(count, maxBatchSize));
-        if not phasesBatch {
+        if not useHammingWeightPhasing {
             for pair in pairs {
                 Exp([PauliX, PauliX], angle, pair);
                 Exp([PauliY, PauliY], angle, pair);
@@ -315,6 +339,7 @@ namespace QDKChemistry.Utils.HubbardPlaquette {
                     -angle,
                     [[PauliZ], size = count],
                     Mapped(q -> [q], Flattened(pairs)),
+                    true,
                     maxBatchSize,
                     gradient
                 );
@@ -334,10 +359,12 @@ namespace QDKChemistry.Utils.HubbardPlaquette {
         let sites = params.width * params.height;
         let pink = PlaquetteSection(params.width, params.height, true);
         let gold = PlaquetteSection(params.width, params.height, false);
-        InteractionLayer(params.interactionAngle / 2.0, sites, systems, params.maxBatchSize, gradient);
-        HoppingLayer(params.hoppingAngle, gold, order, systems, params.maxBatchSize, gradient);
-        InteractionLayer(params.interactionAngle / 2.0, sites, systems, params.maxBatchSize, gradient);
-        HoppingLayer(pinkAngle, pink, order, systems, params.maxBatchSize, gradient);
+        let useHwp = params.useHammingWeightPhasing;
+        let cap = params.maxBatchSize;
+        InteractionLayer(params.interactionAngle / 2.0, sites, systems, useHwp, cap, gradient);
+        HoppingLayer(params.hoppingAngle, gold, order, systems, useHwp, cap, gradient);
+        InteractionLayer(params.interactionAngle / 2.0, sites, systems, useHwp, cap, gradient);
+        HoppingLayer(pinkAngle, pink, order, systems, useHwp, cap, gradient);
     }
 
     /// One interior second-order Trotter body, I^(1/2) G I^(1/2) P, on modes in `order` and the
@@ -367,8 +394,8 @@ namespace QDKChemistry.Utils.HubbardPlaquette {
     /// orders keep the spin-up modes ahead of their spin-down partners, so the on-site pairs
     /// stay one register half apart.
     ///
-    /// The catalysts are prepared by the caller and left prepared, so phase estimation can
-    /// prepare them once for every query. Every layer phases through the same binary gradient,
+    /// The phase gradient is prepared by the caller and left prepared, so phase estimation can
+    /// prepare it once for every query. Every layer phases through the same binary gradient,
     /// whose state does not depend on any angle, so one register serves the whole evolution.
     ///
     /// # Input
@@ -396,7 +423,15 @@ namespace QDKChemistry.Utils.HubbardPlaquette {
             within {
                 RouteModes(identity, order, systems);
             } apply {
-                HoppingLayer(params.hoppingAngle / 2.0, pink, order, systems, params.maxBatchSize, gradient);
+                HoppingLayer(
+                    params.hoppingAngle / 2.0,
+                    pink,
+                    order,
+                    systems,
+                    params.useHammingWeightPhasing,
+                    params.maxBatchSize,
+                    gradient
+                );
 
                 if params.repetitions > 1 {
                     if IsResourceEstimating() {
@@ -420,14 +455,12 @@ namespace QDKChemistry.Utils.HubbardPlaquette {
     /// Number of phase gradient qubits the plaquette evolution consumes.
     ///
     /// # Description
-    /// Both the on-site tower and each hopping tower hold one rotation per site, so a lattice
-    /// either phases every layer through the gradient or none of them, and the batch cap applies
-    /// to all of them alike. Without `usePhaseGradient` every place value is synthesized as its
-    /// own `Rz`, so no gradient is consumed at all.
+    /// Every tower of the evolution is phased through a Hamming-weight register, batch by batch,
+    /// so one gradient serves them all. Without `usePhaseGradient` every place value is
+    /// synthesized as its own `Rz`, and without `useHammingWeightPhasing` every term is its own
+    /// rotation, so neither consumes a gradient.
     function PlaquetteGradientSize(params : HubbardPlaquetteParams) : Int {
-        return params.usePhaseGradient
-            ? TowerGradientSize(params.width * params.height, params.maxBatchSize, params.rotationBitPrecision)
-            | 0;
+        return params.useHammingWeightPhasing and params.usePhaseGradient ? params.rotationBitPrecision | 0;
     }
 
     /// Prepares the binary phase gradient, or nothing when no gradient is consumed.

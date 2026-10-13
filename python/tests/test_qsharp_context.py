@@ -216,6 +216,7 @@ class TestTargetProfiles:
             interactionAngle=0.1,
             hoppingAngle=0.2,
             repetitions=1,
+            useHammingWeightPhasing=True,
             maxBatchSize=-1,
             usePhaseGradient=use_phase_gradient,
             rotationBitPrecision=10,

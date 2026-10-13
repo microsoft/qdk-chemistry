@@ -41,7 +41,7 @@ class HamiltonianUnitaryBuilder(Algorithm):
         super().__init__()
 
     def run(self, qubit_hamiltonian: HamiltonianDescription) -> UnitaryRepresentation:
-        """Check the input type, build the unitary, and check the result.
+        """Build the unitary and check the result.
 
         Args:
             qubit_hamiltonian: The Hamiltonian description to build the unitary from.
@@ -50,25 +50,15 @@ class HamiltonianUnitaryBuilder(Algorithm):
             UnitaryRepresentation: The unitary for the given Hamiltonian.
 
         Raises:
-            TypeError: If the input is not the declared input type, or the result is not a UnitaryRepresentation.
+            TypeError: If the builder does not take the input's type, or the result is not a UnitaryRepresentation.
 
         """
-        expected = self._input_type()
-        if expected is None:
-            if not isinstance(qubit_hamiltonian, HamiltonianDescription):
-                warnings.warn(
-                    f"{type(self).__name__} received a {type(qubit_hamiltonian).__name__}; unitary builders will "
-                    "require a HamiltonianDescription, declared with _input_type().",
-                    DeprecationWarning,
-                    stacklevel=2,
-                )
-        elif not (isinstance(expected, type) and issubclass(expected, HamiltonianDescription)):
-            raise TypeError(
-                f"{type(self).__name__}._input_type() must return a HamiltonianDescription subclass, got {expected!r}."
-            )
-        elif not isinstance(qubit_hamiltonian, expected):
-            raise TypeError(
-                f"The {self.name()!r} builder takes a {expected.__name__}, got {type(qubit_hamiltonian).__name__}."
+        if not isinstance(qubit_hamiltonian, HamiltonianDescription):
+            warnings.warn(
+                f"{type(self).__name__} received a {type(qubit_hamiltonian).__name__}; unitary builders will "
+                "require a HamiltonianDescription.",
+                DeprecationWarning,
+                stacklevel=2,
             )
         unitary = super().run(qubit_hamiltonian)
         if not isinstance(unitary, UnitaryRepresentation):
@@ -77,16 +67,12 @@ class HamiltonianUnitaryBuilder(Algorithm):
             )
         return unitary
 
-    def _input_type(self) -> type[HamiltonianDescription] | None:
-        """Return the HamiltonianDescription subclass this builder takes; None for builders that predate it."""
-        return None
-
     @abstractmethod
     def _run_impl(self, qubit_hamiltonian: HamiltonianDescription) -> UnitaryRepresentation:
         """Construct a UnitaryRepresentation for the given Hamiltonian.
 
         Args:
-            qubit_hamiltonian: The Hamiltonian description, an instance of the type ``_input_type()`` returns.
+            qubit_hamiltonian: The Hamiltonian description. Raise ``TypeError`` for a type the builder does not take.
 
         Returns:
             UnitaryRepresentation: A UnitaryRepresentation for the given Hamiltonian.
@@ -181,7 +167,7 @@ class TimeEvolutionBuilder(HamiltonianUnitaryBuilder):
         """Construct a UnitaryRepresentation representing the time evolution unitary for the given Hamiltonian.
 
         Args:
-            qubit_hamiltonian: The Hamiltonian description, an instance of the type ``_input_type()`` returns.
+            qubit_hamiltonian: The Hamiltonian description. Raise ``TypeError`` for a type the builder does not take.
 
         Returns:
             UnitaryRepresentation: A UnitaryRepresentation representing the evolution of the given Hamiltonian.

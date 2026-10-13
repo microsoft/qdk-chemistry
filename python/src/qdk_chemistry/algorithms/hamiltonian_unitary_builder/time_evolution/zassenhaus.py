@@ -139,10 +139,6 @@ class Zassenhaus(TimeEvolutionBuilder):
         if term_grouper is not None:
             self._settings.set("term_grouper", term_grouper)
 
-    def _input_type(self) -> type[QubitOperator]:
-        """Return :class:`~qdk_chemistry.data.QubitOperator`, the input Zassenhaus evolves."""
-        return QubitOperator
-
     def _run_impl(self, qubit_hamiltonian: QubitOperator) -> UnitaryRepresentation:
         """Construct the unitary representation using Zassenhaus decomposition.
 
@@ -153,6 +149,10 @@ class Zassenhaus(TimeEvolutionBuilder):
             UnitaryRepresentation: The unitary representation built by the Zassenhaus decomposition.
 
         """
+        if not isinstance(qubit_hamiltonian, QubitOperator):
+            raise TypeError(
+                f"The {self.name()!r} builder takes a QubitOperator, got {type(qubit_hamiltonian).__name__}."
+            )
         container_type = qubit_hamiltonian.get_container_type()
         if not isinstance(qubit_hamiltonian.get_container(), PauliDecompositionContainer):
             raise ValueError(

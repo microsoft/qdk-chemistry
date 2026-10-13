@@ -116,8 +116,8 @@ namespace QDKChemistry.Utils.HammingWeightPhasing {
         }
     }
 
-    /// Applies exp(-i theta P_t) for every term P_t, phasing the batch through a Hamming-weight
-    /// register once it reaches the measured break-even size.
+    /// Applies exp(-i theta P_t) for every term P_t, phasing the tower through a Hamming-weight
+    /// register.
     ///
     /// Each term is first rotated onto a single Z on its last qubit, so the batch becomes
     /// `count` equal-angle rotations exp(-i theta Z). Their product is
@@ -129,8 +129,8 @@ namespace QDKChemistry.Utils.HammingWeightPhasing {
     /// plaquette and every on-site pair into a layer of same-angle R_z gates and synthesize that
     /// layer collectively with HWP. Given a phase gradient, each place-value rotation is applied
     /// through it rather than synthesized; given none, each is synthesized as its own `Rz`, the
-    /// original rotation ladder. Below the break-even size each term is applied as its own
-    /// rotation instead.
+    /// original rotation ladder. When `useHammingWeightPhasing` is false, each term is applied as
+    /// its own rotation instead.
     ///
     /// A tower longer than `maxBatchSize` is split into consecutive batches of at most that many
     /// terms, each phased through its own Hamming-weight register. The phases are additive over
@@ -143,22 +143,29 @@ namespace QDKChemistry.Utils.HammingWeightPhasing {
     /// The Pauli string of each term.
     /// ## targets
     /// The qubits of each term, disjoint across terms.
+    /// ## useHammingWeightPhasing
+    /// Whether to phase the tower through a Hamming-weight register rather than term by term.
     /// ## maxBatchSize
     /// Largest tower phased through a single Hamming-weight register, or -1 for no cap.
     /// ## gradient
     /// The shared binary phase gradient, prepared by `PreparePhaseGradientState`, or empty to
-    /// synthesize every place-value rotation as an `Rz`. Unused when every batch is below the
-    /// break-even size.
+    /// synthesize every place-value rotation as an `Rz`. Unused when `useHammingWeightPhasing`
+    /// is false.
     internal operation HammingWeightPhase(
         theta : Double,
         pauliOps : Pauli[][],
         targets : Qubit[][],
+        useHammingWeightPhasing : Bool,
         maxBatchSize : Int,
         gradient : Qubit[]
     ) : Unit is Adj + Ctl {
         let count = Length(targets);
         Fact(Length(pauliOps) == count, "HammingWeightPhase needs one axis list per term.");
-        if count > 0 {
+        if not useHammingWeightPhasing {
+            for t in 0..count - 1 {
+                Exp(pauliOps[t], -theta, targets[t]);
+            }
+        } elif count > 0 {
             // Chunking in a function keeps the index arithmetic out of this adjointable body.
             let batchSize = HammingWeightBatchSize(count, maxBatchSize);
             let opBatches = Chunks(batchSize, pauliOps);
@@ -173,23 +180,22 @@ namespace QDKChemistry.Utils.HammingWeightPhasing {
     /// The tower length phased through one Hamming-weight register, given the cap.
     ///
     /// # Description
-    /// A batch of `n` terms costs one adder tree: roughly `n` Toffolis and, more importantly,
-    /// `n - popcount(n)` scratch qubits held for as long as the weight is needed. Splitting a
-    /// tower into batches lets the scratch of one batch be released before the next allocates,
-    /// so the peak ancilla count follows the batch rather than the whole tower, while the adder
-    /// tree's Toffoli count stays essentially the same. The price is the place-value rotations,
-    /// which are paid once per batch instead of once per tower: phase gradient additions
-    /// (Toffolis) with a gradient, synthesized `Rz` rotations without one.
+    /// A batch of `n` terms costs one adder tree, which holds `n - popcount(n)` scratch qubits
+    /// for as long as the weight is needed. Splitting a tower into batches lets the scratch of
+    /// one batch be released before the next allocates, so the peak ancilla count follows the
+    /// batch rather than the whole tower. The price is the place-value rotations, which are paid
+    /// once per batch instead of once per tower: phase gradient additions (Toffolis) with a
+    /// gradient, synthesized `Rz` rotations without one.
     ///
-    /// It is therefore a knob that trades qubits for those place-value rotations, and the useful
-    /// setting depends on the device: hardware demonstrations of Fermi-Hubbard dynamics run on a
-    /// fixed and comparatively small register, where the adder tree of a full lattice-sized tower
-    /// may simply not fit, while a fault-tolerant estimate is usually better off spending the
-    /// qubits to save the rotations. The default is no cap, which reproduces the uncapped
-    /// construction exactly.
+    /// It is therefore a qubit-for-rotations knob, and the useful setting depends on the device:
+    /// hardware demonstrations of Fermi-Hubbard dynamics run on a fixed and comparatively small
+    /// register, where the
+    /// adder tree of a full lattice-sized tower may simply not fit, while a fault-tolerant
+    /// estimate is usually better off spending the qubits to save the rotations. The default is
+    /// no cap, which reproduces the uncapped construction exactly.
     ///
-    /// A cap below the break-even of `UsesHammingWeightPhasing` leaves every batch too short to
-    /// phase through a register, so the whole tower falls back to one rotation per term.
+    /// Every batch is phased as given, however short. Use a cap of at least 8, since only from 8
+    /// terms are the saved rotations worth the extra Toffolis and scratch qubits.
     ///
     /// # Input
     /// ## count
@@ -211,21 +217,15 @@ namespace QDKChemistry.Utils.HammingWeightPhasing {
         gradient : Qubit[]
     ) : Unit is Adj + Ctl {
         let count = Length(targets);
-        if not UsesHammingWeightPhasing(count) {
-            for t in 0..count - 1 {
-                Exp(pauliOps[t], -theta, targets[t]);
-            }
-        } else {
-            let inputs = Mapped(term -> Tail(term), targets);
-            let (schedule, finalBits, _) = HammingWeightSchedule(count);
-            Fact(All(bit -> bit >= 0, finalBits), "Every place value of the Hamming weight must hold a bit.");
-            use scratch = Qubit[Length(schedule)];
-            let work = inputs + scratch;
-            within {
-                ComputeHammingWeight(pauliOps, targets, schedule, work);
-            } apply {
-                PhaseHammingWeight(theta, count, Mapped(bit -> work[bit], finalBits), inputs[0], gradient);
-            }
+        let inputs = Mapped(term -> Tail(term), targets);
+        let (schedule, finalBits, _) = HammingWeightSchedule(count);
+        Fact(All(bit -> bit >= 0, finalBits), "Every place value of the Hamming weight must hold a bit.");
+        use scratch = Qubit[Length(schedule)];
+        let work = inputs + scratch;
+        within {
+            ComputeHammingWeight(pauliOps, targets, schedule, work);
+        } apply {
+            PhaseHammingWeight(theta, count, Mapped(bit -> work[bit], finalBits), inputs[0], gradient);
         }
     }
 
@@ -365,19 +365,5 @@ namespace QDKChemistry.Utils.HammingWeightPhasing {
             set words += [((raw % modulus) + modulus) % modulus];
         }
         return words;
-    }
-
-    /// Whether a tower of `count` equal-angle rotations is phased through a Hamming-weight
-    /// register: not below the measured break-even of 8, where the adder tree costs more than the
-    /// rotations it saves.
-    internal function UsesHammingWeightPhasing(count : Int) : Bool {
-        return count >= 8;
-    }
-
-    /// Phase gradient qubits a tower of `count` equal-angle rotations consumes: none when every
-    /// batch the cap leaves is below the break-even.
-    internal function TowerGradientSize(count : Int, maxBatchSize : Int, rotationBitPrecision : Int) : Int {
-        let phasesBatch = count > 0 and UsesHammingWeightPhasing(HammingWeightBatchSize(count, maxBatchSize));
-        return phasesBatch ? rotationBitPrecision | 0;
     }
 }

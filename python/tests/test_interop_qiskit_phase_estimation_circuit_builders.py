@@ -159,6 +159,43 @@ class TestQiskitStandardQpeCircuitBuilder:
 
         assert recorded_powers == [1, 2, 4]
 
+    def test_builder_supports_original_append_override(self, two_qubit_circuit_problem: CircuitBuilderProblem) -> None:
+        """A subclass overriding the original append signature sees every power and builds the same circuit."""
+        appended_powers: list[int] = []
+
+        class _LegacyAppendBuilder(QiskitStandardQpeCircuitBuilder):
+            def _append_controlled_unitary(
+                self,
+                circuit: QuantumCircuit,
+                qubit_hamiltonian: QubitOperator,
+                control_qubit: int,
+                target_qubits: list,
+                *,
+                power: int,
+            ) -> None:
+                appended_powers.append(power)
+                super()._append_controlled_unitary(
+                    circuit, qubit_hamiltonian, control_qubit, target_qubits, power=power
+                )
+
+        def build(builder_type: type[QiskitStandardQpeCircuitBuilder]) -> Circuit:
+            builder = builder_type(
+                num_bits=3,
+                controlled_circuit_mapper=AlgorithmRef("controlled_circuit_mapper", "pauli_sequence"),
+                unitary_builder=AlgorithmRef(
+                    "hamiltonian_unitary_builder", "trotter", time=two_qubit_circuit_problem.evolution_time
+                ),
+            )
+            return builder.run(
+                state_preparation=two_qubit_circuit_problem.state_prep,
+                qubit_hamiltonian=two_qubit_circuit_problem.hamiltonian,
+            )[0]
+
+        legacy = build(_LegacyAppendBuilder)
+
+        assert appended_powers == [1, 2, 4]
+        assert legacy.get_qasm() == build(QiskitStandardQpeCircuitBuilder).get_qasm()
+
     def test_builder_raises_invalid_num_bits_error(self, two_qubit_circuit_problem: CircuitBuilderProblem) -> None:
         """Validate that QiskitStandardQpeCircuitBuilder raises ValueError for invalid num_bits."""
         builder = QiskitStandardQpeCircuitBuilder(num_bits=0)  # Invalid number of bits

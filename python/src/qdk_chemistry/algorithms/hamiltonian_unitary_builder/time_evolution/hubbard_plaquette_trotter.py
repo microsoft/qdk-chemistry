@@ -16,13 +16,126 @@ from qdk_chemistry.algorithms.hamiltonian_unitary_builder.base import TimeEvolut
 from qdk_chemistry.data import FermiHubbardModelHamiltonianDescription, LatticeGeometry
 from qdk_chemistry.data.unitary_representation.base import UnitaryRepresentation
 from qdk_chemistry.data.unitary_representation.containers.hubbard_plaquette import HubbardPlaquetteContainer
+from qdk_chemistry.data.unitary_representation.containers.pauli_product_formula import (
+    ExponentiatedPauliTerm,
+    PauliProductFormulaContainer,
+)
 from qdk_chemistry.utils import Logger
-from qdk_chemistry.utils.qsharp import get_qsharp_context
+from qdk_chemistry.utils.qsharp import QSHARP_UTILS, get_qsharp_context
 
 __all__: list[str] = [
     "HubbardPlaquetteTrotter",
     "HubbardPlaquetteTrotterSettings",
 ]
+
+_Layer = list[ExponentiatedPauliTerm]
+
+
+def _adjoint(layers: list[_Layer]) -> list[_Layer]:
+    """Invert ``layers``: reverse the layers and their terms and negate every angle."""
+    return [
+        [ExponentiatedPauliTerm(term.pauli_term, -term.angle) for term in reversed(layer)] for layer in reversed(layers)
+    ]
+
+
+def _fswap_layers(swaps: list[int]) -> list[_Layer]:
+    r"""Spell each fermionic swap on ``(p, p + 1)`` out as :math:`e^{i\pi/4 (XX + YY)} e^{i\pi/4 (Z_p + Z_{p+1})}`.
+
+    That is ``SWAP CZ`` up to :math:`-i`, which the adjoint routing cancels. Runs of disjoint swaps share layers.
+    """
+    runs: list[list[int]] = []
+    occupied: set[int] = set()
+    for position in swaps:
+        if not runs or {position, position + 1} & occupied:
+            runs.append([])
+            occupied = set()
+        runs[-1].append(position)
+        occupied |= {position, position + 1}
+    angle = -0.25 * math.pi
+    layers = []
+    for positions in runs:
+        layers += [[ExponentiatedPauliTerm({p: axis, p + 1: axis}, angle) for p in positions] for axis in "XY"]
+        layers.append([ExponentiatedPauliTerm({q: "Z"}, angle) for p in positions for q in (p, p + 1)])
+    return layers
+
+
+def _hopping_layers(kappa: float, blocks: list[list[int]], order: list[int]) -> list[_Layer]:
+    """Mirror ``HoppingLayer``: route onto the tiling, apply the butterflies and phases, then undo the basis change."""
+    if kappa == 0.0 or not blocks:
+        return []
+    target = QSHARP_UTILS.HubbardPlaquette.TilingOrder(blocks, len(order))
+    basis = _fswap_layers(QSHARP_UTILS.HubbardPlaquette.RoutingSwaps(order, target, True)[1])
+    # TwoModeFFFT(4i + 1, 4i) and TwoModeFFFT(4i + 2, 4i + 3) are exp(i h X_lo Y_hi) exp(-i h Y_lo X_hi), h = -+pi/8.
+    halves = {low: (0.125 if low % 4 else -0.125) * math.pi for low in range(0, 4 * len(blocks), 2)}
+    basis.append([ExponentiatedPauliTerm({low: "X", low + 1: "Y"}, -half) for low, half in halves.items()])
+    basis.append([ExponentiatedPauliTerm({low: "Y", low + 1: "X"}, half) for low, half in halves.items()])
+    middles = [(4 * index + 1, 4 * index + 2) for index in range(len(blocks))]
+    phases = [[ExponentiatedPauliTerm({a: axis, b: axis}, -0.5 * kappa) for a, b in middles] for axis in "XY"]
+    return [*basis, *phases, *_adjoint(basis)]
+
+
+def _plaquette_product_formula(
+    width: int,
+    height: int,
+    interaction_angle: float,
+    hopping_angle: float,
+    phase: float,
+    step_reps: int,
+    scale: float,
+) -> PauliProductFormulaContainer:
+    """Spell ``RepPlaquetteExp`` of HubbardPlaquette.qs out as Pauli exponentials in disjoint layers.
+
+    The steps with a full-angle pink layer are repeated.
+
+    Args:
+        width: Number of lattice columns.
+        height: Number of lattice rows.
+        interaction_angle: The ``Z_s Z_{s+M}`` angle of one full interaction layer.
+        hopping_angle: The hopping angle ``kappa`` of one full tiling layer.
+        phase: The total scalar phase, applied as one identity term.
+        step_reps: The number of second-order steps.
+        scale: The evolution time used for eigenvalue-phase conversion.
+
+    Returns:
+        The product formula, with ``layer_offsets`` delimiting its disjoint layers.
+
+    """
+    sites = width * height
+    pink, gold = (QSHARP_UTILS.HubbardPlaquette.PlaquetteSection(width, height, flag) for flag in (True, False))
+    identity = list(range(2 * sites))
+    # As in Q#, a hopping-free model skips the routing into pink order.
+    order = QSHARP_UTILS.HubbardPlaquette.TilingOrder(pink, 2 * sites) if hopping_angle != 0.0 else identity
+    route = _fswap_layers(QSHARP_UTILS.HubbardPlaquette.RoutingSwaps(identity, order, True)[1])
+    half_interaction = (
+        [[ExponentiatedPauliTerm({s: "Z", s + sites: "Z"}, 0.5 * interaction_angle) for s in range(sites)]]
+        if interaction_angle != 0.0
+        else []
+    )
+    middle = [*half_interaction, *_hopping_layers(hopping_angle, gold, order), *half_interaction]
+    half_pink = _hopping_layers(0.5 * hopping_angle, pink, order)
+
+    scalar = [[ExponentiatedPauliTerm({}, phase)]] if phase != 0.0 else []
+    prefix = [*scalar, *route, *half_pink]
+    last, unroute = [*middle, *half_pink], _adjoint(route)
+    if step_reps > 1:
+        sections = (prefix, [*middle, *_hopping_layers(hopping_angle, pink, order)], [*last, *unroute])
+    else:
+        sections = (prefix, last, unroute)
+
+    offsets = [0]
+    for layers in sections:
+        for layer in layers:
+            offsets.append(offsets[-1] + len(layer))
+    prefix_terms, step_terms, suffix_terms = ([term for layer in layers for term in layer] for layers in sections)
+    return PauliProductFormulaContainer(
+        step_terms,
+        max(step_reps - 1, 1),
+        2 * sites,
+        scale,
+        prefix_terms=prefix_terms,
+        suffix_terms=suffix_terms,
+        layer_offsets=offsets if len(offsets) > 1 else None,
+    )
 
 
 class HubbardPlaquetteTrotterSettings(TimeEvolutionSettings):
@@ -52,6 +165,13 @@ class HubbardPlaquetteTrotterSettings(TimeEvolutionSettings):
             -1,
             "Electron count for the scalar shift to the estimated energy; -1 leaves it unshifted.",
         )
+        self._set_default(
+            "container_type",
+            "string",
+            "hubbard_plaquette",
+            "Output container: 'hubbard_plaquette', or 'pauli_product_formula' for the Pauli-sequence mappers.",
+            ["hubbard_plaquette", "pauli_product_formula"],
+        )
 
 
 class HubbardPlaquetteTrotter(TimeEvolutionBuilder):
@@ -70,6 +190,12 @@ class HubbardPlaquetteTrotter(TimeEvolutionBuilder):
     Setting ``num_electrons`` records that offset so the phase-to-energy conversion reports the described
     model's energy.
 
+    Setting ``container_type`` to ``"pauli_product_formula"`` emits a
+    :class:`~qdk_chemistry.data.PauliProductFormulaContainer` for the Pauli-sequence mappers instead. Prefer the
+    ``"cswap_pauli_sequence"`` mapper for it: ``"pauli_sequence"`` controls every swap and butterfly rotation too.
+    The ``num_electrons`` shift then becomes an identity term in the circuit, so the phase-estimation window must
+    cover the described model's energy rather than the particle-hole symmetric one.
+
     The plaquette decomposition, its error constant, and the exact four-mode plaquette
     evolution are Campbell's :cite:`Campbell2022`. The factor ordering and the step-count
     rule follow the later compilation of the same algorithm in :cite:`Apel2026`.
@@ -85,6 +211,7 @@ class HubbardPlaquetteTrotter(TimeEvolutionBuilder):
         num_divisions: int = 0,
         power: int = 1,
         power_strategy: str = "repeat",
+        container_type: str = "hubbard_plaquette",
     ):
         """Initialize the builder.
 
@@ -97,6 +224,7 @@ class HubbardPlaquetteTrotter(TimeEvolutionBuilder):
             num_divisions: Number of Trotter steps. Max of this and the auto value is used.
             power: The power to raise the unitary to. Defaults to 1.
             power_strategy: Strategy for ``U^power``: ``"rescale"`` or ``"repeat"``.
+            container_type: Output container, ``"hubbard_plaquette"`` or ``"pauli_product_formula"``.
 
         Raises:
             ValueError: If *order* is anything other than 2.
@@ -113,6 +241,7 @@ class HubbardPlaquetteTrotter(TimeEvolutionBuilder):
         settings.set("order", order)
         settings.set("target_accuracy", target_accuracy)
         settings.set("num_divisions", num_divisions)
+        settings.set("container_type", container_type)
         if num_electrons is not None:
             settings.set("num_electrons", num_electrons)
         self._settings = settings
@@ -124,10 +253,6 @@ class HubbardPlaquetteTrotter(TimeEvolutionBuilder):
     def type_name(self) -> str:
         """Return ``hamiltonian_unitary_builder`` as the algorithm type name."""
         return "hamiltonian_unitary_builder"
-
-    def _input_type(self) -> type[FermiHubbardModelHamiltonianDescription]:
-        """Return :class:`~qdk_chemistry.data.FermiHubbardModelHamiltonianDescription`, the model this evolves."""
-        return FermiHubbardModelHamiltonianDescription
 
     def _lattice_geometry(self, lattice: LatticeGeometry) -> tuple[int, int]:
         """Return the width and height of a periodic square lattice that the plaquettes tile.
@@ -269,13 +394,20 @@ class HubbardPlaquetteTrotter(TimeEvolutionBuilder):
             model: The Fermi-Hubbard model on a periodic square lattice.
 
         Returns:
-            UnitaryRepresentation: The segmented plaquette product formula.
+            UnitaryRepresentation: The segmented plaquette product formula, as a ``HubbardPlaquetteContainer`` or,
+            with ``container_type`` set to ``"pauli_product_formula"``, a ``PauliProductFormulaContainer``.
 
         Raises:
+            TypeError: If *model* is not a ``FermiHubbardModelHamiltonianDescription``.
             ValueError: If the order is not 2, the lattice is not a periodic square lattice, or
                 ``num_electrons`` is neither -1 nor a valid electron count for the lattice.
 
         """
+        if not isinstance(model, FermiHubbardModelHamiltonianDescription):
+            raise TypeError(
+                f"The {self.name()!r} builder takes a FermiHubbardModelHamiltonianDescription, "
+                f"got {type(model).__name__}."
+            )
         order = self._settings.get("order")
         if order != 2:
             raise ValueError(f"HubbardPlaquetteTrotter supports order 2 only, got {order}.")
@@ -305,7 +437,21 @@ class HubbardPlaquetteTrotter(TimeEvolutionBuilder):
         time, power_repetitions = self._resolve_power()
         num_divisions = self._step_count(hopping, interaction, width, height, time)
         delta_time = time / num_divisions
+        step_reps = num_divisions * power_repetitions
 
+        if self._settings.get("container_type") == "pauli_product_formula":
+            # A product formula has no classical offset, so the shift becomes a scalar exponential.
+            return UnitaryRepresentation(
+                container=_plaquette_product_formula(
+                    width,
+                    height,
+                    interaction_angle=pair_angle * delta_time,
+                    hopping_angle=2.0 * hopping * delta_time,
+                    phase=shift * delta_time * step_reps,
+                    step_reps=step_reps,
+                    scale=time * power_repetitions,
+                )
+            )
         return UnitaryRepresentation(
             container=HubbardPlaquetteContainer(
                 width=width,
@@ -313,7 +459,7 @@ class HubbardPlaquetteTrotter(TimeEvolutionBuilder):
                 interaction_angle=pair_angle * delta_time,
                 constant_shift=shift * delta_time,
                 hopping_angle=2.0 * hopping * delta_time,
-                step_reps=num_divisions * power_repetitions,
+                step_reps=step_reps,
                 scale=time * power_repetitions,
             )
         )

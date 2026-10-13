@@ -181,10 +181,6 @@ class Trotter(TimeEvolutionBuilder):
         self._settings.set("minimize_pauli_exponentials", minimize_pauli_exponentials)
         self._settings.set("fuse_group_boundaries", fuse_group_boundaries)
 
-    def _input_type(self) -> type[QubitOperator]:
-        """Return :class:`~qdk_chemistry.data.QubitOperator`, the input Trotter evolves."""
-        return QubitOperator
-
     def _run_impl(self, qubit_hamiltonian: QubitOperator) -> UnitaryRepresentation:
         """Construct the unitary representation using Trotter decomposition.
 
@@ -195,6 +191,10 @@ class Trotter(TimeEvolutionBuilder):
             UnitaryRepresentation: The unitary representation built by the Trotter decomposition.
 
         """
+        if not isinstance(qubit_hamiltonian, QubitOperator):
+            raise TypeError(
+                f"The {self.name()!r} builder takes a QubitOperator, got {type(qubit_hamiltonian).__name__}."
+            )
         container_type = qubit_hamiltonian.get_container_type()
         if not isinstance(qubit_hamiltonian.get_container(), PauliDecompositionContainer):
             raise ValueError(

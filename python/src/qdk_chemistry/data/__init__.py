@@ -26,7 +26,7 @@ Exposed classes are:
 - :class:`FermiHubbardModelHamiltonianDescription`: Fermi-Hubbard model on a lattice.
 - :class:`Hamiltonian`: Quantum mechanical Hamiltonian operator representation.
 - :class:`HamiltonianContainer`: Abstract base class for different Hamiltonian storage formats.
-- :class:`HamiltonianDescription`: Abstract type of the Hamiltonian descriptions a Hamiltonian unitary builder takes.
+- :class:`HamiltonianDescription`: Abstract base for data classes that describe a Hamiltonian.
 - :class:`HamiltonianType`: Enumeration of Hamiltonian types (Hermitian, NonHermitian).
 - :class:`LatticeGeometry`: Immutable two-dimensional geometry of a built-in lattice.
 - :class:`LatticeGraph`: Lattice graph defining the connectivity and geometry of a model Hamiltonian.

@@ -375,7 +375,7 @@ class TestStandardQpeCircuitBuilder:
         assert circuit._qsharp_factory.parameter["computeCapacity"] == compute_capacity
 
     def test_sine_phase_state_amplitudes(self) -> None:
-        """The sine window puts sin(pi (t + 1) / (2^b + 1)) on the register value t, ancillas[0] the MSB."""
+        """The sine window puts sin(pi (t + 1) / (2^b + 1)) on the register value t, with ancillas[0] as the MSB."""
         num_bits = 3
         builder = QdkStandardQpeCircuitBuilder(num_bits=num_bits)
         builder.settings().set("phase_state", "sine")
