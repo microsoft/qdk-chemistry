@@ -687,14 +687,6 @@ class TestSharedPhaseGradient:
         with pytest.raises(ValueError, match="same phase gradient register"):
             builder._shared_register([_plaquette_controlled(), _plaquette_controlled(use_phase_gradient=False)])
 
-    def test_the_rotation_ladder_shares_nothing(self):
-        """Nothing is prepared when no controlled unitary asks for a gradient."""
-        builder = create("qpe_circuit_builder", "qdk_standard", num_bits=2)
-        ops, prepare, num_shared = builder._shared_register([_plaquette_controlled(use_phase_gradient=False)] * 2)
-        assert len(ops) == 2
-        assert num_shared == 0
-        assert prepare is QSHARP_UTILS.PrepSelPrep.NoOpPrepare
-
     @pytest.mark.parametrize("method", ["qdk_standard", "qdk_iterative"])
     @pytest.mark.parametrize("use_phase_gradient", [True, False], ids=["phase_gradient", "rz_ladder"])
     def test_phase_estimation_prepares_the_gradient_once(self, method, use_phase_gradient):
