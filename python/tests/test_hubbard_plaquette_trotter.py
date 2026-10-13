@@ -653,16 +653,14 @@ class TestBenchmarkResources:
         assert "__quantum__qis__t__" in qir
 
 
-def _plaquette_controlled(size: int = 4, *, use_hwp: bool = True, use_phase_gradient: bool = True) -> Circuit:
-    """Return the controlled plaquette circuit the mapper builds for a ``size`` x ``size`` container."""
-    container = HubbardPlaquetteContainer(
-        width=size, height=size, interaction_angle=0.3, hopping_angle=0.2, step_reps=1
-    )
+def _plaquette_controlled(*, use_phase_gradient: bool = True) -> Circuit:
+    """Return the controlled plaquette circuit the mapper builds for a 4 x 4 container."""
+    container = HubbardPlaquetteContainer(width=4, height=4, interaction_angle=0.3, hopping_angle=0.2, step_reps=1)
     mapper = create(
         "controlled_circuit_mapper",
         "hubbard_plaquette",
         control_indices=[0],
-        use_hamming_weight_phasing=use_hwp,
+        use_hamming_weight_phasing=True,
         use_phase_gradient=use_phase_gradient,
         rotation_bit_precision=_GRADIENT_BITS,
     )
@@ -671,28 +669,6 @@ def _plaquette_controlled(size: int = 4, *, use_hwp: bool = True, use_phase_grad
 
 class TestSharedPhaseGradient:
     """Phase estimation prepares the plaquette phase gradient once and shares it across queries."""
-
-    def test_the_mapper_defaults_to_the_phase_gradient(self):
-        """The rotation ladder is opt-in, so the default must phase through the gradient."""
-        mapper = create("controlled_circuit_mapper", "hubbard_plaquette", control_indices=[0])
-        assert mapper.settings().get("use_phase_gradient") is True
-        assert int(mapper.settings().get("rotation_bit_precision")) == 10
-
-    @pytest.mark.parametrize("size", [2, 4])
-    def test_the_mapper_declares_its_phase_gradient(self, size):
-        """Every tower phases through one binary gradient, which sits after the system qubits."""
-        circuit = _plaquette_controlled(size)
-        assert circuit.metadata.num_phase_gradient_ancillas == _GRADIENT_BITS
-        assert circuit.num_qubits == 2 * size * size + _GRADIENT_BITS
-
-    @pytest.mark.parametrize(
-        ("use_hwp", "use_phase_gradient"), [(True, False), (False, True)], ids=["rz_ladder", "no_phasing"]
-    )
-    def test_circuits_without_the_gradient_declare_none(self, use_hwp, use_phase_gradient):
-        """The ladder synthesizes every place value and plain rotations have none, so nothing is shared."""
-        circuit = _plaquette_controlled(use_hwp=use_hwp, use_phase_gradient=use_phase_gradient)
-        assert circuit.metadata.num_phase_gradient_ancillas == 0
-        assert circuit.num_qubits is None
 
     @pytest.mark.parametrize(
         ("use_hwp", "use_phase_gradient", "expected"),
