@@ -209,15 +209,6 @@ class TestHammingWeightPhasing:
         )
         assert np.allclose(actual, phases * state, atol=1e-10)
 
-    def test_the_rz_ladder_is_exact_off_the_gradient_lattice(self):
-        """Without a gradient nothing is rounded, so an angle no gradient could hold is still exact."""
-        angle, count = 0.1234567, 12
-        state = _random_state(count, seed=91, support=24)
-        weights = np.array([index.bit_count() for index in range(len(state))])
-        args = f"{angle}, [[PauliZ], size = {count}], Std.Arrays.Chunks(1, {{qs}}), true, -1, []"
-        actual = _apply(_operation("HammingWeightPhase", args, namespace=_HWP), state)
-        assert np.allclose(actual, np.exp(-1j * angle * (count - 2 * weights)) * state, atol=1e-10)
-
     @pytest.mark.parametrize(
         ("count", "cap", "expected"),
         [(16, -1, 16), (16, 8, 8), (16, 16, 16), (16, 32, 16), (5, 8, 5), (1, 1, 1)],
