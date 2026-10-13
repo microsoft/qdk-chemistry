@@ -9,14 +9,28 @@
       "features": ["cpp"]
     },
     "boost-headers",
+    "boost-container",
     "boost-container-hash",
     "boost-dynamic-bitset",
+    "boost-hana",
+    "boost-interval",
+    "boost-locale",
+    "boost-multiprecision",
+    "boost-numeric-conversion",
+    "boost-random",
+    "boost-range",
+    "boost-regex",
     "boost-sort",
+    "boost-spirit",
     "catch2",
     "gtest",
     "nlohmann-json",
     "spdlog",
     "fmt",
+    {
+      "name": "openssl",
+      "platform": "windows & arm64"
+    },
     "openblas"
   ]
 }

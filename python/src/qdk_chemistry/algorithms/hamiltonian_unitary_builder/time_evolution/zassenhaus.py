@@ -148,6 +148,13 @@ class Zassenhaus(TimeEvolutionBuilder):
             UnitaryRepresentation: The unitary representation built by the Zassenhaus decomposition.
 
         """
+        container_type = qubit_hamiltonian.get_container_type()
+        if container_type != "pauli_decomposition":
+            raise ValueError(
+                f"Zassenhaus time evolution requires a Pauli decomposition qubit operator; "
+                f"got the {container_type!r} representation."
+            )
+
         effective_time, power_repetitions = self._resolve_power()
         order = self._settings.get("order")
 

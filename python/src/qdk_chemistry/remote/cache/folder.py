@@ -1,10 +1,12 @@
 """Folder-based cache backend for QDK/Chemistry.
 
-Stores job metadata and DataClass blobs as plain files in a directory::
+Stores job metadata and content-addressed data as plain files in a directory::
 
     cache_dir/
         <run_hash>.job.json              # Job metadata
         <content_hash>.<type_name>.h5    # DataClass blobs
+        <content_hash>.ndarray.npy       # NumPy arrays
+        <content_hash>.list.json         # Supported nested lists
 
 Primitives (floats, ints, strings, …) are stored inline in the Job JSON
 and never written as separate files.
@@ -23,11 +25,13 @@ import pathlib
 import tempfile
 from typing import TYPE_CHECKING, Any
 
+import numpy as np
+
 from qdk_chemistry._core.data import DataClass as CoreDataClass
-from qdk_chemistry.data._hashing import _item_content_hash
+from qdk_chemistry.data._hashing import _item_content_hash, _numpy_scalar_to_python
 from qdk_chemistry.data._type_name import instance_data_type_name
 from qdk_chemistry.data.registry import get_dataclass_type
-from qdk_chemistry.remote.cache.base import CacheBackend
+from qdk_chemistry.remote.cache.base import CacheBackend, is_cacheable
 
 if TYPE_CHECKING:
     from qdk_chemistry.data.base import DataClass
@@ -92,10 +96,10 @@ class FolderCache(CacheBackend):
         p = self._job_path(run_hash)
         self._atomic_write_text(p, json.dumps(job.to_dict(), indent=2))
 
-    # ── DataClass blobs ──────────────────────────────────────────────────
+    # ── Data blobs ───────────────────────────────────────────────────────
 
-    def get_data(self, content_hash: str) -> DataClass | list | None:
-        """Retrieve a DataClass object (or list) by its content hash, or ``None``."""
+    def get_data(self, content_hash: str) -> Any | None:  # noqa: PLR0911
+        """Retrieve cached data by its content hash, or ``None``."""
         self._validate_key(content_hash, "content_hash")
         generic_list_path = self._root / f"{content_hash}.list.json"
         if generic_list_path.exists():
@@ -105,6 +109,12 @@ class FolderCache(CacheBackend):
         list_matches = sorted(self._root.glob(f"{content_hash}.list[[]*].json"))
         if list_matches:
             return self._get_data_list(list_matches[0])
+        array_path = self._root / f"{content_hash}.ndarray.npy"
+        if array_path.exists():
+            try:
+                return np.load(array_path, allow_pickle=False)
+            except (OSError, ValueError):
+                return None
         # Glob for <content_hash>.*.h5 — the type name is in the filename
         matches = sorted(self._root.glob(f"{content_hash}.*.h5"))
         if not matches:
@@ -135,22 +145,33 @@ class FolderCache(CacheBackend):
             items.append(dataclass_type.from_hdf5_file(str(matches[0])))  # type: ignore[attr-defined]
         return items  # type: ignore[return-value]
 
-    def _get_generic_data_list(self, manifest_path: pathlib.Path) -> list | None:
-        """Reconstruct a nested list/tuple result from a generic manifest."""
+    def _get_generic_data_list(self, manifest_path: pathlib.Path) -> list | tuple | None:
+        """Reconstruct a nested list or tuple result from a generic manifest."""
         try:
             manifest = json.loads(manifest_path.read_text())
-            if manifest.get("kind") != "sequence" or manifest.get("sequence_type") != "list":
+            if manifest.get("kind") != "sequence" or manifest.get("sequence_type") not in {"list", "tuple"}:
                 return None
             data = self._node_to_data(manifest)
         except (json.JSONDecodeError, KeyError, OSError, TypeError, ValueError):
             return None
-        return data if isinstance(data, list) else None
+        return data if isinstance(data, list | tuple) else None
 
-    def put_data(self, content_hash: str, data: DataClass | list) -> None:
-        """Store a DataClass object (or list of them) by content hash."""
+    def put_data(self, content_hash: str, data: Any, *, shared_only: bool = False) -> None:
+        """Store data by content hash unless shared storage is required but unavailable."""
+        if shared_only and not self.is_shared:
+            return None
         self._validate_key(content_hash, "content_hash")
-        if isinstance(data, list):
+        if not is_cacheable(data):
+            raise TypeError(f"FolderCache does not support caching values of type {type(data).__name__}")
+        if isinstance(data, list | tuple):
             return self._put_data_list(content_hash, data)
+        if isinstance(data, np.ndarray):
+            filepath = self._root / f"{content_hash}.ndarray.npy"
+            if filepath.exists():
+                return None
+            self._root.mkdir(parents=True, exist_ok=True)
+            self._atomic_write_array(filepath, data)
+            return None
         type_name = instance_data_type_name(data)
         filepath = self._root / f"{content_hash}.{type_name}.h5"
         if filepath.exists():
@@ -159,8 +180,10 @@ class FolderCache(CacheBackend):
         self._atomic_write_hdf5(filepath, data)
         return None
 
-    def _put_data_list(self, content_hash: str, data_list: list) -> None:
-        """Store a list of DataClass objects as individual files."""
+    def _put_data_list(self, content_hash: str, data_list: list | tuple) -> None:
+        """Store a sequence of DataClass objects as individual files."""
+        if isinstance(data_list, tuple):
+            return self._put_generic_data_list(content_hash, data_list)
         if not self._is_homogeneous_dataclass_list(data_list):
             return self._put_generic_data_list(content_hash, data_list)
 
@@ -177,7 +200,7 @@ class FolderCache(CacheBackend):
         self._atomic_write_text(manifest_path, json.dumps({"type": type_name, "items": item_hashes}))
         return None
 
-    def _put_generic_data_list(self, content_hash: str, data_list: list) -> None:
+    def _put_generic_data_list(self, content_hash: str, data_list: list | tuple) -> None:
         """Store a list containing nested tuples/lists, DataClass objects, and primitives."""
         manifest_path = self._root / f"{content_hash}.list.json"
         if manifest_path.exists():
@@ -187,7 +210,7 @@ class FolderCache(CacheBackend):
         self._atomic_write_text(manifest_path, json.dumps(manifest))
 
     @staticmethod
-    def _is_homogeneous_dataclass_list(data_list: list) -> bool:
+    def _is_homogeneous_dataclass_list(data_list: list | tuple) -> bool:
         """Return whether *data_list* can use the legacy homogeneous-list manifest."""
         if not data_list:
             return False
@@ -203,6 +226,8 @@ class FolderCache(CacheBackend):
 
     def _data_to_node(self, data: Any) -> dict[str, Any]:
         """Convert supported cached data into a JSON manifest node."""
+        if isinstance(data, np.generic):
+            data = _numpy_scalar_to_python(data)
         if isinstance(data, list | tuple):
             return {
                 "kind": "sequence",
@@ -219,8 +244,13 @@ class FolderCache(CacheBackend):
                 "hash": item_hash,
                 "type": instance_data_type_name(data),
             }
+        if isinstance(data, np.ndarray):
+            item_hash = _item_content_hash(data)
+            self.put_data(item_hash, data)
+            return {"kind": "ndarray", "hash": item_hash}
         raise TypeError(
-            "FolderCache only supports caching DataClass objects, primitives, and nested lists/tuples containing them"
+            "FolderCache does not support this value graph; expected DataClass objects, NumPy arrays, primitives, "
+            "or nested lists/tuples containing them"
         )
 
     def _node_to_data(self, node: dict[str, Any]) -> Any:
@@ -244,13 +274,21 @@ class FolderCache(CacheBackend):
             if not path.exists():
                 raise FileNotFoundError(path)
             return dataclass_type.from_hdf5_file(str(path))  # type: ignore[attr-defined]
+        if kind == "ndarray":
+            path = self._root / f"{node['hash']}.ndarray.npy"
+            if not path.exists():
+                raise FileNotFoundError(path)
+            return np.load(path, allow_pickle=False)
         raise ValueError(f"Unknown cached manifest node kind: {kind!r}")
 
-    def has_data(self, content_hash: str) -> bool:
+    def has_data(self, content_hash: str, *, shared_only: bool = False) -> bool:
         """Fast existence check via glob (no deserialization)."""
         self._validate_key(content_hash, "content_hash")
+        if shared_only and not self.is_shared:
+            return False
         return (
             bool(list(self._root.glob(f"{content_hash}.*.h5")))
+            or (self._root / f"{content_hash}.ndarray.npy").exists()
             or bool(list(self._root.glob(f"{content_hash}.list[[]*].json")))
             or (self._root / f"{content_hash}.list.json").exists()
         )
@@ -276,17 +314,18 @@ class FolderCache(CacheBackend):
     def delete_data(self, content_hash: str) -> bool:
         """Remove a DataClass blob (or list manifest and its items) by content hash."""
         self._validate_key(content_hash, "content_hash")
-        import json as _json  # noqa: PLC0415
-
         deleted = False
+        child_nodes: set[tuple[str, str]] = set()
 
         # Remove list manifests and their per-item blobs
         generic_manifest = self._root / f"{content_hash}.list.json"
         if generic_manifest.exists():
             try:
-                manifest = _json.loads(generic_manifest.read_text())
-                self._delete_data_nodes(manifest)
-            except (_json.JSONDecodeError, OSError, KeyError, TypeError):
+                manifest = json.loads(generic_manifest.read_text())
+                self._collect_data_nodes(manifest, child_nodes)
+            except (json.JSONDecodeError, OSError, KeyError, TypeError):
+                # Best-effort cleanup: retain any collected child nodes and
+                # continue deleting even when the manifest is corrupt or unreadable.
                 pass
             try:
                 generic_manifest.unlink()
@@ -297,8 +336,8 @@ class FolderCache(CacheBackend):
         list_matches = list(self._root.glob(f"{content_hash}.list[[]*].json"))
         for manifest_path in list_matches:
             try:
-                manifest = _json.loads(manifest_path.read_text())
-            except (_json.JSONDecodeError, OSError):
+                manifest = json.loads(manifest_path.read_text())
+            except (json.JSONDecodeError, OSError):
                 try:
                     manifest_path.unlink()
                     deleted = True
@@ -307,17 +346,28 @@ class FolderCache(CacheBackend):
                 continue
 
             for item_hash in manifest.get("items", []):
-                for f in self._root.glob(f"{item_hash}.*.h5"):
-                    deleted = self._unlink_existing(f) or deleted
+                child_nodes.add(("dataclass", item_hash))
             try:
                 manifest_path.unlink()
                 deleted = True
             except OSError:
                 pass
 
+        if child_nodes:
+            referenced_nodes = self._referenced_data_nodes()
+            for kind, item_hash in child_nodes - referenced_nodes:
+                if kind == "dataclass":
+                    for f in self._root.glob(f"{item_hash}.*.h5"):
+                        deleted = self._unlink_existing(f) or deleted
+                elif kind == "ndarray":
+                    deleted = self._unlink_existing(self._root / f"{item_hash}.ndarray.npy") or deleted
+
         # Remove single-object blobs
         for f in self._root.glob(f"{content_hash}.*.h5"):
             deleted = self._unlink_existing(f) or deleted
+        array_path = self._root / f"{content_hash}.ndarray.npy"
+        if array_path.exists():
+            deleted = self._unlink_existing(array_path) or deleted
 
         return deleted
 
@@ -332,16 +382,36 @@ class FolderCache(CacheBackend):
         except OSError:
             return False
 
-    def _delete_data_nodes(self, node: dict[str, Any]) -> None:
-        """Delete DataClass blobs referenced by a generic manifest node."""
+    @staticmethod
+    def _collect_data_nodes(node: dict[str, Any], nodes: set[tuple[str, str]]) -> None:
+        """Collect data blobs referenced by a generic manifest node."""
         kind = node.get("kind")
         if kind == "dataclass":
-            for f in self._root.glob(f"{node['hash']}.*.h5"):
-                self._unlink_existing(f)
+            nodes.add((kind, node["hash"]))
+            return
+        if kind == "ndarray":
+            nodes.add((kind, node["hash"]))
             return
         if kind == "sequence":
             for item in node.get("items", []):
-                self._delete_data_nodes(item)
+                FolderCache._collect_data_nodes(item, nodes)
+
+    def _referenced_data_nodes(self) -> set[tuple[str, str]]:
+        """Return data blobs referenced by sequence manifests in the cache."""
+        nodes: set[tuple[str, str]] = set()
+        for manifest_path in self._root.glob("*.list.json"):
+            try:
+                manifest = json.loads(manifest_path.read_text())
+                self._collect_data_nodes(manifest, nodes)
+            except (json.JSONDecodeError, OSError, KeyError, TypeError):
+                continue
+        for manifest_path in self._root.glob("*.list[[]*].json"):
+            try:
+                manifest = json.loads(manifest_path.read_text())
+                nodes.update(("dataclass", item_hash) for item_hash in manifest["items"])
+            except (json.JSONDecodeError, OSError, KeyError, TypeError):
+                continue
+        return nodes
 
     def clear(self) -> None:
         """Remove all cached jobs and data blobs."""
@@ -376,6 +446,17 @@ class FolderCache(CacheBackend):
         os.close(fd)
         try:
             data.to_hdf5_file(tmp)
+            os.replace(tmp, path)
+        except BaseException:
+            pathlib.Path(tmp).unlink(missing_ok=True)
+            raise
+
+    def _atomic_write_array(self, path: pathlib.Path, data: np.ndarray) -> None:
+        """Write a NumPy array atomically via temp file + os.replace."""
+        fd, tmp = tempfile.mkstemp(dir=self._root, suffix=".ndarray.npy")
+        try:
+            with os.fdopen(fd, "wb") as file:
+                np.save(file, data, allow_pickle=False)
             os.replace(tmp, path)
         except BaseException:
             pathlib.Path(tmp).unlink(missing_ok=True)

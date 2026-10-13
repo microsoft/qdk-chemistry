@@ -90,6 +90,10 @@ Functions that deal with specific atoms include the word "atom" in their name (e
 All atomic data is const and immutable once set, following QDK/Chemistry's :doc:`immutable data pattern <../design/index>`.
 If you need to modify coordinates or other properties, you must create a new Structure object with the desired changes.
 
+.. note::
+   ``get_nuclear_charges()`` and ``calculate_nuclear_repulsion_energy()`` use the charges stored on the structure; applying an :term:`ECP` does not change them.
+   For ECP-adjusted charges and nuclear repulsion, use ``get_effective_nuclear_charges()`` and ``calculate_effective_nuclear_repulsion_energy()`` on the associated :doc:`BasisSet <basis_set>`.
+
 .. tab:: Python API
 
    .. literalinclude:: ../../../_static/examples/python/structure.py
@@ -137,6 +141,7 @@ Note that here the coordinates are in Angstrom, since this is the standard in xy
 Related classes
 ---------------
 
+- :doc:`BasisSet <basis_set>`: Basis functions, ECP metadata, and ECP-adjusted nuclear properties
 - :doc:`Orbitals <orbitals>`: Molecular orbitals calculated from the structure
 - :doc:`ScfSolver <../algorithms/scf_solver>`: Algorithm that performs calculations on the structure
 

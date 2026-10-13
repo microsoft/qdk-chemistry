@@ -3,18 +3,18 @@ digraph TutorialQpeOrbitalPartition {
     nodesep=0.45;
     overlap=false;
     pad=0.2;
-    bgcolor="#FAFAFA";
+    bgcolor="#FFFFFF";
 
     node [shape=box, style="rounded,filled", fontname="Arial", width=3.1, height=1.2, margin=0.2];
 
     subgraph cluster_orbitals {
-        label="Spatial molecular orbitals";
+        label=<<B>Spatial molecular orbitals</B>>;
         style="filled,rounded";
         fillcolor="#E8EAF6";
         color="#5C6BC0";
         penwidth=2.5;
         fontsize=14;
-        fontname="Arial Bold";
+        fontname="Arial";
         fontcolor="#3949AB";
         rank=same;
 

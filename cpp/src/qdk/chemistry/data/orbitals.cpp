@@ -853,7 +853,7 @@ bool Orbitals::is_restricted() const {
 bool Orbitals::has_active_space() const {
   QDK_LOG_TRACE_ENTERING();
   return !_active_space_indices.first.empty() ||
-         !_active_space_indices.second.empty();
+         !_active_space_indices.second.empty() || has_inactive_space();
 }
 
 bool Orbitals::has_inactive_space() const {
@@ -2298,8 +2298,11 @@ std::shared_ptr<ModelOrbitals> ModelOrbitals::from_hdf5(H5::Group& group) {
     unsigned num_orbitals;
     orbitals_dataset.read(&num_orbitals, H5::PredType::NATIVE_UINT);
 
-    // Load active space indices
+    // Load active space indices. Dataset presence denotes an explicitly
+    // bounded active space even when both datasets have zero length.
     std::vector<size_t> active_indices_alpha, active_indices_beta;
+    bool has_active = group.nameExists("active_space_indices_alpha") ||
+                      group.nameExists("active_space_indices_beta");
     try {
       if (group.nameExists("active_space_indices_alpha")) {
         active_indices_alpha =
@@ -2340,12 +2343,8 @@ std::shared_ptr<ModelOrbitals> ModelOrbitals::from_hdf5(H5::Group& group) {
     }
 
     // Reconstruct via the symmetry-blocked index sets (or the full-active
-    // constructor when no active indices were recorded). save_vector_to_group
-    // omits empty vectors, so an explicitly empty active space is flagged by
-    // the active_space_is_empty marker; treat it as a present-but-empty active
-    // space, distinct from an absent one which defaults to the full space.
-    bool has_active =
-        !active_indices_alpha.empty() || !active_indices_beta.empty();
+    // constructor when no active indices were recorded). The marker supports
+    // files that encode an empty active space without zero-length datasets.
     try {
       if (!has_active && group.nameExists("active_space_is_empty")) {
         H5::DataSet active_empty_dataset =

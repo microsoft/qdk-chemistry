@@ -5,6 +5,10 @@
 # Licensed under the MIT License. See LICENSE.txt in the project root for license information.
 # --------------------------------------------------------------------------------------------
 
+import warnings
+
+import numpy as np
+
 from qdk_chemistry.algorithms.base import Algorithm, AlgorithmFactory
 from qdk_chemistry.data import Circuit, Settings, Wavefunction
 
@@ -12,10 +16,23 @@ __all__: list[str] = []
 
 
 class StatePreparationSettings(Settings):
-    """Settings for state preparation algorithms."""
+    """Deprecated settings container for state preparation algorithms.
+
+    .. deprecated::
+        Each state preparation algorithm now owns its settings, and the transpilation keys
+        below belong to the Qiskit-backed algorithms that actually honour them. Kept so that
+        existing imports keep working; it is no longer used by any algorithm in this package.
+    """
 
     def __init__(self):
         """Initialize the StatePreparationSettings."""
+        warnings.warn(
+            "'StatePreparationSettings' is deprecated and will be removed in a future release; "
+            "use the settings class of the specific state preparation algorithm instead "
+            "(e.g. 'SparseIsometryStatePreparationSettings').",
+            DeprecationWarning,
+            stacklevel=2,
+        )
         super().__init__()
         self._set_default("basis_gates", "vector<string>", ["x", "y", "z", "cx", "cz", "id", "h", "s", "sdg", "rz"])
         self._set_default("transpile", "bool", True)
@@ -63,6 +80,49 @@ class StatePreparation(Algorithm):
         """
         return super().run(wavefunction)
 
+    @staticmethod
+    def _dense_state_vector(wavefunction: Wavefunction, label: str) -> tuple[np.ndarray, int]:
+        """Scatter a wavefunction's coefficients onto their determinant-derived indices.
+
+        A ``Wavefunction`` stores only occupied determinants, so the coefficient list is not
+        positionally aligned with the basis index. Those bits are occupation numbers,
+        so qubit *i* holds mode *i* and the result is in the Jordan-Wigner basis.
+
+        Args:
+            wavefunction: The target wavefunction.
+            label: Algorithm name, used to prefix error messages.
+
+        Returns:
+            The dense real coefficient vector and the width of the state register in qubits.
+
+        Raises:
+            ValueError: If the wavefunction has no coefficients, has a non-zero imaginary
+                part, or is too wide to densify.
+
+        """
+        coefficients = np.asarray(wavefunction.get_coefficients())
+        if coefficients.size == 0:
+            raise ValueError(f"{label} requires at least one coefficient.")
+        if np.iscomplexobj(coefficients):
+            if not np.allclose(coefficients.imag, 0.0):
+                raise ValueError(f"{label} requires real coefficients.")
+            coefficients = coefficients.real
+        coefficients = coefficients.astype(float, copy=False)
+
+        determinants = wavefunction.get_active_determinants()
+        num_bits = wavefunction.get_configuration_set().num_modes() * determinants[0].bits_per_mode()
+        num_qubits = max(num_bits, 1)
+        if num_qubits > 32:
+            raise ValueError(f"{label} is only supported for up to 32 qubits.")
+
+        dense = np.zeros(1 << num_qubits, dtype=float)
+        for coefficient, determinant in zip(coefficients, determinants, strict=True):
+            index = 0
+            for position, bit in enumerate(determinant.to_bits(num_bits)):
+                index |= bit << position
+            dense[index] += coefficient
+        return dense, num_qubits
+
 
 class StatePreparationFactory(AlgorithmFactory):
     """Factory class for creating StatePreparation instances."""
@@ -76,5 +136,5 @@ class StatePreparationFactory(AlgorithmFactory):
         return "state_prep"
 
     def default_algorithm_name(self) -> str:
-        """Return the sparse_isometry_gf2x as default algorithm name."""
-        return "sparse_isometry_gf2x"
+        """Return the sparse_isometry as default algorithm name."""
+        return "sparse_isometry"

@@ -844,6 +844,36 @@ Examples:
     >>> print(f"ECP electrons per atom: {ecp_electrons}")
 )");
 
+  basis_set.def("get_effective_nuclear_charges",
+                &BasisSet::get_effective_nuclear_charges,
+                R"(
+Get nuclear charges adjusted for ECP core electrons.
+
+Returns:
+    numpy.ndarray: Effective nuclear charge for each atom
+
+Raises:
+    RuntimeError: If no structure is associated with this basis set
+
+Examples:
+    >>> charges = basis_set.get_effective_nuclear_charges()
+)");
+
+  basis_set.def("calculate_effective_nuclear_repulsion_energy",
+                &BasisSet::calculate_effective_nuclear_repulsion_energy,
+                R"(
+Calculate nuclear repulsion using ECP-adjusted nuclear charges.
+
+Returns:
+    float: Effective nuclear repulsion energy in atomic units (Hartree)
+
+Raises:
+    RuntimeError: If no structure is associated with this basis set
+
+Examples:
+    >>> energy = basis_set.calculate_effective_nuclear_repulsion_energy()
+)");
+
   basis_set.def("has_ecp_electrons", &BasisSet::has_ecp_electrons,
                 R"(
 Check if ECP (Effective Core Potential) electrons are present.

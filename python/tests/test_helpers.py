@@ -5,14 +5,20 @@
 # Licensed under the MIT License. See LICENSE.txt in the project root for license information.
 # --------------------------------------------------------------------------------------------
 
+import math
+
 import numpy as np
 
+from qdk_chemistry.algorithms.qubit_mapper.sum_of_squares import SumOfSquaresQubitMapper
 from qdk_chemistry.data import (
     Ansatz,
     BasisSet,
     CanonicalFourCenterHamiltonianContainer,
     Configuration,
+    FactorizedHamiltonianContainer,
     Hamiltonian,
+    MajoranaMapping,
+    ModelOrbitals,
     Orbitals,
     OrbitalType,
     Shell,
@@ -20,6 +26,19 @@ from qdk_chemistry.data import (
     Structure,
     Wavefunction,
 )
+
+
+def create_sparse_wavefunction(num_qubits: int, indices: list[int], amplitudes: list[float]) -> Wavefunction:
+    """Create a ``Wavefunction`` occupying only *indices* of a ``num_qubits`` register."""
+    dets = [Configuration.from_bitstring(format(idx, f"0{num_qubits}b")[::-1]) for idx in indices]
+    container = StateVectorContainer(np.array([float(a) for a in amplitudes]), dets, ModelOrbitals(num_qubits))
+    return Wavefunction(container)
+
+
+def create_dense_wavefunction(amplitudes: list[float]) -> Wavefunction:
+    """Create a ``Wavefunction`` holding *amplitudes* on consecutive basis states."""
+    num_qubits = math.ceil(math.log2(len(amplitudes))) if len(amplitudes) > 1 else 1
+    return create_sparse_wavefunction(num_qubits, list(range(len(amplitudes))), amplitudes)
 
 
 def create_test_basis_set(num_atomic_orbitals, name="test-basis", structure=None):
@@ -247,3 +266,167 @@ def create_test_ansatz(num_orbitals: int = 2):
     wavefunction = Wavefunction(container)
 
     return Ansatz(hamiltonian, wavefunction)
+
+
+def create_random_factorized_hamiltonian(
+    num_orbitals: int = 2,
+    num_ranks: int = 2,
+    num_bases: int = 1,
+    num_copies: int = 1,
+    *,
+    seed: int = 42,
+):
+    """Create a random FactorizedHamiltonianContainer for testing.
+
+    Args:
+        num_orbitals: Number of spatial orbitals (N).
+        num_ranks: Number of ranks (R).
+        num_bases: Number of bases (B).
+        num_copies: Number of copies (C).
+        seed: Random seed for reproducibility.
+
+    Returns:
+        FactorizedHamiltonianContainer from C++ pybind11.
+
+    """
+    rng = np.random.default_rng(seed)
+    n, r, b, c = num_orbitals, num_ranks, num_bases, num_copies
+
+    # Symmetric one-body integrals
+    h1 = rng.standard_normal((n, n))
+    h1 = (h1 + h1.T) / 2
+
+    # Random normalized basis vectors (U), flattened [R*B*N]
+    u_matrices = np.zeros(r * b * n)
+    for ri in range(r):
+        for bi in range(b):
+            v = rng.standard_normal(n)
+            v /= np.linalg.norm(v)
+            u_matrices[ri * b * n + bi * n : ri * b * n + (bi + 1) * n] = v
+
+    # Two-body weights W [R*B*C]
+    w_matrices = rng.standard_normal(r * b * c)
+
+    # Identity weights WB [R, C]
+    wb_matrix = rng.standard_normal((r, c))
+
+    orbitals = create_test_orbitals(n)
+    inactive_fock = np.zeros((n, n))
+
+    return FactorizedHamiltonianContainer(
+        one_body_integrals=h1,
+        u_matrices=u_matrices,
+        w_matrices=w_matrices,
+        wb_matrix=wb_matrix,
+        orbitals=orbitals,
+        core_energy=0.0,
+        inactive_fock_matrix=inactive_fock,
+    )
+
+
+def factorized_hamiltonian_to_sossa_operator(factorized_hamiltonian):
+    """Map a factorized Hamiltonian to the SOSSA QubitOperator the SOSSA builder expects.
+
+    Args:
+        factorized_hamiltonian: The FactorizedHamiltonianContainer to map.
+
+    Returns:
+        The SOSSA QubitOperator.
+
+    """
+    num_modes = 2 * factorized_hamiltonian.get_num_orbitals()
+    hamiltonian = Hamiltonian(factorized_hamiltonian)
+    return SumOfSquaresQubitMapper().run(hamiltonian, MajoranaMapping.jordan_wigner(num_modes))
+
+
+def create_random_bitstring_matrix(
+    n_electrons: int,
+    n_orbitals: int,
+    n_dets: int,
+    seed: int = 0,
+) -> np.ndarray:
+    """Generate a random bitstring matrix for sparse isometry testing.
+
+    Args:
+        n_electrons: Total number of electrons.
+        n_orbitals: Number of spatial orbitals.
+        n_dets: Target number of determinants (columns).
+        seed: Random seed for reproducibility.
+
+    Returns:
+        Binary matrix of shape ``(2 * n_orbitals, n_dets)`` where rows are
+        qubits and columns are determinants.
+
+    """
+    n_alpha = n_electrons // 2
+    n_beta = n_electrons - n_alpha
+    rng = np.random.default_rng(seed)
+
+    hf_config = Configuration.canonical_hf_configuration(n_alpha, n_beta, n_orbitals)
+    alpha_bits, beta_bits = hf_config.to_binary_strings(n_orbitals)
+    hf = np.array([int(bit) for bit in alpha_bits + beta_bits], dtype=np.int8)
+
+    seen: set[bytes] = {hf.tobytes()}
+    dets = [hf]
+    for _ in range(n_dets * 200):
+        if len(dets) >= n_dets:
+            break
+        new_det = hf.copy()
+        for channel_start in (0, n_orbitals):
+            channel = hf[channel_start : channel_start + n_orbitals]
+            occupied = np.where(channel == 1)[0]
+            virtual = np.where(channel == 0)[0]
+            if len(occupied) == 0 or len(virtual) == 0:
+                continue
+            order = rng.integers(0, min(len(occupied), len(virtual)) + 1)
+            if order == 0:
+                continue
+            occ = rng.choice(occupied, size=order, replace=False)
+            vir = rng.choice(virtual, size=order, replace=False)
+            new_det[channel_start + occ] = 0
+            new_det[channel_start + vir] = 1
+        if not np.array_equal(new_det, hf) and new_det.tobytes() not in seen:
+            seen.add(new_det.tobytes())
+            dets.append(new_det)
+
+    return np.array(dets, dtype=np.int8).T
+
+
+def create_random_wavefunction(
+    n_electrons: int,
+    n_orbitals: int,
+    n_dets: int,
+    seed: int = 0,
+) -> Wavefunction:
+    """Generate a random normalised Wavefunction for testing.
+
+    Builds physically meaningful determinants from the Hartree-Fock reference
+    plus random excitations, assigns random normalised coefficients.
+
+    Args:
+        n_electrons: Total number of electrons.
+        n_orbitals: Number of spatial orbitals.
+        n_dets: Target number of determinants.
+        seed: Random seed for reproducibility.
+
+    Returns:
+        A normalised :class:`Wavefunction` with ``n_dets`` determinants.
+
+    """
+    det_matrix = create_random_bitstring_matrix(n_electrons, n_orbitals, n_dets, seed).T
+    actual_n_dets = det_matrix.shape[0]
+
+    mapping = {(1, 1): "2", (1, 0): "u", (0, 1): "d", (0, 0): "0"}
+    configs = [
+        Configuration.from_spin_half_string(
+            "".join(mapping[int(row[i]), int(row[n_orbitals + i])] for i in range(n_orbitals))
+        )
+        for row in det_matrix
+    ]
+
+    coeff_rng = np.random.default_rng(seed)
+    raw = coeff_rng.standard_normal(actual_n_dets)
+    coeffs = raw / np.linalg.norm(raw)
+
+    orbitals = create_test_orbitals(n_orbitals)
+    return Wavefunction(StateVectorContainer(coeffs, configs, orbitals))

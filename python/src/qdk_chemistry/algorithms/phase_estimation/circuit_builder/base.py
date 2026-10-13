@@ -123,6 +123,25 @@ class QpeCircuitBuilder(Algorithm):
         circuit = circuit_mapper.run(unitary_rep)
         return circuit, num_ancilla_qubits
 
+    @staticmethod
+    def _validate_state_prep_width(state_preparation: Circuit, num_qubits_passed: int) -> None:
+        """Check that the state preparation fits the register phase estimation hands it.
+
+        Args:
+            state_preparation: The state preparation circuit.
+            num_qubits_passed: Width of the register phase estimation applies it to.
+
+        Raises:
+            ValueError: If the state preparation acts on more qubits than it is given.
+
+        """
+        width = state_preparation.num_qubits
+        if width is not None and width > num_qubits_passed:
+            raise ValueError(
+                f"State preparation acts on {width} qubits but phase estimation applies it to "
+                f"{num_qubits_passed}. Choose a state preparation that fits the system register."
+            )
+
 
 class QpeCircuitBuilderFactory(AlgorithmFactory):
     """Factory class for creating QpeCircuitBuilder instances."""

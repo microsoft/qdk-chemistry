@@ -8,20 +8,47 @@
 ################################################################################
 # start-cell-create
 from qdk_chemistry.algorithms import create
+from qdk_chemistry.data import AlgorithmRef
 
 # Create a StatePreparation instance
-sparse_prep = create("state_prep", "sparse_isometry_gf2x")
+sparse_prep = create("state_prep", "sparse_isometry")
+dense_prep = create("state_prep", "dense_pure_state")
 regular_prep = create("state_prep", "qiskit_regular_isometry")
 # end-cell-create
 ################################################################################
 
 ################################################################################
 # start-cell-configure
-# Configure transpilation settings
-sparse_prep.settings().set("transpile", True)
-sparse_prep.settings().set("basis_gates", ["rz", "cz", "sdg", "h"])
-sparse_prep.settings().set("transpile_optimization_level", 3)
+# Transpilation is configured on the algorithm that emits the Qiskit circuit.
+regular_prep.settings().set("transpile", True)
+regular_prep.settings().set("basis_gates", ["rz", "cz", "sdg", "h"])
+regular_prep.settings().set("transpile_optimization_level", 3)
+
+# Select other dense preparation method for sparse isometry
+sparse_isometry_with_qiskit_dense_prep = create(
+    "state_prep",
+    "sparse_isometry",
+    dense_state_prep=AlgorithmRef(
+        "state_prep",
+        "qiskit_regular_isometry",
+        transpile=True,
+        basis_gates=["rz", "cz", "sdg", "h"],
+        transpile_optimization_level=3,
+    ),
+)
 # end-cell-configure
+################################################################################
+
+################################################################################
+# start-cell-configure-binary-encoding
+# Compress the reduced subspace with binary encoding
+binary_encoded_prep = create("state_prep", "sparse_isometry", binary_encoding=True)
+
+# Select the algorithm that prepares the compressed dense register
+binary_encoded_prep.settings().set(
+    "dense_state_prep", AlgorithmRef("state_prep", "dense_pure_state")
+)
+# end-cell-configure-binary-encoding
 ################################################################################
 
 ################################################################################
@@ -51,8 +78,10 @@ E_cas, wfn_cas = cas_solver.run(hamiltonian, 1, 1)
 # Construct the circuit
 regular_circuit = regular_prep.run(wfn_cas)
 sparse_circuit = sparse_prep.run(wfn_cas)
+dense_circuit = dense_prep.run(wfn_cas)
 print(f"Regular isometry circuit:\n{regular_circuit.get_qiskit_circuit()}")
 print(f"Sparse isometry circuit:\n{sparse_circuit.get_qsharp_circuit()}")
+print(f"Dense pure state circuit:\n{dense_circuit.get_qsharp_circuit()}")
 # end-cell-run
 ################################################################################
 
@@ -61,6 +90,6 @@ print(f"Sparse isometry circuit:\n{sparse_circuit.get_qsharp_circuit()}")
 from qdk_chemistry.algorithms import registry
 
 print(registry.available("state_prep"))
-# ['sparse_isometry_gf2x', 'qiskit_regular_isometry']
+# ['dense_pure_state', 'sparse_isometry', 'alias_sampling', 'qrom', 'qiskit_regular_isometry']
 # end-cell-list-implementations
 ################################################################################

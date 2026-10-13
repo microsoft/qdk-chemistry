@@ -11,7 +11,6 @@
 #include <nlohmann/json.hpp>
 #include <numeric>
 #include <string>
-#include <unordered_map>
 #include <utility>
 #include <vector>
 
@@ -70,9 +69,23 @@ class BasisSet {
   uint64_t num_atomic_orbitals;  ///< Total number of atomic orbitals
 
   std::vector<Shell> ecp_shells;  ///< Effective core potential shells
-  std::unordered_map<int, int>
-      element_ecp_electrons;  ///< Map from atomic number to ECP electron number
-  int n_ecp_electrons = 0;  ///< Total number of core electrons replaced by ECPs
+  std::vector<int>
+      atom_ecp_electrons;  ///< Number of ECP electrons for each atom
+
+  /**
+   * @brief Get the total number of core electrons replaced by ECPs
+   * @return Sum of the per-atom ECP electron counts
+   */
+  int get_n_ecp_electrons() const noexcept {
+    return std::accumulate(atom_ecp_electrons.begin(), atom_ecp_electrons.end(),
+                           0);
+  }
+
+  /**
+   * @brief Validate the per-atom ECP electron counts
+   * @throws std::runtime_error if the vector size or any count is invalid
+   */
+  void validate_atom_ecp_electrons() const;
 
   /**
    * @brief Load basis set from database (QCSchema) JSON file
@@ -185,8 +198,7 @@ class BasisSet {
    * @param mol Molecular structure
    * @param input_shells Orbital atomic orbital shells
    * @param ecp_shells Effective core potential shells
-   * @param element_ecp_electrons Map from atomic number to ECP electron number
-   * @param n_ecp_electrons Total number of core electrons replaced by ECPs
+   * @param atom_ecp_electrons Number of ECP electrons for each atom
    * @param mode Normalization convention
    * @param pure Whether to use spherical harmonics
    * @param sort Whether to sort shells
@@ -194,8 +206,8 @@ class BasisSet {
   explicit BasisSet(std::shared_ptr<Molecule> mol,
                     const std::vector<Shell>& input_shells,
                     const std::vector<Shell>& ecp_shells,
-                    const std::unordered_map<int, int>& element_ecp_electrons,
-                    int n_ecp_electrons, BasisMode mode, bool pure, bool sort);
+                    const std::vector<int>& atom_ecp_electrons, BasisMode mode,
+                    bool pure, bool sort);
 
  private:
   /**

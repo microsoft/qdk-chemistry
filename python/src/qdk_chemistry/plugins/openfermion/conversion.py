@@ -273,6 +273,13 @@ def qubit_hamiltonian_to_qubit_operator(
     """
     Logger.trace_entering()
 
+    container_type = qubit_hamiltonian.get_container_type()
+    if container_type != "pauli_decomposition":
+        raise ValueError(
+            f"OpenFermion conversion requires a Pauli decomposition qubit operator; "
+            f"got the {container_type!r} representation."
+        )
+
     qubit_op = of.QubitOperator()
 
     for pauli_str, coeff in zip(

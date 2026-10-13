@@ -46,8 +46,9 @@ namespace QDKChemistry.Utils.IterativePhaseEstimation {
             Rz(params.accumulatePhase, phaseQubit);
             params.repControlledUnitary(phaseQubit, allTargets);
         }
+        let result = MResetZ(phaseQubit);
         ResetAll(allTargets);
-        return [MResetZ(phaseQubit)];
+        return [result];
     }
 
     /// Prepare iterative Quantum Phase Estimation (IQPE) circuit.

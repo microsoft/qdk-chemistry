@@ -305,6 +305,14 @@ class TestCreateStatevectorFromWavefunction:
         sv = create_statevector_from_wavefunction(wf, normalize=True)
         assert np.all(sv == 0.0)
 
+    def test_no_active_determinants_raises(self, basic_orbitals):
+        """A wavefunction with no active determinants has no statevector to build."""
+        container = StateVectorContainer(np.array([]), [], basic_orbitals)
+        wf = Wavefunction(container)
+
+        with pytest.raises(ValueError, match="no active determinants"):
+            create_statevector_from_wavefunction(wf)
+
     def test_multiple_determinants(self, basic_orbitals):
         """Test wavefunction with multiple determinants."""
         det1 = Configuration.from_spin_half_string("20")

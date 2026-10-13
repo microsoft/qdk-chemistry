@@ -20,6 +20,7 @@ Exposed classes are:
 - :class:`ElectronicStructureSettings`: Specialized settings for electronic structure calculations.
 - :class:`Element`: Represents a chemical element with its properties.
 - :class:`EnergyExpectationResult`: Result for Hamiltonian energy expectation value and variance.
+- :class:`FactorizedHamiltonianContainer`: Container for factorized hamiltonians.
 - :class:`Hamiltonian`: Quantum mechanical Hamiltonian operator representation.
 - :class:`HamiltonianContainer`: Abstract base class for different Hamiltonian storage formats.
 - :class:`HamiltonianType`: Enumeration of Hamiltonian types (Hermitian, NonHermitian).
@@ -80,6 +81,7 @@ from qdk_chemistry._core.data import (
     ConfigurationSet,
     ElectronicStructureSettings,
     Element,
+    FactorizedHamiltonianContainer,
     Hamiltonian,
     HamiltonianContainer,
     HamiltonianType,
@@ -155,6 +157,7 @@ __all__ = [
     "ElectronicStructureSettings",
     "Element",
     "EnergyExpectationResult",
+    "FactorizedHamiltonianContainer",
     "FermionModeOrder",
     "FlatPartition",
     "Hamiltonian",

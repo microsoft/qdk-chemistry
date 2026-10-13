@@ -25,9 +25,10 @@ from qdk.openqasm import circuit as openqasm_circuit
 from qdk.openqasm import compile as openqasm_compile
 from qdk.openqasm import estimate as openqasm_estimate
 
-from qdk_chemistry.data._hashing import _hash_optional, _hash_str
+from qdk_chemistry.data._hashing import _hash_optional, _hash_str, _hash_uint
 from qdk_chemistry.data.base import DataClass
 from qdk_chemistry.utils import Logger
+from qdk_chemistry.utils.qsharp import get_qsharp_context
 
 try:
     from qdk._interpreter import QirInputData
@@ -36,7 +37,7 @@ except ImportError:
     from qsharp._native import Circuit as QdkCircuitType
     from qsharp._qsharp import QirInputData
 
-__all__: list[str] = ["QsharpFactoryData"]
+__all__: list[str] = ["CircuitMetadata", "QsharpFactoryData"]
 
 
 @dataclass(frozen=True)
@@ -48,6 +49,26 @@ class QsharpFactoryData:
 
     parameter: dict[str, Any]
     """The parameter to be passed to the Q# Callable when creating the circuit."""
+
+
+@dataclass(frozen=True)
+class CircuitMetadata:
+    """Metadata specific to the subroutines a circuit is built from."""
+
+    num_phase_gradient_ancillas: int = 0
+    """The phase gradient ancillas that should be initialized once and reused in multiple subroutines."""
+
+    def __post_init__(self) -> None:
+        """Reject invalid metadata.
+
+        Raises:
+            ValueError: If ``num_phase_gradient_ancillas`` is negative.
+
+        """
+        if self.num_phase_gradient_ancillas < 0:
+            raise ValueError(
+                f"num_phase_gradient_ancillas must be non-negative. Got {self.num_phase_gradient_ancillas}."
+            )
 
 
 class Circuit(DataClass):
@@ -63,8 +84,8 @@ class Circuit(DataClass):
         """
         return "circuit"
 
-    # Serialization version for this class
-    _serialization_version = "0.1.0"
+    # Serialization version for this class.
+    _serialization_version = "0.1.2"
 
     # Use keyword arguments to be future-proof
     def __init__(
@@ -75,6 +96,8 @@ class Circuit(DataClass):
         qsharp_op: Callable[..., Any] | None = None,
         qsharp_factory: QsharpFactoryData | None = None,
         encoding: str | None = None,
+        num_qubits: int | None = None,
+        metadata: CircuitMetadata | None = None,
     ) -> None:
         """Initialize a Circuit.
 
@@ -87,6 +110,11 @@ class Circuit(DataClass):
             encoding: The fermion-to-qubit encoding assumed by this circuit.
                 Valid values include "jordan-wigner", "bravyi-kitaev", "parity", or None.
                 Defaults to None.
+            num_qubits: The width of the register ``qsharp_op`` acts on, when the producer
+                knows it. Scratch qubits a circuit allocates internally are not counted.
+                Defaults to None.
+            metadata: Metadata specific to the subroutines this circuit is built from.
+                Defaults to None.
 
         Notes:
             At least one representation (qasm, qir, qsharp, or qsharp_factory) must be provided.
@@ -96,6 +124,10 @@ class Circuit(DataClass):
             - get_qsharp_circuit(): Returns Q# circuit if available, otherwise converts from qasm
             - get_qiskit_circuit(): Converts from qir if available, otherwise converts from qasm
 
+        Raises:
+            ValueError: If ``num_qubits`` is negative, or if a metadata declaration is
+                inconsistent with ``num_qubits``.
+
         """
         Logger.trace_entering()
         self.qasm = qasm
@@ -104,6 +136,19 @@ class Circuit(DataClass):
         self._qsharp_factory = qsharp_factory
         self._qsharp_op = qsharp_op
         self.encoding = encoding
+        if num_qubits is not None and num_qubits < 0:
+            raise ValueError(f"num_qubits must be non-negative. Got {num_qubits}.")
+        metadata = metadata or CircuitMetadata()
+        if metadata.num_phase_gradient_ancillas > 0:
+            if num_qubits is None:
+                raise ValueError("num_qubits must be declared when num_phase_gradient_ancillas is non-zero.")
+            if metadata.num_phase_gradient_ancillas > num_qubits:
+                raise ValueError(
+                    f"num_phase_gradient_ancillas ({metadata.num_phase_gradient_ancillas}) "
+                    f"cannot exceed num_qubits ({num_qubits})."
+                )
+        self.num_qubits = num_qubits
+        self.metadata = metadata
 
         # Check that a representation of the quantum circuit is given by the keyword arguments
         if not any([self.qasm, self.qsharp, self.qir, self._qsharp_factory]):
@@ -236,12 +281,20 @@ class Circuit(DataClass):
                 self._qsharp_factory.program,
                 *self._qsharp_factory.parameter.values(),
             )
-            return logical_counts.estimate(params)
+            result = logical_counts.estimate(params)
+        elif self.qasm is not None:
+            result = openqasm_estimate(self.qasm, params)
+        else:
+            raise RuntimeError("Cannot estimate resources: no Q# factory data or QASM representation is available.")
 
-        if self.qasm is not None:
-            return openqasm_estimate(self.qasm, params)
-
-        raise RuntimeError("Cannot estimate resources: no Q# factory data or QASM representation is available.")
+        estimated_num_qubits = getattr(result, "logical_counts", {}).get("numQubits")
+        if self.num_qubits is not None and estimated_num_qubits is not None and estimated_num_qubits != self.num_qubits:
+            Logger.info(
+                f"This circuit declares {self.num_qubits} qubits but the resource estimate reports "
+                f"{estimated_num_qubits}; there could be ancillary qubits allocated and deallocated "
+                "within the circuit."
+            )
+        return result
 
     def get_qre_application(self):
         """Convert the circuit to a ``qdk.qre`` Application for resource estimation.
@@ -306,6 +359,12 @@ class Circuit(DataClass):
             if self.qasm:
                 Logger.warn("Both QIR and QASM representations are available. Convert from QIR.")
             result = qir_ir_to_qiskit(str(self.get_qir()))
+            if result.num_clbits > 0 and (profile := get_qsharp_context().get_target_profile()) != TargetProfile.Base:
+                Logger.warn(
+                    f"The {profile} target profile produced a circuit with {result.num_clbits} classical bits. "
+                    f"Classically controlled operations might fail; consider switching to the Base profile "
+                    f"with use_qsharp_context(create_qsharp_context(TargetProfile.Base))."
+                )
         elif self.qasm:
             result = qasm3.loads(self.qasm)
         else:
@@ -328,6 +387,8 @@ class Circuit(DataClass):
             lines.append(f"  QASM string: {self.qasm}")
         if self.encoding is not None:
             lines.append(f"  Encoding: {self.encoding}")
+        if self.num_qubits is not None:
+            lines.append(f"  Number of qubits: {self.num_qubits}")
         return "\n".join(lines)
 
     def _hash_update(self, h) -> None:
@@ -347,6 +408,10 @@ class Circuit(DataClass):
             _hash_str(h, "qsharp_factory_qir")
             _hash_str(h, str(self.get_qir()))
         _hash_optional(h, self.encoding, _hash_str)
+        _hash_optional(h, self.num_qubits, _hash_uint)
+        # Only fed when non-zero, so circuits without a phase gradient keep their digest.
+        if self.metadata.num_phase_gradient_ancillas:
+            _hash_uint(h, self.metadata.num_phase_gradient_ancillas)
 
     def to_json(self) -> dict[str, Any]:
         """Convert the Circuit to a dictionary for JSON serialization.
@@ -362,6 +427,10 @@ class Circuit(DataClass):
             data["qir"] = str(self.get_qir())
         if self.encoding is not None:
             data["encoding"] = self.encoding
+        if self.num_qubits is not None:
+            data["num_qubits"] = self.num_qubits
+        if self.metadata.num_phase_gradient_ancillas:
+            data["metadata"] = {"num_phase_gradient_ancillas": self.metadata.num_phase_gradient_ancillas}
         return self._add_json_version(data)
 
     def to_hdf5(self, group: h5py.Group) -> None:
@@ -378,6 +447,11 @@ class Circuit(DataClass):
             group.attrs["qir"] = str(self.get_qir())
         if self.encoding is not None:
             group.attrs["encoding"] = self.encoding
+        if self.num_qubits is not None:
+            group.attrs["num_qubits"] = self.num_qubits
+        if self.metadata.num_phase_gradient_ancillas:
+            metadata_group = group.create_group("metadata")
+            metadata_group.attrs["num_phase_gradient_ancillas"] = self.metadata.num_phase_gradient_ancillas
 
     @classmethod
     def from_json(cls, json_data: dict[str, Any]) -> "Circuit":
@@ -398,6 +472,8 @@ class Circuit(DataClass):
             qasm=json_data.get("qasm"),
             qir=json_data.get("qir"),
             encoding=json_data.get("encoding"),
+            num_qubits=json_data.get("num_qubits"),
+            metadata=CircuitMetadata(**json_data.get("metadata", {})),
         )
 
     @classmethod
@@ -419,8 +495,12 @@ class Circuit(DataClass):
         # Decode encoding if it's stored as bytes (HDF5 behavior can vary)
         if encoding is not None and isinstance(encoding, bytes):
             encoding = encoding.decode("utf-8")
+        num_qubits = group.attrs.get("num_qubits")
+        num_gradient = group["metadata"].attrs.get("num_phase_gradient_ancillas", 0) if "metadata" in group else 0
         return cls(
             qasm=group.attrs.get("qasm"),
             qir=group.attrs.get("qir"),
             encoding=encoding,
+            num_qubits=None if num_qubits is None else int(num_qubits),
+            metadata=CircuitMetadata(num_phase_gradient_ancillas=int(num_gradient)),
         )

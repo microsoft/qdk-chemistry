@@ -7,13 +7,22 @@
 
 from pathlib import Path
 
+import matplotlib as mpl
 import matplotlib.pyplot as plt
 import numpy as np
+
+from tutorial_qpe_svg import (
+    add_accessibility_metadata,
+    figure_descriptions,
+    source_sha256,
+)
 
 REFERENCE_ENERGY_HARTREE = -9.653276065987
 TARGET_OFFSET_HARTREE = 1e-3
 NUM_PHASE_BITS = 6
 SELECTED_GRID_INDEX = 16
+PLOT_BACKGROUND = "#FFFFFF"
+SVG_FILENAME = "tutorial_qpe_phase_wrapping.svg"
 
 
 def phase_to_energy(phase_fraction: float, evolution_time: float) -> float:
@@ -79,6 +88,8 @@ def render_energy_grid_table(
 def generate_phase_wrapping_figure(evolution_time: float) -> plt.Figure:
     """Show phase wrapping, the signed-energy branch, and aliasing."""
     figure, axis = plt.subplots(figsize=(8.8, 4.4), layout="constrained")
+    figure.patch.set_facecolor(PLOT_BACKGROUND)
+    axis.set_facecolor(PLOT_BACKGROUND)
 
     lower_phases = np.linspace(0.0, 0.5, 100)
     upper_phases = np.linspace(0.5, 1.0, 100)
@@ -142,6 +153,7 @@ def generate_phase_wrapping_figure(evolution_time: float) -> plt.Figure:
 
 def main() -> None:
     """Write committed visual and table artifacts from the Chapter 6 constants."""
+    description = figure_descriptions()[SVG_FILENAME]
     grid_size = 2**NUM_PHASE_BITS
     selected_phase = SELECTED_GRID_INDEX / grid_size
     selected_energy = REFERENCE_ENERGY_HARTREE + TARGET_OFFSET_HARTREE
@@ -162,14 +174,35 @@ def main() -> None:
     assert [index for index, _, _ in rows] == [17, None, 16, 15]
     assert np.isclose(rows[2][2] - rows[1][2], TARGET_OFFSET_HARTREE, atol=1e-12)
 
-    figures = {
-        "tutorial_qpe_phase_wrapping.png": generate_phase_wrapping_figure(
-            evolution_time
+    with mpl.rc_context(
+        {
+            "svg.fonttype": "path",
+            "svg.hashsalt": "qdk-chemistry-phase-wrapping",
+        }
+    ):
+        figure = generate_phase_wrapping_figure(evolution_time)
+        output_path = Path(__file__).with_name(SVG_FILENAME)
+        figure.savefig(
+            output_path,
+            format="svg",
+            bbox_inches="tight",
+            facecolor=PLOT_BACKGROUND,
+            metadata={"Date": None},
         )
-    }
-    for filename, figure in figures.items():
-        output_path = Path(__file__).with_name(filename)
-        figure.savefig(output_path, dpi=200, bbox_inches="tight", facecolor="white")
+        plt.close(figure)
+        output_path.write_text(
+            add_accessibility_metadata(
+                output_path.read_text(encoding="utf-8"),
+                identifier="tutorial-qpe-phase-wrapping",
+                title="Signed phase-to-energy wrapping",
+                description=description,
+                source_hash=source_sha256(
+                    Path(__file__),
+                    Path(__file__).with_name("tutorial_qpe_svg.py"),
+                ),
+            ),
+            encoding="utf-8",
+        )
         print(f"Wrote {output_path}")
 
     table_path = Path(__file__).with_name("tutorial_qpe_phase_grid_table.rst")

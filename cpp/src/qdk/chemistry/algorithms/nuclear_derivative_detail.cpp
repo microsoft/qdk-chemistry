@@ -6,7 +6,6 @@
 
 #include <algorithm>
 #include <cmath>
-#include <numeric>
 #include <qdk/chemistry/algorithms/active_space.hpp>
 #include <qdk/chemistry/algorithms/hamiltonian.hpp>
 #include <qdk/chemistry/algorithms/localization.hpp>
@@ -148,12 +147,10 @@ std::pair<unsigned int, unsigned int> active_electron_counts(
     throw std::invalid_argument("Basis set seed must not be null");
   }
 
-  const auto n_ecp_electrons =
-      std::accumulate(basis->get_ecp_electrons().begin(),
-                      basis->get_ecp_electrons().end(), int64_t{0});
-  const auto total_electrons = static_cast<int64_t>(std::llround(
-                                   structure->get_nuclear_charges().sum())) -
-                               charge - n_ecp_electrons;
+  const auto total_electrons =
+      static_cast<int64_t>(
+          std::llround(basis->get_effective_nuclear_charges().sum())) -
+      charge;
   const auto unpaired_electrons = spin_multiplicity - 1;
   if (total_electrons < 0) {
     throw std::invalid_argument(

@@ -25,11 +25,11 @@ After completing this chapter, you will be able to:
    Calculate the number of qubits needed to encode the selected active-space fermionic state before verifying it with code.
    Record the core energy separately and identify every quantity excluded from this qubit count.
 
-Example download
-====================
+Example files
+=============
 
-Download :download:`tutorial_map_n2_to_qubits.py <../../_static/examples/python/tutorial_map_n2_to_qubits.py>` and save it in the tutorial working directory that contains ``tutorial_choose_active_space.py`` and ``tutorial_orbital_coordinates.py`` from :doc:`Choosing the active space <03_choosing_the_active_space>`.
-Open all three files in Visual Studio Code and review the complete mapping script, including imports and setup code omitted from the excerpts below.
+Add :download:`tutorial_map_n2_to_qubits.py <../../_static/examples/python/tutorial_map_n2_to_qubits.py>` to your tutorial working folder.
+Open the new file in Visual Studio Code and review the complete mapping script, including imports and setup code omitted from the excerpts below.
 The script imports the tested :doc:`Choosing the active space <03_choosing_the_active_space>` workflow so that both lessons use the same selected active space.
 
 The active-space Hamiltonian
@@ -134,10 +134,11 @@ Each occupied lower-indexed mode contributes an eigenvalue of :math:`-1`, so the
 Acting on mode :math:`p` crosses the occupied lower-indexed modes in the chosen fermionic ordering, with each crossing contributing a minus sign.
 The parity string supplies their combined sign, so the mapped operators satisfy the fermionic anticommutation relations.
 
-.. graphviz:: /_static/diagrams/tutorial_qpe_jordan_wigner_parity.dot
+.. figure:: /_static/diagrams/tutorial_qpe_jordan_wigner_parity.svg
    :alt: Worked Jordan--Wigner mapping for target active spin orbital p equals 3, also called fermionic mode 3. Modes 0, 1, and 2 map to qubits ell 0, ell 1, and ell 2 and contribute the parity string Z ell 0 times Z ell 1 times Z ell 2. Its eigenvalue is negative when an odd number of those lower modes is occupied. Target qubit ell 3 carries the X minus iY creation action or X plus iY annihilation action. Multiplying target action by parity string preserves the fermionic ordering sign.
    :align: center
-   :caption: A fermionic mode is one active spin orbital. For target spin orbital :math:`p=3`, the qubits assigned to preceding spin orbitals supply the parity string :math:`Z_{\ell_0}Z_{\ell_1}Z_{\ell_2}`, while qubit :math:`\ell_3` changes the target occupation. The same pattern extends to any target :math:`p`.
+
+   A fermionic mode is one active spin orbital. For target spin orbital :math:`p=3`, the qubits assigned to preceding spin orbitals supply the parity string :math:`Z_{\ell_0}Z_{\ell_1}Z_{\ell_2}`, while qubit :math:`\ell_3` changes the target occupation. The same pattern extends to any target :math:`p`.
 
 Because the parity strings depend on mode ordering, the ordering must be specified: :term:`QDK`/Chemistry places all active :math:`\alpha` modes before all active :math:`\beta` modes, a convention called *blocked ordering*.
 
