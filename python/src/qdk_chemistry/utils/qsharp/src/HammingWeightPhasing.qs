@@ -9,6 +9,7 @@ namespace QDKChemistry.Utils.HammingWeightPhasing {
     import Std.Arrays.Chunks;
     import Std.Arrays.Fold;
     import Std.Arrays.Mapped;
+    import Std.Arrays.MappedOverRange;
     import Std.Arrays.Tail;
     import Std.Canon.ApplyXorInPlace;
     import Std.Convert.IntAsDouble;
@@ -207,16 +208,29 @@ namespace QDKChemistry.Utils.HammingWeightPhasing {
         return maxBatchSize == -1 or maxBatchSize > count ? count | maxBatchSize;
     }
 
+    /// # Summary
     /// One batch of equal-angle terms, phased through a single Hamming-weight register and, when
     /// one is given, the shared phase gradient. See `HammingWeightPhase`, which splits a tower
     /// into batches of this shape.
     ///
-    /// The batch applies e^{-i·theta·count} e^{2i·theta·w} to its Hamming weight w = Σ_j 2^j w_j,
-    /// so e^{2i·theta·w} is one rotation per place value, the bit of place value 2^j taking the
-    /// angle 2·theta·2^j. With a phase gradient those rotations are applied by
-    /// `PhaseByBinaryGradient`; without one each is synthesized as its own `Rz`. Either way
-    /// `Rz(a) = e^{-ia/2} R1(a)`, so the layer carries an extra Π_j e^{-i·a_j/2}, and a single
-    /// `R(PauliI, g)` on the first input both cancels it and supplies the batch constant
+    /// # Description
+    /// Hamming-weight phasing (:cite:`Kan2025`): the batch applies e^{-i·theta·count} e^{2i·theta·w}
+    /// to its Hamming weight w = Σ_j 2^j w_j, so e^{2i·theta·w} is one rotation per place value,
+    /// the bit of place value 2^j taking the angle 2·theta·2^j.
+    ///
+    /// Without a gradient each rotation is synthesized as its own `Rz`. With one, every angle is
+    /// classical, so `RzViaPhaseGradient` applies it by adding its word into the gradient
+    /// register, which costs one addition instead of a synthesized rotation and leaves the
+    /// register prepared for the next use. Word j is the `bits`-bit integer x whose
+    /// `Rz(4π·x/2^bits)` is closest to `Rz(2·theta·2^j)`, exact up to the 2π/2^bits resolution of
+    /// the gradient. `Rz` has period 4π and the word covers that period exactly, so no place value
+    /// overflows. The cost is `places` additions of `bits` bits, so `places · (bits - 1)` AND
+    /// operations, plus Cliffords. A word is loaded with X gates, so under control only the load
+    /// is controlled, at one CNOT per set bit: with the control clear the word is zero, and adding
+    /// zero is the identity.
+    ///
+    /// Either way `Rz(a) = e^{-ia/2} R1(a)`, so the layer carries an extra Π_j e^{-i·a_j/2}, and a
+    /// single `R(PauliI, g)` on the first input both cancels it and supplies the batch constant
     /// e^{-i·theta·count}. Under control that phase is not global, which is why it is applied
     /// rather than dropped.
     internal operation HammingWeightPhaseBatch(
@@ -225,122 +239,57 @@ namespace QDKChemistry.Utils.HammingWeightPhasing {
         targets : Qubit[][],
         gradient : Qubit[]
     ) : Unit is Adj + Ctl {
-        let count = Length(targets);
-        let inputs = Mapped(term -> Tail(term), targets);
-        let (schedule, finalBits, _) = HammingWeightSchedule(count);
-        Fact(All(bit -> bit >= 0, finalBits), "Every place value of the Hamming weight must hold a bit.");
-        let places = Length(finalBits);
-        use scratch = Qubit[Length(schedule)];
-        let work = inputs + scratch;
-        within {
-            ComputeHammingWeight(pauliOps, targets, schedule, work);
-        } apply {
-            let weight = Mapped(bit -> work[bit], finalBits);
-            if Length(gradient) == 0 {
-                for j in 0..places - 1 {
-                    Rz(2.0 * theta * IntAsDouble(1 <<< j), weight[j]);
-                }
-                // The ladder's angles sum to 2·theta·(2^places - 1).
-                R(PauliI, 2.0 * theta * IntAsDouble(count - ((1 <<< places) - 1)), inputs[0]);
-            } else {
-                let words = BinaryGradientWords(2.0 * theta, places, Length(gradient));
-                PhaseByBinaryGradient(words, weight, gradient);
-                // Word x stands for the angle 4π·x/2^bits, rounded from 2·theta·2^j.
-                R(
-                    PauliI,
-                    2.0 * theta * IntAsDouble(count)
-                        - 4.0 * PI() * Fold((total, word) -> total + IntAsDouble(word), 0.0, words)
-                            / IntAsDouble(1 <<< Length(gradient)),
-                    inputs[0]
-                );
-            }
-        }
-    }
-
-    /// # Summary
-    /// Applies e^{i·phi·w} to the little-endian integer w held in `weight`, through a shared
-    /// binary phase gradient.
-    ///
-    /// # Description
-    /// Hamming-weight phasing (:cite:`Kan2025`): w = Σ_j 2^j w_j, so the phase
-    /// is a layer of one rotation per place value, the bit of place value 2^j taking the angle
-    /// phi·2^j. Every one of those angles is classical, so `RzViaPhaseGradient` applies it by
-    /// adding its rounded word into the gradient register, which costs one addition instead of a
-    /// synthesized rotation and leaves the register prepared for the next use.
-    ///
-    /// `Rz(a)` is `diag(e^{-ia/2}, e^{ia/2})`, so the layer also carries a constant phase. The
-    /// caller must cancel it: under control it is not a global phase.
-    ///
-    /// Cost: `Length(words)` additions of `Length(gradient)` bits, so
-    /// `Length(words) · (Length(gradient) - 1)` AND operations, plus Cliffords. Under control the
-    /// word load is controlled and the additions are not, which adds one CNOT per set bit.
-    ///
-    /// # Input
-    /// ## words
-    /// The rotation words `BinaryGradientWords` returns, one per place value of w.
-    /// ## weight
-    /// The integer w, little-endian, one qubit per place value.
-    /// ## gradient
-    /// A register prepared by `PreparePhaseGradientState`, returned in that state.
-    operation PhaseByBinaryGradient(words : Int[], weight : Qubit[], gradient : Qubit[]) : Unit is Adj + Ctl {
         body (...) {
-            RzWordLayer(words, weight, gradient, []);
+            Controlled HammingWeightPhaseBatch([], (theta, pauliOps, targets, gradient));
         }
         controlled (controls, ...) {
-            if Length(controls) <= 1 {
-                RzWordLayer(words, weight, gradient, controls);
-            } else {
-                use joint = Qubit();
-                within {
-                    Controlled X(controls, joint);
-                } apply {
-                    RzWordLayer(words, weight, gradient, [joint]);
+            let count = Length(targets);
+            let inputs = Mapped(term -> Tail(term), targets);
+            let (schedule, finalBits, _) = HammingWeightSchedule(count);
+            Fact(All(bit -> bit >= 0, finalBits), "Every place value of the Hamming weight must hold a bit.");
+            let places = Length(finalBits);
+            let bits = Length(gradient);
+            use scratch = Qubit[Length(schedule)];
+            let work = inputs + scratch;
+            within {
+                ComputeHammingWeight(pauliOps, targets, schedule, work);
+            } apply {
+                let weight = Mapped(bit -> work[bit], finalBits);
+                if bits == 0 {
+                    for j in 0..places - 1 {
+                        Controlled Rz(controls, (2.0 * theta * IntAsDouble(1 <<< j), weight[j]));
+                    }
+                    // The ladder's angles sum to 2·theta·(2^places - 1).
+                    let constant = 2.0 * theta * IntAsDouble(count - ((1 <<< places) - 1));
+                    Controlled R(controls, (PauliI, constant, inputs[0]));
+                } else {
+                    let modulus = 1 <<< bits;
+                    let scale = IntAsDouble(modulus) / (4.0 * PI());
+                    let raw = MappedOverRange(j -> Round(2.0 * theta * IntAsDouble(1 <<< j) * scale), 0..places - 1);
+                    let words = Mapped(x -> ((x % modulus) + modulus) % modulus, raw);
+                    // Several controls are first ANDed onto one qubit, so each load stays one CNOT per set bit.
+                    let joined = Length(controls) > 1;
+                    use joint = Qubit[joined ? 1 | 0];
+                    use angle = Qubit[bits];
+                    within {
+                        if joined {
+                            Controlled X(controls, joint[0]);
+                        }
+                    } apply {
+                        for j in 0..places - 1 {
+                            within {
+                                Controlled ApplyXorInPlace(joined ? joint | controls, (words[j], angle));
+                            } apply {
+                                RzViaPhaseGradient(weight[j], angle, gradient);
+                            }
+                        }
+                    }
+                    // Word x stands for the angle 4π·x/2^bits, rounded from 2·theta·2^j.
+                    let loaded = Fold((total, word) -> total + IntAsDouble(word), 0.0, words);
+                    let constant = 2.0 * theta * IntAsDouble(count) - 4.0 * PI() * loaded / IntAsDouble(modulus);
+                    Controlled R(controls, (PauliI, constant, inputs[0]));
                 }
             }
         }
-    }
-
-    /// One `RzViaPhaseGradient` per word, on the matching target, from one reusable angle register.
-    ///
-    /// # Description
-    /// A word is loaded with X gates, so controlling the load costs one CNOT per set bit and
-    /// leaves both the addition and the gradient register uncontrolled: with the control clear the
-    /// word is zero, and adding zero is the identity.
-    internal operation RzWordLayer(
-        words : Int[],
-        targets : Qubit[],
-        gradient : Qubit[],
-        controls : Qubit[]
-    ) : Unit is Adj {
-        Fact(Length(words) == Length(targets), "RzWordLayer needs one rotation word per target.");
-        Fact(Length(gradient) > 0, "RzWordLayer needs a non-empty phase gradient register.");
-        use angle = Qubit[Length(gradient)];
-        for index in 0..Length(targets) - 1 {
-            within {
-                Controlled ApplyXorInPlace(controls, (words[index], angle));
-            } apply {
-                RzViaPhaseGradient(targets[index], angle, gradient);
-            }
-        }
-    }
-
-    /// # Summary
-    /// The rotation words `PhaseByBinaryGradient` applies for the phase `phi` on `n` place values.
-    ///
-    /// # Description
-    /// Word j is the `bits`-bit integer x whose `Rz(4π·x/2^bits)` is closest to `Rz(phi·2^j)`, so
-    /// each angle is exact up to the 2π/2^bits resolution of a `bits`-qubit gradient. `Rz` has
-    /// period 4π and the word covers that period exactly, so no place value overflows however
-    /// large phi·2^j grows.
-    function BinaryGradientWords(phi : Double, n : Int, bits : Int) : Int[] {
-        Fact(bits > 0, "BinaryGradientWords needs a non-empty gradient register.");
-        let modulus = 1 <<< bits;
-        let scale = IntAsDouble(modulus) / (4.0 * PI());
-        mutable words = [];
-        for j in 0..n - 1 {
-            let raw = Round(phi * IntAsDouble(1 <<< j) * scale);
-            set words += [((raw % modulus) + modulus) % modulus];
-        }
-        return words;
     }
 }
