@@ -5,12 +5,15 @@
 namespace QDKChemistry.Utils.HubbardPlaquette {
 
     import QDKChemistry.Utils.CircuitComposition.MaxInt;
+    import QDKChemistry.Utils.HammingWeightPhasing.HammingWeightBatchSize;
     import QDKChemistry.Utils.HammingWeightPhasing.HammingWeightPhase;
-    import QDKChemistry.Utils.PhaseGradient.PreparePhaseGradientState;
+    import QDKChemistry.Utils.HammingWeightPhasing.PrepareCatalyst;
     import Std.Arrays.Flattened;
     import Std.Arrays.Mapped;
     import Std.Arrays.Subarray;
+    import Std.Convert.IntAsDouble;
     import Std.Diagnostics.Fact;
+    import Std.Math.BitSizeI;
     import Std.Math.PI;
     import Std.ResourceEstimation.IsResourceEstimating;
     import Std.ResourceEstimation.RepeatEstimates;
@@ -33,13 +36,11 @@ namespace QDKChemistry.Utils.HubbardPlaquette {
         /// Largest tower phased through a single Hamming-weight register, or -1 for no cap.
         /// See `HammingWeightBatchSize` for what the cap buys and what it costs.
         maxBatchSize : Int,
-        /// Whether the Hamming-weight place values are rotated through a shared binary phase
-        /// gradient, or each synthesized as its own `Rz` (the original rotation ladder). Unused
-        /// without Hamming-weight phasing.
+        /// Whether each Hamming weight is phased by one addition into a catalyst, a generalized phase
+        /// gradient the evolution prepares once per angle, or by synthesizing each of its place
+        /// values as its own `Rz` (the original rotation ladder). Unused without Hamming-weight
+        /// phasing.
         usePhaseGradient : Bool,
-        /// Width of the phase gradient register the Hamming-weight rotations are applied through;
-        /// unused without the phase gradient.
-        rotationBitPrecision : Int,
     }
 
     /// # Summary
@@ -116,14 +117,15 @@ namespace QDKChemistry.Utils.HubbardPlaquette {
         return groups;
     }
 
-    /// The on-site layer, phased through a Hamming-weight register.
+    /// The on-site layer, phased through a Hamming-weight register and, if nonempty, a catalyst
+    /// prepared at `angle`.
     internal operation InteractionLayer(
         angle : Double,
         sites : Int,
         systems : Qubit[],
         useHammingWeightPhasing : Bool,
         maxBatchSize : Int,
-        gradient : Qubit[]
+        catalyst : Qubit[]
     ) : Unit is Adj + Ctl {
         // A zero angle skips the adder tree, which a hopping-only model would pay for nothing.
         if angle != 0.0 {
@@ -133,7 +135,7 @@ namespace QDKChemistry.Utils.HubbardPlaquette {
                 StridedGroups(sites, 2, 1, sites, systems),
                 useHammingWeightPhasing,
                 maxBatchSize,
-                gradient
+                catalyst
             );
         }
     }
@@ -270,7 +272,8 @@ namespace QDKChemistry.Utils.HubbardPlaquette {
     /// One hopping tiling: every plaquette's fswap, ffft, then its momentum-basis phase.
     ///
     /// # Description
-    /// The modes arrive in `order`, listing the mode at each position, and leave in it.
+    /// The modes arrive in `order`, listing the mode at each position, and leave in it. A nonempty
+    /// catalyst must be prepared at `-kappa / 2`, the angle of the momentum-basis tower.
     internal operation HoppingLayer(
         kappa : Double,
         blocks : Int[][],
@@ -278,7 +281,7 @@ namespace QDKChemistry.Utils.HubbardPlaquette {
         systems : Qubit[],
         useHammingWeightPhasing : Bool,
         maxBatchSize : Int,
-        gradient : Qubit[]
+        catalyst : Qubit[]
     ) : Unit is Adj + Ctl {
         // A zero angle or an empty tiling skips the routing, basis change and adders, which would
         // be paid for nothing.
@@ -298,7 +301,7 @@ namespace QDKChemistry.Utils.HubbardPlaquette {
                     StridedGroups(Length(blocks), 2, 4, 1, systems[1...]),
                     useHammingWeightPhasing,
                     maxBatchSize,
-                    gradient
+                    catalyst
                 );
             }
         }
@@ -318,7 +321,7 @@ namespace QDKChemistry.Utils.HubbardPlaquette {
         pairs : Qubit[][],
         useHammingWeightPhasing : Bool,
         maxBatchSize : Int,
-        gradient : Qubit[]
+        catalyst : Qubit[]
     ) : Unit is Adj + Ctl {
         let count = 2 * Length(pairs);
         if not useHammingWeightPhasing {
@@ -341,41 +344,44 @@ namespace QDKChemistry.Utils.HubbardPlaquette {
                     Mapped(q -> [q], Flattened(pairs)),
                     true,
                     maxBatchSize,
-                    gradient
+                    catalyst
                 );
             }
         }
     }
 
-    /// One PIG body, I^(1/2) G I^(1/2), followed by the given pink layer, on modes in `order` and
-    /// the caller-prepared gradient.
+    /// One PIG body, I^(1/2) G I^(1/2), followed by the given pink layer, on modes in `order`.
+    /// The gold layer phases through the `hopping` catalyst and the pink layer through
+    /// `pinkCatalyst`, each prepared for its angle by the caller.
     internal operation PlaquetteStepWithPinkAngle(
         params : HubbardPlaquetteParams,
         pinkAngle : Double,
         order : Int[],
         systems : Qubit[],
-        gradient : Qubit[]
+        interaction : Qubit[],
+        hopping : Qubit[],
+        pinkCatalyst : Qubit[]
     ) : Unit is Adj + Ctl {
         let sites = params.width * params.height;
         let pink = PlaquetteSection(params.width, params.height, true);
         let gold = PlaquetteSection(params.width, params.height, false);
         let useHwp = params.useHammingWeightPhasing;
         let cap = params.maxBatchSize;
-        InteractionLayer(params.interactionAngle / 2.0, sites, systems, useHwp, cap, gradient);
-        HoppingLayer(params.hoppingAngle, gold, order, systems, useHwp, cap, gradient);
-        InteractionLayer(params.interactionAngle / 2.0, sites, systems, useHwp, cap, gradient);
-        HoppingLayer(pinkAngle, pink, order, systems, useHwp, cap, gradient);
+        InteractionLayer(params.interactionAngle / 2.0, sites, systems, useHwp, cap, interaction);
+        HoppingLayer(params.hoppingAngle, gold, order, systems, useHwp, cap, hopping);
+        InteractionLayer(params.interactionAngle / 2.0, sites, systems, useHwp, cap, interaction);
+        HoppingLayer(pinkAngle, pink, order, systems, useHwp, cap, pinkCatalyst);
     }
 
-    /// One interior second-order Trotter body, I^(1/2) G I^(1/2) P, on modes in `order` and the
-    /// caller-prepared gradient.
+    /// One interior second-order Trotter body, I^(1/2) G I^(1/2) P, on modes in `order`.
     internal operation PlaquetteStep(
         params : HubbardPlaquetteParams,
         order : Int[],
         systems : Qubit[],
-        gradient : Qubit[]
+        interaction : Qubit[],
+        hopping : Qubit[]
     ) : Unit is Adj + Ctl {
-        PlaquetteStepWithPinkAngle(params, params.hoppingAngle, order, systems, gradient);
+        PlaquetteStepWithPinkAngle(params, params.hoppingAngle, order, systems, interaction, hopping, hopping);
     }
 
     /// # Summary
@@ -394,33 +400,45 @@ namespace QDKChemistry.Utils.HubbardPlaquette {
     /// orders keep the spin-up modes ahead of their spin-down partners, so the on-site pairs
     /// stay one register half apart.
     ///
-    /// The phase gradient is prepared by the caller and left prepared, so phase estimation can
-    /// prepare it once for every query. Every layer phases through the same binary gradient,
-    /// whose state does not depend on any angle, so one register serves the whole evolution.
+    /// With a catalyst, every Hamming weight is phased by one addition into a generalized phase
+    /// gradient (see `HammingWeightPhase`). Such a catalyst holds a single angle, so the evolution
+    /// prepares one for the interaction layers and one for the hopping layers, and returns both to
+    /// |0⟩ at the end. The full-angle hopping layers run at twice the angle of the half-angle pink
+    /// boundaries, and dropping the first qubit of a catalyst doubles its angle, so one register
+    /// serves both. The catalyzed towers leave out their constant phases, which are classical
+    /// and sum to one rotation, applied once at the end; under control it is a phase on the
+    /// control qubit, which phase estimation would otherwise read as energy.
     ///
     /// # Input
     /// ## params
     /// The lattice shape and the layer angles.
     /// ## systems
     /// The system register.
-    /// ## gradient
-    /// `PlaquetteGradientSize(params)` qubits holding the binary phase gradient; empty when the
-    /// place values are synthesized as a rotation ladder instead.
     operation RepPlaquetteExp(
         params : HubbardPlaquetteParams,
-        systems : Qubit[],
-        gradient : Qubit[]
+        systems : Qubit[]
     ) : Unit is Adj + Ctl {
-        Fact(
-            Length(gradient) == PlaquetteGradientSize(params),
-            "The plaquette phase gradient register has the wrong size."
-        );
         if params.repetitions > 0 {
+            let sites = params.width * params.height;
             let pink = PlaquetteSection(params.width, params.height, true);
+            let gold = PlaquetteSection(params.width, params.height, false);
+            let cap = params.maxBatchSize;
+            let catalyzed = params.useHammingWeightPhasing and params.usePhaseGradient;
+            // Each catalyst holds a qubit per place value of its largest weight; the hopping one
+            // holds one more, the qubit dropped to double its angle.
+            let interactionPlaces = catalyzed and params.interactionAngle != 0.0
+                ? BitSizeI(HammingWeightBatchSize(sites, cap)) | 0;
+            let hoppingPlaces = catalyzed and params.hoppingAngle != 0.0
+                ? BitSizeI(HammingWeightBatchSize(2 * MaxInt([Length(pink), Length(gold)]), cap)) + 1 | 0;
+            use interaction = Qubit[interactionPlaces];
+            use hopping = Qubit[hoppingPlaces];
+            let doubled = hoppingPlaces > 0 ? hopping[1...] | [];
             let identity = IdentityOrder(Length(systems));
             // A hopping-free model has no plaquette to keep local, so it skips the routing.
             let order = params.hoppingAngle != 0.0 ? TilingOrder(pink, Length(systems)) | identity;
             within {
+                PrepareCatalyst(params.interactionAngle / 2.0, interaction);
+                PrepareCatalyst(-params.hoppingAngle / 4.0, hopping);
                 RouteModes(identity, order, systems);
             } apply {
                 HoppingLayer(
@@ -429,8 +447,8 @@ namespace QDKChemistry.Utils.HubbardPlaquette {
                     order,
                     systems,
                     params.useHammingWeightPhasing,
-                    params.maxBatchSize,
-                    gradient
+                    cap,
+                    hopping
                 );
 
                 if params.repetitions > 1 {
@@ -438,84 +456,67 @@ namespace QDKChemistry.Utils.HubbardPlaquette {
                         within {
                             RepeatEstimates(params.repetitions - 1);
                         } apply {
-                            PlaquetteStep(params, order, systems, gradient);
+                            PlaquetteStep(params, order, systems, interaction, doubled);
                         }
                     } else {
                         for _ in 1..params.repetitions - 1 {
-                            PlaquetteStep(params, order, systems, gradient);
+                            PlaquetteStep(params, order, systems, interaction, doubled);
                         }
                     }
                 }
 
-                PlaquetteStepWithPinkAngle(params, params.hoppingAngle / 2.0, order, systems, gradient);
+                PlaquetteStepWithPinkAngle(
+                    params,
+                    params.hoppingAngle / 2.0,
+                    order,
+                    systems,
+                    interaction,
+                    doubled,
+                    hopping
+                );
+            }
+            if catalyzed {
+                // Every interaction tower left out e^{-i·(U/2)·sites} and every hopping tower
+                // e^{i·kappa·plaquettes}, which sum to these per step; `R(PauliI, g)` is e^{-ig/2}.
+                let perStep = params.interactionAngle * IntAsDouble(sites)
+                    - params.hoppingAngle * IntAsDouble(Length(pink) + Length(gold));
+                if perStep != 0.0 {
+                    R(PauliI, 2.0 * IntAsDouble(params.repetitions) * perStep, systems[0]);
+                }
             }
         }
     }
 
-    /// Number of phase gradient qubits the plaquette evolution consumes.
-    ///
-    /// # Description
-    /// Every tower of the evolution is phased through a Hamming-weight register, batch by batch,
-    /// so one gradient serves them all. Without `usePhaseGradient` every place value is
-    /// synthesized as its own `Rz`, and without `useHammingWeightPhasing` every term is its own
-    /// rotation, so neither consumes a gradient.
-    function PlaquetteGradientSize(params : HubbardPlaquetteParams) : Int {
-        return params.useHammingWeightPhasing and params.usePhaseGradient ? params.rotationBitPrecision | 0;
-    }
-
-    /// Prepares the binary phase gradient, or nothing when no gradient is consumed.
-    internal operation PreparePlaquetteGradient(gradient : Qubit[]) : Unit is Adj + Ctl {
-        if Length(gradient) > 0 {
-            PreparePhaseGradientState(gradient);
-        }
-    }
-
-    /// Returns a callable applying the evolution on a gradient it prepares around itself.
+    /// Returns a callable applying the evolution.
     function MakeRepPlaquetteExpOp(params : HubbardPlaquetteParams) : (Qubit[] => Unit is Adj + Ctl) {
-        systems => {
-            use gradient = Qubit[PlaquetteGradientSize(params)];
-            within {
-                PreparePlaquetteGradient(gradient);
-            } apply {
-                RepPlaquetteExp(params, systems, gradient);
-            }
-        }
+        systems => RepPlaquetteExp(params, systems)
     }
 
-    /// Builds the controlled evolution on the given qubit indices, preparing its phase gradient.
+    /// Builds the controlled evolution on the given qubit indices.
     operation MakeRepControlledPlaquetteExpCircuit(
         params : HubbardPlaquetteParams,
         control : Int,
         systems : Int[]
     ) : Unit {
         use qs = Qubit[MaxInt([control] + systems) + 1];
-        use gradient = Qubit[PlaquetteGradientSize(params)];
-        within {
-            PreparePlaquetteGradient(gradient);
-        } apply {
-            ControlledRepPlaquetteExp(params, qs[control], Subarray(systems, qs) + gradient);
-        }
+        ControlledRepPlaquetteExp(params, qs[control], Subarray(systems, qs));
     }
 
-    /// Applies the evolution controlled on `control`; `targets` holds the systems, then the prepared gradient.
+    /// Applies the evolution controlled on `control`; `targets` holds the systems.
     operation ControlledRepPlaquetteExp(
         params : HubbardPlaquetteParams,
         control : Qubit,
         targets : Qubit[]
     ) : Unit is Adj + Ctl {
         let numSystems = 2 * params.width * params.height;
-        let numGradient = PlaquetteGradientSize(params);
         Fact(
-            Length(targets) >= numSystems + numGradient,
-            "The targets must hold the system and the phase gradient register."
+            Length(targets) >= numSystems,
+            "The targets must hold the system register."
         );
-        Controlled RepPlaquetteExp(
-            [control],
-            (params, targets[0..numSystems - 1], targets[Length(targets) - numGradient...])
-        );
+        Controlled RepPlaquetteExp([control], (params, targets[0..numSystems - 1]));
     }
 
-    /// Returns `ControlledRepPlaquetteExp` as a callable whose gradient phase estimation prepares once per query.
+    /// Returns `ControlledRepPlaquetteExp` as a callable.
     function MakeRepControlledPlaquetteExpOp(
         params : HubbardPlaquetteParams
     ) : ((Qubit, Qubit[]) => Unit is Adj + Ctl) {

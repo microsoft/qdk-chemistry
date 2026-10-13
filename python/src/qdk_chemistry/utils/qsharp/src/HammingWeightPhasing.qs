@@ -4,20 +4,15 @@
 
 namespace QDKChemistry.Utils.HammingWeightPhasing {
 
-    import QDKChemistry.Utils.PhaseGradient.RzViaPhaseGradient;
+    import QDKChemistry.Utils.Arithmetic.RippleCarryCGIncByLEWithCarryAction;
     import Std.Arrays.All;
     import Std.Arrays.Chunks;
-    import Std.Arrays.Fold;
     import Std.Arrays.Mapped;
-    import Std.Arrays.MappedOverRange;
     import Std.Arrays.Tail;
-    import Std.Canon.ApplyXorInPlace;
     import Std.Convert.IntAsDouble;
     import Std.Diagnostics.Fact;
     import Std.Intrinsic.AND;
     import Std.Math.BitSizeI;
-    import Std.Math.PI;
-    import Std.Math.Round;
 
     /// Rotates one nonempty Pauli string onto a single Z representative.
     internal operation MapPauliTermToSingleZ(ops : Pauli[], targets : Qubit[]) : Unit is Adj + Ctl {
@@ -119,36 +114,35 @@ namespace QDKChemistry.Utils.HammingWeightPhasing {
 
     /// # Summary
     /// Applies exp(-i theta P_t) for every term P_t, phasing the tower through a Hamming-weight
-    /// register.
+    /// register. With a catalyst the constant phase e^{-i theta count} is left to the caller.
     ///
     /// # Description
     /// Each term is first rotated onto a single Z on its last qubit, so the batch becomes
     /// `count` equal-angle rotations exp(-i theta Z). Their product is
     /// e^{-i theta count} e^{2 i theta w}, where w is the Hamming weight of those qubits. An
-    /// adder tree computes w into log2(count) + 1 bits, which Hamming-weight phasing then phases
-    /// with one rotation per place value instead of one per term; the constant becomes a phase on
-    /// the control when the whole is controlled. This is the construction of :cite:`Kan2025`,
+    /// adder tree computes w into log2(count) + 1 bits, which are phased at a cost that grows with
+    /// the bits rather than the terms. This is the construction of :cite:`Kan2025`,
     /// whose Methods diagonalize every
     /// plaquette and every on-site pair into a layer of same-angle R_z gates and synthesize that
     /// layer collectively with HWP. When `useHammingWeightPhasing` is false, each term is applied
     /// as its own rotation instead.
     ///
-    /// With w = Σ_j 2^j w_j, e^{2i·theta·w} is one rotation per place value, the bit of place
-    /// value 2^j taking the angle 2·theta·2^j. Without a gradient each rotation is synthesized as
-    /// its own `Rz`, the original rotation ladder. With one, every angle is classical, so
-    /// `RzViaPhaseGradient` applies it by adding its word into the gradient register, which costs
-    /// one addition instead of a synthesized rotation and leaves the register prepared for the
-    /// next use. Word j is the `bits`-bit integer x whose `Rz(4π·x/2^bits)` is closest to
-    /// `Rz(2·theta·2^j)`, exact up to the 2π/2^bits resolution of the gradient. `Rz` has period 4π
-    /// and the word covers that period exactly, so no place value overflows. The cost is `places`
-    /// additions of `bits` bits, so `places · (bits - 1)` AND operations, plus Cliffords. A word
-    /// is loaded with X gates, so under control only the load is controlled, at one CNOT per set
-    /// bit: with the control clear the word is zero, and adding zero is the identity.
-    ///
-    /// Either way `Rz(a) = e^{-ia/2} R1(a)`, so the layer carries an extra Π_j e^{-i·a_j/2}, and a
-    /// single `R(PauliI, g)` on the first input both cancels it and supplies the batch constant
+    /// Without a catalyst, e^{2i·theta·w} is one `Rz(2·theta·2^j)` per place value 2^j of w, the
+    /// original rotation ladder. `Rz(a) = e^{-ia/2} R1(a)`, so a single `R(PauliI, g)` on the first
+    /// input both cancels the ladder's extra phase and supplies the batch constant
     /// e^{-i·theta·count}. Under control that phase is not global, which is why it is applied
     /// rather than dropped.
+    ///
+    /// With a catalyst, w is added into it once instead, the catalyzed Hamming-weight phasing of
+    /// :cite:`Kan2025`. The catalyst holds Σ_y e^{-2i·theta·y}|y⟩ (see `PrepareCatalyst`), so adding
+    /// w multiplies it by e^{2i·theta·w} and leaves it unchanged, except that a sum that wraps
+    /// modulo 2^places drops 2^places from y, which one `R1(2·theta·2^places)` on the carry-out
+    /// restores. The ripple-carry adder takes one AND per place value and measures its carries
+    /// away, so a batch costs `places` AND operations and one rotation, however many place values
+    /// w has. Under control only the weight is gated, at one more AND per place value: with the
+    /// control clear the addend is zero, which carries nothing, so neither the catalyst nor the
+    /// carry rotation needs a control. This path leaves the batch constant e^{-i·theta·count} to
+    /// the caller, which can apply the constants of every tower as one rotation.
     ///
     /// A tower longer than `maxBatchSize` is split into consecutive batches of at most that many
     /// terms, each phased through its own Hamming-weight register. The phases are additive over
@@ -165,20 +159,20 @@ namespace QDKChemistry.Utils.HammingWeightPhasing {
     /// Whether to phase the tower through a Hamming-weight register rather than term by term.
     /// ## maxBatchSize
     /// Largest tower phased through a single Hamming-weight register, or -1 for no cap.
-    /// ## gradient
-    /// The shared binary phase gradient, prepared by `PreparePhaseGradientState`, or empty to
-    /// synthesize every place-value rotation as an `Rz`. Unused when `useHammingWeightPhasing`
-    /// is false.
+    /// ## catalyst
+    /// A register `PrepareCatalyst(theta, catalyst)` prepared, with a qubit per place value of the
+    /// largest batch's weight, which is returned in that state; or empty to synthesize every place
+    /// value as an `Rz`. Unused when `useHammingWeightPhasing` is false.
     internal operation HammingWeightPhase(
         theta : Double,
         pauliOps : Pauli[][],
         targets : Qubit[][],
         useHammingWeightPhasing : Bool,
         maxBatchSize : Int,
-        gradient : Qubit[]
+        catalyst : Qubit[]
     ) : Unit is Adj + Ctl {
         body (...) {
-            Controlled HammingWeightPhase([], (theta, pauliOps, targets, useHammingWeightPhasing, maxBatchSize, gradient));
+            Controlled HammingWeightPhase([], (theta, pauliOps, targets, useHammingWeightPhasing, maxBatchSize, catalyst));
         }
         controlled (controls, ...) {
             let count = Length(targets);
@@ -192,57 +186,77 @@ namespace QDKChemistry.Utils.HammingWeightPhasing {
                 let batchSize = HammingWeightBatchSize(count, maxBatchSize);
                 let opBatches = Chunks(batchSize, pauliOps);
                 let targetBatches = Chunks(batchSize, targets);
-                let bits = Length(gradient);
-                for index in 0..Length(targetBatches) - 1 {
-                    let batch = targetBatches[index];
-                    let size = Length(batch);
-                    let inputs = Mapped(term -> Tail(term), batch);
-                    let (schedule, finalBits, _) = HammingWeightSchedule(size);
-                    Fact(All(bit -> bit >= 0, finalBits), "Every place value of the Hamming weight must hold a bit.");
-                    let places = Length(finalBits);
-                    use scratch = Qubit[Length(schedule)];
-                    let work = inputs + scratch;
-                    within {
-                        ComputeHammingWeight(opBatches[index], batch, schedule, work);
-                    } apply {
-                        let weight = Mapped(bit -> work[bit], finalBits);
-                        if bits == 0 {
-                            for j in 0..places - 1 {
-                                Controlled Rz(controls, (2.0 * theta * IntAsDouble(1 <<< j), weight[j]));
-                            }
-                            // The ladder's angles sum to 2·theta·(2^places - 1).
-                            let constant = 2.0 * theta * IntAsDouble(size - ((1 <<< places) - 1));
-                            Controlled R(controls, (PauliI, constant, inputs[0]));
-                        } else {
-                            let modulus = 1 <<< bits;
-                            let scale = IntAsDouble(modulus) / (4.0 * PI());
-                            let raw = MappedOverRange(j -> Round(2.0 * theta * IntAsDouble(1 <<< j) * scale), 0..places - 1);
-                            let words = Mapped(x -> ((x % modulus) + modulus) % modulus, raw);
-                            // Several controls are first ANDed onto one qubit, so each load stays one CNOT per set bit.
-                            let joined = Length(controls) > 1;
-                            use joint = Qubit[joined ? 1 | 0];
-                            use angle = Qubit[bits];
-                            within {
-                                if joined {
-                                    Controlled X(controls, joint[0]);
-                                }
-                            } apply {
+                // Several controls are first ANDed onto one qubit, so each weight bit is gated by one AND.
+                let joined = Length(catalyst) > 0 and Length(controls) > 1;
+                use joint = Qubit[joined ? 1 | 0];
+                within {
+                    if joined {
+                        Controlled X(controls, joint[0]);
+                    }
+                } apply {
+                    let gate = joined ? joint | controls;
+                    for index in 0..Length(targetBatches) - 1 {
+                        let batch = targetBatches[index];
+                        let size = Length(batch);
+                        let inputs = Mapped(term -> Tail(term), batch);
+                        let (schedule, finalBits, _) = HammingWeightSchedule(size);
+                        Fact(All(bit -> bit >= 0, finalBits), "Every place value of the Hamming weight must hold a bit.");
+                        let places = Length(finalBits);
+                        use scratch = Qubit[Length(schedule)];
+                        let work = inputs + scratch;
+                        within {
+                            ComputeHammingWeight(opBatches[index], batch, schedule, work);
+                        } apply {
+                            let weight = Mapped(bit -> work[bit], finalBits);
+                            if Length(catalyst) == 0 {
                                 for j in 0..places - 1 {
-                                    within {
-                                        Controlled ApplyXorInPlace(joined ? joint | controls, (words[j], angle));
-                                    } apply {
-                                        RzViaPhaseGradient(weight[j], angle, gradient);
+                                    Controlled Rz(controls, (2.0 * theta * IntAsDouble(1 <<< j), weight[j]));
+                                }
+                                // The ladder's angles sum to 2·theta·(2^places - 1).
+                                let constant = 2.0 * theta * IntAsDouble(size - ((1 <<< places) - 1));
+                                Controlled R(controls, (PauliI, constant, inputs[0]));
+                            } else {
+                                Fact(Length(catalyst) >= places, "The catalyst needs a qubit per place value of the weight.");
+                                use gated = Qubit[Length(gate) > 0 ? places | 0];
+                                within {
+                                    for j in 0..Length(gated) - 1 {
+                                        AND(gate[0], weight[j], gated[j]);
                                     }
+                                } apply {
+                                    // Adding the weight phases the catalyst except where the sum wraps, which the carry-out restores.
+                                    RippleCarryCGIncByLEWithCarryAction(
+                                        R1(2.0 * theta * IntAsDouble(1 <<< places), _),
+                                        Length(gated) > 0 ? gated | weight,
+                                        catalyst[0..places - 1]
+                                    );
                                 }
                             }
-                            // Word x stands for the angle 4π·x/2^bits, rounded from 2·theta·2^j.
-                            let loaded = Fold((total, word) -> total + IntAsDouble(word), 0.0, words);
-                            let constant = 2.0 * theta * IntAsDouble(size) - 4.0 * PI() * loaded / IntAsDouble(modulus);
-                            Controlled R(controls, (PauliI, constant, inputs[0]));
                         }
                     }
                 }
             }
+        }
+    }
+
+    /// # Summary
+    /// Prepares the catalyst through which `HammingWeightPhase` phases Hamming weights at `theta`.
+    ///
+    /// # Description
+    /// The catalyst is the generalized phase gradient 2^{-n/2} Σ_y e^{-2i·theta·y}|y⟩ on n
+    /// little-endian qubits. It is the product of (|0⟩ + e^{-2i·theta·2^j}|1⟩)/√2 over the qubits j,
+    /// so it takes one rotation per qubit, and every addition returns it unchanged, so one
+    /// preparation serves every tower at that angle. Each prefix of it is the catalyst of the same
+    /// angle on fewer qubits, and dropping its first qubit leaves the catalyst of twice the angle.
+    ///
+    /// # Input
+    /// ## theta
+    /// The angle `HammingWeightPhase` is given.
+    /// ## catalyst
+    /// Qubits in |0⟩, at least one per place value of the largest weight to phase.
+    internal operation PrepareCatalyst(theta : Double, catalyst : Qubit[]) : Unit is Adj + Ctl {
+        for j in 0..Length(catalyst) - 1 {
+            H(catalyst[j]);
+            R1(-2.0 * theta * IntAsDouble(1 <<< j), catalyst[j]);
         }
     }
 
@@ -253,9 +267,9 @@ namespace QDKChemistry.Utils.HammingWeightPhasing {
     /// A batch of `n` terms costs one adder tree, which holds `n - popcount(n)` scratch qubits
     /// for as long as the weight is needed. Splitting a tower into batches lets the scratch of
     /// one batch be released before the next allocates, so the peak ancilla count follows the
-    /// batch rather than the whole tower. The price is the place-value rotations, which are paid
-    /// once per batch instead of once per tower: phase gradient additions (Toffolis) with a
-    /// gradient, synthesized `Rz` rotations without one.
+    /// batch rather than the whole tower. The price is the phasing of each weight, which is paid
+    /// once per batch instead of once per tower: one catalyst addition and rotation with a
+    /// catalyst, one synthesized `Rz` per place value without one.
     ///
     /// It is therefore a qubit-for-rotations knob, and the useful setting depends on the device:
     /// hardware demonstrations of Fermi-Hubbard dynamics run on a fixed and comparatively small

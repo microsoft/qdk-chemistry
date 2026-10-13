@@ -6,7 +6,7 @@
 # --------------------------------------------------------------------------------------------
 
 from qdk_chemistry.data import Circuit, UnitaryRepresentation
-from qdk_chemistry.data.circuit import CircuitMetadata, QsharpFactoryData
+from qdk_chemistry.data.circuit import QsharpFactoryData
 from qdk_chemistry.data.unitary_representation.containers.hubbard_plaquette import HubbardPlaquetteContainer
 from qdk_chemistry.utils.qsharp import QSHARP_UTILS
 
@@ -30,20 +30,18 @@ class ControlledHubbardPlaquetteMapperSettings(ControlledCircuitMapperSettings):
             few rotations to be worth the extra Toffolis and scratch qubits.
             Ignored when ``use_hamming_weight_phasing`` is ``False``.
             Defaults to ``-1``.
-        use_phase_gradient: Whether the Hamming-weight place-value rotations are applied through
-            a shared binary phase gradient register, or each synthesized as its own ``Rz`` (the
-            original rotation ladder).
+        use_phase_gradient: Whether each Hamming weight is phased by one addition into a catalyst,
+            a generalized phase gradient the evolution prepares once per angle, or by synthesizing
+            each of its place values as its own ``Rz`` (the original rotation ladder).
+            The catalyst trades the place-value rotations of every tower for one rotation and
+            Toffolis, and adds a few qubits.
             Ignored when ``use_hamming_weight_phasing`` is ``False``.
             Defaults to ``True``.
-        rotation_bit_precision: Width of the binary phase gradient register the Hamming-weight
-            rotations are applied through, so each one is exact to :math:`2\pi/2^b`.
-            Unused without the phase gradient.
-            Defaults to 10, as :class:`~qdk_chemistry.algorithms.state_preparation.qrom_state_prep` does.
 
     """
 
     def __init__(self):
-        """Initialize the settings, adding the Hamming-weight phasing options and the place-value rotation choice."""
+        """Initialize the settings, adding the Hamming-weight phasing options and the phasing choice."""
         super().__init__()
         self._set_default(
             "use_hamming_weight_phasing",
@@ -66,19 +64,10 @@ class ControlledHubbardPlaquetteMapperSettings(ControlledCircuitMapperSettings):
             "use_phase_gradient",
             "bool",
             True,
-            "Apply the Hamming-weight place-value rotations through a shared binary phase gradient "
-            "register, which phase estimation prepares once, trading each synthesized rotation for "
-            "an addition. Set to False for the original ladder of synthesized Rz rotations, which "
-            "needs no gradient register. Ignored when use_hamming_weight_phasing is False.",
-        )
-        self._set_default(
-            "rotation_bit_precision",
-            "int",
-            10,
-            "Width of the phase gradient register the Hamming-weight rotations are applied through. "
-            "The upper bound of 30 is a sanity limit as 2^-30 is already far below chemical accuracy. "
-            "Unused without the phase gradient.",
-            (1, 30),
+            "Phase each Hamming weight by one addition into a catalyst, a generalized phase gradient "
+            "the evolution prepares once per angle, trading the place-value rotations of every tower "
+            "for one rotation and Toffolis. Set to False for the original ladder of synthesized Rz "
+            "rotations, which needs no catalyst. Ignored when use_hamming_weight_phasing is False.",
         )
 
 
@@ -138,25 +127,12 @@ class ControlledHubbardPlaquetteMapper(ControlledCircuitMapper):
             useHammingWeightPhasing=use_hamming_weight_phasing,
             maxBatchSize=max_batch_size,
             usePhaseGradient=bool(self._settings.get("use_phase_gradient")),
-            rotationBitPrecision=int(self._settings.get("rotation_bit_precision")),
         )
         targets = self._get_target_indices(evolution)
-        factory = QsharpFactoryData(
-            program=QSHARP_UTILS.HubbardPlaquette.MakeRepControlledPlaquetteExpCircuit,
-            parameter={"params": params, "control": control_indices[0], "systems": targets},
-        )
-        qsharp_op = QSHARP_UTILS.HubbardPlaquette.MakeRepControlledPlaquetteExpOp(params)
-        num_gradient = QSHARP_UTILS.HubbardPlaquette.PlaquetteGradientSize(params)
-        if num_gradient == 0:
-            return Circuit(qsharp_factory=factory, qsharp_op=qsharp_op)
-
-        # The Hamming-weight towers phase through one binary phase gradient, whose state does not
-        # depend on any angle. The Q# operation expects it at the end of its targets, so phase
-        # estimation prepares it once for every query; the standalone factory program prepares
-        # its own.
         return Circuit(
-            qsharp_factory=factory,
-            qsharp_op=qsharp_op,
-            num_qubits=len(targets) + num_gradient,
-            metadata=CircuitMetadata(num_phase_gradient_ancillas=num_gradient),
+            qsharp_factory=QsharpFactoryData(
+                program=QSHARP_UTILS.HubbardPlaquette.MakeRepControlledPlaquetteExpCircuit,
+                parameter={"params": params, "control": control_indices[0], "systems": targets},
+            ),
+            qsharp_op=QSHARP_UTILS.HubbardPlaquette.MakeRepControlledPlaquetteExpOp(params),
         )

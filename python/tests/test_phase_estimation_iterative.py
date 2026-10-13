@@ -200,6 +200,7 @@ def _run_iterative(
     builder_name: str = "qdk_iterative",
     unitary_builder_name: str = "trotter",
     controlled_circuit_mapper_name: str = "pauli_sequence",
+    executor_name: str = "qdk_full_state_simulator",
 ) -> QpeResult:
     """Execute iterative phase estimation and return structured results.
 
@@ -208,6 +209,7 @@ def _run_iterative(
         builder_name: The circuit builder to use ("qdk_iterative" or "qiskit_iterative").
         unitary_builder_name: Name of the unitary builder to use.
         controlled_circuit_mapper_name: Name of the controlled circuit mapper to use.
+        executor_name: Name of the circuit executor to use.
 
     Returns:
         :class:`QpeResult` instance summarizing the iterative run.
@@ -221,7 +223,7 @@ def _run_iterative(
     iqpe.settings().set("qpe_circuit_builder", circuit_builder)
     iqpe.settings().set(
         "circuit_executor",
-        AlgorithmRef("circuit_executor", "qdk_full_state_simulator", seed=_SEED),
+        AlgorithmRef("circuit_executor", executor_name, seed=_SEED),
     )
 
     return iqpe.run(
@@ -338,7 +340,10 @@ def test_iterative_phase_estimation_shares_the_gradient_with_the_state_preparati
     state_prep = QROMStatePreparation(rotation_bit_precision=8, allocate_phase_gradient=False).run(
         create_dense_wavefunction([1.0 / np.sqrt(2.0), 0.0, 0.0, 1.0 / np.sqrt(2.0)])
     )
-    result = _run_iterative(replace(two_qubit_phase_problem, state_prep=state_prep))
+    # qdk 1.32.3 panics lowering this QROM to QIR (Std `Unlookup` leaves a constant compare), so interpret it instead.
+    result = _run_iterative(
+        replace(two_qubit_phase_problem, state_prep=state_prep), executor_name="qdk_sparse_state_simulator"
+    )
 
     assert list(result.bits_msb_first or []) == two_qubit_phase_problem.expected_bits
 

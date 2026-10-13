@@ -221,8 +221,9 @@ Hubbard plaquette mapper
 
 :class:`~qdk_chemistry.algorithms.controlled_circuit_mapper.ControlledHubbardPlaquetteMapper` maps the ``HubbardPlaquetteContainer`` from the ``"hubbard_plaquette"`` :doc:`HamiltonianUnitaryBuilder <hamiltonian_unitary_builder>` to a singly-controlled Q# circuit.
 Each layer of the plaquette step is a tower of same-angle :math:`R_z` rotations, which the mapper synthesizes with Hamming-weight phasing :cite:`Kan2025`: an adder tree writes the tower's Hamming weight into a scratch register, and a few place-value rotations on that register replace the per-term rotations.
-By default each place-value angle is applied by adding its rounded word into a binary phase gradient register of ``rotation_bit_precision`` qubits, which phase estimation prepares once and every query reuses, so the place-value rotations become Toffolis.
-Set ``use_phase_gradient`` to ``False`` for the original ladder of synthesized :math:`R_z` rotations, which needs no gradient register.
+By default each tower's Hamming weight is added into a catalyst, a generalized phase gradient :math:`\bigotimes_j (|0\rangle + e^{-2i\theta 2^j}|1\rangle)/\sqrt{2}` that the evolution prepares once per angle and every tower reuses :cite:`Kan2025`.
+The addition kicks back the whole phase exactly, so each tower's place-value rotations become one rotation on the adder's carry-out plus Toffolis.
+Set ``use_phase_gradient`` to ``False`` for the original ladder of synthesized :math:`R_z` rotations, which needs no catalyst.
 
 .. rubric:: Settings
 
@@ -241,10 +242,7 @@ Set ``use_phase_gradient`` to ``False`` for the original ladder of synthesized :
      - Largest tower of same-angle rotations phased through one Hamming-weight register. A smaller cap needs fewer scratch qubits but more place-value rotations. Every batch is phased as given, so use a cap of at least 8: shorter batches save too few rotations to be worth the extra Toffolis and scratch qubits. Ignored when ``use_hamming_weight_phasing`` is False. When set to -1 (default), there is no cap.
    * - ``use_phase_gradient``
      - bool
-     - Apply the place-value rotations through a shared binary phase gradient register (default ``True``), or synthesize each as its own :math:`R_z` when ``False``. Ignored when ``use_hamming_weight_phasing`` is False.
-   * - ``rotation_bit_precision``
-     - int
-     - Width of the phase gradient register, so each place-value rotation is exact to :math:`2\pi/2^b`. Unused without the phase gradient. Default 10.
+     - Phase each Hamming weight by one addition into a catalyst prepared once per angle (default ``True``), or synthesize each place value as its own :math:`R_z` when ``False``. Ignored when ``use_hamming_weight_phasing`` is False.
 
 Related classes
 ---------------
