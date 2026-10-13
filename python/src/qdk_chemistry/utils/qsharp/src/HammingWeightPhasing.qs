@@ -210,6 +210,15 @@ namespace QDKChemistry.Utils.HammingWeightPhasing {
     /// One batch of equal-angle terms, phased through a single Hamming-weight register and, when
     /// one is given, the shared phase gradient. See `HammingWeightPhase`, which splits a tower
     /// into batches of this shape.
+    ///
+    /// The batch applies e^{-i·theta·count} e^{2i·theta·w} to its Hamming weight w = Σ_j 2^j w_j,
+    /// so e^{2i·theta·w} is one rotation per place value, the bit of place value 2^j taking the
+    /// angle 2·theta·2^j. With a phase gradient those rotations are applied by
+    /// `PhaseByBinaryGradient`; without one each is synthesized as its own `Rz`. Either way
+    /// `Rz(a) = e^{-ia/2} R1(a)`, so the layer carries an extra Π_j e^{-i·a_j/2}, and a single
+    /// `R(PauliI, g)` on the first input both cancels it and supplies the batch constant
+    /// e^{-i·theta·count}. Under control that phase is not global, which is why it is applied
+    /// rather than dropped.
     internal operation HammingWeightPhaseBatch(
         theta : Double,
         pauliOps : Pauli[][],
@@ -220,63 +229,31 @@ namespace QDKChemistry.Utils.HammingWeightPhasing {
         let inputs = Mapped(term -> Tail(term), targets);
         let (schedule, finalBits, _) = HammingWeightSchedule(count);
         Fact(All(bit -> bit >= 0, finalBits), "Every place value of the Hamming weight must hold a bit.");
+        let places = Length(finalBits);
         use scratch = Qubit[Length(schedule)];
         let work = inputs + scratch;
         within {
             ComputeHammingWeight(pauliOps, targets, schedule, work);
         } apply {
-            PhaseHammingWeight(theta, count, Mapped(bit -> work[bit], finalBits), inputs[0], gradient);
-        }
-    }
-
-    /// # Summary
-    /// Applies e^{-i·theta·count} e^{2i·theta·w} to the little-endian Hamming weight w of a batch
-    /// of `count` equal-angle terms.
-    ///
-    /// # Description
-    /// w = Σ_j 2^j w_j, so e^{2i·theta·w} is one rotation per place value, the bit of place value
-    /// 2^j taking the angle 2·theta·2^j. With a phase gradient those rotations are applied by
-    /// `PhaseByBinaryGradient`; without one each is synthesized as its own `Rz`. Either way
-    /// `Rz(a) = e^{-ia/2} R1(a)`, so the layer carries an extra Π_j e^{-i·a_j/2}, and a single
-    /// `R(PauliI, g)` on `anchor` both cancels it and supplies the batch constant e^{-i·theta·count}.
-    /// Under control that phase is not global, which is why it is applied rather than dropped.
-    ///
-    /// # Input
-    /// ## theta
-    /// The rotation angle shared by every term of the batch.
-    /// ## count
-    /// Number of terms in the batch.
-    /// ## weight
-    /// The Hamming weight, little-endian, one qubit per place value.
-    /// ## anchor
-    /// Any qubit to carry the `R(PauliI, _)` constant; it is left unchanged.
-    /// ## gradient
-    /// The shared binary phase gradient, or empty to synthesize each place-value rotation.
-    internal operation PhaseHammingWeight(
-        theta : Double,
-        count : Int,
-        weight : Qubit[],
-        anchor : Qubit,
-        gradient : Qubit[]
-    ) : Unit is Adj + Ctl {
-        let places = Length(weight);
-        if Length(gradient) == 0 {
-            for j in 0..places - 1 {
-                Rz(2.0 * theta * IntAsDouble(1 <<< j), weight[j]);
+            let weight = Mapped(bit -> work[bit], finalBits);
+            if Length(gradient) == 0 {
+                for j in 0..places - 1 {
+                    Rz(2.0 * theta * IntAsDouble(1 <<< j), weight[j]);
+                }
+                // The ladder's angles sum to 2·theta·(2^places - 1).
+                R(PauliI, 2.0 * theta * IntAsDouble(count - ((1 <<< places) - 1)), inputs[0]);
+            } else {
+                let words = BinaryGradientWords(2.0 * theta, places, Length(gradient));
+                PhaseByBinaryGradient(words, weight, gradient);
+                // Word x stands for the angle 4π·x/2^bits, rounded from 2·theta·2^j.
+                R(
+                    PauliI,
+                    2.0 * theta * IntAsDouble(count)
+                        - 4.0 * PI() * Fold((total, word) -> total + IntAsDouble(word), 0.0, words)
+                            / IntAsDouble(1 <<< Length(gradient)),
+                    inputs[0]
+                );
             }
-            // The ladder's angles sum to 2·theta·(2^places - 1).
-            R(PauliI, 2.0 * theta * IntAsDouble(count - ((1 <<< places) - 1)), anchor);
-        } else {
-            let words = BinaryGradientWords(2.0 * theta, places, Length(gradient));
-            PhaseByBinaryGradient(words, weight, gradient);
-            // Word x stands for the angle 4π·x/2^bits, rounded from 2·theta·2^j.
-            R(
-                PauliI,
-                2.0 * theta * IntAsDouble(count)
-                    - 4.0 * PI() * Fold((total, word) -> total + IntAsDouble(word), 0.0, words)
-                        / IntAsDouble(1 <<< Length(gradient)),
-                anchor
-            );
         }
     }
 

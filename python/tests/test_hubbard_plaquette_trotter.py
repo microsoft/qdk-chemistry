@@ -260,11 +260,6 @@ class TestHammingWeightPhasing:
         assert np.allclose(actual, phases * state, atol=1e-10)
 
 
-def _basis_index(bits: list[int]) -> int:
-    """Return the dump index of the basis state with qubit ``q`` in ``bits[q]``; qubit 0 is the most significant."""
-    return int("".join(map(str, bits)), 2)
-
-
 def _binary_gradient_words(phi: float, n: int, bits: int) -> list[int]:
     """Return the ``bits``-bit word of each place value, computed independently of Q#."""
     modulus = 1 << bits
@@ -315,8 +310,12 @@ class TestPhaseByBinaryGradient:
 
     @staticmethod
     def _index(control: list[int], weight: int, n: int) -> int:
-        """Return the dump index of ``control``, then little-endian ``weight``, then a gradient in |0>."""
-        return _basis_index([*control, *((weight >> j) & 1 for j in range(n)), *[0] * TestPhaseByBinaryGradient.BITS])
+        """Return the dump index of ``control``, then little-endian ``weight``, then a gradient in |0>.
+
+        Qubit 0 is the most significant bit of the index.
+        """
+        bits = [*control, *((weight >> j) & 1 for j in range(n)), *[0] * TestPhaseByBinaryGradient.BITS]
+        return int("".join(map(str, bits)), 2)
 
     @pytest.mark.parametrize("n", [1, 3])
     def test_phases_every_weight_and_restores_the_gradient(self, n):
