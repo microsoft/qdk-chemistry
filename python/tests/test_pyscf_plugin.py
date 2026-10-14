@@ -32,7 +32,6 @@ try:
     import pyscf.mcscf
     import pyscf.scf
 
-    import qdk_chemistry.plugins.pyscf.mcscf as pyscf_mcscf_plugin
     import qdk_chemistry.plugins.pyscf.stability as pyscf_stability
 
     PYSCF_AVAILABLE = True
@@ -2132,7 +2131,7 @@ class TestPyscfPlugin:
             captured["h1"], captured["core"] = result.get_h1eff(casscf_mf.mo_coeff)
             return result
 
-        monkeypatch.setattr(pyscf_mcscf_plugin.mcscf, "CASSCF", capture_casscf)
+        monkeypatch.setattr(pyscf.mcscf, "CASSCF", capture_casscf)
 
         stability_checker = algorithms.create("stability_checker", "pyscf")
         stability_checker.settings().set("external", False)
