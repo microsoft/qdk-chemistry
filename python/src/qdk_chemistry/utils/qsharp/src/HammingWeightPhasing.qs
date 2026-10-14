@@ -218,8 +218,7 @@ namespace QDKChemistry.Utils.HammingWeightPhasing {
         }
     }
 
-    /// Prepares on `catalyst` the generalized phase gradient ⊗_j (|0⟩ + e^{-2i·theta·2^j}|1⟩)/√2
-    /// that `HammingWeightPhase` adds Hamming weights into.
+    /// Prepares the catalyst `HammingWeightPhase` adds Hamming weights into at `theta`.
     internal operation PrepareCatalyst(theta : Double, catalyst : Qubit[]) : Unit is Adj + Ctl {
         for j in 0..Length(catalyst) - 1 {
             H(catalyst[j]);
@@ -227,8 +226,7 @@ namespace QDKChemistry.Utils.HammingWeightPhasing {
         }
     }
 
-    /// The number of terms phased through one Hamming-weight register: `count`, capped at
-    /// `maxBatchSize` unless it is -1.
+    /// Returns `count` capped at `maxBatchSize`, or `count` itself when the cap is -1.
     internal function HammingWeightBatchSize(count : Int, maxBatchSize : Int) : Int {
         Fact(maxBatchSize == -1 or maxBatchSize > 0, "maxBatchSize must be -1 or positive.");
         return maxBatchSize == -1 or maxBatchSize > count ? count | maxBatchSize;
