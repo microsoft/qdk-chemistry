@@ -78,12 +78,7 @@ def _operation(
     namespace: str = _PLAQUETTE,
     catalyst: tuple[float, int] | None = None,
 ) -> str:
-    """Return a Q# lambda calling ``name``, controlled on ``qs[0]`` if asked.
-
-    With ``catalyst``, an angle and a width, the lambda allocates a catalyst of that width,
-    prepares it for that angle around the call and passes it as ``catalyst``. Only the call is
-    controlled, as in the evolution, which prepares its catalysts outside every tower.
-    """
+    """Return a Q# lambda calling ``name``, controlled on ``qs[0]`` if asked."""
     if controlled:
         call = f"Controlled {namespace}.{name}([qs[0]], ({args.format(qs='qs[1...]')}))"
     else:
