@@ -5,6 +5,7 @@
 #include <gtest/gtest.h>
 
 #include <Eigen/Dense>
+#include <algorithm>
 #include <memory>
 #include <optional>
 #include <qdk/chemistry/algorithms/effective_hamiltonian.hpp>

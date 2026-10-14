@@ -380,13 +380,10 @@ std::shared_ptr<data::Hamiltonian> SchriefferWolffPT2Constructor::_run_impl(
   const bool fold_pays = window_roles.active_electrons > 2;
   const bool fold_requested = _settings->get<bool>("fold_above_two_body");
   const bool fold = fold_requested && fold_pays;
-  // A determinant reference leaves the kept-space density idempotent, D^2 = 2D;
-  // a correlated one loses the two-body cumulant to the fold.
-  const Eigen::MatrixXd kept_density =
-      sub_block(folded_density, active_spatial);
-  const bool determinant_reference =
-      (kept_density * kept_density - 2.0 * kept_density).cwiseAbs().maxCoeff() <
-      1e-6;
+  const char* fold_description =
+      fold             ? "Gaussian 1-RDM fold"
+      : fold_requested ? "not folded (kept space holds at most two electrons)"
+                       : "discarded (fold_above_two_body is off)";
 
   sw::RegularizerOptions reg;
   reg.sigma2 = _settings->get<double>("regularizer_sigma2");
@@ -406,12 +403,7 @@ std::shared_ptr<data::Hamiltonian> SchriefferWolffPT2Constructor::_run_impl(
       "Eh, maximum raw amplitude={:.3g}, semicanonical rotation applied={}, "
       "above two-body={}",
       regularized ? "sigma^2" : "none", down.min_denominator,
-      down.max_amplitude, semicanonical_applied,
-      !fold ? (fold_requested ? "not folded (kept space holds at most two "
-                                "electrons)"
-                              : "discarded (fold_above_two_body is off)")
-      : determinant_reference ? "folded onto a determinant reference"
-                              : "folded onto a correlated reference");
+      down.max_amplitude, semicanonical_applied, fold_description);
   warn_on_intruders(down, regularized);
 
   sw::ActiveHamiltonian active{static_cast<int>(active_spatial.size()),
