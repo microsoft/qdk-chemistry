@@ -11,14 +11,6 @@ namespace QDKChemistry.Utils.Arithmetic {
     /// Increments `ys` by `xs` modulo 2^n with Gidney's ripple-carry adder, applying
     /// `carryAction` to the carry-out of the sum while it is held.
     ///
-    /// # Description
-    /// The adder of Gidney (Quantum 2, 74 (2018)) computes each carry with an AND and uncomputes
-    /// it by measurement, so it costs n AND operations for n-bit registers. Std's
-    /// `RippleCarryCGIncByLE` is the same adder, but a modular sum never exposes its carry-out.
-    /// Here the carries are all computed first, `carryAction` acts on the last one, and the
-    /// carries are then uncomputed while the sum is written. `carryAction` must leave the carry
-    /// in the computational basis, as a phase does, since the uncomputation assumes its value.
-    ///
     /// # Input
     /// ## carryAction
     /// The operation applied to the carry-out qubit.
