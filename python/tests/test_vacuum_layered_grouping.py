@@ -11,6 +11,7 @@ import numpy as np
 import pytest
 
 from qdk_chemistry.algorithms import create
+from qdk_chemistry.algorithms.term_grouper.vacuum_annihilating import _anticommuting_masks, _index_word
 from qdk_chemistry.data import FlatPartition, LatticeGraph, LayeredPartition, MajoranaMapping, QubitOperator
 from qdk_chemistry.data.qubit_operator.containers.sparse_pauli_decomposition import _sparse_terms
 from qdk_chemistry.data.unitary_representation.base import UnitaryRepresentation
@@ -19,6 +20,7 @@ from qdk_chemistry.data.unitary_representation.containers.pauli_product_formula 
     PauliProductFormulaContainer,
 )
 from qdk_chemistry.utils.model_hamiltonians import create_heisenberg_hamiltonian
+from qdk_chemistry.utils.pauli_commutation import do_pauli_maps_commute
 from qdk_chemistry.utils.qsharp import get_qsharp_context
 
 from .helpers import (
@@ -53,6 +55,100 @@ def _assert_grouping(operator: QubitOperator) -> None:
             np.zeros(2**operator.num_qubits, dtype=complex),
         )
         np.testing.assert_allclose(action[1:], 0.0, atol=1e-9)
+
+
+def test_indexed_commutation_matches_pairwise_parity_across_chunks() -> None:
+    """Odd overlaps remain per-term conflicts across chunk boundaries and huge sparse qubit indices."""
+    rng = np.random.default_rng(771)
+    qubits = (0, 1, 2, 2**32 - 1)
+    words = [
+        {q: axis for q, axis in zip(qubits, rng.choice(list("IXYZ"), size=4), strict=True) if axis != "I"}
+        for _ in range(520)
+    ]
+    by_qubit: dict[int, dict[str, dict[int, int]]] = {}
+    for index, word in enumerate(words):
+        masks = _anticommuting_masks(word, by_qubit)
+        actual = {
+            chunk * 256 + bit for chunk, mask in masks.items() for bit in range(mask.bit_length()) if mask >> bit & 1
+        }
+        expected = {i for i in range(index) if not do_pauli_maps_commute(word, words[i])}
+        assert actual == expected
+        _index_word(word, index, by_qubit)
+
+
+def test_packing_does_not_cancel_conflicts_between_members_of_one_group() -> None:
+    """XX and YY both conflict with Z0; projecting to group IDs before parity would hide that."""
+    source = QubitOperator(["XX", "YY", "IZ"], np.array([1.0, 1.0, 0.5]))
+    output = create("term_grouper", "vacuum_annihilating").run(source)
+
+    assert output.term_partition.num_groups == 2
+    _assert_grouping(output)
+
+
+def test_packing_resolves_reordered_term_ordinals_across_chunks() -> None:
+    """Conflicts in different chunks must resolve to the original term owners after producer reordering."""
+    last = 2**32 - 1
+    words = [{0: "X", last: "X"}, {0: "Y", last: "Y"}, *({q: "Z"} for q in (*range(259), last))]
+    diagonal = tuple(range(2, len(words)))
+    source = QubitOperator.from_sparse_terms(
+        2**32,
+        words,
+        np.ones(len(words)),
+        term_partition=FlatPartition(strategy="reordered", groups=((*diagonal, 1, 0),)),
+    )
+    output = create("term_grouper", "vacuum_annihilating").run(source)
+
+    assert output.term_partition.groups == ((diagonal,), ((1,), (0,)))
+
+
+@pytest.mark.parametrize(
+    "words",
+    [
+        [{0: "Z", i: "Z"} for i in range(1, 33)],
+        [{i: "Z"} for i in range(32)],
+        [{0: "Z"}, {1: "Z"}, {0: "Z", 1: "Z"}, {}, {2: "Z"}, {1: "Z", 2: "Z"}, {0: "Z", 2: "Z"}, {2: "Z"}],
+    ],
+    ids=["star", "disjoint", "interleaved-and-identity"],
+)
+def test_derived_layers_keep_the_lowest_available_assignment(words: list[dict[int, str]]) -> None:
+    """Sparse layer cursors must preserve the original first-fit schedule, including cursor gaps."""
+    expected: list[list[int]] = []
+    occupied: list[set[int]] = []
+    for index, word in enumerate(words):
+        layer = next((i for i, support in enumerate(occupied) if support.isdisjoint(word)), len(occupied))
+        if layer == len(occupied):
+            expected.append([])
+            occupied.append(set())
+        expected[layer].append(index)
+        occupied[layer].update(word)
+    source = QubitOperator.from_sparse_terms(2**32, words, np.ones(len(words)))
+    output = create("term_grouper", "vacuum_annihilating").run(source)
+
+    assert output.term_partition.groups == (tuple(tuple(layer) for layer in expected),)
+
+
+@pytest.mark.parametrize("sparse", [False, True])
+def test_loaded_flat_partition_regroups_then_composes(sparse: bool) -> None:
+    """A loaded flat partition can be regrouped for addition to layered output without changing serialization."""
+    flat_partition = FlatPartition(strategy="vacuum_annihilating", groups=((0, 1),))
+    source = QubitOperator(["XX", "YY"], np.ones(2), term_partition=flat_partition)
+    if sparse:
+        source = QubitOperator.from_sparse_terms(
+            2, [{0: "X", 1: "X"}, {0: "Y", 1: "Y"}], np.ones(2), term_partition=flat_partition
+        )
+    loaded = QubitOperator.from_json(source.to_json())
+    before = loaded.to_json()
+    regrouped = create("term_grouper", "vacuum_annihilating").run(loaded)
+    fresh = create("term_grouper", "vacuum_annihilating").run(QubitOperator(["XX", "YY"], np.ones(2)))
+    combined = regrouped + fresh
+
+    assert isinstance(loaded.term_partition, FlatPartition)
+    assert isinstance(regrouped.term_partition, LayeredPartition)
+    assert type(regrouped.get_container()) is type(loaded.get_container())
+    assert loaded.to_json() == before
+    assert regrouped.equiv(loaded)
+    assert combined.equiv(2 * source)
+    assert sorted(combined.term_partition.all_indices()) == [0, 1, 2, 3]
 
 
 @pytest.mark.parametrize("sparse", [False, True])

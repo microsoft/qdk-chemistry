@@ -35,25 +35,36 @@ if TYPE_CHECKING:
 
 __all__ = ["VacuumAnnihilatingTermGrouper", "VacuumAnnihilatingTermGrouperSettings"]
 
+_COMMUTATION_CHUNK_SIZE = 256
 
-def _anticommuting_indices(word: dict[int, str], by_qubit: dict[int, dict[str, set[int]]]) -> set[int]:
-    """Find indexed words differing on an odd number of shared non-identity positions."""
-    odd: set[int] = set()
+
+def _index_word(word: dict[int, str], index: int, by_qubit: dict[int, dict[str, dict[int, int]]]) -> None:
+    """Add a local term ordinal to bounded masks without allocating by physical qubit or total term count."""
+    chunk, offset = divmod(index, _COMMUTATION_CHUNK_SIZE)
+    bit = 1 << offset
     for qubit, axis in word.items():
-        for other_axis, indices in by_qubit.get(qubit, {}).items():
+        chunks = by_qubit.setdefault(qubit, {}).setdefault(axis, {})
+        chunks[chunk] = chunks.get(chunk, 0) | bit
+
+
+def _anticommuting_masks(word: dict[int, str], by_qubit: dict[int, dict[str, dict[int, int]]]) -> dict[int, int]:
+    """Resolve odd-overlap parity per indexed term, before projecting conflicts to owning groups."""
+    odd: dict[int, int] = {}
+    for qubit, axis in word.items():
+        for other_axis, chunks in by_qubit.get(qubit, {}).items():
             if axis != other_axis:
-                odd.symmetric_difference_update(indices)
-    return odd
+                for chunk, mask in chunks.items():
+                    odd[chunk] = odd.get(chunk, 0) ^ mask
+    return {chunk: mask for chunk, mask in odd.items() if mask}
 
 
 def _commuting_group(indices: Iterable[int], words: list[dict[int, str]]) -> bool:
-    """Certify full commutation without constructing an all-pairs conflict graph."""
-    by_qubit: dict[int, dict[str, set[int]]] = {}
-    for index in indices:
-        if _anticommuting_indices(words[index], by_qubit):
+    """Certify full commutation with sparse, bounded term-ordinal masks."""
+    by_qubit: dict[int, dict[str, dict[int, int]]] = {}
+    for position, index in enumerate(indices):
+        if _anticommuting_masks(words[index], by_qubit):
             return False
-        for qubit, axis in words[index].items():
-            by_qubit.setdefault(qubit, {}).setdefault(axis, set()).add(index)
+        _index_word(words[index], position, by_qubit)
     return True
 
 
@@ -108,6 +119,9 @@ class VacuumAnnihilatingTermGrouper(TermGrouper):
     Tolerance is a coefficient-level budget for each flipped-set/Y-parity component, shared
     across the output groups. It is not a bound on a repeated circuit's leakage; the final
     emitted product formula must still be validated after filtering and angle scaling.
+
+    Regroup operators carrying flat partitions before adding them to layered output; operator addition
+    only merges partitions of the same kind.
 
     """
 
@@ -233,13 +247,20 @@ class VacuumAnnihilatingTermGrouper(TermGrouper):
             if current:
                 blocks.append(current)
 
-        placed: dict[int, dict[str, set[int]]] = {}
+        placed: dict[int, dict[str, dict[int, int]]] = {}
+        placed_indices: list[int] = []
         affinities: dict[int, set[int]] = {}
         for block in sorted(blocks, key=lambda members: min(rank[i] for i in members)):
             forbidden: set[int] = set()
             preferred: set[int] = set()
             for i in block:
-                forbidden.update(owners[j] for j in _anticommuting_indices(words[i], placed))
+                for chunk, mask in _anticommuting_masks(words[i], placed).items():
+                    remaining = mask
+                    while remaining:
+                        bit = remaining & -remaining
+                        position = chunk * _COMMUTATION_CHUNK_SIZE + bit.bit_length() - 1
+                        forbidden.add(owners[placed_indices[position]])
+                        remaining ^= bit
                 preferred.update(affinities.get(old_owner.get(i, -1), ()))
             available = preferred - forbidden
             group_index = (
@@ -254,8 +275,8 @@ class VacuumAnnihilatingTermGrouper(TermGrouper):
                 owners[i] = group_index
                 if i in old_owner:
                     affinities.setdefault(old_owner[i], set()).add(group_index)
-                for qubit, axis in words[i].items():
-                    placed.setdefault(qubit, {}).setdefault(axis, set()).add(i)
+                _index_word(words[i], len(placed_indices), placed)
+                placed_indices.append(i)
 
         group_layers: list[list[tuple[int, ...]]] = [[] for _ in groups]
         if isinstance(incoming, LayeredPartition):
@@ -275,18 +296,22 @@ class VacuumAnnihilatingTermGrouper(TermGrouper):
             for g, group in enumerate(groups):
                 disjoint_layers: list[list[int]] = []
                 occupied_layers: dict[int, set[int]] = {}
+                first_free: dict[int, int] = {}
                 for i in sorted(group, key=rank.__getitem__):
-                    unavailable: set[int] = set()
-                    for qubit in words[i]:
-                        unavailable.update(occupied_layers.get(qubit, ()))
-                    layer_index = 0
-                    while layer_index in unavailable:
+                    # Every smaller layer is occupied on a qubit attaining this lower bound.
+                    layer_index = max((first_free.get(qubit, 0) for qubit in words[i]), default=0)
+                    while any(layer_index in occupied_layers.get(qubit, ()) for qubit in words[i]):
                         layer_index += 1
                     if layer_index == len(disjoint_layers):
                         disjoint_layers.append([])
                     disjoint_layers[layer_index].append(i)
                     for qubit in words[i]:
-                        occupied_layers.setdefault(qubit, set()).add(layer_index)
+                        occupied = occupied_layers.setdefault(qubit, set())
+                        occupied.add(layer_index)
+                        cursor = first_free.get(qubit, 0)
+                        while cursor in occupied:
+                            cursor += 1
+                        first_free[qubit] = cursor
                 group_layers[g] = [tuple(layer) for layer in disjoint_layers]
 
         spent = {}
