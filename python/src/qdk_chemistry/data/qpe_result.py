@@ -106,8 +106,13 @@ class QpeResult(DataClass):
             for x in self.bits_msb_first:
                 _hash_arg(h, x)
         _hash_optional(h, self.bitstring_msb_first, _hash_str)
-        _hash_optional(h, self.bitstring_counts, _hash_arg)
         _hash_optional(h, self.metadata, _hash_arg)
+        # Hashed last, and contributing nothing when unset, so that a result carrying no
+        # histogram keeps the content_hash it had before this field existed. The hash names
+        # content-addressed cache artifacts, so an unconditional marker here would miss
+        # every entry written by an earlier version. Keep this the final field.
+        if self.bitstring_counts is not None:
+            _hash_arg(h, self.bitstring_counts)
 
     @classmethod
     def from_phase_fraction(
