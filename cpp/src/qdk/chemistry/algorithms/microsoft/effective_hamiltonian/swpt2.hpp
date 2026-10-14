@@ -85,7 +85,6 @@ class SchriefferWolffPT2Settings : public qdk::chemistry::data::Settings {
  * The emitted two-body block is only 4-fold symmetric: hermiticity and electron
  * exchange survive, the bra swap `(pq|rs) = (qp|rs)` does not. Consumers must
  * read the full dense norb^4 block, not the canonical 8-fold-unique elements.
- * See `to_spatial_chemist` in `swpt2_kernel.hpp`.
  *
  * The window W is the input Hamiltonian's own active space, so that Hamiltonian
  * must be built over the whole window; a P-only active-space Hamiltonian has
@@ -94,6 +93,9 @@ class SchriefferWolffPT2Settings : public qdk::chemistry::data::Settings {
  * occupied and the rest empty), never the partition: P comes from `p_indices`
  * alone and need not coincide with the reference active space. Occupations of
  * folded orbitals are rounded, bounded by `max_folded_occupation_deviation`.
+ *
+ * Concurrent calls within one process are unsupported by the pinned SeQuant
+ * backend. Use sequential calls or separate worker processes.
  *
  * See `swpt2_kernel.hpp` for the operator and tensor conventions.
  */

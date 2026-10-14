@@ -30,7 +30,6 @@
 
 #include "qdk/chemistry/algorithms/microsoft/effective_hamiltonian/swpt2.hpp"
 #include "qdk/chemistry/algorithms/microsoft/effective_hamiltonian/swpt2_kernel.hpp"
-#include "testing_utilities_swpt2.hpp"
 #include "ut_common.hpp"
 
 namespace {
@@ -43,6 +42,52 @@ using qdk::chemistry::algorithms::MultiConfigurationCalculatorFactory;
 using qdk::chemistry::algorithms::ScfSolverFactory;
 
 namespace sw = qdk::chemistry::algorithms::microsoft::swpt2;
+
+struct SpinOrbitalTensors {
+  double core_energy;
+  Eigen::MatrixXd one_body;
+  Eigen::VectorXd two_body;
+};
+
+SpinOrbitalTensors build_spin_orbital_tensors(
+    const Eigen::MatrixXd& alpha, const Eigen::MatrixXd& beta,
+    const Eigen::VectorXd& alpha_integrals,
+    const Eigen::VectorXd& mixed_integrals,
+    const Eigen::VectorXd& beta_integrals, double core_energy, int norb) {
+  const int spin_count = 2 * norb;
+  SpinOrbitalTensors result{
+      core_energy, Eigen::MatrixXd::Zero(spin_count, spin_count),
+      Eigen::VectorXd::Zero(spin_count * spin_count * spin_count * spin_count)};
+  for (int row = 0; row < norb; ++row)
+    for (int col = 0; col < norb; ++col) {
+      result.one_body(2 * row, 2 * col) = alpha(row, col);
+      result.one_body(2 * row + 1, 2 * col + 1) = beta(row, col);
+    }
+  std::vector<double> ordered(result.two_body.size(), 0.0);
+  for (int first = 0; first < norb; ++first)
+    for (int second = 0; second < norb; ++second)
+      for (int third = 0; third < norb; ++third)
+        for (int fourth = 0; fourth < norb; ++fourth) {
+          const auto integral = sw::idx4(first, second, third, fourth, norb);
+          ordered[sw::idx4(2 * first, 2 * third, 2 * fourth, 2 * second,
+                           spin_count)] += 0.5 * alpha_integrals(integral);
+          ordered[sw::idx4(2 * first + 1, 2 * third + 1, 2 * fourth + 1,
+                           2 * second + 1, spin_count)] +=
+              0.5 * beta_integrals(integral);
+          ordered[sw::idx4(2 * first, 2 * third + 1, 2 * fourth + 1, 2 * second,
+                           spin_count)] += mixed_integrals(integral);
+        }
+  for (int first = 0; first < spin_count; ++first)
+    for (int second = 0; second < spin_count; ++second)
+      for (int third = 0; third < spin_count; ++third)
+        for (int fourth = 0; fourth < spin_count; ++fourth)
+          result.two_body(sw::idx4(first, second, third, fourth, spin_count)) =
+              ordered[sw::idx4(first, second, third, fourth, spin_count)] -
+              ordered[sw::idx4(second, first, third, fourth, spin_count)] -
+              ordered[sw::idx4(first, second, fourth, third, spin_count)] +
+              ordered[sw::idx4(second, first, fourth, third, spin_count)];
+  return result;
+}
 
 // A direct full-CI ground-state solver on the interleaved spin-orbital tensors.
 // It independently verifies the emitted effective Hamiltonian below.
@@ -245,8 +290,8 @@ TEST(SchriefferWolffPT2Test, DownfoldRunsEndToEndWater) {
   {
     const auto [T_a, T_b] = H_eff->get_one_body_integrals();
     const int m = static_cast<int>(T_a.rows());
-    const auto H_so = testing::build_spin_orbital_tensors(
-        T_a, T_a, ge, ge, ge, H_eff->get_core_energy(), m);
+    const auto H_so = build_spin_orbital_tensors(T_a, T_a, ge, ge, ge,
+                                                 H_eff->get_core_energy(), m);
     std::vector<int> orbs(2 * m);
     for (int i = 0; i < 2 * m; ++i) orbs[i] = i;
     const double E_kernel_fci = fci_ground_energy(
@@ -294,8 +339,8 @@ TEST(SchriefferWolffPT2Test, DownfoldRunsEndToEndWater) {
 // channel -- its own oo->vv denominators bottom out at 1.7 Eh. That channel is
 // blocked on the reference determinant, so it cannot move the number compared
 // here, but it is a real feature of the emitted operator. The agreement below
-// therefore constrains the doubles channel and the fold; it says nothing about
-// the semi-internal ones, which the symbolic term table covers instead.
+// therefore constrains the doubles channel and the fold; the independent
+// kernel matrix tests cover the semi-internal channels separately.
 TEST(SchriefferWolffPT2Test, ReproducesMp2WhenEveryOccupiedOrbitalIsActive) {
   namespace qcd = qdk::chemistry::data;
   auto water = testing::create_water_structure();
@@ -329,8 +374,8 @@ TEST(SchriefferWolffPT2Test, ReproducesMp2WhenEveryOccupiedOrbitalIsActive) {
   const auto [T_a, T_b] = H_eff->get_one_body_integrals();
   const auto [g_eff, g_eff_ab, g_eff_bb] = H_eff->get_two_body_integrals();
   const int m = static_cast<int>(T_a.rows());
-  const auto H_so = testing::build_spin_orbital_tensors(
-      T_a, T_a, g_eff, g_eff, g_eff, H_eff->get_core_energy(), m);
+  const auto H_so = build_spin_orbital_tensors(T_a, T_a, g_eff, g_eff, g_eff,
+                                               H_eff->get_core_energy(), m);
   std::vector<int> orbs(2 * m);
   std::iota(orbs.begin(), orbs.end(), 0);
   const double E_downfold =
@@ -357,7 +402,7 @@ TEST(SchriefferWolffPT2Test, ReproducesMp2WhenEveryOccupiedOrbitalIsActive) {
       reference, H_window, testing::restricted_index_set(norb, occupied));
   const auto [U_a, U_b] = H_unfolded->get_one_body_integrals();
   const auto [g_u, g_u_ab, g_u_bb] = H_unfolded->get_two_body_integrals();
-  const auto U_so = testing::build_spin_orbital_tensors(
+  const auto U_so = build_spin_orbital_tensors(
       U_a, U_a, g_u, g_u, g_u, H_unfolded->get_core_energy(), m);
   const double E_unfolded =
       fci_ground_energy(U_so.core_energy, U_so.one_body, U_so.two_body, 2 * m,

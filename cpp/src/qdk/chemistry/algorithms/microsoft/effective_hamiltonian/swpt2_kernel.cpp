@@ -4,32 +4,37 @@
 
 #include "qdk/chemistry/algorithms/microsoft/effective_hamiltonian/swpt2_kernel.hpp"
 
+#include <btas/btas.h>
+
+#include <SeQuant/core/eval/backends/btas/eval_expr.hpp>
+#include <SeQuant/core/eval/backends/btas/result.hpp>
+#include <SeQuant/core/eval/eval.hpp>
+#include <SeQuant/core/io/shorthands.hpp>
+#include <SeQuant/core/optimize/optimize.hpp>
+#include <SeQuant/core/wick.hpp>
+#include <SeQuant/domain/mbpt/convention.hpp>
+#include <SeQuant/domain/mbpt/spin.hpp>
 #include <algorithm>
-#include <array>
-#include <blas.hh>
 #include <cmath>
-#include <limits>
-#include <numeric>
+#include <map>
+#include <span>
 #include <stdexcept>
+#include <string>
+#include <tuple>
 #include <utility>
 #include <vector>
 
 namespace qdk::chemistry::algorithms::microsoft::swpt2 {
 
 namespace {
-inline int alpha(int p) { return 2 * p; }
-inline int beta(int p) { return 2 * p + 1; }
 inline Eigen::Index n4(int n) {
   return static_cast<Eigen::Index>(n) * n * n * n;
 }
-// Measured on a folded 6-orbital kept space: 64 rows beat 8, 32, 256 and the
-// untiled path (1.24 s against 2.07 s untiled) at a fraction of the memory.
-constexpr Eigen::Index product_tile_rows = 64;
 }  // namespace
 
 // ===========================================================================
 // Shared kernel foundations: denominator regularization, generalized Fock,
-// occupation-change masks, and projected-commutator Wick machinery.
+// and orbital rotations.
 // ===========================================================================
 
 double regularized_inverse(double delta, const RegularizerOptions& reg) {
@@ -135,824 +140,6 @@ Eigen::VectorXd rotate_two_body(const Eigen::VectorXd& two_body,
   return current;
 }
 
-namespace {
-// Net occupation change of a role set under a^dag_P a_Q / a^dag_P a^dag_Q a_R
-// a_S.
-inline int net_change(const std::vector<char>& role, int P, int Q) {
-  return role[P] - role[Q];
-}
-inline int net_change(const std::vector<char>& role, int P, int Q, int R,
-                      int S) {
-  return role[P] + role[Q] - role[R] - role[S];
-}
-// A term belongs to H_OD when it changes the inactive OR the virtual count;
-// tracking them separately catches inactive<->virtual excitations, which are
-// net-zero on the combined external set.
-inline bool changes_external_occupation(const SpinOrbitalPartition& part, int P,
-                                        int Q) {
-  return net_change(part.is_inactive, P, Q) != 0 ||
-         net_change(part.is_virtual, P, Q) != 0;
-}
-inline bool changes_external_occupation(const SpinOrbitalPartition& part, int P,
-                                        int Q, int R, int S) {
-  return net_change(part.is_inactive, P, Q, R, S) != 0 ||
-         net_change(part.is_virtual, P, Q, R, S) != 0;
-}
-}  // namespace
-
-// ---------------------------------------------------------------------------
-// Projected commutator 1/2 [S, V] via generalized Wick over the external legs.
-// ---------------------------------------------------------------------------
-namespace {
-
-/// One ladder operator: (spin-orbital, 1 = creation / 0 = annihilation).
-using Operator = std::pair<int, int>;
-/// A product of at most two two-body operators, so at most eight ladders.
-using OperatorString = std::array<Operator, 8>;
-
-struct RetainedOperator {
-  RetainedOperator(const std::vector<int>& active_so,
-                   const std::vector<int>& occupied_so = {},
-                   const Eigen::MatrixXd& reference_density = {})
-      : so2c(active_so.empty() ? 0 : active_so.back() + 1, -1),
-        occupied(so2c.size(), 0),
-        density(reference_density),
-        one_body(Eigen::MatrixXd::Zero(active_so.size(), active_so.size())),
-        two_body(Eigen::VectorXd::Zero(n4(active_so.size() / 2))) {
-    for (int compact = 0; compact < static_cast<int>(active_so.size());
-         ++compact)
-      so2c[active_so[compact]] = compact;
-    for (int orbital : occupied_so) occupied[orbital] = 1;
-    has_density = density.size() > 0;
-    folds_above_two_body = !occupied_so.empty() || has_density;
-  }
-
-  void add(const Operator* term, int size, double coeff) {
-    if (size == 0) {
-      scalar += coeff;
-    } else if (size == 2) {
-      one_body(compact(term[0].first), compact(term[1].first)) += coeff;
-    } else if (size == 4) {
-      const int c0 = compact(term[0].first), c1 = compact(term[1].first);
-      const int a0 = compact(term[2].first), a1 = compact(term[3].first);
-      add_abab(c0, c1, a0, a1, +coeff);
-      add_abab(c1, c0, a0, a1, -coeff);
-      add_abab(c0, c1, a1, a0, -coeff);
-      add_abab(c1, c0, a1, a0, +coeff);
-    }
-  }
-
-  bool is_occupied(int orbital) const { return occupied[orbital] != 0; }
-
-  double scalar = 0.0;
-  bool folds_above_two_body = false;
-  bool has_density = false;
-  std::vector<int> so2c;
-  std::vector<char> occupied;
-  Eigen::MatrixXd density;  // spin-traced, over window spatial orbitals
-  Eigen::MatrixXd one_body;
-  Eigen::VectorXd two_body;
-
-  /// Reference propagator <a^dag_P a_Q> for spin-orbitals P, Q. The reference
-  /// is spin-restricted, so the spin-traced density splits evenly and opposite
-  /// spins do not contract.
-  double gamma(int P, int Q) const {
-    if (((P ^ Q) & 1) != 0) return 0.0;
-    return 0.5 * density(P >> 1, Q >> 1);
-  }
-
- private:
-  int compact(int orbital) const { return so2c[orbital]; }
-
-  void add_abab(int i, int j, int k, int l, double coeff) {
-    if ((i & 1) == 0 && (j & 1) == 1 && (k & 1) == 0 && (l & 1) == 1) {
-      const int nactive = one_body.rows() / 2;
-      two_body(idx4(i >> 1, j >> 1, k >> 1, l >> 1, nactive)) += coeff;
-    }
-  }
-};
-
-// Walk every nonempty set of disjoint (creation, annihilation) contractions,
-// carrying the accumulated propagator product and sign and visiting the
-// uncontracted remainder. Pairs whose propagator vanishes are pruned during the
-// walk rather than after it, which is what keeps a diagonal reference density
-// cheap. Terms arrive canonically ordered -- creations first -- so every
-// annihilation sits to the right of every creation and removing a pair
-// preserves the order.
-template <class Visit>
-void walk_contractions(const OperatorString& ops, int n,
-                       const RetainedOperator& out, int position,
-                       std::array<char, 8>& removed, int depth, double weight,
-                       const Visit& visit) {
-  if (position >= n) {
-    if (depth == 0) return;
-    OperatorString remainder{};
-    int size = 0;
-    for (int i = 0; i < n; ++i)
-      if (!removed[i]) remainder[size++] = ops[i];
-    visit(remainder, size, weight);
-    return;
-  }
-  if (ops[position].second != 1 || removed[position]) {
-    walk_contractions(ops, n, out, position + 1, removed, depth, weight, visit);
-    return;
-  }
-  walk_contractions(ops, n, out, position + 1, removed, depth, weight, visit);
-  for (int j = position + 1; j < n; ++j) {
-    if (ops[j].second != 0 || removed[j]) continue;
-    const double propagator = out.gamma(ops[position].first, ops[j].first);
-    if (propagator == 0.0) continue;
-    int crossings = 0;
-    for (int between = position + 1; between < j; ++between)
-      if (!removed[between]) ++crossings;
-    removed[position] = removed[j] = 1;
-    walk_contractions(ops, n, out, position + 1, removed, depth + 1,
-                      (crossings % 2 != 0 ? -weight : weight) * propagator,
-                      visit);
-    removed[position] = removed[j] = 0;
-  }
-}
-
-// Reference-normal-ordered {A}, expressed back in vacuum-ordered strings. This
-// is the Wick identity A = sum_S eps(S) prod(gamma) {A_S} solved for {A}, so
-// the recursion is well founded: every term drops two operators.
-template <class Sink>
-void reference_normal_ordered(const OperatorString& ops, int n, double coeff,
-                              const RetainedOperator& out, const Sink& sink) {
-  sink(ops, n, coeff);
-  std::array<char, 8> removed{};
-  walk_contractions(
-      ops, n, out, 0, removed, 0, 1.0,
-      [&](const OperatorString& remainder, int size, double weight) {
-        reference_normal_ordered(remainder, size, -coeff * weight, out, sink);
-      });
-}
-
-// A term above two-body cannot be emitted, and discarding it throws away its
-// reference contractions, which dominate. Keep everything except the
-// reference-normal-ordered residual: A - {A} = sum over nonempty contraction
-// sets. Unlike the particle-hole construction this needs no idempotency, so it
-// covers correlated and fractionally occupied references.
-void fold_onto_density(const OperatorString& ops, int n, double coeff,
-                       RetainedOperator& out) {
-  std::array<char, 8> removed{};
-  walk_contractions(
-      ops, n, out, 0, removed, 0, 1.0,
-      [&](const OperatorString& remainder, int size, double weight) {
-        reference_normal_ordered(
-            remainder, size, coeff * weight, out,
-            [&out](const OperatorString& term, int emitted_size, double value) {
-              // Anything still above two-body is the residual.
-              if (emitted_size <= 4) out.add(term.data(), emitted_size, value);
-            });
-      });
-}
-
-// Vacuum normal ordering. `sink` receives every fully ordered term, including
-// those above two-body, and decides what to do with them.
-template <class Sink>
-void normal_order(OperatorString ops, int n, double coeff, const Sink& sink) {
-  for (int i = 0; i + 1 < n; ++i) {
-    const int ai = ops[i].first, aa = ops[i].second;
-    const int bi = ops[i + 1].first, ba = ops[i + 1].second;
-    const bool wrong = (aa == 0 && ba == 1) || (aa == ba && ai > bi);
-    if (wrong) {
-      auto swapped = ops;
-      std::swap(swapped[i], swapped[i + 1]);
-      normal_order(swapped, n, -coeff, sink);
-      if (aa != ba && ai == bi) {
-        auto contracted = ops;
-        std::move(contracted.begin() + i + 2, contracted.begin() + n,
-                  contracted.begin() + i);
-        normal_order(contracted, n - 2, coeff, sink);
-      }
-      return;
-    }
-    if (aa == ba && ai == bi) return;
-  }
-  sink(ops, n, coeff);
-}
-
-// The same fold against a reference determinant: exchange creation and
-// annihilation roles on the occupied spin-orbitals, normal-order against that
-// vacuum, and keep whatever falls to two-body. Equivalent to
-// `fold_onto_density` for an idempotent density, which is what the tests
-// cross-check; production always takes the density path.
-void fold_onto_determinant(const OperatorString& ops, int n, double coeff,
-                           RetainedOperator& out) {
-  const auto exchange = [&out](OperatorString term, int size) {
-    for (int i = 0; i < size; ++i)
-      if (out.is_occupied(term[i].first)) term[i].second = 1 - term[i].second;
-    return term;
-  };
-  const auto emit = [&out](const OperatorString& term, int size,
-                           double weight) {
-    if (size <= 4) out.add(term.data(), size, weight);
-  };
-  normal_order(exchange(ops, n), n, coeff,
-               [&](const OperatorString& term, int size, double weight) {
-                 if (size > 4) return;  // the residual this approximation drops
-                 normal_order(exchange(term, size), size, weight, emit);
-               });
-}
-
-void accumulate_normal_ordered(OperatorString ops, int n, double coeff,
-                               RetainedOperator& out) {
-  normal_order(ops, n, coeff,
-               [&out](const OperatorString& term, int size, double weight) {
-                 if (size <= 4)
-                   out.add(term.data(), size, weight);
-                 else if (out.has_density)
-                   fold_onto_density(term, size, weight, out);
-                 else if (out.folds_above_two_body)
-                   fold_onto_determinant(term, size, weight, out);
-               });
-}
-
-template <std::size_t N>
-void accumulate_slots(const std::array<int, N>& values,
-                      const std::array<int, N>& is_cre,
-                      const std::vector<int>& slots, double coeff,
-                      RetainedOperator& out) {
-  OperatorString ops{};
-  int size = 0;
-  for (int slot : slots) ops[size++] = {values[slot], is_cre[slot]};
-  accumulate_normal_ordered(ops, size, coeff, out);
-}
-
-// All disjoint-pair matchings (i < j) of `slots`, including the empty matching.
-void enum_matchings(const std::vector<int>& slots,
-                    std::vector<std::pair<int, int>> cur,
-                    std::vector<std::vector<std::pair<int, int>>>& res) {
-  if (slots.empty()) {
-    res.push_back(cur);
-    return;
-  }
-  std::vector<int> rest(slots.begin() + 1, slots.end());
-  enum_matchings(rest, cur, res);  // first slot unpaired
-  for (std::size_t k = 0; k < rest.size(); ++k) {
-    std::vector<int> rem;
-    for (std::size_t t = 0; t < rest.size(); ++t)
-      if (t != k) rem.push_back(rest[t]);
-    auto c2 = cur;
-    c2.push_back({slots[0], rest[k]});
-    enum_matchings(rem, c2, res);
-  }
-}
-
-int perm_sign(const std::vector<int>& seq) {
-  int s = 1;
-  for (std::size_t i = 0; i < seq.size(); ++i)
-    for (std::size_t j = i + 1; j < seq.size(); ++j)
-      if (seq[i] > seq[j]) s = -s;
-  return s;
-}
-
-Eigen::Index integer_power(Eigen::Index base, int exponent) {
-  Eigen::Index result = 1;
-  for (int i = 0; i < exponent; ++i) result *= base;
-  return result;
-}
-
-void assign_active_slots(std::array<int, 8>& slots,
-                         const std::vector<int>& external_slots,
-                         Eigen::Index row,
-                         const std::vector<int>& active_list) {
-  const Eigen::Index nactive = active_list.size();
-  for (auto slot = external_slots.rbegin(); slot != external_slots.rend();
-       ++slot) {
-    slots[*slot] = active_list[row % nactive];
-    row /= nactive;
-  }
-}
-
-/// Spin-orbitals of each role, ascending, plus the inverse map for the active
-/// ones (-1 elsewhere).
-struct RoleLists {
-  std::vector<int> active, inactive, virtuals, active_position;
-};
-
-RoleLists role_lists(const SpinOrbitalPartition& part) {
-  RoleLists lists;
-  lists.active_position.assign(part.n_so, -1);
-  for (int orbital = 0; orbital < part.n_so; ++orbital) {
-    if (part.is_active[orbital]) {
-      lists.active_position[orbital] = static_cast<int>(lists.active.size());
-      lists.active.push_back(orbital);
-    }
-    if (part.is_inactive[orbital]) lists.inactive.push_back(orbital);
-    if (part.is_virtual[orbital]) lists.virtuals.push_back(orbital);
-  }
-  return lists;
-}
-
-// All matchings factor into two operand-local panels.
-// External active legs form the rows, cross-operator external lines form the
-// shared column, and contractions internal to one operand are reduced while
-// packing that operand's panel.
-//
-// A matching leaving more than four active legs produces a rank-three or
-// higher operator, which survives the two-body truncation only if an
-// annihilator of A coincides with a creator of B. Those channels therefore
-// enumerate the coinciding row pairs instead of forming the full product.
-template <class A2Get, class B2Get, class Output>
-void project_matchings(const Eigen::MatrixXd& A1, A2Get A2get,
-                       const Eigen::MatrixXd& B1, B2Get B2get,
-                       const SpinOrbitalPartition& part, double scale,
-                       Output& out) {
-  const RoleLists lists = role_lists(part);
-  const std::vector<int>& active_list = lists.active;
-  const std::vector<int>& active_position = lists.active_position;
-  if (active_list.empty()) return;
-
-  for (const auto [rA, rB] :
-       {std::pair{1, 1}, std::pair{1, 2}, std::pair{2, 1}, std::pair{2, 2}}) {
-    const int boundary = 2 * rA;
-    const int nslots = boundary + 2 * rB;
-    std::array<int, 8> is_cre{};
-    for (int slot = 0; slot < rA; ++slot) is_cre[slot] = 1;
-    for (int slot = 0; slot < rB; ++slot) is_cre[boundary + slot] = 1;
-
-    std::vector<int> slots(nslots);
-    std::iota(slots.begin(), slots.end(), 0);
-    std::vector<std::vector<std::pair<int, int>>> matches;
-    enum_matchings(slots, {}, matches);
-    for (const auto& match : matches) {
-      // With nothing contracted both commutator orderings normal-order to the
-      // same string -- every operand has an even number of legs -- so they
-      // cancel.
-      if (match.empty()) continue;
-      if (std::any_of(match.begin(), match.end(), [&](const auto& pair) {
-            return is_cre[pair.first] == is_cre[pair.second];
-          }))
-        continue;
-
-      std::vector<int> cross_pairs, internal_a_pairs, internal_b_pairs;
-      std::array<char, 8> contracted{};
-      for (int pair = 0; pair < static_cast<int>(match.size()); ++pair) {
-        const auto [left, right] = match[pair];
-        contracted[left] = contracted[right] = 1;
-        if ((left < boundary) != (right < boundary))
-          cross_pairs.push_back(pair);
-        else if (left < boundary)
-          internal_a_pairs.push_back(pair);
-        else
-          internal_b_pairs.push_back(pair);
-      }
-
-      std::vector<int> ext, ext_a, ext_b;
-      for (int slot = 0; slot < nslots; ++slot) {
-        if (contracted[slot]) continue;
-        ext.push_back(slot);
-        (slot < boundary ? ext_a : ext_b).push_back(slot);
-      }
-      // Above two-body rank only an A-annihilator / B-creator coincidence
-      // survives normal ordering, so without one the whole matching is dropped.
-      // That holds only while terms above two-body are discarded; when they are
-      // folded onto the reference instead, every matching contributes.
-      std::vector<int> a_annihilators, b_creators;
-      for (int slot : ext_a)
-        if (!is_cre[slot]) a_annihilators.push_back(slot);
-      for (int slot : ext_b)
-        if (is_cre[slot]) b_creators.push_back(slot);
-      const bool needs_coincidence =
-          ext.size() > 4 && !out.folds_above_two_body;
-      if (needs_coincidence && (a_annihilators.empty() || b_creators.empty()))
-        continue;
-      // Folding relaxes that gate but not entirely: reaching two-body still
-      // costs one creation and one annihilation per contraction, so a matching
-      // without enough of either cannot contribute.
-      if (out.folds_above_two_body && ext.size() > 4) {
-        int creations = 0;
-        for (int slot : ext)
-          if (is_cre[slot]) ++creations;
-        const int annihilations = static_cast<int>(ext.size()) - creations;
-        const int required = (static_cast<int>(ext.size()) - 4) / 2;
-        if (creations < required || annihilations < required) continue;
-      }
-      std::vector<int> order;
-      for (const auto& pair : match) {
-        order.push_back(pair.first);
-        order.push_back(pair.second);
-      }
-      order.insert(order.end(), ext.begin(), ext.end());
-      const double normA = rA == 2 ? 0.25 : 1.0;
-      const double normB = rB == 2 ? 0.25 : 1.0;
-      const double prefactor = scale * perm_sign(order) * normA * normB;
-
-      std::vector<const std::vector<int>*> pair_lists(match.size());
-      bool empty_external = false;
-      for (int pair = 0; pair < static_cast<int>(match.size()); ++pair) {
-        pair_lists[pair] =
-            is_cre[match[pair].first] ? &lists.inactive : &lists.virtuals;
-        empty_external = empty_external || pair_lists[pair]->empty();
-      }
-      if (empty_external) continue;
-
-      const auto combination_count = [&](const std::vector<int>& pairs) {
-        Eigen::Index count = 1;
-        for (int pair : pairs) count *= pair_lists[pair]->size();
-        return count;
-      };
-      const Eigen::Index nactive = active_list.size();
-      const Eigen::Index nrow_a = integer_power(nactive, ext_a.size());
-      const Eigen::Index nrow_b = integer_power(nactive, ext_b.size());
-      const Eigen::Index ncol = combination_count(cross_pairs);
-      Eigen::MatrixXd a(nrow_a, ncol);
-      Eigen::MatrixXd b(nrow_b, ncol);
-
-      const auto assign_pairs = [&](std::array<int, 8>& values,
-                                    const std::vector<int>& pairs,
-                                    Eigen::Index combination) {
-        for (auto it = pairs.rbegin(); it != pairs.rend(); ++it) {
-          const int pair = *it;
-          const auto& candidates = *pair_lists[pair];
-          const int value = candidates[combination % candidates.size()];
-          combination /= candidates.size();
-          values[match[pair].first] = values[match[pair].second] = value;
-        }
-      };
-      const auto panel_value = [&](bool left_operand,
-                                   std::array<int, 8> values) {
-        const auto& internal_pairs =
-            left_operand ? internal_a_pairs : internal_b_pairs;
-        const Eigen::Index count = combination_count(internal_pairs);
-        double sum = 0.0;
-        for (Eigen::Index combination = 0; combination < count; ++combination) {
-          assign_pairs(values, internal_pairs, combination);
-          if (left_operand) {
-            const double value =
-                rA == 1 ? A1(values[0], values[1])
-                        : A2get(values[0], values[1], values[2], values[3]);
-            sum += value;
-          } else {
-            const double value =
-                rB == 1 ? B1(values[boundary], values[boundary + 1])
-                        : B2get(values[boundary], values[boundary + 1],
-                                values[boundary + 2], values[boundary + 3]);
-            sum += value;
-          }
-        }
-        return sum;
-      };
-
-      for (Eigen::Index col = 0; col < ncol; ++col) {
-        std::array<int, 8> cross_values{};
-        assign_pairs(cross_values, cross_pairs, col);
-        for (Eigen::Index row = 0; row < nrow_a; ++row) {
-          auto values = cross_values;
-          assign_active_slots(values, ext_a, row, active_list);
-          a(row, col) = panel_value(true, values);
-        }
-        for (Eigen::Index row = 0; row < nrow_b; ++row) {
-          auto values = cross_values;
-          assign_active_slots(values, ext_b, row, active_list);
-          b(row, col) = panel_value(false, values);
-        }
-      }
-
-      const auto emit = [&](Eigen::Index row_a, Eigen::Index row_b,
-                            double dot) {
-        const double coeff = prefactor * dot;
-        if (coeff == 0.0) return;
-        std::array<int, 8> values{};
-        assign_active_slots(values, ext_a, row_a, active_list);
-        assign_active_slots(values, ext_b, row_b, active_list);
-        accumulate_slots(values, is_cre, ext, coeff, out);
-      };
-
-      if (!needs_coincidence) {
-        for (Eigen::Index row_begin = 0; row_begin < nrow_a;
-             row_begin += product_tile_rows) {
-          const Eigen::Index rows =
-              std::min(product_tile_rows, nrow_a - row_begin);
-          Eigen::MatrixXd product = Eigen::MatrixXd::Zero(rows, nrow_b);
-          blas::gemm(blas::Layout::ColMajor, blas::Op::NoTrans, blas::Op::Trans,
-                     rows, nrow_b, ncol, 1.0, a.data() + row_begin, nrow_a,
-                     b.data(), nrow_b, 0.0, product.data(), rows);
-          for (Eigen::Index local_row = 0; local_row < rows; ++local_row)
-            for (Eigen::Index row_b = 0; row_b < nrow_b; ++row_b)
-              emit(row_begin + local_row, row_b, product(local_row, row_b));
-        }
-        continue;
-      }
-
-      // `assign_active_slots` reads ext_b back to front, so the k-th ext_b slot
-      // is the digit of weight nactive^(|ext_b| - 1 - k) in row_b. Fixing that
-      // digit to an A-annihilator's orbital enumerates the surviving rows.
-      std::vector<char> seen(nrow_b, 0);
-      std::vector<Eigen::Index> candidates;
-      for (Eigen::Index row_a = 0; row_a < nrow_a; ++row_a) {
-        std::array<int, 8> values_a{};
-        assign_active_slots(values_a, ext_a, row_a, active_list);
-        candidates.clear();
-        for (std::size_t k = 0; k < ext_b.size(); ++k) {
-          if (!is_cre[ext_b[k]]) continue;
-          const Eigen::Index stride =
-              integer_power(nactive, static_cast<int>(ext_b.size() - 1 - k));
-          const Eigen::Index high_count =
-              integer_power(nactive, static_cast<int>(k));
-          for (int a_slot : a_annihilators) {
-            const Eigen::Index digit = active_position[values_a[a_slot]];
-            for (Eigen::Index high = 0; high < high_count; ++high)
-              for (Eigen::Index low = 0; low < stride; ++low) {
-                const Eigen::Index row_b =
-                    (high * nactive + digit) * stride + low;
-                if (seen[row_b]) continue;
-                seen[row_b] = 1;
-                candidates.push_back(row_b);
-              }
-          }
-        }
-        for (Eigen::Index row_b : candidates) {
-          double dot = 0.0;
-          for (Eigen::Index col = 0; col < ncol; ++col)
-            dot += a(row_a, col) * b(row_b, col);
-          emit(row_a, row_b, dot);
-        }
-        for (Eigen::Index row_b : candidates) seen[row_b] = 0;
-      }
-    }
-  }
-}
-
-}  // namespace
-
-// ===========================================================================
-// Spin-blocked on-the-fly downfold.
-// ===========================================================================
-
-SpinBlockedTwoBody build_two_body_blocked(const Eigen::VectorXd& g, int norb) {
-  const Eigen::Index size = n4(norb);
-  SpinBlockedTwoBody b;
-  b.norb = norb;
-  b.v_aaaa = Eigen::VectorXd::Zero(size);
-  b.v_abab = Eigen::VectorXd::Zero(size);
-
-  // Same-spin block: ordered[A,B,C,D] += 0.5 g[idx4(A,D,B,C)], then
-  // antisymmetrize over (P<->Q) and (R<->S).
-  std::vector<double> ordered(static_cast<std::size_t>(size), 0.0);
-  for (int p = 0; p < norb; ++p)
-    for (int q = 0; q < norb; ++q)
-      for (int r = 0; r < norb; ++r)
-        for (int s = 0; s < norb; ++s)
-          ordered[idx4(p, r, s, q, norb)] += 0.5 * g(idx4(p, q, r, s, norb));
-  for (int P = 0; P < norb; ++P)
-    for (int Q = 0; Q < norb; ++Q)
-      for (int R = 0; R < norb; ++R)
-        for (int S = 0; S < norb; ++S)
-          b.v_aaaa(idx4(P, Q, R, S, norb)) = ordered[idx4(P, Q, R, S, norb)] -
-                                             ordered[idx4(Q, P, R, S, norb)] -
-                                             ordered[idx4(P, Q, S, R, norb)] +
-                                             ordered[idx4(Q, P, S, R, norb)];
-
-  // Opposite-spin block v[alpha(p), beta(q), alpha(r), beta(s)]: the cross-spin
-  // terms vanish under (P<->Q)/(R<->S) except one.
-  for (int p = 0; p < norb; ++p)
-    for (int q = 0; q < norb; ++q)
-      for (int r = 0; r < norb; ++r)
-        for (int s = 0; s < norb; ++s)
-          b.v_abab(idx4(p, q, r, s, norb)) = -g(idx4(p, r, q, s, norb));
-  return b;
-}
-
-double so_v_from_blocked(const SpinBlockedTwoBody& blocks, int P, int Q, int R,
-                         int S) {
-  const int n = blocks.norb;
-  const int sP = P & 1, sQ = Q & 1, sR = R & 1, sS = S & 1;
-  const int p = P >> 1, q = Q >> 1, r = R >> 1, s = S >> 1;
-  if (sP == sQ && sQ == sR && sR == sS)
-    return blocks.v_aaaa(idx4(p, q, r, s, n));
-  // Sz conservation: mixed blocks are nonzero only with one alpha and one beta
-  // in each creation/annihilation pair.
-  if (sP + sQ != 1 || sR + sS != 1) return 0.0;
-  if (sP == 0 && sR == 0) return blocks.v_abab(idx4(p, q, r, s, n));   // abab
-  if (sP == 0 && sR == 1) return -blocks.v_abab(idx4(p, q, s, r, n));  // abba
-  if (sP == 1 && sR == 0) return -blocks.v_abab(idx4(q, p, r, s, n));  // baab
-  return blocks.v_abab(idx4(q, p, s, r, n));                           // baba
-}
-
-Eigen::MatrixXd spin_orbital_one_body(const Eigen::MatrixXd& h1a,
-                                      const Eigen::MatrixXd& h1b, int norb) {
-  const int n_so = 2 * norb;
-  Eigen::MatrixXd f = Eigen::MatrixXd::Zero(n_so, n_so);
-  for (int p = 0; p < norb; ++p)
-    for (int q = 0; q < norb; ++q) {
-      f(alpha(p), alpha(q)) = h1a(p, q);
-      f(beta(p), beta(q)) = h1b(p, q);
-    }
-  return f;
-}
-
-ActiveDownfoldResult downfold_blocked(
-    const Eigen::MatrixXd& f, const SpinBlockedTwoBody& blk,
-    const Eigen::VectorXd& eps, const SpinOrbitalPartition& part,
-    const RegularizerOptions& reg, double e_core,
-    const std::vector<int>& occupied_so,
-    const Eigen::MatrixXd& reference_density) {
-  const int n_so = part.n_so;
-
-  std::vector<int> active_so;
-  for (int o = 0; o < n_so; ++o)
-    if (part.is_active[o]) active_so.push_back(o);
-
-  // On-the-fly two-body element accessors (no dense n_so^4 storage).
-  const auto v_at = [&](int P, int Q, int R, int S) {
-    return so_v_from_blocked(blk, P, Q, R, S);
-  };
-  const auto od_v_at = [&](int P, int Q, int R, int S) {
-    return changes_external_occupation(part, P, Q, R, S) ? v_at(P, Q, R, S)
-                                                         : 0.0;
-  };
-  const auto bd_v_at = [&](int P, int Q, int R, int S) {
-    return changes_external_occupation(part, P, Q, R, S) ? 0.0
-                                                         : v_at(P, Q, R, S);
-  };
-  const auto s2_at = [&](int P, int Q, int R, int S) -> double {
-    if (!changes_external_occupation(part, P, Q, R, S)) return 0.0;
-    const double vv = v_at(P, Q, R, S);
-    if (vv == 0.0) return 0.0;
-    const double d = eps(P) + eps(Q) - eps(R) - eps(S);
-    return vv * regularized_inverse(d, reg);
-  };
-
-  // Generator: s1 dense (cheap), s2 on the fly; plus intruder diagnostics.
-  Eigen::MatrixXd s1 = Eigen::MatrixXd::Zero(n_so, n_so);
-  double min_denom = std::numeric_limits<double>::infinity();
-  double max_amp = 0.0;
-  const auto track = [&](double coupling, double delta) {
-    const double ad = std::abs(delta);
-    min_denom = std::min(min_denom, ad);
-    max_amp = std::max(
-        max_amp, std::abs(coupling) / std::max(ad, bare_denominator_floor));
-  };
-  for (int P = 0; P < n_so; ++P)
-    for (int Q = 0; Q < n_so; ++Q)
-      if (changes_external_occupation(part, P, Q) && f(P, Q) != 0.0) {
-        const double d = eps(P) - eps(Q);
-        s1(P, Q) = f(P, Q) * regularized_inverse(d, reg);
-        track(f(P, Q), d);
-      }
-  // Diagnostics only, materializing nothing. Restricted to the six nonzero
-  // spin patterns rather than the full (2*norb)^4 grid.
-  static constexpr int spin_patterns[6][4] = {{0, 0, 0, 0}, {1, 1, 1, 1},
-                                              {0, 1, 0, 1}, {0, 1, 1, 0},
-                                              {1, 0, 0, 1}, {1, 0, 1, 0}};
-  const int n_spatial = n_so / 2;
-  for (int p = 0; p < n_spatial; ++p)
-    for (int q = 0; q < n_spatial; ++q)
-      for (int r = 0; r < n_spatial; ++r)
-        for (int s = 0; s < n_spatial; ++s)
-          for (const auto& sp : spin_patterns) {
-            const int P = 2 * p + sp[0], Q = 2 * q + sp[1];
-            const int R = 2 * r + sp[2], S = 2 * s + sp[3];
-            if (!changes_external_occupation(part, P, Q, R, S)) continue;
-            const double vv = v_at(P, Q, R, S);
-            if (vv == 0.0) continue;
-            track(vv, eps(P) + eps(Q) - eps(R) - eps(S));
-          }
-
-  // Block-diagonal / off-diagonal one-body split (dense, cheap).
-  Eigen::MatrixXd od_f = Eigen::MatrixXd::Zero(n_so, n_so);
-  Eigen::MatrixXd bd_f = Eigen::MatrixXd::Zero(n_so, n_so);
-  for (int P = 0; P < n_so; ++P)
-    for (int Q = 0; Q < n_so; ++Q)
-      (changes_external_occupation(part, P, Q) ? od_f : bd_f)(P, Q) = f(P, Q);
-
-  // Reference-occupation mean-field fold of the block-diagonal part. Folded
-  // occupations are integers by construction, one per occupied spin-orbital.
-  Eigen::VectorXd reference_occupation = Eigen::VectorXd::Zero(n_so);
-  for (int P = 0; P < n_so; ++P)
-    if (part.is_inactive[P]) reference_occupation(P) = 1.0;
-
-  ActiveDownfoldResult res;
-  res.active_so = active_so;
-  const int n_active_so = static_cast<int>(active_so.size());
-  // The emitted effective operator is spin-restricted, so the active space must
-  // be closed under spin (paired spin-orbitals 2s, 2s+1); only the
-  // opposite-spin block is stored and emitted.
-  const int n_active_spatial = n_active_so / 2;
-  bool spin_restricted = n_active_so % 2 == 0;
-  for (int k = 0; k < n_active_spatial && spin_restricted; ++k)
-    spin_restricted = active_so[2 * k] % 2 == 0 &&
-                      active_so[2 * k + 1] == active_so[2 * k] + 1;
-  if (!spin_restricted)
-    throw std::invalid_argument(
-        "downfold_blocked: active space is not spin-restricted");
-  res.e = e_core;
-  for (int P = 0; P < n_so; ++P) res.e += bd_f(P, P) * reference_occupation(P);
-  for (int P = 0; P < n_so; ++P)
-    for (int Q = 0; Q < n_so; ++Q)
-      res.e -= 0.5 * bd_v_at(P, Q, P, Q) * reference_occupation(P) *
-               reference_occupation(Q);
-
-  res.f_active = Eigen::MatrixXd::Zero(n_active_so, n_active_so);
-  for (int ci = 0; ci < n_active_so; ++ci) {
-    const int i = active_so[ci];
-    for (int cj = 0; cj < n_active_so; ++cj) {
-      const int j = active_so[cj];
-      double fold = 0.0;
-      for (int b = 0; b < n_so; ++b)
-        fold += bd_v_at(i, b, b, j) * reference_occupation(b);
-      res.f_active(ci, cj) = bd_f(i, j) + fold;
-    }
-  }
-
-  res.v_abab = Eigen::VectorXd::Zero(n4(n_active_spatial));
-  for (int p = 0; p < n_active_spatial; ++p)
-    for (int q = 0; q < n_active_spatial; ++q)
-      for (int r = 0; r < n_active_spatial; ++r)
-        for (int s = 0; s < n_active_spatial; ++s)
-          res.v_abab(idx4(p, q, r, s, n_active_spatial)) =
-              bd_v_at(active_so[2 * p], active_so[2 * q + 1], active_so[2 * r],
-                      active_so[2 * s + 1]);
-
-  // projected 1/2 [S, V] = 1/2 (project(S*V) - project(V*S)), on the fly.
-  RetainedOperator comm(active_so, occupied_so, reference_density);
-  project_matchings(s1, s2_at, od_f, od_v_at, part, +0.5, comm);
-  project_matchings(od_f, od_v_at, s1, s2_at, part, -0.5, comm);
-
-  res.min_denominator = min_denom;
-  res.max_amplitude = max_amp;
-  res.e += comm.scalar;
-  res.f_active += comm.one_body;
-  res.v_abab += comm.two_body;
-  return res;
-}
-
-ActiveHamiltonian to_spatial_chemist(const ActiveDownfoldResult& down,
-                                     const SpinOrbitalPartition& part) {
-  const int n_so = part.n_so;
-  std::vector<int> spatial;
-  for (int o = 0; 2 * o + 1 < n_so; ++o) {
-    const bool a = part.is_active[2 * o], b = part.is_active[2 * o + 1];
-    if (a != b)
-      throw std::invalid_argument(
-          "to_spatial_chemist: active space is not spin-restricted");
-    if (a) spatial.push_back(o);
-  }
-  const int norb = static_cast<int>(spatial.size());
-  const int n_active_so = static_cast<int>(down.active_so.size());
-  std::vector<int> so2c(n_so, -1);
-  for (int c = 0; c < n_active_so; ++c) so2c[down.active_so[c]] = c;
-
-  ActiveHamiltonian out;
-  out.norb = norb;
-  out.core_energy = down.e;
-  out.one_body = Eigen::MatrixXd::Zero(norb, norb);
-  out.two_body = Eigen::VectorXd::Zero(n4(norb));
-  for (int p = 0; p < norb; ++p)
-    for (int q = 0; q < norb; ++q)
-      out.one_body(p, q) =
-          down.f_active(so2c[2 * spatial[p]], so2c[2 * spatial[q]]);
-
-  // chemist (pq|rs) = -v_abab[p, r, q, s]: the stored opposite-spin block is
-  // indexed by active spatial position (ascending active-orbital order).
-  for (int p = 0; p < norb; ++p)
-    for (int q = 0; q < norb; ++q)
-      for (int r = 0; r < norb; ++r)
-        for (int s = 0; s < norb; ++s)
-          out.two_body(idx4(p, q, r, s, norb)) =
-              -down.v_abab(idx4(p, r, q, s, norb));
-  return out;
-}
-
-SpinOrbitalPartition make_partition(int norb,
-                                    const std::vector<int>& active_spatial,
-                                    const std::vector<int>& inactive_spatial,
-                                    const std::vector<int>& virtual_spatial) {
-  if (norb < 0)
-    throw std::invalid_argument("make_partition: negative orbital count");
-  const int n_so = 2 * norb;
-  SpinOrbitalPartition part;
-  part.n_so = n_so;
-  part.is_active.assign(n_so, 0);
-  part.is_inactive.assign(n_so, 0);
-  part.is_virtual.assign(n_so, 0);
-
-  std::vector<char> assigned(norb, 0);
-  const auto assign = [&](const std::vector<int>& orbitals,
-                          std::vector<char>& role) {
-    for (int o : orbitals) {
-      if (o < 0 || o >= norb)
-        throw std::invalid_argument("make_partition: index out of range");
-      if (assigned[o])
-        throw std::invalid_argument(
-            "make_partition: orbital assigned to more than one role");
-      assigned[o] = 1;
-      role[2 * o] = 1;
-      role[2 * o + 1] = 1;
-    }
-  };
-  assign(active_spatial, part.is_active);
-  assign(inactive_spatial, part.is_inactive);
-  assign(virtual_spatial, part.is_virtual);
-  for (int o = 0; o < norb; ++o)
-    if (!assigned[o])
-      throw std::invalid_argument("make_partition: orbital has no role");
-  return part;
-}
-
 WindowPartition partition_window(
     const std::vector<double>& occupation,
     const std::vector<std::size_t>& window_global,
@@ -1018,6 +205,579 @@ WindowPartition partition_window(
   for (int i : out.virtual_spatial) folded_occupation += occupation[i];
   out.folded_charge_error = folded_electrons - folded_occupation;
   return out;
+}
+
+namespace {
+namespace sq = sequant;
+using Tensor = btas::Tensor<double>;
+
+struct Plan {
+  sq::EvalNodeBTAS tree;
+  int rank;
+  int spin;
+  bool folded;
+};
+
+struct Equations {
+  std::vector<Plan> plans;
+  DerivationStatistics statistics;
+};
+
+// Group by output body rank, one-body spin, and number of density contractions.
+using EquationSums =
+    std::map<std::tuple<int, int, int>, sq::HashingAccumulator>;
+
+std::span<const sq::ExprPtr> summands(const sq::ExprPtr& expression) {
+  if (expression->is<sq::Sum>()) {
+    const auto& terms = expression->as<sq::Sum>().summands();
+    return {terms.data(), terms.size()};
+  }
+  return {&expression, 1};
+}
+
+struct DensityPattern {
+  double coefficient;
+  std::vector<std::pair<int, int>> pairs;
+  std::vector<int> remaining;
+};
+
+std::vector<DensityPattern> density_patterns() {
+  auto context = sq::set_scoped_default_context(
+      {.index_space_registry_shared_ptr =
+           sq::mbpt::make_min_mr_spaces(sq::mbpt::SpinConvention::Legacy),
+       .vacuum = sq::Vacuum::Physical});
+  // Particle-hole reversal turns the three-body Gaussian fold into ordinary
+  // Wick pairings of a a a a+ a+ a+.
+  std::vector<sq::Index> slots;
+  sq::ExprPtr operand;
+  for (int axis = 0; axis < 6; ++axis) {
+    slots.emplace_back(L"u_" + std::to_wstring(axis + 1));
+    const auto ladder =
+        axis < 3 ? sq::fannx(slots.back()) : sq::fcrex(slots.back());
+    operand = operand ? operand * ladder : ladder;
+  }
+  const auto expansion =
+      sq::FWickTheorem{operand}.full_contractions(false).compute();
+  std::vector<DensityPattern> patterns;
+  for (const auto& term : summands(expansion)) {
+    if (!term->is<sq::Product>()) continue;
+    const auto& product = term->as<sq::Product>();
+    DensityPattern pattern{
+        sq::Constant(product.scalar()).value<double>(), {}, {}};
+    std::array<bool, 6> removed{};
+    for (const auto& factor : product.factors()) {
+      if (factor->is<sq::FNOperator>()) {
+        const auto& residual = factor->as<sq::FNOperator>();
+        // FNOperator stores annihilators in reverse literal ladder order.
+        std::vector<int> order;
+        for (const auto& op : residual.annihilators())
+          order.push_back(std::find(slots.begin(), slots.end(), op.index()) -
+                          slots.begin());
+        std::reverse(order.begin(), order.end());
+        for (const auto& op : residual.creators())
+          order.push_back(std::find(slots.begin(), slots.end(), op.index()) -
+                          slots.begin());
+        for (std::size_t left = 0; left < order.size(); ++left)
+          for (std::size_t right = left + 1; right < order.size(); ++right)
+            if (order[left] > order[right])
+              pattern.coefficient = -pattern.coefficient;
+      }
+      if (!factor->is<sq::Tensor>()) continue;
+      const auto& delta = factor->as<sq::Tensor>();
+      if (delta.label() != sq::reserved::overlap_label()) continue;
+      const int left =
+          std::find(slots.begin(), slots.end(), delta.bra()[0]) - slots.begin();
+      const int right =
+          std::find(slots.begin(), slots.end(), delta.ket()[0]) - slots.begin();
+      pattern.pairs.emplace_back(std::min(left, right), std::max(left, right));
+      removed[left] = removed[right] = true;
+    }
+    if (pattern.pairs.empty()) continue;
+    std::sort(pattern.pairs.begin(), pattern.pairs.end());
+    for (int axis = 0; axis < 6; ++axis)
+      if (!removed[axis]) pattern.remaining.push_back(axis);
+    patterns.push_back(std::move(pattern));
+  }
+  return patterns;
+}
+
+bool changes_occupation(const std::string& roles) {
+  // Creator roles precede annihilator roles: i=inactive, u=active, a=virtual.
+  const auto middle = roles.begin() + roles.size() / 2;
+  for (const char role : {'i', 'a'})
+    if (std::count(roles.begin(), middle, role) !=
+        std::count(middle, roles.end(), role))
+      return true;
+  return false;
+}
+
+std::vector<std::string> off_diagonal_blocks(int rank) {
+  std::vector<std::string> result{std::string{}};
+  for (int axis = 0; axis < 2 * rank; ++axis) {
+    std::vector<std::string> next;
+    for (const auto& roles : result)
+      for (const char role : {'i', 'u', 'a'}) next.push_back(roles + role);
+    result = std::move(next);
+  }
+  std::erase_if(result, [rank](const auto& roles) {
+    return !changes_occupation(roles) ||
+           (rank == 2 && (roles[0] > roles[1] || roles[2] > roles[3]));
+  });
+  return result;
+}
+
+double block_normalization(const std::string& roles) {
+  // Equal-role pairs retain the 1/2 factors; distinct-role permutations are
+  // represented once by off_diagonal_blocks().
+  return roles.size() == 2 ? 1.0
+                           : (roles[0] == roles[1] ? 0.5 : 1.0) *
+                                 (roles[2] == roles[3] ? 0.5 : 1.0);
+}
+
+sq::ExprPtr normal_ordered_operand(const std::string& roles, int offset,
+                                   const wchar_t* label) {
+  std::vector<sq::Index> bra, ket;
+  for (std::size_t axis = 0; axis < roles.size(); ++axis) {
+    auto index = sq::Index(std::wstring(1, roles[axis]) + L"_" +
+                           std::to_wstring(offset + axis + 1));
+    (axis < roles.size() / 2 ? bra : ket).push_back(index);
+  }
+  return sq::ex<sq::Tensor>(label, sq::bra(bra), sq::ket(ket)) *
+         sq::ex<sq::FNOperator>(sq::cre(bra), sq::ann(ket));
+}
+
+void accumulate_projected_term(const sq::Product& product,
+                               const std::vector<DensityPattern>& folding,
+                               EquationSums& sums,
+                               DerivationStatistics& statistics) {
+  std::vector<sq::Index> output;
+  std::vector<sq::Tensor> sources;
+  for (const auto& factor : product.factors()) {
+    if (factor->is<sq::FNOperator>()) {
+      const auto& residual = factor->as<sq::FNOperator>();
+      for (const auto& op : residual.creators()) output.push_back(op.index());
+      std::vector<sq::Index> annihilators;
+      for (const auto& op : residual.annihilators())
+        annihilators.push_back(op.index());
+      output.insert(output.end(), annihilators.rbegin(), annihilators.rend());
+    } else {
+      sources.push_back(factor->as<sq::Tensor>());
+    }
+  }
+
+  // Projection leaves only active residual operators. Fold rank three before
+  // building numerical tensors, so no rank-six intermediate is materialized.
+  const int residual_rank = output.size() / 2;
+  if (residual_rank > 3 ||
+      std::any_of(output.begin(), output.end(), [](const auto& index) {
+        return index.space().base_key()[0] != L'u';
+      }))
+    return;
+  ++statistics.projected_terms;
+  std::vector<DensityPattern> reductions;
+  if (residual_rank == 3) {
+    reductions = folding;
+  } else {
+    DensityPattern identity{1.0, {}, {}};
+    for (int axis = 0; axis < 2 * residual_rank; ++axis)
+      identity.remaining.push_back(axis);
+    reductions.push_back(std::move(identity));
+  }
+
+  std::vector<sq::Index> indices;
+  for (const auto& source : sources) {
+    if (source.label() != L"S" && source.label() != L"V")
+      throw std::runtime_error("SW-PT2: unreduced source contraction");
+    for (const auto& index : source.const_braket_indices())
+      if (std::find(indices.begin(), indices.end(), index) == indices.end())
+        indices.push_back(index);
+  }
+
+  // Resolve alpha/beta assignments symbolically; all numerical leaves remain
+  // spatial tensors. Each operand must conserve its spin population.
+  for (unsigned assignment = 0; assignment < (1u << indices.size());
+       ++assignment) {
+    const auto spin = [&](const sq::Index& index) {
+      return static_cast<int>(
+          (assignment >> (std::find(indices.begin(), indices.end(), index) -
+                          indices.begin())) &
+          1u);
+    };
+    if (std::any_of(sources.begin(), sources.end(), [&](const auto& source) {
+          int change = 0;
+          for (const auto& index : source.bra()) change += spin(index);
+          for (const auto& index : source.ket()) change -= spin(index);
+          return change != 0;
+        }))
+      continue;
+    std::map<sq::Index, sq::Index> spin_indices;
+    for (const auto& index : indices)
+      spin_indices.emplace(index, spin(index) == 0
+                                      ? sq::mbpt::make_spinalpha(index)
+                                      : sq::mbpt::make_spinbeta(index));
+    auto expression = sq::ex<sq::Constant>(product.scalar());
+    for (auto source : sources) {
+      source.transform_indices(spin_indices);
+      source.reset_tags();
+      if (source.bra_rank() == 1) {
+        source.set_label(std::wstring(source.label()) +
+                         (sq::mbpt::to_spin(source.bra()[0].space().qns()) ==
+                                  sq::mbpt::Spin::beta
+                              ? L"1"
+                              : L"0"));
+        expression *= sq::ex<sq::Tensor>(source);
+      } else {
+        expression *= sq::mbpt::expand_antisymm(sq::Tensor(
+            source.label(), sq::bra(source.bra()), sq::ket(source.ket()),
+            sq::TensorSymmetries{.perm = sq::Symmetry::Antisymm}));
+      }
+    }
+    sq::expand(expression);
+    sq::rapid_simplify(expression);
+    const auto spatial_coefficient = sq::mbpt::remove_spin(expression);
+
+    for (const auto& reduction : reductions) {
+      if (std::any_of(reduction.pairs.begin(), reduction.pairs.end(),
+                      [&](const auto& pair) {
+                        return spin(output[pair.first]) !=
+                               spin(output[pair.second]);
+                      }))
+        continue;
+      std::vector<sq::Index> target;
+      for (const int axis : reduction.remaining) target.push_back(output[axis]);
+      const int rank = target.size() / 2;
+      double phase = reduction.coefficient;
+      if (rank == 1 && spin(target[0]) != spin(target[1])) continue;
+      if (rank == 2) {
+        // Store only the alpha-beta two-body channel; antisymmetry fixes the
+        // signs when a creator or annihilator pair needs to be swapped.
+        if (spin(target[0]) == spin(target[1]) ||
+            spin(target[2]) == spin(target[3]))
+          continue;
+        for (const int axis : {0, 2})
+          if (spin(target[axis]) == 1) {
+            std::swap(target[axis], target[axis + 1]);
+            phase = -phase;
+          }
+      }
+      expression = sq::ex<sq::Constant>(phase) * spatial_coefficient->clone();
+      for (const auto& [creator, annihilator] : reduction.pairs)
+        expression *= sq::ex<sq::Tensor>(
+            L"D", sq::bra{output[annihilator]}, sq::ket{output[creator]},
+            sq::TensorSymmetries{.hermiticity = sq::Hermiticity::Hermitian});
+
+      // Give equivalent free outputs the same names before combining terms.
+      // Ordinals 21..24 stay clear of the operand indices 1..8.
+      std::map<sq::Index, sq::Index> output_names;
+      for (std::size_t axis = 0; axis < target.size(); ++axis)
+        output_names.emplace(target[axis],
+                             sq::Index(L"u_" + std::to_wstring(21 + axis)));
+      expression->visit(
+          [&](sq::ExprPtr& factor) {
+            if (!factor->is<sq::Tensor>()) return;
+            factor->as<sq::Tensor>().transform_indices(output_names);
+            factor->as<sq::Tensor>().reset_tags();
+          },
+          true);
+      sq::expand(expression);
+      sq::rapid_simplify(expression);
+      auto& sum =
+          sums[{rank, rank == 1 ? spin(target[0]) : 0, reduction.pairs.size()}];
+      for (auto summand : summands(expression)) {
+        sq::canonicalize(summand);
+        sq::rapid_simplify(summand);
+        sum.append(std::move(summand));
+      }
+    }
+  }
+}
+
+Equations derive() {
+  const auto folding = density_patterns();
+  auto context = sq::set_scoped_default_context(
+      {.index_space_registry_shared_ptr =
+           sq::mbpt::make_min_mr_spaces(sq::mbpt::SpinConvention::Default),
+       .vacuum = sq::Vacuum::SingleProduct});
+  Equations equations;
+  EquationSums sums;
+  const std::array roles{off_diagonal_blocks(1), off_diagonal_blocks(2)};
+
+  // Form 1/2 (S H_OD - H_OD S). Only pairs with no net inactive/virtual
+  // occupation change can survive projection onto P.
+  for (const int rank_s : {1, 2})
+    for (const int rank_v : {1, 2})
+      for (const auto& roles_s : roles[rank_s - 1])
+        for (const auto& roles_v : roles[rank_v - 1]) {
+          if (changes_occupation(
+                  roles_s.substr(0, rank_s) + roles_v.substr(0, rank_v) +
+                  roles_s.substr(rank_s) + roles_v.substr(rank_v)))
+            continue;
+          const auto generator = normal_ordered_operand(roles_s, 0, L"S");
+          const auto coupling =
+              normal_ordered_operand(roles_v, 2 * rank_s, L"V");
+          for (const bool generator_first : {true, false}) {
+            const double scale = (generator_first ? 0.5 : -0.5) *
+                                 block_normalization(roles_s) *
+                                 block_normalization(roles_v);
+            auto wick =
+                sq::FWickTheorem{sq::ex<sq::Constant>(scale) *
+                                 (generator_first ? generator * coupling
+                                                  : coupling * generator)};
+            wick.full_contractions(false).use_topology(false);
+            wick.set_nop_connections(std::vector<std::pair<int, int>>{{0, 1}});
+            wick.set_external_indices(std::vector<sq::Index>{});
+            const auto expansion = wick.compute(false, true);
+            for (const auto& term : summands(expansion)) {
+              if (!term->is<sq::Product>()) continue;
+              accumulate_projected_term(term->as<sq::Product>(), folding, sums,
+                                        equations.statistics);
+            }
+          }
+        }
+
+  // Canonical sums become reusable BTAS plans; density-folded terms are
+  // optimized for space as well as time to avoid high-rank intermediates.
+  for (auto& [key, sum] : sums) {
+    const auto [rank, spin, density_order] = key;
+    const auto expression = sum.make_expr(true);
+    std::vector<sq::Index> bra, ket;
+    for (int axis = 0; axis < rank; ++axis) {
+      bra.emplace_back(L"u_" + std::to_wstring(21 + axis));
+      ket.emplace_back(L"u_" + std::to_wstring(21 + rank + axis));
+    }
+    for (const auto& term : summands(expression)) {
+      if (term->is_zero()) continue;
+      auto result =
+          rank == 0 ? sq::ResultExpr(sq::Variable(L"E"), term)
+                    : sq::ResultExpr(
+                          sq::Tensor(L"F", sq::bra(bra), sq::ket(ket)), term);
+      if (density_order != 0)
+        sq::optimize(result, {.objective_function =
+                                  sq::ObjectiveFunction::DenseSpaceTime});
+      auto tree = sq::binarize<sq::EvalExprBTAS>(result);
+      tree.visit([&](const auto& node) {
+        equations.statistics.maximum_rank = std::max(
+            equations.statistics.maximum_rank, node->canon_indices().size());
+      });
+      equations.plans.push_back(
+          {std::move(tree), rank, spin, density_order != 0});
+    }
+  }
+  equations.statistics.contractions = equations.plans.size();
+  return equations;
+}
+
+const Equations& reusable_equations() {
+  static const Equations equations = derive();
+  return equations;
+}
+}  // namespace
+
+DerivationStatistics downfold_statistics() {
+  return reusable_equations().statistics;
+}
+
+DownfoldResult downfold(
+    const Eigen::MatrixXd& one_alpha, const Eigen::MatrixXd& one_beta,
+    const Eigen::VectorXd& integrals, const Eigen::VectorXd& energies,
+    const std::vector<int>& active, const std::vector<int>& inactive,
+    const std::vector<int>& virtuals, const RegularizerOptions& regularizer,
+    double core_energy, const Eigen::MatrixXd& reference_density) {
+  const int norb = energies.size();
+  const int active_count = active.size();
+  const Eigen::Index tensor_size =
+      static_cast<Eigen::Index>(norb) * norb * norb * norb;
+  if (norb <= 0 || active_count == 0 || one_alpha.rows() != norb ||
+      one_alpha.cols() != norb || one_beta.rows() != norb ||
+      one_beta.cols() != norb || integrals.size() != tensor_size ||
+      (reference_density.size() != 0 &&
+       (reference_density.rows() != norb || reference_density.cols() != norb)))
+    throw std::invalid_argument(
+        "SW-PT2: inconsistent spatial tensor dimensions");
+  const std::map<wchar_t, const std::vector<int>*> roles{
+      {L'i', &inactive}, {L'u', &active}, {L'a', &virtuals}};
+  std::vector<char> orbital_roles(norb, 0);
+  for (const auto& [role, orbitals] : roles)
+    for (const int orbital : *orbitals) {
+      if (orbital < 0 || orbital >= norb || orbital_roles[orbital] != 0)
+        throw std::invalid_argument(
+            "SW-PT2: invalid or repeated spatial role index");
+      orbital_roles[orbital] = static_cast<char>(role);
+    }
+  if (std::find(orbital_roles.begin(), orbital_roles.end(), 0) !=
+      orbital_roles.end())
+    throw std::invalid_argument(
+        "SW-PT2: spatial roles do not cover the window");
+  const auto integral = [&](int first, int second, int third, int fourth) {
+    return integrals(idx4(first, second, third, fourth, norb));
+  };
+  const auto inverse_two_body = [&](int first, int second, int third,
+                                    int fourth) {
+    const double creators = energies(first) + energies(second);
+    // Keep creator-first arithmetic at the bare cutoff; average annihilator
+    // orders to preserve their exchange symmetry despite roundoff.
+    return 0.5 *
+           (regularized_inverse(creators - energies(third) - energies(fourth),
+                                regularizer) +
+            regularized_inverse(creators - energies(fourth) - energies(third),
+                                regularizer));
+  };
+  const std::array<Eigen::Ref<const Eigen::MatrixXd>, 2> one_body{one_alpha,
+                                                                  one_beta};
+  // Normal order against the filled inactive space, not the density used for
+  // the generalized Fock. Each generator trace must be regularized separately.
+  std::array<Eigen::MatrixXd, 2> normal_ordered_one_body{one_alpha, one_beta};
+  std::array<Eigen::MatrixXd, 2> generator_one_body{one_alpha, one_beta};
+  for (int row = 0; row < norb; ++row)
+    for (int col = 0; col < norb; ++col) {
+      for (auto& block : generator_one_body)
+        block(row, col) *=
+            regularized_inverse(energies(row) - energies(col), regularizer);
+      for (const int occupied : inactive) {
+        const double trace = 2 * integral(row, col, occupied, occupied) -
+                             integral(row, occupied, occupied, col);
+        for (int spin = 0; spin < 2; ++spin) {
+          normal_ordered_one_body[spin](row, col) += trace;
+          generator_one_body[spin](row, col) +=
+              trace * inverse_two_body(row, occupied, occupied, col);
+        }
+      }
+    }
+
+  // Start with P H_BD P; the contraction plans add 1/2 P [S, H_OD] P below.
+  DownfoldResult result;
+  result.scalar = core_energy;
+  for (const int occupied : inactive) {
+    result.scalar +=
+        one_body[0](occupied, occupied) + one_body[1](occupied, occupied);
+    for (const int other : inactive)
+      result.scalar += 2 * integral(occupied, occupied, other, other) -
+                       integral(occupied, other, other, occupied);
+  }
+  for (int spin = 0; spin < 2; ++spin) {
+    result.one_body[spin].resize(active_count, active_count);
+    for (int row = 0; row < active_count; ++row)
+      for (int col = 0; col < active_count; ++col)
+        result.one_body[spin](row, col) =
+            normal_ordered_one_body[spin](active[row], active[col]);
+  }
+  result.two_body.resize(n4(active_count));
+  for (int first = 0; first < active_count; ++first)
+    for (int second = 0; second < active_count; ++second)
+      for (int third = 0; third < active_count; ++third)
+        for (int fourth = 0; fourth < active_count; ++fourth)
+          result.two_body(idx4(first, second, third, fourth, active_count)) =
+              integral(active[first], active[second], active[third],
+                       active[fourth]);
+  if (inactive.empty() && virtuals.empty()) return result;
+
+  // Diagnostics use raw couplings, before normal ordering or damping.
+  const auto track = [&](double coupling, double delta) {
+    if (coupling == 0.0) return;
+    result.min_denominator = std::min(result.min_denominator, std::abs(delta));
+    result.max_amplitude = std::max(
+        result.max_amplitude,
+        std::abs(coupling) / std::max(std::abs(delta), bare_denominator_floor));
+  };
+  for (int first = 0; first < norb; ++first)
+    for (int second = 0; second < norb; ++second) {
+      if (orbital_roles[first] != orbital_roles[second])
+        for (const auto& block : one_body)
+          track(block(first, second), energies(first) - energies(second));
+      for (int third = 0; third < norb; ++third)
+        for (int fourth = 0; fourth < norb; ++fourth) {
+          if (!changes_occupation({orbital_roles[first], orbital_roles[second],
+                                   orbital_roles[third],
+                                   orbital_roles[fourth]}))
+            continue;
+          const double direct = integral(first, third, second, fourth);
+          const double delta = energies(first) + energies(second) -
+                               energies(third) - energies(fourth);
+          track(direct, delta);
+          track(direct - integral(first, fourth, second, third), delta);
+        }
+    }
+  using OperandKey = std::tuple<std::wstring, std::vector<wchar_t>>;
+  std::map<OperandKey, sq::ResultPtr> operand_cache;
+  const auto evaluate_leaf =
+      [&](const sq::EvalNodeBTAS& node) -> sq::ResultPtr {
+    if (!node->is_tensor())
+      return sq::eval_result<sq::ResultScalar<double>>(
+          node->as_constant().value<double>());
+    const auto& source = node->as_tensor();
+    std::vector<wchar_t> block_roles;
+    std::vector<const std::vector<int>*> orbitals;
+    std::vector<std::size_t> extents;
+    for (const auto& index : source.const_braket_indices()) {
+      block_roles.push_back(index.space().base_key()[0]);
+      orbitals.push_back(roles.at(block_roles.back()));
+      extents.push_back(orbitals.back()->size());
+    }
+    const OperandKey key{std::wstring(source.label()), block_roles};
+    if (operand_cache.contains(key)) return operand_cache.at(key);
+    const bool is_generator = source.label()[0] == L'S';
+    Tensor values{btas::Range{extents}};
+    for (const auto& index : values.range()) {
+      std::array<int, 4> orbital{};
+      for (std::size_t axis = 0; axis < orbitals.size(); ++axis)
+        orbital[axis] = orbitals[axis]->at(index[axis]);
+      double value;
+      if (source.label() == L"D") {
+        // D is spin traced; a spin-diagonal Gaussian contraction uses D/2.
+        value = 0.5 * reference_density(orbital[1], orbital[0]);
+      } else if (source.bra_rank() == 1) {
+        const int spin = source.label().back() == L'1';
+        const auto& block =
+            is_generator ? generator_one_body : normal_ordered_one_body;
+        value = block[spin](orbital[0], orbital[1]);
+      } else {
+        // Symbolic (bra, ket) slots map to spatial chemist (pq|rs) order.
+        value = integral(orbital[0], orbital[2], orbital[1], orbital[3]);
+        if (is_generator)
+          value *=
+              inverse_two_body(orbital[0], orbital[1], orbital[2], orbital[3]);
+      }
+      values(index) = value;
+    }
+    auto value =
+        sq::eval_result<sq::ResultTensorBTAS<Tensor>>(std::move(values));
+    operand_cache.emplace(key, value);
+    return value;
+  };
+  for (const auto& plan : reusable_equations().plans) {
+    if (plan.folded && reference_density.size() == 0) continue;
+    bool empty = false;
+    plan.tree.visit([&](const auto& node) {
+      if (!node.leaf() || !node->is_tensor()) return;
+      for (const auto& index : node->as_tensor().const_braket_indices())
+        empty = empty || roles.at(index.space().base_key()[0])->empty();
+    });
+    if (empty) continue;
+    const auto value = sq::evaluate(plan.tree, evaluate_leaf);
+    if (plan.rank == 0) {
+      result.scalar += value->get<double>();
+      continue;
+    }
+    const auto& values = value->get<Tensor>();
+    // BTAS stores canonical axes, which need not match the requested output.
+    std::vector<std::size_t> output_axes;
+    for (const auto& index : plan.tree->as_tensor().const_braket_indices())
+      output_axes.push_back(std::find(plan.tree->canon_indices().begin(),
+                                      plan.tree->canon_indices().end(), index) -
+                            plan.tree->canon_indices().begin());
+    for (const auto& index : values.range()) {
+      if (plan.rank == 1) {
+        result.one_body[plan.spin](index[output_axes[0]],
+                                   index[output_axes[1]]) += values(index);
+      } else {
+        // Chemist storage reverses the annihilator pair, giving the minus sign.
+        result.two_body(idx4(index[output_axes[0]], index[output_axes[2]],
+                             index[output_axes[1]], index[output_axes[3]],
+                             active_count)) -= values(index);
+      }
+    }
+  }
+  return result;
 }
 
 }  // namespace qdk::chemistry::algorithms::microsoft::swpt2

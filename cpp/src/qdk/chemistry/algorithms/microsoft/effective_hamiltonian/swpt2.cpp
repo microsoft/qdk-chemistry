@@ -190,7 +190,7 @@ void log_fold_rounding(const sw::WindowPartition& roles) {
       roles.folded_charge_error);
 }
 
-void warn_on_intruders(const sw::ActiveDownfoldResult& down, bool regularized) {
+void warn_on_intruders(const sw::DownfoldResult& down, bool regularized) {
   if (!regularized && down.min_denominator < sw::bare_denominator_floor)
     QDK_LOGGER().warn(
         "swpt2 downfold: coupled channels with energy denominators below "
@@ -369,13 +369,7 @@ std::shared_ptr<data::Hamiltonian> SchriefferWolffPT2Constructor::_run_impl(
     }
   }
 
-  Eigen::VectorXd eps(2 * norb);
-  for (int i = 0; i < norb; ++i) eps(2 * i) = eps(2 * i + 1) = fock(i, i);
-
-  const auto blk = sw::build_two_body_blocked(g_aaaa, norb);
-  const auto f = sw::spin_orbital_one_body(h1a, h1a, norb);
-  const auto part = sw::make_partition(norb, active_spatial, inactive_spatial,
-                                       virtual_spatial);
+  const Eigen::VectorXd eps = fock.diagonal();
 
   // Terms above two-body cannot be emitted, and discarding them throws away
   // their reference contractions, which dominate. `folded_density` lets the
@@ -403,8 +397,8 @@ std::shared_ptr<data::Hamiltonian> SchriefferWolffPT2Constructor::_run_impl(
         "SchriefferWolffPT2: regularizer_sigma2 must be finite.");
   const bool regularized = reg.sigma2 > 0.0;
 
-  const auto down =
-      sw::downfold_blocked(f, blk, eps, part, reg, e_core, {},
+  auto down = sw::downfold(h1a, h1a, g_aaaa, eps, active_spatial,
+                           inactive_spatial, virtual_spatial, reg, e_core,
                            fold ? folded_density : Eigen::MatrixXd());
 
   QDK_LOGGER().info(
@@ -420,7 +414,9 @@ std::shared_ptr<data::Hamiltonian> SchriefferWolffPT2Constructor::_run_impl(
                               : "folded onto a correlated reference");
   warn_on_intruders(down, regularized);
 
-  auto active = sw::to_spatial_chemist(down, part);
+  sw::ActiveHamiltonian active{static_cast<int>(active_spatial.size()),
+                               down.scalar, std::move(down.one_body[0]),
+                               std::move(down.two_body)};
   if (semicanonical_applied) {
     const Eigen::MatrixXd active_rotation =
         sub_block(semicanonical_transform, active_spatial).transpose();

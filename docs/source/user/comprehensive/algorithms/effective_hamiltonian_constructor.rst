@@ -125,7 +125,9 @@ The generator :math:`S` is calculated from
 
    [F_0, S] = H_{\mathrm{OD}},
 
-where :math:`F_0` -- the spin-free generalized Fock operator based on the input reference wavefunction -- is used to approximate :math:`H_{\mathrm{BD}}`, which allows for efficient computation of :math:`S`. This results in
+where :math:`F_0` -- the spin-free generalized Fock operator based on the input
+reference wavefunction -- is used to approximate :math:`H_{\mathrm{BD}}`, which
+allows for efficient computation of :math:`S`. This results in
 
 .. math::
 
@@ -139,18 +141,18 @@ where :math:`c_T` are the coefficients of the operator terms :math:`\hat{T}` in
 :math:`\varepsilon_p` are the diagonal elements of the generalized Fock matrix:
 
 .. math::
+
    \varepsilon_p = F_{pp},\qquad F_{pq} = h_{pq}
           + \sum_{rs} \gamma_{rs}\left[(pq|rs) - \tfrac{1}{2}(pr|sq)\right].
 
-:math:`\gamma` is the reference wavefunction's spin-traced one-particle density over
-:math:`W`. Because :math:`\gamma` is spin traced, the two spin channels share the same orbital
-energies, :math:`\varepsilon_{p\alpha} = \varepsilon_{p\beta}`, so the emitted operator
-commutes with the total spin and the active-space solve selects the spin sector.
+:math:`\gamma` is the reference's spin-traced 1-RDM over :math:`W`.
+The restricted, spin-averaged construction preserves spin symmetry and uses common
+orbital energies, :math:`\varepsilon_{p\alpha} = \varepsilon_{p\beta}`.
 
-These denominators assume :math:`F` is diagonal, which holds for canonical orbitals but not in
-general. With ``semicanonicalize``, :math:`F` is diagonalized within each orbital-role block
-before the denominators are formed and the emitted operator is rotated back to the caller's
-basis, making the setting a no-op for canonical orbitals.
+By default, ``semicanonicalize`` diagonalizes :math:`F` within the inactive,
+active, and virtual blocks. Integrals and density are rotated consistently,
+and the emitted integrals are rotated back. With this option disabled, the
+denominators use the diagonal of :math:`F` in the supplied basis.
 
 Near-degenerate channels give a small :math:`\Delta_T` and a large amplitude, which can make the
 perturbative expansion unreliable. ``regularizer_sigma2`` damps them by replacing the
@@ -162,17 +164,18 @@ bare inverse denominator with
 
 the :math:`\sigma^2` regularizer :cite:`Shee2021`, whose :math:`\sigma` (in :math:`E_h^{-2}`)
 is equivalently the DSRG flow parameter :cite:`Evangelista2014`. Larger :math:`\sigma`
-regularizes less. Setting it to ``0`` selects a guarded bare pseudoinverse: coupled channels
-with :math:`|\Delta_T| < 10^{-8}\,E_h` are mapped to zero, while the remaining channels are
-still downfolded. The constructor logs a warning when this cutoff is used because the result
-then depends on omitting near-degenerate channels. ``0`` is a mode switch, not the
-:math:`\sigma \to 0` limit, which damps every channel away entirely.
+regularizes less. Setting it to ``0`` selects a guarded bare pseudoinverse:
+coupled channels with :math:`|\Delta_T| < 10^{-8}\,E_h` are omitted, with a warning.
+This differs from the :math:`\sigma \to 0` limit, which damps all channels to zero.
+Damping or omitting channels makes the generator equation approximate; the
+correction remains the half-commutator above, not a full DSRG expansion.
 
 The damping is not confined to intruders. A channel keeps the fraction
 :math:`1 - e^{-\sigma \Delta_T^2}` of its bare amplitude, so at the default
-:math:`\sigma = 1\,E_h^{-2}` denominators of 0.3, 0.5, 1.0 and 2.0 :math:`E_h` retain 9%,
-22%, 63% and 98% of the second-order result. Ordinary, well-separated channels are damped
-along with the near-degenerate ones; raise :math:`\sigma` to recover them.
+:math:`\sigma = 1\,E_h^{-2}` denominators of 0.3, 0.5, 1.0 and 2.0 :math:`E_h` retain
+approximately 9%, 22%, 63% and 98% of their bare generator amplitudes, respectively.
+Even well-separated channels are damped; increase :math:`\sigma` to approach the
+bare amplitudes.
 
 The kept space :math:`P` is defined by the ``p_indices`` argument. The reference wavefunction
 only supplies the density matrix :math:`\gamma`, and is independent of :math:`P`.
@@ -183,14 +186,13 @@ an occupation that is far from 2 or 0 perturbs the mean field the active space f
 rejected. The active space keeps whatever electrons the folded orbitals do not take.
 
 The commutator :math:`[S, H_{\mathrm{OD}}]` generates three-body terms that the emitted
-two-body operator cannot carry. With ``fold_above_two_body`` they are folded onto the reference
-density using pair contractions formed from the spin-traced 1-RDM. This is the Gaussian-reference
-truncation of the generalized normal-ordering framework :cite:`Kutzelnigg1997`. For a determinant
-reference these are the ordinary Wick contractions, but the residual three-body operator is still
-discarded. For a correlated CAS reference the approximation additionally neglects the two-body and
-higher density cumulants. It can improve on discarding the three-body terms, especially as the
-active electron count grows, but is not a complete correlated-reference normal ordering and costs
-more to evaluate.
+two-body operator cannot carry. With ``fold_above_two_body``, reference-1-RDM pair
+contractions reduce these to lower-rank terms :cite:`Kutzelnigg1997`.
+This Gaussian approximation recovers ordinary Wick contractions for a spin-paired
+determinant and neglects connected higher density cumulants for correlated or
+spin-averaged open-shell references. The residual three-body operator is discarded.
+Folding can improve accuracy but adds cost; it is skipped when the retained space
+contains at most two electrons.
 
 The reference enters only through :math:`\gamma`, so what is accepted is a property of the
 input, not of the method that produced it: any restricted orbital set works, canonical or
@@ -209,21 +211,19 @@ different states.
    :math:`(pq|rs) = (qp|sr)` and electron exchange :math:`(pq|rs) = (rs|pq)` survive the
    transformation, but the bra swap :math:`(pq|rs) = (qp|rs)` of a genuine Coulomb integral
    does not: the commutator is not an electron-repulsion operator. Consumers must be given
-   the full dense :math:`n^4` block; one that reads only the canonical 8-fold-unique
-   elements silently reconstructs a different operator, with no error raised.
+   the full dense :math:`n^4` block.
 
-The constructor logs the active regularization, the derived active electron count, the largest
-folded occupation deviation, the minimum denominator and the maximum raw amplitude
-:math:`|c_T/\Delta_T|`. It warns when a folded deviation or the folded core's excess charge is
-large, and when the amplitude exceeds one. The latter is a heuristic flag for a large individual
-amplitude, not a convergence boundary; SW convergence depends on the perturbation norm and
-spectral gap.
+The constructor logs regularization, active electron count, folded-occupation
+deviation, minimum coupled denominator, and maximum raw amplitude.
+The amplitude diagnostic uses undamped couplings, with the denominator floored at
+:math:`10^{-8}\,E_h`. Large occupation or charge-rounding errors and amplitudes
+above one trigger warnings. These are diagnostics, not convergence guarantees.
 
-Cost is dominated by the projected commutator, and it grows steeply with the kept space;
-building the window's dense integral block is negligible beside it. Widening the window is
-cheaper than enlarging the kept space, but not free, and memory is bounded by the window's
-dense four-center integrals. ``fold_above_two_body`` makes the downfold more expensive,
-increasingly so as the kept space grows.
+SeQuant derives contraction plans on the first downfold with a nonempty external
+space and reuses them within the process. This adds a one-time setup cost.
+Numerical cost and memory depend on the window, kept space, and density fold.
+Evaluation uses spatial spin blocks; memory includes the dense integrals,
+contraction workspace, and cached plans.
 
 .. rubric:: Settings
 
@@ -240,6 +240,7 @@ increasingly so as the kept space grows.
 
 ``max_folded_occupation_deviation`` (float, default ``0.5``)
    Largest deviation from an integer reference occupation allowed for a folded orbital.
+   This tolerance must lie in :math:`[0,1)`.
 
 .. tab:: Python API
 
