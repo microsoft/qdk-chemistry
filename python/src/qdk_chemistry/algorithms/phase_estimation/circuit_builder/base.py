@@ -191,11 +191,6 @@ class QpeCircuitBuilder(Algorithm):
     def _shared_register(state_preparation: Circuit, unitary_circuits: list[Circuit]) -> tuple[Any, int, bool, bool]:
         """Resolve the phase gradient register the state preparation and the unitaries request through their metadata.
 
-        A circuit that declares phase gradient ancillas expects those qubits at the end of its register, prepared by
-        its caller and left prepared. Every declaration is the binary phase gradient, whose state does not depend on
-        any angle, so phase estimation prepares one register around the state preparation and every unitary, and hands
-        it to whichever of them declared it.
-
         Args:
             state_preparation: The state preparation circuit.
             unitary_circuits: The unitaries phase estimation queries, which share one register layout.

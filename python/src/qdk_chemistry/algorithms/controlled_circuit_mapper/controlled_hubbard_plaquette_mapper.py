@@ -33,8 +33,6 @@ class ControlledHubbardPlaquetteMapperSettings(ControlledCircuitMapperSettings):
         use_phase_gradient: Whether each Hamming weight is phased by one addition into a catalyst,
             a generalized phase gradient the evolution prepares once per angle, or by synthesizing
             each of its place values as its own ``Rz`` (the original rotation ladder).
-            The catalyst trades the place-value rotations of every tower for one rotation and
-            Toffolis, and adds a few qubits.
             Ignored when ``use_hamming_weight_phasing`` is ``False``.
             Defaults to ``True``.
 
