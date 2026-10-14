@@ -123,10 +123,8 @@ so the rotation-depth improvement is not a guarantee of constant total gate dept
 With ``use_hamming_weight_phasing``, terms of a declared layer with exactly equal nonzero angles,
 such as the uniform bonds of an Ising or Heisenberg lattice, are phased together with
 Hamming-weight phasing :cite:`Kan2025`: an adder tree writes their Hamming weight into scratch
-qubits, and a few controlled rotations on it replace the per-term rotations. Formulas without
-``layer_offsets`` raise :class:`ValueError` when phasing is requested; supply a layered formula
-or disable phasing. Phasing is off by default, and unlayered formulas retain ordinary evolution
-when it is disabled.
+qubits, and a few controlled rotations on it replace the per-term rotations. Phasing a formula
+without ``layer_offsets`` raises a :class:`ValueError`. Phasing is off by default.
 
 .. rubric:: Settings
 

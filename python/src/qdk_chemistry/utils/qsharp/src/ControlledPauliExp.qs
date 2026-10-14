@@ -28,9 +28,9 @@ namespace QDKChemistry.Utils.ControlledPauliExp {
         phase
     }
 
-    /// Splits terms `first..last` into plain terms, in input order, and towers of terms with exactly
-    /// equal nonzero angles. Without phasing, every term is plain.
-    function LayerRotationTowers(
+    /// Splits terms `first..last` into unphased terms and groups of phased terms with exactly
+    /// equal nonzero angles. Without phasing, every term is unphased, in input order.
+    function SplitPhasedTerms(
         params : RepPauliExpParams,
         first : Int,
         last : Int,
@@ -39,7 +39,7 @@ namespace QDKChemistry.Utils.ControlledPauliExp {
         if not useHammingWeightPhasing {
             return (MappedOverRange(term -> term, first..last), []);
         }
-        // Sort (angle, term) pairs; an identity term takes angle 0, which stays plain.
+        // Sort (angle, term) pairs; an identity term takes angle 0, so it is left unphased.
         // The comparator captures nothing: a capturing one breaks Base-profile lowering.
         let sorted = Sorted(
             ((leftAngle, leftTerm), (rightAngle, rightTerm)) -> leftAngle < rightAngle or (leftAngle == rightAngle and leftTerm <= rightTerm),
@@ -47,8 +47,8 @@ namespace QDKChemistry.Utils.ControlledPauliExp {
         );
         let angles = Mapped((angle, _) -> angle, sorted);
         let terms = Mapped((_, term) -> term, sorted);
-        mutable plain : Int[] = [];
-        mutable towers : Int[][] = [];
+        mutable unphasedTerms : Int[] = [];
+        mutable phasedTerms : Int[][] = [];
         mutable start = 0;
         while start < Length(terms) {
             mutable stop = start + 1;
@@ -56,13 +56,13 @@ namespace QDKChemistry.Utils.ControlledPauliExp {
                 set stop += 1;
             }
             if angles[start] == 0.0 {
-                set plain += terms[start..stop - 1];
+                set unphasedTerms += terms[start..stop - 1];
             } else {
-                set towers += [terms[start..stop - 1]];
+                set phasedTerms += [terms[start..stop - 1]];
             }
             set start = stop;
         }
-        (plain, towers)
+        (unphasedTerms, phasedTerms)
     }
 
     /// Applies the producer's disjoint layers without changing their boundaries.
@@ -79,7 +79,7 @@ namespace QDKChemistry.Utils.ControlledPauliExp {
         for layer in 0..Length(layerOffsets) - 2 {
             let first = layerOffsets[layer];
             let last = layerOffsets[layer + 1] - 1;
-            if first == last {
+            if first == last and not useHammingWeightPhasing {
                 Controlled Exp([control], (
                     params.pauliOps[first], -params.pauliCoefficients[first],
                     Subarray(params.pauliIndices[first], systems)
@@ -105,37 +105,37 @@ namespace QDKChemistry.Utils.ControlledPauliExp {
                         // One control phase keeps every identity term's relative phase, also under further controls.
                         R1(-identityPhase, control);
                     }
-                    let (plainTerms, towers) = LayerRotationTowers(params, first, last, useHammingWeightPhasing);
-                    for term in plainTerms {
+                    let (unphasedTerms, phasedTerms) = SplitPhasedTerms(params, first, last, useHammingWeightPhasing);
+                    for term in unphasedTerms {
                         let indices = params.pauliIndices[term];
                         if Length(indices) > 0 {
                             Rz(params.pauliCoefficients[term], systems[indices[0]]);
                         }
                     }
-                    for term in plainTerms {
+                    for term in unphasedTerms {
                         let indices = params.pauliIndices[term];
                         if Length(indices) > 0 {
                             CNOT(control, systems[indices[0]]);
                         }
                     }
-                    for term in plainTerms {
+                    for term in unphasedTerms {
                         let indices = params.pauliIndices[term];
                         if Length(indices) > 0 {
                             Rz(-params.pauliCoefficients[term], systems[indices[0]]);
                         }
                     }
-                    for term in plainTerms {
+                    for term in unphasedTerms {
                         let indices = params.pauliIndices[term];
                         if Length(indices) > 0 {
                             CNOT(control, systems[indices[0]]);
                         }
                     }
-                    for tower in towers {
+                    for group in phasedTerms {
                         // Every term already sits on its first qubit as a single Z.
                         Controlled HammingWeightPhase([control], (
-                            params.pauliCoefficients[tower[0]],
-                            [[PauliZ], size = Length(tower)],
-                            Mapped(term -> [systems[params.pauliIndices[term][0]]], tower),
+                            params.pauliCoefficients[group[0]],
+                            [[PauliZ], size = Length(group)],
+                            Mapped(term -> [systems[params.pauliIndices[term][0]]], group),
                             useHammingWeightPhasing,
                             maxBatchSize
                         ));

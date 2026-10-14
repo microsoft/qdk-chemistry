@@ -148,3 +148,29 @@ def test_estimation_hubbard_2d():
     (counts_cell,) = (cell for cell in code_cells if cell.source.rstrip().endswith("\ncounts"))
     (result,) = (output for output in counts_cell.outputs if output.output_type == "execute_result")
     _assert_counts_match_the_pins(ast.literal_eval(result.data["text/plain"]), size)
+
+
+@_requires_notebook_deps
+@pytest.mark.slow
+@pytest.mark.skipif(
+    not _HAS_JUPYTER_KERNEL,
+    reason="Jupyter kernel 'python3' not available. Install ipykernel and register the kernel.",
+)
+@pytest.mark.skipif(
+    not _HAS_QRE,
+    reason="qdk.qre not available",
+)
+@pytest.mark.parametrize("notebook_name", ["estimation_magnets", "estimation_spin_liquids"])
+def test_estimation_spin_models(notebook_name: str) -> None:
+    """Run the spin-model resource-estimation notebooks and require nonempty QRE tables."""
+    notebook_path = EXAMPLES_DIR / "resource_estimation" / f"{notebook_name}.ipynb"
+    assert notebook_path.exists(), f"Notebook not found: {notebook_path}"
+    executed = _execute_notebook_skip_visualizations(notebook_path)
+    (results_cell,) = (
+        cell
+        for cell in executed.cells
+        if cell.cell_type == "code" and cell.source.rstrip().endswith("results.as_frame()")
+    )
+    (result,) = (output for output in results_cell.outputs if output.output_type == "execute_result")
+    assert "text/html" in result.data, "Expected a rendered QRE results table."
+    assert "Empty DataFrame" not in result.data["text/plain"], "No accepted QRE estimates were produced."

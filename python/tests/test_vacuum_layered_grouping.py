@@ -21,12 +21,12 @@ from qdk_chemistry.data.unitary_representation.containers.pauli_product_formula 
 from qdk_chemistry.utils.model_hamiltonians import create_heisenberg_hamiltonian
 from qdk_chemistry.utils.qsharp import get_qsharp_context
 
-from .test_helpers import (
-    apply_controlled_operation,
+from .helpers import (
+    apply_operation,
     assert_states_match_up_to_global_phase,
     controlled_product_formula_state,
     create_nontrivial_test_hamiltonian,
-    random_sparse_state,
+    random_state,
 )
 
 
@@ -219,8 +219,9 @@ def test_fermionic_pipeline_accepts_layered_output(mapping_name: str, pre_group:
         use_hamming_weight_phasing=True,
         max_hamming_weight_phasing_batch_size=3,
     ).run(unitary)
-    state = random_sparse_state(5, 32, seed=769)
-    actual = apply_controlled_operation(circuit._qsharp_op, state)
+    system = random_state(unitary.get_num_qubits(), seed=769)
+    state = np.kron(np.ones(2) / np.sqrt(2), system)
+    actual = apply_operation(circuit._qsharp_op, state, split_control=True)
     expected = controlled_product_formula_state(unitary.get_container(), state)
     assert_states_match_up_to_global_phase(actual, expected, 1e-10)
 
@@ -265,7 +266,7 @@ def test_explicit_hwp_requires_declared_layers(variant: str, enabled: bool, with
     )
     mapper = create("controlled_circuit_mapper", variant, use_hamming_weight_phasing=enabled)
     if enabled and not with_layers:
-        with pytest.raises(ValueError, match="requires declared disjoint layers"):
+        with pytest.raises(ValueError, match="layer_offsets"):
             mapper.run(unitary)
     else:
         mapper.run(unitary)

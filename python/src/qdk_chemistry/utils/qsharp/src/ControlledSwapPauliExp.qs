@@ -4,7 +4,7 @@
 
 namespace QDKChemistry.Utils.ControlledSwapPauliExp {
 
-    import QDKChemistry.Utils.ControlledPauliExp.LayerRotationTowers;
+    import QDKChemistry.Utils.ControlledPauliExp.SplitPhasedTerms;
     import QDKChemistry.Utils.HammingWeightPhasing.HammingWeightPhase;
     import QDKChemistry.Utils.PauliExp.RepPauliExp;
     import QDKChemistry.Utils.PauliExp.RepPauliExpParams;
@@ -15,7 +15,7 @@ namespace QDKChemistry.Utils.ControlledSwapPauliExp {
     import Std.ResourceEstimation.IsResourceEstimating;
     import Std.ResourceEstimation.RepeatEstimates;
 
-    /// Applies the declared layers, phasing equal-angle towers as in `ControlledPauliLayers`.
+    /// Applies the declared layers, phasing equal-angle terms as in `ControlledPauliLayers`.
     internal operation PauliLayers(
         params : RepPauliExpParams,
         layerOffsets : Int[],
@@ -24,15 +24,15 @@ namespace QDKChemistry.Utils.ControlledSwapPauliExp {
         systems : Qubit[]
     ) : Unit is Adj + Ctl {
         for layer in 0..Length(layerOffsets) - 2 {
-            let (plainTerms, towers) = LayerRotationTowers(params, layerOffsets[layer], layerOffsets[layer + 1] - 1, useHammingWeightPhasing);
-            for term in plainTerms {
+            let (unphasedTerms, phasedTerms) = SplitPhasedTerms(params, layerOffsets[layer], layerOffsets[layer + 1] - 1, useHammingWeightPhasing);
+            for term in unphasedTerms {
                 Exp(params.pauliOps[term], -params.pauliCoefficients[term], Subarray(params.pauliIndices[term], systems));
             }
-            for tower in towers {
+            for group in phasedTerms {
                 HammingWeightPhase(
-                    params.pauliCoefficients[tower[0]],
-                    Mapped(term -> params.pauliOps[term], tower),
-                    Mapped(term -> Subarray(params.pauliIndices[term], systems), tower),
+                    params.pauliCoefficients[group[0]],
+                    Mapped(term -> params.pauliOps[term], group),
+                    Mapped(term -> Subarray(params.pauliIndices[term], systems), group),
                     useHammingWeightPhasing,
                     maxBatchSize
                 );

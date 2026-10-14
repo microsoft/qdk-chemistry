@@ -15,11 +15,11 @@ from qdk_chemistry.data import (
     Hamiltonian,
 )
 
+from .helpers import create_test_orbitals
 from .reference_tolerances import (
     float_comparison_absolute_tolerance,
     float_comparison_relative_tolerance,
 )
-from .test_helpers import create_test_orbitals
 
 
 def create_positive_semidefinite_test_hamiltonian(num_orbitals=4, num_factors=3, seed=17):

@@ -30,7 +30,7 @@ from qdk_chemistry.remote.cache import (
 )
 from qdk_chemistry.remote.job import Job
 
-from .test_helpers import create_test_orbitals
+from .helpers import create_test_orbitals
 
 # ── Fixtures ─────────────────────────────────────────────────────────────────
 
