@@ -218,21 +218,8 @@ namespace QDKChemistry.Utils.HammingWeightPhasing {
         }
     }
 
-    /// # Summary
-    /// Prepares the catalyst through which `HammingWeightPhase` phases Hamming weights at `theta`.
-    ///
-    /// # Description
-    /// The catalyst is the generalized phase gradient 2^{-n/2} Σ_y e^{-2i·theta·y}|y⟩ on n
-    /// little-endian qubits. It is the product of (|0⟩ + e^{-2i·theta·2^j}|1⟩)/√2 over the qubits j,
-    /// so it takes one rotation per qubit, and every addition returns it unchanged, so one
-    /// preparation serves every tower at that angle. Each prefix of it is the catalyst of the same
-    /// angle on fewer qubits, and dropping its first qubit leaves the catalyst of twice the angle.
-    ///
-    /// # Input
-    /// ## theta
-    /// The angle `HammingWeightPhase` is given.
-    /// ## catalyst
-    /// Qubits in |0⟩, at least one per place value of the largest weight to phase.
+    /// Prepares on `catalyst` the generalized phase gradient ⊗_j (|0⟩ + e^{-2i·theta·2^j}|1⟩)/√2
+    /// that `HammingWeightPhase` adds Hamming weights into.
     internal operation PrepareCatalyst(theta : Double, catalyst : Qubit[]) : Unit is Adj + Ctl {
         for j in 0..Length(catalyst) - 1 {
             H(catalyst[j]);
@@ -240,32 +227,8 @@ namespace QDKChemistry.Utils.HammingWeightPhasing {
         }
     }
 
-    /// # Summary
-    /// The tower length phased through one Hamming-weight register, given the cap.
-    ///
-    /// # Description
-    /// A batch of `n` terms costs one adder tree, which holds `n - popcount(n)` scratch qubits
-    /// for as long as the weight is needed. Splitting a tower into batches lets the scratch of
-    /// one batch be released before the next allocates, so the peak ancilla count follows the
-    /// batch rather than the whole tower. The price is the phasing of each weight, which is paid
-    /// once per batch instead of once per tower: one catalyst addition and rotation with a
-    /// catalyst, one synthesized `Rz` per place value without one.
-    ///
-    /// It is therefore a qubit-for-rotations knob, and the useful setting depends on the device:
-    /// hardware demonstrations of Fermi-Hubbard dynamics run on a fixed and comparatively small
-    /// register, where the
-    /// adder tree of a full lattice-sized tower may simply not fit, while a fault-tolerant
-    /// estimate is usually better off spending the qubits to save the rotations. The default is
-    /// no cap, which reproduces the uncapped construction exactly.
-    ///
-    /// Every batch is phased as given, however short. Use a cap of at least 8, since only from 8
-    /// terms are the saved rotations worth the extra Toffolis and scratch qubits.
-    ///
-    /// # Input
-    /// ## count
-    /// Number of equal-angle terms in the tower.
-    /// ## maxBatchSize
-    /// Largest tower phased through a single register, or -1 for no cap.
+    /// The number of terms phased through one Hamming-weight register: `count`, capped at
+    /// `maxBatchSize` unless it is -1.
     internal function HammingWeightBatchSize(count : Int, maxBatchSize : Int) : Int {
         Fact(maxBatchSize == -1 or maxBatchSize > 0, "maxBatchSize must be -1 or positive.");
         return maxBatchSize == -1 or maxBatchSize > count ? count | maxBatchSize;

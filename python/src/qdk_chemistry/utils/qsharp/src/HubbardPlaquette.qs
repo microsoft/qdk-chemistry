@@ -34,12 +34,8 @@ namespace QDKChemistry.Utils.HubbardPlaquette {
         /// Whether to phase each tower of equal-angle rotations through a Hamming-weight register.
         useHammingWeightPhasing : Bool,
         /// Largest tower phased through a single Hamming-weight register, or -1 for no cap.
-        /// See `HammingWeightBatchSize` for what the cap buys and what it costs.
         maxBatchSize : Int,
-        /// Whether each Hamming weight is phased by one addition into a catalyst, a generalized phase
-        /// gradient the evolution prepares once per angle, or by synthesizing each of its place
-        /// values as its own `Rz` (the original rotation ladder). Unused without Hamming-weight
-        /// phasing.
+        /// Whether each Hamming weight is phased by one addition into a catalyst.
         usePhaseGradient : Bool,
     }
 
