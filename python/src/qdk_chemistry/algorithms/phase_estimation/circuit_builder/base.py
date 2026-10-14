@@ -115,8 +115,8 @@ class QpeCircuitBuilder(Algorithm):
         Returns:
             A tuple of (circuit, num_ancilla_qubits, num_system_qubits) where circuit implements
             controlled-:math:`U^{\\text{power}}`, num_ancilla_qubits is the number of ancilla
-            qubits used by the unitary beyond the system qubits, and num_system_qubits is the
-            width of the system register.
+            qubits used by the unitary beyond the system qubits and the phase gradient it declares,
+            and num_system_qubits is the width of the system register.
 
         """
         unitary_builder = self._create_nested("unitary_builder")
@@ -126,7 +126,11 @@ class QpeCircuitBuilder(Algorithm):
         circuit_mapper = self._create_nested("controlled_circuit_mapper")
         circuit_mapper.settings().update("control_indices", [0])
         circuit = circuit_mapper.run(unitary_rep)
-        return circuit, unitary_rep.get_num_qubits() - num_system_qubits, num_system_qubits
+        # Phase estimation appends the shared gradient itself, so it is not an ancilla of the unitary.
+        num_ancilla_qubits = (
+            unitary_rep.get_num_qubits() - num_system_qubits - circuit.metadata.num_phase_gradient_ancillas
+        )
+        return circuit, num_ancilla_qubits, num_system_qubits
 
     def _controlled_circuit_and_widths(
         self,
@@ -221,22 +225,33 @@ class QpeCircuitBuilder(Algorithm):
         return QSHARP_UTILS.PhaseGradient.PreparePhaseGradientState, width, bool(state_prep_width), bool(unitary_width)
 
     @staticmethod
-    def _validate_state_prep_width(state_preparation: Circuit, num_qubits_passed: int) -> None:
+    def _validate_state_prep_width(state_preparation: Circuit, num_system_qubits: int) -> None:
         """Check that the state preparation fits the register phase estimation hands it.
 
         Args:
             state_preparation: The state preparation circuit.
-            num_qubits_passed: Width of the register phase estimation applies it to.
+            num_system_qubits: Width of the system register phase estimation applies it to.
 
         Raises:
-            ValueError: If the state preparation acts on more qubits than it is given.
+            ValueError: If the state preparation acts on more system qubits than it is given, or, when it consumes
+                the shared phase gradient that phase estimation appends after the system register, on fewer.
 
         """
         width = state_preparation.num_qubits
-        if width is not None and width > num_qubits_passed:
+        if width is None:
+            return
+        num_gradient_qubits = state_preparation.metadata.num_phase_gradient_ancillas
+        num_qubits_passed = num_system_qubits + num_gradient_qubits
+        if width > num_qubits_passed:
             raise ValueError(
                 f"State preparation acts on {width} qubits but phase estimation applies it to "
                 f"{num_qubits_passed}. Choose a state preparation that fits the system register."
+            )
+        if num_gradient_qubits and width != num_qubits_passed:
+            raise ValueError(
+                f"State preparation acts on {width - num_gradient_qubits} system qubits but phase estimation has "
+                f"{num_system_qubits}. A state preparation that consumes the phase gradient must cover the whole "
+                "system register, because phase estimation appends the gradient after it."
             )
 
 

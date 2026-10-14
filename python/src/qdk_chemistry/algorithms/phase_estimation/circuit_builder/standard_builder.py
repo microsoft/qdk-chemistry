@@ -174,9 +174,7 @@ class QdkStandardQpeCircuitBuilder(StandardQpeCircuitBuilder):
         prepare_shared_op, num_shared_ancillas, state_prep_uses_shared, unitary_uses_shared = self._shared_register(
             state_preparation, controlled_unitary_circuits
         )
-        self._validate_state_prep_width(
-            state_preparation, num_system_qubits + state_preparation.metadata.num_phase_gradient_ancillas
-        )
+        self._validate_state_prep_width(state_preparation, num_system_qubits)
         phase_qubit_prep_op = self._phase_state_op(num_bits)
         ancillas = list(range(num_bits))
         systems = [i + num_bits for i in range(num_system_qubits)]

@@ -187,9 +187,7 @@ class QdkIterativeQpeCircuitBuilder(IterativeQpeCircuitBuilder):
         prepare_shared_op, num_shared_ancillas, state_prep_uses_shared, unitary_uses_shared = self._shared_register(
             state_preparation, [controlled_unitary_circuit]
         )
-        self._validate_state_prep_width(
-            state_preparation, num_system_qubits + state_preparation.metadata.num_phase_gradient_ancillas
-        )
+        self._validate_state_prep_width(state_preparation, num_system_qubits)
         iterative_parameters = {
             "statePrep": state_prep_op,
             "repControlledUnitary": controlled_unitary_circuit._qsharp_op,  # noqa: SLF001
