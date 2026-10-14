@@ -105,6 +105,12 @@ See `Available settings`_ below for a complete list of options.
 
 The ``run`` method also accepts either :doc:`Orbitals <../data/orbitals>` as an initial guess or a :doc:`BasisSet <../data/basis_set>` object.
 
+For the native QDK solver, an orbital restart on a new geometry follows the atoms:
+the basis is copied onto the new structure, leaving the input orbitals unchanged.
+An explicit :class:`~qdk_chemistry.data.BasisSet` instead retains its stored AO
+centers while the supplied structure defines the nuclear potential and repulsion.
+In both cases, atom ordering and elements must match the basis.
+
 .. tab:: Python API
 
    .. literalinclude:: ../../../_static/examples/python/scf_solver.py
@@ -283,7 +289,7 @@ This hybrid approach combines the speed of :term:`DIIS` for typical systems with
    * - ``relativity``
      - string
      - ``""``
-     - Relativistic treatment: ``""`` for nonrelativistic integrals, ``"sf-x2c"`` for spin-free X2C with basis decontraction and exact recontraction, or ``"sf-x2c-contracted"`` for spin-free X2C in the supplied contracted basis. Both X2C options use the one-electron approximation, leaving :term:`ERIs <ERI>` unchanged and excluding spin-orbit coupling. They require spherical all-electron basis sets (no ECPs or Cartesian AOs); analytic nuclear gradients and polarizabilities are unavailable. Use the same value for downstream :doc:`Hamiltonian construction <hamiltonian_constructor>` because :doc:`Orbitals <../data/orbitals>` do not retain the relativistic treatment.
+     - Relativistic treatment: ``""`` for nonrelativistic integrals, ``"sf-x2c"`` for spin-free X2C with basis decontraction and exact recontraction, or ``"sf-x2c-contracted"`` for spin-free X2C in the supplied contracted basis. Both X2C options use the one-electron approximation, leaving :term:`ERIs <ERI>` unchanged and excluding spin-orbit coupling. They require spherical all-electron basis sets (no ECPs or Cartesian AOs); analytic nuclear gradients and polarizabilities are unavailable. Use the same value for downstream :doc:`Hamiltonian construction <hamiltonian_constructor>`, PySCF :doc:`stability analysis <stability_checker>`, and :doc:`MCSCF <mcscf>` because :doc:`Orbitals <../data/orbitals>` do not retain the relativistic treatment.
    * - ``fock_reset_steps``
      - int
      - ``1073741824``

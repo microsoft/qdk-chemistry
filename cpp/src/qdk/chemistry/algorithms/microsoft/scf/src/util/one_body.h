@@ -9,6 +9,7 @@
 
 namespace qdk::chemistry::scf {
 class BasisSet;
+struct Molecule;
 struct ParallelConfig;
 
 namespace detail {
@@ -19,7 +20,12 @@ struct DecontractedBasis {
   Eigen::MatrixXd contraction;
 };
 
-/** @brief Decontract a basis, coalescing only exactly repeated primitives. */
+/**
+ * @brief Decontract a basis, coalescing only exactly repeated primitives.
+ * @param contracted_basis Non-null contracted basis with molecular data.
+ * @return Primitive basis and exact recontraction matrix, with primitive AO
+ * rows and original contracted AO columns; recontraction is C transpose H C.
+ */
 DecontractedBasis decontract_basis(
     const std::shared_ptr<BasisSet>& contracted_basis);
 
@@ -27,14 +33,18 @@ DecontractedBasis decontract_basis(
 
 /**
  * @brief Build the spin-free X2C-1e one-electron AO Hamiltonian.
- * @param internal_basis_set Internal spherical all-electron basis.
+ * @param internal_basis_set Non-null internal spherical all-electron basis.
  * @param mpi Parallel configuration used for integral evaluation.
  * @param decontract Whether to decontract before X2C and recontract afterward.
- * @return X2C-1e one-electron matrix in the supplied basis.
- * @throws std::runtime_error if mpi.world_size > 1.
+ * @param nuclei Current nuclear positions and charges supplying V and pVp;
+ * AO centers remain those of internal_basis_set.
+ * @return Square AO matrix in Hartree in the original supplied basis.
+ * @throws std::invalid_argument for non-finite, Cartesian, or ECP basis inputs.
+ * @throws std::runtime_error for multi-rank execution, failed numerical
+ * construction, or screening that loses the supplied contracted space.
  */
 Eigen::MatrixXd build_x2c_one_body_ao(
     const std::shared_ptr<BasisSet>& internal_basis_set,
-    const ParallelConfig& mpi, bool decontract);
+    const ParallelConfig& mpi, bool decontract, const Molecule& nuclei);
 
 }  // namespace qdk::chemistry::scf

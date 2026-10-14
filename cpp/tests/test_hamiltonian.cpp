@@ -2868,10 +2868,11 @@ TEST_F(HamiltonianConstructorTest, X2CDefaultSettings) {
 TEST_F(HamiltonianConstructorTest, X2CRejectsMultiRankBeforeBasisSetup) {
   auto mpi = qdk::chemistry::scf::mpi_default_input();
   mpi.world_size = 2;
+  const qdk::chemistry::scf::Molecule nuclei{};
   for (const bool decontract : {false, true}) {
-    EXPECT_THROW(
-        qdk::chemistry::scf::build_x2c_one_body_ao(nullptr, mpi, decontract),
-        std::runtime_error);
+    EXPECT_THROW(qdk::chemistry::scf::build_x2c_one_body_ao(nullptr, mpi,
+                                                            decontract, nuclei),
+                 std::runtime_error);
   }
 }
 
@@ -2959,7 +2960,7 @@ TEST_F(HamiltonianConstructorTest, X2CNearDependentBasisPermutation) {
     }
     auto basis = std::make_shared<qcs::BasisSet>(
         molecule, shells, qcs::BasisMode::PSI4, true, false);
-    return qcs::build_x2c_one_body_ao(basis, mpi, decontract);
+    return qcs::build_x2c_one_body_ao(basis, mpi, decontract, *molecule);
   };
 
   for (const bool decontract : {false, true}) {
@@ -3026,14 +3027,76 @@ TEST_F(HamiltonianConstructorTest, X2CCommonSpaceMatchesContractedBasis) {
       basis->mol, std::vector<qcs::Shell>{contracted}, qcs::BasisMode::RAW,
       true, false);
   const Eigen::MatrixXd reference = qcs::build_x2c_one_body_ao(
-      reduced_basis, qcs::mpi_default_input(), false);
-  const Eigen::MatrixXd actual =
-      qcs::build_x2c_one_body_ao(basis, qcs::mpi_default_input(), false);
+      reduced_basis, qcs::mpi_default_input(), false, *reduced_basis->mol);
+  const Eigen::MatrixXd actual = qcs::build_x2c_one_body_ao(
+      basis, qcs::mpi_default_input(), false, *basis->mol);
   Eigen::VectorXd product(2);
   blas::gemv(blas::Layout::ColMajor, blas::Op::NoTrans, 2, 2, 1.0,
              actual.data(), 2, retained.data(), 1, 0.0, product.data(), 1);
   EXPECT_NEAR(blas::dot(2, retained.data(), 1, product.data(), 1),
               reference(0, 0), 1e-10);
+}
+
+TEST_F(HamiltonianConstructorTest, X2CUsesCurrentNucleiWithFixedAoCenters) {
+  namespace qcs = qdk::chemistry::scf;
+  qdk::chemistry::utils::microsoft::initialize_backend();
+  Structure old_structure(std::vector<Eigen::Vector3d>{{0, 0, 0}, {0, 0, 1.4}},
+                          std::vector<std::string>{"H", "H"});
+  Structure current_structure(
+      std::vector<Eigen::Vector3d>{{0, 0, 0}, {0, 0, 1.6}},
+      std::vector<std::string>{"H", "H"});
+  BasisSet basis_set(
+      "fixed-centers",
+      {Shell(0, OrbitalType::S, std::vector<double>{1}, std::vector<double>{1}),
+       Shell(1, OrbitalType::S, std::vector<double>{1},
+             std::vector<double>{1})},
+      old_structure);
+  auto basis =
+      qdk::chemistry::utils::microsoft::convert_basis_set_from_qdk(basis_set);
+  auto nuclei = qdk::chemistry::utils::microsoft::convert_to_molecule(
+      current_structure, 0, 1);
+  Eigen::Matrix2d reference;
+  // PySCF ghost-AO/current-nuclei X2C reference with QDK's speed of light.
+  reference << -0.7199529641051647, -0.6414328425085416, -0.6414328425085416,
+      -0.7648968555192283;
+  for (bool decontract : {false, true}) {
+    auto actual = qcs::build_x2c_one_body_ao(basis, qcs::mpi_default_input(),
+                                             decontract, *nuclei);
+    EXPECT_LT((actual - reference).cwiseAbs().maxCoeff(), 2e-10);
+    EXPECT_DOUBLE_EQ(basis->shells[1].O[2], 1.4);
+  }
+}
+
+TEST_F(HamiltonianConstructorTest, X2CRejectsScreenedContractedSpan) {
+  namespace qcs = qdk::chemistry::scf;
+  qdk::chemistry::utils::microsoft::initialize_backend();
+  Structure structure(std::vector<Eigen::Vector3d>{Eigen::Vector3d::Zero()},
+                      std::vector<std::string>{"H"});
+  for (double ratio : {1.00005, 1.000103, 1.000104}) {
+    SCOPED_TRACE(ratio);
+    BasisSet basis_set(
+        "nodal",
+        {Shell(0, OrbitalType::S, std::vector<double>{0.1, 0.1 * ratio},
+               std::vector<double>{1, -1})},
+        structure);
+    auto basis =
+        qdk::chemistry::utils::microsoft::convert_basis_set_from_qdk(basis_set);
+    if (ratio < 1.000104) {
+      try {
+        qcs::build_x2c_one_body_ao(basis, qcs::mpi_default_input(), true,
+                                   *basis->mol);
+        FAIL() << "Screened nodal contraction must not produce an operator";
+      } catch (const std::runtime_error& error) {
+        EXPECT_NE(std::string(error.what()).find("contracted space"),
+                  std::string::npos);
+      }
+    } else {
+      auto core = qcs::build_x2c_one_body_ao(basis, qcs::mpi_default_input(),
+                                             true, *basis->mol);
+      EXPECT_TRUE(core.allFinite());
+      EXPECT_GT(std::abs(core(0, 0)), 0.01);
+    }
+  }
 }
 
 TEST_F(HamiltonianConstructorTest, X2CDiffusePrimitiveRetainsKineticEnergy) {
@@ -3050,8 +3113,8 @@ TEST_F(HamiltonianConstructorTest, X2CDiffusePrimitiveRetainsKineticEnergy) {
   // PySCF one-electron X2C reference using QDK's speed of light.
   constexpr double reference = -0.0050312650433745115;
   for (const bool decontract : {false, true}) {
-    const Eigen::MatrixXd actual =
-        qcs::build_x2c_one_body_ao(basis, qcs::mpi_default_input(), decontract);
+    const Eigen::MatrixXd actual = qcs::build_x2c_one_body_ao(
+        basis, qcs::mpi_default_input(), decontract, *basis->mol);
     EXPECT_NEAR(actual(0, 0), reference, 1e-11);
   }
 }

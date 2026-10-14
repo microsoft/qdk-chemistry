@@ -129,6 +129,34 @@ ScfCalculationResult ScfSolver::_run_with_options(
     throw std::logic_error("Unhandled basis_or_guess alternative.");
   }
 
+  const auto basis_structure = qdk_raw_basis_set->get_structure();
+  if (basis_structure->get_atomic_symbols() !=
+      structure->get_atomic_symbols()) {
+    throw std::invalid_argument(
+        "SCF basis and structure must have the same atom ordering and "
+        "elements");
+  }
+  if (basis_set_type == BasisSetType::FromOrbitals &&
+      !basis_structure->get_coordinates().isApprox(structure->get_coordinates(),
+                                                   1e-12)) {
+    // Orbital restarts follow the atoms; the input orbitals are not modified.
+    if (qdk_raw_basis_set->has_ecp_shells() ||
+        qdk_raw_basis_set->has_ecp_electrons()) {
+      qdk_raw_basis_set = std::make_shared<data::BasisSet>(
+          qdk_raw_basis_set->get_name(), qdk_raw_basis_set->get_shells(),
+          qdk_raw_basis_set->get_ecp_name(),
+          qdk_raw_basis_set->get_ecp_shells(),
+          qdk_raw_basis_set->get_ecp_electrons(), structure,
+          qdk_raw_basis_set->get_atomic_orbital_type());
+    } else {
+      qdk_raw_basis_set = std::make_shared<data::BasisSet>(
+          qdk_raw_basis_set->get_name(), qdk_raw_basis_set->get_shells(),
+          structure, qdk_raw_basis_set->ao_symmetries(),
+          qdk_raw_basis_set->ao_extents(),
+          qdk_raw_basis_set->get_atomic_orbital_type());
+    }
+  }
+
   // Extract geometry from structure object
   std::vector<double> geometry(3 * structure->get_num_atoms());
   std::vector<std::string> symbols(structure->get_num_atoms());

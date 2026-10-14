@@ -120,6 +120,8 @@ class ScfSolver : public qdk::chemistry::algorithms::ScfSolver {
    *
    * @note When MPI is enabled, the analytic gradient is only populated on rank
    * 0. See ScfCalculationResult::nuclear_gradient.
+   * @throws std::invalid_argument if an X2C relativistic treatment is selected;
+   * analytic gradients are unavailable for both X2C modes.
    */
   ScfCalculationResult run_with_analytic_gradient(
       std::shared_ptr<data::Structure> structure, int charge,

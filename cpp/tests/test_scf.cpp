@@ -3,6 +3,7 @@
 // license information.
 
 #include <gtest/gtest.h>
+#include <qdk/chemistry/scf/scf/scf_solver.h>
 #include <spdlog/sinks/ostream_sink.h>
 
 #include <algorithm>
@@ -445,6 +446,85 @@ TEST_F(ScfTest, X2CRejectsAnalyticNuclearGradient) {
       gradient_solver.run_with_analytic_gradient(
           testing::create_water_structure(), 0, 1, std::string("sto-3g")),
       std::invalid_argument);
+}
+
+TEST_F(ScfTest, GeometryChangingOrbitalRestartFollowsAtoms) {
+  auto old_structure = std::make_shared<Structure>(
+      std::vector<Eigen::Vector3d>{{0, 0, 0}, {0, 0, 1.4}},
+      std::vector<std::string>{"H", "H"});
+  auto current_structure = std::make_shared<Structure>(
+      std::vector<Eigen::Vector3d>{{0, 0, 0}, {0, 0, 1.6}},
+      std::vector<std::string>{"H", "H"});
+  for (const std::string relativity : {"", "sf-x2c", "sf-x2c-contracted"}) {
+    SCOPED_TRACE(relativity);
+    auto solver = ScfSolverFactory::create("qdk");
+    solver->settings().set("relativity", relativity);
+    solver->settings().set("enable_gdm", false);
+    solver->settings().set("convergence_threshold", 1e-10);
+    auto [old_energy, old_wavefunction] =
+        solver->run(old_structure, 0, 1, "sto-3g");
+    auto [reference, fresh] = solver->run(current_structure, 0, 1, "sto-3g");
+    auto [actual, restarted] =
+        solver->run(current_structure, 0, 1, old_wavefunction->get_orbitals());
+    EXPECT_NEAR(actual, reference, testing::scf_energy_tolerance);
+    EXPECT_TRUE(restarted->get_orbitals()
+                    ->get_basis_set()
+                    ->get_structure()
+                    ->get_coordinates()
+                    .isApprox(current_structure->get_coordinates()));
+    EXPECT_TRUE(old_wavefunction->get_orbitals()
+                    ->get_basis_set()
+                    ->get_structure()
+                    ->get_coordinates()
+                    .isApprox(old_structure->get_coordinates()));
+  }
+}
+
+TEST_F(ScfTest, NormalizedBasisCoefficientScaleInvariant) {
+  auto structure = std::make_shared<Structure>(
+      std::vector<Eigen::Vector3d>{{0, 0, 0}, {0, 0, 1.4}},
+      std::vector<std::string>{"H", "H"});
+  for (const std::string relativity : {"", "sf-x2c", "sf-x2c-contracted"}) {
+    SCOPED_TRACE(relativity);
+    auto solver = ScfSolverFactory::create("qdk");
+    solver->settings().set("relativity", relativity);
+    solver->settings().set("enable_gdm", false);
+    double reference_energy = 0;
+    Eigen::MatrixXd reference_overlap;
+    for (double scale : {1.0, 1e-7}) {
+      auto basis = std::make_shared<BasisSet>(
+          "scaled",
+          std::vector<Shell>{Shell(0, OrbitalType::S, std::vector<double>{1},
+                                   std::vector<double>{scale}),
+                             Shell(1, OrbitalType::S, std::vector<double>{1},
+                                   std::vector<double>{scale})},
+          structure);
+      auto [energy, wavefunction] = solver->run(structure, 0, 1, basis);
+      const auto& overlap = wavefunction->get_orbitals()->get_overlap_matrix();
+      if (scale == 1) {
+        reference_energy = energy;
+        reference_overlap = overlap;
+      } else {
+        EXPECT_NEAR(energy, reference_energy, testing::scf_energy_tolerance);
+        EXPECT_LT((overlap - reference_overlap).norm(), 1e-12);
+      }
+      EXPECT_NEAR(overlap(0, 1), std::exp(-0.98), 1e-12);
+    }
+  }
+}
+
+TEST_F(ScfTest, X2CRejectsPolarizabilityBeforeBasisSetup) {
+  namespace qcs = qdk::chemistry::scf;
+  auto molecule = qdk::chemistry::utils::microsoft::convert_to_molecule(
+      *testing::create_water_structure(), 0, 1);
+  for (auto relativity :
+       {qcs::Relativity::SFX2C, qcs::Relativity::SFX2CContracted}) {
+    qcs::SCFConfig config{};
+    config.relativity = relativity;
+    config.require_polarizability = true;
+    EXPECT_THROW(qcs::SCF::make_hf_solver(molecule, config),
+                 std::invalid_argument);
+  }
 }
 
 TEST_F(ScfTest, Oxygen_atom_ROHF_GDM) {

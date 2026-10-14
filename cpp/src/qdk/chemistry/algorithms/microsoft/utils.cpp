@@ -314,6 +314,7 @@ std::shared_ptr<qcs::BasisSet> convert_basis_set_from_qdk(
   if (internal_basis_set->mode == qcs::BasisMode::RAW && normalize) {
     _norm_psi4_mode(internal_basis_set->shells);
     internal_basis_set->mode = qcs::BasisMode::PSI4;
+    internal_basis_set->refresh_shell_pairs();
   }
 
   return internal_basis_set;

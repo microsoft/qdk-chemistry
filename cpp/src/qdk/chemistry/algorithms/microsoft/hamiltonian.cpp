@@ -51,7 +51,8 @@ detail::build_one_body_ao(const data::BasisSet& basis_set,
   if (use_x2c) {
     return {internal_basis_set,
             qcs::build_x2c_one_body_ao(internal_basis_set, mpi,
-                                       relativity == qcs::Relativity::SFX2C)};
+                                       relativity == qcs::Relativity::SFX2C,
+                                       *internal_basis_set->mol)};
   }
 
   const size_t dimension = basis_set.get_num_atomic_orbitals();

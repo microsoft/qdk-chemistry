@@ -61,7 +61,8 @@ std::vector<size_t> shell_offsets(const std::vector<qcs::Shell>& shells,
 DiracEigensystem solve_modified_dirac(const Eigen::MatrixXd& overlap,
                                       const Eigen::MatrixXd& kinetic,
                                       const Eigen::MatrixXd& potential,
-                                      const Eigen::MatrixXd& pvp) {
+                                      const Eigen::MatrixXd& pvp,
+                                      const Eigen::MatrixXd* contraction) {
   const Eigen::Index dimension = overlap.rows();
   const Eigen::Index dirac_dimension = 2 * dimension;
   const double inverse_speed_of_light =
@@ -87,6 +88,49 @@ DiracEigensystem solve_modified_dirac(const Eigen::MatrixXd& overlap,
   }
   if (rank == 0) {
     throw std::runtime_error("X2C overlap has no linearly independent modes");
+  }
+
+  if (contraction && rank < dimension) {
+    // Reject loss on the whole accepted contracted span, not individual AOs.
+    const Eigen::Index ncontracted = contraction->cols();
+    const Eigen::Index nlost = dimension - rank;
+    Eigen::MatrixXd weighted = overlap_vectors.transpose() * *contraction;
+    Eigen::MatrixXd contracted_metric =
+        weighted.transpose() * overlap_eigenvalues.asDiagonal() * weighted;
+    Eigen::VectorXd contracted_values(ncontracted);
+    const auto metric_info = lapack::syev(
+        lapack::Job::Vec, lapack::Uplo::Lower, ncontracted,
+        contracted_metric.data(), ncontracted, contracted_values.data());
+    const double contracted_cutoff =
+        overlap_relative_linear_dependence_threshold *
+        contracted_values.maxCoeff();
+    if (metric_info != 0 ||
+        contracted_values.minCoeff() <= -contracted_cutoff) {
+      throw std::runtime_error(
+          "X2C contracted overlap is not positive semidefinite");
+    }
+    const Eigen::Index contracted_rank =
+        (contracted_values.array() > contracted_cutoff).count();
+    // |s| keeps negative roundoff in the discarded-space loss estimate.
+    Eigen::MatrixXd lost =
+        overlap_eigenvalues.head(nlost).cwiseAbs().cwiseSqrt().asDiagonal() *
+        weighted.topRows(nlost) * contracted_metric.rightCols(contracted_rank) *
+        contracted_values.tail(contracted_rank)
+            .cwiseSqrt()
+            .cwiseInverse()
+            .asDiagonal();
+    Eigen::MatrixXd loss_metric = lost.transpose() * lost;
+    Eigen::VectorXd loss_values(contracted_rank);
+    const auto loss_info =
+        lapack::syev(lapack::Job::NoVec, lapack::Uplo::Lower, contracted_rank,
+                     loss_metric.data(), contracted_rank, loss_values.data());
+    // Dimensionless squared-norm loss tolerance, not an energy bound.
+    if (loss_info != 0 || loss_values.maxCoeff() > 1e-6) {
+      throw std::runtime_error(
+          "X2C primitive screening loses the supplied contracted space; "
+          "use sf-x2c-contracted or a better-conditioned primitive "
+          "representation");
+    }
   }
 
   Eigen::MatrixXd dirac =
@@ -159,7 +203,8 @@ DiracEigensystem solve_modified_dirac(const Eigen::MatrixXd& overlap,
 Eigen::MatrixXd compute_x2c_hamiltonian(const Eigen::MatrixXd& overlap,
                                         const Eigen::MatrixXd& kinetic,
                                         const Eigen::MatrixXd& potential,
-                                        const Eigen::MatrixXd& pvp) {
+                                        const Eigen::MatrixXd& pvp,
+                                        const Eigen::MatrixXd* contraction) {
   if (!overlap.allFinite() || !kinetic.allFinite() || !potential.allFinite() ||
       !pvp.allFinite()) {
     throw std::invalid_argument(
@@ -172,7 +217,7 @@ Eigen::MatrixXd compute_x2c_hamiltonian(const Eigen::MatrixXd& overlap,
   const double speed_of_light_squared =
       1.0 / (inverse_speed_of_light * inverse_speed_of_light);
   auto dirac_eigensystem =
-      solve_modified_dirac(overlap, kinetic, potential, pvp);
+      solve_modified_dirac(overlap, kinetic, potential, pvp, contraction);
 
   std::vector<Eigen::Index> electronic_indices;
   for (Eigen::Index index = 0; index < dirac_eigensystem.eigenvalues.size();
@@ -354,7 +399,8 @@ detail::DecontractedBasis detail::decontract_basis(
 
 Eigen::MatrixXd build_x2c_one_body_ao(
     const std::shared_ptr<qcs::BasisSet>& internal_basis_set,
-    const qcs::ParallelConfig& mpi, bool decontract) {
+    const qcs::ParallelConfig& mpi, bool decontract,
+    const qcs::Molecule& nuclei) {
   if (mpi.world_size > 1) {
     throw std::runtime_error(
         "X2C construction is not supported with MPI world_size > 1.");
@@ -378,8 +424,8 @@ Eigen::MatrixXd build_x2c_one_body_ao(
   }
 
   const size_t dimension = working_basis->num_atomic_orbitals;
-  auto int1e = std::make_unique<qcs::OneBodyIntegral>(
-      working_basis.get(), working_basis->mol.get(), mpi);
+  auto int1e =
+      std::make_unique<qcs::OneBodyIntegral>(working_basis.get(), &nuclei, mpi);
   Eigen::MatrixXd overlap(dimension, dimension);
   Eigen::MatrixXd kinetic(dimension, dimension);
   Eigen::MatrixXd potential(dimension, dimension);
@@ -389,8 +435,8 @@ Eigen::MatrixXd build_x2c_one_body_ao(
   int1e->nuclear_integral(potential.data());
   int1e->pvp_integral(pvp.data());
 
-  Eigen::MatrixXd hamiltonian =
-      compute_x2c_hamiltonian(overlap, kinetic, potential, pvp);
+  Eigen::MatrixXd hamiltonian = compute_x2c_hamiltonian(
+      overlap, kinetic, potential, pvp, decontract ? &contraction : nullptr);
   if (decontract) {
     const Eigen::Index contracted_dimension = contraction.cols();
     Eigen::MatrixXd hamiltonian_times_contraction(hamiltonian.rows(),

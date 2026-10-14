@@ -963,7 +963,7 @@ void SCFImpl::build_one_electron_integrals_() {
     case Relativity::SFX2CContracted:
       const bool decontract = ctx_.cfg->relativity == Relativity::SFX2C;
       TIMEIT(one_body_ao = build_x2c_one_body_ao(ctx_.basis_set, ctx_.cfg->mpi,
-                                                 decontract),
+                                                 decontract, *ctx_.mol),
              "SCFImpl::build_one_electron_integrals->x2c");
       break;
   }
