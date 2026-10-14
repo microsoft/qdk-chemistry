@@ -9,6 +9,7 @@ import math
 
 import numpy as np
 import pytest
+from qdk import StateDump
 from qdk.test_utils import dump_operation_on_state
 
 from qdk_chemistry.algorithms.circuit_mapper import SOSSAMapper
@@ -565,22 +566,29 @@ class TestSelectFullFidelity:
 
     @staticmethod
     def _run_select(
-        context_factory, select_data: dict, xo_value: int = 0, b_value: int = 0, use_phase_gradient: bool = False
+        context, select_data: dict, xo_value: int = 0, b_value: int = 0, use_phase_gradient: bool = False
     ) -> np.ndarray:
-        ctx = context_factory()
-        ctx.code.QDKChemistry.TestUtils.SOSSAWalkTests.TestSelectDQ(select_data, xo_value, b_value, use_phase_gradient)
-        return np.array(ctx.dump_machine().as_dense_state())
+        result = context.run(
+            context.code.QDKChemistry.TestUtils.SOSSAWalkTests.TestSelectDQ,
+            1,
+            select_data,
+            xo_value,
+            b_value,
+            use_phase_gradient,
+            save_events=True,
+        )[0]
+        return np.array(StateDump(result["events"][-1].state_dump()).as_dense_state())
 
     @pytest.mark.parametrize("num_free_rider_bits", [0, 1])
-    def test_select_rejects_missing_generator_bits(self, qsharp_test_context_factory, num_free_rider_bits):
+    def test_select_rejects_missing_generator_bits(self, qsharp_test_context, num_free_rider_bits):
         select_data = self._select_data(2, rotation_bit_precision=10)
         select_data["numFreeRiderBits"] = num_free_rider_bits
 
         with pytest.raises(Exception, match="SelectImpl requires at least two free-rider bits"):
-            self._run_select(qsharp_test_context_factory, select_data)
+            self._run_select(qsharp_test_context, select_data)
 
     @pytest.mark.parametrize("N", [2, 3])
-    def test_select_dq_applies_the_analytic_rotated_majorana(self, qsharp_test_context_factory, N):  # noqa: N803
+    def test_select_dq_applies_the_analytic_rotated_majorana(self, qsharp_test_context, N):  # noqa: N803
         rng = np.random.default_rng(2024)
         u = rng.standard_normal(N)
         u /= np.linalg.norm(u)
@@ -599,7 +607,7 @@ class TestSelectFullFidelity:
             "numFreeRiderBits": 2,
             "signQubitIndex": -1,
         }
-        sv = self._run_select(qsharp_test_context_factory, select_data, xo_value=0, b_value=0)
+        sv = self._run_select(qsharp_test_context, select_data, xo_value=0, b_value=0)
         assert np.linalg.norm(sv) == pytest.approx(1.0, abs=1e-10)
 
         total = round(math.log2(len(sv)))
@@ -632,7 +640,7 @@ class TestSelectFullFidelity:
     )
     def test_phase_gradient_backend_matches_direct(
         self,
-        qsharp_test_context_factory,
+        qsharp_test_context,
         dims: tuple[int, int, int, int],
         xo_value: int,
         b_value: int,
@@ -649,10 +657,10 @@ class TestSelectFullFidelity:
         )
 
         direct = self._run_select(
-            qsharp_test_context_factory, select_data, xo_value=xo_value, b_value=b_value, use_phase_gradient=False
+            qsharp_test_context, select_data, xo_value=xo_value, b_value=b_value, use_phase_gradient=False
         )
         qrom = self._run_select(
-            qsharp_test_context_factory, select_data, xo_value=xo_value, b_value=b_value, use_phase_gradient=True
+            qsharp_test_context, select_data, xo_value=xo_value, b_value=b_value, use_phase_gradient=True
         )[:: 1 << bit_precision]
 
         # The gradient is conjugated back to |0...0>, so restricting to it keeps the full norm.

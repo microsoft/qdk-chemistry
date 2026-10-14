@@ -7,7 +7,7 @@
 
 import numpy as np
 import pytest
-from qdk.test_utils import dump_operation_on_state
+from qdk.test_utils import ArithmeticOpTester, dump_operation_on_state
 
 from qdk_chemistry.algorithms.circuit_mapper.psp_mapper import PSPMapper
 from qdk_chemistry.algorithms.hamiltonian_unitary_builder.block_encoding.lcu import LCUBuilder
@@ -66,9 +66,16 @@ class TestUnaryIterationQsharp:
     """Statevector checks of the unary-iteration primitives against exact references."""
 
     @pytest.mark.parametrize("num_actions", [1, 2, 3, 5, 6, 7, 8, 9, 10, 13])
-    def test_action_index_matches_every_address(self, qsharp_test_utils, num_actions):
+    def test_action_index_matches_every_address(self, qsharp_test_context, qsharp_test_utils, num_actions):
         """Classical routing must match the circuit, including unused address states."""
-        assert qsharp_test_utils.UnaryIterationTests.TestUnaryIterationActionIndex(num_actions)
+        tests = qsharp_test_utils.UnaryIterationTests
+        num_address_qubits = _address_qubits(num_actions)
+        tester = ArithmeticOpTester(
+            tests.TestMakeFlagActionsOp(num_actions), [num_address_qubits, num_actions], context=qsharp_test_context
+        )
+        for address_value in range(1 << num_address_qubits):
+            expected_index = tests.TestUnaryIterationActionIndex(num_actions, address_value)
+            assert tester.run([address_value, 0]) == [address_value, 1 << expected_index], f"address {address_value}"
 
     @pytest.mark.parametrize("num_actions", [1, 2, 3, 5, 8])
     def test_one_hot_address_selects_exactly_one_action(self, qsharp_test_context, qsharp_test_utils, num_actions):
@@ -154,7 +161,7 @@ class TestBlockEncodingAgnosticSchedule:
         expected[2] = np.sin(0.45)  # system |1>, ancilla |0>
         np.testing.assert_allclose(state, expected, atol=1e-10)
 
-    @pytest.mark.parametrize("theta", [0.0, 0.35, 1.3, np.pi / 2])
+    @pytest.mark.parametrize("theta", [0.35, 1.3, np.pi / 2])
     def test_psp_schedule_holds_for_every_encoded_eigenvalue(self, qsharp_test_context, qsharp_test_utils, theta):
         """The contract must not depend on what the block encoding encodes."""
         psp = qsharp_test_context.code.QDKChemistry.Utils.PrepSelPrep

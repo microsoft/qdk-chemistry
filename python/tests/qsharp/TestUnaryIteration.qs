@@ -9,39 +9,22 @@
 /// shipped `qdk_chemistry.utils.qsharp` project.
 namespace QDKChemistry.TestUtils.UnaryIterationTests {
 
-    import Std.Arrays.Mapped;
     import Std.Canon.ApplyToEach;
     import Std.Canon.ApplyXorInPlace;
-    import Std.Convert.ResultAsBool;
     import Std.Diagnostics.Fact;
-    import Std.Measurement.MResetEachZ;
     import QDKChemistry.Utils.UnaryIteration.AddressQubits;
     import QDKChemistry.Utils.UnaryIteration.UnaryIteration;
     import QDKChemistry.Utils.UnaryIteration.UnaryIterationActionIndex;
     import QDKChemistry.Utils.UnaryIteration.UnaryIterationWithControl;
 
-    operation TestUnaryIterationActionIndex(numActions : Int) : Bool {
-        let numAddressQubits = AddressQubits(numActions);
-        let numAddressStates = 1 <<< numAddressQubits;
-        use address = Qubit[numAddressQubits];
-        use flags = Qubit[numActions];
-        mutable allCorrect = true;
+    /// The action the classical routing assigns to `addressValue`, unused states included.
+    function TestUnaryIterationActionIndex(numActions : Int, addressValue : Int) : Int {
+        UnaryIterationActionIndex(numActions, addressValue)
+    }
 
-        for addressValue in 0..numAddressStates - 1 {
-            ApplyXorInPlace(addressValue, address);
-            UnaryIteration(address, numActions, index => X(flags[index]));
-            ApplyXorInPlace(addressValue, address);
-
-            let actual = Mapped(ResultAsBool, MResetEachZ(flags));
-            let expectedIndex = UnaryIterationActionIndex(numActions, addressValue);
-            for index in 0..numActions - 1 {
-                if actual[index] != (index == expectedIndex) {
-                    set allCorrect = false;
-                }
-            }
-        }
-
-        allCorrect
+    /// Flips `flags[index]` for every action that `UnaryIteration` fires on `address`.
+    function TestMakeFlagActionsOp(numActions : Int) : (Qubit[], Qubit[]) => Unit {
+        (address, flags) => UnaryIteration(address, numActions, index => X(flags[index]))
     }
 
     /// Flips `flags[index]` for the single selected address.

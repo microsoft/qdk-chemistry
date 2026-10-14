@@ -36,7 +36,6 @@ namespace QDKChemistry.Utils.SelectSwap {
     import Std.Math.MinI;
     import Std.TableLookup.Select;
     import QDKChemistry.Utils.UnaryIteration.AddressQubits;
-    import QDKChemistry.Utils.UnaryIteration.UnaryIteration;
     import QDKChemistry.Utils.UnaryIteration.UnaryIterationActionIndex;
 
     /// Zero-pads a lookup table out to the full `2^nRequired` address space.

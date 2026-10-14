@@ -7,6 +7,7 @@ namespace QDKChemistry.TestUtils.SOSSAWalkTests {
     import Std.Canon.ApplyToEachCA;
     import Std.Canon.ApplyXorInPlace;
     import Std.Core.Length;
+    import Std.Diagnostics.DumpRegister;
     import Std.Math.MaxI;
     import Std.Measurement.MeasureEachZ;
     import QDKChemistry.Utils.PhaseGradient.PreparePhaseGradientState;
@@ -49,7 +50,7 @@ namespace QDKChemistry.TestUtils.SOSSAWalkTests {
         let nSystem = 2 * numOrbitals;
         let nGradient = if usePhaseGradient { selectData.rotationBitPrecision } else { 0 };
         let total = nOuter + nInner + nSpin + nSystem + nGradient;
-        let qs = QIR.Runtime.AllocateQubitArray(total);
+        use qs = Qubit[total];
 
         let outerReg = qs[0..nOuter - 1];
         let innerReg = qs[nOuter..nOuter + nInner - 1];
@@ -83,6 +84,9 @@ namespace QDKChemistry.TestUtils.SOSSAWalkTests {
         } else {
             SelectImpl(selectData, false, outerReg, innerReg, spinReg, systemReg, []);
         }
+
+        DumpRegister(qs);
+        ResetAll(qs);
     }
 
     function TestShouldLoadFreeRiderSeparately(
