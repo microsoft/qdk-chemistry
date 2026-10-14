@@ -29,12 +29,12 @@ from qdk_chemistry.plugins.qiskit import QDK_CHEMISTRY_HAS_QISKIT
 from qdk_chemistry.utils.pauli_matrix import pauli_to_dense_matrix
 from qdk_chemistry.utils.qsharp import QSHARP_UTILS
 
+from .helpers import create_dense_wavefunction
 from .reference_tolerances import (
     float_comparison_relative_tolerance,
     qpe_energy_tolerance,
     qpe_phase_fraction_tolerance,
 )
-from .test_helpers import create_dense_wavefunction
 
 _SEED = 42
 
@@ -306,6 +306,37 @@ _controlled_mapper_params = [
     pytest.param("pauli_sequence", id="pauli_sequence"),
     pytest.param("cswap_pauli_sequence", id="cswap_pauli_sequence"),
 ]
+
+
+@pytest.mark.parametrize("power", [2, 4])
+@pytest.mark.parametrize("power_strategy", ["repeat", "rescale"])
+def test_iterative_phase_estimation_energy_is_independent_of_unitary_power(
+    two_qubit_phase_problem: PhaseEstimationProblem, power: int, power_strategy: str
+) -> None:
+    """Query-schedule powers must not change the base-unitary energy inversion."""
+    problem = two_qubit_phase_problem
+    circuit_builder = AlgorithmRef(
+        "qpe_circuit_builder",
+        "qdk_iterative",
+        num_bits=problem.num_bits,
+        controlled_circuit_mapper=AlgorithmRef("controlled_circuit_mapper", "pauli_sequence"),
+        unitary_builder=AlgorithmRef(
+            "hamiltonian_unitary_builder",
+            "trotter",
+            time=problem.evolution_time,
+            power=power,
+            power_strategy=power_strategy,
+        ),
+    )
+    iqpe = IterativePhaseEstimation(shots_per_bit=problem.shots_iterative)
+    iqpe.settings().set("qpe_circuit_builder", circuit_builder)
+    iqpe.settings().set("circuit_executor", AlgorithmRef("circuit_executor", "qdk_full_state_simulator", seed=_SEED))
+
+    result = iqpe.run(qubit_hamiltonian=problem.hamiltonian, state_preparation=problem.state_prep)
+
+    assert result.bitstring_msb_first == problem.expected_bitstring
+    assert result.raw_energy == pytest.approx(problem.expected_energy, abs=qpe_energy_tolerance)
+    assert result.branching == (result.raw_energy,)
 
 
 @pytest.mark.parametrize("builder_name", _builder_params)

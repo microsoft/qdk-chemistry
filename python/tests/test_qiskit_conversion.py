@@ -13,7 +13,7 @@ from qdk_chemistry.plugins.qiskit.conversion import (
     _configuration_to_statevector_index,
     create_statevector_from_wavefunction,
 )
-from tests.test_helpers import create_test_basis_set
+from tests.helpers import create_test_basis_set
 
 from .reference_tolerances import (
     float_comparison_absolute_tolerance,

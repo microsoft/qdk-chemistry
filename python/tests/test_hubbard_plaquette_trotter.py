@@ -6,7 +6,7 @@
 # --------------------------------------------------------------------------------------------
 
 import math
-from collections.abc import Callable, Mapping
+from collections.abc import Mapping
 from typing import Any
 
 import h5py
@@ -35,6 +35,8 @@ from qdk_chemistry.data.circuit import QsharpFactoryData
 from qdk_chemistry.data.unitary_representation.containers.hubbard_plaquette import HubbardPlaquetteContainer
 from qdk_chemistry.utils.pauli_matrix import pauli_to_dense_matrix, pauli_to_sparse_matrix
 from qdk_chemistry.utils.qsharp import QSHARP_UTILS, create_qsharp_context, get_qsharp_context
+
+from .helpers import apply_operation, random_state
 
 _PLAQUETTE = "QDKChemistry.Utils.HubbardPlaquette"
 _HWP = "QDKChemistry.Utils.HammingWeightPhasing"
@@ -118,55 +120,6 @@ def _evolution(params: str, *, controlled: bool = False) -> str:
     return _operation("RepPlaquetteExp", params + ", {qs}", controlled=controlled)
 
 
-def _apply(operation: str | Callable[..., Any], state: np.ndarray, *, split_control: bool = False) -> np.ndarray:
-    """Return the state ``operation`` produces from a real-amplitude ``state``.
-
-    ``operation`` is either Q# source or a Q# callable of type ``Qubit[] => Unit``. With ``split_control`` it is
-    a ``(Qubit, Qubit[]) => Unit`` callable, such as a controlled circuit mapper's, and the most significant
-    qubit is its control.
-
-    This dumps the whole machine rather than using ``dump_operation_on_state``, whose ``DumpRegister``
-    rejects states with nonzero amplitudes below its zero cutoff as not separable, which the 16-qubit
-    evolutions reach. Every helper qubit is released by then, so the machine is the register.
-    """
-    context = get_qsharp_context()
-    if not hasattr(context.code, "_PlaquetteTestDumpControlled"):
-        for name, signature, call in (
-            ("_PlaquetteTestDumpMachine", "Qubit[]", "qubits"),
-            ("_PlaquetteTestDumpControlled", "(Qubit, Qubit[])", "qubits[0], qubits[1...]"),
-        ):
-            context.eval(
-                f"operation {name}(op : ({signature} => Unit), numQubits : Int, initial : Double[]) : Unit {{"
-                " use qubits = Qubit[numQubits];"
-                " Std.StatePreparation.PreparePureStateD(initial, qubits);"
-                f" op({call});"
-                " Std.Diagnostics.DumpMachine();"
-                " ResetAll(qubits); }"
-            )
-    num_qubits = round(math.log2(len(state)))
-    run = context.run(
-        context.code._PlaquetteTestDumpControlled if split_control else context.code._PlaquetteTestDumpMachine,
-        1,
-        context.eval(operation) if isinstance(operation, str) else operation,
-        num_qubits,
-        state.tolist(),
-        save_events=True,
-    )
-    result = np.zeros(len(state), dtype=complex)
-    for index, amplitude in run[0]["events"][-1].state_dump().get_dict().items():
-        result[index] = amplitude
-    return result
-
-
-def _random_state(num_qubits: int, seed: int, support: int | None = None) -> np.ndarray:
-    """Return a normalized real state, dense or on ``support`` random basis states."""
-    rng = np.random.default_rng(seed)
-    state = np.zeros(2**num_qubits)
-    indices = rng.choice(len(state), size=support, replace=False) if support else slice(None)
-    state[indices] = rng.normal(size=state[indices].shape)
-    return state / np.linalg.norm(state)
-
-
 class TestHammingWeightPhasing:
     """Batched phase towers apply the same unitary as their separate rotations.
 
@@ -192,7 +145,7 @@ class TestHammingWeightPhasing:
         """exp(-i a sum_j Z_j) under any batch split, however short, with or without phasing and control."""
         angle = 0.3127
         catalyzed = catalyzed and use_hwp
-        state = _random_state(count + controlled, seed=count + cap, support=24 if count > 4 else None)
+        state = random_state(count + controlled, seed=count + cap, support=24 if count > 4 else None)
         weights = np.array([(index % 2**count).bit_count() for index in range(len(state))])
         phases = np.exp(-1j * angle * (count - 2 * weights) + 1j * angle * count * catalyzed)
         phases[: len(state) - 2**count] = 1.0  # The control, when present, is the most significant qubit.
@@ -201,7 +154,7 @@ class TestHammingWeightPhasing:
             "catalyst"
         )
         width = QSHARP_UTILS.HammingWeightPhasing.HammingWeightBatchSize(count, cap).bit_length() if catalyzed else 0
-        actual = _apply(
+        actual = apply_operation(
             _operation("HammingWeightPhase", args, controlled=controlled, namespace=_HWP, catalyst=(angle, width)),
             state,
         )
@@ -225,7 +178,7 @@ class TestHammingWeightPhasing:
         catalyzed = catalyzed and use_hwp
         xx_plus_yy = np.kron([[0, 1], [1, 0]], [[0, 1], [1, 0]]) + np.kron([[0, -1j], [1j, 0]], [[0, -1j], [1j, 0]])
         pair_gate = scipy.linalg.expm(1j * angle * xx_plus_yy)
-        state = _random_state(2 * num_pairs + controlled, seed=num_pairs, support=8 if num_pairs > 5 else None)
+        state = random_state(2 * num_pairs + controlled, seed=num_pairs, support=8 if num_pairs > 5 else None)
 
         expected = state.astype(complex).reshape(1 + controlled, -1)
         for pair in range(num_pairs):
@@ -235,7 +188,9 @@ class TestHammingWeightPhasing:
         expected[-1] *= np.exp(-2j * angle * num_pairs * catalyzed)
         args = f"{angle}, Std.Arrays.Chunks(2, {{qs}}), {str(use_hwp).lower()}, -1, catalyst"
         width = (2 * num_pairs).bit_length() if catalyzed else 0
-        actual = _apply(_operation("HoppingPhases", args, controlled=controlled, catalyst=(-angle, width)), state)
+        actual = apply_operation(
+            _operation("HoppingPhases", args, controlled=controlled, catalyst=(-angle, width)), state
+        )
         assert np.allclose(actual, expected.reshape(-1), atol=1e-10)
 
     @_CATALYST_OR_LADDER
@@ -243,11 +198,11 @@ class TestHammingWeightPhasing:
     def test_interaction_tower(self, angle, catalyzed):
         """exp(-i a sum_s Z_s Z_{s+M}) over eight sites, phased through a Hamming-weight register."""
         sites = 8
-        state = _random_state(2 * sites, seed=5, support=24)
+        state = random_state(2 * sites, seed=5, support=24)
         spins = 1 - 2 * ((np.arange(len(state))[:, None] >> np.arange(2 * sites - 1, -1, -1)) & 1)
         phases = np.exp(-1j * angle * ((spins[:, :sites] * spins[:, sites:]).sum(axis=1) - sites * catalyzed))
         width = sites.bit_length() if catalyzed else 0
-        actual = _apply(
+        actual = apply_operation(
             _operation("InteractionLayer", f"{angle}, {sites}, {{qs}}, true, -1, catalyst", catalyst=(angle, width)),
             state,
         )
@@ -395,19 +350,19 @@ class TestPlaquetteCircuit:
         body = [(interaction, 0.5), (gold, 1.0), (interaction, 0.5)]
         layers = [(pink, 0.5), *([*body, (pink, 1.0)] * (reps - 1)), *body, (pink, 0.5)]
 
-        state = _random_state(2 * sites, seed=13, support=32)
+        state = random_state(2 * sites, seed=13, support=32)
         expected = state.astype(complex)
         for hamiltonian, fraction in layers:
             expected = scipy.sparse.linalg.expm_multiply(-1j * fraction * step * hamiltonian, expected)
         params = _params(width, height, 0.25 * u * step, 2 * t * step, reps, catalyzed=False)
-        actual = _apply(_evolution(params), state)
+        actual = apply_operation(_evolution(params), state)
         assert np.allclose(actual, expected, atol=1e-8)
 
     def test_hamming_weight_phasing_matches_plain_rotations(self):
         """At 4x2, phasing every tower under control, whole or in short batches, matches plain rotations."""
-        state = _random_state(17, seed=11, support=32)
+        state = random_state(17, seed=11, support=32)
         plain, *phased = (
-            _apply(
+            apply_operation(
                 _evolution(_params(4, 2, 0.3, 0.4, 2, use_hwp=use_hwp, cap=cap, catalyzed=False), controlled=True),
                 state,
             )
@@ -422,9 +377,9 @@ class TestPlaquetteCircuit:
         The towers are phased whole or in short batches. The simulator carries the catalysts'
         superposition, which multiplies its cost, so this runs on the smallest lattice rather than at 4x2.
         """
-        state = _random_state(9, seed=5)
+        state = random_state(9, seed=5)
         plain, *phased = (
-            _apply(_evolution(_params(2, 2, 0.3, 0.4, 2, use_hwp=use_hwp, cap=cap), controlled=True), state)
+            apply_operation(_evolution(_params(2, 2, 0.3, 0.4, 2, use_hwp=use_hwp, cap=cap), controlled=True), state)
             for use_hwp, cap in ((False, -1), (True, -1), (True, 3))
         )
         for actual in phased:
@@ -438,8 +393,8 @@ class TestPlaquetteCircuit:
         c = step.run(_model(2, t=t, u=u)).get_container()
         params = _params(2, 2, c.interaction_angle, c.hopping_angle, c.step_reps)
         propagator = scipy.linalg.expm(-1j * time * _reference_hamiltonian(_model(2, t=t, u=u)))
-        state = _random_state(8, seed=7)
-        actual = _apply(_evolution(params), state)
+        state = random_state(8, seed=7)
+        actual = apply_operation(_evolution(params), state)
         assert abs(np.vdot(propagator @ state, actual)) == pytest.approx(1.0, abs=1e-9)
 
 
@@ -466,9 +421,9 @@ class TestPauliProductFormulaOutput:
         )
         circuit = create("circuit_mapper", "pauli_sequence").run(UnitaryRepresentation(container=formula))
         params = _params(width, 2, interaction_angle, hopping_angle, reps, catalyzed=False)
-        state = _random_state(4 * width, seed=13, support=32)
-        expected = _apply(_evolution(params), state)
-        assert np.allclose(_apply(circuit._qsharp_op, state), expected, atol=1e-8)
+        state = random_state(4 * width, seed=13, support=32)
+        expected = apply_operation(_evolution(params), state)
+        assert np.allclose(apply_operation(circuit._qsharp_op, state), expected, atol=1e-8)
 
     @pytest.mark.parametrize("mapper", ["pauli_sequence", "cswap_pauli_sequence"])
     def test_controlled_mappers_apply_the_shifted_evolution(self, mapper):
@@ -481,12 +436,12 @@ class TestPauliProductFormulaOutput:
         assert plaquette.constant_shift != 0.0
 
         params = _params(2, 2, plaquette.interaction_angle, plaquette.hopping_angle, plaquette.step_reps)
-        state = _random_state(9, seed=3)
-        expected = _apply(_evolution(params, controlled=True), state)
+        state = random_state(9, seed=3)
+        expected = apply_operation(_evolution(params, controlled=True), state)
         expected[256:] *= np.exp(-1j * plaquette.constant_shift * plaquette.step_reps)
         circuit = create("controlled_circuit_mapper", mapper, control_indices=[0]).run(formula)
         # Both control branches are populated, so a unit overlap allows only a global phase.
-        assert abs(np.vdot(expected, _apply(circuit._qsharp_op, state, split_control=True))) == pytest.approx(
+        assert abs(np.vdot(expected, apply_operation(circuit._qsharp_op, state, split_control=True))) == pytest.approx(
             1.0, abs=1e-9
         )
 
