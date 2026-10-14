@@ -9,9 +9,11 @@ from __future__ import annotations
 
 import json
 from dataclasses import dataclass
+from unittest.mock import Mock
 
 import numpy as np
 import pytest
+from qdk.test_utils import dump_operation_on_state
 
 from qdk_chemistry.algorithms.phase_estimation.circuit_builder.iterative_builder import (
     QdkIterativeQpeCircuitBuilder,
@@ -23,10 +25,14 @@ from qdk_chemistry.algorithms.phase_estimation.circuit_builder.standard_builder 
 from qdk_chemistry.data import (
     AlgorithmRef,
     Circuit,
+    FermiHubbardModelHamiltonianDescription,
+    LatticeGeometry,
     QubitOperator,
+    UnitaryRepresentation,
 )
 from qdk_chemistry.data.circuit import QsharpFactoryData
-from qdk_chemistry.utils.qsharp import QSHARP_UTILS
+from qdk_chemistry.data.unitary_representation.containers.base import UnitaryContainer
+from qdk_chemistry.utils.qsharp import QSHARP_UTILS, get_qsharp_context
 
 
 @dataclass(frozen=True)
@@ -337,6 +343,49 @@ class TestStandardQpeCircuitBuilder:
                 qubit_hamiltonian=two_qubit_circuit_problem.hamiltonian,
             )
 
+    @pytest.mark.parametrize("compute_capacity", [0, -2])
+    def test_invalid_compute_capacity_raises_error(
+        self, two_qubit_circuit_problem: CircuitBuilderProblem, compute_capacity: int
+    ) -> None:
+        """Validate that compute_capacity must be -1 or positive."""
+        builder = QdkStandardQpeCircuitBuilder(num_bits=2, compute_capacity=compute_capacity)
+
+        with pytest.raises(ValueError, match="compute_capacity must be -1 or a positive integer"):
+            builder.run(
+                state_preparation=two_qubit_circuit_problem.state_prep,
+                qubit_hamiltonian=two_qubit_circuit_problem.hamiltonian,
+            )
+
+    @pytest.mark.parametrize("compute_capacity", [-1, 2])
+    def test_compute_capacity_reaches_qsharp(
+        self, two_qubit_circuit_problem: CircuitBuilderProblem, compute_capacity: int
+    ) -> None:
+        """Validate that compute_capacity is forwarded to the Q# circuit factory."""
+        builder = QdkStandardQpeCircuitBuilder(num_bits=2, compute_capacity=compute_capacity)
+        builder.settings().set(
+            "unitary_builder",
+            AlgorithmRef("hamiltonian_unitary_builder", "trotter", time=two_qubit_circuit_problem.evolution_time),
+        )
+
+        (circuit,) = builder.run(
+            state_preparation=two_qubit_circuit_problem.state_prep,
+            qubit_hamiltonian=two_qubit_circuit_problem.hamiltonian,
+        )
+
+        assert circuit._qsharp_factory.parameter["computeCapacity"] == compute_capacity
+
+    def test_sine_phase_state_amplitudes(self) -> None:
+        """The sine window puts sin(pi (t + 1) / (2^b + 1)) on the register value t, with ancillas[0] as the MSB."""
+        num_bits = 3
+        builder = QdkStandardQpeCircuitBuilder(num_bits=num_bits)
+        builder.settings().set("phase_state", "sine")
+        state = np.array(
+            dump_operation_on_state(builder._phase_state_op(num_bits), num_bits, context=get_qsharp_context())
+        )
+
+        expected = np.sin(np.pi * (np.arange(2**num_bits) + 1) / (2**num_bits + 1))
+        np.testing.assert_allclose(state, expected / np.linalg.norm(expected), atol=1e-10)
+
     def test_raises_error_for_qasm_only_state_prep(self) -> None:
         """Validate that passing a QASM-only state prep (no Q# op) raises RuntimeError."""
         hamiltonian = QubitOperator(pauli_strings=["XX", "ZZ"], coefficients=[0.25, 0.5])
@@ -364,3 +413,70 @@ class TestStandardQpeCircuitBuilder:
         builder = QdkStandardQpeCircuitBuilder()
         assert builder.name() == "qdk_standard"
         assert builder.type_name() == "qpe_circuit_builder"
+
+
+def _stub_nested(
+    builder: QdkStandardQpeCircuitBuilder | QdkIterativeQpeCircuitBuilder,
+    monkeypatch: pytest.MonkeyPatch,
+    *,
+    num_qubits: int,
+    num_system_qubits: int,
+) -> tuple[Mock, Mock]:
+    """Swap the builder's nested algorithms for mocks whose unitary has the given widths."""
+    unitary_builder = Mock()
+    unitary_builder.run.return_value = UnitaryRepresentation(
+        Mock(spec=UnitaryContainer, num_qubits=num_qubits, num_system_qubits=num_system_qubits)
+    )
+    circuit_mapper = Mock()
+    circuit_mapper.run.return_value = Mock(_qsharp_op=object())
+    nested = {"unitary_builder": unitary_builder, "controlled_circuit_mapper": circuit_mapper}
+    monkeypatch.setattr(builder, "_create_nested", nested.__getitem__)
+    return unitary_builder, circuit_mapper
+
+
+def test_controlled_circuit_takes_system_width_from_unitary(monkeypatch: pytest.MonkeyPatch) -> None:
+    """QPE sizes a model's system register from its unitary, so the unitary's ancillas are counted."""
+    builder = QdkStandardQpeCircuitBuilder(num_bits=2)
+    unitary_builder, circuit_mapper = _stub_nested(builder, monkeypatch, num_qubits=5, num_system_qubits=3)
+    model = FermiHubbardModelHamiltonianDescription(LatticeGeometry.chain(3), t=1.0, u=4.0)
+
+    circuit, num_ancilla_qubits = builder._create_controlled_circuit(model, power=1)
+
+    unitary_builder.run.assert_called_once_with(model)
+    assert circuit is circuit_mapper.run.return_value
+    assert num_ancilla_qubits == 2
+    assert builder._num_system_qubits(model, unitary_builder.run.return_value) == 3
+
+
+@pytest.mark.parametrize("builder_class", [QdkStandardQpeCircuitBuilder, QdkIterativeQpeCircuitBuilder])
+def test_qubit_operator_system_width_is_its_qubit_count(
+    monkeypatch: pytest.MonkeyPatch,
+    builder_class: type[QdkStandardQpeCircuitBuilder | QdkIterativeQpeCircuitBuilder],
+) -> None:
+    """A QubitOperator still sets the system width, even if its unitary's container does not say which are ancillas."""
+    builder = builder_class(num_bits=1)
+    _stub_nested(builder, monkeypatch, num_qubits=3, num_system_qubits=3)
+    widths: list[tuple[int, int]] = []
+    monkeypatch.setattr(builder, "_create_circuit_from_qsharp_op", lambda *args: widths.append(args[-2:]))
+
+    builder._run_impl(Mock(_qsharp_op=object()), QubitOperator(["ZZ"], np.array([1.0])))
+
+    assert widths == [(2, 1)]
+
+
+@pytest.mark.parametrize("builder_class", [QdkStandardQpeCircuitBuilder, QdkIterativeQpeCircuitBuilder])
+def test_model_unitary_is_built_once_per_power(
+    monkeypatch: pytest.MonkeyPatch,
+    builder_class: type[QdkStandardQpeCircuitBuilder | QdkIterativeQpeCircuitBuilder],
+) -> None:
+    """QPE builds a model's unitary once for each controlled power and takes the system width from it."""
+    builder = builder_class(num_bits=3)
+    unitary_builder, _ = _stub_nested(builder, monkeypatch, num_qubits=5, num_system_qubits=3)
+    widths: list[tuple[int, int]] = []
+    monkeypatch.setattr(builder, "_create_circuit_from_qsharp_op", lambda *args: widths.append(args[-2:]))
+    model = FermiHubbardModelHamiltonianDescription(LatticeGeometry.chain(3), t=1.0, u=4.0)
+
+    builder._run_impl(Mock(_qsharp_op=object()), model)
+
+    assert unitary_builder.run.call_count == 3
+    assert set(widths) == {(3, 2)}

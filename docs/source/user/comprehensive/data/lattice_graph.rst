@@ -65,12 +65,12 @@ Use :meth:`~qdk_chemistry.data.LatticeGraph.from_geometry` to materialize the re
 
 The Python call is ``LatticeGraph.from_geometry(geometry, shells, bond_flavors=[], weight=1.0, tolerance=1e-9, coloring_seed=0)``.
 ``shells`` is deduplicated; an empty selection or unavailable finite shells create no edges.
-Each physical connection becomes one edge whose weight is the finite ``weight``.
+Each periodic image of a connection adds the finite ``weight`` to the edge between its sites, so a pair joined by several images gets the sum.
 ``tolerance`` must be positive and less than 1, the lattice unit length, and controls distance and axis comparisons.
 Optional :class:`~qdk_chemistry.data.BondFlavorDefinition` objects assign semantic labels while constructing the graph.
 A bond whose axis lies within ``tolerance`` of several flavor axes of its shell is rejected.
 The graph does not retain the geometry.
-Each edge is a single bond, so small periodic cells where several periodic images join one pair, or a site neighbors its own image, are rejected.
+Small periodic cells where images of different shells or flavors join one pair, or a site neighbors its own image, are rejected.
 
 Once constructed, the graph's edges are explicit.
 Passing shell mappings to a :doc:`model builder <../model_hamiltonians>` does not discover or add edges.
@@ -361,7 +361,7 @@ The ``~~~`` edges show the wrap-around connections that turn the open lattice in
       :end-before: // end-cell-periodic
 
 Small periodic cells can have several physical connections for one site pair; distinct-neighbor counts need not equal bulk coordination numbers.
-The nearest-neighbor graph factories preserve their existing adjacency weights, while :meth:`~qdk_chemistry.data.LatticeGraph.from_geometry` rejects such cells.
+:meth:`~qdk_chemistry.data.LatticeGraph.from_geometry` sums the weights of images with the same shell and flavor; the nearest-neighbor graph factories preserve their existing adjacency weights.
 See :ref:`geometry-periodic-images` for the image convention.
 
 Accessing lattice data

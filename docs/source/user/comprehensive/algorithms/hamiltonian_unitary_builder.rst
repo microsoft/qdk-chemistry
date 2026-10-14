@@ -2,17 +2,17 @@ Hamiltonian Unitary Builder
 ===========================
 
 The :class:`~qdk_chemistry.algorithms.HamiltonianUnitaryBuilder` algorithm in QDK/Chemistry constructs a unitary based on the Hamiltonian, such as time simulation unitary :math:`U(t) = e^{-iHt}` or block-encoded unitary :math:`U = \frac{H}{\|H\|}`.
-Following QDK/Chemistry's :doc:`algorithm design principles <../design/index>`, it takes a :class:`~qdk_chemistry.data.QubitOperator` and produces a :class:`~qdk_chemistry.data.UnitaryRepresentation` as output.
+Following QDK/Chemistry's :doc:`algorithm design principles <../design/index>`, it takes a :class:`~qdk_chemistry.data.HamiltonianDescription` (for example a :class:`~qdk_chemistry.data.QubitOperator` or a :class:`~qdk_chemistry.data.ModelHamiltonianDescription`) and produces a :class:`~qdk_chemistry.data.UnitaryRepresentation` as output.
 
 Overview
 --------
 
 Building unitary from Hamiltonian — such as the Hamiltonian simulation unitary :math:`U(t) = e^{-iHt}` or block encoding unitary :math:`U = \frac{H}{\|H\|}` — is a central subroutine in many quantum algorithms.
-The :class:`~qdk_chemistry.algorithms.HamiltonianUnitaryBuilder` provides a unified interface for methods that construct this operator from a :class:`~qdk_chemistry.data.QubitOperator`.
+The :class:`~qdk_chemistry.algorithms.HamiltonianUnitaryBuilder` provides a unified interface for methods that construct this operator from a :class:`~qdk_chemistry.data.HamiltonianDescription`.
 
-QDK/Chemistry currently provides two families of implementations for this task: Trotter-Suzuki product formulas and block encoding.
+QDK/Chemistry currently provides two families of implementations for this task: product formulas (Trotter-Suzuki, Zassenhaus, and a plaquette Trotterization specialized to the Fermi-Hubbard model) and block encoding.
 
-The resulting :class:`~qdk_chemistry.data.UnitaryRepresentation` objects wrap either a ``PauliProductFormulaContainer`` (Trotter) or an ``LCUContainer`` (block encoding).
+The resulting :class:`~qdk_chemistry.data.UnitaryRepresentation` objects wrap a ``PauliProductFormulaContainer`` (Trotter-Suzuki and Zassenhaus), a ``HubbardPlaquetteContainer`` (plaquette Trotterization, by default), or a block-encoding container (``LCUContainer``, ``LCUWalkContainer`` for the LCU quantum walk, or ``SOSSABlockEncodingContainer``).
 
 
 Using the HamiltonianUnitaryBuilder
@@ -29,9 +29,10 @@ Input requirements
 
 The :class:`~qdk_chemistry.algorithms.HamiltonianUnitaryBuilder` requires the following inputs:
 
-QubitOperator
-   A :class:`~qdk_chemistry.data.QubitOperator` containing the Pauli-string representation of the Hamiltonian.
-   This can be obtained from the :doc:`QubitMapper <qubit_mapper>` algorithm, constructed from a :doc:`model Hamiltonian <../model_hamiltonians>`, or built directly.
+HamiltonianDescription
+   A :class:`~qdk_chemistry.data.HamiltonianDescription`, such as a :class:`~qdk_chemistry.data.QubitOperator` containing the Pauli-string representation of the Hamiltonian or a :class:`~qdk_chemistry.data.ModelHamiltonianDescription` like :class:`~qdk_chemistry.data.FermiHubbardModelHamiltonianDescription` holding a lattice and the model parameters.
+   A :class:`~qdk_chemistry.data.QubitOperator` can be obtained from the :doc:`QubitMapper <qubit_mapper>` algorithm, constructed from a :doc:`model Hamiltonian <../model_hamiltonians>`, or built directly.
+   The ``hubbard_plaquette`` builder takes a :class:`~qdk_chemistry.data.FermiHubbardModelHamiltonianDescription`.
 
 .. rubric:: Creating a builder
 
@@ -206,6 +207,59 @@ When ``order`` is set to ``0`` (auto), the builder dynamically sweeps orders 2, 
      - float
      - Coefficient threshold below which Pauli terms are discarded. Default is 1e-12.
 
+.. _hubbard-plaquette-builder:
+
+Hubbard plaquette Trotterization
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+.. rubric:: Factory name: ``"hubbard_plaquette"``
+
+The plaquette builder Trotterizes the Fermi-Hubbard model with uniform hopping :math:`t` and on-site interaction :math:`U` on a two-dimensional square lattice, two spin orbitals per site.
+Unlike the other builders, it takes a :class:`~qdk_chemistry.data.FermiHubbardModelHamiltonianDescription` rather than a :class:`~qdk_chemistry.data.QubitOperator`, and builds the Hamiltonian from its lattice and its parameters ``t``, ``u`` and ``epsilon``.
+The lattice has to be periodic in both directions, with both sides even and at least four, or 2x2, because only then do the two plaquette tilings cover every bond exactly once.
+Its geometry has to be the one :meth:`LatticeGeometry.square(width, height, periodic_x=True, periodic_y=True) <qdk_chemistry.data.LatticeGeometry.square>` builds: unit-spaced sites numbered ``y * width + x``, with period vectors ``(width, 0)`` and ``(0, height)``.
+A translated, scaled, rotated or renumbered square lattice is rejected.
+
+The hopping term splits into two layers of disjoint four-site plaquettes, :math:`P` and :math:`G`, each of which is evolved exactly :cite:`Campbell2022`.
+The interaction is taken in its particle-hole symmetric form :math:`U \sum_i (n_{i\uparrow} - 1/2)(n_{i\downarrow} - 1/2)`, whose Jordan-Wigner image is pure :math:`ZZ`.
+Each second-order step is the symmetric product :math:`P^{1/2} I^{1/2} G I^{1/2} P^{1/2}`, the "PIG" ordering of :cite:`Apel2026`.
+The half-angle pink layers of neighbouring steps merge into one full-angle layer, so a repeated evolution emits a single half-angle pink layer only at each end.
+The modes are likewise routed into pink order once at each end, so every pink plaquette stays local and only the gold layers route.
+Setting ``num_electrons`` records the scalar offset to the described model, with its on-site energy :math:`\epsilon` and interaction :math:`U \sum_i n_{i\uparrow} n_{i\downarrow}`, so that phase estimation reports that model's energy.
+
+By default the output is a ``HubbardPlaquetteContainer`` that stores the angles and step count rather than individual Pauli terms.
+It is consumed by the :ref:`"hubbard_plaquette" controlled circuit mapper <hubbard-plaquette-mapper>`, :class:`~qdk_chemistry.algorithms.controlled_circuit_mapper.ControlledHubbardPlaquetteMapper`.
+
+Setting ``container_type`` to ``"pauli_product_formula"`` instead emits every fermionic swap, Fourier butterfly and phase as a Pauli exponential, for the ``"pauli_sequence"`` and :ref:`"cswap_pauli_sequence" <cswap-pauli-sequence-mapper>` mappers.
+The ``num_electrons`` shift then becomes an identity term in the circuit, so the phase-estimation window must cover the described model's energy rather than the particle-hole symmetric one.
+Prefer ``"cswap_pauli_sequence"``, which applies the formula uncontrolled; ``"pauli_sequence"`` controls every swap and butterfly rotation as well, so it is costlier and mainly useful for compatibility.
+
+The number of steps can be set directly (``num_divisions``) or estimated from ``target_accuracy`` with Campbell's error constant for the related IPG ordering :cite:`Campbell2022`.
+
+.. rubric:: Settings
+
+.. list-table::
+   :header-rows: 1
+   :widths: 25 15 60
+
+   * - Setting
+     - Type
+     - Description
+   * - ``order``
+     - int
+     - Trotter order. Only 2 is supported. Default is 2.
+   * - ``num_electrons``
+     - int
+     - Electron count for the scalar shift to the estimated energy. When set to -1 (default), the particle-hole symmetric model's energy is reported.
+   * - ``target_accuracy``
+     - float
+     - Energy error budget that sizes the automatic step count. When set to 0.0 (default), automatic step-count estimation is disabled.
+   * - ``num_divisions``
+     - int
+     - Explicit number of plaquette Trotter steps. When set to 0 (default), determined from ``target_accuracy``; otherwise the larger of the two is used.
+   * - ``container_type``
+     - str
+     - Output container: ``"hubbard_plaquette"`` (default) or ``"pauli_product_formula"``.
+
 
 Consuming term partitions
 -------------------------
@@ -319,8 +373,8 @@ Formulas without this metadata retain term-by-term controlled mapping.
 A single commuting group absorbs the repetition count into its angles; formulas with nonempty ``prefix_terms`` or ``suffix_terms`` are returned unchanged, making the rewrite idempotent.
 The finite, nonnegative ``atol`` (default ``1e-12``) drops only merged rotations with absolute angle at most that tolerance; unmatched small rotations remain.
 
-:meth:`~qdk_chemistry.data.PauliProductFormulaContainer.combine` appends another formula's evolution, requiring the same register width and finite ``scale`` values matching under ``numpy.isclose``.
-It retains the first formula's ``scale`` and uses compact fast paths for eligible identical bodies with matching layer schedules; otherwise the original flatten-and-adjacent-merge fallback expands both evolutions, including prefix and suffix terms, and returns ``step_reps=1``.
+:meth:`~qdk_chemistry.data.PauliProductFormulaContainer.combine` appends another formula's evolution, requiring the same register width and finite ``scale`` values with a finite sum.
+It adds both formulas' ``scale`` values and uses compact fast paths for eligible identical bodies with matching layer schedules; otherwise the original flatten-and-adjacent-merge fallback expands both evolutions, including prefix and suffix terms, and returns ``step_reps=1``.
 
 :doc:`JSON and HDF5 serialization <../data/serialization>` write schema ``0.3.0`` without expanding repetitions; convert ``0.2.0`` files from earlier releases with the :doc:`migration tool <../../migrating-data-files>`.
 Plain formulas without prefix or suffix terms or group/layer metadata retain their legacy content hashes.
@@ -431,8 +485,8 @@ The resulting :class:`~qdk_chemistry.data.UnitaryRepresentation` wraps an ``LCUC
 Related classes
 ---------------
 
-- :class:`~qdk_chemistry.data.UnitaryRepresentation`: Output data class wrapping the exponentiated Pauli terms or LCU container
-- :class:`~qdk_chemistry.data.QubitOperator`: Input qubit Hamiltonian
+- :class:`~qdk_chemistry.data.UnitaryRepresentation`: Output data class wrapping the product formula, plaquette, or block-encoding container
+- :class:`~qdk_chemistry.data.HamiltonianDescription`: Input Hamiltonian, such as a :class:`~qdk_chemistry.data.QubitOperator` or a :class:`~qdk_chemistry.data.ModelHamiltonianDescription`
 - :doc:`PhaseEstimation <phase_estimation>`: Consumer of the hamiltonian unitary
 
 Further reading

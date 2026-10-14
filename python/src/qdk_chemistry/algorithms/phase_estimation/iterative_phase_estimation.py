@@ -21,9 +21,9 @@ import numpy as np
 
 from qdk_chemistry.data import (
     Circuit,
+    HamiltonianDescription,
     QpeResult,
     QuantumErrorProfile,
-    QubitOperator,
 )
 from qdk_chemistry.utils import Logger
 
@@ -73,7 +73,7 @@ class IterativePhaseEstimation(PhaseEstimation):
     def _run_impl(
         self,
         state_preparation: Circuit,
-        qubit_hamiltonian: QubitOperator,
+        qubit_hamiltonian: HamiltonianDescription,
         *,
         noise: QuantumErrorProfile | None = None,
     ) -> QpeResult:
@@ -81,7 +81,7 @@ class IterativePhaseEstimation(PhaseEstimation):
 
         Args:
             state_preparation: The state preparation circuit.
-            qubit_hamiltonian: The qubit Hamiltonian for which to estimate the phase.
+            qubit_hamiltonian: The Hamiltonian description the unitary builder takes.
             noise: The quantum error profile to simulate noise, defaults to None.
 
         Returns:
@@ -97,8 +97,10 @@ class IterativePhaseEstimation(PhaseEstimation):
                 f"but got {type(circuit_builder)} instead."
             )
 
-        # Resolve container before running iterations
+        # Resolve container before running iterations. The circuit builder overrides the
+        # unitary's power per phase bit, so inversion must use the base (power=1) unitary.
         unitary_builder = circuit_builder._create_nested("unitary_builder")  # noqa: SLF001
+        unitary_builder.settings().update("power", 1)
         unitary_rep = unitary_builder.run(qubit_hamiltonian)
         container = unitary_rep.get_container()
 
