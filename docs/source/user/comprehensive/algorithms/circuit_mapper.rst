@@ -184,29 +184,10 @@ fermionic term are exponentiated as one contiguous block:
    \approx \prod_i e^{-it P_i}|0\ldots0\rangle = |0\ldots0\rangle .
 
 The :ref:`vacuum-annihilating term grouper <algorithms-term-grouper>` (factory name
-``"vacuum_annihilating"``) returns a :class:`~qdk_chemistry.data.LayeredPartition` whose outer
-groups commute and preserve the vacuum up to a phase, with disjoint-support Pauli layers inside
-each group. A Pauli factor *flips* a qubit when it exchanges :math:`|0\rangle` and
-:math:`|1\rangle`, which :math:`X` and :math:`Y` do and :math:`I` and :math:`Z` do not.
-Only terms flipping the same qubits can cancel. Within a single :math:`Y`-count parity they
-also commute, so exact zero-sum cuts of :math:`\sum_j c_j i^{n_Y^{(j)}}` form cancellation
-blocks. Compatible blocks can share an outer group, but no block is split between independently
-weighted Trotter groups. Diagonal I/Z terms contribute the allowed vacuum phase.
-
-An existing compatible :class:`~qdk_chemistry.data.LayeredPartition` is preserved exactly.
-When cancellation partners span incompatible old groups, the grouper repairs those boundaries
-while retaining compatible groups and each supplied layer whole or as an ordered fragment.
-For flat or unpartitioned inputs, it derives disjoint layers from full Pauli supports, including
-Z parity strings. A cancellation block may span layers: an XX layer can excite the vacuum and
-its matching YY layer restore it, provided both belong to the same commuting outer group.
-Repartitioning changes neither terms nor coefficients, but it can change a finite-step Trotter
-approximation and therefore its error bound.
-
-The grouper's ``tolerance`` is a coefficient-residual budget for each flipped-set/Y-parity
-component, shared across its output groups. It is not a circuit-leakage bound after time scaling,
-repetition, or coefficient filtering. Grouping for vacuum preservation is also not grouping for
-measurement: use a suitable :doc:`expectation estimator <expectation_estimator>` and a
-qubit-wise commuting partition for simultaneous Pauli-basis measurements.
+``"vacuum_annihilating"``) supports :class:`~qdk_chemistry.data.LayeredPartition`: outer groups
+commute and preserve the vacuum, with disjoint-support layers within each group. It preserves
+compatible incoming groups and layers, repairing group boundaries when needed to keep cancellation
+partners together. For flat or unpartitioned inputs, it constructs disjoint layers from Pauli supports.
 
 The mapper validates its input product formula and raises a :class:`ValueError` when the
 ordering is not vacuum preserving, rather than returning a wrong result.
@@ -218,16 +199,10 @@ ordering is not vacuum preserving, rather than returning a wrong result.
 
 .. rubric:: Hamming-weight phasing
 
-With ``use_hamming_weight_phasing``, the evolution on the vacuum register is phased as in the
-:ref:`Pauli sequence mapper <pauli-sequence-mapper>`, but uncontrolled, since the swap sandwich
-supplies the control.
-
-The :ref:`vacuum-annihilating term grouper <algorithms-term-grouper>` supports this HWP pipeline:
-it returns a :class:`~qdk_chemistry.data.LayeredPartition`, preserving compatible incoming layers
-or constructing disjoint layers when needed. The :doc:`Trotter builder <hamiltonian_unitary_builder>`
-propagates those layers as ``layer_offsets``, so both controlled Pauli-sequence mappers can phase
-their exactly equal, nonzero-angle terms. Small or nonuniform layers may offer little benefit.
-Requesting phasing on a formula without this metadata raises :class:`ValueError`.
+With ``use_hamming_weight_phasing``, HWP is supported for formulas built from a
+:class:`~qdk_chemistry.data.LayeredPartition`, as in the
+:ref:`Pauli sequence mapper <pauli-sequence-mapper>`. The evolution on the vacuum register is
+uncontrolled, since the swap sandwich supplies the control.
 
 .. rubric:: Settings
 
