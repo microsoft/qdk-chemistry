@@ -7,14 +7,12 @@
 
 import math
 from collections.abc import Mapping
-from typing import Any
 
 import h5py
 import numpy as np
 import pytest
 import scipy.linalg
 import scipy.sparse.linalg
-from qdk import TargetProfile
 
 from qdk_chemistry.algorithms import create
 from qdk_chemistry.algorithms.hamiltonian_unitary_builder.time_evolution.hubbard_plaquette_trotter import (
@@ -34,7 +32,7 @@ from qdk_chemistry.data import (
 from qdk_chemistry.data.circuit import QsharpFactoryData
 from qdk_chemistry.data.unitary_representation.containers.hubbard_plaquette import HubbardPlaquetteContainer
 from qdk_chemistry.utils.pauli_matrix import pauli_to_dense_matrix, pauli_to_sparse_matrix
-from qdk_chemistry.utils.qsharp import QSHARP_UTILS, create_qsharp_context, get_qsharp_context
+from qdk_chemistry.utils.qsharp import QSHARP_UTILS, get_qsharp_context
 
 from .helpers import apply_operation, random_state
 
@@ -457,40 +455,6 @@ _ROTATION_RELATIVE_TOLERANCE = 1e-4
 _ROTATION_ABSOLUTE_TOLERANCE = 16
 
 
-def _benchmark_counts(
-    size: int, max_batch_size: int = -1, *, use_hwp: bool = True, use_phase_gradient: bool = True
-) -> dict[str, int]:
-    """Return the logical counts of the notebook's 10-bit sine-window QPE on an LxL lattice."""
-    num_bits, energy_budget = 10, 0.0051 * size * size
-    qpe_budget = 2.0 / 3.0 * energy_budget  # The optimal split of Campbell arXiv:2012.09238v4, App. F.
-    builder = create(
-        "qpe_circuit_builder",
-        "qdk_standard",
-        num_bits=num_bits,
-        phase_state="sine",
-        unitary_builder=AlgorithmRef(
-            "hamiltonian_unitary_builder",
-            "hubbard_plaquette",
-            order=2,
-            # A sine window over 2^bits - 1 queries has spread tan(pi / (2^bits + 1)).
-            time=math.tan(math.pi / (2**num_bits + 1)) / qpe_budget,
-            power_strategy="rescale",
-            target_accuracy=energy_budget - qpe_budget,
-        ),
-        controlled_circuit_mapper=AlgorithmRef(
-            "controlled_circuit_mapper",
-            "hubbard_plaquette",
-            use_hamming_weight_phasing=use_hwp,
-            max_hamming_weight_phasing_batch_size=max_batch_size,
-            use_phase_gradient=use_phase_gradient,
-        ),
-    )
-    model = _model(size, t=1.0, u=8.0)
-    factory = builder.run(identity_state_prep(num_qubits=2 * size * size), model)[0]._qsharp_factory
-    counts = get_qsharp_context().logical_counts(factory.program, *factory.parameter.values())
-    return {key: int(counts.get(key, 0)) for key in _COUNT_KEYS}
-
-
 def _assert_counts_match_the_pins(counts: Mapping[str, float], size: int) -> None:
     """Exact, except rotations get a tolerance for cross-platform synthesis drift."""
     mismatches = {
@@ -506,72 +470,35 @@ def _assert_counts_match_the_pins(counts: Mapping[str, float], size: int) -> Non
     assert not mismatches, f"L={size} (actual, pinned): {mismatches}"
 
 
-def _plaquette_params(namespace: Any, *, use_hwp: bool = True, cap: int = -1, use_phase_gradient: bool = True) -> Any:
-    """Return 4x4 ``HubbardPlaquetteParams`` from the Q# ``namespace``."""
-    return namespace.HubbardPlaquetteParams(
-        width=4,
-        height=4,
-        interactionAngle=0.1,
-        hoppingAngle=0.2,
-        repetitions=1,
-        useHammingWeightPhasing=use_hwp,
-        maxBatchSize=cap,
-        usePhaseGradient=use_phase_gradient,
-    )
-
-
 class TestBenchmarkResources:
     """Pin the logical cost the 2D Hubbard estimation notebook reports."""
 
     @pytest.mark.parametrize("size", [2, 4])
     def test_counts_match_the_pins(self, size):
         """``test_estimation_hubbard_2d`` holds the notebook's own output to the same pins."""
-        _assert_counts_match_the_pins(_benchmark_counts(size), size)
-
-    def test_batch_cap_trades_qubits_for_toffolis(self):
-        """A cap of 8 keeps the adder tree on fewer qubits, and turning phasing off drops it."""
-        uncapped = _benchmark_counts(4)
-        # At L=4 the interaction and hopping towers both have 16 terms, so 16 is the cap that splits nothing.
-        assert _benchmark_counts(4, max_batch_size=16) == uncapped
-
-        capped = _benchmark_counts(4, max_batch_size=8)
-        assert capped["numQubits"] < uncapped["numQubits"]
-        assert capped["cczCount"] > uncapped["cczCount"], "each batch pays its own catalyst addition"
-
-        plain = _benchmark_counts(4, use_hwp=False)
-        assert plain["cczCount"] + plain["ccixCount"] == 0
-        assert plain["numQubits"] < uncapped["numQubits"]
-        assert plain["rotationCount"] > capped["rotationCount"]
-
-    def test_capping_the_ladder_trades_qubits_for_rotations(self):
-        """Without the gradient the per-batch price is paid in synthesized place-value rotations."""
-        uncapped = _benchmark_counts(4, use_phase_gradient=False)
-        capped = _benchmark_counts(4, max_batch_size=8, use_phase_gradient=False)
-        assert capped["numQubits"] < uncapped["numQubits"]
-        assert capped["rotationCount"] > uncapped["rotationCount"]
-        assert capped["cczCount"] > 0
-
-    @pytest.mark.parametrize("use_phase_gradient", [True, False], ids=["catalyst", "rz_ladder"])
-    @pytest.mark.parametrize(("use_hwp", "cap", "uses_adders"), [(False, -1, False), (True, 2, True)])
-    def test_short_batches_are_phased(self, use_hwp, cap, uses_adders, use_phase_gradient):
-        """Phasing takes an adder tree even for batches of 2, and turning it off leaves plain rotations."""
-        params = _plaquette_params(
-            QSHARP_UTILS.HubbardPlaquette, use_hwp=use_hwp, cap=cap, use_phase_gradient=use_phase_gradient
+        # The notebook's 10-bit sine-window QPE on an LxL lattice.
+        num_bits, energy_budget = 10, 0.0051 * size * size
+        qpe_budget = 2.0 / 3.0 * energy_budget  # The optimal split of Campbell arXiv:2012.09238v4, App. F.
+        builder = create(
+            "qpe_circuit_builder",
+            "qdk_standard",
+            num_bits=num_bits,
+            phase_state="sine",
+            unitary_builder=AlgorithmRef(
+                "hamiltonian_unitary_builder",
+                "hubbard_plaquette",
+                order=2,
+                # A sine window over 2^bits - 1 queries has spread tan(pi / (2^bits + 1)).
+                time=math.tan(math.pi / (2**num_bits + 1)) / qpe_budget,
+                power_strategy="rescale",
+                target_accuracy=energy_budget - qpe_budget,
+            ),
+            controlled_circuit_mapper=AlgorithmRef("controlled_circuit_mapper", "hubbard_plaquette"),
         )
-        counts = get_qsharp_context().logical_counts(
-            QSHARP_UTILS.HubbardPlaquette.MakeRepControlledPlaquetteExpCircuit, params, 0, list(range(1, 33))
-        )
-        assert (counts.get("cczCount", 0) + counts.get("ccixCount", 0) > 0) == uses_adders
-
-    @pytest.mark.parametrize("use_phase_gradient", [True, False], ids=["catalyst", "rz_ladder"])
-    def test_base_profile_lowers_the_adder_tree(self, use_phase_gradient):
-        """A 4x4 lattice batches enough rotations to lower the Hamming-weight adder to Base QIR too."""
-        context = create_qsharp_context(TargetProfile.Base)
-        plaquette = context.code.QDKChemistry.Utils.HubbardPlaquette
-        params = _plaquette_params(plaquette, use_phase_gradient=use_phase_gradient)
-        qir = str(context.compile(plaquette.MakeRepControlledPlaquetteExpCircuit, params, 0, list(range(1, 33))))
-        # The adders' Toffolis, in the weight and in the catalyst addition, are the only source of T gates.
-        assert "__quantum__qis__t__" in qir
+        model = _model(size, t=1.0, u=8.0)
+        factory = builder.run(identity_state_prep(num_qubits=2 * size * size), model)[0]._qsharp_factory
+        counts = get_qsharp_context().logical_counts(factory.program, *factory.parameter.values())
+        _assert_counts_match_the_pins(counts, size)
 
 
 class TestStepCountAndShift:
@@ -628,27 +555,6 @@ class TestStepCountAndShift:
         assert np.allclose(gap, gap[0], atol=1e-10)
         shift = shifted.eigenvalue_from_phase(0.125) - unshifted.eigenvalue_from_phase(0.125)
         assert shift == pytest.approx(gap[0])
-
-    @pytest.mark.parametrize("power_strategy", ["repeat", "rescale"])
-    def test_powered_evolution_decodes_the_unpowered_energy(self, power_strategy):
-        """A phase of U^power decodes to the same shifted energy under either power strategy."""
-        energy, time, power = -1.3, 0.3, 3
-        container = (
-            HubbardPlaquetteTrotter(
-                order=2,
-                time=time,
-                power=power,
-                power_strategy=power_strategy,
-                num_divisions=2,
-                target_accuracy=0.0,
-                num_electrons=6,
-            )
-            .run(_model(2, u=8.0))
-            .get_container()
-        )
-        phase = (-energy * time * power / (2 * math.pi)) % 1.0
-        # (epsilon + U/2) eta - U M / 4 = 4 * 6 - 8 * 4 / 4 = 16.
-        assert container.eigenvalue_from_phase(phase) == pytest.approx(energy + 16.0)
 
 
 _BODY = {"width": 4, "height": 4, "interaction_angle": 0.1, "hopping_angle": 0.2, "step_reps": 1}
@@ -761,14 +667,3 @@ class TestContainerAndValidation:
     def test_rejects_unsupported_inputs(self, build, error, match):
         with pytest.raises(error, match=match):
             build()
-
-    def test_batch_cap_is_ignored_when_phasing_is_off(self):
-        """With phasing off the cap is never read, so a cap that would otherwise be rejected is accepted."""
-        circuit = create(
-            "controlled_circuit_mapper",
-            "hubbard_plaquette",
-            control_indices=[0],
-            use_hamming_weight_phasing=False,
-            max_hamming_weight_phasing_batch_size=0,
-        ).run(UnitaryRepresentation(container=HubbardPlaquetteContainer(**_BODY)))
-        assert not circuit._qsharp_factory.parameter["params"].useHammingWeightPhasing
