@@ -14,7 +14,7 @@ from qdk.test_utils import dump_operation_on_state
 from qdk_chemistry.algorithms.state_preparation.alias_sampling import AliasSamplingStatePreparation
 from qdk_chemistry.utils.qsharp import QSHARP_UTILS, create_qsharp_context, get_qsharp_context
 
-from .test_helpers import create_dense_wavefunction, create_sparse_wavefunction
+from .helpers import create_dense_wavefunction, create_sparse_wavefunction
 
 
 def _run_alias_sampling_and_dump(

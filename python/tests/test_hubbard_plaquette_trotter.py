@@ -35,7 +35,7 @@ from qdk_chemistry.data.unitary_representation.containers.hubbard_plaquette impo
 from qdk_chemistry.utils.pauli_matrix import pauli_to_dense_matrix, pauli_to_sparse_matrix
 from qdk_chemistry.utils.qsharp import QSHARP_UTILS, create_qsharp_context, get_qsharp_context
 
-from .test_helpers import apply_operation, random_state
+from .helpers import apply_operation, random_state
 
 _PLAQUETTE = "QDKChemistry.Utils.HubbardPlaquette"
 _HWP = "QDKChemistry.Utils.HammingWeightPhasing"

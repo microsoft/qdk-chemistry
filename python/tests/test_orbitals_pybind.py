@@ -15,7 +15,7 @@ from qdk_chemistry.data import (
 )
 from qdk_chemistry.data import symmetry as sym
 
-from .test_helpers import create_test_basis_set
+from .helpers import create_test_basis_set
 
 
 @pytest.fixture
