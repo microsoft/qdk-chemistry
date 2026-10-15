@@ -9,7 +9,6 @@ import math
 
 import numpy as np
 import pytest
-from qdk import StateDump
 from qdk.test_utils import dump_operation_on_state
 
 from qdk_chemistry.algorithms.circuit_mapper import SOSSAMapper
@@ -577,7 +576,11 @@ class TestSelectFullFidelity:
             use_phase_gradient,
             save_events=True,
         )[0]
-        return np.array(StateDump(result["events"][-1].state_dump()).as_dense_state())
+        dump = result["events"][-1].state_dump()
+        state = np.zeros(1 << dump.qubit_count, dtype=complex)
+        for index, amplitude in dump.get_dict().items():
+            state[index] = amplitude
+        return state
 
     @pytest.mark.parametrize("num_free_rider_bits", [0, 1])
     def test_select_rejects_missing_generator_bits(self, qsharp_test_context, num_free_rider_bits):
