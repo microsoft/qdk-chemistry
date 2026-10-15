@@ -178,7 +178,8 @@ Unary-iteration Phase Estimation Circuit Builder
 
 Constructs one flat chain of :math:`p` qubitized walk queries, using unary iteration over the phase register to select which interleaved reflection is omitted and so realize :math:`W^{2a-p}` from a single chain :cite:`Babbush2018` :cite:`Lee2021`.
 The phase register is sized to :math:`\lceil \log_2(p+1) \rceil` and ``num_bits`` is ignored.
-Requires a qubitized walk, so ``unitary_builder`` must be an LCU builder with ``quantum_walk=True`` (its default here).
+Takes a block encoding and completes the walk around it, so ``unitary_builder`` may be an LCU builder with or without ``quantum_walk`` (``quantum_walk=True`` is its default here), or the SOSSA builder.
+Time evolution (Trotter) is unsupported: the schedule needs a self-inverse block encoding and ancilla reflection.
 
 **Additional settings:**
 
