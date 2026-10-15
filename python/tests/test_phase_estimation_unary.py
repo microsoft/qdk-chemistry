@@ -11,6 +11,7 @@ from qdk.test_utils import dump_operation_on_state
 
 from qdk_chemistry.algorithms.circuit_mapper.psp_mapper import PSPMapper
 from qdk_chemistry.algorithms.hamiltonian_unitary_builder.block_encoding.lcu import LCUBuilder
+from qdk_chemistry.algorithms.hamiltonian_unitary_builder.time_evolution.trotter import Trotter
 from qdk_chemistry.algorithms.phase_estimation.circuit_builder import unary_phase_estimation_builder
 from qdk_chemistry.algorithms.phase_estimation.circuit_builder.unary_phase_estimation_builder import (
     QdkUnaryQpeCircuitBuilder,
@@ -32,6 +33,7 @@ from qdk_chemistry.data import (
 )
 from qdk_chemistry.data.circuit import Circuit, QsharpFactoryData
 from qdk_chemistry.data.unitary_representation.base import UnitaryRepresentation
+from qdk_chemistry.data.unitary_representation.containers.block_encoding import LCUContainer
 from qdk_chemistry.data.unitary_representation.containers.quantum_walk import LCUWalkContainer
 from qdk_chemistry.utils.qsharp import QSHARP_UTILS, get_qsharp_context
 from tests.reference_tolerances import float_comparison_absolute_tolerance, float_comparison_relative_tolerance
@@ -307,10 +309,10 @@ class TestMisconfigurationIsSurfaced:
         with pytest.raises(ValueError, match="compute_capacity must be -1 or a positive integer"):
             _run_builder(QdkUnaryQpeCircuitBuilder(num_queries=3, compute_capacity=compute_capacity))
 
-    def test_a_plain_block_encoding_is_rejected(self):
-        """A bare LCU has no phase-to-energy relation, so it cannot back a unary QPE run."""
-        with pytest.raises(ValueError, match="Requires an LCU walk or SOSSA block encoding"):
-            _run_builder(_make_builder(unitary_builder=LCUBuilder(quantum_walk=False)))
+    def test_time_evolution_is_rejected(self):
+        """A Trotter step is not self-inverse and has no ancilla, so the schedule cannot walk it."""
+        with pytest.raises(ValueError, match="Requires an LCU or SOSSA block encoding"):
+            _run_builder(_make_builder(unitary_builder=Trotter(time=0.1, num_divisions=1)))
 
     @pytest.mark.parametrize(
         ("declared_width", "message"),
@@ -362,13 +364,16 @@ class TestMisconfigurationIsSurfaced:
 
         assert any("num_bits=7 is ignored" in message for message in warnings), warnings
 
-    def test_a_carried_walk_power_is_ignored_with_a_warning(self, monkeypatch):
+    @pytest.mark.parametrize("quantum_walk", [True, False])
+    def test_a_carried_power_is_ignored_with_a_warning(self, monkeypatch, quantum_walk):
         """The schedule picks its own power per slot, so a container power is meaningless."""
         warnings: list[str] = []
         monkeypatch.setattr(unary_phase_estimation_builder.Logger, "warn", warnings.append)
         container = LCUBuilder(quantum_walk=True).run(_hamiltonian()).get_container()
         powered = UnitaryRepresentation(
             container=LCUWalkContainer(container.block_encoding, power=2, scale=container.scale)
+            if quantum_walk
+            else LCUContainer(container.block_encoding.prepare, container.block_encoding.select, power=2)
         )
 
         _run_builder(_make_builder(unitary_builder=_Stub(powered)))
@@ -538,6 +543,52 @@ class TestUnaryQpeEndToEnd:
         result = qpe.run(qubit_hamiltonian=hamiltonian, state_preparation=state_preparation)
 
         assert result.raw_energy == pytest.approx(float(energies[0]), abs=0.02)
+
+    def test_a_plain_lcu_block_encoding_recovers_the_ground_state_energy(self):
+        """The schedule completes the walk around an LCU built without ``quantum_walk``."""
+        # lambda = 1.5 keeps the walk phase on a bin, and a decode that dropped lambda would miss by a third.
+        hamiltonian = QubitOperator(pauli_strings=["X", "Z"], coefficients=np.array([0.75, 0.75]))
+        energies, vectors = np.linalg.eigh(hamiltonian.to_matrix())
+        state_prep_params = {
+            "rowMap": list(range(hamiltonian.num_qubits - 1, -1, -1)),
+            "stateVector": np.real(vectors[:, 0]).tolist(),
+            "expansionOps": [],
+            "numQubits": hamiltonian.num_qubits,
+        }
+        state_preparation = Circuit(
+            qsharp_factory=QsharpFactoryData(
+                program=QSHARP_UTILS.StatePreparation.MakeStatePreparationCircuit,
+                parameter=state_prep_params,
+            ),
+            qsharp_op=QSHARP_UTILS.StatePreparation.MakeStatePreparationOp(state_prep_params),
+        )
+
+        qpe = UnaryPhaseEstimation(shots=200)
+        qpe.settings().set(
+            "qpe_circuit_builder",
+            AlgorithmRef(
+                "qpe_circuit_builder",
+                "qdk_unary",
+                num_queries=7,
+                unitary_builder=AlgorithmRef("hamiltonian_unitary_builder", "lcu", quantum_walk=False),
+            ),
+        )
+        qpe.settings().set("circuit_executor", AlgorithmRef("circuit_executor", "qdk_sparse_state_simulator"))
+
+        result = qpe.run(qubit_hamiltonian=hamiltonian, state_preparation=state_preparation)
+
+        assert result.raw_energy == pytest.approx(float(energies[0]), abs=1e-9)
+
+
+def test_a_plain_lcu_builds_the_circuit_its_walk_does():
+    """With or without ``quantum_walk``, the LCU hands the schedule the same block encoding."""
+
+    def parameters(quantum_walk: bool) -> tuple[dict, int | None]:
+        circuit = _run_builder(_make_builder(unitary_builder=LCUBuilder(quantum_walk=quantum_walk)))[0]
+        scalars = {key: value for key, value in circuit._qsharp_factory.parameter.items() if isinstance(value, int)}
+        return scalars, circuit.num_qubits
+
+    assert parameters(quantum_walk=False) == parameters(quantum_walk=True)
 
 
 def test_the_builder_reflects_the_ancilla_tail_the_mapper_declared():
