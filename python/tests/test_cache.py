@@ -10,11 +10,13 @@ from __future__ import annotations
 import importlib.metadata
 import json
 import logging
+from unittest.mock import Mock
 
 import numpy as np
 import pytest
 
 import qdk_chemistry.remote.cache as cache_module
+import qdk_chemistry.remote.cache.folder as folder_module
 from qdk_chemistry.data import EnergyExpectationResult, MeasurementData, Orbitals, QubitOperator
 from qdk_chemistry.data._spin_channels import spin_channel_matrix
 from qdk_chemistry.data.symmetry import axes
@@ -445,6 +447,87 @@ class TestFolderCacheData:
         manifest_path = cache_dir / "list_hash.list[orbitals].json"
 
         assert folder_cache._get_data_list(manifest_path) is None
+
+    @pytest.mark.parametrize("key", ["../outside", "..\\outside", "C:outside", "*", "", None, 1])
+    @pytest.mark.parametrize("manifest_kind", ["legacy", "dataclass", "ndarray"])
+    def test_nested_references_reject_invalid_keys(
+        self, folder_cache, cache_dir, tmp_path, monkeypatch, caplog, key, manifest_kind
+    ):
+        """Nested references are validated before any blob loader is invoked."""
+        cache_dir.mkdir()
+        (tmp_path / "outside.orbitals.h5").write_bytes(b"not an HDF5 file")
+        loader = Mock()
+        monkeypatch.setattr(folder_module, "_resolve_dataclass_type", lambda _name: loader)
+        array_loader = Mock()
+        monkeypatch.setattr(folder_module.np, "load", array_loader)
+        if manifest_kind == "legacy":
+            manifest = {"type": "orbitals", "items": [key]}
+            path = cache_dir / "list_hash.list[orbitals].json"
+        else:
+            manifest = {
+                "kind": "sequence",
+                "sequence_type": "list",
+                "items": [{"kind": manifest_kind, "hash": key, "type": "orbitals"}],
+            }
+            path = cache_dir / "list_hash.list.json"
+        path.write_text(json.dumps(manifest))
+
+        with caplog.at_level(logging.WARNING, logger=folder_module.__name__):
+            assert folder_cache.get_data("list_hash") is None
+
+        loader.from_hdf5_file.assert_not_called()
+        array_loader.assert_not_called()
+        assert "Invalid cache content_hash" in caplog.text
+
+    def test_nested_reference_rejects_path_in_type_name(self, folder_cache, cache_dir, caplog):
+        """Registered type dispatch cannot turn a manifest type into a path."""
+        cache_dir.mkdir()
+        manifest = {
+            "kind": "sequence",
+            "sequence_type": "list",
+            "items": [{"kind": "dataclass", "hash": "safe", "type": "../orbitals"}],
+        }
+        (cache_dir / "list_hash.list.json").write_text(json.dumps(manifest))
+
+        with caplog.at_level(logging.WARNING, logger=folder_module.__name__):
+            assert folder_cache.get_data("list_hash") is None
+
+        assert "Invalid cache type_name" in caplog.text
+
+    @pytest.mark.parametrize("manifest_kind", ["legacy", "dataclass", "ndarray"])
+    def test_delete_nested_reference_cannot_escape_root(self, folder_cache, cache_dir, tmp_path, manifest_kind):
+        """Deleting a corrupt sequence never deletes a referenced external file."""
+        cache_dir.mkdir()
+        suffix = "ndarray.npy" if manifest_kind == "ndarray" else "orbitals.h5"
+        outside = tmp_path / f"outside.{suffix}"
+        outside.write_bytes(b"preserve")
+        if manifest_kind == "legacy":
+            manifest = {"type": "orbitals", "items": ["../outside"]}
+            path = cache_dir / "list_hash.list[orbitals].json"
+        else:
+            manifest = {
+                "kind": "sequence",
+                "sequence_type": "list",
+                "items": [{"kind": manifest_kind, "hash": "../outside", "type": "orbitals"}],
+            }
+            path = cache_dir / "list_hash.list.json"
+        path.write_text(json.dumps(manifest))
+
+        assert folder_cache.delete_data("list_hash")
+        assert outside.read_bytes() == b"preserve"
+
+    def test_data_symlink_cannot_escape_root(self, folder_cache, cache_dir, tmp_path):
+        """A cache blob symlink cannot redirect loading outside the cache."""
+        cache_dir.mkdir()
+        outside = tmp_path / "outside.ndarray.npy"
+        np.save(outside, np.array([1.0]), allow_pickle=False)
+        try:
+            (cache_dir / "array_hash.ndarray.npy").symlink_to(outside)
+        except OSError as exc:
+            pytest.skip(f"Symlink creation is not supported: {exc}")
+
+        with pytest.raises(ValueError, match="escapes cache root"):
+            folder_cache.get_data("array_hash")
 
 
 # ── FolderCache: clear ───────────────────────────────────────────────────────
