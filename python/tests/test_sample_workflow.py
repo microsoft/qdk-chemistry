@@ -16,12 +16,15 @@ To run slow notebook tests, set:
 # Licensed under the MIT License. See LICENSE.txt in the project root for license information.
 # --------------------------------------------------------------------------------------------
 
+import ast
+import re
 from pathlib import Path
 
 import pytest
 
 from qdk_chemistry.plugins.qiskit import QDK_CHEMISTRY_HAS_QISKIT
 
+from .test_hubbard_plaquette_trotter import _assert_counts_match_the_pins
 from .test_sample_workflow_utils import (
     _HAS_JUPYTER_KERNEL,
     _execute_notebook_skip_visualizations,
@@ -115,3 +118,59 @@ def test_qpe_stretched_n2():
             },
         },
     )
+
+
+@_requires_notebook_deps
+@pytest.mark.slow
+@pytest.mark.skipif(
+    not _HAS_JUPYTER_KERNEL,
+    reason="Jupyter kernel 'python3' not available. Install ipykernel and register the kernel.",
+)
+@pytest.mark.skipif(
+    not _HAS_QRE,
+    reason="qdk.qre not available",
+)
+def test_estimation_hubbard_2d():
+    """Test the 2D Fermi-Hubbard resource-estimation notebook and hold its logical counts to the pins.
+
+    ``test_hubbard_plaquette_trotter.py`` checks the same pins against its own construction on every
+    run, so this test catches the notebook drifting away from that construction.
+    """
+    notebook_path = EXAMPLES_DIR / "resource_estimation" / "estimation_hubbard_2d.ipynb"
+    assert notebook_path.exists(), f"Notebook not found: {notebook_path}"
+    executed = _execute_notebook_skip_visualizations(notebook_path)
+    code_cells = [cell for cell in executed.cells if cell.cell_type == "code"]
+    (size,) = (
+        int(match.group(1))
+        for cell in code_cells
+        if (match := re.search(r"^EXAMPLE_SIZE = (\d+)$", cell.source, re.MULTILINE))
+    )
+    (counts_cell,) = (cell for cell in code_cells if cell.source.rstrip().endswith("\ncounts"))
+    (result,) = (output for output in counts_cell.outputs if output.output_type == "execute_result")
+    _assert_counts_match_the_pins(ast.literal_eval(result.data["text/plain"]), size)
+
+
+@_requires_notebook_deps
+@pytest.mark.slow
+@pytest.mark.skipif(
+    not _HAS_JUPYTER_KERNEL,
+    reason="Jupyter kernel 'python3' not available. Install ipykernel and register the kernel.",
+)
+@pytest.mark.skipif(
+    not _HAS_QRE,
+    reason="qdk.qre not available",
+)
+@pytest.mark.parametrize("notebook_name", ["estimation_magnets", "estimation_spin_liquids"])
+def test_estimation_spin_models(notebook_name: str) -> None:
+    """Run the spin-model resource-estimation notebooks and require nonempty QRE tables."""
+    notebook_path = EXAMPLES_DIR / "resource_estimation" / f"{notebook_name}.ipynb"
+    assert notebook_path.exists(), f"Notebook not found: {notebook_path}"
+    executed = _execute_notebook_skip_visualizations(notebook_path)
+    (results_cell,) = (
+        cell
+        for cell in executed.cells
+        if cell.cell_type == "code" and cell.source.rstrip().endswith("results.as_frame()")
+    )
+    (result,) = (output for output in results_cell.outputs if output.output_type == "execute_result")
+    assert "text/html" in result.data, "Expected a rendered QRE results table."
+    assert "Empty DataFrame" not in result.data["text/plain"], "No accepted QRE estimates were produced."

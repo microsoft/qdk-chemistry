@@ -3,6 +3,7 @@
 // license information.
 
 #include <gtest/gtest.h>
+#include <qdk/chemistry/scf/core/enums.h>
 
 #include <Eigen/Dense>
 #include <algorithm>
@@ -26,6 +27,16 @@
 using namespace qdk::chemistry::data;
 using namespace qdk::chemistry::algorithms;
 using namespace qdk::chemistry::utils;
+
+TEST(MicrosoftUtilsTest, ParsesRelativity) {
+  using qdk::chemistry::scf::Relativity;
+  EXPECT_EQ(microsoft::parse_relativity(""), Relativity::None);
+  EXPECT_EQ(microsoft::parse_relativity("sf-x2c"), Relativity::SFX2C);
+  EXPECT_EQ(microsoft::parse_relativity("sf-x2c-contracted"),
+            Relativity::SFX2CContracted);
+  EXPECT_THROW(microsoft::parse_relativity("unsupported"),
+               std::invalid_argument);
+}
 
 TEST(MicrosoftUtilsTest, ConvertsNearlyIntegralNuclearCharges) {
   Eigen::VectorXd charges(3);

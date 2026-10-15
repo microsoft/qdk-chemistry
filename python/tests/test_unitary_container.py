@@ -88,6 +88,18 @@ class TestPauliProductFormulaContainer:
         assert container.step_reps == 4
         assert len(container.step_terms) == 3
 
+    @pytest.mark.parametrize("scale", [-2.0, 0.5, 2.0])
+    def test_energy_period(self, step_terms, scale):
+        """Periodic aliases acquire the same phase for either evolution direction."""
+        container = PauliProductFormulaContainer(step_terms, step_reps=1, num_qubits=2, scale=scale)
+        assert container.energy_period == pytest.approx(2 * np.pi / abs(scale))
+
+    def test_zero_scale_has_no_energy_period(self, step_terms):
+        """An identity evolution cannot resolve energy aliases."""
+        container = PauliProductFormulaContainer(step_terms, step_reps=1, num_qubits=2, scale=0.0)
+        with pytest.raises(ValueError, match="zero evolution-time scale"):
+            _ = container.energy_period
+
     def test_stored_terms_are_read_only(self):
         """Stored term sequences and Pauli maps cannot change after their layout is validated."""
         layer = [ExponentiatedPauliTerm({0: "X"}, 0.5), ExponentiatedPauliTerm({1: "Z"}, 0.25)]
@@ -98,6 +110,24 @@ class TestPauliProductFormulaContainer:
         with pytest.raises(TypeError, match="item assignment"):
             container.step_terms[1].pauli_term[0] = "Z"  # type: ignore[index]
         assert container.step_terms[1].pauli_term == {1: "Z"}
+
+    def test_stored_terms_share_one_copy_per_source_map(self):
+        """Terms that share a source map share one read-only copy across all segments."""
+        x, z = {0: "X"}, {1: "Z"}
+        container = PauliProductFormulaContainer(
+            [ExponentiatedPauliTerm(x, 0.5), ExponentiatedPauliTerm(z, 0.25), ExponentiatedPauliTerm(x, 0.5)],
+            2,
+            2,
+            prefix_terms=[ExponentiatedPauliTerm(x, 0.25)],
+            suffix_terms=[ExponentiatedPauliTerm(z, 0.125)],
+        )
+        stored = [*container.prefix_terms, *container.step_terms, *container.suffix_terms]
+        assert len({id(term.pauli_term) for term in stored}) == 2
+        assert [dict(term.pauli_term) for term in stored] == [x, x, z, x, z]
+
+        # Sources freed mid-construction must not alias a later map through a reused id.
+        fresh = PauliProductFormulaContainer((ExponentiatedPauliTerm({q: "Y"}, 0.1) for q in range(64)), 1, 64)
+        assert [dict(term.pauli_term) for term in fresh.step_terms] == [{q: "Y"} for q in range(64)]
 
     def test_stored_terms_pickle_and_copy(self, container):
         """Read-only stored terms still pickle and deep-copy."""
@@ -125,13 +155,19 @@ class TestPauliProductFormulaContainer:
         assert container.step_reps == 3
         assert isinstance(container.step_reps, int)
 
-    def test_update_ordering(self, container):
+    @pytest.mark.parametrize("scale", [0.4, 1.0, 2.4])
+    def test_update_ordering(self, step_terms, scale):
         """Test setting a new valid evolution ordering."""
+        container = PauliProductFormulaContainer(step_terms, step_reps=4, num_qubits=2, scale=scale)
         updated_container = container.reorder_terms([1, 2, 0])
 
         assert updated_container.step_terms[0] == container.step_terms[1]
         assert updated_container.step_terms[1] == container.step_terms[2]
         assert updated_container.step_terms[2] == container.step_terms[0]
+        assert updated_container.scale == scale
+        assert updated_container.step_reps == container.step_reps
+        assert updated_container.num_qubits == container.num_qubits
+        assert updated_container.eigenvalue_from_phase(0.1) == container.eigenvalue_from_phase(0.1)
 
     def test_update_ordering_invalid(self, container):
         """Test setting an invalid evolution ordering."""
@@ -205,6 +241,46 @@ class TestPauliProductFormulaContainer:
         assert restored.to_json() == container.to_json()
         assert restored.content_hash() == container.content_hash()
         assert all(isinstance(key, int) for term in restored.step_terms for key in term.pauli_term)
+
+    @pytest.mark.parametrize("fuse", [False, True])
+    @pytest.mark.parametrize("step_ratio", [1, 2])
+    @pytest.mark.parametrize("time", [-0.25, 0.25])
+    def test_combine_phase_inversion(self, fuse, step_ratio, time):
+        """All combine paths retain the energy and accumulate signed evolution time."""
+        formulas = []
+        for step_time, reps in ((time, 2), (time * step_ratio, 3)):
+            formula = PauliProductFormulaContainer(
+                [
+                    ExponentiatedPauliTerm({0: "Z"}, 0.1 * step_time),
+                    ExponentiatedPauliTerm({}, 0.1 * step_time),
+                    ExponentiatedPauliTerm({0: "Z"}, 0.1 * step_time),
+                ],
+                reps,
+                1,
+                scale=step_time * reps,
+            )
+            formulas.append(formula.fuse_boundaries() if fuse else formula)
+
+        combined = formulas[0].combine(formulas[1])
+        total_time = time * (2 + 3 * step_ratio)
+        unitary = _formula_unitary(combined)
+        np.testing.assert_allclose(unitary, _formula_unitary(formulas[1]) @ _formula_unitary(formulas[0]), atol=1e-14)
+        phase = (np.angle(unitary[0, 0]) / (2 * np.pi)) % 1.0
+        assert combined.scale == pytest.approx(total_time)
+        assert combined.eigenvalue_from_phase(phase) == pytest.approx(0.3)
+        assert combined.energy_period == pytest.approx(2 * np.pi / abs(total_time))
+
+    @pytest.mark.parametrize(
+        ("first_scale", "second_scale"),
+        [(np.nan, 1.0), (1.0, np.nan), (np.inf, 1.0), (1.0, -np.inf), (1e308, 1e308)],
+    )
+    def test_combine_rejects_nonfinite_scale(self, first_scale, second_scale):
+        """Reject nonfinite operand scales and overflow of their sum."""
+        terms = [ExponentiatedPauliTerm({0: "Z"}, 0.1)]
+        first = PauliProductFormulaContainer(terms, 1, 1, scale=first_scale)
+        second = PauliProductFormulaContainer(terms, 1, 1, scale=second_scale)
+        with pytest.raises(ValueError, match="nonfinite"):
+            first.combine(second)
 
     def test_combine_no_adjacent_identical(self):
         """Test combine when no adjacent terms share the same Pauli string."""
@@ -296,7 +372,7 @@ class TestPauliProductFormulaContainer:
         )
         result = container.combine(inverse)
         assert result.step_reps == 1
-        assert result.scale == container.scale
+        assert result.scale == container.scale + inverse.scale
         assert result.step_terms == container.step_terms * (4 - inverse_reps)
 
     @pytest.mark.parametrize("repetitions", [3, 10**9])

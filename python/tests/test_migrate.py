@@ -14,6 +14,7 @@ from __future__ import annotations
 
 import json
 import pathlib
+import warnings
 
 import h5py
 import numpy as np
@@ -240,10 +241,10 @@ def test_lattice_graph(tmp_path, source_format, output_format):
 # --------------------------------------------------------------------------- #
 # Pauli product formula
 # --------------------------------------------------------------------------- #
-def _write_old_product_formula(path, source_format):
+def _write_old_product_formula(path, source_format, step_reps=3):
     """Write twelve terms in the 0.2.0 layout, so HDF5 term indices reach two digits."""
     step_terms = [{"pauli_term": {str(i % 3): "XYZ"[i % 3]}, "angle": 0.1 * (i + 1)} for i in range(12)]
-    header = {"version": "0.2.0", "container_type": "pauli_product_formula", "step_reps": 3, "num_qubits": 3}
+    header = {"version": "0.2.0", "container_type": "pauli_product_formula", "step_reps": step_reps, "num_qubits": 3}
     if source_format == "json":
         path.write_text(json.dumps({**header, "step_terms": step_terms, "scale": 1.7}))
     else:
@@ -258,26 +259,35 @@ def _write_old_product_formula(path, source_format):
 
 
 @pytest.mark.parametrize("type_token", ["unitary_representation", "pauli_product_formula_container"])
+@pytest.mark.parametrize("step_reps", [1, 3])
 @pytest.mark.parametrize(
     ("source_format", "output_format"),
     [("json", "json"), ("json", "hdf5"), ("hdf5", "json"), ("hdf5", "hdf5")],
 )
-def test_pauli_product_formula(tmp_path, type_token, source_format, output_format):
+def test_pauli_product_formula(tmp_path, type_token, source_format, output_format, step_reps):
     src = tmp_path / f"old.{type_token}.{'json' if source_format == 'json' else 'h5'}"
     dst = tmp_path / f"new.{type_token}.{'json' if output_format == 'json' else 'h5'}"
-    step_terms = _write_old_product_formula(src, source_format)
+    step_terms = _write_old_product_formula(src, source_format, step_reps)
     data_class = UnitaryRepresentation if type_token == "unitary_representation" else PauliProductFormulaContainer
     with pytest.raises(RuntimeError, match=r"qdk_chemistry\.migrate"):
         data_class.from_file(src, source_format)
 
-    migrate.convert_file(src, dst)
+    with warnings.catch_warnings(record=True) as emitted:
+        warnings.simplefilter("always")
+        migrate.convert_file(src, dst)
+    assert len(emitted) == int(step_reps > 1)
+    if emitted:
+        assert emitted[0].category is UserWarning
+        assert "scale is preserved unchanged" in str(emitted[0].message)
+        assert "Rebuild" in str(emitted[0].message)
+
     restored = data_class.from_file(dst, output_format)
     formula = restored.get_container() if type_token == "unitary_representation" else restored
     assert formula.to_json() == {
         "version": "0.3.0",
         "container_type": "pauli_product_formula",
         "step_terms": step_terms,
-        "step_reps": 3,
+        "step_reps": step_reps,
         "num_qubits": 3,
         "scale": 1.7,
         "prefix_terms": [],

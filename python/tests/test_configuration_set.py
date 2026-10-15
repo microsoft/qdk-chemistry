@@ -15,7 +15,7 @@ from qdk_chemistry.data import (
     ConfigurationSet,
 )
 
-from .test_helpers import create_test_orbitals
+from .helpers import create_test_orbitals
 
 
 class TestConfigurationSetBasics:

@@ -11,7 +11,7 @@ without executing them, enabling standalone resource estimation and circuit prev
 # Licensed under the MIT License. See LICENSE.txt in the project root for license information.
 # --------------------------------------------------------------------------------------------
 
-from qdk_chemistry.data import AlgorithmRef, Circuit, QubitOperator
+from qdk_chemistry.data import AlgorithmRef, Circuit, HamiltonianDescription
 from qdk_chemistry.data.circuit import QsharpFactoryData
 from qdk_chemistry.utils import Logger
 from qdk_chemistry.utils.qsharp import QSHARP_UTILS, get_qsharp_context
@@ -99,7 +99,7 @@ class QdkIterativeQpeCircuitBuilder(IterativeQpeCircuitBuilder):
     def _run_impl(
         self,
         state_preparation: Circuit,
-        qubit_hamiltonian: QubitOperator,
+        qubit_hamiltonian: HamiltonianDescription,
     ) -> list[Circuit]:
         """Build IQPE iteration circuits.
 
@@ -112,7 +112,7 @@ class QdkIterativeQpeCircuitBuilder(IterativeQpeCircuitBuilder):
 
         Args:
             state_preparation: The circuit that prepares the initial state.
-            qubit_hamiltonian: The qubit Hamiltonian for which to build circuits.
+            qubit_hamiltonian: The Hamiltonian description the unitary builder takes.
 
         Returns:
             A list of quantum circuits, one per phase bit iteration (or a single-element
@@ -120,8 +120,7 @@ class QdkIterativeQpeCircuitBuilder(IterativeQpeCircuitBuilder):
             ``combine_iterations`` is enabled).
 
         Raises:
-            ValueError: If ``num_iteration`` >= ``num_bits``, ``mid_shots`` is not positive in combined mode,
-                or combined rounds require different ancilla counts.
+            ValueError: If iteration settings are invalid or combined rounds require different system or ancilla widths.
 
         """
         num_bits = self.settings().get("num_bits")
@@ -165,7 +164,7 @@ class QdkIterativeQpeCircuitBuilder(IterativeQpeCircuitBuilder):
     def _create_iteration_circuit(
         self,
         state_preparation: Circuit,
-        qubit_hamiltonian: QubitOperator,
+        qubit_hamiltonian: HamiltonianDescription,
         *,
         iteration: int,
         total_iterations: int,
@@ -175,7 +174,7 @@ class QdkIterativeQpeCircuitBuilder(IterativeQpeCircuitBuilder):
 
         Args:
             state_preparation: Trial-state preparation circuit that prepares the initial state on the system qubits.
-            qubit_hamiltonian: The qubit Hamiltonian for which to estimate the phase.
+            qubit_hamiltonian: The Hamiltonian description the unitary builder takes.
             iteration: Current iteration index (0-based); iteration 0 uses the largest power and
                 measures the least-significant bit.
             total_iterations: Total number of phase bits to measure across all iterations.
@@ -186,10 +185,11 @@ class QdkIterativeQpeCircuitBuilder(IterativeQpeCircuitBuilder):
 
         """
         _validate_iteration_inputs(iteration, total_iterations)
-        num_system_qubits = qubit_hamiltonian.num_qubits
         power = 2 ** (total_iterations - iteration - 1)
 
-        ctrl_unitary_circuit, num_ancilla_qubits = self._create_controlled_circuit(qubit_hamiltonian, power)
+        ctrl_unitary_circuit, num_ancilla_qubits, num_system_qubits = self._controlled_circuit_and_widths(
+            qubit_hamiltonian, power
+        )
 
         if state_preparation._qsharp_op and ctrl_unitary_circuit._qsharp_op:  # noqa: SLF001
             return self._create_circuit_from_qsharp_op(
@@ -243,7 +243,7 @@ class QdkIterativeQpeCircuitBuilder(IterativeQpeCircuitBuilder):
     def _create_full_circuit(
         self,
         state_preparation: Circuit,
-        qubit_hamiltonian: QubitOperator,
+        qubit_hamiltonian: HamiltonianDescription,
         *,
         num_bits: int,
         mid_shots: int,
@@ -261,7 +261,7 @@ class QdkIterativeQpeCircuitBuilder(IterativeQpeCircuitBuilder):
 
         Args:
             state_preparation: Trial-state preparation circuit that prepares the initial state on the system qubits.
-            qubit_hamiltonian: The qubit Hamiltonian for which to estimate the phase.
+            qubit_hamiltonian: The Hamiltonian description the unitary builder takes.
             num_bits: Total number of phase bits to measure.
             mid_shots: Repetitions of each round that are majority-voted to decide its bit.
 
@@ -270,23 +270,29 @@ class QdkIterativeQpeCircuitBuilder(IterativeQpeCircuitBuilder):
 
         Raises:
             RuntimeError: If the required Q# operations are not available, or if the active Q# target profile is Base.
-            ValueError: If the state preparation acts on more qubits than the system register,
-                or the controlled-unitary rounds require different ancilla counts.
+            ValueError: If state preparation exceeds the system width or combined rounds have different register widths.
 
         """
-        num_system_qubits = qubit_hamiltonian.num_qubits
-
         # One controlled unitary per round, mirroring the per-bit path: round k uses U^(2^(num_bits-1-k)).
         ctrl_unitary_circuits: list[Circuit] = []
         num_ancilla_qubits = 0
+        num_system_qubits = 0
         for k in range(num_bits):
-            circuit, round_ancilla_qubits = self._create_controlled_circuit(qubit_hamiltonian, 2 ** (num_bits - 1 - k))
+            circuit, round_ancilla_qubits, round_system_qubits = self._controlled_circuit_and_widths(
+                qubit_hamiltonian, 2 ** (num_bits - 1 - k)
+            )
             if k == 0:
                 num_ancilla_qubits = round_ancilla_qubits
+                num_system_qubits = round_system_qubits
             elif round_ancilla_qubits != num_ancilla_qubits:
                 raise ValueError(
                     "Combined IQPE requires identical ancilla counts across rounds: "
                     f"round 1 requires {num_ancilla_qubits}, but round {k + 1} requires {round_ancilla_qubits}."
+                )
+            elif round_system_qubits != num_system_qubits:
+                raise ValueError(
+                    "Combined IQPE requires identical system widths across rounds: "
+                    f"round 1 requires {num_system_qubits}, but round {k + 1} requires {round_system_qubits}."
                 )
             ctrl_unitary_circuits.append(circuit)
 

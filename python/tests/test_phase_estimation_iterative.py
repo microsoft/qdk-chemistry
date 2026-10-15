@@ -8,13 +8,17 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from unittest.mock import patch
+from unittest.mock import Mock, call, patch
 
 import numpy as np
 import pytest
 
 from qdk_chemistry.algorithms import create
 from qdk_chemistry.algorithms.circuit_executor.qdk import QdkFullStateSimulator
+from qdk_chemistry.algorithms.phase_estimation.circuit_builder.base import (
+    IterativeQpeCircuitBuilder,
+    QpeCircuitBuilderSettings,
+)
 from qdk_chemistry.algorithms.phase_estimation.circuit_builder.iterative_builder import (
     QdkIterativeQpeCircuitBuilder,
 )
@@ -24,11 +28,14 @@ from qdk_chemistry.data import (
     Circuit,
     CircuitExecutorData,
     Configuration,
+    FermiHubbardModelHamiltonianDescription,
+    LatticeGeometry,
     LatticeGraph,
     ModelOrbitals,
     QpeResult,
     QuantumErrorProfile,
     QubitOperator,
+    SettingNotFound,
     StateVectorContainer,
     Wavefunction,
 )
@@ -313,6 +320,37 @@ _controlled_mapper_params = [
     pytest.param("pauli_sequence", id="pauli_sequence"),
     pytest.param("cswap_pauli_sequence", id="cswap_pauli_sequence"),
 ]
+
+
+@pytest.mark.parametrize("power", [2, 4])
+@pytest.mark.parametrize("power_strategy", ["repeat", "rescale"])
+def test_iterative_phase_estimation_energy_is_independent_of_unitary_power(
+    two_qubit_phase_problem: PhaseEstimationProblem, power: int, power_strategy: str
+) -> None:
+    """Query-schedule powers must not change the base-unitary energy inversion."""
+    problem = two_qubit_phase_problem
+    circuit_builder = AlgorithmRef(
+        "qpe_circuit_builder",
+        "qdk_iterative",
+        num_bits=problem.num_bits,
+        controlled_circuit_mapper=AlgorithmRef("controlled_circuit_mapper", "pauli_sequence"),
+        unitary_builder=AlgorithmRef(
+            "hamiltonian_unitary_builder",
+            "trotter",
+            time=problem.evolution_time,
+            power=power,
+            power_strategy=power_strategy,
+        ),
+    )
+    iqpe = IterativePhaseEstimation(shots_per_bit=problem.shots_iterative)
+    iqpe.settings().set("qpe_circuit_builder", circuit_builder)
+    iqpe.settings().set("circuit_executor", AlgorithmRef("circuit_executor", "qdk_full_state_simulator", seed=_SEED))
+
+    result = iqpe.run(qubit_hamiltonian=problem.hamiltonian, state_preparation=problem.state_prep)
+
+    assert result.bitstring_msb_first == problem.expected_bitstring
+    assert result.raw_energy == pytest.approx(problem.expected_energy, abs=qpe_energy_tolerance)
+    assert result.branching == (result.raw_energy,)
 
 
 @pytest.mark.parametrize("builder_name", _builder_params)
@@ -910,6 +948,40 @@ def test_combined_iqpe_decodes_voted_bitstring(
     assert result.phase_fraction == pytest.approx(int(expected_bitstring, 2) / 2**problem.num_bits)
 
 
+@pytest.mark.parametrize(
+    ("counts", "error", "message"),
+    [
+        ({}, RuntimeError, "No measurement results"),
+        ({"00": 1, "11": 1}, ValueError, "too many values to unpack"),
+        ({"00": 2, "11": 1}, ValueError, "too many values to unpack"),
+    ],
+)
+def test_combined_iqpe_requires_one_bitstring(counts: dict[str, int], error: type[Exception], message: str) -> None:
+    """A single execution must return one distinct bitstring, not a distribution to select from."""
+    estimator = IterativePhaseEstimation(combine_iterations=True)
+    circuit = Mock(spec=Circuit)
+    builder = Mock(spec=IterativeQpeCircuitBuilder)
+    builder.run.return_value = [circuit]
+    executor = Mock()
+    executor.run.return_value = Mock(spec=CircuitExecutorData, bitstring_counts=counts)
+    container = Mock()
+
+    with pytest.raises(error, match=message):
+        estimator._run_single_circuit(
+            circuit_builder=builder,
+            circuit_executor=executor,
+            state_preparation=Mock(spec=Circuit),
+            qubit_hamiltonian=QubitOperator(["Z"], [1.0]),
+            container=container,
+            num_bits=2,
+            shots_per_bit=3,
+            noise=None,
+        )
+
+    executor.run.assert_called_once_with(circuit, shots=1, noise=None)
+    container.eigenvalue_from_phase.assert_not_called()
+
+
 @pytest.mark.parametrize("combine_iterations", [False, True])
 @pytest.mark.parametrize("shots_per_bit", [0, -1])
 def test_iqpe_rejects_non_positive_shots_per_bit(
@@ -948,7 +1020,7 @@ def test_iqpe_rejects_non_positive_shots_per_bit(
             "qiskit_iterative",
             True,
             {},
-            "requires a QDK iterative QPE circuit builder",
+            "requires a circuit builder with combine_iterations and mid_shots settings",
             marks=pytest.mark.skipif(not QDK_CHEMISTRY_HAS_QISKIT, reason="Qiskit not available"),
         ),
     ],
@@ -977,3 +1049,98 @@ def test_iqpe_rejects_invalid_combined_configuration(
             qubit_hamiltonian=two_qubit_phase_problem.hamiltonian,
         )
     execute.assert_not_called()
+
+
+@pytest.mark.parametrize("combine_iterations", [False, True])
+@pytest.mark.parametrize(
+    "custom_combined_settings",
+    [
+        pytest.param(None, id="qdk"),
+        pytest.param(("combine_iterations", "mid_shots"), id="custom-combined"),
+        pytest.param((), id="custom-per-bit"),
+        pytest.param(("combine_iterations",), id="custom-missing-mid-shots"),
+        pytest.param(("mid_shots",), id="custom-missing-combine-iterations"),
+    ],
+)
+def test_iqpe_passes_model_description_to_nested_algorithms(
+    monkeypatch: pytest.MonkeyPatch,
+    combine_iterations: bool,
+    custom_combined_settings: tuple[str, ...] | None,
+) -> None:
+    """Configure builders by settings and forward model descriptions unchanged in both execution modes."""
+    estimator = IterativePhaseEstimation(shots_per_bit=3, combine_iterations=combine_iterations)
+    if custom_combined_settings is None:
+        builder = QdkIterativeQpeCircuitBuilder(num_bits=3)
+    else:
+        builder_settings = QpeCircuitBuilderSettings()
+        builder_settings.set("num_bits", 3)
+        builder_settings._set_default("phase_correction", "double", 0.0)
+        builder_settings._set_default("num_iteration", "int", -1)
+        if "combine_iterations" in custom_combined_settings:
+            builder_settings._set_default("combine_iterations", "bool", False)
+        if "mid_shots" in custom_combined_settings:
+            builder_settings._set_default("mid_shots", "int", 5)
+        builder = Mock(spec=IterativeQpeCircuitBuilder)
+        builder.settings.return_value = builder_settings
+        builder.name.return_value = "custom_iterative"
+    model = FermiHubbardModelHamiltonianDescription(LatticeGeometry.chain(3), t=1.0, u=4.0)
+    state_preparation = Mock(spec=Circuit)
+    circuit = Mock(spec=Circuit)
+    build = Mock(return_value=[circuit])
+    monkeypatch.setattr(builder, "_run_impl", build)
+    monkeypatch.setattr(builder, "run", build)
+    unitary_builder = Mock()
+    container = unitary_builder.run.return_value.get_container.return_value
+    container.eigenvalue_from_phase.return_value = -1.5
+    monkeypatch.setattr(builder, "_create_nested", {"unitary_builder": unitary_builder}.__getitem__)
+    executor = Mock()
+    bitstrings = ["110"] if combine_iterations else ["0", "1", "1"]
+    shots = 1 if combine_iterations else 3
+    executor.run.side_effect = [
+        CircuitExecutorData(bitstring_counts={bitstring: shots}, total_shots=shots, executor="test")
+        for bitstring in bitstrings
+    ]
+    nested = {"qpe_circuit_builder": builder, "circuit_executor": executor}
+    monkeypatch.setattr(estimator, "_create_nested", nested.__getitem__)
+
+    if combine_iterations and custom_combined_settings is not None and len(custom_combined_settings) < 2:
+        with pytest.raises(ValueError, match="requires a circuit builder with combine_iterations and mid_shots") as exc:
+            estimator.run(state_preparation=state_preparation, qubit_hamiltonian=model)
+        assert isinstance(exc.value.__cause__, SettingNotFound)
+        unitary_builder.run.assert_not_called()
+        build.assert_not_called()
+        executor.run.assert_not_called()
+        return
+
+    result = estimator.run(state_preparation=state_preparation, qubit_hamiltonian=model)
+
+    unitary_builder.settings().update.assert_called_once_with("power", 1)
+    unitary_builder.run.assert_called_once_with(model)
+    expected_build = call(state_preparation=state_preparation, qubit_hamiltonian=model)
+    assert build.call_args_list == [expected_build] * len(bitstrings)
+    assert executor.run.call_args_list == [call(circuit, shots=shots, noise=None)] * len(bitstrings)
+    assert result.bitstring_msb_first == "110"
+    assert result.phase_fraction == pytest.approx(0.75)
+    assert result.raw_energy == pytest.approx(-1.5)
+    container.eigenvalue_from_phase.assert_called_once_with(0.75)
+    if combine_iterations:
+        assert builder.settings().get("combine_iterations") is True
+        assert builder.settings().get("mid_shots") == 3
+
+
+def test_iqpe_rejects_combined_mode_only_on_custom_builder(monkeypatch: pytest.MonkeyPatch) -> None:
+    """The estimator must enable combined execution even when a custom builder supports it."""
+    estimator = IterativePhaseEstimation()
+    builder_settings = QpeCircuitBuilderSettings()
+    builder_settings._set_default("combine_iterations", "bool", True)
+    builder = Mock(spec=IterativeQpeCircuitBuilder)
+    builder.settings.return_value = builder_settings
+    executor = Mock()
+    nested = {"qpe_circuit_builder": builder, "circuit_executor": executor}
+    monkeypatch.setattr(estimator, "_create_nested", nested.__getitem__)
+
+    with pytest.raises(ValueError, match="Set combine_iterations=True on IterativePhaseEstimation"):
+        estimator.run(state_preparation=Mock(spec=Circuit), qubit_hamiltonian=QubitOperator(["Z"], [1.0]))
+
+    builder._create_nested.assert_not_called()
+    executor.run.assert_not_called()

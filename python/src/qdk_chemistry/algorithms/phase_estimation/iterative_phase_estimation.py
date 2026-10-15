@@ -21,15 +21,15 @@ import numpy as np
 
 from qdk_chemistry.data import (
     Circuit,
+    HamiltonianDescription,
     QpeResult,
     QuantumErrorProfile,
-    QubitOperator,
+    SettingNotFound,
 )
 from qdk_chemistry.utils import Logger
 
 from .base import PhaseEstimation, PhaseEstimationSettings
 from .circuit_builder.base import IterativeQpeCircuitBuilder
-from .circuit_builder.iterative_builder import QdkIterativeQpeCircuitBuilder
 
 __all__: list[str] = ["IterativePhaseEstimation", "IterativePhaseEstimationSettings"]
 
@@ -50,7 +50,8 @@ class IterativePhaseEstimationSettings(PhaseEstimationSettings):
             "combine_iterations",
             "bool",
             False,
-            "Run all rounds in one adaptive circuit with in-circuit voting. Requires the QDK iterative builder.",
+            "Run all rounds in one adaptive circuit with in-circuit voting. "
+            "Requires builder settings combine_iterations and mid_shots.",
         )
 
 
@@ -64,11 +65,11 @@ class IterativePhaseEstimation(PhaseEstimation):
     ):
         """Initialize IterativePhaseEstimation with the given settings.
 
+        Combined execution requires builder settings ``combine_iterations`` and ``mid_shots``.
+
         Args:
-            shots_per_bit: Samples per phase bit. When ``combine_iterations`` is enabled,
-                overrides the builder's ``mid_shots`` to vote inside a single whole-circuit execution.
-            combine_iterations: Run every round in one adaptive circuit, executed once.
-                Requires the QDK iterative circuit builder. Default to False.
+            shots_per_bit: Samples per phase bit, overriding the builder's ``mid_shots`` in combined mode.
+            combine_iterations: Run every round in one adaptive circuit, executed once. Defaults to False.
 
         """
         Logger.trace_entering()
@@ -80,7 +81,7 @@ class IterativePhaseEstimation(PhaseEstimation):
     def _run_impl(
         self,
         state_preparation: Circuit,
-        qubit_hamiltonian: QubitOperator,
+        qubit_hamiltonian: HamiltonianDescription,
         *,
         noise: QuantumErrorProfile | None = None,
     ) -> QpeResult:
@@ -88,7 +89,7 @@ class IterativePhaseEstimation(PhaseEstimation):
 
         Args:
             state_preparation: The state preparation circuit.
-            qubit_hamiltonian: The qubit Hamiltonian for which to estimate the phase.
+            qubit_hamiltonian: The Hamiltonian description the unitary builder takes.
             noise: The quantum error profile to simulate noise, defaults to None.
 
         Returns:
@@ -115,7 +116,7 @@ class IterativePhaseEstimation(PhaseEstimation):
             )
 
         builder_settings = circuit_builder.settings()
-        if isinstance(circuit_builder, QdkIterativeQpeCircuitBuilder):
+        try:
             if builder_settings.get("combine_iterations") and not combine_iterations:
                 raise ValueError(
                     "Set combine_iterations=True on IterativePhaseEstimation, not only on qpe_circuit_builder."
@@ -123,13 +124,18 @@ class IterativePhaseEstimation(PhaseEstimation):
             builder_settings.update("combine_iterations", combine_iterations)
             if combine_iterations:
                 builder_settings.update("mid_shots", shots_per_bit)
-        elif combine_iterations:
-            raise ValueError(
-                f"combine_iterations=True requires a QDK iterative QPE circuit builder; got {circuit_builder.name()!r}."
-            )
+        except SettingNotFound as exc:
+            if combine_iterations:
+                raise ValueError(
+                    "combine_iterations=True requires a circuit builder with "
+                    "combine_iterations and mid_shots settings; "
+                    f"got {circuit_builder.name()!r}."
+                ) from exc
 
-        # Resolve container before running iterations
+        # Resolve container before running iterations. The circuit builder overrides the
+        # unitary's power per phase bit, so inversion must use the base (power=1) unitary.
         unitary_builder = circuit_builder._create_nested("unitary_builder")  # noqa: SLF001
+        unitary_builder.settings().update("power", 1)
         unitary_rep = unitary_builder.run(qubit_hamiltonian)
         container = unitary_rep.get_container()
 
@@ -193,7 +199,7 @@ class IterativePhaseEstimation(PhaseEstimation):
         circuit_builder: IterativeQpeCircuitBuilder,
         circuit_executor,
         state_preparation: Circuit,
-        qubit_hamiltonian: QubitOperator,
+        qubit_hamiltonian: HamiltonianDescription,
         container,
         num_bits: int,
         shots_per_bit: int,
@@ -212,7 +218,7 @@ class IterativePhaseEstimation(PhaseEstimation):
             circuit_builder: The iterative circuit builder configured with ``combine_iterations`` enabled.
             circuit_executor: The circuit executor used to run the circuit.
             state_preparation: The state preparation circuit.
-            qubit_hamiltonian: The qubit Hamiltonian for which to estimate the phase.
+            qubit_hamiltonian: The Hamiltonian description the unitary builder takes.
             container: The unitary container providing ``eigenvalue_from_phase``.
             num_bits: The number of phase bits to estimate.
             shots_per_bit: The validated number of internal samples per phase bit.
@@ -223,6 +229,7 @@ class IterativePhaseEstimation(PhaseEstimation):
 
         Raises:
             RuntimeError: If the executor returns no measurement results.
+            ValueError: If the executor returns more than one distinct bitstring for the single execution.
 
         """
         full_circuit = circuit_builder.run(state_preparation=state_preparation, qubit_hamiltonian=qubit_hamiltonian)[0]
@@ -235,8 +242,8 @@ class IterativePhaseEstimation(PhaseEstimation):
         if not counts:
             raise RuntimeError("No measurement results returned from the circuit executor.")
 
-        # Each shot returns one voted bitstring, MSB-first, as in the standard QPE path.
-        bitstring_msb_first = min(counts, key=lambda b: (-counts[b], b))
+        # The single execution returns one voted bitstring, MSB-first.
+        (bitstring_msb_first,) = counts
         Logger.info(f"Voted bitstring (MSB first): {bitstring_msb_first}")
         phase_fraction = int(bitstring_msb_first, 2) / (2**num_bits)
 
