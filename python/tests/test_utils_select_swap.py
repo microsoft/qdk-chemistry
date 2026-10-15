@@ -52,9 +52,9 @@ def _word(bits):
     return sum(1 << index for index, bit in enumerate(bits) if bit)
 
 
-def _assert_1d_loads_every_address(context, data, num_swap_bits):
+def _assert_1d_loads_every_address(context, test_utils, data, num_swap_bits):
     """Every address loads its row, and the address and output registers come back clean."""
-    op = context.code.QDKChemistry.TestUtils.SelectSwapTests.TestMakeSelectSwap1DCopyOp(data, num_swap_bits)
+    op = test_utils.SelectSwapTests.TestMakeSelectSwap1DCopyOp(data, num_swap_bits)
     width = len(data[0])
     tester = ArithmeticOpTester(op, [_address_bits(len(data)), width, width], context=context)
     failures = [
@@ -65,11 +65,9 @@ def _assert_1d_loads_every_address(context, data, num_swap_bits):
     assert not failures, f"(address, [address, output, copy]) mismatches at num_swap_bits={num_swap_bits}: {failures}"
 
 
-def _assert_2d_loads_every_address(context, data, num_swap_bits, outer_always_valid):
+def _assert_2d_loads_every_address(context, test_utils, data, num_swap_bits, outer_always_valid):
     """Every (outer, inner) pair loads its word, and every other register comes back clean."""
-    op = context.code.QDKChemistry.TestUtils.SelectSwapTests.TestMakeSelectSwap2DCopyOp(
-        data, num_swap_bits, outer_always_valid
-    )
+    op = test_utils.SelectSwapTests.TestMakeSelectSwap2DCopyOp(data, num_swap_bits, outer_always_valid)
     width = len(data[0][0])
     tester = ArithmeticOpTester(
         op, [_address_bits(len(data)), _address_bits(len(data[0])), width, width], context=context
@@ -101,37 +99,47 @@ class TestSelectSwapLoadsCorrectValues:
     """The loaded word is the addressed word, for every select/swap split."""
 
     @pytest.mark.parametrize("num_swap_bits", [0, 1, 2, 3])
-    def test_1d_loads_every_address(self, qsharp_test_context, num_swap_bits):
-        _assert_1d_loads_every_address(qsharp_test_context, _DATA_1D, num_swap_bits)
+    def test_1d_loads_every_address(self, qsharp_test_context, qsharp_test_utils, num_swap_bits):
+        _assert_1d_loads_every_address(qsharp_test_context, qsharp_test_utils, _DATA_1D, num_swap_bits)
 
     @pytest.mark.parametrize("num_swap_bits", [0, 1, 2])
-    def test_1d_loads_every_address_when_length_is_not_a_power_of_two(self, qsharp_test_context, num_swap_bits):
-        _assert_1d_loads_every_address(qsharp_test_context, _DATA_1D_RAGGED, num_swap_bits)
+    def test_1d_loads_every_address_when_length_is_not_a_power_of_two(
+        self, qsharp_test_context, qsharp_test_utils, num_swap_bits
+    ):
+        _assert_1d_loads_every_address(qsharp_test_context, qsharp_test_utils, _DATA_1D_RAGGED, num_swap_bits)
 
     @pytest.mark.parametrize("data", [_DATA_1D, _DATA_1D_RAGGED])
-    def test_1d_auto_swap_width_loads_every_address(self, qsharp_test_context, data):
+    def test_1d_auto_swap_width_loads_every_address(self, qsharp_test_context, qsharp_test_utils, data):
         """``numSwapBits = -1`` hands the select/swap split to ``ComputeOptimalLambda1D``."""
-        _assert_1d_loads_every_address(qsharp_test_context, data, -1)
+        _assert_1d_loads_every_address(qsharp_test_context, qsharp_test_utils, data, -1)
 
     @pytest.mark.parametrize("outer_always_valid", [False, True])
     @pytest.mark.parametrize("num_swap_bits", [0, 1, 2])
-    def test_2d_word_loads_every_address(self, qsharp_test_context, num_swap_bits, outer_always_valid):
-        _assert_2d_loads_every_address(qsharp_test_context, _DATA_2D, num_swap_bits, outer_always_valid)
+    def test_2d_word_loads_every_address(
+        self, qsharp_test_context, qsharp_test_utils, num_swap_bits, outer_always_valid
+    ):
+        _assert_2d_loads_every_address(
+            qsharp_test_context, qsharp_test_utils, _DATA_2D, num_swap_bits, outer_always_valid
+        )
 
     @pytest.mark.parametrize("outer_always_valid", [False, True])
     @pytest.mark.parametrize("num_swap_bits", [0, 1, 2])
     def test_2d_word_loads_every_address_when_both_lengths_are_powers_of_two(
-        self, qsharp_test_context, num_swap_bits, outer_always_valid
+        self, qsharp_test_context, qsharp_test_utils, num_swap_bits, outer_always_valid
     ):
         """No address is aliased onto a real row, so the in-range fixups must be no-ops."""
-        _assert_2d_loads_every_address(qsharp_test_context, _DATA_2D_POWER_OF_TWO, num_swap_bits, outer_always_valid)
+        _assert_2d_loads_every_address(
+            qsharp_test_context, qsharp_test_utils, _DATA_2D_POWER_OF_TWO, num_swap_bits, outer_always_valid
+        )
 
     @pytest.mark.parametrize("outer_always_valid", [False, True])
     @pytest.mark.parametrize("num_swap_bits", [0, 1, 2])
     def test_2d_word_loads_every_address_when_outer_length_is_not_a_power_of_two(
-        self, qsharp_test_context, num_swap_bits, outer_always_valid
+        self, qsharp_test_context, qsharp_test_utils, num_swap_bits, outer_always_valid
     ):
-        _assert_2d_loads_every_address(qsharp_test_context, _DATA_2D_RAGGED_OUTER, num_swap_bits, outer_always_valid)
+        _assert_2d_loads_every_address(
+            qsharp_test_context, qsharp_test_utils, _DATA_2D_RAGGED_OUTER, num_swap_bits, outer_always_valid
+        )
 
 
 class TestSelectSwapPreservesAddressPhases:
@@ -184,10 +192,10 @@ def _unlookup_toffolis(num_entries: int) -> int:
     return 2 ** math.ceil(address_bits / 2) + 2 ** (address_bits // 2) - address_bits - 2
 
 
-def _probe_toffolis(ctx, data, num_swap_bits, *, forward, adjoint):
+def _probe_toffolis(ctx, test_utils, data, num_swap_bits, *, forward, adjoint):
     """Trace ``TestSelectSwap2DResourceProbe`` and return its Toffoli count."""
     counts = ctx.logical_counts(
-        ctx.code.QDKChemistry.TestUtils.SelectSwapTests.TestSelectSwap2DResourceProbe,
+        test_utils.SelectSwapTests.TestSelectSwap2DResourceProbe,
         data,
         num_swap_bits,
         True,
@@ -204,7 +212,9 @@ class TestSelectSwap2DErasesByMeasurement:
         ("num_outer", "num_inner", "width"),
         [(4, 4, 5), (8, 4, 6), (6, 8, 7), (16, 8, 4)],
     )
-    def test_adjoint_costs_the_unlookup_whatever_the_swap_width(self, qsharp_test_context, num_outer, num_inner, width):
+    def test_adjoint_costs_the_unlookup_whatever_the_swap_width(
+        self, qsharp_test_context, qsharp_test_utils, num_outer, num_inner, width
+    ):
         """Erasure cost follows the table size alone, and undercuts the load it undoes."""
         ctx = qsharp_test_context
         data = [
@@ -213,8 +223,8 @@ class TestSelectSwap2DErasesByMeasurement:
         expected = _unlookup_toffolis(num_outer * num_inner)
 
         for num_swap_bits in (0, 1, 2):
-            forward = _probe_toffolis(ctx, data, num_swap_bits, forward=True, adjoint=False)
-            round_trip = _probe_toffolis(ctx, data, num_swap_bits, forward=True, adjoint=True)
+            forward = _probe_toffolis(ctx, qsharp_test_utils, data, num_swap_bits, forward=True, adjoint=False)
+            round_trip = _probe_toffolis(ctx, qsharp_test_utils, data, num_swap_bits, forward=True, adjoint=True)
 
             assert round_trip - forward == expected
             assert expected < forward

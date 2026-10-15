@@ -24,6 +24,7 @@ namespace QDKChemistry.TestUtils.AliasSamplingTests {
             let nCondBits = Ceiling(Lg(IntAsDouble(nCond)));
             let nQromOutput = bitsPrecision + nIndexBits + 2;
 
+            // Layout: [condition | index | uniform | flag | qrom].
             let conditionalReg = qs[0..nCondBits - 1];
             let indexReg = qs[nCondBits..nCondBits + nIndexBits - 1];
             let uniformReg = qs[nCondBits + nIndexBits..nCondBits + nIndexBits + bitsPrecision - 1];

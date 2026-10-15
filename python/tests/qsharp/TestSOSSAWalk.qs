@@ -48,6 +48,9 @@ namespace QDKChemistry.TestUtils.SOSSAWalkTests {
         let nInner = bBits + nFR;
         let nSpin = 2;
         let nSystem = 2 * numOrbitals;
+        // The gradient register is allocated only on the QROM path. It is conjugated back to
+        // |0...0>, so the direct path's state is recovered from the QROM dump by restricting
+        // to the gradient=|0...0> subspace.
         let nGradient = if usePhaseGradient { selectData.rotationBitPrecision } else { 0 };
         let total = nOuter + nInner + nSpin + nSystem + nGradient;
         use qs = Qubit[total];
@@ -69,6 +72,7 @@ namespace QDKChemistry.TestUtils.SOSSAWalkTests {
             if xoValue >= numOrbitals { X(innerReg[frStart]); }
             if xoValue >= numPositiveOneBody { X(innerReg[frStart + 1]); }
 
+            // Rank as the inner PREPARE's free-rider data would carry it: 0 for one-body.
             let rValue = if xoValue >= numOrbitals { (xoValue - numOrbitals) / selectData.numCopies } else { 0 };
             ApplyXorInPlace(rValue, innerReg[frStart + 2..frStart + nFR - 1]);
         }

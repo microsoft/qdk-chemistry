@@ -107,13 +107,15 @@ def pytest_collection_modifyitems(items):
 
 @pytest.fixture(scope="session")
 def qsharp_test_context():
-    """Create a shared Q# context containing the test-only sources."""
+    """Create a shared Q# context containing the test-only sources.
+
+    Building an ``ArithmeticOpTester`` here invalidates earlier testers, so use each one before building the next.
+    """
+    # Unrestricted: ArithmeticOpTester needs Std.ArithmeticTestUtils, which Adaptive_RIF does not resolve.
     context = create_qsharp_context(target_profile=TargetProfile.Unrestricted)
-    for path in sorted((Path(__file__).parent / "qsharp").glob("*.qs")):
-        try:
-            context.eval(path.read_text(encoding="utf-8"))
-        except Exception as error:
-            raise RuntimeError(f"failed to evaluate Q# test source {path.name}: {error}") from error
+    context.eval(
+        "\n".join(path.read_text(encoding="utf-8") for path in sorted((Path(__file__).parent / "qsharp").glob("*.qs")))
+    )
     return context
 
 

@@ -256,14 +256,10 @@ class TestTestOnlySourcesAreNotShipped:
         """A user context must not be able to call the test drivers."""
         chemistry = create_qsharp_context(profile).code.QDKChemistry
         assert not hasattr(chemistry, "TestUtils")
-        algorithm_names = {
-            "QDKChemistry.Utils.HadamardTest",
-            "QDKChemistry.Utils.HadamardTest.HadamardTest",
-        }
         shipped_helpers = [
             path
-            for path, name, _ in self._walk_namespaces(chemistry, "QDKChemistry")
-            if "Test" in name and path not in algorithm_names
+            for path, name, is_namespace in self._walk_namespaces(chemistry.Utils, "Utils")
+            if not is_namespace and (name.startswith("Test") or name.endswith("ForTest"))
         ]
         assert shipped_helpers == []
 
