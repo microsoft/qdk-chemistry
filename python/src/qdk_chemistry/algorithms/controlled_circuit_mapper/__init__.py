@@ -12,6 +12,7 @@ from .controlled_hubbard_plaquette_mapper import (
 )
 from .controlled_pauli_sequence_mapper import ControlledPauliSequenceMapper, ControlledPauliSequenceMapperSettings
 from .controlled_psp_mapper import ControlledPSPMapper, ControlledPSPMapperSettings
+from .controlled_sossa_mapper import ControlledSOSSAMapper, ControlledSOSSAMapperSettings
 from .controlled_swap_pauli_sequence_mapper import (
     ControlledSwapPauliSequenceMapper,
     ControlledSwapPauliSequenceMapperSettings,
@@ -26,6 +27,8 @@ __all__ = [
     "ControlledPSPMapperSettings",
     "ControlledPauliSequenceMapper",
     "ControlledPauliSequenceMapperSettings",
+    "ControlledSOSSAMapper",
+    "ControlledSOSSAMapperSettings",
     "ControlledSwapPauliSequenceMapper",
     "ControlledSwapPauliSequenceMapperSettings",
 ]

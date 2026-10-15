@@ -1,8 +1,11 @@
-"""Integration tests for unary-iteration QPE with the SOSSA block encoding.
+"""Integration tests for phase estimation with the SOSSA block encoding.
 
 Tests the full pipeline:
     DFTHCHamiltonianContainer → SOSSABuilder → UnitaryRepresentation
     → SOSSAMapper → Circuit → unary-iteration QPE → energy
+
+and its standard and iterative counterparts, which query the controlled walk built by
+ControlledSOSSAMapper instead of SOSSAMapper.
 """
 
 # --------------------------------------------------------------------------------------------
@@ -19,7 +22,10 @@ import pytest
 
 from qdk_chemistry.algorithms import available, create
 from qdk_chemistry.algorithms.hamiltonian_unitary_builder.block_encoding.sossa import SOSSABuilder
+from qdk_chemistry.algorithms.phase_estimation.iterative_phase_estimation import IterativePhaseEstimation
+from qdk_chemistry.algorithms.phase_estimation.standard_phase_estimation import StandardPhaseEstimation
 from qdk_chemistry.algorithms.phase_estimation.unary_phase_estimation import UnaryPhaseEstimation
+from qdk_chemistry.algorithms.state_preparation.qrom_state_prep import QROMStatePreparation
 from qdk_chemistry.data import (
     AlgorithmRef,
     Circuit,
@@ -35,6 +41,7 @@ from qdk_chemistry.utils.qsharp import QSHARP_UTILS
 
 from .helpers import (
     create_random_factorized_hamiltonian,
+    create_sparse_wavefunction,
     create_test_orbitals,
     factorized_hamiltonian_to_sossa_operator,
 )
@@ -241,18 +248,19 @@ def _get_ground_state_and_energy(h_matrix, num_orbitals, nalpha=1, nbeta=1):
         sector_indices = list(range(len(eigenvalues)))
 
     # Permute from Python Kron convention to Q# convention
-    perm = _python_to_qsharp_permutation(num_orbitals)
-    signs = _python_to_qsharp_sign(num_orbitals)
     gs_idx = sector_indices[0]
     gs_energy = eigenvalues[gs_idx]
-    gs_vec = eigenvectors[:, gs_idx]
+    return gs_energy, _to_qsharp_ordering(eigenvectors[:, gs_idx], num_orbitals)
 
-    # Apply permutation
-    gs_vec_qs = np.zeros(dim)
-    for i in range(dim):
-        gs_vec_qs[perm[i]] = signs[i] * gs_vec[i]
 
-    return gs_energy, gs_vec_qs
+def _to_qsharp_ordering(state_vector, num_orbitals):
+    """Reorder a Python-Kron state vector into the Q# spin-blocked basis, with fermionic signs."""
+    perm = _python_to_qsharp_permutation(num_orbitals)
+    signs = _python_to_qsharp_sign(num_orbitals)
+    reordered = np.zeros(len(state_vector))
+    for i in range(len(state_vector)):
+        reordered[perm[i]] = signs[i] * state_vector[i]
+    return reordered
 
 
 def _python_to_qsharp_permutation(num_orbitals):
@@ -296,6 +304,24 @@ def _python_to_qsharp_sign(num_orbitals):
 # ═══════════════════════════════════════════════════════════════════════════════
 # SOSSA QPE helper
 # ═══════════════════════════════════════════════════════════════════════════════
+
+
+def _direct_state_prep(state_vector):
+    """Return a circuit that prepares a dense real ``state_vector`` given in the Q# ordering."""
+    num_system_qubits = len(state_vector).bit_length() - 1
+    state_prep_params = {
+        "rowMap": list(range(num_system_qubits - 1, -1, -1)),
+        "stateVector": np.asarray(state_vector, dtype=float).tolist(),
+        "expansionOps": [],
+        "numQubits": num_system_qubits,
+    }
+    return Circuit(
+        qsharp_factory=QsharpFactoryData(
+            program=QSHARP_UTILS.StatePreparation.MakeStatePreparationCircuit,
+            parameter=state_prep_params,
+        ),
+        qsharp_op=QSHARP_UTILS.StatePreparation.MakeStatePreparationOp(state_prep_params),
+    )
 
 
 def _sossa_circuit_mapper_ref(
@@ -407,21 +433,7 @@ def _run_sossa_unary_qpe(num_queries, mapper_kwargs=None, shots=100, seed=202508
     )
     sossa_op = factorized_hamiltonian_to_sossa_operator(fh)
     container = SOSSABuilder().run(sossa_op).get_container()
-
-    num_system_qubits = 2 * n_orb
-    state_prep_params = {
-        "rowMap": list(range(num_system_qubits - 1, -1, -1)),
-        "stateVector": gs_vec.real.tolist(),
-        "expansionOps": [],
-        "numQubits": num_system_qubits,
-    }
-    state_prep = Circuit(
-        qsharp_factory=QsharpFactoryData(
-            program=QSHARP_UTILS.StatePreparation.MakeStatePreparationCircuit,
-            parameter=state_prep_params,
-        ),
-        qsharp_op=QSHARP_UTILS.StatePreparation.MakeStatePreparationOp(state_prep_params),
-    )
+    state_prep = _direct_state_prep(gs_vec.real)
 
     qpe = UnaryPhaseEstimation(shots=shots)
     qpe.settings().set(
@@ -448,6 +460,167 @@ def _run_sossa_unary_qpe(num_queries, mapper_kwargs=None, shots=100, seed=202508
         f"exact {exact_doubled_phase:.6f} (num_bins={num_bins})."
     )
     return result, gs_energy, physical_energy, container
+
+
+#: Block-encoding normalization of :func:`_exact_walk_phase_problem`, which its ``b`` leaves unchanged.
+_EXACT_PHASE_LAMBDA = 1.69
+
+#: Phase-gradient width that holds every rotation of :func:`_exact_walk_phase_problem` exactly.
+_EXACT_PHASE_ROTATION_BITS = 4
+
+
+def _exact_walk_phase_problem(walk_phase):
+    r"""Build a two-orbital SOSSA problem with an eigenstate at an exactly representable walk phase.
+
+    The one-body matrix ``[[a, b], [b, a]]`` and the single two-body rank, with basis vectors
+    :math:`(1, \pm 1)/\sqrt{2}` and weights ``w1, w2``, share eigenvectors. Every Givens angle the
+    builder derives is then a multiple of :math:`\pi/4`, which ``QuantizeGivensAngle`` holds exactly
+    at :data:`_EXACT_PHASE_ROTATION_BITS` bits, so the phase-gradient SELECT adds no rotation error.
+    The Hamiltonian is also diagonal in the bonding/antibonding occupations: doubly occupying the
+    bonding orbital is an eigenstate of physical energy :math:`2(a + b) + w_1^2`. While both
+    corrected one-body eigenvalues stay negative, neither :math:`\Lambda` nor
+    :math:`E_\mathrm{SOS} = -2\Lambda` depends on ``b``, so
+
+    .. math:: b = \tfrac12\left[\Lambda(\cos 2\pi\phi - 1) - w_1^2\right] - a
+
+    places that eigenstate at walk phase :math:`\phi`, by
+    :math:`\cos 2\pi\phi = (E - E_\mathrm{SOS})/\Lambda - 1`. A phase that is a multiple of
+    :math:`2^{-n}` is measured exactly by ``n`` phase bits, so a QPE result can be compared
+    exactly rather than within a bin.
+
+    Args:
+        walk_phase: Target walk phase, in ``[0, 1/2]``.
+
+    Returns:
+        A dict with the SOSSA qubit ``operator``, its ``container``, the eigenstate ``state`` in
+        the Q# ordering, and its ``energy`` measured against the physical Hamiltonian.
+
+    """
+    a, w1, w2 = -1.0, 0.5, 0.3
+    b = 0.5 * (_EXACT_PHASE_LAMBDA * (math.cos(2.0 * math.pi * walk_phase) - 1.0) - w1**2) - a
+    s = 1.0 / math.sqrt(2.0)
+    h1 = np.array([[a, b], [b, a]])
+    basis_vectors = np.array([[[s, s], [s, -s]]])
+    two_body_weights = np.array([[[w1], [w2]]])
+    identity_weight = np.zeros((1, 1))
+    n_orb = 2
+
+    fh = DFTHCHamiltonianContainer(
+        one_body_integrals=h1,
+        u_matrices=basis_vectors.flatten(),
+        w_matrices=two_body_weights.flatten(),
+        wb_matrix=identity_weight,
+        orbitals=create_test_orbitals(n_orb),
+        core_energy=0.0,
+        inactive_fock_matrix=np.zeros((n_orb, n_orb)),
+    )
+    operator = factorized_hamiltonian_to_sossa_operator(fh)
+    container = SOSSABuilder().run(operator).get_container()
+    assert container.normalization == pytest.approx(_EXACT_PHASE_LAMBDA)
+    for angles in (container.select.one_body_rotation_angles, container.select.two_body_rotation_angles):
+        steps = np.asarray(angles) / (math.pi / 4.0)
+        np.testing.assert_allclose(steps, np.round(steps), atol=1e-12)
+
+    gap_energies, gap_states = np.linalg.eigh(
+        _build_dfthc_hamiltonian_matrix(h1, basis_vectors, two_body_weights, identity_weight)
+    )
+    distances = np.abs(gap_energies - container.normalization * (1.0 + math.cos(2.0 * math.pi * walk_phase)))
+    index = int(np.argmin(distances))
+    assert distances[index] < 1e-9, "no eigenstate at the target walk phase"
+    assert np.partition(distances, 1)[1] > 0.1, "the target eigenstate must be non-degenerate"
+    assert _energy_to_qpe_phase(gap_energies[index], container.normalization) == pytest.approx(walk_phase)
+
+    state = gap_states[:, index]
+    physical = _build_physical_hamiltonian_matrix(h1, basis_vectors, two_body_weights)
+    return {
+        "operator": operator,
+        "container": container,
+        "state": _to_qsharp_ordering(state, n_orb),
+        "energy": float(state @ physical @ state),
+    }
+
+
+def _exact_phase_state_prep(state_vector, consumes_gradient):
+    """Prepare ``state_vector``, optionally with a QROM preparation that shares the walk's gradient.
+
+    The QROM preparation is built with ``allocate_phase_gradient=False``, so it declares a
+    :data:`_EXACT_PHASE_ROTATION_BITS`-qubit phase gradient that phase estimation must hand it,
+    the same register the controlled walk consumes.
+    """
+    if not consumes_gradient:
+        return _direct_state_prep(state_vector)
+    support = np.flatnonzero(np.abs(state_vector) > 1e-12)
+    wavefunction = create_sparse_wavefunction(
+        len(state_vector).bit_length() - 1, support.tolist(), np.asarray(state_vector)[support].tolist()
+    )
+    state_prep = QROMStatePreparation(
+        rotation_bit_precision=_EXACT_PHASE_ROTATION_BITS, allocate_phase_gradient=False
+    ).run(wavefunction)
+    assert state_prep.metadata.num_phase_gradient_ancillas == _EXACT_PHASE_ROTATION_BITS
+    return state_prep
+
+
+def _controlled_walk_builder_settings(num_bits, select_algorithm):
+    """Settings of a QPE circuit builder that queries the controlled SOSSA walk."""
+    return {
+        "num_bits": num_bits,
+        "unitary_builder": AlgorithmRef("hamiltonian_unitary_builder", "sossa"),
+        "controlled_circuit_mapper": AlgorithmRef(
+            "controlled_circuit_mapper",
+            "sossa",
+            outer_prepare_algorithm=AlgorithmRef("state_prep", "dense_pure_state"),
+            inner_prepare_algorithm="direct",
+            select_algorithm=select_algorithm,
+            rotation_bit_precision=_EXACT_PHASE_ROTATION_BITS,
+        ),
+    }
+
+
+def _run_controlled_walk_qpe(qpe, builder_name, problem, *, num_bits, select_algorithm, prepare_consumes_gradient):
+    """Run ``qpe`` on ``problem`` through the controlled SOSSA walk."""
+    qpe.settings().set(
+        "qpe_circuit_builder",
+        AlgorithmRef(
+            "qpe_circuit_builder", builder_name, **_controlled_walk_builder_settings(num_bits, select_algorithm)
+        ),
+    )
+    qpe.settings().set("circuit_executor", AlgorithmRef("circuit_executor", "qdk_sparse_state_simulator", seed=7))
+    return qpe.run(
+        qubit_hamiltonian=problem["operator"],
+        state_preparation=_exact_phase_state_prep(problem["state"], prepare_consumes_gradient),
+    )
+
+
+def _walk_qpe_circuit_counts(
+    builder_name, problem, *, num_bits, select_algorithm, prepare_consumes_gradient, shots, **builder_settings
+):
+    """Measure the single circuit ``builder_name`` builds for ``problem`` and return its MSB-first bitstring counts.
+
+    The drivers reduce the shots to a single outcome, the most frequent bitstring for
+    :class:`StandardPhaseEstimation` and a per-bit majority vote for :class:`IterativePhaseEstimation`,
+    which hides a minority of wrong shots, so the full distribution is read from the circuit directly.
+    """
+    builder = create(
+        "qpe_circuit_builder",
+        builder_name,
+        **_controlled_walk_builder_settings(num_bits, select_algorithm),
+        **builder_settings,
+    )
+    (circuit,) = builder.run(
+        state_preparation=_exact_phase_state_prep(problem["state"], prepare_consumes_gradient),
+        qubit_hamiltonian=problem["operator"],
+    )
+    executor = create("circuit_executor", "qdk_sparse_state_simulator", seed=7)
+    return executor.run(circuit, shots=shots).bitstring_counts
+
+
+#: ``(select_algorithm, prepare_consumes_gradient)`` for the controlled-walk QPE tests. A QROM
+#: preparation needs a gradient to share, so it is paired only with the phase-gradient SELECT.
+_CONTROLLED_WALK_CASES = [
+    pytest.param("qrom_phase_gradient", False, id="gradient_walk"),
+    pytest.param("qrom_phase_gradient", True, id="gradient_walk_and_prep"),
+    pytest.param("direct", False, id="gradient_free_walk"),
+]
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -706,30 +879,170 @@ class TestSOSSAQPEIntegration:
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
-# Resource estimation
+# Standard and iterative QPE through the controlled walk
 # ═══════════════════════════════════════════════════════════════════════════════
 
 
-class TestSOSSAQPEScope:
-    """SOSSA is supported under unary QPE only."""
+class TestControlledSOSSAMapper:
+    """The ``sossa`` controlled circuit mapper, which carries the SOSSA walk into standard and iterative QPE."""
 
-    def test_no_controlled_mapper_accepts_the_sossa_block_encoding(self):
-        """Iterative and standard QPE cannot drive the SOSSA walk.
-
-        Both build their circuits through a ``controlled_circuit_mapper``, so SOSSA would
-        need one that accepts ``SOSSABlockEncodingContainer``. None is registered, which is what
-        confines SOSSA to ``qdk_unary``. If a controlled SOSSA mapper is ever added, this
-        test fails and the unary-only claim in the mapper and container docstrings should
-        be revisited alongside it.
-        """
+    @staticmethod
+    def _operator():
         factorized = create_random_factorized_hamiltonian(num_orbitals=2, num_ranks=1, num_bases=2, num_copies=1)
-        unitary = SOSSABuilder().run(factorized_hamiltonian_to_sossa_operator(factorized))
+        return factorized_hamiltonian_to_sossa_operator(factorized)
 
-        mappers = list(available("controlled_circuit_mapper"))
-        assert mappers, "expected at least one registered controlled circuit mapper"
-        for name in mappers:
+    def test_only_the_sossa_controlled_mapper_accepts_the_block_encoding(self):
+        """Every other controlled mapper rejects the SOSSA container rather than mis-mapping it."""
+        unitary = SOSSABuilder().run(self._operator())
+
+        mappers = set(available("controlled_circuit_mapper"))
+        assert "sossa" in mappers
+        assert mappers - {"sossa"}, "expected other registered controlled circuit mappers"
+        for name in mappers - {"sossa"}:
             with pytest.raises(ValueError, match="not supported"):
                 create("controlled_circuit_mapper", name).run(unitary)
+
+    @pytest.mark.parametrize("select_algorithm", ["direct", "qrom_phase_gradient"])
+    def test_walk_acts_on_the_block_encoding_register(self, select_algorithm):
+        """Controlled-W^power declares the register and gradient of the block encoding it repeats.
+
+        Phase estimation reads the target width and the gradient from the controlled circuit, so
+        both must match the uncontrolled ``SOSSAMapper`` -- independent of the power -- and the
+        gradient must be exactly the phase-gradient SELECT's.
+        """
+        operator = self._operator()
+        block = create("circuit_mapper", "sossa", select_algorithm=select_algorithm).run(SOSSABuilder().run(operator))
+        walk = create("controlled_circuit_mapper", "sossa", select_algorithm=select_algorithm).run(
+            SOSSABuilder(power=4).run(operator)
+        )
+
+        assert walk.num_qubits == block.num_qubits
+        gradient = walk.metadata.num_phase_gradient_ancillas
+        assert gradient == block.metadata.num_phase_gradient_ancillas
+        expected = (
+            create("controlled_circuit_mapper", "sossa").settings().get("rotation_bit_precision")
+            if select_algorithm == "qrom_phase_gradient"
+            else 0
+        )
+        assert gradient == expected
+
+    @pytest.mark.parametrize("control_indices", [[1], [0, 1]])
+    def test_rejects_controls_other_than_one_qubit_at_index_zero(self, control_indices):
+        """The walk takes a single control qubit, which phase estimation puts at index 0."""
+        unitary = SOSSABuilder().run(self._operator())
+        mapper = create("controlled_circuit_mapper", "sossa", control_indices=control_indices)
+        with pytest.raises(ValueError, match="single control qubit at index 0"):
+            mapper.run(unitary)
+
+
+class TestSOSSAControlledWalkQPE:
+    r"""Standard and iterative QPE through the controlled SOSSA walk.
+
+    Each case runs the phase-gradient SELECT, whose walk consumes a gradient that phase estimation
+    prepares once and shares, both with a state preparation that ignores the gradient and with a
+    QROM preparation that consumes the same register. The gradient-free ``direct`` SELECT runs as a
+    control. The walk carries nonzero ancillas besides the gradient in every case.
+
+    Phase estimation starts from :math:`|\psi\rangle|0\rangle`, an equal superposition of the
+    walk eigenvectors at :math:`\pm\phi`, so a shot measures :math:`\phi` or :math:`1 - \phi`.
+    Both decode the same energy. :func:`_exact_walk_phase_problem` puts :math:`\phi` on a multiple of
+    :math:`2^{-n}`, so every shot lands exactly on one of the two.
+    """
+
+    @pytest.mark.parametrize(("select_algorithm", "prepare_consumes_gradient"), _CONTROLLED_WALK_CASES)
+    def test_standard_qpe_measures_the_walk_phase(self, select_algorithm, prepare_consumes_gradient):
+        r"""Standard QPE measures :math:`\phi = 3/8` exactly and decodes the physical energy.
+
+        :math:`3/8` is not invariant under :math:`\phi \to \phi + 1/2`, so a walk off by a sign --
+        a controlled reflection whose global phase turned relative -- would land on 1/8 or 7/8.
+        A walk that is only partly wrong, such as one whose reflection about the ancilla zero state
+        ignores the control, or one fed an unprepared gradient, still peaks on 3/8 or 5/8 but leaks
+        shots onto other phases. The driver keeps only the peak, so every shot of the circuit is
+        checked as well.
+        """
+        problem = _exact_walk_phase_problem(3.0 / 8.0)
+        result = _run_controlled_walk_qpe(
+            StandardPhaseEstimation(shots=8),
+            "qdk_standard",
+            problem,
+            num_bits=3,
+            select_algorithm=select_algorithm,
+            prepare_consumes_gradient=prepare_consumes_gradient,
+        )
+
+        assert any(result.phase_fraction == pytest.approx(phase, abs=1e-12) for phase in (3.0 / 8.0, 5.0 / 8.0)), (
+            f"measured phase {result.phase_fraction} is neither 3/8 nor 5/8"
+        )
+        assert result.raw_energy == pytest.approx(problem["energy"], abs=1e-9)
+
+        counts = _walk_qpe_circuit_counts(
+            "qdk_standard",
+            problem,
+            num_bits=3,
+            select_algorithm=select_algorithm,
+            prepare_consumes_gradient=prepare_consumes_gradient,
+            shots=16,
+        )
+        assert set(counts) <= {"011", "101"}, f"shots leaked off 3/8 and 5/8: {counts}"
+
+    @pytest.mark.parametrize(("select_algorithm", "prepare_consumes_gradient"), _CONTROLLED_WALK_CASES)
+    def test_iterative_qpe_measures_the_walk_phase(self, select_algorithm, prepare_consumes_gradient):
+        r"""Iterative QPE measures :math:`\phi = 1/4` exactly and decodes the physical energy.
+
+        Iterations are separate circuits, so the :math:`\pm\phi` branches never collapse and an
+        iteration at power :math:`p` with feedback :math:`\omega` measures 1 with probability
+        :math:`\tfrac12[1 - \cos(2\pi p\phi)\cos\omega]`. For a generic :math:`\phi` the feedback
+        bits then become coin flips. At :math:`\phi = 1/4` every iteration but the last is
+        deterministic, and the last only picks :math:`1/4` or :math:`3/4`.
+        """
+        problem = _exact_walk_phase_problem(1.0 / 4.0)
+        result = _run_controlled_walk_qpe(
+            IterativePhaseEstimation(shots_per_bit=3),
+            "qdk_iterative",
+            problem,
+            num_bits=3,
+            select_algorithm=select_algorithm,
+            prepare_consumes_gradient=prepare_consumes_gradient,
+        )
+
+        assert any(result.phase_fraction == pytest.approx(phase, abs=1e-12) for phase in (1.0 / 4.0, 3.0 / 4.0)), (
+            f"measured phase {result.phase_fraction} is neither 1/4 nor 3/4"
+        )
+        assert result.raw_energy == pytest.approx(problem["energy"], abs=1e-9)
+
+    @pytest.mark.parametrize(("select_algorithm", "prepare_consumes_gradient"), _CONTROLLED_WALK_CASES)
+    def test_iterative_qpe_iteration_measures_the_walk_overlap(self, select_algorithm, prepare_consumes_gradient):
+        r"""A power-1 IQPE iteration without feedback measures 1 with probability :math:`(1 - \cos 2\pi\phi)/2`.
+
+        At :math:`\phi = 1/4` that power-1 iteration is a coin flip, so the full IQPE run above
+        cannot tell a correct walk from one that is off by a sign, whose Ref_B ignores the control,
+        or that is fed an unprepared gradient. At :math:`\phi = 3/8` the probability is
+        :math:`(2 + \sqrt2)/4 \approx 0.854`, while a sign error gives about 0.146, an uncontrolled
+        Ref_B gives 0.5, and an unprepared gradient also lands far below. The shot count is checked
+        within :math:`4\sigma` of the correct binomial mean.
+        """
+        walk_phase = 3.0 / 8.0
+        shots = 64
+        counts = _walk_qpe_circuit_counts(
+            "qdk_iterative",
+            _exact_walk_phase_problem(walk_phase),
+            num_bits=1,
+            select_algorithm=select_algorithm,
+            prepare_consumes_gradient=prepare_consumes_gradient,
+            shots=shots,
+            num_iteration=0,
+        )
+
+        probability_one = 0.5 * (1.0 - math.cos(2.0 * math.pi * walk_phase))
+        tolerance = 4.0 * math.sqrt(shots * probability_one * (1.0 - probability_one))
+        assert abs(counts.get("1", 0) - shots * probability_one) <= tolerance, (
+            f"expected about {shots * probability_one:.1f} of {shots} shots on 1, got {counts}"
+        )
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# Resource estimation
+# ═══════════════════════════════════════════════════════════════════════════════
 
 
 class TestSOSSAResourceEstimation:

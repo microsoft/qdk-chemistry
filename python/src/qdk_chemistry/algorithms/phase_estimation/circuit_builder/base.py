@@ -126,10 +126,11 @@ class QpeCircuitBuilder(Algorithm):
         circuit_mapper = self._create_nested("controlled_circuit_mapper")
         circuit_mapper.settings().update("control_indices", [0])
         circuit = circuit_mapper.run(unitary_rep)
+        # A mapper that knows its target width declares it; the container's width omits scratch the
+        # mapper chose, such as a phase gradient.
+        num_target_qubits = unitary_rep.get_num_qubits() if circuit.num_qubits is None else circuit.num_qubits
         # Phase estimation appends the shared gradient itself, so it is not an ancilla of the unitary.
-        num_ancilla_qubits = (
-            unitary_rep.get_num_qubits() - num_system_qubits - circuit.metadata.num_phase_gradient_ancillas
-        )
+        num_ancilla_qubits = num_target_qubits - num_system_qubits - circuit.metadata.num_phase_gradient_ancillas
         return circuit, num_ancilla_qubits, num_system_qubits
 
     def _controlled_circuit_and_widths(

@@ -290,6 +290,21 @@ Each layer of the plaquette step is a tower of same-angle :math:`R_z` rotations,
      - bool
      - Phase each Hamming weight by one addition into a catalyst prepared once per angle (default ``True``), or synthesize each place value as its own :math:`R_z` when ``False``. Ignored when ``use_hamming_weight_phasing`` is False.
 
+.. _sossa-walk-mapper:
+
+SOSSA walk mapper
+~~~~~~~~~~~~~~~~~
+
+.. rubric:: Factory name: ``"sossa"``
+
+:class:`~qdk_chemistry.algorithms.controlled_circuit_mapper.ControlledSOSSAMapper` maps the ``SOSSABlockEncodingContainer`` from the ``"sossa"`` :doc:`HamiltonianUnitaryBuilder <hamiltonian_unitary_builder>` to the controlled quantum walk :math:`C\text{-}W^{\text{power}}` with :math:`W = \mathrm{Ref}_a \cdot B` and :math:`B = U^\dagger \cdot \mathrm{Ref}_B \cdot U` :cite:`Low2025`, so standard and iterative :doc:`PhaseEstimation <phase_estimation>` can query it.
+Only the two reflections are controlled: with the control off :math:`U^\dagger U = I`, so the PREPARE and SELECT oracles of :math:`U` run uncontrolled.
+The target register is ``[system | ancillas | phase gradient]``. The circuit declares the phase gradient width in its metadata, so phase estimation prepares the gradient once and shares it with every walk power and with a state preparation that consumes it.
+
+.. rubric:: Settings
+
+The mapper takes the oracle settings of the uncontrolled ``"sossa"`` circuit mapper: ``outer_prepare_algorithm``, ``inner_prepare_algorithm`` (``"controlled_alias_sampling"`` or ``"direct"``), ``select_algorithm`` (``"qrom_phase_gradient"`` or ``"direct"``), ``rotation_bit_precision``, and ``coefficient_bit_precision``.
+
 Related classes
 ---------------
 
