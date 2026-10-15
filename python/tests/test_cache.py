@@ -10,6 +10,7 @@ from __future__ import annotations
 import importlib.metadata
 import json
 import logging
+from typing import Any
 from unittest.mock import Mock
 
 import numpy as np
@@ -501,6 +502,7 @@ class TestFolderCacheData:
         suffix = "ndarray.npy" if manifest_kind == "ndarray" else "orbitals.h5"
         outside = tmp_path / f"outside.{suffix}"
         outside.write_bytes(b"preserve")
+        manifest: dict[str, Any]
         if manifest_kind == "legacy":
             manifest = {"type": "orbitals", "items": ["../outside"]}
             path = cache_dir / "list_hash.list[orbitals].json"
