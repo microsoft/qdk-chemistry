@@ -1583,6 +1583,31 @@ TEST_F(HamiltonianTest, SparseContainerHDF5RejectsMalformedDatasetShapes) {
   }
 }
 
+TEST_F(HamiltonianTest, SparseContainerHDF5RejectsNonNativePackedTypes) {
+  SparseHamiltonianContainer container(one_body, two_body, core_energy);
+  H5::FileAccPropList properties;
+  properties.setCore(65536, false);
+  const auto* swapped = H5::PredType::NATIVE_DOUBLE.getOrder() == H5T_ORDER_LE
+                            ? &H5::PredType::IEEE_F64BE
+                            : &H5::PredType::IEEE_F64LE;
+  for (const bool two_body_dataset : {false, true}) {
+    const auto* name = two_body_dataset ? "two_body_integrals_sparse"
+                                        : "one_body_integrals_alpha_sparse";
+    const hsize_t dims[] = {1, two_body_dataset ? hsize_t{3} : hsize_t{2}};
+    for (const auto* type :
+         {&H5::PredType::NATIVE_INT, &H5::PredType::NATIVE_FLOAT, swapped}) {
+      H5::H5File file("sparse-packed-type.h5", H5F_ACC_TRUNC,
+                      H5::FileCreatPropList::DEFAULT, properties);
+      auto group = file.createGroup("container");
+      container.to_hdf5(group);
+      group.unlink(name);
+      group.createDataSet(name, *type, H5::DataSpace(2, dims));
+      EXPECT_THROW(SparseHamiltonianContainer::from_hdf5(group),
+                   std::runtime_error);
+    }
+  }
+}
+
 TEST_F(HamiltonianTest, SparseContainerHDF5RejectsMalformedScalarAttributes) {
   SparseHamiltonianContainer container(one_body, core_energy);
   H5::FileAccPropList properties;

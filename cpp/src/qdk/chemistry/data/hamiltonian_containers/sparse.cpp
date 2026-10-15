@@ -535,6 +535,13 @@ SparseHamiltonianContainer::from_hdf5(H5::Group& group) {
       if (dims[1] != packed_width && dims[1] != legacy_width) {
         throw std::runtime_error("Invalid sparse integral dataset width");
       }
+      // Packed rows hold index bit patterns, which survive only when the
+      // stored type is the native double the writer used.
+      if (dims[1] == packed_width &&
+          !(dataset.getDataType() == H5::PredType::NATIVE_DOUBLE)) {
+        throw std::runtime_error(
+            "Packed sparse integral dataset must use native double precision");
+      }
       std::vector<double> buffer;
       if (dims[0] > buffer.max_size() / dims[1]) {
         throw std::runtime_error("Sparse integral dataset is too large");
