@@ -4,6 +4,7 @@
 
 #include "scf/guess.h"
 
+#include <qdk/chemistry/scf/config.h>
 #include <qdk/chemistry/scf/core/types.h>
 
 #include <Eigen/Dense>
@@ -13,7 +14,10 @@
 #include <fstream>
 #include <iostream>
 #include <map>
+#include <optional>
+#include <qdk/chemistry/utils/archive.hpp>
 #include <qdk/chemistry/utils/logger.hpp>
+#include <system_error>
 #include <vector>
 
 #include "scf_algorithm/asahf.h"
@@ -22,23 +26,31 @@
 namespace qdk::chemistry::scf {
 void atom_guess(const BasisSet& obs, const Molecule& mol, double* D) {
   QDK_LOG_TRACE_ENTERING();
-  std::filesystem::path guess_chk(std::filesystem::temp_directory_path() /
-                                  "qdk" / "chemistry");
-  if (obs.pure) {
-    guess_chk = guess_chk / "guess" / (obs.name + "_pure");
-  } else {
-    guess_chk = guess_chk / "guess" / (obs.name + "_cart");
+  // Precomputed atomic guesses ship in the basis archive next to the basis
+  // JSON. Names that are not a single path component never select an archive.
+  const auto guess_name = obs.name + (obs.pure ? "_pure" : "_cart");
+  const std::filesystem::path name(obs.name);
+  const auto archive_path = QDKChemistryConfig::get_resources_dir() /
+                            "compressed" / (obs.name + ".tar.gz");
+  std::error_code error;
+  std::optional<utils::ArchiveDirectory> archive;
+  std::optional<std::filesystem::path> guess_chk;
+  if (!obs.name.empty() && name.filename() == name &&
+      std::filesystem::is_regular_file(archive_path, error)) {
+    archive.emplace();
+    archive->extract(archive_path);
+    guess_chk = archive->find(std::filesystem::path("guess") / guess_name);
   }
 
   int N = obs.num_atomic_orbitals;
   RowMajorMatrix nD = RowMajorMatrix::Zero(N, N);
-  if (!std::filesystem::exists(guess_chk)) {
+  if (!guess_chk) {
     QDK_LOGGER().info("Guess file {} not found, generating atomic guesses",
-                      guess_chk.string());
+                      guess_name);
     get_atom_guess(obs, mol, nD);
   } else {
     std::map<int, RowMajorMatrix> atom_dm;
-    std::ifstream fin(guess_chk);
+    std::ifstream fin(*guess_chk);
     int atomic_number;
     while (fin >> atomic_number) {
       int n;

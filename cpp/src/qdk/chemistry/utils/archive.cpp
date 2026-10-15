@@ -186,7 +186,7 @@ void ArchiveDirectory::extract(const std::filesystem::path& archive) const {
 #endif
 }
 
-std::filesystem::path ArchiveDirectory::file(
+std::optional<std::filesystem::path> ArchiveDirectory::find(
     const std::filesystem::path& relative) const {
   const auto root = std::filesystem::weakly_canonical(_path / "contents");
   const auto path = std::filesystem::weakly_canonical(root / relative);
@@ -196,11 +196,21 @@ std::filesystem::path ArchiveDirectory::file(
         "Extracted basis file is outside the extraction directory: " +
         relative.string());
   }
-  if (!std::filesystem::is_regular_file(path)) {
-    throw std::invalid_argument("Basis set JSON file does not exist: " +
-                                path.string());
+  std::error_code error;
+  if (!std::filesystem::is_regular_file(path, error)) {
+    return std::nullopt;
   }
   return path;
+}
+
+std::filesystem::path ArchiveDirectory::file(
+    const std::filesystem::path& relative) const {
+  auto path = find(relative);
+  if (!path) {
+    throw std::invalid_argument("Basis set JSON file does not exist: " +
+                                (_path / "contents" / relative).string());
+  }
+  return *path;
 }
 
 }  // namespace qdk::chemistry::utils
