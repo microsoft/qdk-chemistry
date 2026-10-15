@@ -40,6 +40,7 @@ _BASE_PROFILE_FILES = (
     "HammingWeightPhasing.qs",
     "HubbardPlaquette.qs",
     "PauliExp.qs",
+    "PhaseGradient.qs",
     "MeasurementBasis.qs",
     "Select.qs",
     "PrepSelPrep.qs",

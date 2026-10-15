@@ -22,6 +22,7 @@ from qdk_chemistry.algorithms.phase_estimation.circuit_builder.iterative_builder
 from qdk_chemistry.algorithms.phase_estimation.circuit_builder.standard_builder import (
     QdkStandardQpeCircuitBuilder,
 )
+from qdk_chemistry.algorithms.state_preparation.qrom_state_prep import QROMStatePreparation
 from qdk_chemistry.data import (
     AlgorithmRef,
     Circuit,
@@ -30,9 +31,11 @@ from qdk_chemistry.data import (
     QubitOperator,
     UnitaryRepresentation,
 )
-from qdk_chemistry.data.circuit import QsharpFactoryData
+from qdk_chemistry.data.circuit import CircuitMetadata, QsharpFactoryData
 from qdk_chemistry.data.unitary_representation.containers.base import UnitaryContainer
 from qdk_chemistry.utils.qsharp import QSHARP_UTILS, get_qsharp_context
+
+from .helpers import create_dense_wavefunction
 
 
 @dataclass(frozen=True)
@@ -497,6 +500,7 @@ def _stub_nested(
     *,
     num_qubits: int,
     num_system_qubits: int,
+    num_gradient_qubits: int = 0,
 ) -> tuple[Mock, Mock]:
     """Swap the builder's nested algorithms for mocks whose unitary has the given widths."""
     unitary_builder = Mock()
@@ -504,7 +508,9 @@ def _stub_nested(
         Mock(spec=UnitaryContainer, num_qubits=num_qubits, num_system_qubits=num_system_qubits)
     )
     circuit_mapper = Mock()
-    circuit_mapper.run.return_value = Mock(_qsharp_op=object())
+    circuit_mapper.run.return_value = Mock(
+        _qsharp_op=object(), metadata=CircuitMetadata(num_phase_gradient_ancillas=num_gradient_qubits)
+    )
     nested = {"unitary_builder": unitary_builder, "controlled_circuit_mapper": circuit_mapper}
     monkeypatch.setattr(builder, "_create_nested", nested.__getitem__)
     return unitary_builder, circuit_mapper
@@ -610,3 +616,40 @@ def test_combined_model_unitary_validates_state_preparation_width(monkeypatch: p
 
     with pytest.raises(ValueError, match="State preparation acts on 4 qubits but phase estimation applies it to 3"):
         builder.run(state_preparation=state_preparation, qubit_hamiltonian=model)
+
+
+@pytest.mark.parametrize("builder_class", [QdkStandardQpeCircuitBuilder, QdkIterativeQpeCircuitBuilder])
+def test_unitary_gradient_is_not_an_ancilla(
+    monkeypatch: pytest.MonkeyPatch,
+    builder_class: type[QdkStandardQpeCircuitBuilder | QdkIterativeQpeCircuitBuilder],
+) -> None:
+    """QPE appends the gradient a unitary declares after the unitary's ancillas, so it must not count it twice."""
+    builder = builder_class(num_bits=1)
+    _stub_nested(builder, monkeypatch, num_qubits=6, num_system_qubits=3, num_gradient_qubits=2)
+    widths: list[tuple[int, int]] = []
+    monkeypatch.setattr(builder, "_create_circuit_from_qsharp_op", lambda *args: widths.append(args[-2:]))
+
+    builder._run_impl(
+        Mock(_qsharp_op=object()), FermiHubbardModelHamiltonianDescription(LatticeGeometry.chain(3), t=1.0, u=4.0)
+    )
+
+    assert widths == [(3, 1)]
+
+
+@pytest.mark.parametrize("builder_class", [QdkStandardQpeCircuitBuilder, QdkIterativeQpeCircuitBuilder])
+def test_rejects_a_gradient_state_prep_narrower_than_the_system(
+    two_qubit_circuit_problem: CircuitBuilderProblem,
+    builder_class: type[QdkStandardQpeCircuitBuilder | QdkIterativeQpeCircuitBuilder],
+) -> None:
+    """QPE appends the gradient after the whole system, where a one-qubit QROM would read a system qubit instead."""
+    state_prep = QROMStatePreparation(rotation_bit_precision=8, allocate_phase_gradient=False).run(
+        create_dense_wavefunction([0.6, 0.8])
+    )
+    builder = builder_class(num_bits=2)
+    builder.settings().set(
+        "unitary_builder",
+        AlgorithmRef("hamiltonian_unitary_builder", "trotter", time=two_qubit_circuit_problem.evolution_time),
+    )
+
+    with pytest.raises(ValueError, match="must cover the whole system register"):
+        builder.run(state_preparation=state_prep, qubit_hamiltonian=two_qubit_circuit_problem.hamiltonian)

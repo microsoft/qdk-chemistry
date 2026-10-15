@@ -13,6 +13,7 @@ import numpy as np
 import pytest
 
 from qdk_chemistry.algorithms.phase_estimation.standard_phase_estimation import StandardPhaseEstimation
+from qdk_chemistry.algorithms.state_preparation.qrom_state_prep import QROMStatePreparation
 from qdk_chemistry.data import (
     AlgorithmRef,
     Circuit,
@@ -23,6 +24,7 @@ from qdk_chemistry.data.circuit import QsharpFactoryData
 from qdk_chemistry.plugins.qiskit import QDK_CHEMISTRY_HAS_QISKIT
 from qdk_chemistry.utils.qsharp import QSHARP_UTILS
 
+from .helpers import create_dense_wavefunction
 from .reference_tolerances import (
     float_comparison_relative_tolerance,
     qpe_energy_tolerance,
@@ -201,6 +203,7 @@ def _run_standard(
     problem: PhaseEstimationProblem,
     builder_name: str = "qdk_standard",
     controlled_circuit_mapper_name: str = "pauli_sequence",
+    executor_name: str = "qdk_full_state_simulator",
 ) -> QpeResult:
     """Execute standard QPE and return structured results.
 
@@ -208,6 +211,7 @@ def _run_standard(
         problem: Benchmark description supplying Hamiltonian, state prep, and expectations.
         builder_name: The circuit builder to use ("qdk_standard" or "qiskit_standard").
         controlled_circuit_mapper_name: Name of the controlled circuit mapper to use.
+        executor_name: Name of the circuit executor to use.
 
     Returns:
         :class:`QpeResult` instance summarizing the standard run.
@@ -217,7 +221,7 @@ def _run_standard(
     qpe = StandardPhaseEstimation(shots=problem.shots)
     qpe.settings().set(
         "circuit_executor",
-        AlgorithmRef("circuit_executor", "qdk_full_state_simulator", seed=_SEED),
+        AlgorithmRef("circuit_executor", executor_name, seed=_SEED),
     )
     qpe.settings().set(
         "qpe_circuit_builder",
@@ -284,6 +288,21 @@ def test_standard_phase_estimation_extracts_phase_and_energy(
         rtol=float_comparison_relative_tolerance,
         atol=qpe_energy_tolerance,
     )
+
+
+def test_standard_phase_estimation_shares_the_gradient_with_the_state_preparation(
+    two_qubit_phase_problem: PhaseEstimationProblem,
+) -> None:
+    """A QROM state preparation rotates through the gradient QPE prepares, though no controlled unitary does."""
+    state_prep = QROMStatePreparation(rotation_bit_precision=8, allocate_phase_gradient=False).run(
+        create_dense_wavefunction([1.0 / np.sqrt(2.0), 0.0, 0.0, 1.0 / np.sqrt(2.0)])
+    )
+    # qdk 1.32.3 panics lowering this QROM to QIR (Std `Unlookup` leaves a constant compare), so interpret it instead.
+    result = _run_standard(
+        replace(two_qubit_phase_problem, state_prep=state_prep), executor_name="qdk_sparse_state_simulator"
+    )
+
+    assert result.bitstring_msb_first == two_qubit_phase_problem.expected_bitstring
 
 
 @pytest.mark.parametrize("power", [2, 4])
