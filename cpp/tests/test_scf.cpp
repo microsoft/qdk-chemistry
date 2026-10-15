@@ -388,7 +388,9 @@ TEST_F(ScfTest, X2COHROHFReference) {
   EXPECT_TRUE(wavefunction->get_orbitals()->is_restricted());
 }
 
-TEST_F(ScfTest, X2COHROHFGdmMatchesDiis) {
+namespace {
+void expect_x2c_gdm_matches_diis(std::shared_ptr<Structure> structure,
+                                 int multiplicity) {
   using qdk::chemistry::utils::Logger;
   using qdk::chemistry::utils::LogLevel;
   std::ostringstream messages;
@@ -419,7 +421,7 @@ TEST_F(ScfTest, X2COHROHFGdmMatchesDiis) {
       solver->settings().set("energy_thresh_diis_switch", 1e-14);
       messages.str("");
       auto [energy, wavefunction] =
-          solver->run(testing::create_oh_structure(), 0, 2, "sto-3g");
+          solver->run(structure, 0, multiplicity, "sto-3g");
       EXPECT_TRUE(wavefunction->get_orbitals()->is_restricted());
       if (gdm) {
         EXPECT_NE(messages.str().find("Switching from DIIS to GDM"),
@@ -430,6 +432,15 @@ TEST_F(ScfTest, X2COHROHFGdmMatchesDiis) {
       }
     }
   }
+}
+}  // namespace
+
+TEST_F(ScfTest, X2COHROHFGdmMatchesDiis) {
+  expect_x2c_gdm_matches_diis(testing::create_oh_structure(), 2);
+}
+
+TEST_F(ScfTest, X2CWaterRHFGdmMatchesDiis) {
+  expect_x2c_gdm_matches_diis(testing::create_water_structure(), 1);
 }
 
 TEST_F(ScfTest, X2CRejectsEcp) {
