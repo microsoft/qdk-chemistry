@@ -501,6 +501,7 @@ def _stub_nested(
     num_qubits: int,
     num_system_qubits: int,
     num_gradient_qubits: int = 0,
+    circuit_num_qubits: int | None = None,
 ) -> tuple[Mock, Mock]:
     """Swap the builder's nested algorithms for mocks whose unitary has the given widths."""
     unitary_builder = Mock()
@@ -509,7 +510,9 @@ def _stub_nested(
     )
     circuit_mapper = Mock()
     circuit_mapper.run.return_value = Mock(
-        _qsharp_op=object(), metadata=CircuitMetadata(num_phase_gradient_ancillas=num_gradient_qubits)
+        _qsharp_op=object(),
+        num_qubits=circuit_num_qubits,
+        metadata=CircuitMetadata(num_phase_gradient_ancillas=num_gradient_qubits),
     )
     nested = {"unitary_builder": unitary_builder, "controlled_circuit_mapper": circuit_mapper}
     monkeypatch.setattr(builder, "_create_nested", nested.__getitem__)
@@ -634,6 +637,24 @@ def test_unitary_gradient_is_not_an_ancilla(
     )
 
     assert widths == [(3, 1)]
+
+
+@pytest.mark.parametrize("builder_class", [QdkStandardQpeCircuitBuilder, QdkIterativeQpeCircuitBuilder])
+def test_declared_controlled_circuit_width_overrides_the_container(
+    monkeypatch: pytest.MonkeyPatch,
+    builder_class: type[QdkStandardQpeCircuitBuilder | QdkIterativeQpeCircuitBuilder],
+) -> None:
+    """A mapper that adds scratch the container cannot see, such as a gradient, sizes the ancillas by its own width."""
+    builder = builder_class(num_bits=1)
+    _stub_nested(builder, monkeypatch, num_qubits=5, num_system_qubits=3, num_gradient_qubits=2, circuit_num_qubits=9)
+    widths: list[tuple[int, int]] = []
+    monkeypatch.setattr(builder, "_create_circuit_from_qsharp_op", lambda *args: widths.append(args[-2:]))
+
+    builder._run_impl(
+        Mock(_qsharp_op=object()), FermiHubbardModelHamiltonianDescription(LatticeGeometry.chain(3), t=1.0, u=4.0)
+    )
+
+    assert widths == [(3, 4)]
 
 
 @pytest.mark.parametrize("builder_class", [QdkStandardQpeCircuitBuilder, QdkIterativeQpeCircuitBuilder])

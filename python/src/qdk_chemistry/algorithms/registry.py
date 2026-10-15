@@ -918,6 +918,7 @@ def _register_python_algorithms():
     from qdk_chemistry.algorithms.controlled_circuit_mapper import (  # noqa: PLC0415
         ControlledPauliSequenceMapper,
         ControlledPSPMapper,
+        ControlledSOSSAMapper,
         ControlledSwapPauliSequenceMapper,
     )
     from qdk_chemistry.algorithms.controlled_circuit_mapper.controlled_hubbard_plaquette_mapper import (  # noqa: PLC0415
@@ -1008,6 +1009,7 @@ def _register_python_algorithms():
     register(lambda: ControlledPauliSequenceMapper())
     register(lambda: ControlledSwapPauliSequenceMapper())
     register(lambda: SOSSAMapper())
+    register(lambda: ControlledSOSSAMapper())
     register(lambda: SOSSABuilder())
     register(lambda: SumOfSquaresQubitMapper())
     register(lambda: EulerIntegrator())
