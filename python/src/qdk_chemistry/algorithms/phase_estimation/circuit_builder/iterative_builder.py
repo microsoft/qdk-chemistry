@@ -184,21 +184,15 @@ class QdkIterativeQpeCircuitBuilder(IterativeQpeCircuitBuilder):
 
         """
         state_prep_op = state_preparation._qsharp_op  # noqa: SLF001
-        prepare_shared_op, num_shared_ancillas, state_prep_uses_shared, unitary_uses_shared = self._shared_register(
-            state_preparation, [controlled_unitary_circuit]
-        )
+        ctrl_unitary_op = controlled_unitary_circuit._qsharp_op  # noqa: SLF001
         self._validate_state_prep_width(state_preparation, num_system_qubits)
         iterative_parameters = {
             "statePrep": state_prep_op,
-            "repControlledUnitary": controlled_unitary_circuit._qsharp_op,  # noqa: SLF001
+            "repControlledUnitary": ctrl_unitary_op,
             "accumulatePhase": phase_correction,
             "phaseQubit": 0,
             "systems": [i + 1 for i in range(num_system_qubits)],
             "numAncillaQubits": num_ancilla_qubits,
-            "prepareSharedOp": prepare_shared_op,
-            "numSharedAncillas": num_shared_ancillas,
-            "statePrepUsesShared": state_prep_uses_shared,
-            "unitaryUsesShared": unitary_uses_shared,
         }
         return Circuit(
             qsharp_factory=QsharpFactoryData(
