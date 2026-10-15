@@ -135,7 +135,7 @@ If you chose the minimal `pip install qdk-chemistry` above, you can add specific
 | `qre` | Quantum Resource Estimator support | qdk[qre,jupyter]>=1.31.0 |
 | `dev` | Development and testing tools | pytest, ruff, mypy, and related tooling |
 | `test` | Testing tools and optional runtime dependencies; does not include `docs` | qdk-chemistry[azure-quantum,coverage,discovery,jupyter,mcp,networkx-extras,openfermion-extras,plugins,qiskit-extras,qre], nbclient, nbformat, pennylane, rdkit, requests>=2.33.0 |
-| `all` | Union of all defined extras | coverage, dev, discovery, docs, jupyter, mcp, networkx-extras, openfermion-extras, plugins, qiskit-extras, qre, test |
+| `all` | Union of all defined extras | azure-quantum, coverage, dev, discovery, docs, jupyter, mcp, networkx-extras, openfermion-extras, plugins, qiskit-extras, qre, test |
 
 To build the documentation, install the `docs` extra (for example,
 `python3 -m pip install 'qdk-chemistry[docs]'`), install the Doxygen system
