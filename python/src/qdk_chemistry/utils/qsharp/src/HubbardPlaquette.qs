@@ -350,15 +350,6 @@ namespace QDKChemistry.Utils.HubbardPlaquette {
         HoppingPhasesWithLegacyCosts(angle, pairs, useHammingWeightPhasing, maxBatchSize, false);
     }
 
-    internal operation HoppingPhasesWithForcedLegacyCostsForTest(
-        angle : Double,
-        pairs : Qubit[][],
-        useHammingWeightPhasing : Bool,
-        maxBatchSize : Int
-    ) : Unit is Adj + Ctl {
-        HoppingPhasesWithLegacyCosts(angle, pairs, useHammingWeightPhasing, maxBatchSize, true);
-    }
-
     internal operation HoppingPhasesWithLegacyCosts(
         angle : Double,
         pairs : Qubit[][],
@@ -520,13 +511,6 @@ namespace QDKChemistry.Utils.HubbardPlaquette {
         systems : Qubit[]
     ) : Unit is Adj + Ctl {
         RepPlaquetteExpWithLegacyCosts(params, systems, false);
-    }
-
-    internal operation RepPlaquetteExpWithForcedLegacyCostsForTest(
-        params : HubbardPlaquetteParams,
-        systems : Qubit[]
-    ) : Unit is Adj + Ctl {
-        RepPlaquetteExpWithLegacyCosts(params, systems, true);
     }
 
     internal operation RepPlaquetteExpWithLegacyCosts(

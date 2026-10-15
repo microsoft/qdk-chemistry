@@ -239,10 +239,21 @@ class TestTestOnlySourcesAreNotShipped:
         ]
         assert unprefixed == []
 
-    def test_a_default_context_cannot_reach_the_test_helpers(self) -> None:
+    @pytest.mark.parametrize("profile", [TargetProfile.Base, TargetProfile.Adaptive_RIF, TargetProfile.Unrestricted])
+    def test_a_production_context_cannot_reach_the_test_helpers(self, profile: TargetProfile) -> None:
         """A user context must not be able to call the test drivers."""
-        chemistry = create_qsharp_context().code.QDKChemistry
+        chemistry = create_qsharp_context(profile).code.QDKChemistry
         assert not hasattr(chemistry, "TestUtils")
+        algorithm_names = {
+            "QDKChemistry.Utils.HadamardTest",
+            "QDKChemistry.Utils.HadamardTest.HadamardTest",
+        }
+        shipped_helpers = [
+            path
+            for path, name, _ in self._walk_namespaces(chemistry, "QDKChemistry")
+            if "Test" in name and path not in algorithm_names
+        ]
+        assert shipped_helpers == []
 
     def test_the_test_context_can_reach_them(self, qsharp_test_context: qdk.Context) -> None:
         """Evaluating the test sources is what makes the drivers available to the Python tests."""
