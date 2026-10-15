@@ -13,6 +13,7 @@
 #include <qdk/chemistry/data/symmetry/symmetry.hpp>
 #include <qdk/chemistry/data/symmetry/symmetry_blocked_sparse_map.hpp>
 #include <stdexcept>
+#include <vector>
 
 using namespace qdk::chemistry::data;
 
@@ -98,4 +99,15 @@ TEST(SymmetryBlockedSparseMapTest, JsonRejectsMismatchedVersion) {
   auto j = make_unrestricted_sparse_map().to_json();
   j["version"] = "99.0.0";
   EXPECT_THROW(SBSM::from_json(j), std::runtime_error);
+}
+
+TEST(SymmetryBlockedSparseMapTest, JsonRejectsIndicesOutsideUnsignedRange) {
+  const auto valid = make_unrestricted_sparse_map().to_json();
+  // 2^32 and -2^32 would otherwise wrap to the in-range index 0.
+  for (const auto& index : std::vector<nlohmann::json>{
+           std::uint64_t{1} << 32, -(std::int64_t{1} << 32), -1, 0.0, true}) {
+    auto j = valid;
+    j["blocks"][0]["entries"][0][0] = index;
+    EXPECT_THROW(SBSM::from_json(j), std::invalid_argument) << index;
+  }
 }
