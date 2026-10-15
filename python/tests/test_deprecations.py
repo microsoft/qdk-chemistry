@@ -43,7 +43,7 @@ from qdk_chemistry.data.symmetry import (
     spin_index_set,
 )
 
-from .test_helpers import create_test_basis_set
+from .helpers import create_test_basis_set
 
 
 def _restricted_orbitals_with_active_space() -> Orbitals:

@@ -16,7 +16,7 @@ from qdk.test_utils import dump_operation_on_state
 from qdk_chemistry.algorithms.state_preparation.qrom_state_prep import QROMStatePreparation
 from qdk_chemistry.utils.qsharp import QSHARP_UTILS, get_qsharp_context
 
-from .test_helpers import create_dense_wavefunction, create_sparse_wavefunction
+from .helpers import create_dense_wavefunction, create_sparse_wavefunction
 
 
 def _dump_op(op, num_qubits: int) -> np.ndarray:

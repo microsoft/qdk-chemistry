@@ -20,7 +20,7 @@ from qdk_chemistry.data.unitary_representation.base import UnitaryRepresentation
 from qdk_chemistry.data.unitary_representation.containers.sossa import SOSSABlockEncodingContainer
 from qdk_chemistry.utils.qsharp import QSHARP_UTILS, get_qsharp_context, use_qsharp_context
 
-from .test_helpers import (
+from .helpers import (
     create_random_factorized_hamiltonian,
     create_test_orbitals,
     factorized_hamiltonian_to_sossa_operator,

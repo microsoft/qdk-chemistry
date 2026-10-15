@@ -197,16 +197,21 @@ class TestTargetProfiles:
         state_prep = utils.StatePreparation.MakeStatePreparationCircuit
         assert "define" in str(base_context.compile(state_prep, [0], [1.0, 0.0], [], 1))
 
-        pauli_exp = utils.ControlledPauliExp.MakeRepControlledPauliExpCircuit
+        # With phasing on, the equal-angle pair reaches the Sorted comparator and the controlled adder.
         params = utils.PauliExp.RepPauliExpParams(
-            pauliIndices=[[0, 1]],
-            pauliOps=[[Pauli.X, Pauli.Z]],
-            pauliCoefficients=[0.5],
+            pauliIndices=[[0, 1], [2, 3], [4]],
+            pauliOps=[[Pauli.X, Pauli.Z], [Pauli.Z, Pauli.Z], [Pauli.Y]],
+            pauliCoefficients=[0.5, 0.5, 0.3],
             repetitions=2,
             numPrefixTerms=0,
             numSuffixTerms=0,
         )
-        assert "define" in str(base_context.compile(pauli_exp, params, [0, 1], 0, [1, 2]))
+        systems = [1, 2, 3, 4, 5]
+        for phasing in (False, True):
+            pauli_exp = utils.ControlledPauliExp.MakeRepControlledPauliExpCircuit
+            assert "define" in str(base_context.compile(pauli_exp, params, [0, 3], phasing, -1, 0, systems))
+            swap_exp = utils.ControlledSwapPauliExp.MakeRepControlledSwapPauliExpCircuit
+            assert "define" in str(base_context.compile(swap_exp, params, [0, 3], phasing, -1, 0.0, 0, systems))
 
 
 class TestTestOnlySourcesAreNotShipped:

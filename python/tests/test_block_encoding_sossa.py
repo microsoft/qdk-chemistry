@@ -34,7 +34,7 @@ from qdk_chemistry.data.unitary_representation.containers.sossa import (
     SOSSASelect,
 )
 
-from .test_helpers import create_random_factorized_hamiltonian, factorized_hamiltonian_to_sossa_operator
+from .helpers import create_random_factorized_hamiltonian, factorized_hamiltonian_to_sossa_operator
 
 
 def _make_sossa_unitary_representation(*, power: int = 1, lambda_eff: float | None = None):

@@ -43,7 +43,7 @@ from qdk_chemistry.data import (
 )
 from qdk_chemistry.utils.qsharp import create_qsharp_context
 
-from .test_helpers import create_test_orbitals
+from .helpers import create_test_orbitals
 
 # Dynamically add the build directory to Python path
 # This ensures the _core module can be found regardless of platform
