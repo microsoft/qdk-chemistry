@@ -80,6 +80,7 @@ dev = [
   "pre-commit",
   "pytest",
   "pytest-env",
+  "pytest-timeout",
   "ruff"
 ]
 docs = [
@@ -135,6 +136,7 @@ test = [
   # pennylane also requires rustworkx (see qiskit-extras); the sample test skips when it is absent.
   "pennylane; sys_platform != 'win32' or platform_machine != 'ARM64'",
   "pytest-env",
+  "pytest-timeout",
   "pytest-xdist",
   # rdkit publishes no win-arm64 wheels; the sample test skips when it is absent.
   "rdkit; sys_platform != 'win32' or platform_machine != 'ARM64'",

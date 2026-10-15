@@ -52,8 +52,6 @@ jobs:
       with:
         python-version: '3.12'
         architecture: ${{ matrix.architecture }}
-        cache: pip
-        cache-dependency-path: python/pyproject.toml
 
     - name: Read tutorial package version
       id: tutorial-version
@@ -65,7 +63,7 @@ jobs:
     - name: Install published tutorial environment
       run: |
         python -m pip install --upgrade pip
-        python -m pip install "qdk-chemistry==${{ steps.tutorial-version.outputs.version }}" "ipykernel>=6.0" nbclient nbformat pytest pytest-env
+        python -m pip install "qdk-chemistry==${{ steps.tutorial-version.outputs.version }}" "ipykernel>=6.0" nbclient nbformat pytest pytest-env pytest-timeout
         python -m ipykernel install --user --name python3 --display-name "Python 3"
 
     - name: Verify published package boundary
@@ -92,6 +90,7 @@ jobs:
         QSHARP_PYTHON_TELEMETRY: 'false'
         MPLBACKEND: Agg
         PYTHONIOENCODING: utf-8
+        PYTEST_TIMEOUT: '1800'
         QDK_CHEMISTRY_RUN_SLOW_TESTS: '1'
         QDK_CHEMISTRY_RUN_TUTORIAL_SNAPSHOTS: '1'
       run: >-
