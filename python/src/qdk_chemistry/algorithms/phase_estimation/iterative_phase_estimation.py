@@ -116,21 +116,20 @@ class IterativePhaseEstimation(PhaseEstimation):
             )
 
         builder_settings = circuit_builder.settings()
-        try:
-            if builder_settings.get("combine_iterations") and not combine_iterations:
-                raise ValueError(
-                    "Set combine_iterations=True on IterativePhaseEstimation, not only on qpe_circuit_builder."
-                )
-            builder_settings.update("combine_iterations", combine_iterations)
-            if combine_iterations:
+        if combine_iterations:
+            try:
+                builder_settings.update("combine_iterations", True)
                 builder_settings.update("mid_shots", shots_per_bit)
-        except SettingNotFound as exc:
-            if combine_iterations:
+            except SettingNotFound as exc:
                 raise ValueError(
                     "combine_iterations=True requires a circuit builder with "
                     "combine_iterations and mid_shots settings; "
                     f"got {circuit_builder.name()!r}."
                 ) from exc
+        elif builder_settings.has("combine_iterations") and builder_settings.get("combine_iterations"):
+            raise ValueError(
+                "Set combine_iterations=True on IterativePhaseEstimation, not only on qpe_circuit_builder."
+            )
 
         # Resolve container before running iterations. The circuit builder overrides the
         # unitary's power per phase bit, so inversion must use the base (power=1) unitary.

@@ -1083,6 +1083,8 @@ def test_iqpe_passes_model_description_to_nested_algorithms(
         builder = Mock(spec=IterativeQpeCircuitBuilder)
         builder.settings.return_value = builder_settings
         builder.name.return_value = "custom_iterative"
+    settings_spy = Mock(wraps=builder.settings())
+    monkeypatch.setattr(builder, "settings", Mock(return_value=settings_spy))
     model = FermiHubbardModelHamiltonianDescription(LatticeGeometry.chain(3), t=1.0, u=4.0)
     state_preparation = Mock(spec=Circuit)
     circuit = Mock(spec=Circuit)
@@ -1107,6 +1109,7 @@ def test_iqpe_passes_model_description_to_nested_algorithms(
         with pytest.raises(ValueError, match="requires a circuit builder with combine_iterations and mid_shots") as exc:
             estimator.run(state_preparation=state_preparation, qubit_hamiltonian=model)
         assert isinstance(exc.value.__cause__, SettingNotFound)
+        settings_spy.get.assert_not_called()
         unitary_builder.run.assert_not_called()
         build.assert_not_called()
         executor.run.assert_not_called()
@@ -1124,8 +1127,23 @@ def test_iqpe_passes_model_description_to_nested_algorithms(
     assert result.raw_energy == pytest.approx(-1.5)
     container.eigenvalue_from_phase.assert_called_once_with(0.75)
     if combine_iterations:
+        settings_spy.has.assert_not_called()
+        assert settings_spy.update.call_args_list == [
+            call("combine_iterations", True),
+            call("mid_shots", 3),
+        ]
+        assert call("combine_iterations") not in settings_spy.get.call_args_list
         assert builder.settings().get("combine_iterations") is True
         assert builder.settings().get("mid_shots") == 3
+    else:
+        settings_spy.has.assert_called_once_with("combine_iterations")
+        assert all(
+            setting_call.args[0] not in {"combine_iterations", "mid_shots"}
+            for setting_call in settings_spy.update.call_args_list
+        )
+        assert call("mid_shots") not in settings_spy.get.call_args_list
+        if custom_combined_settings is not None and "combine_iterations" not in custom_combined_settings:
+            assert call("combine_iterations") not in settings_spy.get.call_args_list
 
 
 def test_iqpe_rejects_combined_mode_only_on_custom_builder(monkeypatch: pytest.MonkeyPatch) -> None:
