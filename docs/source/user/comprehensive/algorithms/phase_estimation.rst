@@ -198,7 +198,7 @@ Direct settings on :class:`~qdk_chemistry.algorithms.phase_estimation.iterative_
    * - ``combine_iterations``
      - bool
      - Execute all rounds in one adaptive circuit with in-circuit voting. The estimator passes
-       this mode to the builder. Requires the QDK iterative builder. Default is ``False``.
+       this mode to the builder, which must declare ``combine_iterations`` and ``mid_shots``. Default is ``False``.
 
 Nested algorithm configuration (via ``qpe_circuit_builder``):
 
