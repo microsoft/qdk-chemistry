@@ -460,12 +460,22 @@ TEST_F(ScfTest, X2CRejectsAnalyticNuclearGradient) {
 }
 
 TEST_F(ScfTest, GeometryChangingOrbitalRestartFollowsAtoms) {
+  // A large common translation must not hide a small displacement.
   auto old_structure = std::make_shared<Structure>(
-      std::vector<Eigen::Vector3d>{{0, 0, 0}, {0, 0, 1.4}},
+      std::vector<Eigen::Vector3d>{{1e8, 0, 0}, {1e8, 0, 1.4}},
       std::vector<std::string>{"H", "H"});
   auto current_structure = std::make_shared<Structure>(
-      std::vector<Eigen::Vector3d>{{0, 0, 0}, {0, 0, 1.6}},
+      std::vector<Eigen::Vector3d>{{1e8, 0, 0}, {1e8, 0, 1.4001}},
       std::vector<std::string>{"H", "H"});
+  auto center_error = [](const auto& wavefunction, const auto& structure) {
+    return (wavefunction->get_orbitals()
+                ->get_basis_set()
+                ->get_structure()
+                ->get_coordinates() -
+            structure->get_coordinates())
+        .cwiseAbs()
+        .maxCoeff();
+  };
   for (const std::string relativity : {"", "sf-x2c", "sf-x2c-contracted"}) {
     SCOPED_TRACE(relativity);
     auto solver = ScfSolverFactory::create("qdk");
@@ -478,16 +488,10 @@ TEST_F(ScfTest, GeometryChangingOrbitalRestartFollowsAtoms) {
     auto [actual, restarted] =
         solver->run(current_structure, 0, 1, old_wavefunction->get_orbitals());
     EXPECT_NEAR(actual, reference, testing::scf_energy_tolerance);
-    EXPECT_TRUE(restarted->get_orbitals()
-                    ->get_basis_set()
-                    ->get_structure()
-                    ->get_coordinates()
-                    .isApprox(current_structure->get_coordinates()));
-    EXPECT_TRUE(old_wavefunction->get_orbitals()
-                    ->get_basis_set()
-                    ->get_structure()
-                    ->get_coordinates()
-                    .isApprox(old_structure->get_coordinates()));
+    EXPECT_LT(center_error(restarted, current_structure),
+              testing::numerical_zero_tolerance);
+    EXPECT_LT(center_error(old_wavefunction, old_structure),
+              testing::numerical_zero_tolerance);
   }
 }
 

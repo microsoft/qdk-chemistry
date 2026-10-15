@@ -137,8 +137,9 @@ ScfCalculationResult ScfSolver::_run_with_options(
         "elements");
   }
   if (basis_set_type == BasisSetType::FromOrbitals &&
-      !basis_structure->get_coordinates().isApprox(structure->get_coordinates(),
-                                                   1e-12)) {
+      (basis_structure->get_coordinates() - structure->get_coordinates())
+              .cwiseAbs()
+              .maxCoeff() > 1e-12) {
     // Orbital restarts follow the atoms; the input orbitals are not modified.
     if (qdk_raw_basis_set->has_ecp_shells() ||
         qdk_raw_basis_set->has_ecp_electrons()) {
