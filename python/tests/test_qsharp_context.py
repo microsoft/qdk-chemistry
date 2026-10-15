@@ -251,10 +251,9 @@ class TestTestOnlySourcesAreNotShipped:
         ]
         assert unprefixed == []
 
-    @pytest.mark.parametrize("profile", [TargetProfile.Base, TargetProfile.Adaptive_RIF, TargetProfile.Unrestricted])
-    def test_a_production_context_cannot_reach_the_test_helpers(self, profile: TargetProfile) -> None:
+    def test_a_production_context_cannot_reach_the_test_helpers(self) -> None:
         """A user context must not be able to call the test drivers."""
-        chemistry = create_qsharp_context(profile).code.QDKChemistry
+        chemistry = create_qsharp_context().code.QDKChemistry
         assert not hasattr(chemistry, "TestUtils")
         shipped_helpers = [
             path

@@ -30,6 +30,7 @@ from pathlib import Path
 import numpy as np
 import pytest
 from qdk import TargetProfile
+from qdk.qsharp import QSharpError
 
 from qdk_chemistry.algorithms import create
 from qdk_chemistry.data import (
@@ -113,9 +114,16 @@ def qsharp_test_context():
     """
     # Unrestricted: ArithmeticOpTester needs Std.ArithmeticTestUtils, which Adaptive_RIF does not resolve.
     context = create_qsharp_context(target_profile=TargetProfile.Unrestricted)
-    context.eval(
-        "\n".join(path.read_text(encoding="utf-8") for path in sorted((Path(__file__).parent / "qsharp").glob("*.qs")))
-    )
+    paths = sorted((Path(__file__).parent / "qsharp").glob("*.qs"))
+    sources = [path.read_text(encoding="utf-8") for path in paths]
+    try:
+        context.eval("\n".join(sources))
+    except QSharpError as error:
+        layout, line = [], 1
+        for path, source in zip(paths, sources, strict=True):
+            layout.append(f"{path.name} at line {line}")
+            line += source.count("\n") + 1
+        raise RuntimeError(f"failed to evaluate the Q# test sources ({', '.join(layout)}): {error}") from error
     return context
 
 
