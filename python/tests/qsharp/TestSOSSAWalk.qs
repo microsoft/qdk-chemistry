@@ -7,7 +7,7 @@ namespace QDKChemistry.TestUtils.SOSSAWalkTests {
     import Std.Canon.ApplyToEachCA;
     import Std.Canon.ApplyXorInPlace;
     import Std.Core.Length;
-    import Std.Diagnostics.DumpRegister;
+    import Std.Diagnostics.DumpMachine;
     import Std.Math.MaxI;
     import Std.Measurement.MeasureEachZ;
     import QDKChemistry.Utils.PhaseGradient.PreparePhaseGradientState;
@@ -89,7 +89,7 @@ namespace QDKChemistry.TestUtils.SOSSAWalkTests {
             SelectImpl(selectData, false, outerReg, innerReg, spinReg, systemReg, []);
         }
 
-        DumpRegister(qs);
+        DumpMachine();
         ResetAll(qs);
     }
 
