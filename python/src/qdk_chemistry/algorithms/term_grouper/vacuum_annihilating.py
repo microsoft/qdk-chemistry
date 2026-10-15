@@ -58,13 +58,21 @@ def _anticommuting_masks(word: dict[int, str], by_qubit: dict[int, dict[str, dic
     return {chunk: mask for chunk, mask in odd.items() if mask}
 
 
-def _commuting_group(indices: Iterable[int], words: list[dict[int, str]]) -> bool:
-    """Certify full commutation with sparse, bounded term-ordinal masks."""
+def _commuting_group(
+    indices: Iterable[int], words: list[dict[int, str]], keys: list[tuple[frozenset[int], int]]
+) -> bool:
+    """Certify full commutation; same flipped-set/Y-parity words commute, so only cross-bucket pairs are checked."""
+    buckets: dict[tuple[frozenset[int], int], list[int]] = {}
+    for index in indices:
+        buckets.setdefault(keys[index], []).append(index)
     by_qubit: dict[int, dict[str, dict[int, int]]] = {}
-    for position, index in enumerate(indices):
-        if _anticommuting_masks(words[index], by_qubit):
+    position = 0
+    for members in buckets.values():
+        if any(_anticommuting_masks(words[index], by_qubit) for index in members):
             return False
-        _index_word(words[index], position, by_qubit)
+        for index in members:
+            _index_word(words[index], position, by_qubit)
+            position += 1
     return True
 
 
@@ -205,7 +213,7 @@ class VacuumAnnihilatingTermGrouper(TermGrouper):
         preserved = {
             g
             for g, group in enumerate(old_groups)
-            if all(abs(value) <= tolerance for value in residuals[g].values()) and _commuting_group(group, words)
+            if all(abs(value) <= tolerance for value in residuals[g].values()) and _commuting_group(group, words, keys)
         }
         # Approximate preserved groups and the repair pool share one budget per component.
         # Recompute from original coefficients, rather than subtracting rounded group sums.
@@ -249,6 +257,7 @@ class VacuumAnnihilatingTermGrouper(TermGrouper):
 
         placed: dict[int, dict[str, dict[int, int]]] = {}
         placed_indices: list[int] = []
+        owner_masks: dict[int, dict[int, int]] = {}
         affinities: dict[int, set[int]] = {}
         for block in sorted(blocks, key=lambda members: min(rank[i] for i in members)):
             forbidden: set[int] = set()
@@ -259,8 +268,9 @@ class VacuumAnnihilatingTermGrouper(TermGrouper):
                     while remaining:
                         bit = remaining & -remaining
                         position = chunk * _COMMUTATION_CHUNK_SIZE + bit.bit_length() - 1
-                        forbidden.add(owners[placed_indices[position]])
-                        remaining ^= bit
+                        owner = owners[placed_indices[position]]
+                        forbidden.add(owner)
+                        remaining &= ~owner_masks[owner][chunk]
                 preferred.update(affinities.get(old_owner.get(i, -1), ()))
             available = preferred - forbidden
             group_index = (
@@ -275,6 +285,9 @@ class VacuumAnnihilatingTermGrouper(TermGrouper):
                 owners[i] = group_index
                 if i in old_owner:
                     affinities.setdefault(old_owner[i], set()).add(group_index)
+                chunk, offset = divmod(len(placed_indices), _COMMUTATION_CHUNK_SIZE)
+                masks = owner_masks.setdefault(group_index, {})
+                masks[chunk] = masks.get(chunk, 0) | 1 << offset
                 _index_word(words[i], len(placed_indices), placed)
                 placed_indices.append(i)
 

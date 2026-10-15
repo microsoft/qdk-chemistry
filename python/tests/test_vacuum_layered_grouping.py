@@ -85,6 +85,15 @@ def test_packing_does_not_cancel_conflicts_between_members_of_one_group() -> Non
     _assert_grouping(output)
 
 
+def test_packing_forbids_every_group_conflicting_within_one_chunk() -> None:
+    """Z conflicts with the X and Y groups in one chunk; resolving one owner must not hide the other."""
+    source = QubitOperator(["X", "X", "Y", "Y", "Z"], np.array([1.0, -1.0, 1.0, -1.0, 0.5]))
+    output = create("term_grouper", "vacuum_annihilating").run(source)
+
+    assert output.term_partition.groups == (((0,), (1,)), ((2,), (3,)), ((4,),))
+    _assert_grouping(output)
+
+
 def test_packing_resolves_reordered_term_ordinals_across_chunks() -> None:
     """Conflicts in different chunks must resolve to the original term owners after producer reordering."""
     last = 2**32 - 1

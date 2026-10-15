@@ -45,6 +45,19 @@ def _is_identity_only(pauli_strings: list[str]) -> bool:
     return all(set(ps) == {"I"} for ps in pauli_strings)
 
 
+def _is_qubit_wise_commuting(pauli_strings: list[str]) -> bool:
+    """Return True if the Pauli strings can be measured in a single Pauli basis.
+
+    Args:
+        pauli_strings: List of Pauli label strings.
+
+    Returns:
+        True if no qubit carries two different non-identity Paulis.
+
+    """
+    return all(len(set(column) - {"I"}) <= 1 for column in zip(*pauli_strings, strict=True))
+
+
 def _paulis_to_nonid_masks(pauli_strings: list[str]) -> list[int]:
     """Converts a list of Pauli operators into a list of non-identity bitmasks.
 
@@ -295,7 +308,9 @@ class QdkExpectationEstimator(ExpectationEstimator):
         partition is consumed and each group becomes one measurement circuit.
         The groups must be compatible with the measurement backend — at
         present, each group must be qubit-wise commuting so that a single
-        Pauli basis suffices.
+        Pauli basis suffices. Layered groups that are not qubit-wise
+        commuting are split into their layers, and such layers into single
+        terms.
 
         When no partition is present, each Pauli term is measured
         individually.
@@ -309,21 +324,41 @@ class QdkExpectationEstimator(ExpectationEstimator):
         """
         partition = qubit_hamiltonian.term_partition
         if partition is not None:
-            from qdk_chemistry.data.term_partition import FlatPartition  # noqa: PLC0415
+            from qdk_chemistry.data.term_partition import FlatPartition, LayeredPartition  # noqa: PLC0415
 
+            labels = qubit_hamiltonian.pauli_strings
+            groups: list[tuple[int, ...]] | None = None
             if isinstance(partition, FlatPartition):
+                groups = list(partition.groups)
+            elif isinstance(partition, LayeredPartition):
+                groups = []
+                for layers in partition.groups:
+                    members = tuple(i for layer in layers for i in layer)
+                    if members and _is_qubit_wise_commuting([labels[i] for i in members]):
+                        groups.append(members)
+                        continue
+                    # Commuting terms such as XX and YY may still need different measurement bases.
+                    for layer in layers:
+                        if not layer:
+                            continue
+                        if _is_qubit_wise_commuting([labels[i] for i in layer]):
+                            groups.append(layer)
+                        else:
+                            groups.extend((i,) for i in layer)
+
+            if groups is not None:
                 Logger.debug(
                     f"ExpectationEstimator: consuming term_partition "
                     f"(strategy={partition.strategy!r}, num_groups={partition.num_groups})."
                 )
                 return [
                     QubitOperator(
-                        pauli_strings=[qubit_hamiltonian.pauli_strings[i] for i in group],
+                        pauli_strings=[labels[i] for i in group],
                         coefficients=np.asarray([qubit_hamiltonian.coefficients[i] for i in group]),
                         encoding=qubit_hamiltonian.encoding,
                         fermion_mode_order=qubit_hamiltonian.fermion_mode_order,
                     )
-                    for group in partition.groups
+                    for group in groups
                 ]
 
             Logger.debug(

@@ -22,7 +22,7 @@ from qdk_chemistry.algorithms.expectation_estimator.qdk import (
     _parity,
     _paulis_to_nonid_masks,
 )
-from qdk_chemistry.data import AlgorithmRef, Circuit, FlatPartition, MeasurementData, QubitOperator
+from qdk_chemistry.data import AlgorithmRef, Circuit, FlatPartition, LayeredPartition, MeasurementData, QubitOperator
 from qdk_chemistry.plugins.qiskit import QDK_CHEMISTRY_HAS_QISKIT, QDK_CHEMISTRY_HAS_QISKIT_AER
 from qdk_chemistry.utils import Logger
 
@@ -441,8 +441,13 @@ def test_estimator_multiple_identity_terms(wavefunction_4e4o):
 @pytest.mark.skipif(not QDK_CHEMISTRY_HAS_QISKIT, reason="Qiskit not available")
 @pytest.mark.parametrize(
     "partition",
-    [None, FlatPartition(strategy="manual", groups=((0, 3), (1,), (2,)))],
-    ids=["unpartitioned", "partitioned"],
+    [
+        None,
+        FlatPartition(strategy="manual", groups=((0, 3), (1,), (2,))),
+        LayeredPartition(strategy="manual", groups=(((0, 3),), ((1,), (2,)))),
+        LayeredPartition(strategy="manual", groups=((), ((1, 2), (), (0, 3)))),
+    ],
+    ids=["unpartitioned", "partitioned", "layered", "hand_built_layers"],
 )
 def test_estimator_sparse_matches_dense(partition):
     """Sparse storage yields the dense energy, measuring the Bell state's ZZ, XX and YY eigenvalues exactly."""
@@ -457,3 +462,24 @@ def test_estimator_sparse_matches_dense(partition):
     energies = [estimator.run(circuit, op, total_shots=300)[0].energy_expectation_value for op in (dense, sparse)]
 
     np.testing.assert_allclose(energies, 3.75, atol=float_comparison_absolute_tolerance)
+
+
+@pytest.mark.skipif(not QDK_CHEMISTRY_HAS_QISKIT, reason="Qiskit not available")
+@pytest.mark.parametrize("sparse", [False, True])
+def test_estimator_measures_qubit_wise_commuting_layered_group_once(sparse):
+    """A qubit-wise commuting group spanning several layers needs one circuit, so a single shot suffices."""
+    circuit = Circuit(qasm='OPENQASM 3.0;\ninclude "stdgates.inc";\nqubit[2] q;\n')
+    partition = LayeredPartition(strategy="manual", groups=(((0,), (1,)),))
+    coefficients = np.array([1.0, 2.0])
+    observable = (
+        QubitOperator.from_sparse_terms(2, [{0: "Z"}, {1: "Z"}], coefficients, term_partition=partition)
+        if sparse
+        else QubitOperator(["IZ", "ZI"], coefficients, term_partition=partition)
+    )
+    estimator = QdkExpectationEstimator()
+    estimator.settings().set("circuit_executor", AlgorithmRef("circuit_executor", "qdk_sparse_state_simulator"))
+
+    energy_result, measurement_data = estimator.run(circuit, observable, total_shots=1)
+
+    assert measurement_data.shots_list == [1]
+    assert np.isclose(energy_result.energy_expectation_value, 3.0, atol=float_comparison_absolute_tolerance)
