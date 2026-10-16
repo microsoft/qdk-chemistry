@@ -76,15 +76,14 @@ def _paulis_to_nonid_masks(pauli_strings: list[str]) -> list[int]:
     return [x | z for x, z, _ in (pauli_string_to_masks(ps) for ps in pauli_strings)]
 
 
-def _outcome_signs(bitstring_counts: dict[str, int], pauli_strings: list[str]) -> Iterator[tuple[int, np.ndarray]]:
-    """Yield each outcome's frequency and the eigenvalue (+1 or -1) it gives every Pauli string.
+def _measurement_masks(pauli_strings: list[str]) -> list[int]:
+    """Return each Pauli string's support as a mask over the bits of a measured outcome.
 
     Args:
-        bitstring_counts: A dictionary of measurement outcomes.
         pauli_strings: List of qubit-wise commuting Pauli label strings.
 
-    Yields:
-        Pairs of an outcome's frequency and an array of its eigenvalues, one per Pauli string.
+    Returns:
+        One mask per Pauli string, selecting the outcome bits whose parity gives its eigenvalue.
 
     """
     # Determine measurement basis and restrict Paulis to measured qubits (drop I terms)
@@ -102,7 +101,11 @@ def _outcome_signs(bitstring_counts: dict[str, int], pauli_strings: list[str]) -
             if nonid & (1 << q):
                 val |= 1 << bit_pos
         diag_inds.append(val)
+    return diag_inds
 
+
+def _outcome_signs(bitstring_counts: dict[str, int], masks: list[int]) -> Iterator[tuple[int, np.ndarray]]:
+    """Yield each outcome's frequency and the eigenvalue (+1 or -1) it gives every masked Pauli string."""
     if sum(bitstring_counts.values()) == 0:
         raise ValueError("Bitstring counts are empty.")
 
@@ -111,17 +114,17 @@ def _outcome_signs(bitstring_counts: dict[str, int], pauli_strings: list[str]) -
             outcome = int(bitstr, 16) if bitstr.startswith("0x") else int(bitstr, 2)
         except ValueError as err:
             raise ValueError(f"Unsupported bitstring format: {bitstr}") from err
-        yield freq, np.array([(-1) ** _parity(mask & outcome) for mask in diag_inds])
+        yield freq, np.array([(-1) ** _parity(mask & outcome) for mask in masks])
 
 
 def _compute_expval_and_variance_from_bitstrings(
-    bitstring_counts: dict[str, int], pauli_strings: list[str]
+    bitstring_counts: dict[str, int], masks: list[int]
 ) -> tuple[np.ndarray, np.ndarray]:
     """Computes the expectation values and variances for a given set of Pauli operators.
 
     Args:
         bitstring_counts: A dictionary of measurement outcomes.
-        pauli_strings: List of Pauli label strings for computing expectation values.
+        masks: Outcome masks of the Pauli strings, from ``_measurement_masks``.
 
     Returns:
         A tuple containing expectation values and variances.
@@ -129,13 +132,13 @@ def _compute_expval_and_variance_from_bitstrings(
     """
     Logger.trace_entering()
     nshots = sum(bitstring_counts.values())
-    expvals = sum(freq * signs for freq, signs in _outcome_signs(bitstring_counts, pauli_strings)) / nshots
+    expvals = sum(freq * signs for freq, signs in _outcome_signs(bitstring_counts, masks)) / nshots
     variances = (1 - expvals**2) / nshots
     return expvals, variances
 
 
 def _compute_energy_variance_from_bitstrings(
-    bitstring_counts: dict[str, int], pauli_strings: list[str], coefficients: np.ndarray, expvals: np.ndarray
+    bitstring_counts: dict[str, int], masks: list[int], coefficients: np.ndarray, expvals: np.ndarray
 ) -> float:
     """Compute the variance of a group's estimated energy from its per-shot energies.
 
@@ -144,7 +147,7 @@ def _compute_energy_variance_from_bitstrings(
 
     Args:
         bitstring_counts: A dictionary of measurement outcomes.
-        pauli_strings: List of qubit-wise commuting Pauli label strings.
+        masks: Outcome masks of the Pauli strings, from ``_measurement_masks``.
         coefficients: Coefficient of each Pauli string.
         expvals: Expectation value of each Pauli string over the same outcomes.
 
@@ -152,7 +155,7 @@ def _compute_energy_variance_from_bitstrings(
         The variance of the group's mean energy.
 
     """
-    outcomes = _outcome_signs(bitstring_counts, pauli_strings)
+    outcomes = _outcome_signs(bitstring_counts, masks)
     total = sum(freq * abs(np.dot(signs - expvals, coefficients)) ** 2 for freq, signs in outcomes)
     return total / sum(bitstring_counts.values()) ** 2
 
@@ -474,15 +477,15 @@ class QdkExpectationEstimator(ExpectationEstimator):
         for counts, group in zip(bitstring_counts_list, hamiltonians, strict=True):
             if counts is None:
                 continue
-            paulis = group.pauli_strings
+            masks = _measurement_masks(group.pauli_strings)
             coeffs = group.coefficients
 
-            expvals, variances = _compute_expval_and_variance_from_bitstrings(counts, paulis)
+            expvals, variances = _compute_expval_and_variance_from_bitstrings(counts, masks)
             expvals_list.append(expvals)
             vars_list.append(variances)
 
             total_expval += np.dot(expvals, coeffs)
-            total_var += _compute_energy_variance_from_bitstrings(counts, paulis, coeffs, expvals)
+            total_var += _compute_energy_variance_from_bitstrings(counts, masks, coeffs, expvals)
 
         return EnergyExpectationResult(
             energy_expectation_value=float(np.real_if_close(total_expval)),

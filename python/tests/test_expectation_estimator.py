@@ -19,6 +19,7 @@ from qdk_chemistry.algorithms.expectation_estimator.qdk import (
     _compute_expval_and_variance_from_bitstrings,
     _determine_measurement_basis,
     _is_identity_only,
+    _measurement_masks,
     _parity,
     _paulis_to_nonid_masks,
 )
@@ -145,7 +146,7 @@ def test_create_measurement_circuits_basic(wavefunction_4e4o):
 )
 def test_compute_expval_and_variance_for_paulis_from_bitstring_counts(counts, paulis, expected_expvals, expected_vars):
     """Test the statistics (mean and variance) calculation for Pauli observables."""
-    expvals, vars_ = _compute_expval_and_variance_from_bitstrings(counts, paulis)
+    expvals, vars_ = _compute_expval_and_variance_from_bitstrings(counts, _measurement_masks(paulis))
     assert np.allclose(
         expvals, expected_expvals, rtol=float_comparison_relative_tolerance, atol=float_comparison_absolute_tolerance
     )
@@ -161,7 +162,7 @@ def test_compute_expval_invalid_bitstring_format():
     paulis = ["Z"]
 
     with pytest.raises(ValueError, match="Unsupported bitstring format"):
-        _compute_expval_and_variance_from_bitstrings(counts, paulis)
+        _compute_expval_and_variance_from_bitstrings(counts, _measurement_masks(paulis))
 
 
 def test_compute_expval_mixed_bitstring_formats():
@@ -170,7 +171,7 @@ def test_compute_expval_mixed_bitstring_formats():
     counts = {"0x0": 30, "1": 70}  # Mix of hex and binary
     paulis = ["Z"]
 
-    expvals, vars_ = _compute_expval_and_variance_from_bitstrings(counts, paulis)
+    expvals, vars_ = _compute_expval_and_variance_from_bitstrings(counts, _measurement_masks(paulis))
 
     # Should handle both formats correctly
     assert len(expvals) == 1
@@ -191,7 +192,7 @@ def test_compute_expval_empty_counts() -> None:
     paulis = ["Z"]
 
     with pytest.raises(ValueError, match=r"Bitstring counts are empty\."):
-        _compute_expval_and_variance_from_bitstrings(counts, paulis)
+        _compute_expval_and_variance_from_bitstrings(counts, _measurement_masks(paulis))
 
 
 def test_paulis_to_nonid_masks():

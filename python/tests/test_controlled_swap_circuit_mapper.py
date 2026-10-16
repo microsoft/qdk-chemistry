@@ -456,6 +456,11 @@ class TestVacuumPreservingBlocks:
         """Diagonal terms leave the vacuum in place and contribute -sum(angles) of phase."""
         assert _vacuum_eigenphase([(Z0, 0.3), (IDENTITY, 0.2)], 1e-9) == pytest.approx(-0.5)
 
+    def test_identity_factors_do_not_split_a_block(self):
+        """An explicit identity factor commutes with every Pauli on its qubit."""
+        terms = [({0: "X", 1: "X", 2: "I"}, 0.5), ({2: "Z"}, 0.1), ({0: "Y", 1: "Y", 2: "I"}, 0.5)]
+        assert _vacuum_eigenphase(terms, 1e-9) == pytest.approx(-0.1)
+
     def test_tolerance_controls_amplitude_cancellation(self):
         """Residual amplitude below ``atol`` counts as cancelled."""
         terms = [(XX, 0.5), (YY, 0.5 + 1e-7)]

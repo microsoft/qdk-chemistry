@@ -184,8 +184,8 @@ fermionic term are exponentiated as one contiguous block:
    \approx \prod_i e^{-it P_i}|0\ldots0\rangle = |0\ldots0\rangle .
 
 The :ref:`vacuum-annihilating term grouper <algorithms-term-grouper>` (factory name
-``"vacuum_annihilating"``) supports :class:`~qdk_chemistry.data.LayeredPartition`: outer groups
-commute and preserve the vacuum, with disjoint-support layers within each group. It preserves
+``"vacuum_annihilating"``) supports :class:`~qdk_chemistry.data.LayeredPartition`: terms within
+each outer group commute and each group preserves the vacuum, with disjoint-support layers. It preserves
 compatible incoming groups and layers, repairing group boundaries when needed to keep cancellation
 partners together. For flat or unpartitioned inputs, it constructs disjoint layers from Pauli supports.
 
