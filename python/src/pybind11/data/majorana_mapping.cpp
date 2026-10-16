@@ -345,8 +345,13 @@ Returns:
 Map a fermionic Hamiltonian to qubit Pauli terms using Majorana loops.
 
 When ``spin_symmetric`` is true, uses a spin-summed fast path that assumes
-identical integrals across spin channels (restricted orbitals). When false,
-handles each spin channel independently (unrestricted orbitals).
+identical integrals across spin channels (restricted orbitals). That path also
+needs 8-fold permutation symmetry; tensors carrying only the 4-fold subgroup
+``(pq|rs) == (qp|sr) == (rs|pq)`` fall back to the general spin-channel path.
+A Hermitian tensor not stored with ``(pq|rs) == (rs|pq)`` raises ``ValueError``
+-- that swap leaves the operator unchanged, so use the bra-ket average -- as
+does a genuinely non-Hermitian tensor. When false, handles each spin channel
+independently (unrestricted orbitals).
 
 Returns ``(words, coefficients)`` where ``words`` is a list of sparse
 Pauli words.
@@ -378,10 +383,10 @@ other container uses the dense path.
 For Cholesky and dense containers, the returned ``(words, coefficients)``
 match the dense path for the same underlying integrals.  For sparse
 containers, stored entries are canonicalized and symmetry-expanded before
-mapping, so results agree with the dense path when integrals are stored
-canonically or symmetry-complete (as for in-repo model builders); the
-sparse fast path is more robust when only non-canonical symmetry
-representatives are stored.
+mapping, so each permutation class must be stored exactly once (unambiguously
+a representative) or in full; a partially stored class raises ``ValueError``
+because the expansion would overwrite the zeros implied at its missing
+positions.
 
 The Hamiltonian's constant energy shift (nuclear repulsion / frozen core)
 is intentionally **not** included in the mapped operator, matching the

@@ -353,14 +353,23 @@ struct MajoranaMapResult {
  * @param eri_aabb Flattened two-body integrals (aa|bb), chemist notation.
  * @param eri_bbbb Flattened two-body integrals (bb|bb), chemist notation.
  * @param n_spatial Number of spatial orbitals.
- * @param spin_symmetric If true, use the spin-summed fast path. This assumes
- *        identical integrals across all spin channels (h_alpha == h_beta,
- *        eri_aaaa == eri_bbbb == eri_aabb), as produced by restricted orbitals.
- *        For unrestricted orbital sets, pass false — the engine handles each
- *        spin channel independently.
+ * @param spin_symmetric Declare that the input is spin-restricted and request
+ *        the spin-summed fast path. The caller must guarantee identical
+ *        integrals across all spin channels (h_alpha == h_beta and
+ *        eri_aaaa == eri_bbbb == eri_aabb); this equality is not validated.
+ *        The fast path additionally requires 8-fold ERI permutation symmetry,
+ *        which the engine does validate; tensors carrying only the 4-fold
+ *        subgroup (pq|rs) = (qp|sr) = (rs|pq) automatically use the general
+ *        spin-channel path, which reproduces them exactly. For unrestricted
+ *        inputs, pass false.
  * @param threshold Pauli terms with |coeff| < threshold are dropped.
  * @param integral_threshold Integrals with |value| < this are skipped.
  * @return MajoranaMapResult with Pauli words and coefficients.
+ * @throws std::invalid_argument If spin_symmetric is true and the two-body
+ *         integrals either define a non-Hermitian operator, or are Hermitian
+ *         but not stored with (pq|rs) = (rs|pq). The latter swap leaves the
+ *         operator unchanged, so such tensors need only be replaced by their
+ *         bra-ket average before mapping.
  */
 MajoranaMapResult majorana_map_hamiltonian(
     const MajoranaMapping& mapping, double core_energy, const double* h1_alpha,
@@ -382,10 +391,20 @@ MajoranaMapResult majorana_map_hamiltonian(
  *
  * @param mapping The Majorana-to-Pauli encoding.
  * @param hamiltonian The fermionic Hamiltonian.
- * @param spin_symmetric Use the spin-summed restricted fast path when true.
+ * @param spin_symmetric Declare that the Hamiltonian is spin-restricted and
+ *        request the spin-summed fast path. The caller is responsible for the
+ *        spin-restriction guarantee. The fast path also requires 8-fold ERI
+ *        permutation symmetry, and each container enforces it differently:
+ *        dense tensors carrying only the 4-fold subgroup fall back to the
+ *        general spin-channel path, Cholesky containers require pair-symmetric
+ *        three-center factors, and sparse containers require each permutation
+ *        class to be stored once or in full.
  * @param threshold Pauli terms with |coeff| < threshold are dropped.
  * @param integral_threshold Integrals with |value| < this are skipped.
  * @return MajoranaMapResult with Pauli words and coefficients.
+ * @throws std::invalid_argument If the container's two-body integrals cannot
+ *         be reproduced by any evaluation path (see the per-container entry
+ *         points below).
  */
 MajoranaMapResult majorana_map_hamiltonian(const MajoranaMapping& mapping,
                                            const Hamiltonian& hamiltonian,
@@ -417,9 +436,17 @@ MajoranaMapResult majorana_map_hamiltonian(const MajoranaMapping& mapping,
  * @param n_spatial Number of spatial orbitals.
  * @param naux Number of auxiliary (Cholesky) vectors.
  * @param spin_symmetric If true, use the spin-summed restricted fast path.
+ *        That path needs 8-fold ERI symmetry, and the reconstruction
+ *        sum_Q L^Q_pq L^Q_rs only carries it when every factor is symmetric in
+ *        its orbital pair, so @p three_center_aa is validated for that.
  * @param threshold Pauli terms with |coeff| < threshold are dropped.
  * @param integral_threshold Integrals with |value| < this are skipped.
  * @return MajoranaMapResult with Pauli words and coefficients.
+ * @throws std::invalid_argument If spin_symmetric is true and the alpha
+ *         three-center factors are not pair-symmetric.  Establishing the
+ *         weaker symmetry the general path needs would require materializing
+ *         the dense tensor this entry point exists to avoid, so such inputs
+ *         must be mapped from dense storage.
  */
 MajoranaMapResult majorana_map_hamiltonian_cholesky(
     const MajoranaMapping& mapping, double core_energy, const double* h1_alpha,
@@ -452,6 +479,14 @@ MajoranaMapResult majorana_map_hamiltonian_cholesky(
  * floating-point equality); conflicting duplicates are rejected rather
  * than resolved in encounter order.
  *
+ * Because one representative is expanded over its whole permutation class,
+ * each class must be stored either exactly once (unambiguously a
+ * representative) or in full.  A partially stored class is ambiguous — the
+ * expansion would overwrite the zeros implied at its missing positions — and
+ * members that disagree cannot be represented at all.  Both are rejected
+ * rather than silently symmetrized, so a tensor with genuinely reduced
+ * permutation symmetry must be mapped from dense storage instead.
+ *
  * @param mapping The Majorana-to-Pauli encoding.
  * @param core_energy Core (nuclear repulsion + frozen core) energy.
  * @param h1_alpha One-body integrals, alpha spin (row-major).
@@ -468,8 +503,9 @@ MajoranaMapResult majorana_map_hamiltonian_cholesky(
  * @param integral_threshold Integrals with |value| < this are skipped.
  * @return MajoranaMapResult with Pauli words and coefficients.
  * @throws std::invalid_argument If spin_symmetric is false, any two-body
- *         index is outside [0, n_spatial), or duplicate entries for the
- *         same position carry conflicting values.
+ *         index is outside [0, n_spatial), duplicate entries for the same
+ *         position carry conflicting values, or a permutation class is
+ *         stored partially or with disagreeing values.
  */
 MajoranaMapResult majorana_map_hamiltonian_sparse(
     const MajoranaMapping& mapping, double core_energy, const double* h1_alpha,
