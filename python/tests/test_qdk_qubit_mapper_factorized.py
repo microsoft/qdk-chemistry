@@ -37,7 +37,7 @@ from qdk_chemistry.utils.model_hamiltonians import (
     create_ppp_hamiltonian,
 )
 
-from .test_helpers import create_test_basis_set, create_test_orbitals
+from .helpers import create_test_basis_set, create_test_orbitals
 
 try:
     import pyscf

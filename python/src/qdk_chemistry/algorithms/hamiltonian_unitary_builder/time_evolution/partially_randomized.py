@@ -228,6 +228,10 @@ class PartiallyRandomized(QDrift):
                 partially randomized method.
 
         """
+        if not isinstance(qubit_hamiltonian, QubitOperator):
+            raise TypeError(
+                f"The {self.name()!r} builder takes a QubitOperator, got {type(qubit_hamiltonian).__name__}."
+            )
         effective_time, power_repetitions = self._resolve_power()
         time: float = effective_time
         tolerance: float = self._settings.get("tolerance")
@@ -256,7 +260,7 @@ class PartiallyRandomized(QDrift):
                     step_terms=[],
                     step_reps=1,
                     num_qubits=qubit_hamiltonian.num_qubits,
-                    scale=time,
+                    scale=time * power_repetitions,
                 )
             )
 
@@ -319,7 +323,7 @@ class PartiallyRandomized(QDrift):
                 step_terms=all_terms,
                 step_reps=power_repetitions,
                 num_qubits=qubit_hamiltonian.num_qubits,
-                scale=time,
+                scale=time * power_repetitions,
             )
         )
 

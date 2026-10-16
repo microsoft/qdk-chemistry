@@ -378,15 +378,16 @@ LatticeGraph LatticeGraph::from_geometry(
           "A lattice edge cannot join a site to its own periodic image.");
     }
     // Geometry records order endpoints with site_i < site_j.
-    if (!labels
-             .try_emplace(
-                 {i, j}, bond.shell,
-                 detail::flavor_of(flavors, bond.shell, bond.axis, tolerance))
-             .second) {
+    const EdgeLabel label{bond.shell, detail::flavor_of(flavors, bond.shell,
+                                                        bond.axis, tolerance)};
+    const auto [existing, inserted] = labels.try_emplace({i, j}, label);
+    if (!inserted && existing->second != label) {
       throw std::invalid_argument(
           "Several periodic images join sites " + std::to_string(i) + " and " +
-          std::to_string(j) + "; enlarge the periodic lattice.");
+          std::to_string(j) +
+          " with different shells or flavors; enlarge the periodic lattice.");
     }
+    // setFromTriplets adds the weights of repeated images.
     detail::add_edge(triplets, static_cast<int>(i), static_cast<int>(j),
                      weight);
   }
@@ -394,6 +395,10 @@ LatticeGraph LatticeGraph::from_geometry(
   Eigen::SparseMatrix<double> adjacency(n, n);
   adjacency.setFromTriplets(triplets.begin(), triplets.end());
   adjacency.makeCompressed();
+  // Repeated periodic images add their weights, which can overflow.
+  if (!adjacency.coeffs().allFinite()) {
+    throw std::invalid_argument("Connection weight must be finite.");
+  }
   // Color every labelled pair, including zero-weight pairs kept in the
   // topology. Match the native sparse-adjacency traversal before shuffled
   // trials.

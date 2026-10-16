@@ -46,7 +46,7 @@ from qdk_chemistry.data.qubit_operator.containers.sum_of_squares import (
 from qdk_chemistry.plugins.networkx import QDK_CHEMISTRY_HAS_NETWORKX
 from qdk_chemistry.utils.pauli_commutation import commutator_bound_first_order
 
-from .test_helpers import create_random_factorized_hamiltonian, create_test_orbitals
+from .helpers import create_random_factorized_hamiltonian, create_test_orbitals
 
 
 def _sum_of_squares_container() -> SumOfSquaresContainer:

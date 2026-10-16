@@ -87,7 +87,14 @@ registered make the following changes:
 - :class:`~qdk_chemistry.data.PauliProductFormulaContainer` — product formulas,
   saved alone or as a :class:`~qdk_chemistry.data.UnitaryRepresentation`, gain
   empty prefix and suffix term segments; the repeated terms, repetition count, and scale
-  are unchanged. Other unitary containers load without conversion.
+  are preserved. The current scale means total evolution time, but legacy files
+  did not separately record the power or composition history needed to recover it.
+  Migrating a repeated formula (``step_reps > 1``) emits a ``UserWarning`` without
+  changing its scale. Before phase-to-energy inversion, rebuild legacy formulas
+  created with ``power > 1`` and ``power_strategy="repeat"``, or by multi-step
+  composition. A composed formula can have ``step_reps=1`` and therefore produce
+  no warning; migration cannot identify every affected file. Other unitary
+  containers load without conversion.
 
 Data classes whose serialization schema has not changed (for example
 :class:`~qdk_chemistry.data.Structure` and the remaining qubit-level classes)

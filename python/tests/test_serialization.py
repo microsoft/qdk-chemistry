@@ -26,7 +26,7 @@ from qdk_chemistry.remote.serialization import (
     serialize_outputs,
 )
 
-from .test_helpers import create_test_orbitals
+from .helpers import create_test_orbitals
 
 
 @pytest.fixture

@@ -23,13 +23,16 @@ Exposed classes are:
 - :class:`Element`: Represents a chemical element with its properties.
 - :class:`EnergyExpectationResult`: Result for Hamiltonian energy expectation value and variance.
 - :class:`FactorizedHamiltonianContainer`: Container for factorized hamiltonians.
+- :class:`FermiHubbardModelHamiltonianDescription`: Fermi-Hubbard model on a lattice.
 - :class:`Hamiltonian`: Quantum mechanical Hamiltonian operator representation.
 - :class:`HamiltonianContainer`: Abstract base class for different Hamiltonian storage formats.
+- :class:`HamiltonianDescription`: Abstract base for data classes that describe a Hamiltonian.
 - :class:`HamiltonianType`: Enumeration of Hamiltonian types (Hermitian, NonHermitian).
 - :class:`LatticeGeometry`: Immutable two-dimensional geometry of a built-in lattice.
 - :class:`LatticeGraph`: Lattice graph defining the connectivity and geometry of a model Hamiltonian.
 - :class:`MajoranaMapping`: Majorana-to-Pauli mapping data class for fermion-to-qubit encodings.
 - :class:`MeasurementData`: Measurement bitstring data and metadata for QubitOperator objects.
+- :class:`ModelHamiltonianDescription`: Abstract lattice model Hamiltonian with its model parameters.
 - :class:`SparseHamiltonianContainer`: Container for lattice model Hamiltonians with sparse internal storage.
 - :class:`ModelOrbitals`: Simple orbital representation for model systems without full basis set information.
 - :class:`NuclearGradients`: Nuclear gradient values associated with a molecular structure.
@@ -122,6 +125,9 @@ from qdk_chemistry.data.circuit import Circuit
 from qdk_chemistry.data.circuit_executor_data import CircuitExecutorData
 from qdk_chemistry.data.enums.fermion_mode_order import FermionModeOrder
 from qdk_chemistry.data.estimator_data import EnergyExpectationResult, MeasurementData
+from qdk_chemistry.data.hamiltonian_description.base import HamiltonianDescription
+from qdk_chemistry.data.hamiltonian_description.fermi_hubbard import FermiHubbardModelHamiltonianDescription
+from qdk_chemistry.data.hamiltonian_description.model_hamiltonian import ModelHamiltonianDescription
 from qdk_chemistry.data.noise_models import QuantumErrorProfile
 from qdk_chemistry.data.qpe_result import QpeResult
 
@@ -166,16 +172,19 @@ __all__ = [
     "Element",
     "EnergyExpectationResult",
     "FactorizedHamiltonianContainer",
+    "FermiHubbardModelHamiltonianDescription",
     "FermionModeOrder",
     "FlatPartition",
     "Hamiltonian",
     "HamiltonianContainer",
+    "HamiltonianDescription",
     "HamiltonianType",
     "LatticeGeometry",
     "LatticeGraph",
     "LayeredPartition",
     "MajoranaMapping",
     "MeasurementData",
+    "ModelHamiltonianDescription",
     "ModelOrbitals",
     "NuclearGradients",
     "NuclearHessian",

@@ -6,6 +6,8 @@
 # --------------------------------------------------------------------------------------------
 
 import math
+from collections.abc import Callable
+from typing import Any
 
 import numpy as np
 
@@ -26,6 +28,8 @@ from qdk_chemistry.data import (
     Structure,
     Wavefunction,
 )
+from qdk_chemistry.data.unitary_representation.containers.pauli_product_formula import PauliProductFormulaContainer
+from qdk_chemistry.utils.qsharp import get_qsharp_context
 
 
 def create_sparse_wavefunction(num_qubits: int, indices: list[int], amplitudes: list[float]) -> Wavefunction:
@@ -430,3 +434,89 @@ def create_random_wavefunction(
 
     orbitals = create_test_orbitals(n_orbitals)
     return Wavefunction(StateVectorContainer(coeffs, configs, orbitals))
+
+
+def apply_operation(
+    operation: str | Callable[..., Any], state: np.ndarray, *, split_control: bool = False
+) -> np.ndarray:
+    """Return the state ``operation`` produces from a real-amplitude ``state``.
+
+    ``operation`` is either Q# source or a Q# callable of type ``Qubit[] => Unit``. With ``split_control`` it is
+    a ``(Qubit, Qubit[]) => Unit`` callable, such as a controlled circuit mapper's, and the most significant
+    qubit is its control.
+
+    This dumps the whole machine rather than using ``dump_operation_on_state``, whose ``DumpRegister``
+    rejects states with nonzero amplitudes below its zero cutoff as not separable, which long
+    evolutions reach. Every helper qubit is released by then, so the machine is the register.
+    """
+    context = get_qsharp_context()
+    if not hasattr(context.code, "_TestDumpControlled"):
+        for name, signature, call in (
+            ("_TestDumpMachine", "Qubit[]", "qubits"),
+            ("_TestDumpControlled", "(Qubit, Qubit[])", "qubits[0], qubits[1...]"),
+        ):
+            context.eval(
+                f"operation {name}(op : ({signature} => Unit), numQubits : Int, initial : Double[]) : Unit {{"
+                " use qubits = Qubit[numQubits];"
+                " Std.StatePreparation.PreparePureStateD(initial, qubits);"
+                f" op({call});"
+                " Std.Diagnostics.DumpMachine();"
+                " ResetAll(qubits); }"
+            )
+    num_qubits = round(math.log2(len(state)))
+    run = context.run(
+        context.code._TestDumpControlled if split_control else context.code._TestDumpMachine,
+        1,
+        context.eval(operation) if isinstance(operation, str) else operation,
+        num_qubits,
+        state.tolist(),
+        save_events=True,
+    )
+    result = np.zeros(len(state), dtype=complex)
+    for index, amplitude in run[0]["events"][-1].state_dump().get_dict().items():
+        result[index] = amplitude
+    return result
+
+
+def random_state(num_qubits: int, seed: int, support: int | None = None) -> np.ndarray:
+    """Return a normalized real state, dense or on ``support`` random basis states."""
+    rng = np.random.default_rng(seed)
+    state = np.zeros(2**num_qubits)
+    indices = rng.choice(len(state), size=support, replace=False) if support else slice(None)
+    state[indices] = rng.normal(size=state[indices].shape)
+    return state / np.linalg.norm(state)
+
+
+def controlled_product_formula_state(container: PauliProductFormulaContainer, state: np.ndarray) -> np.ndarray:
+    r"""Apply the controlled product formula of ``container`` to ``state`` exactly, term by term.
+
+    The control is the most significant qubit, as in :func:`apply_operation` with ``split_control``.
+    Each factor uses :math:`e^{-i\theta P} = \cos\theta - i\sin\theta P` on the control-one half only.
+    """
+    num_qubits = round(math.log2(len(state)))
+    indices = np.arange(len(state))
+    controlled = (indices >> (num_qubits - 1)) & 1 == 1
+    terms = [*container.prefix_terms, *container.step_terms * container.step_reps, *container.suffix_terms]
+    result = state.astype(complex)
+    for term in terms:
+        flip = parity_mask = num_y = 0
+        for qubit, axis in term.pauli_term.items():
+            bit = 1 << (num_qubits - 2 - qubit)
+            flip |= bit if axis in "XY" else 0
+            parity_mask |= bit if axis in "YZ" else 0
+            num_y += axis == "Y"
+        parity = np.zeros(len(state), dtype=int)
+        for position in range(num_qubits):
+            if parity_mask >> position & 1:
+                parity ^= (indices >> position) & 1
+        pauli = np.zeros_like(result)
+        pauli[indices ^ flip] = 1j**num_y * (1 - 2 * parity) * result
+        rotated = np.cos(term.angle) * result - 1j * np.sin(term.angle) * pauli
+        result = np.where(controlled, rotated, result)
+    return result
+
+
+def assert_states_match_up_to_global_phase(actual: np.ndarray, expected: np.ndarray, atol: float) -> None:
+    """Assert two normalized states agree once the global phase of ``actual`` is aligned to ``expected``."""
+    overlap = np.vdot(actual, expected)
+    np.testing.assert_allclose(actual * overlap / abs(overlap), expected, atol=atol, rtol=0)

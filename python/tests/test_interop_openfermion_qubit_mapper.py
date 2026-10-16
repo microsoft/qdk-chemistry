@@ -13,12 +13,12 @@ from unittest.mock import Mock
 import numpy as np
 import pytest
 
-from .reference_tolerances import (
-    float_comparison_absolute_tolerance,
-)
-from .test_helpers import (
+from .helpers import (
     create_nontrivial_test_hamiltonian,
     create_test_basis_set,
+)
+from .reference_tolerances import (
+    float_comparison_absolute_tolerance,
 )
 
 OPENFERMION_AVAILABLE = importlib.util.find_spec("openfermion") is not None

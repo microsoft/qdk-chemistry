@@ -231,6 +231,10 @@ class QDrift(TimeEvolutionBuilder):
             UnitaryRepresentation: The unitary representation built by qDRIFT sampling.
 
         """
+        if not isinstance(qubit_hamiltonian, QubitOperator):
+            raise TypeError(
+                f"The {self.name()!r} builder takes a QubitOperator, got {type(qubit_hamiltonian).__name__}."
+            )
         effective_time, power_repetitions = self._resolve_power()
         time: float = effective_time
         seed: int = self._settings.get("seed")
@@ -272,7 +276,7 @@ class QDrift(TimeEvolutionBuilder):
                 step_terms=terms,
                 step_reps=power_repetitions,
                 num_qubits=qubit_hamiltonian.num_qubits,
-                scale=time,
+                scale=time * power_repetitions,
             )
         )
 

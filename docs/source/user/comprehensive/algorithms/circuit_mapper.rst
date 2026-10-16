@@ -89,6 +89,8 @@ You can discover available implementations programmatically:
       :end-before: # end-cell-list-implementations
 
 
+.. _pauli-sequence-mapper:
+
 Pauli sequence mapper
 ~~~~~~~~~~~~~~~~~~~~~
 
@@ -115,6 +117,30 @@ exponential is completed separately.
 This can reduce logical rotation depth without extra ancillas or a different
 mapper selection. Shared-control CNOTs remain serial in a two-qubit-gate model,
 so the rotation-depth improvement is not a guarantee of constant total gate depth.
+
+.. rubric:: Hamming-weight phasing
+
+With ``use_hamming_weight_phasing``, terms of a declared layer with exactly equal nonzero angles,
+such as the uniform bonds of an Ising or Heisenberg lattice, are phased together with
+Hamming-weight phasing :cite:`Kan2025`: an adder tree writes their Hamming weight into scratch
+qubits, and a few controlled rotations on it replace the per-term rotations. Phasing a formula
+without ``layer_offsets`` raises a :class:`ValueError`. Phasing is off by default.
+
+.. rubric:: Settings
+
+.. list-table::
+   :header-rows: 1
+   :widths: 25 15 60
+
+   * - Setting
+     - Type
+     - Description
+   * - ``use_hamming_weight_phasing``
+     - bool
+     - Whether to phase each layer's equal-angle rotations through Hamming-weight registers. Pays off only when layers hold many equal angles. Default is False.
+   * - ``max_hamming_weight_phasing_batch_size``
+     - int
+     - Largest batch phased through one register; -1 (default) means no cap. A smaller cap needs fewer scratch qubits but more rotations; use at least 8, as smaller batches save too few rotations. Ignored when phasing is off.
 
 .. _cswap-pauli-sequence-mapper:
 
@@ -174,6 +200,32 @@ ordering is not vacuum preserving, rather than returning a wrong result.
    Compact formulas support nonempty ``prefix_terms`` and ``suffix_terms``; each executes once around the repeated body inside the same CSWAP sandwich.
    The prefix, body, and suffix are independently validated for vacuum preservation, sharing one leakage tolerance across repetition counts ``1``, ``step_reps``, and ``1``.
 
+.. rubric:: Hamming-weight phasing
+
+With ``use_hamming_weight_phasing``, the evolution on the vacuum register is phased as in the
+:ref:`Pauli sequence mapper <pauli-sequence-mapper>`, but uncontrolled, since the swap sandwich
+supplies the control. The vacuum-annihilating grouper declares no ``layer_offsets``, so its output
+cannot be phased.
+
+.. rubric:: Settings
+
+.. list-table::
+   :header-rows: 1
+   :widths: 25 15 60
+
+   * - Setting
+     - Type
+     - Description
+   * - ``use_hamming_weight_phasing``
+     - bool
+     - Whether to phase each layer's equal-angle rotations through Hamming-weight registers. Pays off only when layers hold many equal angles. Default is False.
+   * - ``max_hamming_weight_phasing_batch_size``
+     - int
+     - Largest batch phased through one register; -1 (default) means no cap. A smaller cap needs fewer scratch qubits but more rotations; use at least 8, as smaller batches save too few rotations. Ignored when phasing is off.
+   * - ``vacuum_preservation_tolerance``
+     - float
+     - Absolute tolerance on the total amplitude the full evolution may leak out of the vacuum (default ``1e-9``).
+
 .. rubric:: Worked example
 
 Take the two-mode Hamiltonian
@@ -211,6 +263,32 @@ so half of the vacuum amplitude leaks. Keeping the partners together instead giv
       :language: python
       :start-after: # start-cell-cswap
       :end-before: # end-cell-cswap
+
+.. _hubbard-plaquette-mapper:
+
+Hubbard plaquette mapper
+~~~~~~~~~~~~~~~~~~~~~~~~
+
+.. rubric:: Factory name: ``"hubbard_plaquette"``
+
+:class:`~qdk_chemistry.algorithms.controlled_circuit_mapper.ControlledHubbardPlaquetteMapper` maps the ``HubbardPlaquetteContainer`` from the ``"hubbard_plaquette"`` :doc:`HamiltonianUnitaryBuilder <hamiltonian_unitary_builder>` to a singly-controlled Q# circuit.
+Each layer of the plaquette step is a tower of same-angle :math:`R_z` rotations, which the mapper synthesizes with Hamming-weight phasing :cite:`Kan2025`: an adder tree writes the tower's Hamming weight into a scratch register, and a few place-value rotations on that register replace the per-term rotations.
+
+.. rubric:: Settings
+
+.. list-table::
+   :header-rows: 1
+   :widths: 25 15 60
+
+   * - Setting
+     - Type
+     - Description
+   * - ``use_hamming_weight_phasing``
+     - bool
+     - Whether to phase each tower of same-angle rotations through a Hamming-weight register. When False, every term is its own rotation. Default is True.
+   * - ``max_hamming_weight_phasing_batch_size``
+     - int
+     - Largest tower of same-angle rotations phased through one Hamming-weight register. A smaller cap needs fewer scratch qubits but more rotations. Every batch is phased as given, so use a cap of at least 8: shorter batches save too few rotations to be worth the extra Toffolis and scratch qubits. Ignored when ``use_hamming_weight_phasing`` is False. When set to -1 (default), there is no cap.
 
 Related classes
 ---------------

@@ -96,6 +96,7 @@ jobs:
       QSHARP_PYTHON_TELEMETRY: 'false'
       CMAKE_INSTALL_PREFIX: ${{ github.workspace }}/install
       CPP_DEPS_PREFIX: ${{ github.workspace }}/cpp_deps_install
+      EXACHEM_INSTALL_PREFIX: ${{ github.workspace }}/exachem_install
       CTEST_OUTPUT_ON_FAILURE: 1
       CMAKE_BUILD_PARALLEL_LEVEL: ${{ matrix.build-parallel }}
       QDK_UARCH: ${{ matrix.uarch }}
@@ -110,7 +111,7 @@ jobs:
       run: |
         echo "PATH=${{ github.workspace }}/install/bin:${{ github.workspace }}/install/lib:$PATH" >> $GITHUB_ENV
         echo "PYTHONPATH=${{ github.workspace }}/install/lib/python${{ matrix.python-version }}/site-packages:${{ github.workspace }}/install/lib:$PYTHONPATH" >> $GITHUB_ENV
-        echo "LD_LIBRARY_PATH=${{ github.workspace }}/install/lib:$LD_LIBRARY_PATH" >> $GITHUB_ENV
+        echo "LD_LIBRARY_PATH=${{ github.workspace }}/install/lib${LD_LIBRARY_PATH:+:${LD_LIBRARY_PATH}}" >> $GITHUB_ENV
 
     - name: Set up Python
       uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
@@ -150,7 +151,12 @@ jobs:
           libgfortran5 \
           pkg-config \
           doxygen \
-          graphviz
+          graphviz \
+          gcovr \
+          gfortran \
+          libnuma-dev \
+          openmpi-bin \
+          libopenmpi-dev
 
     - name: Install macOS system packages
       if: matrix.os-name == 'macOS'
@@ -164,10 +170,10 @@ jobs:
           boost \
           hdf5 \
           graphviz \
+          gcovr \
           nlohmann-json \
           bison \
-          flex \
-          googletest
+          flex
 
     - name: Cache Doxygen (macOS)
       if: matrix.os-name == 'macOS'
@@ -201,43 +207,81 @@ jobs:
       run: |
         echo "PATH=${{ github.workspace }}/doxygen_install/bin:$PATH" >> $GITHUB_ENV
 
-    - name: Cache C++ dependency install # Checks if manifest files or build script have changed to rebuild dependencies
+    - name: Cache C++ dependencies and ExaChem install # Checks if manifest files or build scripts have changed to rebuild dependencies
       id: cache-cpp-deps
       if: ${{ !inputs.rebuild_dep_cache }}
       uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
       with:
         path: |
           ${{ env.CPP_DEPS_PREFIX }}
+          ${{ env.EXACHEM_INSTALL_PREFIX }}
         key: >-
           cpp-deps-${{ runner.os }}-${{ matrix.uarch }}-
-          ${{ hashFiles('cpp/manifest/qdk-chemistry/cgmanifest.json', 'external/macis/manifest/cgmanifest.json', '.devcontainer/scripts/install_cpp_dependencies.sh') }}
+          ${{ hashFiles('cpp/manifest/qdk-chemistry/cgmanifest.json', 'external/macis/manifest/cgmanifest.json', '.pipelines/install-scripts/common.sh', '.pipelines/install-scripts/install-cpp-deps.sh', '.pipelines/install-scripts/install-blaspp.sh', '.pipelines/install-scripts/install-lapackpp.sh', '.pipelines/install-scripts/exachem/**') }}
 
     - name: Add C++ deps prefix to CMake search path
       run: |
         echo "CMAKE_PREFIX_PATH=${{ env.CPP_DEPS_PREFIX }}:${{ env.CMAKE_INSTALL_PREFIX }}:${CMAKE_PREFIX_PATH}" >> $GITHUB_ENV
-        echo "LD_LIBRARY_PATH=${{ env.CPP_DEPS_PREFIX }}/lib:${LD_LIBRARY_PATH}" >> $GITHUB_ENV
+        echo "LD_LIBRARY_PATH=${{ env.CPP_DEPS_PREFIX }}/lib${LD_LIBRARY_PATH:+:${LD_LIBRARY_PATH}}" >> $GITHUB_ENV
         echo "PATH=${{ env.CPP_DEPS_PREFIX }}/bin:${PATH}" >> $GITHUB_ENV
 
-    - name: Install C++ dependencies
+    - name: Install C++ dependencies and ExaChem (Linux)
       if: steps.cache-cpp-deps.outputs.cache-hit != 'true' # Run the dependency build if we don't find the right hash in the cache
       env:
-        INSTALL_PREFIX: ${{ env.CPP_DEPS_PREFIX }}
         BUILD_DIR: ${{ github.workspace }}/cpp_deps_build
+        MARCH: ${{ matrix.uarch }}
         KEEP_BUILD_DIR: 1
       run: |
-        bash ${{ github.workspace }}/.devcontainer/scripts/install_cpp_dependencies.sh \
-          ${{ github.workspace }}/cpp/manifest/qdk-chemistry/cgmanifest.json \
-          ${{ github.workspace }}/external/macis/manifest/cgmanifest.json
+        # Cap only dependency/ExaChem builds here; the later qdk-chemistry build keeps matrix-level parallelism.
+        if [ "${{ matrix.os-name }}" == "macOS" ]; then
+          jobs="${{ matrix.build-parallel }}"
+          echo "macOS dependency build -> JOBS=$jobs"
+        else
+          cpu=$(command -v nproc >/dev/null 2>&1 && nproc || sysctl -n hw.logicalcpu)
+          if [ -r /proc/meminfo ]; then
+            ram_gb=$(( $(grep MemTotal /proc/meminfo | awk '{print $2}') / 1024 / 1024 ))
+          else
+            ram_gb=$(( $(sysctl -n hw.memsize) / 1024 / 1024 / 1024 ))
+          fi
+          jobs=$(awk "BEGIN { print int($ram_gb / 8) }")
+          [ "$jobs" -lt 1 ] && jobs=1
+          [ "$jobs" -gt "$cpu" ] && jobs=$cpu
+          echo "CPUs=$cpu RAM=${ram_gb}GB -> JOBS=$jobs"
+        fi
 
-    - name: Save C++ dependency cache
+        # macOS has no BLAS package installed, so let BLAS++ auto-detect Apple's Accelerate framework; Linux
+        # installs OpenBLAS via apt above.
+        if [ "${{ matrix.os-name }}" == "macOS" ]; then
+          BLAS_VENDOR=auto
+        else
+          BLAS_VENDOR=openblas
+        fi
+        INSTALL_PREFIX="${{ env.CPP_DEPS_PREFIX }}" \
+        JOBS="$jobs" \
+          bash ${{ github.workspace }}/.pipelines/install-scripts/install-cpp-deps.sh \
+          ${{ github.workspace }}/cpp/manifest/qdk-chemistry/cgmanifest.json \
+          ${{ github.workspace }}/external/macis/manifest/cgmanifest.json \
+          "$BLAS_VENDOR"
+
+        if [ "${{ matrix.os-name }}" == "Linux" ]; then
+          # A separate prefix from CPP_DEPS_PREFIX: TAMM's CMSB superbuild rebuilds its own BLAS/LAPACK, which
+          # would shadow the real OpenBLAS for the main build otherwise (caused SEGFAULTs).
+          INSTALL_PREFIX="${{ env.EXACHEM_INSTALL_PREFIX }}" \
+          BUILD_ROOT="${{ github.workspace }}/exachem_build" \
+          JOBS="$jobs" \
+            bash ${{ github.workspace }}/.pipelines/install-scripts/exachem/install-exachem.sh
+        fi
+
+    - name: Save C++ dependencies and ExaChem cache
       if: steps.cache-cpp-deps.outputs.cache-hit != 'true'
       uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
       with:
         path: |
           ${{ env.CPP_DEPS_PREFIX }}
+          ${{ env.EXACHEM_INSTALL_PREFIX }}
         key: >-
           cpp-deps-${{ runner.os }}-${{ matrix.uarch }}-
-          ${{ hashFiles('cpp/manifest/qdk-chemistry/cgmanifest.json', 'external/macis/manifest/cgmanifest.json', '.devcontainer/scripts/install_cpp_dependencies.sh') }}
+          ${{ hashFiles('cpp/manifest/qdk-chemistry/cgmanifest.json', 'external/macis/manifest/cgmanifest.json', '.pipelines/install-scripts/common.sh', '.pipelines/install-scripts/install-cpp-deps.sh', '.pipelines/install-scripts/install-blaspp.sh', '.pipelines/install-scripts/install-lapackpp.sh', '.pipelines/install-scripts/exachem/**') }}
 
     - name: Configure C++ CMake build
       run: |
@@ -271,9 +315,9 @@ jobs:
         echo "=== Running C++ Tests ==="
         set +e
         if [ "$QDK_UARCH" == "native" ]; then # Exclude particular test on macOS builds
-          ctest -j "$CTEST_WORKERS" --output-on-failure --verbose --timeout 400 --output-junit ${{ github.workspace }}/test-results/ctest_results.xml -E "MACIS_SERIAL_TEST|AtomInitGuessEnergyConvergence"
+          ctest -j "$CTEST_WORKERS" --output-on-failure --verbose --timeout 600 --output-junit ${{ github.workspace }}/test-results/ctest_results.xml -E "MACIS_SERIAL_TEST|AtomInitGuessEnergyConvergence"
         else
-          ctest -j "$CTEST_WORKERS" --output-on-failure --verbose --timeout 400 --output-junit ${{ github.workspace }}/test-results/ctest_results.xml -E "MACIS_SERIAL_TEST"
+          ctest -j "$CTEST_WORKERS" --output-on-failure --verbose --timeout 600 --output-junit ${{ github.workspace }}/test-results/ctest_results.xml -E "MACIS_SERIAL_TEST"
         fi
 
         CTEST_EXIT_CODE=$?
@@ -332,6 +376,13 @@ jobs:
       working-directory: python
       run: |
         set -e
+        # Point ExaChem at its install prefix (basis files live in <prefix>/basis) and prepend its runtime paths.
+        if [ "${{ matrix.os-name }}" == "Linux" ]; then
+          export LIBINT_DATA_PATH="${{ env.EXACHEM_INSTALL_PREFIX }}"
+          export PATH="${{ env.EXACHEM_INSTALL_PREFIX }}/bin:${PATH}"
+          export LD_LIBRARY_PATH="${{ env.EXACHEM_INSTALL_PREFIX }}/lib:${{ env.EXACHEM_INSTALL_PREFIX }}/lib64${LD_LIBRARY_PATH:+:${LD_LIBRARY_PATH}}"
+        fi
+
         mkdir -p ../test-results
 
         XDIST_ARGS=()
@@ -376,7 +427,7 @@ jobs:
     # this artifact) don't pay for the extra upload.
     - name: Upload install dir (for test-with-qdk-branch)
       if: matrix.os-name == 'Linux' && matrix.python-version == '3.13' && github.event_name == 'workflow_dispatch' && inputs.test_with_qdk_branch
-      uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+      uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
       with:
         name: qdk-chemistry-install-linux-x86-64-v3-py3.13
         path: ${{ github.workspace }}/install
@@ -485,7 +536,7 @@ jobs:
 
     - name: Retain coverage XML for benchmarks
       if: always() && matrix.enable-coverage && github.event_name == 'workflow_dispatch'
-      uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+      uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
       with:
         name: cobertura-xml-linux-py${{ matrix.python-version }}
         path: |
@@ -497,7 +548,7 @@ jobs:
     # Fork PRs are skipped by the action itself (no write access), not by this condition.
     - name: Upload C++ code coverage
       if: matrix.enable-coverage && (github.event_name == 'pull_request' || github.event_name == 'push')
-      uses: actions/upload-code-coverage@bfa741d815a28cb064a8e3a0837e577457a017d5 # v1.4.3
+      uses: actions/upload-code-coverage@2b21a77928be8d5168c2b9581a67f2adbebacc52 # v1.4.4
       with:
         file: coverage-reports/cpp_coverage.cobertura.xml
         language: C++
@@ -506,7 +557,7 @@ jobs:
 
     - name: Upload Pybind11 code coverage
       if: matrix.enable-coverage && (github.event_name == 'pull_request' || github.event_name == 'push')
-      uses: actions/upload-code-coverage@bfa741d815a28cb064a8e3a0837e577457a017d5 # v1.4.3
+      uses: actions/upload-code-coverage@2b21a77928be8d5168c2b9581a67f2adbebacc52 # v1.4.4
       with:
         file: coverage-reports/pybind11_coverage.cobertura.xml
         language: C++
@@ -515,7 +566,7 @@ jobs:
 
     - name: Upload Python code coverage
       if: matrix.enable-coverage && (github.event_name == 'pull_request' || github.event_name == 'push')
-      uses: actions/upload-code-coverage@bfa741d815a28cb064a8e3a0837e577457a017d5 # v1.4.3
+      uses: actions/upload-code-coverage@2b21a77928be8d5168c2b9581a67f2adbebacc52 # v1.4.4
       with:
         file: coverage-reports/python_coverage.xml
         language: Python
@@ -546,7 +597,7 @@ jobs:
 
     - name: Upload JUnit test results
       if: always()
-      uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+      uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
       with:
         name: junit-${{ matrix.os-name }}-py${{ matrix.python-version }}
         path: test-results/*.xml
@@ -771,7 +822,7 @@ jobs:
 
     - name: Upload JUnit test results
       if: always()
-      uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+      uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
       with:
         name: junit-windows-x64-${{ matrix.compiler }}
         path: |
@@ -1038,7 +1089,7 @@ jobs:
 
     - name: Upload JUnit test results
       if: always()
-      uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+      uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
       with:
         name: junit-windows-arm64-${{ matrix.compiler }}
         path: |
@@ -1067,7 +1118,7 @@ jobs:
       run: |
         echo "PATH=${{ github.workspace }}/install/bin:${{ github.workspace }}/install/lib:$PATH" >> $GITHUB_ENV
         echo "PYTHONPATH=${{ github.workspace }}/install/lib/python3.13/site-packages:${{ github.workspace }}/install/lib:$PYTHONPATH" >> $GITHUB_ENV
-        echo "LD_LIBRARY_PATH=${{ github.workspace }}/install/lib:$LD_LIBRARY_PATH" >> $GITHUB_ENV
+        echo "LD_LIBRARY_PATH=${{ github.workspace }}/install/lib${LD_LIBRARY_PATH:+:${LD_LIBRARY_PATH}}" >> $GITHUB_ENV
 
     - name: Set up Python
       uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
@@ -1102,7 +1153,7 @@ jobs:
     # Reuses the coverage job's own Linux/x86-64-v3/Python-3.13 build (dependencies + C++ + Python install)
     # Adds the "install qdk from branch" override and re-runs the Python test suite against it.
     - name: Download coverage build (Linux x86-64-v3, Python 3.13)
-      uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+      uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
       with:
         name: qdk-chemistry-install-linux-x86-64-v3-py3.13
         path: ${{ github.workspace }}/install
@@ -1141,7 +1192,7 @@ jobs:
 
     - name: Upload test results
       if: always()
-      uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+      uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
       with:
         name: qdk-branch-test-results
         path: test-results/

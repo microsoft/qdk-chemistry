@@ -115,6 +115,10 @@ class LCUBuilder(HamiltonianUnitaryBuilder):
             UnitaryRepresentation: The unitary representation wrapping the built LCUContainer.
 
         """
+        if not isinstance(qubit_hamiltonian, QubitOperator):
+            raise TypeError(
+                f"The {self.name()!r} builder takes a QubitOperator, got {type(qubit_hamiltonian).__name__}."
+            )
         power: int = self._settings.get("power")
         quantum_walk: bool = self._settings.get("quantum_walk")
 

@@ -5,19 +5,25 @@
 # Licensed under the MIT License. See LICENSE.txt in the project root for license information.
 # --------------------------------------------------------------------------------------------
 
+import warnings
 from itertools import permutations
 
 import numpy as np
 import pytest
 import scipy
 
+from qdk_chemistry.algorithms import create
 from qdk_chemistry.algorithms.hamiltonian_unitary_builder.time_evolution.trotter import Trotter
 from qdk_chemistry.algorithms.hamiltonian_unitary_builder.time_evolution.trotter_error import trotter_steps_commutator
 from qdk_chemistry.data import (
+    FermiHubbardModelHamiltonianDescription,
     FlatPartition,
+    Hamiltonian,
+    HamiltonianDescription,
     LatticeGeometry,
     LatticeGraph,
     LayeredPartition,
+    ModelHamiltonianDescription,
     QubitOperator,
     UnitaryRepresentation,
 )
@@ -133,7 +139,7 @@ class TestTrotter:
         assert isinstance(sparse_container, PauliProductFormulaContainer)
         assert sparse_container.num_qubits == 2
         assert sparse_container.step_reps == (12 if power_strategy == "repeat" else 4)
-        assert sparse_container.scale == (0.2 if power_strategy == "repeat" else 0.2 * 3)
+        assert sparse_container.scale == pytest.approx(0.2 * 3)
         assert list(sparse_container.step_terms) == list(dense_container.step_terms)
 
     @pytest.mark.parametrize("sparse", [False, True])
@@ -637,6 +643,36 @@ class TestTrotter:
             atol=float_comparison_absolute_tolerance,
         )
 
+    @pytest.mark.parametrize("power_strategy", ["repeat", "rescale"])
+    @pytest.mark.parametrize("fuse_group_boundaries", [False, True])
+    def test_eigenvalue_from_phase_roundtrip_with_power(self, power_strategy, fuse_group_boundaries):
+        """A powered representation inverts against its total evolution time, before and after serialization."""
+        t = 0.7
+        power = 3
+        energy = 0.5
+        # The circuit represents e^{-iH(t*power)}, so the measured phase carries the total time.
+        phi = (-energy * t * power / (2 * np.pi)) % 1.0
+        hamiltonian = QubitOperator(pauli_strings=["X", "Z"], coefficients=[1.0, 0.5])
+        builder = Trotter(
+            order=2,
+            num_divisions=2,
+            time=t,
+            power=power,
+            power_strategy=power_strategy,
+            fuse_group_boundaries=fuse_group_boundaries,
+        )
+        container = builder.run(hamiltonian).get_container()
+        restored = PauliProductFormulaContainer.from_json(container.to_json())
+
+        assert np.isclose(container.scale, t * power, rtol=float_comparison_relative_tolerance)
+        for inverted in (container, restored):
+            assert np.isclose(
+                inverted.eigenvalue_from_phase(phi),
+                energy,
+                rtol=float_comparison_relative_tolerance,
+                atol=float_comparison_absolute_tolerance,
+            )
+
 
 class TestTrotterAccuracyAware:
     """Tests for accuracy-aware Trotter parameterization."""
@@ -951,6 +987,57 @@ class TestTrotterAccuracyAware:
             atol=float_comparison_absolute_tolerance,
             rtol=float_comparison_relative_tolerance,
         )
+
+
+class TestHamiltonianDescription:
+    """Trotter evolves a QubitOperator and rejects any other HamiltonianDescription."""
+
+    def test_rejects_a_description_it_does_not_evolve(self):
+        """QubitOperator and ModelHamiltonianDescription are descriptions; Trotter turns a model away."""
+        assert issubclass(FermiHubbardModelHamiltonianDescription, HamiltonianDescription)
+        assert issubclass(QubitOperator, HamiltonianDescription)
+        assert issubclass(ModelHamiltonianDescription, HamiltonianDescription)
+        assert not issubclass(LatticeGeometry, HamiltonianDescription)
+        assert not issubclass(Hamiltonian, HamiltonianDescription)
+        model = FermiHubbardModelHamiltonianDescription(LatticeGeometry.chain(2), t=1.0, u=4.0)
+        with pytest.raises(TypeError, match="takes a QubitOperator, got FermiHubbardModelHamiltonianDescription"):
+            Trotter(time=0.1).run(model)
+
+    @pytest.mark.parametrize("name", ["trotter", "qdrift", "partially_randomized", "zassenhaus", "lcu", "sossa"])
+    def test_qubit_operator_builders_reject_a_model_description(self, name):
+        """Every built-in builder checks its input and turns a model description away."""
+        model = FermiHubbardModelHamiltonianDescription(LatticeGeometry.chain(2), t=1.0, u=4.0)
+        with pytest.raises(TypeError, match="QubitOperator"):
+            create("hamiltonian_unitary_builder", name).run(model)
+
+    def test_builder_warns_for_inputs_that_are_not_descriptions(self):
+        """A builder that takes another input still runs, and warns that descriptions will be required."""
+
+        class _DictTrotter(Trotter):
+            def _run_impl(self, qubit_hamiltonian):
+                if isinstance(qubit_hamiltonian, dict):
+                    qubit_hamiltonian = QubitOperator(
+                        pauli_strings=list(qubit_hamiltonian), coefficients=list(qubit_hamiltonian.values())
+                    )
+                return super()._run_impl(qubit_hamiltonian)
+
+        builder = _DictTrotter(time=0.1)
+        with warnings.catch_warnings():
+            warnings.simplefilter("error", DeprecationWarning)
+            builder.run(QubitOperator(pauli_strings=["Z"], coefficients=[1.0]))
+        with pytest.warns(DeprecationWarning, match="will require a HamiltonianDescription"):
+            unitary = builder.run({"Z": 1.0})
+        assert isinstance(unitary, UnitaryRepresentation)
+
+    def test_rejects_a_result_that_is_not_a_unitary(self):
+        """A builder must return a UnitaryRepresentation."""
+
+        class _IdentityTrotter(Trotter):
+            def _run_impl(self, qubit_hamiltonian):
+                return qubit_hamiltonian
+
+        with pytest.raises(TypeError, match="returned a QubitOperator, not a UnitaryRepresentation"):
+            _IdentityTrotter(time=0.1).run(QubitOperator(pauli_strings=["Z"], coefficients=[1.0]))
 
 
 class TestNoPartitionFallback:

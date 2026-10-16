@@ -31,6 +31,7 @@ _BUNDLED_PLUGIN_AUTOLOAD_CASES = (
     ("openfermion", "QDK_CHEMISTRY_DISABLE_OPENFERMION_AUTOLOAD"),
     ("networkx", "QDK_CHEMISTRY_DISABLE_NETWORKX_AUTOLOAD"),
     ("geometric", "QDK_CHEMISTRY_DISABLE_GEOMETRIC_AUTOLOAD"),
+    ("azure_quantum", "QDK_CHEMISTRY_DISABLE_AZURE_QUANTUM_AUTOLOAD"),
 )
 
 
@@ -351,6 +352,8 @@ def test_unified_plugins_load_before_bundled_integrations(monkeypatch):
 @pytest.mark.parametrize(("plugin_name", "disable_env_var"), _BUNDLED_PLUGIN_AUTOLOAD_CASES)
 def test_bundled_plugin_autoload_can_be_disabled(monkeypatch, plugin_name, disable_env_var):
     """Each bundled plugin can be excluded before its module is imported."""
+    assert disable_env_var == f"QDK_CHEMISTRY_DISABLE_{plugin_name.upper()}_AUTOLOAD"
+    assert (plugin_name, disable_env_var) in qdk_chemistry._BUNDLED_PLUGIN_AUTOLOAD
     import_module = MagicMock()
     monkeypatch.setenv(disable_env_var, "TrUe")
     monkeypatch.setattr(qdk_chemistry.importlib, "import_module", import_module)

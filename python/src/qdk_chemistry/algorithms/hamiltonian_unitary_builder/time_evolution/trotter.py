@@ -191,6 +191,10 @@ class Trotter(TimeEvolutionBuilder):
             UnitaryRepresentation: The unitary representation built by the Trotter decomposition.
 
         """
+        if not isinstance(qubit_hamiltonian, QubitOperator):
+            raise TypeError(
+                f"The {self.name()!r} builder takes a QubitOperator, got {type(qubit_hamiltonian).__name__}."
+            )
         container_type = qubit_hamiltonian.get_container_type()
         if not isinstance(qubit_hamiltonian.get_container(), PauliDecompositionContainer):
             raise ValueError(
@@ -244,7 +248,7 @@ class Trotter(TimeEvolutionBuilder):
             step_terms=terms,
             step_reps=num_divisions * power_repetitions,
             num_qubits=num_qubits,
-            scale=time,
+            scale=time * power_repetitions,
             group_offsets=group_offsets if self._settings.get("fuse_group_boundaries") else None,
             layer_offsets=layer_offsets,
         )
