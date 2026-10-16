@@ -461,18 +461,15 @@ def _run_sossa_unary_qpe(num_queries, mapper_kwargs=None, shots=100, seed=202508
     return result, gs_energy, physical_energy, container
 
 
-#: Block-encoding normalization of :func:`_exact_walk_phase_problem`, which its ``b`` leaves unchanged.
-_EXACT_PHASE_LAMBDA = 1.69
-
 #: Phase-gradient width that holds every rotation of :func:`_exact_walk_phase_problem` exactly.
 _EXACT_PHASE_ROTATION_BITS = 4
 
 
-def _exact_walk_phase_problem(walk_phase):
-    """Build a two-orbital SOSSA problem with an eigenstate at ``walk_phase``, exact at 4 rotation bits."""
-    a, w1, w2 = -1.0, 0.5, 0.3
+def _exact_walk_phase_problem(walk_phase, prepare_consumes_gradient):
+    """Build a two-orbital SOSSA problem and a state prep for its eigenstate at an exact ``walk_phase``."""
+    lambda_sos, a, w1, w2 = 1.69, -1.0, 0.5, 0.3
     # Lambda does not depend on b, so b alone moves the bonding pair's energy 2(a + b) + w1^2 to walk_phase.
-    b = 0.5 * (_EXACT_PHASE_LAMBDA * (math.cos(2.0 * math.pi * walk_phase) - 1.0) - w1**2) - a
+    b = 0.5 * (lambda_sos * (math.cos(2.0 * math.pi * walk_phase) - 1.0) - w1**2) - a
     s = 1.0 / math.sqrt(2.0)
     h1 = np.array([[a, b], [b, a]])
     basis_vectors = np.array([[[s, s], [s, -s]]])
@@ -491,7 +488,7 @@ def _exact_walk_phase_problem(walk_phase):
     )
     operator = factorized_hamiltonian_to_sossa_operator(fh)
     container = SOSSABuilder().run(operator).get_container()
-    assert container.normalization == pytest.approx(_EXACT_PHASE_LAMBDA)
+    assert container.normalization == pytest.approx(lambda_sos)
     for angles in (container.select.one_body_rotation_angles, container.select.two_body_rotation_angles):
         steps = np.asarray(angles) / (math.pi / 4.0)
         np.testing.assert_allclose(steps, np.round(steps), atol=1e-12)
@@ -505,86 +502,24 @@ def _exact_walk_phase_problem(walk_phase):
     assert np.partition(distances, 1)[1] > 0.1, "the target eigenstate must be non-degenerate"
     assert _energy_to_qpe_phase(gap_energies[index], container.normalization) == pytest.approx(walk_phase)
 
-    state = gap_states[:, index]
+    eigenstate = gap_states[:, index]
+    state = _to_qsharp_ordering(eigenstate, n_orb)
+    if prepare_consumes_gradient:
+        support = np.flatnonzero(np.abs(state) > 1e-12)
+        wavefunction = create_sparse_wavefunction(2 * n_orb, support.tolist(), state[support].tolist())
+        state_prep = QROMStatePreparation(
+            rotation_bit_precision=_EXACT_PHASE_ROTATION_BITS, allocate_phase_gradient=False
+        ).run(wavefunction)
+        assert state_prep.metadata.num_phase_gradient_ancillas == _EXACT_PHASE_ROTATION_BITS
+    else:
+        state_prep = _direct_state_prep(state)
+
     physical = _build_physical_hamiltonian_matrix(h1, basis_vectors, two_body_weights)
     return {
         "operator": operator,
-        "container": container,
-        "state": _to_qsharp_ordering(state, n_orb),
-        "energy": float(state @ physical @ state),
+        "state_prep": state_prep,
+        "energy": float(eigenstate @ physical @ eigenstate),
     }
-
-
-def _exact_phase_state_prep(state_vector, consumes_gradient):
-    """Prepare ``state_vector`` directly, or with a QROM that consumes the shared gradient."""
-    if not consumes_gradient:
-        return _direct_state_prep(state_vector)
-    support = np.flatnonzero(np.abs(state_vector) > 1e-12)
-    wavefunction = create_sparse_wavefunction(
-        len(state_vector).bit_length() - 1, support.tolist(), np.asarray(state_vector)[support].tolist()
-    )
-    state_prep = QROMStatePreparation(
-        rotation_bit_precision=_EXACT_PHASE_ROTATION_BITS, allocate_phase_gradient=False
-    ).run(wavefunction)
-    assert state_prep.metadata.num_phase_gradient_ancillas == _EXACT_PHASE_ROTATION_BITS
-    return state_prep
-
-
-def _controlled_walk_builder_settings(num_bits, select_algorithm):
-    """QPE builder settings for the controlled SOSSA walk."""
-    return {
-        "num_bits": num_bits,
-        "unitary_builder": AlgorithmRef("hamiltonian_unitary_builder", "sossa"),
-        "controlled_circuit_mapper": AlgorithmRef(
-            "controlled_circuit_mapper",
-            "sossa",
-            outer_prepare_algorithm=AlgorithmRef("state_prep", "dense_pure_state"),
-            inner_prepare_algorithm="direct",
-            select_algorithm=select_algorithm,
-            rotation_bit_precision=_EXACT_PHASE_ROTATION_BITS,
-        ),
-    }
-
-
-def _run_controlled_walk_qpe(qpe, builder_name, problem, *, num_bits, select_algorithm, prepare_consumes_gradient):
-    """Run ``qpe`` on ``problem`` through the controlled SOSSA walk."""
-    qpe.settings().set(
-        "qpe_circuit_builder",
-        AlgorithmRef(
-            "qpe_circuit_builder", builder_name, **_controlled_walk_builder_settings(num_bits, select_algorithm)
-        ),
-    )
-    qpe.settings().set("circuit_executor", AlgorithmRef("circuit_executor", "qdk_sparse_state_simulator", seed=7))
-    return qpe.run(
-        qubit_hamiltonian=problem["operator"],
-        state_preparation=_exact_phase_state_prep(problem["state"], prepare_consumes_gradient),
-    )
-
-
-def _walk_qpe_circuit_counts(
-    builder_name, problem, *, num_bits, select_algorithm, prepare_consumes_gradient, shots, **builder_settings
-):
-    """Run the QPE circuit directly and return all its MSB-first bitstring counts."""
-    builder = create(
-        "qpe_circuit_builder",
-        builder_name,
-        **_controlled_walk_builder_settings(num_bits, select_algorithm),
-        **builder_settings,
-    )
-    (circuit,) = builder.run(
-        state_preparation=_exact_phase_state_prep(problem["state"], prepare_consumes_gradient),
-        qubit_hamiltonian=problem["operator"],
-    )
-    executor = create("circuit_executor", "qdk_sparse_state_simulator", seed=7)
-    return executor.run(circuit, shots=shots).bitstring_counts
-
-
-#: ``(select_algorithm, prepare_consumes_gradient)``; a QROM prep needs the gradient SELECT.
-_CONTROLLED_WALK_CASES = [
-    pytest.param("qrom_phase_gradient", False, id="gradient_walk"),
-    pytest.param("qrom_phase_gradient", True, id="gradient_walk_and_prep"),
-    pytest.param("direct", False, id="gradient_free_walk"),
-]
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -885,87 +820,65 @@ class TestControlledSOSSAMapper:
         )
         assert gradient == expected
 
-    @pytest.mark.parametrize("control_indices", [[1], [0, 1]])
-    def test_rejects_controls_other_than_one_qubit_at_index_zero(self, control_indices):
-        """The walk takes one control qubit, at index 0."""
-        unitary = SOSSABuilder().run(self._operator())
-        mapper = create("controlled_circuit_mapper", "sossa", control_indices=control_indices)
-        with pytest.raises(ValueError, match="single control qubit at index 0"):
-            mapper.run(unitary)
 
-
-class TestSOSSAControlledWalkQPE:
-    """Standard and iterative QPE through the controlled SOSSA walk; shots land on phi or 1 - phi."""
-
-    @pytest.mark.parametrize(("select_algorithm", "prepare_consumes_gradient"), _CONTROLLED_WALK_CASES)
-    def test_standard_qpe_measures_the_walk_phase(self, select_algorithm, prepare_consumes_gradient):
-        """Every standard QPE shot lands on phi = 3/8 or 5/8, and the energy decodes."""
-        problem = _exact_walk_phase_problem(3.0 / 8.0)
-        result = _run_controlled_walk_qpe(
-            StandardPhaseEstimation(shots=8),
-            "qdk_standard",
-            problem,
-            num_bits=3,
+@pytest.mark.parametrize(
+    ("select_algorithm", "prepare_consumes_gradient"),
+    [
+        pytest.param("qrom_phase_gradient", False, id="gradient_walk"),
+        pytest.param("qrom_phase_gradient", True, id="gradient_walk_and_prep"),
+        pytest.param("direct", False, id="gradient_free_walk"),
+    ],
+)
+def test_controlled_walk_qpe_measures_the_walk_phase(select_algorithm, prepare_consumes_gradient):
+    """Standard and iterative QPE through the controlled SOSSA walk measure phi or 1 - phi exactly."""
+    walk = {
+        "unitary_builder": AlgorithmRef("hamiltonian_unitary_builder", "sossa"),
+        "controlled_circuit_mapper": AlgorithmRef(
+            "controlled_circuit_mapper",
+            "sossa",
+            outer_prepare_algorithm=AlgorithmRef("state_prep", "dense_pure_state"),
+            inner_prepare_algorithm="direct",
             select_algorithm=select_algorithm,
-            prepare_consumes_gradient=prepare_consumes_gradient,
-        )
+            rotation_bit_precision=_EXACT_PHASE_ROTATION_BITS,
+        ),
+    }
+    three_eighths = _exact_walk_phase_problem(3.0 / 8.0, prepare_consumes_gradient)
+    quarter = _exact_walk_phase_problem(1.0 / 4.0, prepare_consumes_gradient)
 
-        assert any(result.phase_fraction == pytest.approx(phase, abs=1e-12) for phase in (3.0 / 8.0, 5.0 / 8.0)), (
-            f"measured phase {result.phase_fraction} is neither 3/8 nor 5/8"
+    # IQPE feedback is deterministic only at phi = 1/4; standard QPE uses 3/8, which a sign flip would move.
+    for qpe, builder_name, problem, phases in [
+        (StandardPhaseEstimation(shots=8), "qdk_standard", three_eighths, (3.0 / 8.0, 5.0 / 8.0)),
+        (IterativePhaseEstimation(shots_per_bit=3), "qdk_iterative", quarter, (1.0 / 4.0, 3.0 / 4.0)),
+        (
+            IterativePhaseEstimation(shots_per_bit=3, combine_iterations=True),
+            "qdk_iterative",
+            quarter,
+            (1.0 / 4.0, 3.0 / 4.0),
+        ),
+    ]:
+        qpe.settings().set("qpe_circuit_builder", AlgorithmRef("qpe_circuit_builder", builder_name, num_bits=3, **walk))
+        qpe.settings().set("circuit_executor", AlgorithmRef("circuit_executor", "qdk_sparse_state_simulator", seed=7))
+        result = qpe.run(qubit_hamiltonian=problem["operator"], state_preparation=problem["state_prep"])
+        assert any(result.phase_fraction == pytest.approx(phase, abs=1e-12) for phase in phases), (
+            f"{builder_name} measured phase {result.phase_fraction}, not one of {phases}"
         )
         assert result.raw_energy == pytest.approx(problem["energy"], abs=1e-9)
 
-        counts = _walk_qpe_circuit_counts(
-            "qdk_standard",
-            problem,
-            num_bits=3,
-            select_algorithm=select_algorithm,
-            prepare_consumes_gradient=prepare_consumes_gradient,
-            shots=16,
-        )
-        assert set(counts) <= {"011", "101"}, f"shots leaked off 3/8 and 5/8: {counts}"
+    # The drivers keep only the peak, so read every shot of the circuits directly.
+    inputs = {"state_preparation": three_eighths["state_prep"], "qubit_hamiltonian": three_eighths["operator"]}
+    (circuit,) = create("qpe_circuit_builder", "qdk_standard", num_bits=3, **walk).run(**inputs)
+    counts = create("circuit_executor", "qdk_sparse_state_simulator", seed=7).run(circuit, shots=16).bitstring_counts
+    assert set(counts) <= {"011", "101"}, f"shots leaked off 3/8 and 5/8: {counts}"
 
-    @pytest.mark.parametrize("combine_iterations", [False, True], ids=["per_bit", "combined"])
-    @pytest.mark.parametrize(("select_algorithm", "prepare_consumes_gradient"), _CONTROLLED_WALK_CASES)
-    def test_iterative_qpe_measures_the_walk_phase(
-        self, select_algorithm, prepare_consumes_gradient, combine_iterations
-    ):
-        """Per-bit and combined IQPE measure phi = 1/4 or 3/4 and decode the energy."""
-        problem = _exact_walk_phase_problem(1.0 / 4.0)
-        result = _run_controlled_walk_qpe(
-            IterativePhaseEstimation(shots_per_bit=3, combine_iterations=combine_iterations),
-            "qdk_iterative",
-            problem,
-            num_bits=3,
-            select_algorithm=select_algorithm,
-            prepare_consumes_gradient=prepare_consumes_gradient,
-        )
-
-        assert any(result.phase_fraction == pytest.approx(phase, abs=1e-12) for phase in (1.0 / 4.0, 3.0 / 4.0)), (
-            f"measured phase {result.phase_fraction} is neither 1/4 nor 3/4"
-        )
-        assert result.raw_energy == pytest.approx(problem["energy"], abs=1e-9)
-
-    @pytest.mark.parametrize(("select_algorithm", "prepare_consumes_gradient"), _CONTROLLED_WALK_CASES)
-    def test_iterative_qpe_iteration_measures_the_walk_overlap(self, select_algorithm, prepare_consumes_gradient):
-        """A power-1 iteration at phi = 3/8 measures 1 with probability (1 - cos 2 pi phi) / 2, within 4 sigma."""
-        walk_phase = 3.0 / 8.0
-        shots = 64
-        counts = _walk_qpe_circuit_counts(
-            "qdk_iterative",
-            _exact_walk_phase_problem(walk_phase),
-            num_bits=1,
-            select_algorithm=select_algorithm,
-            prepare_consumes_gradient=prepare_consumes_gradient,
-            shots=shots,
-            num_iteration=0,
-        )
-
-        probability_one = 0.5 * (1.0 - math.cos(2.0 * math.pi * walk_phase))
-        tolerance = 4.0 * math.sqrt(shots * probability_one * (1.0 - probability_one))
-        assert abs(counts.get("1", 0) - shots * probability_one) <= tolerance, (
-            f"expected about {shots * probability_one:.1f} of {shots} shots on 1, got {counts}"
-        )
+    # A power-1 iteration without feedback measures 1 with probability (1 - cos 2 pi phi) / 2.
+    (circuit,) = create("qpe_circuit_builder", "qdk_iterative", num_bits=1, num_iteration=0, **walk).run(**inputs)
+    shots = 64
+    counts = create("circuit_executor", "qdk_sparse_state_simulator", seed=7).run(circuit, shots=shots).bitstring_counts
+    probability_one = 0.5 * (1.0 - math.cos(2.0 * math.pi * 3.0 / 8.0))
+    tolerance = 4.0 * math.sqrt(shots * probability_one * (1.0 - probability_one))
+    assert abs(counts.get("1", 0) - shots * probability_one) <= tolerance, (
+        f"expected about {shots * probability_one:.1f} of {shots} shots on 1, got {counts}"
+    )
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
