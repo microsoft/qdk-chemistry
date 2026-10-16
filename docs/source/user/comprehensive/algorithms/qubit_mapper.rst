@@ -298,6 +298,12 @@ Supported base encodings: :ref:`Jordan-Wigner <encoding-jordan-wigner>`, :ref:`B
 
 Both restricted (RHF) and unrestricted (UHF) Hamiltonians are supported.
 
+The plugin permutes the two-body tensor axes from QDK's chemist ordering to
+Qiskit Nature's operator ordering, so 4-fold integrals are mapped exactly. An
+unrestricted ``ab`` block that violates :math:`(pq|rs) = (qp|sr)` defines a
+non-Hermitian operator, which Qiskit Nature cannot represent, so ``run()``
+raises ``ValueError``.
+
 .. rubric:: Settings
 
 This implementation has no configurable settings.
@@ -315,6 +321,9 @@ This is a **third-party** backend: it reads ``mapping.base_encoding`` to select 
 Supported base encodings: :ref:`Jordan-Wigner <encoding-jordan-wigner>`, :ref:`Bravyi-Kitaev <encoding-bravyi-kitaev>`, :ref:`Bravyi-Kitaev tree <encoding-bk-tree>`
 
 Both restricted (RHF) and unrestricted (UHF) Hamiltonians are supported.
+
+The plugin permutes the two-body tensor axes from QDK's chemist ordering to
+OpenFermion's operator ordering, so 4-fold integrals are mapped exactly.
 
 .. rubric:: Settings
 

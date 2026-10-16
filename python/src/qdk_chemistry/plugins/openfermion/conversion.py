@@ -68,7 +68,7 @@ def _spatial_to_spinorb_two_body(
 
     OpenFermion defines ``h[p,q,r,s]`` via
     ``H₂ = ½ Σ h[p,q,r,s] a†_p a†_q a_r a_s``, which in physicist (Dirac)
-    notation is ``⟨pq|sr⟩``, or equivalently ``(ps|rq)`` in chemist notation.
+    notation is ``⟨pq|sr⟩``, or equivalently ``(ps|qr)`` in chemist notation.
 
     Args:
         h2_aaaa: Alpha-alpha two-body integrals in chemist notation, shape ``(norb, norb, norb, norb)``.
@@ -83,30 +83,21 @@ def _spatial_to_spinorb_two_body(
     norb = h2_aaaa.shape[0]
     n_spinorb = 2 * norb
 
-    # Convert chemist notation (pq|rs) to physicist notation <pr|qs>
-    # OpenFermion InteractionOperator convention: h[p,q,r,s] for a†_p a†_q a_r a_s
-    # which is <pq|sr> in physicist notation = (ps|rq) in chemist notation
     h2_so = np.zeros((n_spinorb, n_spinorb, n_spinorb, n_spinorb), dtype=float)
-
-    # The loop body assigns h2_so[2p,2q,2r,2s] = h2_aaaa[p,s,r,q], i.e. a
-    # transpose (0,3,2,1) of the source block placed into even-index slots.
-    # The same pattern applies to every spin block.
 
     # Slice objects for even (alpha) and odd (beta) spin-orbital indices
     e = slice(0, n_spinorb, 2)  # even: 0,2,4,...
     o = slice(1, n_spinorb, 2)  # odd:  1,3,5,...
 
     # alpha-alpha block
-    h2_so[e, e, e, e] = h2_aaaa.transpose(0, 3, 2, 1)
+    h2_so[e, e, e, e] = h2_aaaa.transpose(0, 2, 3, 1)
 
     # beta-beta block
-    h2_so[o, o, o, o] = h2_bbbb.transpose(0, 3, 2, 1)
+    h2_so[o, o, o, o] = h2_bbbb.transpose(0, 2, 3, 1)
 
-    # alpha-beta block: h2_so[2p, 2q+1, 2r+1, 2s] = h2_aabb[p,s,r,q]
-    h2_so[e, o, o, e] = h2_aabb.transpose(0, 3, 2, 1)
+    h2_so[e, o, o, e] = h2_aabb.transpose(0, 2, 3, 1)
 
-    # beta-alpha block: h2_so[2p+1, 2q, 2r, 2s+1] = h2_aabb[q,r,s,p]
-    h2_so[o, e, e, o] = h2_aabb.transpose(3, 0, 1, 2)
+    h2_so[o, e, e, o] = h2_aabb.transpose(2, 0, 1, 3)
 
     return h2_so
 

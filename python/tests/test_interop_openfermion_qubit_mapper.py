@@ -17,6 +17,7 @@ from .reference_tolerances import (
     float_comparison_absolute_tolerance,
 )
 from .test_helpers import (
+    create_non_hermitian_mixed_block_hamiltonian,
     create_nontrivial_test_hamiltonian,
     create_test_basis_set,
 )
@@ -486,3 +487,25 @@ def test_scbk_cross_backend():
     eigs_qdk = sorted(np.linalg.eigvalsh(mat_qdk))
     eigs_of = sorted(np.linalg.eigvalsh(mat_of))
     np.testing.assert_allclose(eigs_qdk, eigs_of, atol=1e-10)
+
+
+# -------------------------------------------------------------------------------------
+# Fourfold (non-eightfold) integrals
+# -------------------------------------------------------------------------------------
+
+
+def test_openfermion_fourfold_jordan_wigner_full_matrix(fourfold_hamiltonian):
+    """Jordan-Wigner reproduces the independent reference matrix."""
+    hamiltonian, reference = fourfold_hamiltonian
+    mapping = MajoranaMapping.jordan_wigner(_num_spin_orbitals(hamiltonian))
+    operator = create("qubit_mapper", "openfermion").run(hamiltonian, mapping)
+
+    assert operator.num_qubits == mapping.num_modes
+    np.testing.assert_allclose(operator.to_matrix(), reference, atol=1e-11, rtol=0)
+
+
+def test_openfermion_non_hermitian_mixed_block_maps_literally():
+    """A non-Hermitian alpha-beta block maps to its literal operator."""
+    hamiltonian, reference = create_non_hermitian_mixed_block_hamiltonian()
+    operator = create("qubit_mapper", "openfermion").run(hamiltonian, MajoranaMapping.jordan_wigner(6))
+    np.testing.assert_allclose(operator.to_matrix(), reference, atol=1e-11, rtol=0)

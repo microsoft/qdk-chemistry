@@ -12,6 +12,7 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING, ClassVar
 
+import numpy as np
 from qiskit_nature.second_q.hamiltonians import ElectronicEnergy
 from qiskit_nature.second_q.mappers import (
     BravyiKitaevMapper,
@@ -36,6 +37,9 @@ _SUPPORTED_ENCODINGS: dict[str, type] = {
     "bravyi-kitaev": BravyiKitaevMapper,
     "parity": ParityMapper,
 }
+
+# Relative to the largest integral, as in the native mapper's symmetry checks.
+_TWO_BODY_SYMMETRY_TOLERANCE = 1e-8
 
 
 class QiskitQubitMapperSettings(QubitMapperSettings):
@@ -122,6 +126,8 @@ class QiskitQubitMapper(QubitMapper):
 
         Raises:
             NotImplementedError: If ``mapping.base_encoding`` is not a supported Qiskit encoding.
+            ValueError: If an unrestricted alpha-beta block violates (pq|rs) = (qp|sr), which defines a
+                non-Hermitian operator that Qiskit Nature cannot represent.
 
         """
         Logger.trace_entering()
@@ -142,19 +148,26 @@ class QiskitQubitMapper(QubitMapper):
 
         if is_restricted:
             electronic_hamiltonian = ElectronicEnergy.from_raw_integrals(
-                h1_a=h1_a, h2_aa=h2_aa.reshape(num_orbs, num_orbs, num_orbs, num_orbs)
+                h1_a=h1_a,
+                h2_aa=h2_aa.reshape(num_orbs, num_orbs, num_orbs, num_orbs).transpose(0, 2, 3, 1),
+                auto_index_order=False,
             )
         else:
-            # h2_ab is eri_aabb in chemist notation: (aa|bb).
-            # Qiskit's h2_ba parameter expects (bb|aa) = eri_aabb transposed.
-            # By Coulomb symmetry (pq|rs)=(rs|pq), this is eri_aabb[r,s,p,q].
             h2_ab_4d = h2_ab.reshape(num_orbs, num_orbs, num_orbs, num_orbs)
+            tolerance = _TWO_BODY_SYMMETRY_TOLERANCE * np.max(np.abs(h2_ab_4d), initial=0.0)
+            if not np.allclose(h2_ab_4d, h2_ab_4d.transpose(1, 0, 3, 2), rtol=0.0, atol=tolerance):
+                raise ValueError(
+                    "The alpha-beta two-body integrals violate (pq|rs) = (qp|sr), so they define a "
+                    "non-Hermitian operator that Qiskit's raw-integral interface cannot represent. "
+                    "Use the 'qdk' or 'openfermion' qubit mapper instead."
+                )
             electronic_hamiltonian = ElectronicEnergy.from_raw_integrals(
                 h1_a=h1_a,
-                h2_aa=h2_aa.reshape(num_orbs, num_orbs, num_orbs, num_orbs),
+                h2_aa=h2_aa.reshape(num_orbs, num_orbs, num_orbs, num_orbs).transpose(0, 2, 3, 1),
                 h1_b=h1_b,
-                h2_bb=h2_bb.reshape(num_orbs, num_orbs, num_orbs, num_orbs),
-                h2_ba=h2_ab_4d.transpose(2, 3, 0, 1),
+                h2_bb=h2_bb.reshape(num_orbs, num_orbs, num_orbs, num_orbs).transpose(0, 2, 3, 1),
+                h2_ba=h2_ab_4d.transpose(2, 0, 1, 3),
+                auto_index_order=False,
             )
 
         fermionic_op = electronic_hamiltonian.second_q_op()
