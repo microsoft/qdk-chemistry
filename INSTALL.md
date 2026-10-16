@@ -181,6 +181,12 @@ to native Windows installs; none of them apply under
 | arm64 dependencies and extras | MCP is omitted from the `all` and `test` extras because its `cryptography` dependency publishes no win-arm64 wheel. A base, `all`, or `test` install therefore needs neither Rust nor a source build of `cryptography`; installing the `mcp` extra explicitly may require an ARM64 Rust toolchain, MSVC C/C++ build tools, and ARM64 OpenSSL development libraries. Qiskit (and Qiskit Aer, Nature, IBM Runtime), PennyLane and RDKit are skipped because they require `rustworkx`, which also publishes no win-arm64 wheel. The Microsoft Discovery backend (`azure-ai-discovery`, `azure-identity`, `azure-storage-blob`) is skipped as well, as is the Azure Quantum backend (`azure-quantum`, `azure-identity`), which depends on the same `cryptography` wheel. The features that depend on those skipped extras are unavailable. |
 | OpenMP | Shared-memory threading via OpenMP is disabled on Windows. |
 
+### Notes for Linux Users
+
+| Topic | Detail |
+|-------|--------|
+| Static TLS with Qiskit 2.6 | On x86_64, Qiskit 2.6.0 needs more static thread-local storage than glibc reserves by default, so loading it together with OpenMP-based native libraries (including QDK/Chemistry's) can fail with `cannot allocate memory in static TLS block`. Set `GLIBC_TUNABLES=glibc.rtld.optional_static_tls=65536` in the environment that starts Python or the Jupyter kernel; it cannot be changed from inside a running Python process. See [Qiskit issue #17213](https://github.com/Qiskit/qiskit/issues/17213). |
+
 ---
 
 ## Using the VSCode Dev Container
