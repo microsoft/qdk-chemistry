@@ -185,7 +185,7 @@ to native Windows installs; none of them apply under
 
 | Topic | Detail |
 |-------|--------|
-| Static TLS with Qiskit 2.6 | On x86_64, Qiskit 2.6.0 needs more static thread-local storage than glibc reserves by default, so loading it together with OpenMP-based native libraries (including QDK/Chemistry's) can fail with `cannot allocate memory in static TLS block`. Set `GLIBC_TUNABLES=glibc.rtld.optional_static_tls=65536` in the environment that starts Python or the Jupyter kernel; it cannot be changed from inside a running Python process. See [Qiskit issue #17213](https://github.com/Qiskit/qiskit/issues/17213). |
+| Qiskit plugin | On x86_64, Qiskit 2.6.0 needs more static thread-local storage than glibc reserves by default. When Qiskit is installed (for example through the `qiskit-extras` extra), the Qiskit plugin loads it on `import qdk_chemistry`, and loading it alongside OpenMP-based native libraries, including QDK/Chemistry's, can fail with `cannot allocate memory in static TLS block`. Set `GLIBC_TUNABLES=glibc.rtld.optional_static_tls=65536` in the environment that starts Python or the Jupyter kernel; it cannot be changed from inside a running Python process. |
 
 ---
 

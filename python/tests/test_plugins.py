@@ -429,9 +429,13 @@ def test_qiskit_plugin_loads_in_fresh_process(first_import):
             "-c",
             f"""\
 import {first_import}
+import importlib.util
+
 from qdk_chemistry.algorithms import available
 
 assert "qiskit_regular_isometry" in available("state_prep")
+if importlib.util.find_spec("qiskit_aer") is not None:
+    assert "qiskit_aer_simulator" in available("circuit_executor")
 """,
         ],
         capture_output=True,

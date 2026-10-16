@@ -101,7 +101,6 @@ jobs:
       CMAKE_BUILD_PARALLEL_LEVEL: ${{ matrix.build-parallel }}
       QDK_UARCH: ${{ matrix.uarch }}
       ENABLE_COVERAGE: ${{ matrix.enable-coverage }}
-      # Qiskit 2.6 needs more static TLS than glibc reserves by default: https://github.com/Qiskit/qiskit/issues/17213
       GLIBC_TUNABLES: glibc.rtld.optional_static_tls=65536
     steps:
     - name: Checkout repository
@@ -1110,7 +1109,6 @@ jobs:
       OMP_NUM_THREADS: '4'
       PYTHON_TEST_WORKERS: '8'
       QDK_BRANCH: main
-      # Qiskit 2.6 needs more static TLS than glibc reserves by default: https://github.com/Qiskit/qiskit/issues/17213
       GLIBC_TUNABLES: glibc.rtld.optional_static_tls=65536
     steps:
     - name: Checkout repository
