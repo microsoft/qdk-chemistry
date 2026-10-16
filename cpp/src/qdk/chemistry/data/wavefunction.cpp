@@ -14,6 +14,7 @@
 #include <qdk/chemistry/data/symmetry/spin_channel_indices.hpp>
 #include <qdk/chemistry/data/wavefunction.hpp>
 #include <qdk/chemistry/data/wavefunction_containers/amplitude_container.hpp>
+#include <qdk/chemistry/data/wavefunction_containers/mps_wavefunction.hpp>
 #include <qdk/chemistry/data/wavefunction_containers/state_vector.hpp>
 #include <qdk/chemistry/utils/logger.hpp>
 #include <sstream>
@@ -805,6 +806,173 @@ void WavefunctionContainer::_clear_rdms() const {
   _active_two_rdm.reset();
 }
 
+void WavefunctionContainer::_serialize_rdms_to_json(nlohmann::json& j) const {
+  if (!_one_rdm_spin_traced && !_two_rdm_spin_traced && !_active_one_rdm &&
+      !_active_two_rdm) {
+    return;
+  }
+  nlohmann::json rdms;
+  if (_one_rdm_spin_traced) {
+    const bool complex =
+        detail::is_matrix_variant_complex(*_one_rdm_spin_traced);
+    rdms["is_one_rdm_spin_traced_complex"] = complex;
+    rdms["one_rdm_spin_traced"] =
+        matrix_variant_to_json(*_one_rdm_spin_traced, complex);
+  }
+  if (_two_rdm_spin_traced) {
+    const bool complex =
+        detail::is_vector_variant_complex(*_two_rdm_spin_traced);
+    rdms["is_two_rdm_spin_traced_complex"] = complex;
+    rdms["two_rdm_spin_traced"] =
+        vector_variant_to_json(*_two_rdm_spin_traced, complex);
+  }
+  if (_active_one_rdm) {
+    rdms["active_one_rdm"] = std::visit(
+        [](const auto& tensor) { return tensor.to_json(); }, *_active_one_rdm);
+  }
+  if (_active_two_rdm) {
+    rdms["active_two_rdm"] = std::visit(
+        [](const auto& tensor) { return tensor.to_json(); }, *_active_two_rdm);
+  }
+  j["rdms"] = std::move(rdms);
+}
+
+void WavefunctionContainer::_deserialize_rdms_from_json(
+    const nlohmann::json& j) {
+  _clear_rdms();
+  if (!j.contains("rdms")) return;
+  const auto& rdms = j.at("rdms");
+  if (!rdms.is_object()) {
+    throw std::invalid_argument("Stored RDMs must be a JSON object.");
+  }
+  if (rdms.contains("one_rdm_spin_traced")) {
+    _one_rdm_spin_traced =
+        std::make_shared<MatrixVariant>(json_to_matrix_variant(
+            rdms.at("one_rdm_spin_traced"),
+            rdms.value("is_one_rdm_spin_traced_complex", false)));
+  }
+  if (rdms.contains("two_rdm_spin_traced")) {
+    _two_rdm_spin_traced =
+        std::make_shared<VectorVariant>(json_to_vector_variant(
+            rdms.at("two_rdm_spin_traced"),
+            rdms.value("is_two_rdm_spin_traced_complex", false)));
+  }
+  if (rdms.contains("active_one_rdm")) {
+    const auto& tensor = rdms.at("active_one_rdm");
+    if (tensor.at("scalar").get<std::string>() == "complex") {
+      _active_one_rdm = std::make_shared<SymmetryBlockedTensorVariant<2>>(
+          std::move(*SymmetryBlockedTensor<2, std::complex<double>>::from_json(
+              tensor)));
+    } else {
+      _active_one_rdm = std::make_shared<SymmetryBlockedTensorVariant<2>>(
+          std::move(*SymmetryBlockedTensor<2>::from_json(tensor)));
+    }
+  }
+  if (rdms.contains("active_two_rdm")) {
+    const auto& tensor = rdms.at("active_two_rdm");
+    if (tensor.at("scalar").get<std::string>() == "complex") {
+      _active_two_rdm = std::make_shared<SymmetryBlockedTensorVariant<4>>(
+          std::move(*SymmetryBlockedTensor<4, std::complex<double>>::from_json(
+              tensor)));
+    } else {
+      _active_two_rdm = std::make_shared<SymmetryBlockedTensorVariant<4>>(
+          std::move(*SymmetryBlockedTensor<4>::from_json(tensor)));
+    }
+  }
+}
+
+void WavefunctionContainer::_serialize_rdms_to_hdf5(H5::Group& group) const {
+  if (!_one_rdm_spin_traced && !_two_rdm_spin_traced && !_active_one_rdm &&
+      !_active_two_rdm) {
+    return;
+  }
+  auto rdms = group.createGroup("rdms");
+  if (_one_rdm_spin_traced) {
+    save_matrix_variant_to_group_with_complex_attr(
+        _one_rdm_spin_traced, rdms, "one_rdm_spin_traced",
+        "is_one_rdm_spin_traced_complex");
+  }
+  if (_two_rdm_spin_traced) {
+    save_vector_variant_to_group_with_complex_attr(
+        _two_rdm_spin_traced, rdms, "two_rdm_spin_traced",
+        "is_two_rdm_spin_traced_complex");
+  }
+  if (_active_one_rdm) {
+    auto tensor = rdms.createGroup("active_one_rdm");
+    hbool_t complex = _active_one_rdm->index() == 1 ? 1 : 0;
+    tensor
+        .createAttribute("is_complex", H5::PredType::NATIVE_HBOOL,
+                         H5::DataSpace(H5S_SCALAR))
+        .write(H5::PredType::NATIVE_HBOOL, &complex);
+    std::visit([&](const auto& value) { value.to_hdf5(tensor); },
+               *_active_one_rdm);
+  }
+  if (_active_two_rdm) {
+    auto tensor = rdms.createGroup("active_two_rdm");
+    hbool_t complex = _active_two_rdm->index() == 1 ? 1 : 0;
+    tensor
+        .createAttribute("is_complex", H5::PredType::NATIVE_HBOOL,
+                         H5::DataSpace(H5S_SCALAR))
+        .write(H5::PredType::NATIVE_HBOOL, &complex);
+    std::visit([&](const auto& value) { value.to_hdf5(tensor); },
+               *_active_two_rdm);
+  }
+}
+
+void WavefunctionContainer::_deserialize_rdms_from_hdf5(H5::Group& group) {
+  _clear_rdms();
+  if (!group.nameExists("rdms")) return;
+  auto rdms = group.openGroup("rdms");
+  if (rdms.nameExists("one_rdm_spin_traced")) {
+    hbool_t complex = 0;
+    if (rdms.attrExists("is_one_rdm_spin_traced_complex")) {
+      rdms.openAttribute("is_one_rdm_spin_traced_complex")
+          .read(H5::PredType::NATIVE_HBOOL, &complex);
+    }
+    _one_rdm_spin_traced =
+        std::make_shared<MatrixVariant>(load_matrix_variant_from_group(
+            rdms, "one_rdm_spin_traced", complex != 0));
+  }
+  if (rdms.nameExists("two_rdm_spin_traced")) {
+    hbool_t complex = 0;
+    if (rdms.attrExists("is_two_rdm_spin_traced_complex")) {
+      rdms.openAttribute("is_two_rdm_spin_traced_complex")
+          .read(H5::PredType::NATIVE_HBOOL, &complex);
+    }
+    _two_rdm_spin_traced =
+        std::make_shared<VectorVariant>(load_vector_variant_from_group(
+            rdms, "two_rdm_spin_traced", complex != 0));
+  }
+  if (rdms.nameExists("active_one_rdm")) {
+    auto tensor = rdms.openGroup("active_one_rdm");
+    hbool_t complex = 0;
+    tensor.openAttribute("is_complex")
+        .read(H5::PredType::NATIVE_HBOOL, &complex);
+    if (complex) {
+      _active_one_rdm = std::make_shared<SymmetryBlockedTensorVariant<2>>(
+          std::move(*SymmetryBlockedTensor<2, std::complex<double>>::from_hdf5(
+              tensor)));
+    } else {
+      _active_one_rdm = std::make_shared<SymmetryBlockedTensorVariant<2>>(
+          std::move(*SymmetryBlockedTensor<2>::from_hdf5(tensor)));
+    }
+  }
+  if (rdms.nameExists("active_two_rdm")) {
+    auto tensor = rdms.openGroup("active_two_rdm");
+    hbool_t complex = 0;
+    tensor.openAttribute("is_complex")
+        .read(H5::PredType::NATIVE_HBOOL, &complex);
+    if (complex) {
+      _active_two_rdm = std::make_shared<SymmetryBlockedTensorVariant<4>>(
+          std::move(*SymmetryBlockedTensor<4, std::complex<double>>::from_hdf5(
+              tensor)));
+    } else {
+      _active_two_rdm = std::make_shared<SymmetryBlockedTensorVariant<4>>(
+          std::move(*SymmetryBlockedTensor<4>::from_hdf5(tensor)));
+    }
+  }
+}
+
 void WavefunctionContainer::_serialize_entropies_to_json(
     nlohmann::json& j) const {
   QDK_LOG_TRACE_ENTERING();
@@ -829,6 +997,10 @@ void WavefunctionContainer::_serialize_entropies_to_json(
 std::unique_ptr<WavefunctionContainer> WavefunctionContainer::from_json(
     const nlohmann::json& j) {
   QDK_LOG_TRACE_ENTERING();
+
+  if (j.value("container_type", std::string{}) == "mps") {
+    return MPSContainer::from_json(j);
+  }
 
   try {
     // Check version first
@@ -921,83 +1093,17 @@ std::unique_ptr<WavefunctionContainer> WavefunctionContainer::from_json(
       }
     }
 
-    // Load RDMs if they are available
-    if (j.contains("rdms")) {
-      const auto& rdm_json = j["rdms"];
-
-      std::shared_ptr<MatrixVariant> one_rdm_spin_traced;
-      std::shared_ptr<VectorVariant> two_rdm_spin_traced;
-      std::shared_ptr<const SymmetryBlockedTensorVariant<2>> active_one_rdm;
-      std::shared_ptr<const SymmetryBlockedTensorVariant<4>> active_two_rdm;
-
-      if (rdm_json.contains("one_rdm_spin_traced")) {
-        bool is_complex =
-            rdm_json.value("is_one_rdm_spin_traced_complex", false);
-        one_rdm_spin_traced =
-            std::make_shared<MatrixVariant>(json_to_matrix_variant(
-                rdm_json["one_rdm_spin_traced"], is_complex));
-      }
-      if (rdm_json.contains("two_rdm_spin_traced")) {
-        bool is_complex =
-            rdm_json.value("is_two_rdm_spin_traced_complex", false);
-        two_rdm_spin_traced =
-            std::make_shared<VectorVariant>(json_to_vector_variant(
-                rdm_json["two_rdm_spin_traced"], is_complex));
-      }
-      if (rdm_json.contains("active_one_rdm")) {
-        const auto& sub = rdm_json["active_one_rdm"];
-        if (sub.at("scalar").get<std::string>() == "complex") {
-          active_one_rdm =
-              std::make_shared<SymmetryBlockedTensorVariant<2>>(std::move(
-                  *SymmetryBlockedTensor<2, std::complex<double>>::from_json(
-                      sub)));
-        } else {
-          active_one_rdm = std::make_shared<SymmetryBlockedTensorVariant<2>>(
-              std::move(*SymmetryBlockedTensor<2, double>::from_json(sub)));
-        }
-      }
-      if (rdm_json.contains("active_two_rdm")) {
-        const auto& sub = rdm_json["active_two_rdm"];
-        if (sub.at("scalar").get<std::string>() == "complex") {
-          active_two_rdm =
-              std::make_shared<SymmetryBlockedTensorVariant<4>>(std::move(
-                  *SymmetryBlockedTensor<4, std::complex<double>>::from_json(
-                      sub)));
-        } else {
-          active_two_rdm = std::make_shared<SymmetryBlockedTensorVariant<4>>(
-              std::move(*SymmetryBlockedTensor<4, double>::from_json(sub)));
-        }
-      }
-
-      bool has_any = one_rdm_spin_traced || two_rdm_spin_traced ||
-                     active_one_rdm || active_two_rdm;
-
-      if (has_any) {
-        if (container_type == "state_vector" || container_type == "cas" ||
-            container_type == "sci" || container_type == "sd") {
-          return std::make_unique<StateVectorContainer>(
-              coefficients, determinants, orbitals,
-              std::move(one_rdm_spin_traced), std::move(two_rdm_spin_traced),
-              std::move(active_one_rdm), std::move(active_two_rdm), sector,
-              entropies, type);
-        } else {
-          throw std::runtime_error(
-              "RDMs are only supported for state-vector containers in "
-              "WavefunctionContainer::from_json. Container type: " +
-              container_type);
-        }
-      }
-    }
-
     // Legacy container_type values "cas" and "sci" are accepted here to
     // support forward-looking back-compat: once the deferred 0.1.0 reader is
     // implemented (bypassing the version gate above), existing cas/sci files
     // will load through this path without additional changes.
     if (container_type == "state_vector" || container_type == "cas" ||
         container_type == "sci" || container_type == "sd") {
-      return std::make_unique<StateVectorContainer>(
+      auto result = std::make_unique<StateVectorContainer>(
           coefficients, determinants, orbitals, std::nullopt, std::nullopt,
           sector, entropies, type);
+      result->_deserialize_rdms_from_json(j);
+      return result;
     } else {
       throw std::runtime_error(
           "Unrecognized container_type '" + container_type +
@@ -1515,6 +1621,8 @@ std::shared_ptr<Wavefunction> Wavefunction::from_json(const nlohmann::json& j) {
     } else if (container_type == "amplitude" ||
                container_type == "coupled_cluster" || container_type == "mp2") {
       container = AmplitudeContainer::from_json(j["container"]);
+    } else if (container_type == "mps") {
+      container = MPSContainer::from_json(j["container"]);
     } else {
       throw std::runtime_error("Unknown container type: " + container_type);
     }
@@ -1612,6 +1720,8 @@ std::shared_ptr<Wavefunction> Wavefunction::from_hdf5(H5::Group& group) {
     } else if (container_type == "amplitude" ||
                container_type == "coupled_cluster" || container_type == "mp2") {
       container = AmplitudeContainer::from_hdf5(container_group);
+    } else if (container_type == "mps") {
+      container = MPSContainer::from_hdf5(container_group);
     } else {
       throw std::runtime_error("Unknown container type: " + container_type);
     }
@@ -1757,42 +1867,7 @@ void WavefunctionContainer::to_hdf5(H5::Group& group) const {
       get_configuration_set().to_hdf5(config_set_group);
     }
 
-    // Serialize RDMs (if any) — spin-traced via Eigen helpers, active-space
-    // via the canonical SBT serializer.
-    {
-      bool has_any_rdm =
-          _one_rdm_spin_traced != nullptr || _two_rdm_spin_traced != nullptr ||
-          _active_one_rdm != nullptr || _active_two_rdm != nullptr;
-      if (has_any_rdm) {
-        H5::Group rdm_group = group.createGroup("rdms");
-        if (_one_rdm_spin_traced != nullptr) {
-          save_matrix_variant_to_group_with_complex_attr(
-              _one_rdm_spin_traced, rdm_group, "one_rdm_spin_traced",
-              "is_one_rdm_spin_traced_complex");
-        }
-        if (_two_rdm_spin_traced != nullptr) {
-          save_vector_variant_to_group_with_complex_attr(
-              _two_rdm_spin_traced, rdm_group, "two_rdm_spin_traced",
-              "is_two_rdm_spin_traced_complex");
-        }
-        if (_active_one_rdm != nullptr) {
-          H5::Group sub = rdm_group.createGroup("active_one_rdm");
-          hbool_t is_complex = _active_one_rdm->index() == 1 ? 1 : 0;
-          sub.createAttribute("is_complex", H5::PredType::NATIVE_HBOOL,
-                              H5::DataSpace(H5S_SCALAR))
-              .write(H5::PredType::NATIVE_HBOOL, &is_complex);
-          std::visit([&](const auto& t) { t.to_hdf5(sub); }, *_active_one_rdm);
-        }
-        if (_active_two_rdm != nullptr) {
-          H5::Group sub = rdm_group.createGroup("active_two_rdm");
-          hbool_t is_complex = _active_two_rdm->index() == 1 ? 1 : 0;
-          sub.createAttribute("is_complex", H5::PredType::NATIVE_HBOOL,
-                              H5::DataSpace(H5S_SCALAR))
-              .write(H5::PredType::NATIVE_HBOOL, &is_complex);
-          std::visit([&](const auto& t) { t.to_hdf5(sub); }, *_active_two_rdm);
-        }
-      }
-    }
+    _serialize_rdms_to_hdf5(group);
 
     // Serialize entropies if available
     if (_entropies.single_orbital) {
@@ -1837,6 +1912,14 @@ std::unique_ptr<WavefunctionContainer> WavefunctionContainer::from_hdf5(
   QDK_LOG_TRACE_ENTERING();
 
   try {
+    if (group.attrExists("container_type")) {
+      H5::StrType type(H5::PredType::C_S1, H5T_VARIABLE);
+      std::string name;
+      group.openAttribute("container_type").read(type, name);
+      if (name == "mps") {
+        return MPSContainer::from_hdf5(group);
+      }
+    }
     // Check version first
     H5::StrType string_type(H5::PredType::C_S1, H5T_VARIABLE);
     H5::Attribute version_attr = group.openAttribute("version");
@@ -1942,90 +2025,13 @@ std::unique_ptr<WavefunctionContainer> WavefunctionContainer::from_hdf5(
       entropies.mutual_information = Eigen::MatrixXd(mi_row_major);
     }
 
-    // Load RDMs if they are available
-    if (group.nameExists("rdms")) {
-      H5::Group rdm_group = group.openGroup("rdms");
-
-      std::shared_ptr<MatrixVariant> one_rdm_spin_traced;
-      std::shared_ptr<VectorVariant> two_rdm_spin_traced;
-      std::shared_ptr<const SymmetryBlockedTensorVariant<2>> active_one_rdm;
-      std::shared_ptr<const SymmetryBlockedTensorVariant<4>> active_two_rdm;
-
-      if (rdm_group.nameExists("one_rdm_spin_traced")) {
-        bool is_complex = false;
-        if (rdm_group.attrExists("is_one_rdm_spin_traced_complex")) {
-          hbool_t flag;
-          rdm_group.openAttribute("is_one_rdm_spin_traced_complex")
-              .read(H5::PredType::NATIVE_HBOOL, &flag);
-          is_complex = (flag != 0);
-        }
-        one_rdm_spin_traced =
-            std::make_shared<MatrixVariant>(load_matrix_variant_from_group(
-                rdm_group, "one_rdm_spin_traced", is_complex));
-      }
-      if (rdm_group.nameExists("two_rdm_spin_traced")) {
-        bool is_complex = false;
-        if (rdm_group.attrExists("is_two_rdm_spin_traced_complex")) {
-          hbool_t flag;
-          rdm_group.openAttribute("is_two_rdm_spin_traced_complex")
-              .read(H5::PredType::NATIVE_HBOOL, &flag);
-          is_complex = (flag != 0);
-        }
-        two_rdm_spin_traced =
-            std::make_shared<VectorVariant>(load_vector_variant_from_group(
-                rdm_group, "two_rdm_spin_traced", is_complex));
-      }
-      if (rdm_group.nameExists("active_one_rdm")) {
-        H5::Group sub = rdm_group.openGroup("active_one_rdm");
-        hbool_t is_complex = 0;
-        sub.openAttribute("is_complex")
-            .read(H5::PredType::NATIVE_HBOOL, &is_complex);
-        if (is_complex) {
-          active_one_rdm =
-              std::make_shared<SymmetryBlockedTensorVariant<2>>(std::move(
-                  *SymmetryBlockedTensor<2, std::complex<double>>::from_hdf5(
-                      sub)));
-        } else {
-          active_one_rdm = std::make_shared<SymmetryBlockedTensorVariant<2>>(
-              std::move(*SymmetryBlockedTensor<2, double>::from_hdf5(sub)));
-        }
-      }
-      if (rdm_group.nameExists("active_two_rdm")) {
-        H5::Group sub = rdm_group.openGroup("active_two_rdm");
-        hbool_t is_complex = 0;
-        sub.openAttribute("is_complex")
-            .read(H5::PredType::NATIVE_HBOOL, &is_complex);
-        if (is_complex) {
-          active_two_rdm =
-              std::make_shared<SymmetryBlockedTensorVariant<4>>(std::move(
-                  *SymmetryBlockedTensor<4, std::complex<double>>::from_hdf5(
-                      sub)));
-        } else {
-          active_two_rdm = std::make_shared<SymmetryBlockedTensorVariant<4>>(
-              std::move(*SymmetryBlockedTensor<4, double>::from_hdf5(sub)));
-        }
-      }
-
-      bool has_any = one_rdm_spin_traced || two_rdm_spin_traced ||
-                     active_one_rdm || active_two_rdm;
-
-      if (has_any) {
-        if (container_type == "state_vector" || container_type == "cas" ||
-            container_type == "sci" || container_type == "sd") {
-          return std::make_unique<StateVectorContainer>(
-              coefficients, determinants, orbitals,
-              std::move(one_rdm_spin_traced), std::move(two_rdm_spin_traced),
-              std::move(active_one_rdm), std::move(active_two_rdm), sector,
-              entropies, type);
-        }
-      }
-    }
-
     if (container_type == "state_vector" || container_type == "cas" ||
         container_type == "sci" || container_type == "sd") {
-      return std::make_unique<StateVectorContainer>(
+      auto result = std::make_unique<StateVectorContainer>(
           coefficients, determinants, orbitals, std::nullopt, std::nullopt,
           sector, entropies, type);
+      result->_deserialize_rdms_from_hdf5(group);
+      return result;
     } else {
       throw std::runtime_error(
           "Did not expect to get here for containers other than "
@@ -2084,6 +2090,27 @@ std::string Wavefunction::get_summary() const {
   std::ostringstream oss;
   oss << "Wavefunction Summary:\n";
   oss << "  Container type: " << _container->get_container_type() << "\n";
+  if (has_container_type<MPSContainer>()) {
+    const auto& mps = get_container<MPSContainer>();
+    oss << "  Number of MPS sites: " << mps.num_sites() << "\n";
+    oss << "  Complex: " << (mps.is_complex() ? "yes" : "no") << "\n";
+    oss << "  Orthogonality center: "
+        << (mps.orthogonality_center()
+                ? std::to_string(*mps.orthogonality_center())
+                : "unspecified")
+        << "\n";
+    oss << "  Total particles: "
+        << (mps.has_total_num_particles()
+                ? mps.total_num_particles()->get_summary()
+                : "unavailable")
+        << "\n";
+    oss << "  Active particles: "
+        << (mps.has_active_num_particles()
+                ? mps.active_num_particles()->get_summary()
+                : "unavailable")
+        << "\n";
+    return oss.str();
+  }
   oss << "  Number of determinants: " << size() << "\n";
   oss << "  Wavefunction type: "
       << (get_type() == WavefunctionType::SelfDual ? "SelfDual" : "NotSelfDual")
