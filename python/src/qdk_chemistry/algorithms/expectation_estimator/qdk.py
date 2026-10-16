@@ -74,20 +74,17 @@ def _paulis_to_nonid_masks(pauli_strings: list[str]) -> list[int]:
     return [x | z for x, z, _ in (pauli_string_to_masks(ps) for ps in pauli_strings)]
 
 
-def _compute_expval_and_variance_from_bitstrings(
-    bitstring_counts: dict[str, int], pauli_strings: list[str]
-) -> tuple[np.ndarray, np.ndarray]:
-    """Computes the expectation values and variances for a given set of Pauli operators.
+def _measurement_signs(bitstring_counts: dict[str, int], pauli_strings: list[str]) -> tuple[np.ndarray, np.ndarray]:
+    """Return each outcome's frequency and the eigenvalue (+1 or -1) it gives every Pauli string.
 
     Args:
         bitstring_counts: A dictionary of measurement outcomes.
-        pauli_strings: List of Pauli label strings for computing expectation values.
+        pauli_strings: List of qubit-wise commuting Pauli label strings.
 
     Returns:
-        A tuple containing expectation values and variances.
+        A tuple of outcome frequencies and an ``(outcomes, pauli_strings)`` array of eigenvalues.
 
     """
-    Logger.trace_entering()
     # Determine measurement basis and restrict Paulis to measured qubits (drop I terms)
     basis = _determine_measurement_basis(pauli_strings)
     n_qubits = len(basis)
@@ -104,22 +101,62 @@ def _compute_expval_and_variance_from_bitstrings(
                 val |= 1 << bit_pos
         diag_inds.append(val)
 
-    expvals = np.zeros(len(pauli_strings), dtype=float)
-    nshots = sum(bitstring_counts.values())
-    if nshots == 0:
+    frequencies = np.array(list(bitstring_counts.values()), dtype=float)
+    if frequencies.sum() == 0:
         raise ValueError("Bitstring counts are empty.")
 
-    for bitstr, freq in bitstring_counts.items():
+    signs = np.empty((len(frequencies), len(diag_inds)))
+    for row, bitstr in enumerate(bitstring_counts):
         try:
             outcome = int(bitstr, 16) if bitstr.startswith("0x") else int(bitstr, 2)
         except ValueError as err:
             raise ValueError(f"Unsupported bitstring format: {bitstr}") from err
-        for i, mask in enumerate(diag_inds):
-            expvals[i] += freq * (-1) ** _parity(mask & outcome)
+        signs[row] = [(-1) ** _parity(mask & outcome) for mask in diag_inds]
+    return frequencies, signs
 
-    expvals /= nshots
+
+def _compute_expval_and_variance_from_bitstrings(
+    bitstring_counts: dict[str, int], pauli_strings: list[str]
+) -> tuple[np.ndarray, np.ndarray]:
+    """Computes the expectation values and variances for a given set of Pauli operators.
+
+    Args:
+        bitstring_counts: A dictionary of measurement outcomes.
+        pauli_strings: List of Pauli label strings for computing expectation values.
+
+    Returns:
+        A tuple containing expectation values and variances.
+
+    """
+    Logger.trace_entering()
+    frequencies, signs = _measurement_signs(bitstring_counts, pauli_strings)
+    nshots = frequencies.sum()
+    expvals = frequencies @ signs / nshots
     variances = (1 - expvals**2) / nshots
     return expvals, variances
+
+
+def _compute_energy_variance_from_bitstrings(
+    bitstring_counts: dict[str, int], pauli_strings: list[str], coefficients: np.ndarray
+) -> float:
+    """Compute the variance of a group's estimated energy from its per-shot energies.
+
+    Terms measured in the same circuit share shots, so their covariances contribute.
+
+    Args:
+        bitstring_counts: A dictionary of measurement outcomes.
+        pauli_strings: List of qubit-wise commuting Pauli label strings.
+        coefficients: Coefficient of each Pauli string.
+
+    Returns:
+        The variance of the group's mean energy.
+
+    """
+    frequencies, signs = _measurement_signs(bitstring_counts, pauli_strings)
+    nshots = frequencies.sum()
+    energies = signs @ coefficients
+    mean = frequencies @ energies / nshots
+    return float(frequencies @ np.abs(energies - mean) ** 2 / nshots**2)
 
 
 def _determine_measurement_basis(pauli_strings: list[str]) -> str:
@@ -447,7 +484,7 @@ class QdkExpectationEstimator(ExpectationEstimator):
             vars_list.append(variances)
 
             total_expval += np.dot(expvals, coeffs)
-            total_var += np.dot(variances, np.abs(coeffs) ** 2)
+            total_var += _compute_energy_variance_from_bitstrings(counts, paulis, coeffs)
 
         return EnergyExpectationResult(
             energy_expectation_value=float(np.real_if_close(total_expval)),

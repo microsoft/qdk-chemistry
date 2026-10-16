@@ -102,8 +102,8 @@ class VacuumAnnihilatingTermGrouperSettings(TermGrouperSettings):
             "tolerance",
             "double",
             1e-9,
-            "Absolute tolerance on residual vacuum amplitude "
-            "when certifying cancellation within each flipped-qubit set.",
+            "Absolute tolerance on the residual vacuum amplitude of each "
+            "flipped-set/Y-parity component, shared across output groups.",
         )
 
 

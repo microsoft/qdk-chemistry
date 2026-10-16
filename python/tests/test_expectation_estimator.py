@@ -225,6 +225,16 @@ def test_calculate_energy_expval_variance_none_counts():
     )
 
 
+@pytest.mark.parametrize(("coefficients", "expected_variance"), [((1.0, 1.0), 0.04), ((1.0, -1.0), 0.0)])
+def test_energy_variance_includes_covariance_of_terms_measured_together(coefficients, expected_variance):
+    """Bell-state outcomes correlate Z0 and Z1, doubling or cancelling the summed term variances of 0.02."""
+    group = QubitOperator(["IZ", "ZI"], np.array(coefficients))
+
+    result = QdkExpectationEstimator._compute_energy_expectation_from_bitstrings([group], [{"00": 50, "11": 50}])
+
+    assert np.isclose(result.energy_variance, expected_variance, atol=float_comparison_absolute_tolerance)
+
+
 def test_measurement_data_to_json():
     """Test MeasurementData.to_json method."""
     measurement_results = MeasurementData(
@@ -483,3 +493,27 @@ def test_estimator_measures_qubit_wise_commuting_layered_group_once(sparse):
 
     assert measurement_data.shots_list == [1]
     assert np.isclose(energy_result.energy_expectation_value, 3.0, atol=float_comparison_absolute_tolerance)
+
+
+@pytest.mark.skipif(not QDK_CHEMISTRY_HAS_QISKIT, reason="Qiskit not available")
+@pytest.mark.parametrize("sparse", [False, True])
+def test_estimator_measures_each_vacuum_grouped_layer_in_one_circuit(sparse):
+    """XX, YY and ZZ on two bonds form one group of three two-term layers: three circuits, not six."""
+    circuit = Circuit(
+        qasm='OPENQASM 3.0;\ninclude "stdgates.inc";\nqubit[4] q;\nh q[0];\ncx q[0], q[1];\nh q[2];\ncx q[2], q[3];\n'
+    )
+    labels = ["IIXX", "XXII", "IIYY", "YYII", "IIZZ", "ZZII"]
+    coefficients = np.array([0.5, 0.5, 0.5, 0.5, 1.0, 1.0])
+    words = [{q: label[3 - q] for q in range(4) if label[3 - q] != "I"} for label in labels]
+    observable = (
+        QubitOperator.from_sparse_terms(4, words, coefficients) if sparse else QubitOperator(labels, coefficients)
+    )
+    grouped = create("term_grouper", "vacuum_annihilating").run(observable)
+    estimator = QdkExpectationEstimator()
+    estimator.settings().set("circuit_executor", AlgorithmRef("circuit_executor", "qdk_sparse_state_simulator"))
+
+    energy_result, measurement_data = estimator.run(circuit, grouped, total_shots=300)
+
+    assert [len(layer) for group in grouped.term_partition.groups for layer in group] == [2, 2, 2]
+    assert measurement_data.shots_list == [100, 100, 100]
+    assert np.isclose(energy_result.energy_expectation_value, 2.0, atol=float_comparison_absolute_tolerance)
