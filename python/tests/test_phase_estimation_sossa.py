@@ -985,19 +985,23 @@ class TestSOSSAControlledWalkQPE:
         )
         assert set(counts) <= {"011", "101"}, f"shots leaked off 3/8 and 5/8: {counts}"
 
+    @pytest.mark.parametrize("combine_iterations", [False, True], ids=["per_bit", "combined"])
     @pytest.mark.parametrize(("select_algorithm", "prepare_consumes_gradient"), _CONTROLLED_WALK_CASES)
-    def test_iterative_qpe_measures_the_walk_phase(self, select_algorithm, prepare_consumes_gradient):
+    def test_iterative_qpe_measures_the_walk_phase(
+        self, select_algorithm, prepare_consumes_gradient, combine_iterations
+    ):
         r"""Iterative QPE measures :math:`\phi = 1/4` exactly and decodes the physical energy.
 
-        Iterations are separate circuits, so the :math:`\pm\phi` branches never collapse and an
+        Every sample re-prepares the state, so the :math:`\pm\phi` branches never collapse and an
         iteration at power :math:`p` with feedback :math:`\omega` measures 1 with probability
         :math:`\tfrac12[1 - \cos(2\pi p\phi)\cos\omega]`. For a generic :math:`\phi` the feedback
         bits then become coin flips. At :math:`\phi = 1/4` every iteration but the last is
-        deterministic, and the last only picks :math:`1/4` or :math:`3/4`.
+        deterministic, and the last only picks :math:`1/4` or :math:`3/4`. This holds whether the
+        iterations are separate circuits or rounds of one combined circuit that shares the gradient.
         """
         problem = _exact_walk_phase_problem(1.0 / 4.0)
         result = _run_controlled_walk_qpe(
-            IterativePhaseEstimation(shots_per_bit=3),
+            IterativePhaseEstimation(shots_per_bit=3, combine_iterations=combine_iterations),
             "qdk_iterative",
             problem,
             num_bits=3,

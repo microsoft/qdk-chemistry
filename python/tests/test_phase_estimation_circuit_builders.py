@@ -567,60 +567,6 @@ def test_model_unitary_is_built_once_per_power(
     assert set(widths) == {(3, 2)}
 
 
-@pytest.mark.parametrize("num_ancilla_qubits", [0, 2])
-def test_combined_model_unitary_uses_resolved_widths(monkeypatch: pytest.MonkeyPatch, num_ancilla_qubits: int) -> None:
-    """Combined IQPE resolves a model's register widths once per power without materializing it."""
-    builder = QdkIterativeQpeCircuitBuilder(num_bits=3, combine_iterations=True, mid_shots=5)
-    unitary_builder, circuit_mapper = _stub_nested(
-        builder, monkeypatch, num_qubits=3 + num_ancilla_qubits, num_system_qubits=3
-    )
-    model = FermiHubbardModelHamiltonianDescription(LatticeGeometry.chain(3), t=1.0, u=4.0)
-    state_preparation = Mock(spec=Circuit, num_qubits=3, _qsharp_op=object())
-
-    circuits = builder.run(state_preparation=state_preparation, qubit_hamiltonian=model)
-
-    assert unitary_builder.run.call_args_list == [call(model)] * 3
-    assert unitary_builder.settings().update.call_args_list == [call("power", power) for power in (4, 2, 1)]
-    assert circuit_mapper.run.call_count == 3
-    assert len(circuits) == 1
-    parameters = circuits[0]._qsharp_factory.parameter
-    assert parameters["systems"] == [1, 2, 3]
-    assert parameters["numAncillaQubits"] == num_ancilla_qubits
-    assert parameters["controlledUnitary"] == [circuit_mapper.run.return_value._qsharp_op] * 3
-    assert parameters["statePrep"] is state_preparation._qsharp_op
-    assert parameters["midShots"] == 5
-
-
-@pytest.mark.parametrize("system_widths", [(3, 4), (4, 3)])
-def test_combined_model_unitary_rejects_mismatched_system_widths(
-    monkeypatch: pytest.MonkeyPatch, system_widths: tuple[int, int]
-) -> None:
-    """Combined rounds must agree on the model's system width even when ancilla counts match."""
-    builder = QdkIterativeQpeCircuitBuilder(num_bits=2, combine_iterations=True)
-    unitary_builder, _ = _stub_nested(builder, monkeypatch, num_qubits=5, num_system_qubits=3)
-    unitary_builder.run.side_effect = [
-        UnitaryRepresentation(Mock(spec=UnitaryContainer, num_qubits=width + 2, num_system_qubits=width))
-        for width in system_widths
-    ]
-    model = FermiHubbardModelHamiltonianDescription(LatticeGeometry.chain(3), t=1.0, u=4.0)
-
-    with pytest.raises(
-        ValueError, match=f"round 1 requires {system_widths[0]}, but round 2 requires {system_widths[1]}"
-    ):
-        builder.run(state_preparation=Mock(spec=Circuit), qubit_hamiltonian=model)
-
-
-def test_combined_model_unitary_validates_state_preparation_width(monkeypatch: pytest.MonkeyPatch) -> None:
-    """The state preparation must fit the model's system register, not the unitary's total width."""
-    builder = QdkIterativeQpeCircuitBuilder(num_bits=2, combine_iterations=True)
-    _stub_nested(builder, monkeypatch, num_qubits=5, num_system_qubits=3)
-    model = FermiHubbardModelHamiltonianDescription(LatticeGeometry.chain(3), t=1.0, u=4.0)
-    state_preparation = Mock(spec=Circuit, num_qubits=4, _qsharp_op=object())
-
-    with pytest.raises(ValueError, match="State preparation acts on 4 qubits but phase estimation applies it to 3"):
-        builder.run(state_preparation=state_preparation, qubit_hamiltonian=model)
-
-
 @pytest.mark.parametrize("builder_class", [QdkStandardQpeCircuitBuilder, QdkIterativeQpeCircuitBuilder])
 def test_unitary_gradient_is_not_an_ancilla(
     monkeypatch: pytest.MonkeyPatch,
@@ -674,3 +620,80 @@ def test_rejects_a_gradient_state_prep_narrower_than_the_system(
 
     with pytest.raises(ValueError, match="must cover the whole system register"):
         builder.run(state_preparation=state_prep, qubit_hamiltonian=two_qubit_circuit_problem.hamiltonian)
+
+
+@pytest.mark.parametrize("num_ancilla_qubits", [0, 2])
+def test_combined_model_unitary_uses_resolved_widths(monkeypatch: pytest.MonkeyPatch, num_ancilla_qubits: int) -> None:
+    """Combined IQPE resolves a model's register widths once per power without materializing it."""
+    builder = QdkIterativeQpeCircuitBuilder(num_bits=3, combine_iterations=True, mid_shots=5)
+    unitary_builder, circuit_mapper = _stub_nested(
+        builder, monkeypatch, num_qubits=3 + num_ancilla_qubits, num_system_qubits=3
+    )
+    model = FermiHubbardModelHamiltonianDescription(LatticeGeometry.chain(3), t=1.0, u=4.0)
+    state_preparation = Mock(spec=Circuit, num_qubits=3, _qsharp_op=object(), metadata=CircuitMetadata())
+
+    circuits = builder.run(state_preparation=state_preparation, qubit_hamiltonian=model)
+
+    assert unitary_builder.run.call_args_list == [call(model)] * 3
+    assert unitary_builder.settings().update.call_args_list == [call("power", power) for power in (4, 2, 1)]
+    assert circuit_mapper.run.call_count == 3
+    assert len(circuits) == 1
+    parameters = circuits[0]._qsharp_factory.parameter
+    assert parameters["systems"] == [1, 2, 3]
+    assert parameters["numAncillaQubits"] == num_ancilla_qubits
+    assert parameters["controlledUnitary"] == [circuit_mapper.run.return_value._qsharp_op] * 3
+    assert parameters["statePrep"] is state_preparation._qsharp_op
+    assert parameters["midShots"] == 5
+
+
+@pytest.mark.parametrize("state_prep_gradient", [0, 2])
+def test_combined_iqpe_shares_the_unitary_gradient(monkeypatch: pytest.MonkeyPatch, state_prep_gradient: int) -> None:
+    """Combined IQPE appends the gradient its rounds declare instead of counting it as an ancilla."""
+    builder = QdkIterativeQpeCircuitBuilder(num_bits=2, combine_iterations=True)
+    _stub_nested(builder, monkeypatch, num_qubits=6, num_system_qubits=3, num_gradient_qubits=2)
+    model = FermiHubbardModelHamiltonianDescription(LatticeGeometry.chain(3), t=1.0, u=4.0)
+    state_preparation = Mock(
+        spec=Circuit,
+        num_qubits=3 + state_prep_gradient,
+        _qsharp_op=object(),
+        metadata=CircuitMetadata(num_phase_gradient_ancillas=state_prep_gradient),
+    )
+
+    (circuit,) = builder.run(state_preparation=state_preparation, qubit_hamiltonian=model)
+
+    parameters = circuit._qsharp_factory.parameter
+    assert parameters["numAncillaQubits"] == 1
+    assert parameters["numSharedAncillas"] == 2
+    assert parameters["prepareSharedOp"] is QSHARP_UTILS.PhaseGradient.PreparePhaseGradientState
+    assert parameters["unitaryUsesShared"] is True
+    assert parameters["statePrepUsesShared"] is bool(state_prep_gradient)
+
+
+@pytest.mark.parametrize("system_widths", [(3, 4), (4, 3)])
+def test_combined_model_unitary_rejects_mismatched_system_widths(
+    monkeypatch: pytest.MonkeyPatch, system_widths: tuple[int, int]
+) -> None:
+    """Combined rounds must agree on the model's system width even when ancilla counts match."""
+    builder = QdkIterativeQpeCircuitBuilder(num_bits=2, combine_iterations=True)
+    unitary_builder, _ = _stub_nested(builder, monkeypatch, num_qubits=5, num_system_qubits=3)
+    unitary_builder.run.side_effect = [
+        UnitaryRepresentation(Mock(spec=UnitaryContainer, num_qubits=width + 2, num_system_qubits=width))
+        for width in system_widths
+    ]
+    model = FermiHubbardModelHamiltonianDescription(LatticeGeometry.chain(3), t=1.0, u=4.0)
+
+    with pytest.raises(
+        ValueError, match=f"round 1 requires {system_widths[0]}, but round 2 requires {system_widths[1]}"
+    ):
+        builder.run(state_preparation=Mock(spec=Circuit), qubit_hamiltonian=model)
+
+
+def test_combined_model_unitary_validates_state_preparation_width(monkeypatch: pytest.MonkeyPatch) -> None:
+    """The state preparation must fit the model's system register, not the unitary's total width."""
+    builder = QdkIterativeQpeCircuitBuilder(num_bits=2, combine_iterations=True)
+    _stub_nested(builder, monkeypatch, num_qubits=5, num_system_qubits=3)
+    model = FermiHubbardModelHamiltonianDescription(LatticeGeometry.chain(3), t=1.0, u=4.0)
+    state_preparation = Mock(spec=Circuit, num_qubits=4, _qsharp_op=object(), metadata=CircuitMetadata())
+
+    with pytest.raises(ValueError, match="State preparation acts on 4 qubits but phase estimation applies it to 3"):
+        builder.run(state_preparation=state_preparation, qubit_hamiltonian=model)
