@@ -84,13 +84,6 @@ python -m pip install "qdk-chemistry[all]"
 > **Tip:** `[all]` is the path of least resistance if you're just getting started.
 > You can always switch to a slimmer install later.
 
-On Linux x86_64, Qiskit 2.6 (installed by `[all]` and `qiskit-extras`) needs more static thread-local storage than glibc reserves by default, and loading it can fail with `cannot allocate memory in static TLS block`. Set `GLIBC_TUNABLES` in the shell before starting Python or Jupyter:
-
-```bash
-# Linux x86_64 with Qiskit 2.6
-export GLIBC_TUNABLES=glibc.rtld.optional_static_tls=65536
-```
-
 If you prefer a minimal install (core library only, no optional backends):
 
 ```bash
@@ -187,6 +180,16 @@ to native Windows installs; none of them apply under
 | PySCF plugin | PySCF publishes no Windows wheels, so the `plugins` extra installs no PySCF and the PySCF plugin is unavailable. The native implementations are unaffected. |
 | arm64 dependencies and extras | MCP is omitted from the `all` and `test` extras because its `cryptography` dependency publishes no win-arm64 wheel. A base, `all`, or `test` install therefore needs neither Rust nor a source build of `cryptography`; installing the `mcp` extra explicitly may require an ARM64 Rust toolchain, MSVC C/C++ build tools, and ARM64 OpenSSL development libraries. Qiskit (and Qiskit Aer, Nature, IBM Runtime), PennyLane and RDKit are skipped because they require `rustworkx`, which also publishes no win-arm64 wheel. The Microsoft Discovery backend (`azure-ai-discovery`, `azure-identity`, `azure-storage-blob`) is skipped as well, as is the Azure Quantum backend (`azure-quantum`, `azure-identity`), which depends on the same `cryptography` wheel. The features that depend on those skipped extras are unavailable. |
 | OpenMP | Shared-memory threading via OpenMP is disabled on Windows. |
+
+### Notes for Linux Users
+
+| Topic | Detail |
+|-------|--------|
+| Qiskit plugin | Affects x86_64 only, when Qiskit 2.6.0 is installed (for example through the `all` or `qiskit-extras` extra). Installation works, but loading Qiskit alongside OpenMP-based native libraries, including QDK/Chemistry's, can fail with `cannot allocate memory in static TLS block` because Qiskit 2.6.0 needs more static thread-local storage than glibc reserves by default. The Qiskit plugin loads Qiskit on `import qdk_chemistry`, so run the command below in the shell before starting Python or Jupyter; setting it from inside a running Python process has no effect. |
+
+```bash
+export GLIBC_TUNABLES=glibc.rtld.optional_static_tls=65536
+```
 
 ---
 
@@ -390,7 +393,6 @@ The simplest way to build from source is via `pip`. If the C++ library hasn't be
 ```bash
 cd python
 python3 -m pip install '.[all]'
-export GLIBC_TUNABLES=glibc.rtld.optional_static_tls=65536  # Linux x86_64 with Qiskit 2.6
 pytest tests/
 cd ..
 ```
