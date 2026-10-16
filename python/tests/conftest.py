@@ -29,6 +29,8 @@ from pathlib import Path
 
 import numpy as np
 import pytest
+from qdk import TargetProfile
+from qdk.qsharp import QSharpError
 
 from qdk_chemistry.algorithms import create
 from qdk_chemistry.data import (
@@ -40,6 +42,7 @@ from qdk_chemistry.data import (
     StateVectorContainer,
     Wavefunction,
 )
+from qdk_chemistry.utils.qsharp import create_qsharp_context
 
 from .helpers import create_test_orbitals
 
@@ -101,6 +104,33 @@ def pytest_collection_modifyitems(items):
     for item in items:
         if "slow" in item.keywords:
             item.add_marker(skip_slow)
+
+
+@pytest.fixture(scope="session")
+def qsharp_test_context():
+    """Create a shared Q# context containing the test-only sources.
+
+    Building an ``ArithmeticOpTester`` here invalidates earlier testers, so use each one before building the next.
+    """
+    # Unrestricted: ArithmeticOpTester needs Std.ArithmeticTestUtils, which Adaptive_RIF does not resolve.
+    context = create_qsharp_context(target_profile=TargetProfile.Unrestricted)
+    paths = sorted((Path(__file__).parent / "qsharp").glob("*.qs"))
+    sources = [path.read_text(encoding="utf-8") for path in paths]
+    try:
+        context.eval("\n".join(sources))
+    except QSharpError as error:
+        layout, line = [], 1
+        for path, source in zip(paths, sources, strict=True):
+            layout.append(f"{path.name} at line {line}")
+            line += source.count("\n") + 1
+        raise RuntimeError(f"failed to evaluate the Q# test sources ({', '.join(layout)}): {error}") from error
+    return context
+
+
+@pytest.fixture(scope="session")
+def qsharp_test_utils(qsharp_test_context):
+    """Return the test-only Q# utilities namespace."""
+    return qsharp_test_context.code.QDKChemistry.TestUtils
 
 
 @pytest.fixture
