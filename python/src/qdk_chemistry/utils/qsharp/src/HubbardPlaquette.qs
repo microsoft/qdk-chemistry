@@ -5,13 +5,15 @@
 namespace QDKChemistry.Utils.HubbardPlaquette {
 
     import QDKChemistry.Utils.CircuitComposition.MaxInt;
+    import QDKChemistry.Utils.HammingWeightPhasing.HammingWeightBatchSize;
     import QDKChemistry.Utils.HammingWeightPhasing.HammingWeightPhase;
-    import QDKChemistry.Utils.HammingWeightPhasing.HammingWeightPhaseWithLegacyCosts;
+    import QDKChemistry.Utils.HammingWeightPhasing.PrepareCatalyst;
     import Std.Arrays.Flattened;
     import Std.Arrays.Mapped;
     import Std.Arrays.Subarray;
     import Std.Convert.IntAsDouble;
     import Std.Diagnostics.Fact;
+    import Std.Math.BitSizeI;
     import Std.Math.PI;
     import Std.ResourceEstimation.IsResourceEstimating;
     import Std.ResourceEstimation.RepeatEstimates;
@@ -32,8 +34,9 @@ namespace QDKChemistry.Utils.HubbardPlaquette {
         /// Whether to phase each tower of equal-angle rotations through a Hamming-weight register.
         useHammingWeightPhasing : Bool,
         /// Largest tower phased through a single Hamming-weight register, or -1 for no cap.
-        /// See `HammingWeightBatchSize` for what the cap buys and what it costs.
         maxBatchSize : Int,
+        /// Whether each Hamming weight is phased by one addition into a catalyst.
+        usePhaseGradient : Bool,
     }
 
     /// # Summary
@@ -110,47 +113,25 @@ namespace QDKChemistry.Utils.HubbardPlaquette {
         return groups;
     }
 
-    /// The on-site layer, phased through a Hamming-weight register.
+    /// The on-site layer, phased through a Hamming-weight register and, if nonempty, a catalyst
+    /// prepared at `angle`.
     internal operation InteractionLayer(
         angle : Double,
         sites : Int,
         systems : Qubit[],
         useHammingWeightPhasing : Bool,
-        maxBatchSize : Int
-    ) : Unit is Adj + Ctl {
-        InteractionLayerWithLegacyCosts(angle, sites, systems, useHammingWeightPhasing, maxBatchSize, false);
-    }
-
-    internal operation InteractionLayerWithLegacyCosts(
-        angle : Double,
-        sites : Int,
-        systems : Qubit[],
-        useHammingWeightPhasing : Bool,
         maxBatchSize : Int,
-        forceLegacyCosts : Bool
+        catalyst : Qubit[]
     ) : Unit is Adj + Ctl {
         // A zero angle skips the adder tree, which a hopping-only model would pay for nothing.
         if angle != 0.0 {
-            let legacy = UsesLegacyCostsWithOverride(forceLegacyCosts);
-            // TEMPORARY (legacy parity): the legacy layer also phased a single-mode Z tower over
-            // every mode, the conventional model's n_up + n_down terms.
-            if legacy {
-                HammingWeightPhaseWithLegacyCosts(
-                    -angle,
-                    [[PauliZ], size = Length(systems)],
-                    Mapped(q -> [q], systems),
-                    useHammingWeightPhasing,
-                    maxBatchSize,
-                    legacy
-                );
-            }
-            HammingWeightPhaseWithLegacyCosts(
+            HammingWeightPhase(
                 angle,
                 [[PauliZ, PauliZ], size = sites],
                 StridedGroups(sites, 2, 1, sites, systems),
                 useHammingWeightPhasing,
                 maxBatchSize,
-                legacy
+                catalyst
             );
         }
     }
@@ -287,26 +268,16 @@ namespace QDKChemistry.Utils.HubbardPlaquette {
     /// One hopping tiling: every plaquette's fswap, ffft, then its momentum-basis phase.
     ///
     /// # Description
-    /// The modes arrive in `order`, listing the mode at each position, and leave in it.
+    /// The modes arrive in `order`, listing the mode at each position, and leave in it. A nonempty
+    /// catalyst must be prepared at `-kappa / 2`, the angle of the momentum-basis tower.
     internal operation HoppingLayer(
         kappa : Double,
         blocks : Int[][],
         order : Int[],
         systems : Qubit[],
         useHammingWeightPhasing : Bool,
-        maxBatchSize : Int
-    ) : Unit is Adj + Ctl {
-        HoppingLayerWithLegacyCosts(kappa, blocks, order, systems, useHammingWeightPhasing, maxBatchSize, false);
-    }
-
-    internal operation HoppingLayerWithLegacyCosts(
-        kappa : Double,
-        blocks : Int[][],
-        order : Int[],
-        systems : Qubit[],
-        useHammingWeightPhasing : Bool,
         maxBatchSize : Int,
-        forceLegacyCosts : Bool
+        catalyst : Qubit[]
     ) : Unit is Adj + Ctl {
         // A zero angle or an empty tiling skips the routing, basis change and adders, which would
         // be paid for nothing.
@@ -321,12 +292,12 @@ namespace QDKChemistry.Utils.HubbardPlaquette {
             } apply {
                 // The third butterfly is fused into the phases, so the equal-angle family is the
                 // middle pair of every plaquette: exp(i angle XX) exp(i angle YY) on each pair.
-                HoppingPhasesWithLegacyCosts(
+                HoppingPhases(
                     kappa / 2.0,
                     StridedGroups(Length(blocks), 2, 4, 1, systems[1...]),
                     useHammingWeightPhasing,
                     maxBatchSize,
-                    forceLegacyCosts
+                    catalyst
                 );
             }
         }
@@ -345,47 +316,11 @@ namespace QDKChemistry.Utils.HubbardPlaquette {
         angle : Double,
         pairs : Qubit[][],
         useHammingWeightPhasing : Bool,
-        maxBatchSize : Int
-    ) : Unit is Adj + Ctl {
-        HoppingPhasesWithLegacyCosts(angle, pairs, useHammingWeightPhasing, maxBatchSize, false);
-    }
-
-    internal operation HoppingPhasesWithForcedLegacyCostsForTest(
-        angle : Double,
-        pairs : Qubit[][],
-        useHammingWeightPhasing : Bool,
-        maxBatchSize : Int
-    ) : Unit is Adj + Ctl {
-        HoppingPhasesWithLegacyCosts(angle, pairs, useHammingWeightPhasing, maxBatchSize, true);
-    }
-
-    internal operation HoppingPhasesWithLegacyCosts(
-        angle : Double,
-        pairs : Qubit[][],
-        useHammingWeightPhasing : Bool,
         maxBatchSize : Int,
-        forceLegacyCosts : Bool
+        catalyst : Qubit[]
     ) : Unit is Adj + Ctl {
         let count = 2 * Length(pairs);
-        // TEMPORARY (legacy parity): the legacy layer phased XX and YY as two separate towers.
-        if UsesLegacyCostsWithOverride(forceLegacyCosts) {
-            HammingWeightPhaseWithLegacyCosts(
-                -angle,
-                [[PauliX, PauliX], size = Length(pairs)],
-                pairs,
-                useHammingWeightPhasing,
-                maxBatchSize,
-                true
-            );
-            HammingWeightPhaseWithLegacyCosts(
-                -angle,
-                [[PauliY, PauliY], size = Length(pairs)],
-                pairs,
-                useHammingWeightPhasing,
-                maxBatchSize,
-                true
-            );
-        } elif not useHammingWeightPhasing {
+        if not useHammingWeightPhasing {
             for pair in pairs {
                 Exp([PauliX, PauliX], angle, pair);
                 Exp([PauliY, PauliY], angle, pair);
@@ -404,93 +339,45 @@ namespace QDKChemistry.Utils.HubbardPlaquette {
                     [[PauliZ], size = count],
                     Mapped(q -> [q], Flattened(pairs)),
                     true,
-                    maxBatchSize
+                    maxBatchSize,
+                    catalyst
                 );
             }
         }
     }
 
     /// One PIG body, I^(1/2) G I^(1/2), followed by the given pink layer, on modes in `order`.
+    /// The gold layer phases through the `hopping` catalyst and the pink layer through
+    /// `pinkCatalyst`, each prepared for its angle by the caller.
     internal operation PlaquetteStepWithPinkAngle(
         params : HubbardPlaquetteParams,
         pinkAngle : Double,
         order : Int[],
-        systems : Qubit[]
-    ) : Unit is Adj + Ctl {
-        PlaquetteStepWithPinkAngleAndLegacyCosts(params, pinkAngle, order, systems, false);
-    }
-
-    internal operation PlaquetteStepWithPinkAngleAndLegacyCosts(
-        params : HubbardPlaquetteParams,
-        pinkAngle : Double,
-        order : Int[],
         systems : Qubit[],
-        forceLegacyCosts : Bool
+        interaction : Qubit[],
+        hopping : Qubit[],
+        pinkCatalyst : Qubit[]
     ) : Unit is Adj + Ctl {
         let sites = params.width * params.height;
         let pink = PlaquetteSection(params.width, params.height, true);
         let gold = PlaquetteSection(params.width, params.height, false);
-        InteractionLayerWithLegacyCosts(
-            params.interactionAngle / 2.0,
-            sites,
-            systems,
-            params.useHammingWeightPhasing,
-            params.maxBatchSize,
-            forceLegacyCosts
-        );
-        HoppingLayerWithLegacyCosts(
-            params.hoppingAngle,
-            gold,
-            order,
-            systems,
-            params.useHammingWeightPhasing,
-            params.maxBatchSize,
-            forceLegacyCosts
-        );
-        InteractionLayerWithLegacyCosts(
-            params.interactionAngle / 2.0,
-            sites,
-            systems,
-            params.useHammingWeightPhasing,
-            params.maxBatchSize,
-            forceLegacyCosts
-        );
-        // TEMPORARY (legacy parity): the legacy step also applied the conventional model's scalar,
-        // a real rotation under control.
-        if UsesLegacyCostsWithOverride(forceLegacyCosts) and params.interactionAngle != 0.0 {
-            R(PauliI, 2.0 * params.interactionAngle * IntAsDouble(sites), systems[0]);
-        }
-        HoppingLayerWithLegacyCosts(
-            pinkAngle,
-            pink,
-            order,
-            systems,
-            params.useHammingWeightPhasing,
-            params.maxBatchSize,
-            forceLegacyCosts
-        );
+        let useHwp = params.useHammingWeightPhasing;
+        let cap = params.maxBatchSize;
+        InteractionLayer(params.interactionAngle / 2.0, sites, systems, useHwp, cap, interaction);
+        HoppingLayer(params.hoppingAngle, gold, order, systems, useHwp, cap, hopping);
+        InteractionLayer(params.interactionAngle / 2.0, sites, systems, useHwp, cap, interaction);
+        HoppingLayer(pinkAngle, pink, order, systems, useHwp, cap, pinkCatalyst);
     }
 
     /// One interior second-order Trotter body, I^(1/2) G I^(1/2) P, on modes in `order`.
     internal operation PlaquetteStep(
         params : HubbardPlaquetteParams,
         order : Int[],
-        systems : Qubit[]
+        systems : Qubit[],
+        interaction : Qubit[],
+        hopping : Qubit[]
     ) : Unit is Adj + Ctl {
-        PlaquetteStepWithPinkAngle(params, params.hoppingAngle, order, systems);
-    }
-
-    /// TEMPORARY (legacy parity): resource estimates count the legacy circuit's conventional-model
-    /// terms. These differ from the simulated symmetric model by a particle-number-dependent phase,
-    /// which is global only inside a fixed-particle-number sector. They also count the legacy
-    /// routing, which moves the modes from row-major order on every hopping layer instead of
-    /// keeping them in pink order. Remove this function and every branch on it to revert.
-    internal function UsesLegacyCosts() : Bool {
-        return UsesLegacyCostsWithOverride(false);
-    }
-
-    internal function UsesLegacyCostsWithOverride(forceLegacyCosts : Bool) : Bool {
-        return forceLegacyCosts or IsResourceEstimating();
+        PlaquetteStepWithPinkAngle(params, params.hoppingAngle, order, systems, interaction, hopping, hopping);
     }
 
     /// # Summary
@@ -507,8 +394,16 @@ namespace QDKChemistry.Utils.HubbardPlaquette {
     /// The modes are routed into pink order once at the start and back once at the end, so
     /// pink plaquettes are always local and only the gold layers route, from pink order. Both
     /// orders keep the spin-up modes ahead of their spin-down partners, so the on-site pairs
-    /// stay one register half apart. The legacy costs instead keep the modes in row-major
-    /// order and route both tilings from it on every layer.
+    /// stay one register half apart.
+    ///
+    /// With a catalyst, every Hamming weight is phased by one addition into a generalized phase
+    /// gradient (see `HammingWeightPhase`). Such a catalyst holds a single angle, so the evolution
+    /// prepares one for the interaction layers and one for the hopping layers, and returns both to
+    /// |0⟩ at the end. The full-angle hopping layers run at twice the angle of the half-angle pink
+    /// boundaries, and dropping the first qubit of a catalyst doubles its angle, so one register
+    /// serves both. The catalyzed towers leave out their constant phases, which are classical
+    /// and sum to one rotation, applied once at the end; under control it is a phase on the
+    /// control qubit, which phase estimation would otherwise read as energy.
     ///
     /// # Input
     /// ## params
@@ -519,39 +414,37 @@ namespace QDKChemistry.Utils.HubbardPlaquette {
         params : HubbardPlaquetteParams,
         systems : Qubit[]
     ) : Unit is Adj + Ctl {
-        RepPlaquetteExpWithLegacyCosts(params, systems, false);
-    }
-
-    internal operation RepPlaquetteExpWithForcedLegacyCostsForTest(
-        params : HubbardPlaquetteParams,
-        systems : Qubit[]
-    ) : Unit is Adj + Ctl {
-        RepPlaquetteExpWithLegacyCosts(params, systems, true);
-    }
-
-    internal operation RepPlaquetteExpWithLegacyCosts(
-        params : HubbardPlaquetteParams,
-        systems : Qubit[],
-        forceLegacyCosts : Bool
-    ) : Unit is Adj + Ctl {
         if params.repetitions > 0 {
+            let sites = params.width * params.height;
             let pink = PlaquetteSection(params.width, params.height, true);
+            let gold = PlaquetteSection(params.width, params.height, false);
+            let cap = params.maxBatchSize;
+            let catalyzed = params.useHammingWeightPhasing and params.usePhaseGradient;
+            // Each catalyst holds a qubit per place value of its largest weight; the hopping one
+            // holds one more, the qubit dropped to double its angle.
+            let interactionPlaces = catalyzed and params.interactionAngle != 0.0
+                ? BitSizeI(HammingWeightBatchSize(sites, cap)) | 0;
+            let hoppingPlaces = catalyzed and params.hoppingAngle != 0.0
+                ? BitSizeI(HammingWeightBatchSize(2 * MaxInt([Length(pink), Length(gold)]), cap)) + 1 | 0;
+            use interaction = Qubit[interactionPlaces];
+            use hopping = Qubit[hoppingPlaces];
+            let doubled = hoppingPlaces > 0 ? hopping[1...] | [];
             let identity = IdentityOrder(Length(systems));
-            // A hopping-free model has no plaquette to keep local, so it skips the routing. The
-            // legacy costs keep the register in row-major order, so every hopping layer routes.
-            let routeOnce = params.hoppingAngle != 0.0 and not UsesLegacyCostsWithOverride(forceLegacyCosts);
-            let order = routeOnce ? TilingOrder(pink, Length(systems)) | identity;
+            // A hopping-free model has no plaquette to keep local, so it skips the routing.
+            let order = params.hoppingAngle != 0.0 ? TilingOrder(pink, Length(systems)) | identity;
             within {
+                PrepareCatalyst(params.interactionAngle / 2.0, interaction);
+                PrepareCatalyst(-params.hoppingAngle / 4.0, hopping);
                 RouteModes(identity, order, systems);
             } apply {
-                HoppingLayerWithLegacyCosts(
+                HoppingLayer(
                     params.hoppingAngle / 2.0,
                     pink,
                     order,
                     systems,
                     params.useHammingWeightPhasing,
-                    params.maxBatchSize,
-                    forceLegacyCosts
+                    cap,
+                    hopping
                 );
 
                 if params.repetitions > 1 {
@@ -559,34 +452,33 @@ namespace QDKChemistry.Utils.HubbardPlaquette {
                         within {
                             RepeatEstimates(params.repetitions - 1);
                         } apply {
-                            PlaquetteStepWithPinkAngleAndLegacyCosts(
-                                params,
-                                params.hoppingAngle,
-                                order,
-                                systems,
-                                forceLegacyCosts
-                            );
+                            PlaquetteStep(params, order, systems, interaction, doubled);
                         }
                     } else {
                         for _ in 1..params.repetitions - 1 {
-                            PlaquetteStepWithPinkAngleAndLegacyCosts(
-                                params,
-                                params.hoppingAngle,
-                                order,
-                                systems,
-                                forceLegacyCosts
-                            );
+                            PlaquetteStep(params, order, systems, interaction, doubled);
                         }
                     }
                 }
 
-                PlaquetteStepWithPinkAngleAndLegacyCosts(
+                PlaquetteStepWithPinkAngle(
                     params,
                     params.hoppingAngle / 2.0,
                     order,
                     systems,
-                    forceLegacyCosts
+                    interaction,
+                    doubled,
+                    hopping
                 );
+            }
+            if catalyzed {
+                // Every interaction tower left out e^{-i·(U/2)·sites} and every hopping tower
+                // e^{i·kappa·plaquettes}, which sum to these per step; `R(PauliI, g)` is e^{-ig/2}.
+                let perStep = params.interactionAngle * IntAsDouble(sites)
+                    - params.hoppingAngle * IntAsDouble(Length(pink) + Length(gold));
+                if perStep != 0.0 {
+                    R(PauliI, 2.0 * IntAsDouble(params.repetitions) * perStep, systems[0]);
+                }
             }
         }
     }

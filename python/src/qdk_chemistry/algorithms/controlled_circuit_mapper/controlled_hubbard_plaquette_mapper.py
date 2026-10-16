@@ -30,11 +30,16 @@ class ControlledHubbardPlaquetteMapperSettings(ControlledCircuitMapperSettings):
             few rotations to be worth the extra Toffolis and scratch qubits.
             Ignored when ``use_hamming_weight_phasing`` is ``False``.
             Defaults to ``-1``.
+        use_phase_gradient: Whether each Hamming weight is phased by one addition into a catalyst,
+            a generalized phase gradient the evolution prepares once per angle, or by synthesizing
+            each of its place values as its own ``Rz`` (the original rotation ladder).
+            Ignored when ``use_hamming_weight_phasing`` is ``False``.
+            Defaults to ``True``.
 
     """
 
     def __init__(self):
-        """Initialize the settings, adding the Hamming-weight phasing switch and batch cap."""
+        """Initialize the settings, adding the Hamming-weight phasing options and the phasing choice."""
         super().__init__()
         self._set_default(
             "use_hamming_weight_phasing",
@@ -52,6 +57,15 @@ class ControlledHubbardPlaquetteMapperSettings(ControlledCircuitMapperSettings):
             "given, so use a cap of at least 8: shorter batches save too few rotations to be worth "
             "the extra Toffolis and scratch qubits. Ignored when use_hamming_weight_phasing is False. "
             "Set to -1 for no cap.",
+        )
+        self._set_default(
+            "use_phase_gradient",
+            "bool",
+            True,
+            "Phase each Hamming weight by one addition into a catalyst, a generalized phase gradient "
+            "the evolution prepares once per angle, trading the place-value rotations of every tower "
+            "for one rotation and Toffolis. Set to False for the original ladder of synthesized Rz "
+            "rotations, which needs no catalyst. Ignored when use_hamming_weight_phasing is False.",
         )
 
 
@@ -110,6 +124,7 @@ class ControlledHubbardPlaquetteMapper(ControlledCircuitMapper):
             repetitions=container.step_reps,
             useHammingWeightPhasing=use_hamming_weight_phasing,
             maxBatchSize=max_batch_size,
+            usePhaseGradient=bool(self._settings.get("use_phase_gradient")),
         )
         targets = self._get_target_indices(evolution)
         return Circuit(
