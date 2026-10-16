@@ -33,12 +33,12 @@ from qdk_chemistry.data import (
 from qdk_chemistry.data.circuit import QsharpFactoryData
 from qdk_chemistry.utils.qsharp import QSHARP_UTILS
 
-from .reference_tolerances import ci_energy_tolerance
-from .test_helpers import (
+from .helpers import (
     create_random_factorized_hamiltonian,
     create_test_orbitals,
     factorized_hamiltonian_to_sossa_operator,
 )
+from .reference_tolerances import ci_energy_tolerance
 
 # ═══════════════════════════════════════════════════════════════════════════════
 # Test Hamiltonian construction (small DFTHC-like H2 data)

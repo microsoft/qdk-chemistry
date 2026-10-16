@@ -10,8 +10,8 @@ namespace QDKChemistry.Utils.IterativePhaseEstimation {
     /// - `statePrep`: A function to prepare the initial quantum state.
     /// - `repControlledUnitary`: A function to perform repeated controlled unitary operations.
     /// - `accumulatePhase`: The phase to accumulate during the evolution.
-    /// - `phaseQubit`: The index of the phase qubit (ancilla used for phase readout).
-    /// - `systems`: An array of indices representing the system qubits.
+    /// - `phaseQubit`: The phase qubit index, distinct from every system index.
+    /// - `systems`: Unique system indices, in the order expected by state preparation and the unitary.
     /// - `numAncillaQubits`: Number of ancilla qubits needed by the controlled unitary (0 if none).
     struct IterativePhaseEstimationParams {
         statePrep : Qubit[] => Unit,
@@ -22,20 +22,51 @@ namespace QDKChemistry.Utils.IterativePhaseEstimation {
         numAncillaQubits : Int,
     }
 
+    /// Validates a register of `Length(systems) + 1 + numAncillaQubits` qubits
+    /// and returns its unused indices in ascending order.
+    function GetIQPEAncillaIndices(phaseQubit : Int, systems : Int[], numAncillaQubits : Int) : Int[] {
+        if numAncillaQubits < 0 {
+            fail "numAncillaQubits must be non-negative.";
+        }
+        let numQubits = Length(systems) + 1 + numAncillaQubits;
+        if phaseQubit < 0 or phaseQubit >= numQubits {
+            fail "phaseQubit must be within the allocated register.";
+        }
+        mutable occupied = [false, size = numQubits];
+        set occupied w/= phaseQubit <- true;
+        for index in systems {
+            if index < 0 or index >= numQubits {
+                fail "System qubit indices must be within the allocated register.";
+            }
+            if index == phaseQubit {
+                fail "System qubit indices must be distinct from phaseQubit.";
+            }
+            if occupied[index] {
+                fail "System qubit indices must be unique.";
+            }
+            set occupied w/= index <- true;
+        }
+        mutable ancillas = [];
+        for index in 0..numQubits - 1 {
+            if not occupied[index] {
+                set ancillas += [index];
+            }
+        }
+        return ancillas;
+    }
+
     /// Runs the iterative Quantum Phase Estimation (IQPE) circuit based on the provided parameters.
+    /// Ancillas are the unused register indices in ascending order, appended after the systems.
     /// # Parameters
     /// - `params`: An `IterativePhaseEstimationParams` struct containing the parameters for IQPE.
     /// # Returns
     /// - `Result[]`: The result of measuring the phase qubit after the IQPE circuit is executed.
     operation RunIQPE(params : IterativePhaseEstimationParams) : Result[] {
+        let ancillaIndices = GetIQPEAncillaIndices(params.phaseQubit, params.systems, params.numAncillaQubits);
         use qs = Qubit[Length(params.systems) + 1 + params.numAncillaQubits];
         let phaseQubit = qs[params.phaseQubit];
         let systems = Subarray(params.systems, qs);
-        let ancillas = if params.numAncillaQubits == 0 {
-            []
-        } else {
-            qs[1 + Length(params.systems)..Length(qs) - 1]
-        };
+        let ancillas = Subarray(ancillaIndices, qs);
         let allTargets = systems + ancillas;
 
         params.statePrep(systems);
@@ -56,9 +87,11 @@ namespace QDKChemistry.Utils.IterativePhaseEstimation {
     /// - `statePrep`: A function to prepare the initial quantum state.
     /// - `repControlledUnitary`: A function to perform repeated controlled unitary operations.
     /// - `accumulatePhase`: The phase to accumulate during the evolution.
-    /// - `phaseQubit`: The index of the phase qubit (ancilla used for phase readout).
-    /// - `systems`: An array of indices representing the system qubits.
+    /// - `phaseQubit`: The phase qubit index, distinct from every system index.
+    /// - `systems`: Unique system indices, in the order expected by state preparation and the unitary.
     /// - `numAncillaQubits`: Number of ancilla qubits needed by the controlled unitary (0 if none).
+    /// All indices must be within a register of `Length(systems) + 1 + numAncillaQubits` qubits.
+    /// Ancillas are the unused indices in ascending order, appended after the systems.
     /// # Returns
     /// The result of measuring the phase qubit after the IQPE circuit is executed.
     operation MakeIQPECircuit(

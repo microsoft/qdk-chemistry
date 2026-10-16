@@ -208,7 +208,8 @@ class PauliProductFormulaContainer(UnitaryContainer):
             step_terms: The repeated block of exponentiated Pauli terms, one product-formula step unless fused.
             step_reps: The number of repetitions of the repeated block.
             num_qubits: The number of qubits the unitary acts on.
-            scale: The evolution time used for eigenvalue-phase conversion.
+            scale: The total evolution time represented by the container, including
+                any repetitions folded into ``step_reps``.
             prefix_terms: Terms executed once before the repeated block.
             suffix_terms: Terms executed once after the repeated block.
             group_offsets: Strictly increasing commuting-group boundaries spanning step_terms, starting at zero.
@@ -280,6 +281,13 @@ class PauliProductFormulaContainer(UnitaryContainer):
         if angle > np.pi:
             angle -= 2 * np.pi
         return float(-angle / self.scale)
+
+    @property
+    def energy_period(self) -> float:
+        """Return the energy-alias period; raise ``ValueError`` for zero evolution time."""
+        if self.scale == 0:
+            raise ValueError("The unitary representation has a zero evolution-time scale")
+        return float(2 * np.pi / abs(self.scale))
 
     def _hash_update(self, h) -> None:
         """Feed identifying data into the hasher."""
@@ -454,11 +462,11 @@ class PauliProductFormulaContainer(UnitaryContainer):
         proportional to the expanded output. Prefix and suffix terms participate in that fallback.
 
         Args:
-            other_container: Evolution to append, with matching width and compatible finite scale.
+            other_container: Evolution to append, with matching width and finite scale.
             atol: Finite nonnegative tolerance for dropping only merged near-zero angles.
 
         Returns:
-            An equivalent formula retaining this container's scale.
+            A combined formula whose scale is the sum of both evolution times.
 
         """
         if not isfinite(atol) or atol < 0:
@@ -469,14 +477,11 @@ class PauliProductFormulaContainer(UnitaryContainer):
                 f"num_qubits (self.num_qubits={self.num_qubits}, "
                 f"other_container.num_qubits={other_container.num_qubits})."
             )
-        if (
-            not isfinite(self.scale)
-            or not isfinite(other_container.scale)
-            or not np.isclose(self.scale, other_container.scale)
-        ):
+        scale = self.scale + other_container.scale
+        if not isfinite(self.scale) or not isfinite(other_container.scale) or not isfinite(scale):
             raise ValueError(
-                f"Cannot combine PauliProductFormulaContainer instances with different or nonfinite "
-                f"scale (self.scale={self.scale}, other_container.scale={other_container.scale})."
+                f"Cannot combine PauliProductFormulaContainer instances with nonfinite scales or sum "
+                f"(self.scale={self.scale}, other_container.scale={other_container.scale})."
             )
         if self.step_terms == other_container.step_terms and self.layer_offsets == other_container.layer_offsets:
             if not (
@@ -486,7 +491,7 @@ class PauliProductFormulaContainer(UnitaryContainer):
                     self.step_terms,
                     self.step_reps + other_container.step_reps,
                     self.num_qubits,
-                    self.scale,
+                    scale,
                     group_offsets=self.group_offsets or other_container.group_offsets,
                     layer_offsets=self.layer_offsets,
                 ).fuse_boundaries(atol)
@@ -521,7 +526,7 @@ class PauliProductFormulaContainer(UnitaryContainer):
                         self.step_terms,
                         self.step_reps + other_container.step_reps + int(bool(join)),
                         self.num_qubits,
-                        self.scale,
+                        scale,
                         prefix_terms=self.prefix_terms,
                         suffix_terms=self.suffix_terms,
                         group_offsets=self.group_offsets,
@@ -569,7 +574,7 @@ class PauliProductFormulaContainer(UnitaryContainer):
         if layers is not None and layers[-1] != len(merged):
             layers.append(len(merged))
         return PauliProductFormulaContainer(
-            merged, 1, self.num_qubits, self.scale, layer_offsets=None if layers is None else tuple(layers)
+            merged, 1, self.num_qubits, scale, layer_offsets=None if layers is None else tuple(layers)
         )
 
     def to_json(self) -> dict[str, Any]:
