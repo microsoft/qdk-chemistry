@@ -13,10 +13,17 @@
 namespace QDKChemistry.Utils.PhaseGradient {
 
     import Std.Arithmetic.RippleCarryCGIncByLE;
+    import Std.Arrays.Mapped;
     import Std.Canon.ApplyQFT;
     import Std.Canon.ApplyXorInPlace;
+    import Std.Convert.IntAsBoolArray;
+    import Std.Convert.IntAsDouble;
     import Std.Core.Length;
     import Std.Diagnostics.Fact;
+    import Std.Math.AbsD;
+    import Std.Math.PI;
+    import Std.Math.Round;
+    import QDKChemistry.Utils.SelectSwap.SelectSwap;
 
     /// Prepares the phase gradient state |φ⟩ = (1/√2^n) Σ_k exp(-2πi·k/2^n) |k⟩_LE.
     ///
@@ -89,6 +96,56 @@ namespace QDKChemistry.Utils.PhaseGradient {
             H(targetQubit);
         } apply {
             RzViaPhaseGradient(targetQubit, angleQubits, phaseGradient);
+        }
+    }
+
+    /// Returns the `bits`-bit word x = Round(2^b · angle / (4π)) mod 2^b for which
+    /// `RyViaPhaseGradient` applies Ry(angle).
+    function QuantizeRyAngle(angle : Double, bits : Int) : Int {
+        Fact(AbsD(angle) <= 4.0 * PI(), "QuantizeRyAngle: angle must be finite and within [-4π, 4π]");
+        let scale = 1 <<< bits;
+        let raw = Round(IntAsDouble(scale) * angle / (4.0 * PI()));
+        ((raw % scale) + scale) % scale
+    }
+
+    /// Quantizes each angle with `QuantizeRyAngle` into a `SelectSwap` table of `bits`-bit words.
+    function QuantizeRyAngles(angles : Double[], bits : Int) : Bool[][] {
+        Mapped(angle -> IntAsBoolArray(QuantizeRyAngle(angle, bits), bits), angles)
+    }
+
+    /// Applies Ry(4π·data[a]/2^b) to `targetQubit` for each state |a⟩ of the little-endian
+    /// `address`, loading the word from `QuantizeRyAngles` into the clean b-qubit `angleReg`
+    /// with `SelectSwap`.
+    operation ApplyMultiplexedRy(
+        data : Bool[][],
+        address : Qubit[],
+        targetQubit : Qubit,
+        phaseGradient : Qubit[],
+        angleReg : Qubit[]
+    ) : Unit is Adj + Ctl {
+        within {
+            SelectSwap(-1, data, address, angleReg);
+        } apply {
+            RyViaPhaseGradient(targetQubit, angleReg, phaseGradient);
+        }
+    }
+
+    /// `ApplyMultiplexedRy` that rotates only when every qubit of `controls` is |1⟩.
+    ///
+    /// Only the lookup is controlled, since a zero angle register already gives the identity.
+    /// This is cheaper than `Controlled ApplyMultiplexedRy`, which also controls the adder.
+    operation ApplyControlledMultiplexedRy(
+        data : Bool[][],
+        address : Qubit[],
+        controls : Qubit[],
+        targetQubit : Qubit,
+        phaseGradient : Qubit[],
+        angleReg : Qubit[]
+    ) : Unit is Adj + Ctl {
+        within {
+            Controlled SelectSwap(controls, (-1, data, address, angleReg));
+        } apply {
+            RyViaPhaseGradient(targetQubit, angleReg, phaseGradient);
         }
     }
 
