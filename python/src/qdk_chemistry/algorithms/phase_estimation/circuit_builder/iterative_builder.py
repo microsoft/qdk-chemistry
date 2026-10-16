@@ -223,15 +223,21 @@ class QdkIterativeQpeCircuitBuilder(IterativeQpeCircuitBuilder):
 
         """
         state_prep_op = state_preparation._qsharp_op  # noqa: SLF001
-        ctrl_unitary_op = controlled_unitary_circuit._qsharp_op  # noqa: SLF001
+        prepare_shared_op, num_shared_ancillas, state_prep_uses_shared, unitary_uses_shared = self._shared_register(
+            state_preparation, [controlled_unitary_circuit]
+        )
         self._validate_state_prep_width(state_preparation, num_system_qubits)
         iterative_parameters = {
             "statePrep": state_prep_op,
-            "repControlledUnitary": ctrl_unitary_op,
+            "repControlledUnitary": controlled_unitary_circuit._qsharp_op,  # noqa: SLF001
             "accumulatePhase": phase_correction,
             "phaseQubit": 0,
             "systems": [i + 1 for i in range(num_system_qubits)],
             "numAncillaQubits": num_ancilla_qubits,
+            "prepareSharedOp": prepare_shared_op,
+            "numSharedAncillas": num_shared_ancillas,
+            "statePrepUsesShared": state_prep_uses_shared,
+            "unitaryUsesShared": unitary_uses_shared,
         }
         return Circuit(
             qsharp_factory=QsharpFactoryData(
@@ -257,7 +263,8 @@ class QdkIterativeQpeCircuitBuilder(IterativeQpeCircuitBuilder):
 
         Each round is repeated ``mid_shots`` times inside the circuit and its bit is the
         majority of those repetitions. This internal repetition count is independent of
-        how many times the executor runs the whole circuit.
+        how many times the executor runs the whole circuit. A phase gradient that the rounds
+        or the state preparation declare is prepared once and shared by every round.
 
         Args:
             state_preparation: Trial-state preparation circuit that prepares the initial state on the system qubits.
@@ -270,7 +277,8 @@ class QdkIterativeQpeCircuitBuilder(IterativeQpeCircuitBuilder):
 
         Raises:
             RuntimeError: If the required Q# operations are not available, or if the active Q# target profile is Base.
-            ValueError: If state preparation exceeds the system width or combined rounds have different register widths.
+            ValueError: If state preparation does not fit the system width, combined rounds have different register
+                widths, or the rounds and the state preparation request different phase gradients.
 
         """
         # One controlled unitary per round, mirroring the per-bit path: round k uses U^(2^(num_bits-1-k)).
@@ -302,6 +310,9 @@ class QdkIterativeQpeCircuitBuilder(IterativeQpeCircuitBuilder):
                 "For Qiskit support, use QiskitIterativeQpeCircuitBuilder from the qiskit plugin."
             )
         self._validate_state_prep_width(state_preparation, num_system_qubits)
+        prepare_shared_op, num_shared_ancillas, state_prep_uses_shared, unitary_uses_shared = self._shared_register(
+            state_preparation, ctrl_unitary_circuits
+        )
 
         # Base profile has no mid-circuit measurement, so fail clearly instead of on a Q# compile error.
         profile = get_qsharp_context().get_target_profile()
@@ -322,6 +333,10 @@ class QdkIterativeQpeCircuitBuilder(IterativeQpeCircuitBuilder):
             "phaseQubit": 0,
             "systems": [i + 1 for i in range(num_system_qubits)],
             "numAncillaQubits": num_ancilla_qubits,
+            "prepareSharedOp": prepare_shared_op,
+            "numSharedAncillas": num_shared_ancillas,
+            "statePrepUsesShared": state_prep_uses_shared,
+            "unitaryUsesShared": unitary_uses_shared,
         }
         return Circuit(
             qsharp_factory=QsharpFactoryData(

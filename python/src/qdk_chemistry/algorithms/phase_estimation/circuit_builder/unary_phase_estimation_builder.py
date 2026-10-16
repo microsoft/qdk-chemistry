@@ -96,8 +96,10 @@ class QdkUnaryQpeCircuitBuilder(QpeCircuitBuilder):
     query count is supported.
 
     The phase register is prepared in a cosine window state to suppress the spectral leakage
-    of the truncated schedule. The unitary builder must set ``quantum_walk=True`` for the
-    post-processing formula.
+    of the truncated schedule. The schedule completes the walk around the block encoding
+    itself, so the unitary builder may return a plain LCU block encoding, an LCU walk, or a
+    SOSSA block encoding. Time evolution is unsupported: the schedule relies on the block
+    encoding and the reflection both being self-inverse.
 
     References:
         * :cite:`Babbush2018` — cosine-window control state.
@@ -169,8 +171,8 @@ class QdkUnaryQpeCircuitBuilder(QpeCircuitBuilder):
 
         Raises:
             RuntimeError: If the state preparation circuit has no Q# operation.
-            ValueError: If the unitary representation is neither an LCU walk nor a SOSSA
-                block encoding, if a SOSSA block encoding has non-unit power, if the mapper
+            ValueError: If the unitary representation is neither an LCU block encoding, an LCU walk,
+                nor a SOSSA block encoding, if a SOSSA block encoding has non-unit power, if the mapper
                 does not declare its register width, if the block encoding has no ancilla
                 register for the walk to reflect about, or if the state preparation and block
                 encoding disagree on the shared ancilla count.
@@ -179,10 +181,10 @@ class QdkUnaryQpeCircuitBuilder(QpeCircuitBuilder):
         unitary_builder = self._create_nested("unitary_builder")
         unitary_rep = unitary_builder.run(qubit_hamiltonian)
         container = unitary_rep.get_container()
-        if not isinstance(container, LCUWalkContainer | SOSSABlockEncodingContainer):
+        if not isinstance(container, LCUContainer | LCUWalkContainer | SOSSABlockEncodingContainer):
             raise ValueError(
-                "Requires an LCU walk or SOSSA block encoding unitary representation because this circuit "
-                f"explicitly controls the block encoding's reflection, got '{container.type}'."
+                "Requires an LCU or SOSSA block encoding unitary representation because this circuit "
+                f"completes the walk around a self-inverse block encoding, got '{container.type}'."
             )
 
         block_encoding_container: BlockEncodingContainer
@@ -191,7 +193,9 @@ class QdkUnaryQpeCircuitBuilder(QpeCircuitBuilder):
                 raise ValueError(f"Requires a unit-power SOSSA block encoding, got power {container.power}.")
             block_encoding_container = container
         else:
-            block_encoding_container = container.block_encoding
+            block_encoding_container = (
+                container.block_encoding if isinstance(container, LCUWalkContainer) else container
+            )
             if container.power != 1 or block_encoding_container.power != 1:
                 Logger.warn(f"The unitary representation's power {container.power} is ignored.")
                 block_encoding_container = LCUContainer(
@@ -218,20 +222,10 @@ class QdkUnaryQpeCircuitBuilder(QpeCircuitBuilder):
             raise ValueError(f"Circuit mapper '{type(mapper).__name__}' did not report num_qubits.")
         num_system_qubits = self._num_system_qubits(qubit_hamiltonian, unitary_rep)
 
-        block_encoding_shared = block_encoding.metadata.num_phase_gradient_ancillas
-        state_prep_shared = state_preparation.metadata.num_phase_gradient_ancillas
-        if block_encoding_shared and state_prep_shared and block_encoding_shared != state_prep_shared:
-            raise ValueError(
-                f"State preparation expects {state_prep_shared} phase gradient ancilla but the "
-                f"block encoding expects {block_encoding_shared}."
-            )
-        num_phase_gradient_ancillas = max(block_encoding_shared, state_prep_shared)
-        prepare_shared_op = (
-            QSHARP_UTILS.PhaseGradient.PreparePhaseGradientState
-            if num_phase_gradient_ancillas
-            else QSHARP_UTILS.PrepSelPrep.NoOpPrepare
+        prepare_shared_op, num_phase_gradient_ancillas, state_prep_uses_shared, block_encoding_uses_shared = (
+            self._shared_register(state_preparation, [block_encoding])
         )
-        num_ancilla_qubits = num_qubits - num_system_qubits - block_encoding_shared
+        num_ancilla_qubits = num_qubits - num_system_qubits - block_encoding.metadata.num_phase_gradient_ancillas
         if num_ancilla_qubits <= 0:
             raise ValueError(f"Requires a non-empty ancilla register to reflect about, got {num_ancilla_qubits}.")
 
@@ -239,7 +233,7 @@ class QdkUnaryQpeCircuitBuilder(QpeCircuitBuilder):
         state_prep_op = state_preparation._qsharp_op  # noqa: SLF001
         if state_prep_op is None:
             raise RuntimeError("State preparation has no Q# operation.")
-        self._validate_state_prep_width(state_preparation, num_system_qubits + state_prep_shared)
+        self._validate_state_prep_width(state_preparation, num_system_qubits)
 
         phase_prep_params = QSHARP_UTILS.StatePreparation.StatePreparationParams(
             rowMap=list(range(num_phase_qubits - 1, -1, -1)),
@@ -257,8 +251,8 @@ class QdkUnaryQpeCircuitBuilder(QpeCircuitBuilder):
             "numSystemQubits": num_system_qubits,
             "numAncillas": num_ancilla_qubits,
             "numSharedAncillas": num_phase_gradient_ancillas,
-            "statePrepUsesShared": bool(state_prep_shared),
-            "blockEncodingUsesShared": bool(block_encoding_shared),
+            "statePrepUsesShared": state_prep_uses_shared,
+            "blockEncodingUsesShared": block_encoding_uses_shared,
             "computeCapacity": compute_capacity,
         }
         circuit = Circuit(

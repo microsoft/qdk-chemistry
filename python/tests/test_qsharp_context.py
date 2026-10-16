@@ -51,7 +51,6 @@ _ADAPTIVE_ONLY_MODULES = (
     "SelectSwap",
     "AliasSamplingStatePrep",
     "QROMStatePrep",
-    "PhaseGradient",
     "SOSSAWalk",
 )
 
@@ -248,7 +247,10 @@ def test_iqpe_qubit_layout(combined: bool, phase: int, systems: list[int], ancil
         call = f"CombinedIterationPhaseEstimation.RunFullIQPE(1, 1, _ => (), [{unitary}]"
     else:
         call = f"IterativePhaseEstimation.MakeIQPECircuit(_ => (), {unitary}, 0.0"
-    expression = f"QDKChemistry.Utils.{call}, {phase}, {systems}, {ancillas})"
+    expression = (
+        f"QDKChemistry.Utils.{call}, {phase}, {systems}, {ancillas}, "
+        "QDKChemistry.Utils.PrepSelPrep.NoOpPrepare, 0, false, false)"
+    )
     if error is not None:
         with pytest.raises(QSharpError, match=error):
             get_qsharp_context().eval(expression)

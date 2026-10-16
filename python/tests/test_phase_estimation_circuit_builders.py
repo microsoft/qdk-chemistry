@@ -30,7 +30,7 @@ from qdk_chemistry.data import (
     QubitOperator,
     UnitaryRepresentation,
 )
-from qdk_chemistry.data.circuit import QsharpFactoryData
+from qdk_chemistry.data.circuit import CircuitMetadata, QsharpFactoryData
 from qdk_chemistry.data.unitary_representation.containers.base import UnitaryContainer
 from qdk_chemistry.utils.qsharp import QSHARP_UTILS, get_qsharp_context
 
@@ -497,6 +497,7 @@ def _stub_nested(
     *,
     num_qubits: int,
     num_system_qubits: int,
+    num_gradient_qubits: int = 0,
 ) -> tuple[Mock, Mock]:
     """Swap the builder's nested algorithms for mocks whose unitary has the given widths."""
     unitary_builder = Mock()
@@ -504,7 +505,11 @@ def _stub_nested(
         Mock(spec=UnitaryContainer, num_qubits=num_qubits, num_system_qubits=num_system_qubits)
     )
     circuit_mapper = Mock()
-    circuit_mapper.run.return_value = Mock(_qsharp_op=object())
+    circuit_mapper.run.return_value = Mock(
+        _qsharp_op=object(),
+        num_qubits=None,
+        metadata=CircuitMetadata(num_phase_gradient_ancillas=num_gradient_qubits),
+    )
     nested = {"unitary_builder": unitary_builder, "controlled_circuit_mapper": circuit_mapper}
     monkeypatch.setattr(builder, "_create_nested", nested.__getitem__)
     return unitary_builder, circuit_mapper
@@ -566,7 +571,7 @@ def test_combined_model_unitary_uses_resolved_widths(monkeypatch: pytest.MonkeyP
         builder, monkeypatch, num_qubits=3 + num_ancilla_qubits, num_system_qubits=3
     )
     model = FermiHubbardModelHamiltonianDescription(LatticeGeometry.chain(3), t=1.0, u=4.0)
-    state_preparation = Mock(spec=Circuit, num_qubits=3, _qsharp_op=object())
+    state_preparation = Mock(spec=Circuit, num_qubits=3, _qsharp_op=object(), metadata=CircuitMetadata())
 
     circuits = builder.run(state_preparation=state_preparation, qubit_hamiltonian=model)
 
@@ -580,6 +585,29 @@ def test_combined_model_unitary_uses_resolved_widths(monkeypatch: pytest.MonkeyP
     assert parameters["controlledUnitary"] == [circuit_mapper.run.return_value._qsharp_op] * 3
     assert parameters["statePrep"] is state_preparation._qsharp_op
     assert parameters["midShots"] == 5
+
+
+@pytest.mark.parametrize("state_prep_gradient", [0, 2])
+def test_combined_iqpe_shares_the_unitary_gradient(monkeypatch: pytest.MonkeyPatch, state_prep_gradient: int) -> None:
+    """Combined IQPE shares the rounds' gradient instead of counting it as an ancilla."""
+    builder = QdkIterativeQpeCircuitBuilder(num_bits=2, combine_iterations=True)
+    _stub_nested(builder, monkeypatch, num_qubits=6, num_system_qubits=3, num_gradient_qubits=2)
+    model = FermiHubbardModelHamiltonianDescription(LatticeGeometry.chain(3), t=1.0, u=4.0)
+    state_preparation = Mock(
+        spec=Circuit,
+        num_qubits=3 + state_prep_gradient,
+        _qsharp_op=object(),
+        metadata=CircuitMetadata(num_phase_gradient_ancillas=state_prep_gradient),
+    )
+
+    (circuit,) = builder.run(state_preparation=state_preparation, qubit_hamiltonian=model)
+
+    parameters = circuit._qsharp_factory.parameter
+    assert parameters["numAncillaQubits"] == 1
+    assert parameters["numSharedAncillas"] == 2
+    assert parameters["prepareSharedOp"] is QSHARP_UTILS.PhaseGradient.PreparePhaseGradientState
+    assert parameters["unitaryUsesShared"] is True
+    assert parameters["statePrepUsesShared"] is bool(state_prep_gradient)
 
 
 @pytest.mark.parametrize("system_widths", [(3, 4), (4, 3)])
@@ -606,7 +634,7 @@ def test_combined_model_unitary_validates_state_preparation_width(monkeypatch: p
     builder = QdkIterativeQpeCircuitBuilder(num_bits=2, combine_iterations=True)
     _stub_nested(builder, monkeypatch, num_qubits=5, num_system_qubits=3)
     model = FermiHubbardModelHamiltonianDescription(LatticeGeometry.chain(3), t=1.0, u=4.0)
-    state_preparation = Mock(spec=Circuit, num_qubits=4, _qsharp_op=object())
+    state_preparation = Mock(spec=Circuit, num_qubits=4, _qsharp_op=object(), metadata=CircuitMetadata())
 
     with pytest.raises(ValueError, match="State preparation acts on 4 qubits but phase estimation applies it to 3"):
         builder.run(state_preparation=state_preparation, qubit_hamiltonian=model)
