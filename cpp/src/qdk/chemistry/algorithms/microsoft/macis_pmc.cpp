@@ -186,6 +186,7 @@ std::pair<double, std::shared_ptr<data::Wavefunction>> MacisPmc::_run_impl(
         "MacisPmc does not support unrestricted orbitals. "
         "Only restricted orbitals are supported.");
   }
+  validate_macis_two_body_symmetry(*hamiltonian, "MacisPmc");
   auto result = dispatch_by_norb<pmc_helper>(
       data::spin_channel_indices(orbitals->active_indices(),
                                  data::axes::alpha())

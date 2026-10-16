@@ -6,6 +6,8 @@
 
 #include <qdk/chemistry/utils/logger.hpp>
 
+#include "../../data/two_body_symmetry.hpp"
+
 #define SET_MACIS_SETTING(qdk_settings, macis_settings, param_name, type) \
   macis_settings.param_name = qdk_settings.get_or_default<type>(          \
       #param_name, macis_settings.param_name)
@@ -131,6 +133,18 @@ macis::ASCISettings get_asci_settings_(const data::Settings& settings_) {
   }
 
   return asci_settings;
+}
+
+void validate_macis_two_body_symmetry(const data::Hamiltonian& hamiltonian,
+                                      const std::string& solver) {
+  QDK_LOG_TRACE_ENTERING();
+
+  if (!hamiltonian.has_two_body_integrals()) return;
+  const auto n = static_cast<std::size_t>(
+      std::get<0>(hamiltonian.get_one_body_integrals()).rows());
+  const auto& aaaa = std::get<0>(hamiltonian.get_two_body_integrals());
+  if (static_cast<std::size_t>(aaaa.size()) != n * n * n * n) return;
+  data::detail::require_fourfold_two_body(aaaa.data(), n, solver);
 }
 
 }  // namespace qdk::chemistry::algorithms::microsoft

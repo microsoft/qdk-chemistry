@@ -347,6 +347,13 @@ def fourfold_average(tensor):
     return (tensor + tensor.transpose(2, 3, 0, 1) + tensor.transpose(1, 0, 3, 2) + tensor.transpose(3, 2, 1, 0)) / 4
 
 
+def non_fourfold_perturbation(tensor, kind):
+    """Project ``tensor`` onto a part that breaks exchange but not Hermiticity, or Hermiticity but not exchange."""
+    keep, flip = ((1, 0, 3, 2), (2, 3, 0, 1)) if kind == "exchange" else ((2, 3, 0, 1), (1, 0, 3, 2))
+    tensor = tensor + tensor.transpose(keep)
+    return tensor - tensor.transpose(flip)
+
+
 def fourfold_orbit(indices):
     """Return the distinct positions related to ``indices`` by exchange and reversal."""
     first, second, third, fourth = indices
