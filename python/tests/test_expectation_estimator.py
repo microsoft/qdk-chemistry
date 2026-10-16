@@ -235,6 +235,15 @@ def test_energy_variance_includes_covariance_of_terms_measured_together(coeffici
     assert np.isclose(result.energy_variance, expected_variance, atol=float_comparison_absolute_tolerance)
 
 
+def test_energy_variance_is_not_masked_by_a_large_constant_term():
+    """A constant term far larger than the fluctuating one must not round the variance away."""
+    group = QubitOperator(["I", "Z"], np.array([1e16, 1.0]))
+
+    result = QdkExpectationEstimator._compute_energy_expectation_from_bitstrings([group], [{"0": 50, "1": 50}])
+
+    assert np.isclose(result.energy_variance, 0.01, atol=float_comparison_absolute_tolerance)
+
+
 def test_measurement_data_to_json():
     """Test MeasurementData.to_json method."""
     measurement_results = MeasurementData(
