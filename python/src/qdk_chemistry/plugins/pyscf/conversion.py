@@ -37,7 +37,9 @@ from typing import TypeVar
 
 import numpy as np
 import pyscf
+from pyscf import lib
 
+from qdk_chemistry.constants import FINE_STRUCTURE_CONSTANT
 from qdk_chemistry.data import AOType, BasisSet, Hamiltonian, Orbitals, Shell, Structure
 from qdk_chemistry.data._spin_channels import spin_channel_indices, spin_channel_matrix, spin_channel_vector
 from qdk_chemistry.data.symmetry import axes
@@ -68,6 +70,20 @@ class SCFType(CaseInsensitiveStrEnum):
     AUTO = "auto"
     RESTRICTED = "restricted"
     UNRESTRICTED = "unrestricted"
+
+
+def _apply_relativity(mf: pyscf.scf.hf.SCF, relativity: str) -> pyscf.scf.hf.SCF:
+    """Replace the core Hamiltonian with PySCF spin-free X2C-1e using QDK's speed of light."""
+    if not relativity:
+        return mf
+    x2c_mf = mf.sfx2c1e()
+    x2c_mf.with_x2c.approx = "1e"
+    x2c_mf.with_x2c.basis = None
+    x2c_mf.with_x2c.xuncontract = relativity == "sf-x2c"
+    with lib.temporary_env(lib.param, LIGHT_SPEED=1.0 / FINE_STRUCTURE_CONSTANT):
+        hcore = x2c_mf.get_hcore()
+    mf.get_hcore = lambda *_: hcore
+    return mf
 
 
 def structure_to_pyscf_atom_labels(structure: Structure) -> tuple:
