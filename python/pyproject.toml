@@ -57,7 +57,7 @@ qcmcp = "qdk_chemistry.ui.mcp:main"
 
 [project.optional-dependencies]
 all = [
-  "qdk-chemistry[coverage,dev,discovery,docs,jupyter,networkx-extras,openfermion-extras,plugins,qiskit-extras,qre,test]",
+  "qdk-chemistry[azure-quantum,coverage,dev,discovery,docs,jupyter,networkx-extras,openfermion-extras,plugins,qiskit-extras,qre,test]",
   "qdk-chemistry[mcp]; sys_platform != 'win32' or platform_machine != 'ARM64'"
 ]
 coverage = [
@@ -87,7 +87,8 @@ docs = [
   "sphinx-rtd-theme",
   "myst-parser",
   "breathe==4.36.0",
-  "sphinx-autodoc-typehints",
+  # sphinx-autodoc-typehints temporarily capped to avoid https://github.com/microsoft/qdk-chemistry/issues/779
+  "sphinx-autodoc-typehints<3.14",
   "sphinx-inline-tabs",
   "sphinxcontrib-napoleon",
   "sphinxcontrib-bibtex",
@@ -128,7 +129,7 @@ qre = [
   "qdk[qre,jupyter]==1.32.3"
 ]
 test = [
-  "qdk-chemistry[coverage,discovery,jupyter,networkx-extras,openfermion-extras,plugins,qiskit-extras,qre]",
+  "qdk-chemistry[azure-quantum,coverage,discovery,jupyter,networkx-extras,openfermion-extras,plugins,qiskit-extras,qre]",
   "qdk-chemistry[mcp]; sys_platform != 'win32' or platform_machine != 'ARM64'",
   "nbclient",
   "nbformat",
@@ -141,6 +142,11 @@ test = [
   "requests>=2.33.0",
   "setuptools>=64",
   "wheel"
+]
+azure-quantum = [
+  # azure-quantum requires azure-identity and azure-storage-blob, which both pull in cryptography; no win-arm64 wheel
+  "azure-identity>=1.19.0,<2; sys_platform != 'win32' or platform_machine != 'ARM64'",
+  "azure-quantum>=2.1.0; sys_platform != 'win32' or platform_machine != 'ARM64'"
 ]
 
 [project.urls]

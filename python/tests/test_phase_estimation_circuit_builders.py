@@ -9,7 +9,7 @@ from __future__ import annotations
 
 import json
 from dataclasses import dataclass
-from unittest.mock import Mock
+from unittest.mock import Mock, call
 
 import numpy as np
 import pytest
@@ -99,6 +99,14 @@ def four_qubit_circuit_problem() -> CircuitBuilderProblem:
 class TestIterativeQpeCircuitBuilder:
     """Tests for the iterative phase estimation circuit builder."""
 
+    def test_mid_shots_setting(self) -> None:
+        """Internal repetitions have their own builder setting, independent of executor shots."""
+        assert QdkIterativeQpeCircuitBuilder().settings().get("mid_shots") == 3
+        builder = QdkIterativeQpeCircuitBuilder(mid_shots=5)
+        assert builder.settings().get("mid_shots") == 5
+        builder_keys = builder.settings().keys()
+        assert "shots_per_bit" not in builder_keys
+
     def test_generates_correct_number_of_circuits(
         self,
         two_qubit_circuit_problem: CircuitBuilderProblem,
@@ -154,6 +162,74 @@ class TestIterativeQpeCircuitBuilder:
             assert len(qsc_json["qubits"]) == two_qubit_circuit_problem.num_qubits
             # Ancilla qubit (q_0) has a measurement result
             assert qsc_json["qubits"][0]["numResults"] == 1
+
+    def test_combined_iterations_returns_single_circuit(self, two_qubit_circuit_problem: CircuitBuilderProblem) -> None:
+        """combine_iterations collapses the per-bit circuits into one adaptive circuit."""
+        builder = QdkIterativeQpeCircuitBuilder(num_bits=two_qubit_circuit_problem.num_bits)
+        builder.settings().set("combine_iterations", True)
+        builder.settings().set(
+            "controlled_circuit_mapper",
+            AlgorithmRef("controlled_circuit_mapper", "pauli_sequence"),
+        )
+        builder.settings().set(
+            "unitary_builder",
+            AlgorithmRef("hamiltonian_unitary_builder", "trotter", time=two_qubit_circuit_problem.evolution_time),
+        )
+
+        circuits = builder.run(
+            state_preparation=two_qubit_circuit_problem.state_prep,
+            qubit_hamiltonian=two_qubit_circuit_problem.hamiltonian,
+        )
+
+        assert len(circuits) == 1
+        assert circuits[0]._qsharp_factory.program is QSHARP_UTILS.CombinedIterationPhaseEstimation.RunFullIQPE
+
+    def test_combined_iterations_builds_one_controlled_unitary_per_round(
+        self, two_qubit_circuit_problem: CircuitBuilderProblem
+    ) -> None:
+        """Combined mode requests the same powers as the per-bit path, so power_strategy applies."""
+        recorded_powers: list[int] = []
+
+        class _PowerRecordingBuilder(QdkIterativeQpeCircuitBuilder):
+            """Records the controlled power requested for each round."""
+
+            def _create_controlled_circuit(self, qubit_hamiltonian, power):
+                recorded_powers.append(power)
+                return super()._create_controlled_circuit(qubit_hamiltonian, power)
+
+        builder = _PowerRecordingBuilder(
+            num_bits=two_qubit_circuit_problem.num_bits,
+            unitary_builder=AlgorithmRef(
+                "hamiltonian_unitary_builder", "trotter", time=two_qubit_circuit_problem.evolution_time
+            ),
+            controlled_circuit_mapper=AlgorithmRef("controlled_circuit_mapper", "pauli_sequence"),
+        )
+        builder.settings().set("combine_iterations", True)
+
+        builder.run(
+            state_preparation=two_qubit_circuit_problem.state_prep,
+            qubit_hamiltonian=two_qubit_circuit_problem.hamiltonian,
+        )
+
+        num_bits = two_qubit_circuit_problem.num_bits
+        assert recorded_powers == [2 ** (num_bits - k - 1) for k in range(num_bits)]
+
+    @pytest.mark.parametrize("ancilla_counts", [(1, 0), (0, 1)])
+    def test_combined_iterations_rejects_mismatched_ancillas(
+        self, two_qubit_circuit_problem: CircuitBuilderProblem, monkeypatch, ancilla_counts: tuple[int, int]
+    ) -> None:
+        """Combined rounds must agree on the shared ancilla register size."""
+        problem = two_qubit_circuit_problem
+        builder = QdkIterativeQpeCircuitBuilder(num_bits=2, combine_iterations=True)
+        circuit, _ = builder._create_controlled_circuit(problem.hamiltonian, 1)
+        counts = iter(ancilla_counts)
+        monkeypatch.setattr(builder, "_create_controlled_circuit", lambda *_: (circuit, next(counts)))
+
+        with pytest.raises(
+            ValueError,
+            match=f"round 1 requires {ancilla_counts[0]}, but round 2 requires {ancilla_counts[1]}",
+        ):
+            builder.run(state_preparation=problem.state_prep, qubit_hamiltonian=problem.hamiltonian)
 
     def test_run_returns_circuits_four_qubit(self, four_qubit_circuit_problem: CircuitBuilderProblem) -> None:
         """Validate circuit builder with a four-qubit Hamiltonian produces more circuits."""
@@ -480,3 +556,57 @@ def test_model_unitary_is_built_once_per_power(
 
     assert unitary_builder.run.call_count == 3
     assert set(widths) == {(3, 2)}
+
+
+@pytest.mark.parametrize("num_ancilla_qubits", [0, 2])
+def test_combined_model_unitary_uses_resolved_widths(monkeypatch: pytest.MonkeyPatch, num_ancilla_qubits: int) -> None:
+    """Combined IQPE resolves a model's register widths once per power without materializing it."""
+    builder = QdkIterativeQpeCircuitBuilder(num_bits=3, combine_iterations=True, mid_shots=5)
+    unitary_builder, circuit_mapper = _stub_nested(
+        builder, monkeypatch, num_qubits=3 + num_ancilla_qubits, num_system_qubits=3
+    )
+    model = FermiHubbardModelHamiltonianDescription(LatticeGeometry.chain(3), t=1.0, u=4.0)
+    state_preparation = Mock(spec=Circuit, num_qubits=3, _qsharp_op=object())
+
+    circuits = builder.run(state_preparation=state_preparation, qubit_hamiltonian=model)
+
+    assert unitary_builder.run.call_args_list == [call(model)] * 3
+    assert unitary_builder.settings().update.call_args_list == [call("power", power) for power in (4, 2, 1)]
+    assert circuit_mapper.run.call_count == 3
+    assert len(circuits) == 1
+    parameters = circuits[0]._qsharp_factory.parameter
+    assert parameters["systems"] == [1, 2, 3]
+    assert parameters["numAncillaQubits"] == num_ancilla_qubits
+    assert parameters["controlledUnitary"] == [circuit_mapper.run.return_value._qsharp_op] * 3
+    assert parameters["statePrep"] is state_preparation._qsharp_op
+    assert parameters["midShots"] == 5
+
+
+@pytest.mark.parametrize("system_widths", [(3, 4), (4, 3)])
+def test_combined_model_unitary_rejects_mismatched_system_widths(
+    monkeypatch: pytest.MonkeyPatch, system_widths: tuple[int, int]
+) -> None:
+    """Combined rounds must agree on the model's system width even when ancilla counts match."""
+    builder = QdkIterativeQpeCircuitBuilder(num_bits=2, combine_iterations=True)
+    unitary_builder, _ = _stub_nested(builder, monkeypatch, num_qubits=5, num_system_qubits=3)
+    unitary_builder.run.side_effect = [
+        UnitaryRepresentation(Mock(spec=UnitaryContainer, num_qubits=width + 2, num_system_qubits=width))
+        for width in system_widths
+    ]
+    model = FermiHubbardModelHamiltonianDescription(LatticeGeometry.chain(3), t=1.0, u=4.0)
+
+    with pytest.raises(
+        ValueError, match=f"round 1 requires {system_widths[0]}, but round 2 requires {system_widths[1]}"
+    ):
+        builder.run(state_preparation=Mock(spec=Circuit), qubit_hamiltonian=model)
+
+
+def test_combined_model_unitary_validates_state_preparation_width(monkeypatch: pytest.MonkeyPatch) -> None:
+    """The state preparation must fit the model's system register, not the unitary's total width."""
+    builder = QdkIterativeQpeCircuitBuilder(num_bits=2, combine_iterations=True)
+    _stub_nested(builder, monkeypatch, num_qubits=5, num_system_qubits=3)
+    model = FermiHubbardModelHamiltonianDescription(LatticeGeometry.chain(3), t=1.0, u=4.0)
+    state_preparation = Mock(spec=Circuit, num_qubits=4, _qsharp_op=object())
+
+    with pytest.raises(ValueError, match="State preparation acts on 4 qubits but phase estimation applies it to 3"):
+        builder.run(state_preparation=state_preparation, qubit_hamiltonian=model)
