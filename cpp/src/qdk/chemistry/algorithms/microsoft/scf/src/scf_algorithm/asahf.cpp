@@ -324,6 +324,7 @@ void AtomicSphericallyAveragedHartreeFock::solve_fock_eigenproblem(
 
   // Diagonalize each l-block of the spherically averaged Fock matrix
   size_t offset = 0;
+  size_t eigenvalue_offset = 0;
   std::vector<RowMajorMatrix> mo_coeffs_by_l;
   for (int l = 0; l < max_l; ++l) {
     const auto& idx = ao_indices_by_l[l];
@@ -363,10 +364,17 @@ void AtomicSphericallyAveragedHartreeFock::solve_fock_eigenproblem(
     RowMajorMatrix tmp1 = X_block.transpose() * F_averaged;
     RowMajorMatrix tmp2 = tmp1 * X_block;
 
-    std::vector<double> eigenvalues_block(n_shells, 0.0);
-
-    lapack::syev(lapack::Job::Vec, lapack::Uplo::Lower, n_shells, tmp2.data(),
-                 n_shells, eigenvalues_block.data());
+    const size_t retained_shells = X_block.cols();
+    if (eigenvalue_offset + retained_shells * degeneracy >
+        static_cast<size_t>(num_molecular_orbitals)) {
+      throw std::runtime_error(
+          "ASAHF angular-momentum blocks exceed the retained MO count.");
+    }
+    std::vector<double> eigenvalues_block(retained_shells, 0.0);
+    if (retained_shells > 0) {
+      lapack::syev(lapack::Job::Vec, lapack::Uplo::Lower, retained_shells,
+                   tmp2.data(), retained_shells, eigenvalues_block.data());
+    }
 
     // lapack::syev returns column-major eigenvectors, transpose for row-major
     // storage
@@ -378,11 +386,17 @@ void AtomicSphericallyAveragedHartreeFock::solve_fock_eigenproblem(
     // update eigenvalues_
     for (size_t i = 0; i < eigenvalues_block.size(); ++i) {
       for (size_t m = 0; m < degeneracy; ++m) {
-        eigenvalues(0, idx[i * degeneracy + m]) = eigenvalues_block[i];
+        eigenvalues(0, eigenvalue_offset + i * degeneracy + m) =
+            eigenvalues_block[i];
       }
     }
 
     offset += n_ao;
+    eigenvalue_offset += retained_shells * degeneracy;
+  }
+  if (eigenvalue_offset != static_cast<size_t>(num_molecular_orbitals)) {
+    throw std::runtime_error(
+        "ASAHF angular-momentum blocks do not match the retained MO count.");
   }
 
   // Populate C_dm
@@ -404,18 +418,19 @@ void AtomicSphericallyAveragedHartreeFock::solve_fock_eigenproblem(
     for (size_t i = 0; i < n_shells; ++i) {
       for (size_t m = 0; m < degeneracy; ++m) {
         size_t ao_row = idx[i * degeneracy + m];
-        for (size_t j = 0; j < n_shells; ++j) {
+        for (size_t j = 0; j < static_cast<size_t>(C_tmp.cols()); ++j) {
           size_t mo_col = mo_offset + j * degeneracy + m;
           C_dm(ao_row, mo_col) = C_tmp(i, j);
         }
       }
     }
 
-    mo_offset += n_shells * degeneracy;
+    mo_offset += C_tmp.cols() * degeneracy;
   }
 
   // get fractional occupation
   std::vector<double> occupation;
+  l_idx = 0;
 
   // Get core configuration from ECP shells
   std::array<size_t, 4> core_config =
@@ -426,7 +441,7 @@ void AtomicSphericallyAveragedHartreeFock::solve_fock_eigenproblem(
     if (idx.empty()) continue;
 
     size_t degeneracy = 2 * l + 1;
-    size_t n_shells = idx.size() / degeneracy;
+    size_t n_shells = mo_coeffs_by_l[l_idx++].cols();
 
     // Get full configuration for this atom using atomic number
     auto [n_double_occ, frac_occ] =

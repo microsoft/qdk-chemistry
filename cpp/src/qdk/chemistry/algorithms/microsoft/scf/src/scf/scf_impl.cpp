@@ -213,7 +213,6 @@ SCFImpl::SCFImpl(std::shared_ptr<Molecule> mol_ptr, const SCFConfig& cfg,
   if (cfg.mpi.world_rank == 0) {
     F_ = RowMajorMatrix::Zero(num_density_matrices_ * num_atomic_orbitals_,
                               num_atomic_orbitals_);
-    scf_algorithm_ = SCFAlgorithm::create(ctx_);
   }
 
   // MO and mixed AO/MO quantities
@@ -473,6 +472,11 @@ void SCFImpl::compute_orthogonalization_matrix_(const RowMajorMatrix& S_,
   }
 
   auto sigma = s.bottomRows(num_molecular_orbitals_);
+  if (!sigma.allFinite() || (sigma.array() <= 0.0).any()) {
+    throw std::runtime_error(
+        "Overlap orthogonalization requires positive finite retained "
+        "eigenvalues.");
+  }
   auto sigma_invsqrt = sigma.array().sqrt().inverse().matrix().asDiagonal();
 
   auto U_cond = U.block(0, num_atomic_orbitals_ - num_molecular_orbitals_,
@@ -512,12 +516,12 @@ void SCFImpl::iterate_() {
     res.scf_total_energy = res.nuclear_repulsion_energy;
     res.scf_iterations = 0;
     res.converged = true;
-    // Initialize coefficient matrix with identity (virtual orbitals only)
-    C_ = RowMajorMatrix::Identity(num_molecular_orbitals_,
-                                  num_molecular_orbitals_);
+    // All orbitals are virtual, but still need AO rows and S-orthonormal
+    // columns.
+    C_ = X_.replicate(num_orbital_spin_blocks_, 1);
     // Initialize eigenvalues to zero for zero-electron system
     eigenvalues_ =
-        RowMajorMatrix::Zero(num_density_matrices_, num_molecular_orbitals_);
+        RowMajorMatrix::Zero(num_orbital_spin_blocks_, num_molecular_orbitals_);
     QDK_LOGGER().info(
         "Zero-electron system detected. SCF energy = nuclear repulsion = "
         "{:.12f}",
@@ -528,6 +532,7 @@ void SCFImpl::iterate_() {
   build_one_electron_integrals_();
 
   if (ctx_.cfg->mpi.world_rank == 0) {
+    scf_algorithm_ = SCFAlgorithm::create(ctx_);
     init_density_matrix_();
     res.nuclear_repulsion_energy = calc_nuclear_repulsion_energy_();
 
@@ -919,6 +924,14 @@ void SCFImpl::build_one_electron_integrals_() {
            "matrix");
     num_molecular_orbitals_ = X_.cols();  // Reset num_molecular_orbitals_ based
                                           // on the rank of the overlap matrix
+    if (num_molecular_orbitals_ == 0 ||
+        num_molecular_orbitals_ <
+            static_cast<size_t>(std::max(nelec_[0], nelec_[1]))) {
+      throw std::runtime_error(
+          fmt::format("Retained MO rank {} cannot accommodate alpha/beta "
+                      "occupations {}/{}.",
+                      num_molecular_orbitals_, nelec_[0], nelec_[1]));
+    }
     ctx_.num_molecular_orbitals =
         num_molecular_orbitals_;  // Update the context to ensure proper
                                   // serialization

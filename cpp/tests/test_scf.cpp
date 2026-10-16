@@ -10,6 +10,7 @@
 #include <qdk/chemistry/algorithms/hamiltonian.hpp>
 #include <qdk/chemistry/algorithms/scf.hpp>
 #include <qdk/chemistry/algorithms/stability.hpp>
+#include <qdk/chemistry/constants.hpp>
 #include <qdk/chemistry/data/ansatz.hpp>
 #include <qdk/chemistry/data/basis_set.hpp>
 #include <qdk/chemistry/data/wavefunction_containers/state_vector.hpp>
@@ -1374,4 +1375,30 @@ TEST_F(ScfTest, HydrogenIon_CCPVDZ_SCF) {
   scf_solver->settings().set("enable_gdm", true);
   auto [E_HF, wfn_HF] = scf_solver->run(h_ion, 1, 1, "cc-pvdz");
   EXPECT_NEAR(E_HF, 0.0, testing::scf_energy_tolerance);
+}
+
+TEST_F(ScfTest, C4H_ROHF_LinearlyDependentAO) {
+  std::vector<Eigen::Vector3d> coordinates = {{0.0, 0.0, -1.06},
+                                              {0.0, 0.0, 0.0},
+                                              {0.0, 0.0, 1.30},
+                                              {0.0, 0.0, 2.60},
+                                              {0.0, 0.0, 3.90}};
+  for (auto& coordinate : coordinates) {
+    coordinate *= qdk::chemistry::constants::angstrom_to_bohr;
+  }
+  auto structure = std::make_shared<Structure>(
+      coordinates, std::vector<std::string>{"H", "C", "C", "C", "C"});
+  auto scf_solver = ScfSolverFactory::create("qdk");
+  scf_solver->settings().set("method", "hf");
+  scf_solver->settings().set("scf_type", "restricted");
+  scf_solver->settings().set("nthreads", 1);
+  auto [energy, wavefunction] =
+      scf_solver->run(structure, 0, 2, "d-aug-cc-pvdz");
+  const auto orbitals = wavefunction->get_orbitals();
+
+  EXPECT_TRUE(orbitals->is_restricted());
+  EXPECT_EQ(orbitals->get_num_atomic_orbitals(), 141);
+  EXPECT_EQ(orbitals->get_num_molecular_orbitals(), 139);
+  // PySCF ROHF reference with the same 1e-6 overlap cutoff.
+  EXPECT_NEAR(energy, -151.81510534420579, testing::scf_energy_tolerance);
 }
