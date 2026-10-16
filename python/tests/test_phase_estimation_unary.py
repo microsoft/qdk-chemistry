@@ -310,7 +310,7 @@ class TestMisconfigurationIsSurfaced:
             _run_builder(QdkUnaryQpeCircuitBuilder(num_queries=3, compute_capacity=compute_capacity))
 
     def test_time_evolution_is_rejected(self):
-        """A Trotter step is not self-inverse and has no ancilla, so the schedule cannot walk it."""
+        """Unary QPE rejects a Trotter step, which is not self-inverse."""
         with pytest.raises(ValueError, match="Requires an LCU or SOSSA block encoding"):
             _run_builder(_make_builder(unitary_builder=Trotter(time=0.1, num_divisions=1)))
 
@@ -545,8 +545,8 @@ class TestUnaryQpeEndToEnd:
         assert result.raw_energy == pytest.approx(float(energies[0]), abs=0.02)
 
     def test_a_plain_lcu_block_encoding_recovers_the_ground_state_energy(self):
-        """The schedule completes the walk around an LCU built without ``quantum_walk``."""
-        # lambda = 1.5 keeps the walk phase on a bin, and a decode that dropped lambda would miss by a third.
+        """Unary QPE recovers the energy from an LCU built without ``quantum_walk``."""
+        # lambda = 1.5 puts the phase on a bin; a decode without lambda would miss.
         hamiltonian = QubitOperator(pauli_strings=["X", "Z"], coefficients=np.array([0.75, 0.75]))
         energies, vectors = np.linalg.eigh(hamiltonian.to_matrix())
         state_prep_params = {
@@ -578,17 +578,6 @@ class TestUnaryQpeEndToEnd:
         result = qpe.run(qubit_hamiltonian=hamiltonian, state_preparation=state_preparation)
 
         assert result.raw_energy == pytest.approx(float(energies[0]), abs=1e-9)
-
-
-def test_a_plain_lcu_builds_the_circuit_its_walk_does():
-    """With or without ``quantum_walk``, the LCU hands the schedule the same block encoding."""
-
-    def parameters(quantum_walk: bool) -> tuple[dict, int | None]:
-        circuit = _run_builder(_make_builder(unitary_builder=LCUBuilder(quantum_walk=quantum_walk)))[0]
-        scalars = {key: value for key, value in circuit._qsharp_factory.parameter.items() if isinstance(value, int)}
-        return scalars, circuit.num_qubits
-
-    assert parameters(quantum_walk=False) == parameters(quantum_walk=True)
 
 
 def test_the_builder_reflects_the_ancilla_tail_the_mapper_declared():

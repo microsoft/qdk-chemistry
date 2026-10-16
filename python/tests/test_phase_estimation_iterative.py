@@ -230,7 +230,7 @@ def _run_iterative(
         unitary_builder_name: Name of the unitary builder to use.
         controlled_circuit_mapper_name: Name of the controlled circuit mapper to use.
         executor_name: Name of the circuit executor to use.
-        combine_iterations: Run every round in one adaptive circuit instead of one circuit per bit.
+        combine_iterations: Run all rounds in one adaptive circuit.
 
     Returns:
         :class:`QpeResult` instance summarizing the iterative run.
@@ -389,14 +389,11 @@ def test_iterative_phase_estimation_extracts_phase_and_energy(
 def test_iterative_phase_estimation_shares_the_gradient_with_the_state_preparation(
     two_qubit_phase_problem: PhaseEstimationProblem, combine_iterations: bool
 ) -> None:
-    """A QROM state preparation rotates through the gradient IQPE prepares, though the controlled unitary does not.
-
-    The combined circuit prepares the gradient once and reuses it for every round's state preparation.
-    """
+    """Per-bit and combined IQPE hand their gradient to a QROM state preparation."""
     state_prep = QROMStatePreparation(rotation_bit_precision=8, allocate_phase_gradient=False).run(
         create_dense_wavefunction([1.0 / np.sqrt(2.0), 0.0, 0.0, 1.0 / np.sqrt(2.0)])
     )
-    # qdk 1.32.3 panics lowering this QROM to QIR (Std `Unlookup` leaves a constant compare), so interpret it instead.
+    # qdk 1.32.3 cannot lower this QROM to QIR, so use the sparse simulator.
     result = _run_iterative(
         replace(two_qubit_phase_problem, state_prep=state_prep),
         executor_name="qdk_sparse_state_simulator",

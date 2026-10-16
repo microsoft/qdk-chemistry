@@ -309,7 +309,7 @@ Nested algorithm configuration (via ``qpe_circuit_builder``):
 See :doc:`qpe_circuit_builder` for configuring:
 
 - ``num_queries`` — Number of walk queries :math:`p`; need not be a power of two
-- ``unitary_builder`` — An LCU or SOSSA block encoding; the schedule completes the walk, so ``quantum_walk`` is optional. The unary path has no Trotter equivalent
+- ``unitary_builder`` → ``quantum_walk`` — Required; the unary path has no Trotter equivalent
 - ``circuit_mapper`` — Circuit synthesis strategy, which must expose the block encoding's ancilla reflection
 
 .. tab:: Python API (Unary-iteration configuration)

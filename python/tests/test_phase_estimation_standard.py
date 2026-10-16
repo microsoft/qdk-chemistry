@@ -293,11 +293,11 @@ def test_standard_phase_estimation_extracts_phase_and_energy(
 def test_standard_phase_estimation_shares_the_gradient_with_the_state_preparation(
     two_qubit_phase_problem: PhaseEstimationProblem,
 ) -> None:
-    """A QROM state preparation rotates through the gradient QPE prepares, though no controlled unitary does."""
+    """Standard QPE hands its gradient to a QROM state preparation."""
     state_prep = QROMStatePreparation(rotation_bit_precision=8, allocate_phase_gradient=False).run(
         create_dense_wavefunction([1.0 / np.sqrt(2.0), 0.0, 0.0, 1.0 / np.sqrt(2.0)])
     )
-    # qdk 1.32.3 panics lowering this QROM to QIR (Std `Unlookup` leaves a constant compare), so interpret it instead.
+    # qdk 1.32.3 cannot lower this QROM to QIR, so use the sparse simulator.
     result = _run_standard(
         replace(two_qubit_phase_problem, state_prep=state_prep), executor_name="qdk_sparse_state_simulator"
     )
