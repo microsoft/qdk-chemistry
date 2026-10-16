@@ -2,6 +2,9 @@
 // Licensed under the MIT License. See LICENSE.txt in the project root for
 // license information.
 
+#include <algorithm>
+#include <array>
+#include <cmath>
 #include <cstdint>
 #include <cstring>
 #include <fstream>
@@ -24,10 +27,16 @@ namespace qdk::chemistry::data {
 // the v1 sparse constructors can delegate to the generic
 // @ref make_spin_diagonal_rank4_sbsm helper.
 static SparseMapBlock<4, double> to_sparse_block(
-    SparseHamiltonianContainer::TwoBodyMap map) {
+    SparseHamiltonianContainer::TwoBodyMap map, std::size_t num_orbitals) {
   SparseMapBlock<4, double> block;
   for (const auto& [idx, val] : map) {
     auto [p, q, r, s] = idx;
+    if (p >= num_orbitals || q >= num_orbitals || r >= num_orbitals ||
+        s >= num_orbitals ||
+        num_orbitals > std::numeric_limits<unsigned>::max()) {
+      throw std::invalid_argument(
+          "Sparse two-body index is outside the orbital range");
+    }
     block[{static_cast<unsigned>(p), static_cast<unsigned>(q),
            static_cast<unsigned>(r), static_cast<unsigned>(s)}] = val;
   }
@@ -35,6 +44,25 @@ static SparseMapBlock<4, double> to_sparse_block(
 }
 
 namespace detail {
+static void validate_sparse_orbital_count(std::int64_t n) {
+  const auto max_elements = std::vector<double>().max_size();
+  if (n < 0 || n > std::numeric_limits<int>::max() ||
+      (n != 0 && static_cast<std::uint64_t>(n) >
+                     max_elements / static_cast<std::uint64_t>(n))) {
+    throw std::invalid_argument("Invalid sparse Hamiltonian orbital count");
+  }
+}
+
+static Eigen::MatrixXd dense_sparse_one_body(
+    const Eigen::SparseMatrix<double>& integrals) {
+  validate_sparse_orbital_count(integrals.rows());
+  if (integrals.rows() != integrals.cols()) {
+    throw std::invalid_argument(
+        "Sparse one-body integrals must be a square matrix");
+  }
+  return Eigen::MatrixXd(integrals);
+}
+
 /**
  * @brief Pack two 32-bit unsigned indices into a single double via bitwise
  *        reinterpretation.
@@ -76,7 +104,8 @@ SparseHamiltonianContainer::SparseHamiltonianContainer(
     : SparseHamiltonianContainer(
           Eigen::SparseMatrix<double>(one_body_integrals),
           make_spin_diagonal_rank4_sbsm<double>(
-              to_sparse_block(std::move(two_body_integrals)),
+              to_sparse_block(std::move(two_body_integrals),
+                              one_body_integrals.rows()),
               static_cast<std::size_t>(one_body_integrals.rows())),
           core_energy, type) {}
 
@@ -95,7 +124,8 @@ SparseHamiltonianContainer::SparseHamiltonianContainer(
           make_spin_diagonal_rank4_sbsm<double>(
               to_sparse_block(
                   _to_map(two_body_integrals,
-                          static_cast<std::size_t>(one_body_integrals.rows()))),
+                          static_cast<std::size_t>(one_body_integrals.rows())),
+                  one_body_integrals.rows()),
               static_cast<std::size_t>(one_body_integrals.rows())),
           core_energy, type) {}
 
@@ -110,8 +140,9 @@ SparseHamiltonianContainer::SparseHamiltonianContainer(
     std::shared_ptr<const SymmetryBlockedSparseMap<4>> two_body,
     double core_energy, HamiltonianType type)
     : HamiltonianContainer(
-          make_spin_diagonal_rank2_sbt(Eigen::MatrixXd(one_body_integrals),
-                                       Eigen::MatrixXd{}, /*restricted=*/true),
+          make_spin_diagonal_rank2_sbt(
+              detail::dense_sparse_one_body(one_body_integrals),
+              Eigen::MatrixXd{}, /*restricted=*/true),
           _make_orbitals(static_cast<int>(one_body_integrals.rows())),
           core_energy,
           make_spin_diagonal_rank2_sbt(
@@ -120,7 +151,18 @@ SparseHamiltonianContainer::SparseHamiltonianContainer(
               Eigen::MatrixXd{}),
           type),
       _one_body_sparse(std::move(one_body_integrals)),
-      _two_body_sparse(std::move(two_body)) {}
+      _two_body_sparse(std::move(two_body)) {
+  if (_two_body_sparse) {
+    for (const auto& slot : _two_body_sparse->extents()) {
+      for (const auto& [label, extent] : slot) {
+        if (extent != static_cast<std::size_t>(_one_body_sparse.rows())) {
+          throw std::invalid_argument(
+              "Sparse two-body extents must match the one-body orbital count");
+        }
+      }
+    }
+  }
+}
 
 std::unique_ptr<HamiltonianContainer> SparseHamiltonianContainer::clone()
     const {
@@ -236,13 +278,41 @@ SparseHamiltonianContainer::from_json(const nlohmann::json& j) {
     }
 
     // Load one-body integrals (sparse triplets)
-    int n = j.value("num_orbitals", 0);
+    const bool has_one_body = j.value("has_one_body_integrals", false);
+    auto count = j.value("num_orbitals", nlohmann::json(0));
+    if (!j.contains("num_orbitals") && has_one_body &&
+        !j.contains("one_body_integrals_alpha_sparse") &&
+        j.contains("one_body_integrals_alpha")) {
+      const auto& dense = j.at("one_body_integrals_alpha");
+      if (!dense.is_array()) {
+        throw std::invalid_argument("Invalid dense one-body matrix");
+      }
+      count = dense.size();
+    }
+    if (!count.is_number_integer() || count < 0 ||
+        count > std::numeric_limits<int>::max()) {
+      throw std::invalid_argument("Invalid sparse Hamiltonian orbital count");
+    }
+    const int n = count.get<int>();
+    detail::validate_sparse_orbital_count(n);
     Eigen::SparseMatrix<double> one_body_sparse(n, n);
-    if (j.value("has_one_body_integrals", false)) {
+    if (has_one_body) {
       // Prefer sparse format; fall back to dense for backward compatibility
       if (j.contains("one_body_integrals_alpha_sparse")) {
+        const auto& entries = j.at("one_body_integrals_alpha_sparse");
+        if (!entries.is_array() ||
+            entries.size() >
+                static_cast<std::size_t>(std::numeric_limits<int>::max())) {
+          throw std::invalid_argument("Invalid sparse one-body triplet list");
+        }
         std::vector<Eigen::Triplet<double>> triplets;
-        for (const auto& entry : j["one_body_integrals_alpha_sparse"]) {
+        for (const auto& entry : entries) {
+          if (!entry.is_array() || entry.size() != 3 ||
+              !entry[0].is_number_integer() || !entry[1].is_number_integer() ||
+              entry[0] < 0 || entry[0] >= n || entry[1] < 0 || entry[1] >= n) {
+            throw std::invalid_argument(
+                "Invalid sparse one-body triplet or orbital index");
+          }
           int row = entry[0].get<int>();
           int col = entry[1].get<int>();
           double val = entry[2].get<double>();
@@ -252,8 +322,18 @@ SparseHamiltonianContainer::from_json(const nlohmann::json& j) {
         one_body_sparse.makeCompressed();
       } else if (j.contains("one_body_integrals_alpha")) {
         // Backward compatibility: dense format
-        Eigen::MatrixXd one_body_dense =
-            json_to_matrix(j.at("one_body_integrals_alpha"));
+        const auto& dense = j.at("one_body_integrals_alpha");
+        if (!dense.is_array() || dense.size() != static_cast<std::size_t>(n)) {
+          throw std::invalid_argument(
+              "Dense one-body dimensions must match the orbital count");
+        }
+        for (const auto& row : dense) {
+          if (!row.is_array() || row.size() != static_cast<std::size_t>(n)) {
+            throw std::invalid_argument(
+                "Dense one-body dimensions must match the orbital count");
+          }
+        }
+        Eigen::MatrixXd one_body_dense = json_to_matrix(dense);
         one_body_sparse = _to_sparse(one_body_dense);
       }
     }
@@ -383,10 +463,19 @@ std::unique_ptr<SparseHamiltonianContainer>
 SparseHamiltonianContainer::from_hdf5(H5::Group& group) {
   QDK_LOG_TRACE_ENTERING();
   try {
+    auto require_scalar = [](const H5::Attribute& attribute) {
+      if (attribute.getSpace().getSimpleExtentType() != H5S_SCALAR) {
+        throw std::runtime_error(
+            "Sparse Hamiltonian attribute must be scalar: " +
+            attribute.getName());
+      }
+    };
+
     // Validate version
     if (group.attrExists("version")) {
       H5::StrType string_type(H5::PredType::C_S1, H5T_VARIABLE);
       H5::Attribute version_attr = group.openAttribute("version");
+      require_scalar(version_attr);
       std::string version_str;
       version_attr.read(string_type, version_str);
       validate_serialization_version(SERIALIZATION_VERSION, version_str);
@@ -398,6 +487,7 @@ SparseHamiltonianContainer::from_hdf5(H5::Group& group) {
     double core_energy = 0.0;
     if (metadata_group.attrExists("core_energy")) {
       H5::Attribute ce_attr = metadata_group.openAttribute("core_energy");
+      require_scalar(ce_attr);
       ce_attr.read(H5::PredType::NATIVE_DOUBLE, &core_energy);
     }
 
@@ -405,6 +495,7 @@ SparseHamiltonianContainer::from_hdf5(H5::Group& group) {
     if (metadata_group.attrExists("type")) {
       H5::StrType string_type(H5::PredType::C_S1, H5T_VARIABLE);
       H5::Attribute type_attr = metadata_group.openAttribute("type");
+      require_scalar(type_attr);
       std::string type_str;
       type_attr.read(string_type, type_str);
       if (type_str == "NonHermitian") {
@@ -421,35 +512,77 @@ SparseHamiltonianContainer::from_hdf5(H5::Group& group) {
     int n_orb = 0;
     if (h1_dataset.attrExists("num_orbitals")) {
       H5::Attribute norb_attr = h1_dataset.openAttribute("num_orbitals");
-      norb_attr.read(H5::PredType::NATIVE_INT, &n_orb);
+      require_scalar(norb_attr);
+      if (norb_attr.getTypeClass() != H5T_INTEGER) {
+        throw std::runtime_error(
+            "Sparse Hamiltonian orbital count must be an integer");
+      }
+      long long count = 0;
+      norb_attr.read(H5::PredType::NATIVE_LLONG, &count);
+      detail::validate_sparse_orbital_count(count);
+      n_orb = static_cast<int>(count);
     }
+    detail::validate_sparse_orbital_count(n_orb);
 
-    H5::DataSpace h1_space = h1_dataset.getSpace();
-    hsize_t h1_dims[2];
-    h1_space.getSimpleExtentDims(h1_dims);
-    auto nnz = h1_dims[0];
-    auto ncols = h1_dims[1];
+    auto read_sparse_dataset = [](const H5::DataSet& dataset,
+                                  hsize_t packed_width, hsize_t legacy_width) {
+      const auto space = dataset.getSpace();
+      if (space.getSimpleExtentNdims() != 2) {
+        throw std::runtime_error("Sparse integral dataset must have rank 2");
+      }
+      std::array<hsize_t, 2> dims{};
+      space.getSimpleExtentDims(dims.data());
+      if (dims[1] != packed_width && dims[1] != legacy_width) {
+        throw std::runtime_error("Invalid sparse integral dataset width");
+      }
+      // Packed rows hold index bit patterns, which survive only when the
+      // stored type is the native double the writer used.
+      if (dims[1] == packed_width &&
+          !(dataset.getDataType() == H5::PredType::NATIVE_DOUBLE)) {
+        throw std::runtime_error(
+            "Packed sparse integral dataset must use native double precision");
+      }
+      std::vector<double> buffer;
+      if (dims[0] > buffer.max_size() / dims[1]) {
+        throw std::runtime_error("Sparse integral dataset is too large");
+      }
+      buffer.resize(static_cast<std::size_t>(dims[0] * dims[1]));
+      if (!buffer.empty()) {
+        dataset.read(buffer.data(), H5::PredType::NATIVE_DOUBLE);
+      }
+      return std::make_pair(std::move(buffer), dims[1]);
+    };
+
+    auto read_index = [n_orb](double index) {
+      if (!std::isfinite(index) || index < 0 || index >= n_orb ||
+          std::floor(index) != index) {
+        throw std::runtime_error(
+            "Sparse integral index is outside the orbital range");
+      }
+      return static_cast<int>(index);
+    };
+
+    auto [h1_buffer, ncols] = read_sparse_dataset(h1_dataset, 2, 3);
+    const auto nnz = h1_buffer.size() / ncols;
+    if (nnz > static_cast<std::size_t>(std::numeric_limits<int>::max())) {
+      throw std::runtime_error("Too many sparse one-body entries");
+    }
 
     std::vector<Eigen::Triplet<double>> triplets;
     triplets.reserve(nnz);
 
     if (ncols == 2) {
       // Packed format: [packed(row,col), value]
-      std::vector<double> h1_buffer(nnz * 2);
-      h1_dataset.read(h1_buffer.data(), H5::PredType::NATIVE_DOUBLE);
       for (hsize_t i = 0; i < nnz; ++i) {
         auto [row, col] = detail::unpack_indices(h1_buffer[i * 2 + 0]);
         double val = h1_buffer[i * 2 + 1];
-        triplets.emplace_back(static_cast<int>(row), static_cast<int>(col),
-                              val);
+        triplets.emplace_back(read_index(row), read_index(col), val);
       }
     } else {
       // Legacy format: [row, col, value] as doubles
-      std::vector<double> h1_buffer(nnz * 3);
-      h1_dataset.read(h1_buffer.data(), H5::PredType::NATIVE_DOUBLE);
       for (hsize_t i = 0; i < nnz; ++i) {
-        int row = static_cast<int>(h1_buffer[i * 3 + 0]);
-        int col = static_cast<int>(h1_buffer[i * 3 + 1]);
+        int row = read_index(h1_buffer[i * 3 + 0]);
+        int col = read_index(h1_buffer[i * 3 + 1]);
         double val = h1_buffer[i * 3 + 2];
         triplets.emplace_back(row, col, val);
       }
@@ -460,40 +593,31 @@ SparseHamiltonianContainer::from_hdf5(H5::Group& group) {
 
     // Load sparse two-body integrals (if present)
     TwoBodyMap two_body_map;
-    try {
+    if (group.nameExists("two_body_integrals_sparse")) {
       H5::DataSet dataset = group.openDataSet("two_body_integrals_sparse");
-      H5::DataSpace dataspace = dataset.getSpace();
-      hsize_t dims[2];
-      dataspace.getSimpleExtentDims(dims);
-      auto n_entries = dims[0];
-      auto ncols = dims[1];
+      auto [buffer, width] = read_sparse_dataset(dataset, 3, 5);
+      const auto n_entries = buffer.size() / width;
 
-      if (ncols == 3) {
+      if (width == 3) {
         // Packed format: [packed(p,q), packed(r,s), value]
-        std::vector<double> buffer(n_entries * 3);
-        dataset.read(buffer.data(), H5::PredType::NATIVE_DOUBLE);
         for (hsize_t row = 0; row < n_entries; ++row) {
           auto [p, q] = detail::unpack_indices(buffer[row * 3 + 0]);
           auto [r, s] = detail::unpack_indices(buffer[row * 3 + 1]);
           double val = buffer[row * 3 + 2];
-          two_body_map[{static_cast<int>(p), static_cast<int>(q),
-                        static_cast<int>(r), static_cast<int>(s)}] = val;
+          two_body_map[{read_index(p), read_index(q), read_index(r),
+                        read_index(s)}] = val;
         }
       } else {
         // Legacy format: [p, q, r, s, value] as doubles
-        std::vector<double> buffer(n_entries * 5);
-        dataset.read(buffer.data(), H5::PredType::NATIVE_DOUBLE);
         for (hsize_t row = 0; row < n_entries; ++row) {
-          int p = static_cast<int>(buffer[row * 5 + 0]);
-          int q = static_cast<int>(buffer[row * 5 + 1]);
-          int r = static_cast<int>(buffer[row * 5 + 2]);
-          int s = static_cast<int>(buffer[row * 5 + 3]);
+          int p = read_index(buffer[row * 5 + 0]);
+          int q = read_index(buffer[row * 5 + 1]);
+          int r = read_index(buffer[row * 5 + 2]);
+          int s = read_index(buffer[row * 5 + 3]);
           double val = buffer[row * 5 + 4];
           two_body_map[{p, q, r, s}] = val;
         }
       }
-    } catch (const H5::Exception&) {
-      // No two-body dataset — (e.g. Hückel model)
     }
 
     if (two_body_map.empty()) {
@@ -601,10 +725,20 @@ double SparseHamiltonianContainer::one_body_element(int i, int j) const {
 
 void SparseHamiltonianContainer::_materialize_dense_two_body() const {
   size_t n = _orbitals->get_num_molecular_orbitals();
+  size_t size = 1;
+  const auto max_elements = std::min(
+      std::vector<double>().max_size(),
+      static_cast<std::size_t>(std::numeric_limits<Eigen::Index>::max()));
+  for (int slot = 0; slot < 4; ++slot) {
+    if (n != 0 && size > max_elements / n) {
+      throw std::length_error("Dense two-body integrals are too large");
+    }
+    size *= n;
+  }
   size_t n2 = n * n;
   size_t n3 = n2 * n;
   _two_body_dense_cache =
-      Eigen::VectorXd::Zero(static_cast<Eigen::Index>(n * n * n * n));
+      Eigen::VectorXd::Zero(static_cast<Eigen::Index>(size));
   if (_two_body_sparse) {
     for (const auto& [idx, val] : _two_body_sparse->block(
              {axes::alpha(), axes::alpha(), axes::alpha(), axes::alpha()})) {

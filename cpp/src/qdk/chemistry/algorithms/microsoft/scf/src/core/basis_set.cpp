@@ -16,6 +16,8 @@
 #include <iostream>
 #include <libint2.hpp>
 #include <nlohmann/json.hpp>
+#include <optional>
+#include <qdk/chemistry/utils/archive.hpp>
 #include <qdk/chemistry/utils/logger.hpp>
 #include <regex>
 #include <unordered_map>
@@ -257,46 +259,20 @@ BasisSet::BasisSet(std::shared_ptr<Molecule> mol, const std::string& path,
   normalized_path =
       std::regex_replace(normalized_path, std::regex("/"), "_sl_");
   std::filesystem::path bs_path(normalized_path);
+  std::optional<utils::ArchiveDirectory> archive;
   if (!std::filesystem::exists(bs_path)) {
-    bs_path = std::filesystem::temp_directory_path() / "qdk" / "chemistry" /
-              "basis" / (normalized_path + ".json");
     name = normalized_path;
+    const auto compressed_path = QDKChemistryConfig::get_resources_dir() /
+                                 "compressed" / (name + ".tar.gz");
+    // An unknown name falls through to the "not supported" error below.
+    if (std::filesystem::exists(compressed_path)) {
+      archive.emplace();
+      archive->extract(compressed_path);
+      bs_path =
+          archive->file(std::filesystem::path("basis") / (name + ".json"));
+    }
   } else {
     name = bs_path.stem().string();
-  }
-  if (!std::filesystem::exists(bs_path)) {
-    auto compressed_path = QDKChemistryConfig::get_resources_dir() /
-                           "compressed" / (name + ".tar.gz");
-    if (mpi::get_local_rank() == 0 &&
-        std::filesystem::exists(compressed_path)) {
-      auto odir = std::filesystem::temp_directory_path() / "qdk" / "chemistry";
-      if (!std::filesystem::exists(odir)) {
-        std::filesystem::create_directories(odir);
-      }
-      // On Windows, GNU tar (Git for Windows/MSYS) interprets paths with a
-      // colon as remote host:path and fails with "Cannot connect to C:". The
-      // --force-local flag disables that parsing. BSD tar (the System32 one)
-      // does not need or recognize it. Detect at runtime which tar is
-      // available.
-#ifdef _WIN32
-      static const bool tar_has_force_local =
-          (std::system("tar --force-local --version > nul 2>&1") == 0);
-      auto cmd =
-          fmt::format("{} -xzf \"{}\" --directory \"{}\"",
-                      tar_has_force_local ? "tar --force-local" : "tar",
-                      compressed_path.generic_string(), odir.generic_string());
-#else
-      auto cmd =
-          fmt::format("tar -xzf \"{}\" --directory \"{}\"",
-                      compressed_path.generic_string(), odir.generic_string());
-#endif
-      QDK_LOGGER().trace("Execute command: {}", cmd);
-      int return_code = std::system(cmd.c_str());
-      if (return_code != 0) {
-        QDK_LOGGER().error("command execution failed: {}", cmd);
-        exit(EXIT_FAILURE);
-      }
-    }
   }
 
 #ifdef QDK_CHEMISTRY_ENABLE_MPI

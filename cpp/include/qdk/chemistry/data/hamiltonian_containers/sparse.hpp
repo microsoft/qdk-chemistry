@@ -189,6 +189,10 @@ class SparseHamiltonianContainer : public HamiltonianContainer {
    * @brief Deserialize Hamiltonian data from HDF5 group
    * @param group HDF5 group to read data from
    * @return Unique pointer to Hamiltonian loaded from group
+   * @throws std::runtime_error if datasets have invalid ranks, widths, indices,
+   *         or non-scalar metadata. Packed and legacy sparse layouts are
+   * accepted.
+   * @throws std::invalid_argument if the orbital count is invalid.
    */
   static std::unique_ptr<SparseHamiltonianContainer> from_hdf5(
       H5::Group& group);
@@ -197,6 +201,8 @@ class SparseHamiltonianContainer : public HamiltonianContainer {
    * @brief Load Hamiltonian from JSON
    * @param j JSON object containing Hamiltonian data
    * @return Unique pointer to Hamiltonian loaded from JSON
+   * @throws std::invalid_argument if dimensions, triplets, or indices are
+   * invalid, or if one-body and two-body orbital extents disagree.
    */
   static std::unique_ptr<SparseHamiltonianContainer> from_json(
       const nlohmann::json& j);

@@ -4,6 +4,7 @@
 
 #include "scf/guess.h"
 
+#include <qdk/chemistry/scf/config.h>
 #include <qdk/chemistry/scf/core/types.h>
 
 #include <Eigen/Dense>
@@ -13,7 +14,10 @@
 #include <fstream>
 #include <iostream>
 #include <map>
+#include <optional>
+#include <qdk/chemistry/utils/archive.hpp>
 #include <qdk/chemistry/utils/logger.hpp>
+#include <system_error>
 #include <vector>
 
 #include "scf_algorithm/asahf.h"
@@ -22,23 +26,30 @@
 namespace qdk::chemistry::scf {
 void atom_guess(const BasisSet& obs, const Molecule& mol, double* D) {
   QDK_LOG_TRACE_ENTERING();
-  std::filesystem::path guess_chk(std::filesystem::temp_directory_path() /
-                                  "qdk" / "chemistry");
-  if (obs.pure) {
-    guess_chk = guess_chk / "guess" / (obs.name + "_pure");
-  } else {
-    guess_chk = guess_chk / "guess" / (obs.name + "_cart");
+  // Precomputed atomic guesses ship in the basis archive next to the basis
+  // JSON. Names that are not a single path component never select an archive.
+  const auto guess_name = obs.name + (obs.pure ? "_pure" : "_cart");
+  const std::filesystem::path name(obs.name);
+  const auto archive_path = QDKChemistryConfig::get_resources_dir() /
+                            "compressed" / (obs.name + ".tar.gz");
+  std::error_code error;
+  std::optional<utils::ArchiveDirectory> archive;
+  std::optional<std::filesystem::path> guess_chk;
+  if (!obs.name.empty() && name.filename() == name &&
+      std::filesystem::is_regular_file(archive_path, error)) {
+    archive.emplace();
+    archive->extract(archive_path);
+    guess_chk = archive->find(std::filesystem::path("guess") / guess_name);
   }
 
   int N = obs.num_atomic_orbitals;
   RowMajorMatrix nD = RowMajorMatrix::Zero(N, N);
-  if (!std::filesystem::exists(guess_chk)) {
-    QDK_LOGGER().info("Guess file {} not found, generating atomic guesses",
-                      guess_chk.string());
-    get_atom_guess(obs, mol, nD);
-  } else {
-    std::map<int, RowMajorMatrix> atom_dm;
-    std::ifstream fin(guess_chk);
+  auto shell_num_atomic_orbitals = [&](int am) {
+    return obs.pure ? 2 * am + 1 : (am + 1) * (am + 2) / 2;
+  };
+  std::map<int, RowMajorMatrix> atom_dm;
+  if (guess_chk) {
+    std::ifstream fin(*guess_chk);
     int atomic_number;
     while (fin >> atomic_number) {
       int n;
@@ -52,12 +63,41 @@ void atom_guess(const BasisSet& obs, const Molecule& mol, double* D) {
       atom_dm[atomic_number] = d;
     }
 
-    RowMajorMatrix tD = RowMajorMatrix::Zero(N, N);
-    for (size_t i = 0, p = 0; i < mol.n_atoms; i++) {
+    // The guess file is selected by basis name only, so its per-atom blocks
+    // must match this basis before they are placed into the density.
+    std::vector<int> atom_size(mol.n_atoms, 0);
+    bool matches = true;
+    for (const auto& shell : obs.shells) {
+      if (shell.atom_index >= mol.n_atoms) {
+        matches = false;
+        break;
+      }
+      atom_size[shell.atom_index] +=
+          shell_num_atomic_orbitals(shell.angular_momentum);
+    }
+    for (size_t i = 0; matches && i < mol.n_atoms; i++) {
       int z = mol.atomic_nums[i];
       VERIFY_INPUT(atom_dm.count(z),
                    fmt::format("No basis for Atom(Z={}) in {}", z, obs.name));
-      const auto& d = atom_dm[z];
+      matches = atom_dm[z].rows() == atom_size[i];
+    }
+    if (!matches) {
+      QDK_LOGGER().info(
+          "Guess file {} does not match basis {}, generating atomic guesses",
+          guess_name, obs.name);
+      guess_chk.reset();
+    }
+  } else {
+    QDK_LOGGER().info("Guess file {} not found, generating atomic guesses",
+                      guess_name);
+  }
+
+  if (!guess_chk) {
+    get_atom_guess(obs, mol, nD);
+  } else {
+    RowMajorMatrix tD = RowMajorMatrix::Zero(N, N);
+    for (size_t i = 0, p = 0; i < mol.n_atoms; i++) {
+      const auto& d = atom_dm[mol.atomic_nums[i]];
       tD.block(p, p, d.rows(), d.cols()) = d;
       p += d.rows();
     }
@@ -74,9 +114,6 @@ void atom_guess(const BasisSet& obs, const Molecule& mol, double* D) {
                         : a.exponents[0] > b.exponents[0]);
     });
 
-    auto shell_num_atomic_orbitals = [&](int am) {
-      return obs.pure ? 2 * am + 1 : (am + 1) * (am + 2) / 2;
-    };
     std::vector<int> sh2bf;
     for (size_t i = 0, p = 0; i < obs.shells.size(); i++) {
       sh2bf.push_back(p);

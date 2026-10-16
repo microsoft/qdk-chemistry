@@ -10,6 +10,7 @@
 #include <map>
 #include <qdk/chemistry/data/basis_set.hpp>
 #include <qdk/chemistry/data/structure.hpp>
+#include <qdk/chemistry/utils/archive.hpp>
 #include <qdk/chemistry/utils/logger.hpp>
 #include <regex>
 #include <set>
@@ -40,73 +41,6 @@ std::string denormalize_basis_set_name(const std::string& normalized) {
   name = std::regex_replace(name, std::regex("_sl_"), "/");
   name = std::regex_replace(name, std::regex("_pl_"), "+");
   return name;
-}
-
-/**
- * @brief Unpack the basis set archive and return the path to the temporary
- * directory containing the extracted files.
- * @param basis_set_name Name of the basis set to unpack.
- * @return Path to the temporary directory with extracted files.
- */
-std::filesystem::path unpack_basis_set_archive(std::string& basis_set_name) {
-  // Normalize the basis set name for filesystem operations
-  std::string normalized_name = normalize_basis_set_name(basis_set_name);
-  std::filesystem::path file_path =
-      qdk::chemistry::scf::QDKChemistryConfig::get_resources_dir() /
-      "compressed" / (normalized_name + ".tar.gz");
-
-  if (!std::filesystem::exists(file_path)) {
-    throw std::invalid_argument("Basis set file does not exist: " +
-                                file_path.string());
-  }
-
-  // create temporary directory to extract the tar.gz file
-  std::filesystem::path temp_dir =
-      std::filesystem::temp_directory_path() / "qdk" / "chemistry";
-  if (!std::filesystem::exists(temp_dir)) {
-    std::filesystem::create_directories(temp_dir);
-  }
-
-  // unpack the tar.gz file
-  // On Windows, GNU tar needs --force-local so it doesn't treat "C:/..." as a
-  // host:path. BSD tar (System32\tar.exe) rejects the flag, detect at runtime.
-#ifdef _WIN32
-  static const bool tar_has_force_local =
-      (std::system("tar --force-local --version > nul 2>&1") == 0);
-  const std::string tar_cmd =
-      tar_has_force_local ? "tar --force-local -xzf " : "tar -xzf ";
-#else
-  const std::string tar_cmd = "tar -xzf ";
-#endif
-  auto cmd = tar_cmd + "\"" + file_path.generic_string() + "\" --directory \"" +
-             temp_dir.generic_string() + "\"";
-  int return_code = std::system(cmd.c_str());
-  if (return_code != 0) {
-    throw std::runtime_error("command execution failed: " + cmd);
-  }
-
-  return temp_dir;
-}
-
-/**
- * @brief Get the correct basis set JSON file path after unpacking the archive.
- * @param basis_set_name Name of the basis set.
- * @return Path to the basis set JSON file.
- */
-std::filesystem::path get_correct_basis_set_file(std::string& basis_set_name) {
-  // unpack basis set archive
-  std::filesystem::path temp_dir = unpack_basis_set_archive(basis_set_name);
-
-  // Normalize the basis set name for the JSON file path
-  std::string normalized_name = normalize_basis_set_name(basis_set_name);
-  // return path to the extracted JSON file
-  std::filesystem::path json_file_path =
-      temp_dir / "basis" / (normalized_name + ".json");
-  if (!std::filesystem::exists(json_file_path)) {
-    throw std::invalid_argument("Basis set JSON file does not exist: " +
-                                json_file_path.string());
-  }
-  return json_file_path;
 }
 
 /**
@@ -210,10 +144,13 @@ std::tuple<std::vector<Shell>, std::vector<Shell>, size_t>
 get_basis_for_nuclear_charge(const double nuclear_charge,
                              std::string basis_set_name,
                              const size_t atom_index) {
-  std::filesystem::path json_file_path =
-      get_correct_basis_set_file(basis_set_name);
-
-  std::ifstream fin(json_file_path);
+  const auto normalized_name = normalize_basis_set_name(basis_set_name);
+  const auto file_path = scf::QDKChemistryConfig::get_resources_dir() /
+                         "compressed" / (normalized_name + ".tar.gz");
+  utils::ArchiveDirectory archive;
+  archive.extract(file_path);
+  std::ifstream fin(archive.file(std::filesystem::path("basis") /
+                                 (normalized_name + ".json")));
   auto data = nlohmann::json::parse(fin);
 
   // extract basis set information for each nuclear charge

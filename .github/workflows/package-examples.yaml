@@ -14,12 +14,16 @@ jobs:
 
     steps:
     - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      with:
+        persist-credentials: false
 
     - name: Create zip
+      env:
+        RELEASE_TAG: ${{ github.event.release.tag_name }}
+        REF_NAME: ${{ github.ref_name }}
       run: |
         mkdir -p dist
-        VERSION="${{ github.event.release.tag_name }}"
-        VERSION="${VERSION:-${{ github.ref_name }}}"
+        VERSION="${RELEASE_TAG:-$REF_NAME}"
         VERSION="${VERSION//\//-}"
         zip -r "dist/qdk-chemistry-examples-${VERSION}.zip" examples
 
@@ -32,11 +36,12 @@ jobs:
     - name: Upload release asset
       if: github.event_name == 'release'
       run: |
-        VERSION="${{ github.event.release.tag_name }}"
+        VERSION="$RELEASE_TAG"
         VERSION="${VERSION//\//-}"
         gh release upload \
-          "${{ github.event.release.tag_name }}" \
-          "dist/qdk-chemistry-examples-${VERSION}.zip" \
-          --clobber
+          --clobber -- \
+          "$RELEASE_TAG" \
+          "dist/qdk-chemistry-examples-${VERSION}.zip"
       env:
+        RELEASE_TAG: ${{ github.event.release.tag_name }}
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

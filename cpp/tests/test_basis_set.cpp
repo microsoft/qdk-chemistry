@@ -3,6 +3,7 @@
 // license information.
 
 #include <gtest/gtest.h>
+#include <qdk/chemistry/scf/config.h>
 
 #include <Eigen/Dense>
 #include <cmath>
@@ -12,6 +13,7 @@
 #include <qdk/chemistry/algorithms/scf.hpp>
 #include <qdk/chemistry/data/basis_set.hpp>
 #include <qdk/chemistry/data/structure.hpp>
+#include <qdk/chemistry/utils/archive.hpp>
 #include <stdexcept>
 #include <string>
 #include <vector>
@@ -1867,6 +1869,78 @@ TEST_F(BasisSetTest, BasisSetNameNormalization) {
   EXPECT_EQ("sto-3g", detail::denormalize_basis_set_name("sto-3g"));
   EXPECT_EQ("def2-TZVP", detail::normalize_basis_set_name("def2-TZVP"));
   EXPECT_EQ("def2-TZVP", detail::denormalize_basis_set_name("def2-TZVP"));
+}
+
+TEST_F(BasisSetTest, BasisArchiveDirectoriesArePrivateAndScoped) {
+  const auto source =
+      qdk::chemistry::scf::QDKChemistryConfig::get_resources_dir() /
+      "compressed" / "sto-3g.tar.gz";
+  std::filesystem::path first_file;
+  std::filesystem::path second_file;
+  {
+    qdk::chemistry::utils::ArchiveDirectory first;
+    qdk::chemistry::utils::ArchiveDirectory second;
+    first.extract(source);
+    second.extract(source);
+    first_file = first.file("basis/sto-3g.json");
+    second_file = second.file("basis/sto-3g.json");
+    EXPECT_NE(first_file, second_file);
+    EXPECT_TRUE(std::filesystem::is_regular_file(first_file));
+    EXPECT_TRUE(std::filesystem::is_regular_file(second_file));
+#ifndef _WIN32
+    const auto root = first_file.parent_path().parent_path().parent_path();
+    const auto permissions = std::filesystem::status(root).permissions();
+    EXPECT_EQ(permissions & (std::filesystem::perms::group_all |
+                             std::filesystem::perms::others_all),
+              std::filesystem::perms::none);
+#endif
+  }
+  EXPECT_FALSE(std::filesystem::exists(first_file));
+  EXPECT_FALSE(std::filesystem::exists(second_file));
+}
+
+TEST_F(BasisSetTest, BasisArchivePathIsNotShellCode) {
+  const auto source =
+      qdk::chemistry::scf::QDKChemistryConfig::get_resources_dir() /
+      "compressed" / "sto-3g.tar.gz";
+  qdk::chemistry::utils::ArchiveDirectory workspace;
+  workspace.extract(source);
+  const auto expected = workspace.file("basis/sto-3g.json");
+  std::vector<std::string> names{
+      "literal $(printf unused) %USERPROFILE% ; & ' name.tar.gz"};
+#ifndef _WIN32
+  names.emplace_back("literal:archive.tar.gz");
+#endif
+  for (const auto& name : names) {
+    const auto archive = expected.parent_path().parent_path() / name;
+    std::filesystem::copy_file(source, archive);
+
+    qdk::chemistry::utils::ArchiveDirectory extracted;
+    extracted.extract(archive);
+    std::ifstream expected_stream(expected);
+    std::ifstream actual_stream(extracted.file("basis/sto-3g.json"));
+    EXPECT_EQ(nlohmann::json::parse(expected_stream),
+              nlohmann::json::parse(actual_stream));
+  }
+}
+
+TEST_F(BasisSetTest, BasisArchiveRejectsExternalSymlinks) {
+  const auto source =
+      qdk::chemistry::scf::QDKChemistryConfig::get_resources_dir() /
+      "compressed" / "sto-3g.tar.gz";
+  qdk::chemistry::utils::ArchiveDirectory first;
+  qdk::chemistry::utils::ArchiveDirectory second;
+  first.extract(source);
+  second.extract(source);
+  const auto first_file = first.file("basis/sto-3g.json");
+  const auto second_file = second.file("basis/sto-3g.json");
+  std::error_code error;
+  std::filesystem::create_symlink(
+      second_file, first_file.parent_path() / "redirect.json", error);
+  if (error) {
+    GTEST_SKIP() << "Symlink creation is unavailable: " << error.message();
+  }
+  EXPECT_THROW(first.file("basis/redirect.json"), std::invalid_argument);
 }
 
 TEST_F(BasisSetTest, DataTypeName) {
