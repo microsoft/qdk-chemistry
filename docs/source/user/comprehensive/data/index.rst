@@ -109,6 +109,7 @@ LayeredPartition
 
 :class:`~qdk_chemistry.data.LayeredPartition` stores a two-level hierarchy: groups contain parallelisable layers, and each layer contains term indices.
 It is suitable for Trotter-style decompositions where the outer level controls Strang/Suzuki splitting order and each inner layer groups operators with disjoint qubit supports that can be applied simultaneously.
+It can also drive measurement grouping: :class:`~qdk_chemistry.algorithms.QdkExpectationEstimator` measures each qubit-wise commuting group in one circuit and other groups layer by layer.
 
 The ``groups`` field is a nested tuple: ``(((idx0, idx1), (idx2,)), ...)``.
 The outer level is groups, the middle level is layers within a group, and the innermost level is term indices.
