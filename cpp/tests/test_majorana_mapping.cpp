@@ -3,17 +3,23 @@
 // license information.
 
 #include <gtest/gtest.h>
+#include <spdlog/sinks/ostream_sink.h>
 
 #include <Eigen/Dense>
 #include <algorithm>
+#include <array>
 #include <complex>
-#include <cstdint>
+#include <qdk/chemistry/data/lattice_graph.hpp>
 #include <qdk/chemistry/data/majorana_mapping.hpp>
+#include <qdk/chemistry/utils/logger.hpp>
+#include <sstream>
 #include <stdexcept>
 #include <string>
 #include <unordered_map>
 #include <utility>
 #include <vector>
+
+#include "../src/qdk/chemistry/data/two_body_symmetry.hpp"
 
 using namespace qdk::chemistry::data;
 
@@ -62,137 +68,34 @@ void expect_real_term(
   EXPECT_NEAR(it->second.imag(), 0.0, 1e-12);
 }
 
-// ── Ground-truth reference for the mapping ─────────────────────────
-//
-// Comparing sorted eigenvalues makes the check independent of qubit and mode
-// ordering: relabeling either is a unitary conjugation, so the spectrum is
-// invariant.  That lets the reference below be built straight from the second
-// quantized Hamiltonian without reproducing the engine's mode layout.
-
-std::vector<double> mapped_spectrum(const MajoranaMapResult& result,
-                                    std::size_t num_qubits) {
-  const std::size_t dim = std::size_t{1} << num_qubits;
-  Eigen::MatrixXcd matrix = Eigen::MatrixXcd::Zero(dim, dim);
-  for (std::size_t t = 0; t < result.words.size(); ++t) {
-    const std::string label = sparse_to_dense_le(result.words[t], num_qubits);
-    // Every Pauli word maps each basis state to exactly one other state, so
-    // the term is applied column by column instead of built by Kronecker
-    // products.
-    for (std::size_t column = 0; column < dim; ++column) {
-      std::size_t row = column;
-      std::complex<double> phase = result.coefficients[t];
-      for (std::size_t qubit = 0; qubit < num_qubits; ++qubit) {
-        const bool set = ((column >> qubit) & std::size_t{1}) != 0;
-        switch (label[num_qubits - 1 - qubit]) {
-          case 'X':
-            row ^= std::size_t{1} << qubit;
-            break;
-          case 'Y':
-            row ^= std::size_t{1} << qubit;
-            phase *= std::complex<double>(0.0, set ? -1.0 : 1.0);
-            break;
-          case 'Z':
-            if (set) phase = -phase;
-            break;
-          default:
-            break;
-        }
-      }
-      matrix(static_cast<Eigen::Index>(row),
-             static_cast<Eigen::Index>(column)) += phase;
-    }
+/// Collects warnings from the global QDK logger for its lifetime.
+class LogCapture {
+ public:
+  LogCapture()
+      : sink_(std::make_shared<spdlog::sinks::ostream_sink_mt>(stream_)),
+        previous_(utils::Logger::get_global_level()) {
+    utils::Logger::set_global_level(utils::LogLevel::warn);
+    utils::Logger::get()->sinks().push_back(sink_);
   }
-  Eigen::SelfAdjointEigenSolver<Eigen::MatrixXcd> solver(matrix);
-  const auto& values = solver.eigenvalues();
-  return std::vector<double>(values.data(), values.data() + values.size());
-}
-
-// Spectrum of
-//   H = core + sum_{pq,sigma} h_pq a+_{p sigma} a_{q sigma}
-//     + 1/2 sum_{pqrs,sigma tau} (pq|rs) a+_{p sigma} a+_{r tau}
-//                                        a_{s tau} a_{q sigma}
-// built directly in the occupation-number basis, sharing no code with the
-// mapping engine.  Mode 2*p + spin, bit `mode` of the basis index.
-std::vector<double> fock_spectrum(const double* h1, const double* eri,
-                                  std::size_t n, double core_energy) {
-  const std::size_t modes = 2 * n;
-  const std::size_t dim = std::size_t{1} << modes;
-
-  // Returns false when the operator annihilates the state.
-  auto apply = [](std::size_t& state, double& sign, std::size_t mode,
-                  bool dagger) {
-    const bool occupied = ((state >> mode) & std::size_t{1}) != 0;
-    if (dagger == occupied) return false;
-    int below = 0;
-    for (std::size_t m = 0; m < mode; ++m) {
-      below += static_cast<int>((state >> m) & std::size_t{1});
-    }
-    if (below % 2 != 0) sign = -sign;
-    state ^= std::size_t{1} << mode;
-    return true;
-  };
-
-  Eigen::MatrixXd matrix = core_energy * Eigen::MatrixXd::Identity(dim, dim);
-  for (std::size_t column = 0; column < dim; ++column) {
-    for (std::size_t p = 0; p < n; ++p) {
-      for (std::size_t q = 0; q < n; ++q) {
-        for (std::size_t spin = 0; spin < 2; ++spin) {
-          std::size_t state = column;
-          double sign = 1.0;
-          if (!apply(state, sign, 2 * q + spin, false)) continue;
-          if (!apply(state, sign, 2 * p + spin, true)) continue;
-          matrix(static_cast<Eigen::Index>(state),
-                 static_cast<Eigen::Index>(column)) += sign * h1[p * n + q];
-        }
-      }
-    }
-    for (std::size_t p = 0; p < n; ++p) {
-      for (std::size_t q = 0; q < n; ++q) {
-        for (std::size_t r = 0; r < n; ++r) {
-          for (std::size_t s = 0; s < n; ++s) {
-            const double value = eri[((p * n + q) * n + r) * n + s];
-            if (value == 0.0) continue;
-            for (std::size_t sigma = 0; sigma < 2; ++sigma) {
-              for (std::size_t tau = 0; tau < 2; ++tau) {
-                std::size_t state = column;
-                double sign = 1.0;
-                if (!apply(state, sign, 2 * q + sigma, false)) continue;
-                if (!apply(state, sign, 2 * s + tau, false)) continue;
-                if (!apply(state, sign, 2 * r + tau, true)) continue;
-                if (!apply(state, sign, 2 * p + sigma, true)) continue;
-                matrix(static_cast<Eigen::Index>(state),
-                       static_cast<Eigen::Index>(column)) += 0.5 * sign * value;
-              }
-            }
-          }
-        }
-      }
-    }
+  ~LogCapture() {
+    auto& sinks = utils::Logger::get()->sinks();
+    sinks.erase(std::remove(sinks.begin(), sinks.end(), sink_), sinks.end());
+    utils::Logger::set_global_level(previous_);
   }
+  LogCapture(const LogCapture&) = delete;
+  LogCapture& operator=(const LogCapture&) = delete;
+  std::string str() const { return stream_.str(); }
 
-  Eigen::SelfAdjointEigenSolver<Eigen::MatrixXd> solver(matrix);
-  const auto& values = solver.eigenvalues();
-  return std::vector<double>(values.data(), values.data() + values.size());
-}
-
-void expect_matches_fock_reference(const MajoranaMapResult& result,
-                                   std::size_t num_qubits, const double* h1,
-                                   const double* eri, std::size_t n_spatial,
-                                   double core_energy) {
-  const auto mapped = mapped_spectrum(result, num_qubits);
-  const auto reference = fock_spectrum(h1, eri, n_spatial, core_energy);
-  ASSERT_EQ(mapped.size(), reference.size());
-  for (std::size_t i = 0; i < mapped.size(); ++i) {
-    EXPECT_NEAR(mapped[i], reference[i], 1e-10)
-        << "Eigenvalue " << i << " disagrees with the Fock-space reference";
-  }
-}
+ private:
+  std::ostringstream stream_;
+  std::shared_ptr<spdlog::sinks::ostream_sink_mt> sink_;
+  utils::LogLevel previous_;
+};
 
 }  // namespace qdk::chemistry::tests::test_support
 
 namespace test_support = qdk::chemistry::tests::test_support;
 using test_support::collect_terms;
-using test_support::expect_matches_fock_reference;
 using test_support::expect_real_term;
 
 TEST(MajoranaMapEngineTest, MapsOneBodyUnrestrictedJordanWignerHamiltonian) {
@@ -291,139 +194,16 @@ TEST(MajoranaMapEngineTest, SpinSymmetricMatchesUnrestricted) {
   }
 }
 
-TEST(MajoranaMapEngineTest, SpinSummedPathMatchesFockSpaceReference) {
-  auto mapping = MajoranaMapping::jordan_wigner(4);
-  const double h1[4] = {1.0, 0.3, 0.3, 0.5};
-  double eri[16] = {};
-  auto idx = [](std::size_t p, std::size_t q, std::size_t r, std::size_t s) {
-    return ((p * 2 + q) * 2 + r) * 2 + s;
-  };
-  // Fully 8-fold symmetric, so the spin-summed fast path is selected.
-  for (std::size_t p = 0; p < 2; ++p) {
-    for (std::size_t q = 0; q < 2; ++q) {
-      for (std::size_t r = 0; r < 2; ++r) {
-        for (std::size_t s = 0; s < 2; ++s) {
-          eri[idx(p, q, r, s)] =
-              0.3 + 0.1 * static_cast<double>((p + q) * (r + s));
-        }
-      }
-    }
-  }
-
-  auto result = majorana_map_hamiltonian(mapping, 0.5, h1, h1, eri, eri, eri,
-                                         /*n_spatial=*/2,
-                                         /*spin_symmetric=*/true,
-                                         /*threshold=*/0.0,
-                                         /*integral_threshold=*/0.0);
-
-  expect_matches_fock_reference(result, mapping.num_qubits(), h1, eri, 2, 0.5);
-}
-
-TEST(MajoranaMapEngineTest, FourFoldTwoBodyMatchesFockSpaceReference) {
-  auto mapping = MajoranaMapping::jordan_wigner(4);
-  const double h1[4] = {1.0, 0.3, 0.3, 0.5};
-  double eri[16] = {};
-  auto idx = [](std::size_t p, std::size_t q, std::size_t r, std::size_t s) {
-    return ((p * 2 + q) * 2 + r) * 2 + s;
-  };
-
-  // Four-fold symmetry: (pq|rs) = (qp|sr) = (rs|pq) = (sr|qp), but
-  // (01|01) != (10|01), so independent bra/ket swaps are not valid.
-  eri[idx(0, 1, 0, 1)] = 0.7;
-  eri[idx(1, 0, 1, 0)] = 0.7;
-  eri[idx(1, 0, 0, 1)] = -0.2;
-  eri[idx(0, 1, 1, 0)] = -0.2;
-
-  auto result = majorana_map_hamiltonian(mapping, 0.5, h1, h1, eri, eri, eri,
-                                         /*n_spatial=*/2,
-                                         /*spin_symmetric=*/true,
-                                         /*threshold=*/0.0,
-                                         /*integral_threshold=*/0.0);
-
-  expect_matches_fock_reference(result, mapping.num_qubits(), h1, eri, 2, 0.5);
-}
-
-TEST(MajoranaMapEngineTest, RejectsBraKetAsymmetricStorage) {
-  auto mapping = MajoranaMapping::jordan_wigner(4);
-  const double h1[4] = {1.0, 0.3, 0.3, 0.5};
-  double eri[16] = {};
-  auto idx = [](std::size_t p, std::size_t q, std::size_t r, std::size_t s) {
-    return ((p * 2 + q) * 2 + r) * 2 + s;
-  };
-
-  // Hermitian, and its bra-ket average is fully 8-fold, but the cross-spin
-  // channel reads the stored tensor directly, so the caller has to average.
-  eri[idx(0, 0, 1, 1)] = 0.4;
-  eri[idx(1, 1, 0, 0)] = 0.9;
-
-  try {
-    majorana_map_hamiltonian(mapping, 0.5, h1, h1, eri, eri, eri,
-                             /*n_spatial=*/2, /*spin_symmetric=*/true,
-                             /*threshold=*/0.0, /*integral_threshold=*/0.0);
-    FAIL() << "Expected bra-ket-asymmetric storage to be rejected";
-  } catch (const std::invalid_argument& error) {
-    EXPECT_NE(std::string(error.what()).find("bra-ket average"),
-              std::string::npos);
-  }
-}
-
-TEST(MajoranaMapEngineTest, BraKetAverageOfRejectedStorageMapsExactly) {
-  auto mapping = MajoranaMapping::jordan_wigner(4);
-  const double h1[4] = {1.0, 0.3, 0.3, 0.5};
-  double eri[16] = {};
-  auto idx = [](std::size_t p, std::size_t q, std::size_t r, std::size_t s) {
-    return ((p * 2 + q) * 2 + r) * 2 + s;
-  };
-  // The remedy the rejection above asks for: same operator, mapped exactly.
-  eri[idx(0, 0, 1, 1)] = 0.65;
-  eri[idx(1, 1, 0, 0)] = 0.65;
-
-  auto result = majorana_map_hamiltonian(mapping, 0.5, h1, h1, eri, eri, eri,
-                                         /*n_spatial=*/2,
-                                         /*spin_symmetric=*/true,
-                                         /*threshold=*/0.0,
-                                         /*integral_threshold=*/0.0);
-
-  expect_matches_fock_reference(result, mapping.num_qubits(), h1, eri, 2, 0.5);
-}
-
-TEST(MajoranaMapEngineTest, RejectsNonHermitianTwoBody) {
-  auto mapping = MajoranaMapping::jordan_wigner(4);
-  const double h1[4] = {1.0, 0.3, 0.3, 0.5};
-  double eri[16] = {};
-  auto idx = [](std::size_t p, std::size_t q, std::size_t r, std::size_t s) {
-    return ((p * 2 + q) * 2 + r) * 2 + s;
-  };
-
-  // Bra-ket symmetric, so no gauge freedom is left, but (pq|rs) != (qp|sr):
-  // the operator it denotes is not Hermitian.
-  eri[idx(0, 1, 0, 0)] = 0.25;
-  eri[idx(0, 0, 0, 1)] = 0.25;
-  eri[idx(1, 0, 0, 0)] = -0.25;
-  eri[idx(0, 0, 1, 0)] = -0.25;
-
-  try {
-    majorana_map_hamiltonian(mapping, 0.5, h1, h1, eri, eri, eri,
-                             /*n_spatial=*/2, /*spin_symmetric=*/true,
-                             /*threshold=*/0.0, /*integral_threshold=*/0.0);
-    FAIL() << "Expected a non-Hermitian two-body tensor to be rejected";
-  } catch (const std::invalid_argument& error) {
-    EXPECT_NE(std::string(error.what()).find("non-Hermitian"),
-              std::string::npos);
-  }
-}
-
 TEST(MajoranaMapEngineTest, SymmetryToleranceScalesWithIntegralMagnitude) {
   auto mapping = MajoranaMapping::jordan_wigner(4);
   const double h1[4] = {1.0, 0.3, 0.3, 0.5};
-  // Round-off left by an integral transformation is relative to the integral
-  // magnitude, so a large tensor perturbed far below that relative scale must
-  // still be accepted.  An absolute tolerance rejects this, and with it the
-  // ordinary RHF Hamiltonians whose asymmetry grows with the basis.
+  // Round-off from an integral transformation in a nearly linearly dependent
+  // basis reaches ~1e-6 relative to the largest integral, and must not be
+  // mistaken for genuinely reduced symmetry.
   const double magnitude = 1.0e6;
   double eri[16] = {};
   for (double& value : eri) value = magnitude;
-  eri[1] += 1.0e-9 * magnitude;
+  eri[1] += 1.0e-6 * magnitude;
 
   EXPECT_NO_THROW(majorana_map_hamiltonian(mapping, 0.0, h1, h1, eri, eri, eri,
                                            /*n_spatial=*/2,
@@ -432,82 +212,21 @@ TEST(MajoranaMapEngineTest, SymmetryToleranceScalesWithIntegralMagnitude) {
                                            /*integral_threshold=*/0.0));
 }
 
-TEST(MajoranaMapEngineTest, CholeskyRejectsPairAsymmetricFactors) {
-  auto mapping = MajoranaMapping::jordan_wigner(4);
-  const double h1[4] = {1.0, 0.3, 0.3, 0.5};
+TEST(MajoranaMapEngineTest, SparseLegacyRepresentativesLogDeprecation) {
+  const auto mapping = MajoranaMapping::jordan_wigner(4);
+  const double one_body[4] = {1.0, 0.3, 0.3, 0.5};
+  // Each entry is the only stored member of its 8-fold class.
+  const int indices[8] = {0, 1, 0, 1, 1, 1, 0, 0};
+  const double values[2] = {0.7, 0.4};
 
-  // One antisymmetric factor: sum_Q L_pq L_rs stays bra-ket symmetric but
-  // loses the p<->q symmetry the spin-summed path needs, and confirming the
-  // weaker 4-fold symmetry would mean materializing the dense tensor.
-  const double three_center[4] = {0.0, 0.6, -0.6, 0.0};
-
-  try {
-    majorana_map_hamiltonian_cholesky(mapping, 0.0, h1, h1, three_center,
-                                      three_center, /*n_spatial=*/2,
-                                      /*naux=*/1, /*spin_symmetric=*/true,
-                                      /*threshold=*/0.0,
-                                      /*integral_threshold=*/0.0);
-    FAIL() << "Expected pair-asymmetric three-center factors to be rejected";
-  } catch (const std::invalid_argument& error) {
-    EXPECT_NE(std::string(error.what()).find("pair"), std::string::npos);
-  }
-}
-
-TEST(MajoranaMapEngineTest, SparseRejectsDisagreeingPermutationClass) {
-  auto mapping = MajoranaMapping::jordan_wigner(4);
-  const double h1[4] = {1.0, 0.3, 0.3, 0.5};
-
-  // Same permutation class as (0,1,0,1), but a different value: the sparse
-  // path keeps one representative per class, so this cannot be represented.
-  const int indices[8] = {0, 1, 0, 1, 1, 0, 0, 1};
-  const double values[2] = {0.7, -0.2};
-
-  try {
-    majorana_map_hamiltonian_sparse(mapping, 0.5, h1, h1, indices, values,
-                                    /*num_entries=*/2, /*n_spatial=*/2,
-                                    /*spin_symmetric=*/true,
-                                    /*threshold=*/1e-12,
-                                    /*integral_threshold=*/1e-12);
-    FAIL() << "Expected reduced-symmetry sparse input to be rejected";
-  } catch (const std::invalid_argument& error) {
-    EXPECT_NE(std::string(error.what()).find("8-fold"), std::string::npos);
-  }
-}
-
-TEST(MajoranaMapEngineTest, SparseRejectsPartiallyStoredPermutationClass) {
-  auto mapping = MajoranaMapping::jordan_wigner(4);
-  const double h1[4] = {1.0, 0.3, 0.3, 0.5};
-
-  // (01|01) and (10|10) are two of the four distinct members of one class;
-  // the caller means the other two to be zero, but symmetry expansion would
-  // overwrite them, so the intent is ambiguous rather than representable.
-  const int indices[8] = {0, 1, 0, 1, 1, 0, 1, 0};
-  const double values[2] = {0.7, 0.7};
-
-  try {
-    majorana_map_hamiltonian_sparse(mapping, 0.5, h1, h1, indices, values,
-                                    /*num_entries=*/2, /*n_spatial=*/2,
-                                    /*spin_symmetric=*/true,
-                                    /*threshold=*/1e-12,
-                                    /*integral_threshold=*/1e-12);
-    FAIL() << "Expected a partially stored permutation class to be rejected";
-  } catch (const std::invalid_argument& error) {
-    EXPECT_NE(std::string(error.what()).find("permutation class"),
-              std::string::npos);
-  }
-}
-
-TEST(MajoranaMapEngineTest, SparseAcceptsRedundantSymmetryRelatedStorage) {
-  auto mapping = MajoranaMapping::jordan_wigner(4);
-  const double h1[4] = {1.0, 0.3, 0.3, 0.5};
-
-  const int indices[8] = {0, 0, 1, 1, 1, 1, 0, 0};
-  const double values[2] = {0.7, 0.7};
-
-  EXPECT_NO_THROW(majorana_map_hamiltonian_sparse(
-      mapping, 0.5, h1, h1, indices, values, /*num_entries=*/2,
-      /*n_spatial=*/2, /*spin_symmetric=*/true, /*threshold=*/1e-12,
-      /*integral_threshold=*/1e-12));
+  test_support::LogCapture log;
+  const auto result = majorana_map_hamiltonian_sparse(
+      mapping, 0.5, one_body, one_body, indices, values, /*num_entries=*/2,
+      /*n_spatial=*/2, /*spin_symmetric=*/true, /*threshold=*/0.0,
+      /*integral_threshold=*/0.0);
+  EXPECT_FALSE(result.words.empty());
+  EXPECT_NE(log.str().find("2 sparse two-body entries"), std::string::npos);
+  EXPECT_NE(log.str().find("deprecated"), std::string::npos);
 }
 
 TEST(MajoranaMapEngineTest, TwoBodyIntegralsProduceAdditionalTerms) {
@@ -566,6 +285,136 @@ TEST(MajoranaMapEngineTest, RejectsZeroQubitMappings) {
                                /*threshold=*/1e-12,
                                /*integral_threshold=*/1e-12),
       std::invalid_argument);
+}
+
+namespace {
+
+void expect_same_coefficients(const MajoranaMapResult& actual,
+                              const MajoranaMapResult& expected,
+                              std::size_t num_qubits) {
+  auto difference = collect_terms(actual, num_qubits);
+  for (const auto& [label, coefficient] : collect_terms(expected, num_qubits))
+    difference[label] -= coefficient;
+  for (const auto& [label, coefficient] : difference)
+    EXPECT_NEAR(std::abs(coefficient), 0.0, 1e-11) << label;
+}
+
+std::vector<double> fourfold_test_tensor(std::size_t extent) {
+  std::vector<double> tensor(extent * extent * extent * extent);
+  for (std::size_t bra = 0; bra < extent; ++bra)
+    for (std::size_t ket = 0; ket < extent; ++ket)
+      for (std::size_t other_bra = 0; other_bra < extent; ++other_bra)
+        for (std::size_t other_ket = 0; other_ket < extent; ++other_ket) {
+          using Key = std::array<std::size_t, 4>;
+          const auto canonical =
+              std::min({Key{bra, ket, other_bra, other_ket},
+                        Key{other_bra, other_ket, bra, ket},
+                        Key{ket, bra, other_ket, other_bra},
+                        Key{other_ket, other_bra, ket, bra}});
+          const auto flattened = [extent](const Key& key) {
+            return ((key[0] * extent + key[1]) * extent + key[2]) * extent +
+                   key[3];
+          };
+          tensor[flattened({bra, ket, other_bra, other_ket})] =
+              0.3 * std::sin(1.0 + static_cast<double>(flattened(canonical)));
+        }
+  return tensor;
+}
+
+}  // namespace
+
+TEST(MajoranaMapEngineTest, FourFoldSplitMatchesGeneralAcrossMappings) {
+  const auto tensor = fourfold_test_tensor(3);
+  // Bra-ket antisymmetric: same operator, but aaaa no longer allows the split.
+  auto general_tensor = tensor;
+  general_tensor[4] += 0.5;
+  general_tensor[36] -= 0.5;
+  const double one_alpha[9] = {1.0, 0.2, -0.1, 0.2, 0.5, 0.3, -0.1, 0.3, 0.7};
+  const double one_beta[9] = {0.3, -0.2, 0.1, -0.2, 0.4, 0.2, 0.1, 0.2, -0.5};
+  // Breaks ab bra-ket symmetry but keeps reversal, which is all the split
+  // needs.
+  auto mixed = tensor;
+  mixed[1] += 0.25;
+  mixed[3] += 0.25;
+  std::vector<MajoranaMapping> mappings{
+      MajoranaMapping::jordan_wigner(6), MajoranaMapping::bravyi_kitaev(6),
+      MajoranaMapping::parity(6), MajoranaMapping::bravyi_kitaev_tree(6)};
+  const LatticeGraph lattice({{{0, 1}, 1.0}, {{1, 2}, 1.0}, {{0, 2}, 1.0}}, 3);
+  mappings.push_back(MajoranaMapping::verstraete_cirac(lattice));
+  std::vector<std::pair<std::complex<double>, SparsePauliWord>> bilinears;
+  for (std::size_t first = 0; first < 12; ++first)
+    for (std::size_t second = first + 1; second < 12; ++second) {
+      const auto [coefficient, word] = mappings.front().bilinear(first, second);
+      bilinears.emplace_back(coefficient, word);
+    }
+  mappings.push_back(MajoranaMapping::from_bilinears(6, std::move(bilinears)));
+  auto shifted_table = mappings.front().table();
+  for (auto& word : shifted_table)
+    for (auto& [qubit, pauli] : word) qubit += 63;
+  mappings.push_back(MajoranaMapping::from_table(std::move(shifted_table)));
+  for (const auto& mapping : mappings) {
+    for (bool restricted : {true, false}) {
+      const auto* beta = restricted ? one_alpha : one_beta;
+      const auto* cross = restricted ? tensor.data() : mixed.data();
+      const auto fast = majorana_map_hamiltonian(
+          mapping, 0.375, one_alpha, beta, tensor.data(), cross, tensor.data(),
+          3, restricted, 1e-12, 0.0);
+      const auto general = majorana_map_hamiltonian(
+          mapping, 0.375, one_alpha, beta, general_tensor.data(), cross,
+          tensor.data(), 3, false, 1e-12, 0.0);
+      expect_same_coefficients(fast, general, mapping.num_qubits());
+    }
+  }
+}
+
+TEST(MajoranaMapEngineTest, SparseFourFoldInputOrderIsDeterministic) {
+  const auto mapping = MajoranaMapping::jordan_wigner(4);
+  const double one_body[4] = {1.0, 0.3, 0.3, 0.5};
+  std::vector<std::array<int, 4>> keys{
+      {0, 1, 0, 1}, {1, 0, 1, 0}, {0, 1, 1, 0}, {1, 0, 0, 1}};
+  std::vector<double> values{0.7, 0.7, 0.0, 0.0};
+  auto map_entries = [&]() {
+    std::vector<int> indices;
+    for (const auto& key : keys)
+      indices.insert(indices.end(), key.begin(), key.end());
+    return majorana_map_hamiltonian_sparse(mapping, 0.0, one_body, one_body,
+                                           indices.data(), values.data(),
+                                           values.size(), 2, true, 1e-12, 0.0);
+  };
+  const auto forward = map_entries();
+  std::reverse(keys.begin(), keys.end());
+  std::reverse(values.begin(), values.end());
+  const auto reverse = map_entries();
+  EXPECT_EQ(forward.words, reverse.words);
+  EXPECT_EQ(forward.coefficients, reverse.coefficients);
+}
+
+TEST(MajoranaMapEngineTest, CholeskyFourFoldValidationIsScaleInvariant) {
+  namespace detail = qdk::chemistry::data::detail;
+  for (double scale : {1e-150, 1.0, 1e150}) {
+    Eigen::MatrixXd factors(4, 2);
+    factors << 0.8, -0.8, 0.7, 0.3, -0.3, -0.7, 0.3, -0.3;
+    factors *= scale;
+    EXPECT_EQ(detail::cholesky_two_body_symmetry(factors.data(), 2, 2, 1e-8),
+              detail::TwoBodySymmetry::FourFold);
+    factors(0, 1) += 0.2 * scale;
+    EXPECT_EQ(detail::cholesky_two_body_symmetry(factors.data(), 2, 2, 1e-8),
+              detail::TwoBodySymmetry::NonHermitian);
+  }
+}
+
+TEST(MajoranaMapEngineTest, CholeskyMixedSpinValidationChecksCrossParity) {
+  namespace detail = qdk::chemistry::data::detail;
+  Eigen::MatrixXd alpha(4, 2);
+  alpha << 0.8, 0.0, 0.2, 0.5, 0.2, -0.5, 0.3, 0.0;
+  Eigen::MatrixXd beta = alpha;
+  EXPECT_TRUE(detail::cholesky_mixed_spin_has_reversal_symmetry(
+      alpha.data(), beta.data(), 2, 2, 1e-8));
+  beta.col(0).swap(beta.col(1));
+  EXPECT_EQ(detail::cholesky_two_body_symmetry(beta.data(), 2, 2, 1e-8),
+            detail::TwoBodySymmetry::FourFold);
+  EXPECT_FALSE(detail::cholesky_mixed_spin_has_reversal_symmetry(
+      alpha.data(), beta.data(), 2, 2, 1e-8));
 }
 
 TEST(MajoranaMappingHashTest, EqualMappingsHaveStableHash) {

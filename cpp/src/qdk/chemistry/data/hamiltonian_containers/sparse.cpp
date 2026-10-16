@@ -2,6 +2,7 @@
 // Licensed under the MIT License. See LICENSE.txt in the project root for
 // license information.
 
+#include <cmath>
 #include <cstdint>
 #include <cstring>
 #include <fstream>
@@ -522,16 +523,25 @@ void SparseHamiltonianContainer::to_fcidump_file(const std::string& filename,
   }
 
   // Ordinary FCIDUMP readers reconstruct the eight permutations of every
-  // two-electron record, so a permutation class that is only partially stored
-  // or whose stored records disagree cannot be represented by this format.
-  if (has_two_body_integrals() &&
-      !detail::sparse_entries_have_eightfold_symmetry(
-          _two_body_sparse->block(
-              {axes::alpha(), axes::alpha(), axes::alpha(), axes::alpha()}),
-          detail::two_body_symmetry_tolerance)) {
-    throw std::runtime_error(
-        "FCIDUMP export requires 8-fold two-body permutation symmetry; "
-        "reduced-symmetry tensors cannot be represented losslessly.");
+  // two-electron record, so the stored tensor must have 8-fold symmetry.
+  if (has_two_body_integrals()) {
+    detail::SparseTwoBodyTensor tensor;
+    for (const auto& [idx, value] : _two_body_sparse->block(
+             {axes::alpha(), axes::alpha(), axes::alpha(), axes::alpha()})) {
+      tensor.emplace(detail::TwoBodyKey{static_cast<std::size_t>(idx[0]),
+                                        static_cast<std::size_t>(idx[1]),
+                                        static_cast<std::size_t>(idx[2]),
+                                        static_cast<std::size_t>(idx[3])},
+                     value);
+    }
+    detail::expand_legacy_eightfold_representatives(tensor, "to_fcidump_file");
+    if (detail::classify_sparse_two_body_symmetry(
+            tensor, detail::two_body_symmetry_tolerance)
+            .symmetry != detail::TwoBodySymmetry::EightFold) {
+      throw std::runtime_error(
+          "FCIDUMP export requires 8-fold two-body permutation symmetry; "
+          "reduced-symmetry tensors cannot be represented losslessly.");
+    }
   }
 
   std::ofstream file(filename);
@@ -591,6 +601,65 @@ void SparseHamiltonianContainer::to_fcidump_file(const std::string& filename,
 
   // Write core energy
   formatted_line(0, 0, 0, 0, _core_energy);
+}
+
+bool SparseHamiltonianContainer::uses_eightfold_shorthand(
+    const TwoBodyMap& two_body_integrals) {
+  QDK_LOG_TRACE_ENTERING();
+
+  detail::SparseTwoBodyTensor tensor;
+  for (const auto& [index, value] : two_body_integrals) {
+    const auto& [p, q, r, s] = index;
+    tensor.emplace(detail::TwoBodyKey{static_cast<std::size_t>(p),
+                                      static_cast<std::size_t>(q),
+                                      static_cast<std::size_t>(r),
+                                      static_cast<std::size_t>(s)},
+                   value);
+  }
+  return !detail::lone_eightfold_representatives(tensor).empty();
+}
+
+SparseHamiltonianContainer::TwoBodyMap
+SparseHamiltonianContainer::expand_symmetry_representatives(
+    const TwoBodyMap& representatives, TwoBodyPermutationGroup group) {
+  QDK_LOG_TRACE_ENTERING();
+
+  TwoBodyMap expanded;
+  auto assign = [&expanded](const auto& orbit, double value) {
+    for (const auto& position : orbit) {
+      const TwoBodyIndex member{
+          static_cast<int>(position[0]), static_cast<int>(position[1]),
+          static_cast<int>(position[2]), static_cast<int>(position[3])};
+      const auto [it, inserted] = expanded.try_emplace(member, value);
+      if (!inserted && it->second != value) {
+        throw std::invalid_argument(
+            "expand_symmetry_representatives: representatives assign "
+            "different values to position " +
+            detail::two_body_key_string(position) + ".");
+      }
+    }
+  };
+  for (const auto& [index, value] : representatives) {
+    const auto& [p, q, r, s] = index;
+    if (p < 0 || q < 0 || r < 0 || s < 0) {
+      throw std::invalid_argument(
+          "expand_symmetry_representatives: two-body indices must be "
+          "non-negative.");
+    }
+    if (!std::isfinite(value)) {
+      throw std::invalid_argument(
+          "expand_symmetry_representatives: two-body values must be finite.");
+    }
+    const detail::TwoBodyKey key{
+        static_cast<std::size_t>(p), static_cast<std::size_t>(q),
+        static_cast<std::size_t>(r), static_cast<std::size_t>(s)};
+    if (group == TwoBodyPermutationGroup::FourFold) {
+      assign(detail::fourfold_orbit(key), value);
+    } else {
+      assign(detail::eightfold_orbit(key), value);
+    }
+  }
+  return expanded;
 }
 
 const Eigen::SparseMatrix<double>&

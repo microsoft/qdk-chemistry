@@ -201,48 +201,63 @@ Both restricted (RHF) and unrestricted (UHF) Hamiltonians are supported.
 
 Custom encodings can be defined by constructing a :class:`~qdk_chemistry.data.MajoranaMapping` from a Pauli-string table.
 
+.. rubric:: Integral symmetry
+
+Restricted integrals with 8-fold permutation symmetry use spin-summed
+excitations. Integrals with only the 4-fold symmetry
+:math:`(pq|rs) = (qp|sr) = (rs|pq)`, as produced by downfolding, use
+spin-summed symmetric and antisymmetric excitation pairs. A restricted tensor
+that defines a non-Hermitian operator raises, as does a Hermitian one not
+stored with :math:`(pq|rs) = (rs|pq)`; since that exchange leaves the operator
+unchanged, map its bra-ket average instead.
+
+Unrestricted integrals use the same excitation-pair split when the ``aa`` and
+``bb`` blocks are 4-fold and ``ab`` satisfies
+:math:`(pq|rs)_{ab} = (qp|sr)_{ab}`; ``ab`` need not satisfy
+:math:`(pq|rs)_{ab} = (rs|pq)_{ab}`. Other unrestricted integrals are mapped
+channel by channel, as are integrals whose screening would break the symmetry
+a split needs.
+
 .. rubric:: Container-aware fast paths
 
 The ``"qdk"`` backend consumes two-body integrals directly from the underlying
-:doc:`HamiltonianContainer <../data/hamiltonian>` without ever materializing a
+:doc:`HamiltonianContainer <../data/hamiltonian>` without reconstructing a
 dense :math:`N^4` two-body tensor when the container stores its integrals in a
 compressed form:
 
 - :class:`~qdk_chemistry.data.SparseHamiltonianContainer` — the mapping loop
-  iterates over **only the stored non-zero** ``(p, q, r, s)`` integrals rather
-  than the full :math:`O(N^4)` index space, skipping the zeros that dominate
-  lattice/model Hamiltonians (e.g. those produced by
+  iterates over the stored ``(p, q, r, s)`` integrals rather than the full
+  :math:`O(N^4)` index space, skipping the zeros that dominate lattice/model
+  Hamiltonians (e.g. those produced by
   :func:`~qdk_chemistry.utils.model_hamiltonians.create_hubbard_hamiltonian`
   and :func:`~qdk_chemistry.utils.model_hamiltonians.create_ppp_hamiltonian`).
-  This improves **both memory and runtime**, since neither the dense tensor nor
-  the zero entries are ever touched. Stored entries are canonicalized under the
-  8-fold integral symmetry before mapping, so the result does not depend on
-  which symmetry-related permutations of an integral the container stores, nor
-  on their order. Because one representative is expanded over its whole
-  permutation class, each class must be stored exactly once or in full; a
-  partially stored class raises, since the expansion would overwrite the zeros
-  implied at its missing positions.
+  Stored entries are read **literally**: positions that are not stored are
+  zero, exactly as in the dense view of the container, so a complete 4-fold
+  suborbit needs no explicit zeros for the rest of its 8-fold orbit. To build
+  entries from symmetry representatives, use
+  :meth:`~qdk_chemistry.data.SparseHamiltonianContainer.expand_symmetry_representatives`
+  with :class:`~qdk_chemistry.data.TwoBodyPermutationGroup`. As a deprecated
+  shorthand, a nonzero entry that is the only stored member of a larger 8-fold
+  orbit is still expanded over that orbit, with a warning. Entry order does not
+  affect the result.
 - :class:`~qdk_chemistry.data.CholeskyHamiltonianContainer` — the three-center
   (Cholesky / density-fitted) factors are kept in their
   :math:`O(N^2 \cdot n_\text{aux})` form and the auxiliary index is contracted
   in integral space, one ``(pq|.)`` row at a time (a vectorized matrix-vector
-  product per orbital pair). The dense four-center tensor is never built and
-  peak additional memory is a single :math:`N^2`-length row, making this path
-  suitable for systems whose dense ERI tensor does not fit in memory. The
-  reconstruction :math:`\sum_Q L^Q_{pq} L^Q_{rs}` carries the 8-fold symmetry
-  only when every factor is symmetric in its orbital pair, which is validated.
+  product per orbital pair). Factors that are not symmetric in their orbital
+  pair are checked for 4-fold symmetry through thin QR factors of their
+  pair-symmetric and pair-antisymmetric parts, which needs
+  :math:`O(N^2 n_\text{aux} + n_\text{aux}^2)` scratch for
+  :math:`n_\text{aux} \le N^2`.
 
 In all cases the result is a :class:`~qdk_chemistry.data.QubitOperator` that
-is numerically equivalent — term-by-term, to within ``1e-12`` — to the dense
+is numerically equivalent, term by term, to the dense
 :class:`~qdk_chemistry.data.CanonicalFourCenterHamiltonianContainer` path for
-integrals the container can represent. The behaviour of ``run()`` and the shape
-of the returned operator are unchanged, and the selection is fully automatic
-based on the container type. The
+the same integrals (after the deprecated sparse expansion). The behaviour of
+``run()`` and the shape of the returned operator are unchanged, and the
+selection is fully automatic based on the container type. The
 :class:`~qdk_chemistry.data.CanonicalFourCenterHamiltonianContainer` continues
-to use the dense path, which additionally accepts two-body tensors carrying
-only the 4-fold subgroup :math:`(pq|rs) = (qp|sr) = (rs|pq)` -- the general
-Hermitian two-body operator, as produced by downfolding. Electron-repulsion
-integrals over real orbitals always satisfy the full 8-fold symmetry.
+to use the dense path.
 
 .. rubric:: Settings
 

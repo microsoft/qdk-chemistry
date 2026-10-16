@@ -353,23 +353,22 @@ struct MajoranaMapResult {
  * @param eri_aabb Flattened two-body integrals (aa|bb), chemist notation.
  * @param eri_bbbb Flattened two-body integrals (bb|bb), chemist notation.
  * @param n_spatial Number of spatial orbitals.
- * @param spin_symmetric Declare that the input is spin-restricted and request
- *        the spin-summed fast path. The caller must guarantee identical
- *        integrals across all spin channels (h_alpha == h_beta and
- *        eri_aaaa == eri_bbbb == eri_aabb); this equality is not validated.
- *        The fast path additionally requires 8-fold ERI permutation symmetry,
- *        which the engine does validate; tensors carrying only the 4-fold
- *        subgroup (pq|rs) = (qp|sr) = (rs|pq) automatically use the general
- *        spin-channel path, which reproduces them exactly. For unrestricted
- *        inputs, pass false.
+ * @param spin_symmetric True for restricted input: the caller guarantees
+ *        h_alpha == h_beta and eri_aaaa == eri_bbbb == eri_aabb (not
+ *        validated).  8-fold integrals use spin-summed excitations; 4-fold
+ *        integrals, (pq|rs) = (qp|sr) = (rs|pq), use spin-summed symmetric
+ *        and antisymmetric excitation pairs.  False for unrestricted input:
+ *        the excitation-pair split is used when aa and bb are 4-fold and ab
+ *        satisfies (pq|rs) = (qp|sr), and every spin channel is looped over
+ *        in full otherwise.  Either split falls back to the full loop when
+ *        integral screening would break the symmetry it needs.
  * @param threshold Pauli terms with |coeff| < threshold are dropped.
  * @param integral_threshold Integrals with |value| < this are skipped.
  * @return MajoranaMapResult with Pauli words and coefficients.
  * @throws std::invalid_argument If spin_symmetric is true and the two-body
- *         integrals either define a non-Hermitian operator, or are Hermitian
- *         but not stored with (pq|rs) = (rs|pq). The latter swap leaves the
- *         operator unchanged, so such tensors need only be replaced by their
- *         bra-ket average before mapping.
+ *         integrals define a non-Hermitian operator, or are Hermitian but not
+ *         stored with (pq|rs) = (rs|pq); in the latter case, map their
+ *         bra-ket average instead.
  */
 MajoranaMapResult majorana_map_hamiltonian(
     const MajoranaMapping& mapping, double core_energy, const double* h1_alpha,
@@ -381,7 +380,7 @@ MajoranaMapResult majorana_map_hamiltonian(
  * @brief Map a fermionic Hamiltonian to qubit Pauli terms.
  *
  * Dispatches to the dense, Cholesky, or sparse engine entry point based on
- * the Hamiltonian's container type, without materializing a dense N^4
+ * the Hamiltonian's container type, without reconstructing a dense N^4
  * two-body tensor when a specialized container is present.  One-body
  * integrals are flattened to row-major layout internally.
  *
@@ -391,20 +390,13 @@ MajoranaMapResult majorana_map_hamiltonian(
  *
  * @param mapping The Majorana-to-Pauli encoding.
  * @param hamiltonian The fermionic Hamiltonian.
- * @param spin_symmetric Declare that the Hamiltonian is spin-restricted and
- *        request the spin-summed fast path. The caller is responsible for the
- *        spin-restriction guarantee. The fast path also requires 8-fold ERI
- *        permutation symmetry, and each container enforces it differently:
- *        dense tensors carrying only the 4-fold subgroup fall back to the
- *        general spin-channel path, Cholesky containers require pair-symmetric
- *        three-center factors, and sparse containers require each permutation
- *        class to be stored once or in full.
+ * @param spin_symmetric True for restricted Hamiltonians; see the
+ *        buffer-based overload for how integral symmetry selects the path.
  * @param threshold Pauli terms with |coeff| < threshold are dropped.
  * @param integral_threshold Integrals with |value| < this are skipped.
  * @return MajoranaMapResult with Pauli words and coefficients.
- * @throws std::invalid_argument If the container's two-body integrals cannot
- *         be reproduced by any evaluation path (see the per-container entry
- *         points below).
+ * @throws std::invalid_argument As documented for the container's entry
+ *         point.
  */
 MajoranaMapResult majorana_map_hamiltonian(const MajoranaMapping& mapping,
                                            const Hamiltonian& hamiltonian,
@@ -420,9 +412,12 @@ MajoranaMapResult majorana_map_hamiltonian(const MajoranaMapping& mapping,
  * factors instead of a dense N^4 tensor.  The auxiliary index is
  * contracted in integral space one (pq|.) row at a time — a vectorized
  * matrix-vector product per orbital pair — so the dense four-center
- * tensor is never materialized and peak additional memory is a single
- * N^2 row.  The result is numerically equivalent to the dense path for
- * the same integrals.
+ * tensor is never reconstructed.
+ *
+ * Factors symmetric in their orbital pair give 8-fold integrals.  Otherwise
+ * their pair-symmetric and pair-antisymmetric parts S and A give 4-fold
+ * integrals exactly when S A^T = 0, which is checked through thin QR
+ * factors of S and A (scratch O(N^2 naux + naux^2) for naux <= N^2).
  *
  * @param mapping The Majorana-to-Pauli encoding.
  * @param core_energy Core (nuclear repulsion + frozen core) energy.
@@ -435,18 +430,13 @@ MajoranaMapResult majorana_map_hamiltonian(const MajoranaMapping& mapping,
  *        restricted inputs this may alias @p three_center_aa.
  * @param n_spatial Number of spatial orbitals.
  * @param naux Number of auxiliary (Cholesky) vectors.
- * @param spin_symmetric If true, use the spin-summed restricted fast path.
- *        That path needs 8-fold ERI symmetry, and the reconstruction
- *        sum_Q L^Q_pq L^Q_rs only carries it when every factor is symmetric in
- *        its orbital pair, so @p three_center_aa is validated for that.
+ * @param spin_symmetric As for ::majorana_map_hamiltonian, with the integral
+ *        symmetry determined from the factors.
  * @param threshold Pauli terms with |coeff| < threshold are dropped.
  * @param integral_threshold Integrals with |value| < this are skipped.
  * @return MajoranaMapResult with Pauli words and coefficients.
- * @throws std::invalid_argument If spin_symmetric is true and the alpha
- *         three-center factors are not pair-symmetric.  Establishing the
- *         weaker symmetry the general path needs would require materializing
- *         the dense tensor this entry point exists to avoid, so such inputs
- *         must be mapped from dense storage.
+ * @throws std::invalid_argument If spin_symmetric is true and S A^T != 0, so
+ *         the reconstructed two-body integrals are non-Hermitian.
  */
 MajoranaMapResult majorana_map_hamiltonian_cholesky(
     const MajoranaMapping& mapping, double core_energy, const double* h1_alpha,
@@ -459,33 +449,22 @@ MajoranaMapResult majorana_map_hamiltonian_cholesky(
  *        sparse two-body integral list.
  *
  * Equivalent to ::majorana_map_hamiltonian but consumes the stored
- * non-zero (p,q,r,s) integrals instead of a dense N^4 tensor, which is
- * never materialized.  Missing entries are treated as zero, exactly as in
- * the dense layout.
+ * (p,q,r,s) integrals without reconstructing a dense N^4 tensor, iterating
+ * nonzero pair products rather than the full N^4 index space.
  *
- * Stored entries are canonicalized under the 8-fold ERI symmetry and
- * symmetry-expanded before mapping.  The dense reference path for
- * ``SparseHamiltonianContainer`` materializes each stored tuple at its
- * exact index with no symmetry expansion, so the two paths agree when
- * stored integrals are canonical or symmetry-complete (as for in-repo
- * model builders), while this entry point is more robust when a container
- * stores only non-canonical symmetry representatives.
+ * Entries are read literally: positions that are not stored are zero, as in
+ * the dense view of SparseHamiltonianContainer, and the resulting tensor is
+ * classified like dense restricted integrals.  A complete 4-fold suborbit
+ * therefore needs no explicit zeros for the rest of its 8-fold orbit.
  *
- * Entries are canonicalized under the 8-fold ERI symmetry at ingestion
- * (p<=q, r<=s, (p,q)<=(r,s)) and deduplicated deterministically, so the
- * mapped operator does not depend on which symmetry-related permutation(s)
- * of an integral the caller stored, nor on the order of the entry list.
- * Duplicate entries for the same position must agree exactly (bitwise
- * floating-point equality); conflicting duplicates are rejected rather
- * than resolved in encounter order.
+ * As a deprecated shorthand, a nonzero entry that is the only stored member
+ * of a larger 8-fold orbit is expanded over that orbit, and a warning is
+ * logged. Read literally, such an entry is never 4-fold symmetric and would
+ * be rejected, so the expansion cannot change the meaning of an accepted
+ * tensor.
  *
- * Because one representative is expanded over its whole permutation class,
- * each class must be stored either exactly once (unambiguously a
- * representative) or in full.  A partially stored class is ambiguous — the
- * expansion would overwrite the zeros implied at its missing positions — and
- * members that disagree cannot be represented at all.  Both are rejected
- * rather than silently symmetrized, so a tensor with genuinely reduced
- * permutation symmetry must be mapped from dense storage instead.
+ * Duplicate entries for the same position must agree exactly; conflicting
+ * duplicates are rejected. The result is independent of entry order.
  *
  * @param mapping The Majorana-to-Pauli encoding.
  * @param core_energy Core (nuclear repulsion + frozen core) energy.
@@ -494,7 +473,8 @@ MajoranaMapResult majorana_map_hamiltonian_cholesky(
  * @param two_body_indices Flattened (p,q,r,s) indices, 4 ints per entry;
  *        each index must lie in [0, n_spatial).
  * @param two_body_values Integral values, one per entry.
- * @param num_entries Number of stored non-zero two-body integrals.
+ * @param num_entries Number of stored two-body entries, including explicit
+ *        zeros.
  * @param n_spatial Number of spatial orbitals.
  * @param spin_symmetric Must be true: the sparse fast path is spin-summed
  *        (SparseHamiltonianContainer is restricted-only).  Unrestricted
@@ -503,9 +483,10 @@ MajoranaMapResult majorana_map_hamiltonian_cholesky(
  * @param integral_threshold Integrals with |value| < this are skipped.
  * @return MajoranaMapResult with Pauli words and coefficients.
  * @throws std::invalid_argument If spin_symmetric is false, any two-body
- *         index is outside [0, n_spatial), duplicate entries for the same
- *         position carry conflicting values, or a permutation class is
- *         stored partially or with disagreeing values.
+ *         index is outside [0, n_spatial), a value is not finite, duplicate
+ *         entries for the same position carry conflicting values, or the
+ *         literal tensor defines a non-Hermitian operator or is not stored
+ *         with (pq|rs) = (rs|pq).
  */
 MajoranaMapResult majorana_map_hamiltonian_sparse(
     const MajoranaMapping& mapping, double core_energy, const double* h1_alpha,

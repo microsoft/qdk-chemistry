@@ -81,6 +81,17 @@ Values:
       .value("Hermitian", HamiltonianType::Hermitian)
       .value("NonHermitian", HamiltonianType::NonHermitian);
 
+  py::enum_<TwoBodyPermutationGroup>(data, "TwoBodyPermutationGroup", R"(
+Index permutations that a two-body symmetry representative stands for, in
+chemist notation (pq|rs).
+
+Values:
+    FourFold: (pq|rs) = (rs|pq) = (qp|sr) = (sr|qp)
+    EightFold: additionally (pq|rs) = (qp|rs) = (pq|sr)
+)")
+      .value("FourFold", TwoBodyPermutationGroup::FourFold)
+      .value("EightFold", TwoBodyPermutationGroup::EightFold);
+
   // SpinChannel enumeration
   py::enum_<SpinChannel>(data, "SpinChannel", R"(
 Enumeration for different spin channels in unrestricted calculations.
@@ -114,6 +125,14 @@ for quantum chemistry calculations. It contains:
 
 Derived classes implement specific storage formats for two-electron integrals
 (e.g., canonical 4-center, density-fitted, etc.).
+
+Two-electron integrals are real, in chemist notation (pq|rs), and represent the
+operator literally, with the beta-alpha block given by (pq|rs)_ba = (rs|pq)_ab.
+Restricted integrals and the same-spin blocks of a Hermitian Hamiltonian are
+expected to have the 4-fold permutation symmetry (pq|rs) = (rs|pq) = (qp|sr);
+the alpha-beta block need only satisfy (pq|rs) = (qp|sr). The additional 8-fold
+symmetry of ordinary electron-repulsion integrals is not assumed; consumers that
+need it check for it and reject other input.
 
 Note:
     This class cannot be instantiated directly. Use a derived class like
@@ -784,7 +803,10 @@ Hamiltonian container for lattice model Hamiltonians (Hückel, Hubbard, PPP, etc
 with sparse internal storage.
 
 Stores one-body integrals as a sparse matrix and two-body integrals as a
-sparse dictionary of (p, q, r, s) index tuples.
+sparse dictionary of (p, q, r, s) index tuples. Two-body entries are literal:
+positions that are not stored are zero. Use
+:meth:`expand_symmetry_representatives` to build such a dictionary from
+symmetry representatives.
 
 Internally uses ``ModelOrbitals`` so that the full ``HamiltonianContainer``
 interface (``get_one_body_integrals``, ``get_orbitals``, etc.) works.
@@ -800,10 +822,28 @@ Examples:
 )");
 
   // -- Sparse + two-body constructor --
-  sparse_container.def(py::init<Eigen::SparseMatrix<double>,
-                                SparseHamiltonianContainer::TwoBodyMap, double,
-                                HamiltonianType>(),
-                       R"(
+  sparse_container.def(
+      py::init([](Eigen::SparseMatrix<double> one_body_integrals,
+                  SparseHamiltonianContainer::TwoBodyMap two_body_integrals,
+                  double core_energy, HamiltonianType type) {
+        if (SparseHamiltonianContainer::uses_eightfold_shorthand(
+                two_body_integrals) &&
+            PyErr_WarnEx(
+                PyExc_DeprecationWarning,
+                "Sparse two-body entries that are the only stored member of a "
+                "larger 8-fold permutation class are expanded over that "
+                "class. This shorthand is deprecated: store every class "
+                "member, or call "
+                "SparseHamiltonianContainer.expand_symmetry_representatives "
+                "with TwoBodyPermutationGroup.EightFold.",
+                1) < 0) {
+          throw py::error_already_set();
+        }
+        return std::make_unique<SparseHamiltonianContainer>(
+            std::move(one_body_integrals), std::move(two_body_integrals),
+            core_energy, type);
+      }),
+      R"(
 Construct from sparse one-body integrals and a sparse two-body map.
 
 Args:
@@ -812,11 +852,14 @@ Args:
         integral map from (p, q, r, s) index tuples to values.
     core_energy (float, optional): Scalar energy offset. Defaults to 0.0.
     type (HamiltonianType, optional): Hamiltonian type. Defaults to Hermitian.
+
+Warns:
+    DeprecationWarning: If a nonzero entry is the only stored member of a larger
+        8-fold permutation class; such an entry still stands for its whole class.
 )",
-                       py::arg("one_body_integrals"),
-                       py::arg("two_body_integrals"),
-                       py::arg("core_energy") = 0.0,
-                       py::arg("type") = HamiltonianType::Hermitian);
+      py::arg("one_body_integrals"), py::arg("two_body_integrals"),
+      py::arg("core_energy") = 0.0,
+      py::arg("type") = HamiltonianType::Hermitian);
 
   // -- Sparse one-body only --
   sparse_container.def(
@@ -995,11 +1038,44 @@ Args:
     nbeta (int): Number of beta electrons.
 
 Raises:
-    RuntimeError: If I/O error occurs, the Hamiltonian is unrestricted, or a
-        two-body permutation class is stored partially or with disagreeing
-        values, which FCIDUMP readers would expand into contradictory records.
+    RuntimeError: If I/O error occurs, the Hamiltonian is unrestricted, or its
+        two-body integrals lack the 8-fold permutation symmetry that FCIDUMP
+        readers reconstruct (unstored entries are zero). A nonzero entry that
+        is the only stored member of a larger permutation class is still
+        expanded over the class, with a deprecation warning.
 )",
       py::arg("filename"), py::arg("nalpha"), py::arg("nbeta"));
+
+  sparse_container.def_static(
+      "expand_symmetry_representatives",
+      &SparseHamiltonianContainer::expand_symmetry_representatives, R"(
+Expand symmetry representatives into literal two-body entries.
+
+Assigns each representative's value to every distinct position of its orbit
+under ``group``. The result can be passed to the constructor.
+
+Args:
+    representatives (dict[tuple[int,int,int,int], float]): Representative
+        entries; values are final, not additive contributions.
+    group (TwoBodyPermutationGroup): Permutation group the representatives
+        stand for.
+
+Returns:
+    dict[tuple[int,int,int,int], float]: Literal two-body entries.
+
+Raises:
+    ValueError: If an index is negative, a value is not finite, or two
+        representatives assign different values to one position.
+
+Examples:
+    >>> from qdk_chemistry.data import SparseHamiltonianContainer, TwoBodyPermutationGroup
+    >>> entries = SparseHamiltonianContainer.expand_symmetry_representatives(
+    ...     {(0, 0, 1, 1): 0.5}, TwoBodyPermutationGroup.EightFold
+    ... )
+    >>> sorted(entries)
+    [(0, 0, 1, 1), (1, 1, 0, 0)]
+)",
+      py::arg("representatives"), py::arg("group"));
 
   // ============================================================================
   // Hamiltonian - Interface class

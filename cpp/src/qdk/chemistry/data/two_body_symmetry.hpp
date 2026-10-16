@@ -4,25 +4,40 @@
 
 #pragma once
 
+#include <Eigen/QR>
 #include <algorithm>
 #include <array>
 #include <cmath>
 #include <cstddef>
 #include <map>
+#include <qdk/chemistry/utils/logger.hpp>
+#include <stdexcept>
+#include <string>
 #include <utility>
+#include <vector>
 
 namespace qdk::chemistry::data::detail {
 
-/// Relative to the largest integral in the tensor.  A four-index
-/// transformation leaves round-off proportional to the integral magnitude
-/// rather than at an absolute floor: measured worst-case asymmetry runs from
-/// 3e-15 relative (cc-pVDZ) to 9e-12 relative (cc-pVQZ), while a genuinely
-/// reduced-symmetry tensor breaks the symmetry at O(1) relative magnitude.
-inline constexpr double two_body_symmetry_tolerance = 1e-8;
+/// Relative to the largest integral in the tensor.  Rounding in a four-index
+/// transformation grows with the orbital coefficients: about 1e-13 for
+/// ordinary molecules, but up to 2e-6 measured in nearly linearly dependent
+/// bases (an H8 chain in cc-pVTZ).  Genuinely reduced symmetry, as in
+/// downfolded Hamiltonians, appears near 1e-3 and above.  Qiskit Nature uses
+/// the same relative tolerance when it infers this symmetry.
+inline constexpr double two_body_symmetry_tolerance = 1e-5;
 
 using TwoBodyKey = std::array<std::size_t, 4>;
 
-/// Permutation symmetry of a two-body tensor, in increasing strength.
+inline double max_abs(const double* values, std::size_t count) {
+  double scale = 0.0;
+  for (std::size_t i = 0; i < count; ++i) {
+    scale = std::max(scale, std::abs(values[i]));
+  }
+  return scale;
+}
+
+/// Permutation symmetry of a restricted or same-spin two-body tensor, in
+/// increasing strength.
 ///
 /// The three generators have different standing.  a+_p a+_r a_s a_q is
 /// invariant under (p,q) <-> (r,s), so the operator depends only on the
@@ -41,55 +56,117 @@ enum class TwoBodySymmetry {
   EightFold,           ///< additionally (pq|rs) = (qp|rs) = (pq|sr)
 };
 
-/// Classify `integrals`, a row-major (pq|rs) tensor of extent `n` per index.
-inline TwoBodySymmetry classify_two_body_symmetry(const double* integrals,
-                                                  std::size_t n,
-                                                  double relative_tolerance) {
-  const std::size_t count = n * n * n * n;
-  double scale = 0.0;
-  for (std::size_t i = 0; i < count; ++i) {
-    scale = std::max(scale, std::abs(integrals[i]));
-  }
-  const double tolerance = relative_tolerance * scale;
-
-  auto idx = [n](std::size_t p, std::size_t q, std::size_t r, std::size_t s) {
-    return ((p * n + q) * n + r) * n + s;
-  };
+/// Strongest symmetry that holds at `key`, reading partner positions via `at`.
+/// Results order like the enum, so a tensor's symmetry is the minimum over
+/// its positions.
+template <class At>
+TwoBodySymmetry two_body_symmetry_at(const TwoBodyKey& key, double value,
+                                     const At& at, double tolerance) {
+  const auto [p, q, r, s] = key;
   auto equal = [tolerance](double lhs, double rhs) {
     return std::abs(lhs - rhs) <= tolerance;
   };
-
-  bool braket_symmetric = true;
-  bool eightfold = true;
-  for (std::size_t p = 0; p < n; ++p) {
-    for (std::size_t q = 0; q < n; ++q) {
-      for (std::size_t r = 0; r < n; ++r) {
-        for (std::size_t s = 0; s < n; ++s) {
-          const double value = integrals[idx(p, q, r, s)];
-          const double swapped = integrals[idx(r, s, p, q)];
-          // Hermiticity and the 8-fold test apply to the bra-ket average,
-          // since that is all the operator sees.
-          const double mean = 0.5 * (value + swapped);
-          if (!equal(mean, 0.5 * (integrals[idx(q, p, s, r)] +
-                                  integrals[idx(s, r, q, p)]))) {
-            return TwoBodySymmetry::NonHermitian;
-          }
-          if (braket_symmetric && !equal(value, swapped)) {
-            braket_symmetric = false;
-          }
-          if (eightfold && !equal(mean, 0.5 * (integrals[idx(q, p, r, s)] +
-                                               integrals[idx(r, s, q, p)]))) {
-            eightfold = false;
-          }
-        }
-      }
-    }
+  const double swapped = at({r, s, p, q});
+  // Hermiticity and the 8-fold test apply to the bra-ket average, since that
+  // is all the operator sees.
+  const double mean = 0.5 * (value + swapped);
+  if (!equal(mean, 0.5 * (at({q, p, s, r}) + at({s, r, q, p})))) {
+    return TwoBodySymmetry::NonHermitian;
   }
   // Both evaluation strategies read the stored tensor directly in the
   // cross-spin channel, so a Hermitian operator in the wrong gauge still has
   // to be symmetrized by the caller before it can be mapped.
-  if (!braket_symmetric) return TwoBodySymmetry::NotBraKetSymmetric;
-  return eightfold ? TwoBodySymmetry::EightFold : TwoBodySymmetry::FourFold;
+  if (!equal(value, swapped)) return TwoBodySymmetry::NotBraKetSymmetric;
+  if (!equal(mean, 0.5 * (at({q, p, r, s}) + at({r, s, q, p})))) {
+    return TwoBodySymmetry::FourFold;
+  }
+  return TwoBodySymmetry::EightFold;
+}
+
+/// Classify `integrals`, a row-major (pq|rs) tensor of extent `n` per index.
+inline TwoBodySymmetry classify_two_body_symmetry(const double* integrals,
+                                                  std::size_t n,
+                                                  double relative_tolerance) {
+  const double tolerance =
+      relative_tolerance * max_abs(integrals, n * n * n * n);
+  auto at = [integrals, n](const TwoBodyKey& k) {
+    return integrals[((k[0] * n + k[1]) * n + k[2]) * n + k[3]];
+  };
+
+  auto symmetry = TwoBodySymmetry::EightFold;
+  for (std::size_t p = 0; p < n; ++p) {
+    for (std::size_t q = 0; q < n; ++q) {
+      for (std::size_t r = 0; r < n; ++r) {
+        for (std::size_t s = 0; s < n; ++s) {
+          const TwoBodyKey key{p, q, r, s};
+          symmetry = std::min(
+              symmetry, two_body_symmetry_at(key, at(key), at, tolerance));
+          if (symmetry == TwoBodySymmetry::NonHermitian) return symmetry;
+        }
+      }
+    }
+  }
+  return symmetry;
+}
+
+/// Whether (pq|rs) = (qp|sr) for every element, the Hermiticity condition of
+/// a mixed-spin block that has no exchange partner within itself.
+inline bool two_body_has_reversal_symmetry(const double* integrals,
+                                           std::size_t n,
+                                           double relative_tolerance) {
+  const double tolerance =
+      relative_tolerance * max_abs(integrals, n * n * n * n);
+  for (std::size_t bra = 0; bra < n; ++bra)
+    for (std::size_t ket = 0; ket < n; ++ket)
+      for (std::size_t other_bra = 0; other_bra < n; ++other_bra)
+        for (std::size_t other_ket = 0; other_ket < n; ++other_ket)
+          if (std::abs(
+                  integrals[((bra * n + ket) * n + other_bra) * n + other_ket] -
+                  integrals[((ket * n + bra) * n + other_ket) * n +
+                            other_bra]) > tolerance)
+            return false;
+  return true;
+}
+
+inline void require_finite_two_body(const double* integrals, std::size_t count,
+                                    const std::string& consumer) {
+  if (!std::all_of(integrals, integrals + count,
+                   [](double value) { return std::isfinite(value); })) {
+    throw std::invalid_argument(
+        consumer + ": the two-body integrals contain a non-finite value.");
+  }
+}
+
+/// Rejects `NonHermitian` and `NotBraKetSymmetric`, for consumers that
+/// silently assume (pq|rs) = (rs|pq) = (qp|sr).
+inline void throw_unless_fourfold(TwoBodySymmetry symmetry,
+                                  const std::string& consumer) {
+  if (symmetry == TwoBodySymmetry::NonHermitian) {
+    throw std::invalid_argument(
+        consumer +
+        ": (pq|rs) + (rs|pq) != (qp|sr) + (sr|qp), so the two-body integrals "
+        "define a non-Hermitian operator, which is not supported.");
+  }
+  if (symmetry == TwoBodySymmetry::NotBraKetSymmetric) {
+    throw std::invalid_argument(
+        consumer +
+        ": the two-body integrals are Hermitian but not stored with "
+        "(pq|rs) = (rs|pq), which this method assumes. That swap leaves the "
+        "operator unchanged, so replace the tensor by its bra-ket average "
+        "((pq|rs) + (rs|pq)) / 2.");
+  }
+}
+
+/// Rejects a restricted or same-spin tensor outside the fourfold group, and
+/// returns its classification (`FourFold` or `EightFold`).
+inline TwoBodySymmetry require_fourfold_two_body(const double* integrals,
+                                                 std::size_t n,
+                                                 const std::string& consumer) {
+  require_finite_two_body(integrals, n * n * n * n, consumer);
+  const auto symmetry =
+      classify_two_body_symmetry(integrals, n, two_body_symmetry_tolerance);
+  throw_unless_fourfold(symmetry, consumer);
+  return symmetry;
 }
 
 /// Whether every three-center factor is symmetric in its orbital pair.
@@ -102,11 +179,7 @@ inline bool cholesky_factors_are_pair_symmetric(const double* factors,
                                                 std::size_t n, std::size_t naux,
                                                 double relative_tolerance) {
   const std::size_t n2 = n * n;
-  double scale = 0.0;
-  for (std::size_t i = 0; i < n2 * naux; ++i) {
-    scale = std::max(scale, std::abs(factors[i]));
-  }
-  const double tolerance = relative_tolerance * scale;
+  const double tolerance = relative_tolerance * max_abs(factors, n2 * naux);
 
   for (std::size_t aux = 0; aux < naux; ++aux) {
     const double* factor = factors + aux * n2;
@@ -121,9 +194,101 @@ inline bool cholesky_factors_are_pair_symmetric(const double* factors,
   return true;
 }
 
-/// Representative shared by all eight permutations of (p,q,r,s).  It is also
-/// the lexicographic minimum of the class, which sparse ingestion relies on to
-/// pick a deterministic representative value.
+struct CholeskyFactorSymmetryQR {
+  Eigen::MatrixXd symmetric;
+  Eigen::MatrixXd antisymmetric;
+};
+
+inline CholeskyFactorSymmetryQR cholesky_factor_symmetry_qr(
+    const double* factors, std::size_t n, std::size_t naux) {
+  const std::size_t n2 = n * n;
+  const Eigen::Index rows = static_cast<Eigen::Index>(n2);
+  const Eigen::Index columns = static_cast<Eigen::Index>(naux);
+  const double scale = max_abs(factors, n2 * naux);
+  if (scale == 0.0) {
+    return {Eigen::MatrixXd::Zero(std::min(rows, columns), columns),
+            Eigen::MatrixXd::Zero(std::min(rows, columns), columns)};
+  }
+
+  Eigen::MatrixXd symmetric(rows, columns);
+  Eigen::MatrixXd antisymmetric(rows, columns);
+  for (std::size_t aux = 0; aux < naux; ++aux) {
+    for (std::size_t p = 0; p < n; ++p) {
+      for (std::size_t q = 0; q < n; ++q) {
+        const double forward = factors[p * n + q + aux * n2] / scale;
+        const double reverse = factors[q * n + p + aux * n2] / scale;
+        symmetric(p * n + q, aux) = 0.5 * (forward + reverse);
+        antisymmetric(p * n + q, aux) = 0.5 * (forward - reverse);
+      }
+    }
+  }
+  auto reduced_qr = [](const Eigen::MatrixXd& matrix) -> Eigen::MatrixXd {
+    Eigen::HouseholderQR<Eigen::MatrixXd> qr(matrix);
+    const Eigen::Index reduced_rows = std::min(matrix.rows(), matrix.cols());
+    return qr.matrixQR().topRows(reduced_rows).triangularView<Eigen::Upper>();
+  };
+  return {reduced_qr(symmetric), reduced_qr(antisymmetric)};
+}
+
+inline double cholesky_reduced_product_norm(const Eigen::MatrixXd& left,
+                                            const Eigen::MatrixXd& right) {
+  Eigen::MatrixXd product(left.rows(), right.rows());
+  product.noalias() = left * right.transpose();
+  return product.stableNorm();
+}
+
+inline TwoBodySymmetry cholesky_two_body_symmetry(const double* factors,
+                                                  std::size_t n,
+                                                  std::size_t naux,
+                                                  double relative_tolerance) {
+  if (n == 0 || naux == 0 ||
+      cholesky_factors_are_pair_symmetric(factors, n, naux,
+                                          relative_tolerance)) {
+    return TwoBodySymmetry::EightFold;
+  }
+  const auto reduced = cholesky_factor_symmetry_qr(factors, n, naux);
+  const double mixed_norm =
+      cholesky_reduced_product_norm(reduced.symmetric, reduced.antisymmetric);
+  const double scale = std::hypot(
+      cholesky_reduced_product_norm(reduced.symmetric, reduced.symmetric),
+      cholesky_reduced_product_norm(reduced.antisymmetric,
+                                    reduced.antisymmetric),
+      std::sqrt(2.0) * mixed_norm);
+  return mixed_norm <= relative_tolerance * scale
+             ? TwoBodySymmetry::FourFold
+             : TwoBodySymmetry::NonHermitian;
+}
+
+inline bool cholesky_mixed_spin_has_reversal_symmetry(
+    const double* alpha, const double* beta, std::size_t n, std::size_t naux,
+    double relative_tolerance) {
+  if (n == 0 || naux == 0 ||
+      (cholesky_factors_are_pair_symmetric(alpha, n, naux,
+                                           relative_tolerance) &&
+       cholesky_factors_are_pair_symmetric(beta, n, naux,
+                                           relative_tolerance))) {
+    return true;
+  }
+  const auto alpha_reduced = cholesky_factor_symmetry_qr(alpha, n, naux);
+  const auto beta_reduced = cholesky_factor_symmetry_qr(beta, n, naux);
+  const double symmetric_norm = cholesky_reduced_product_norm(
+      alpha_reduced.symmetric, beta_reduced.symmetric);
+  const double antisymmetric_norm = cholesky_reduced_product_norm(
+      alpha_reduced.antisymmetric, beta_reduced.antisymmetric);
+  const double symmetric_antisymmetric_norm = cholesky_reduced_product_norm(
+      alpha_reduced.symmetric, beta_reduced.antisymmetric);
+  const double antisymmetric_symmetric_norm = cholesky_reduced_product_norm(
+      alpha_reduced.antisymmetric, beta_reduced.symmetric);
+  const double scale = std::hypot(
+      std::hypot(symmetric_norm, antisymmetric_norm),
+      std::hypot(symmetric_antisymmetric_norm, antisymmetric_symmetric_norm));
+  const double tolerance = relative_tolerance * scale;
+  return symmetric_antisymmetric_norm <= tolerance &&
+         antisymmetric_symmetric_norm <= tolerance;
+}
+
+/// Representative shared by all eight permutations of (p,q,r,s); also the
+/// lexicographic minimum of the class.
 inline TwoBodyKey eightfold_canonical(TwoBodyKey k) {
   if (k[0] > k[1]) std::swap(k[0], k[1]);
   if (k[2] > k[3]) std::swap(k[2], k[3]);
@@ -144,42 +309,108 @@ inline std::size_t eightfold_class_size(const TwoBodyKey& canonical) {
   return bra * ket * swap;
 }
 
-/// Sparse counterpart of @ref classify_two_body_symmetry.
-///
-/// Consumers of sparse data — the mapping engine and ordinary FCIDUMP readers
-/// alike — expand one stored record over its whole permutation class, while
-/// the container implies zero everywhere nothing is stored.  The two readings
-/// agree only when a class is stored exactly once (unambiguously a
-/// representative) or in full; in between, the expansion would overwrite the
-/// implied zeros.
-template <class Entries>
-bool sparse_entries_have_eightfold_symmetry(const Entries& entries,
-                                            double relative_tolerance) {
-  std::map<TwoBodyKey, double> stored;
+/// Images of (pq|rs) under exchange and reversal; may repeat positions.
+inline std::array<TwoBodyKey, 4> fourfold_orbit(const TwoBodyKey& k) {
+  return {{k,
+           {k[2], k[3], k[0], k[1]},
+           {k[1], k[0], k[3], k[2]},
+           {k[3], k[2], k[1], k[0]}}};
+}
+
+/// Images of (pq|rs) under the eightfold group; may repeat positions.
+inline std::array<TwoBodyKey, 8> eightfold_orbit(const TwoBodyKey& k) {
+  const auto direct = fourfold_orbit(k);
+  const auto swapped = fourfold_orbit({k[1], k[0], k[2], k[3]});
+  std::array<TwoBodyKey, 8> orbit;
+  std::copy(direct.begin(), direct.end(), orbit.begin());
+  std::copy(swapped.begin(), swapped.end(), orbit.begin() + 4);
+  return orbit;
+}
+
+/// Literal sparse two-body tensor: positions that are absent are zero.
+using SparseTwoBodyTensor = std::map<TwoBodyKey, double>;
+
+inline std::string two_body_key_string(const TwoBodyKey& key) {
+  return "(" + std::to_string(key[0]) + ", " + std::to_string(key[1]) + ", " +
+         std::to_string(key[2]) + ", " + std::to_string(key[3]) + ")";
+}
+
+/// Sparse classification, with a stored position that violates the
+/// strongest symmetry the result denies.
+struct SparseTwoBodySymmetry {
+  TwoBodySymmetry symmetry;
+  TwoBodyKey witness{};
+};
+
+/// Sparse counterpart of @ref classify_two_body_symmetry, reading absent
+/// positions as zero.  Every comparison involving a nonzero value is made at
+/// a stored position, so visiting only the stored entries is sufficient.
+inline SparseTwoBodySymmetry classify_sparse_two_body_symmetry(
+    const SparseTwoBodyTensor& tensor, double relative_tolerance) {
   double scale = 0.0;
-  for (const auto& [idx, value] : entries) {
-    stored[{static_cast<std::size_t>(idx[0]), static_cast<std::size_t>(idx[1]),
-            static_cast<std::size_t>(idx[2]),
-            static_cast<std::size_t>(idx[3])}] = value;
+  for (const auto& [key, value] : tensor) {
     scale = std::max(scale, std::abs(value));
   }
   const double tolerance = relative_tolerance * scale;
+  auto at = [&tensor](const TwoBodyKey& key) {
+    const auto it = tensor.find(key);
+    return it == tensor.end() ? 0.0 : it->second;
+  };
 
-  std::map<TwoBodyKey, std::pair<double, std::size_t>> classes;
-  for (const auto& [key, value] : stored) {
-    auto [it, inserted] =
-        classes.try_emplace(eightfold_canonical(key), value, 1);
-    if (inserted) continue;
-    if (std::abs(it->second.first - value) > tolerance) return false;
-    ++it->second.second;
-  }
-  for (const auto& [key, aggregate] : classes) {
-    if (aggregate.second != 1 &&
-        aggregate.second != eightfold_class_size(key)) {
-      return false;
+  SparseTwoBodySymmetry result{TwoBodySymmetry::EightFold};
+  for (const auto& [key, value] : tensor) {
+    const auto symmetry = two_body_symmetry_at(key, value, at, tolerance);
+    if (symmetry < result.symmetry) {
+      result = {symmetry, key};
+      if (symmetry == TwoBodySymmetry::NonHermitian) break;
     }
   }
-  return true;
+  return result;
+}
+
+/// Nonzero entries that are the only stored member of a larger eightfold
+/// class: the deprecated sparse shorthand in which one record stands for its
+/// whole class.  Read literally, such a record is never fourfold symmetric
+/// (only (ii|ii) is its own fourfold orbit), so it would be rejected.
+inline std::vector<TwoBodyKey> lone_eightfold_representatives(
+    const SparseTwoBodyTensor& tensor) {
+  std::map<TwoBodyKey, std::pair<TwoBodyKey, std::size_t>> classes;
+  for (const auto& [key, value] : tensor) {
+    ++classes.try_emplace(eightfold_canonical(key), key, 0)
+          .first->second.second;
+  }
+  std::vector<TwoBodyKey> lone;
+  for (const auto& [canonical, stored] : classes) {
+    const auto& [key, count] = stored;
+    if (count == 1 && eightfold_class_size(canonical) > 1 &&
+        tensor.at(key) != 0.0) {
+      lone.push_back(key);
+    }
+  }
+  return lone;
+}
+
+/// Expands every lone eightfold representative over its class, and logs a
+/// deprecation warning naming `consumer` if there were any.
+inline void expand_legacy_eightfold_representatives(
+    SparseTwoBodyTensor& tensor, const std::string& consumer) {
+  const auto lone = lone_eightfold_representatives(tensor);
+  if (lone.empty()) return;
+  for (const auto& key : lone) {
+    const double value = tensor.at(key);
+    for (const auto& position : eightfold_orbit(key)) {
+      tensor.emplace(position, value);
+    }
+  }
+  const std::size_t expanded = lone.size();
+  QDK_LOGGER().warn(
+      "{}: {} sparse two-body {} expanded over a larger 8-fold permutation "
+      "class in which {} the only stored member. This shorthand is "
+      "deprecated: store every class member, or call "
+      "SparseHamiltonianContainer.expand_symmetry_representatives with "
+      "TwoBodyPermutationGroup.EightFold.",
+      consumer, expanded, expanded == 1 ? "entry was" : "entries were",
+      expanded == 1 ? "it is" : "each is");
 }
 
 }  // namespace qdk::chemistry::data::detail

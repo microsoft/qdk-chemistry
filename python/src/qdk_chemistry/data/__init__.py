@@ -46,6 +46,7 @@ Exposed classes are:
 - :class:`Symmetries`: Physical symmetries of an electronic state.
 - :class:`TermPartition`: Index-based partition of Hamiltonian terms.
   See :class:`FlatPartition` and :class:`LayeredPartition`.
+- :class:`TwoBodyPermutationGroup`: Permutation group of sparse two-body symmetry representatives (FourFold, EightFold).
 - :class:`UnitaryRepresentation`: Unitary representation.
 - :class:`UnitaryContainer`: Abstract base class for different unitary representations.
 - :class:`Wavefunction`: Electronic wavefunction data and coefficients.
@@ -104,6 +105,7 @@ from qdk_chemistry._core.data import (
     StateVectorContainer,
     Structure,
     TaperingSpecification,
+    TwoBodyPermutationGroup,
     Wavefunction,
     WavefunctionContainer,
     WavefunctionType,
@@ -195,6 +197,7 @@ __all__ = [
     "TermPartition",
     "TimeDependentQubitHamiltonian",
     "TimeDependentQubitHamiltonianContainer",
+    "TwoBodyPermutationGroup",
     "UnitaryContainer",
     "UnitaryRepresentation",
     "Wavefunction",

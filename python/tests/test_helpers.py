@@ -340,3 +340,135 @@ def create_random_wavefunction(
 
     orbitals = create_test_orbitals(n_orbitals)
     return Wavefunction(StateVectorContainer(coeffs, configs, orbitals))
+
+
+def fourfold_average(tensor):
+    """Average a ``(pq|rs)`` tensor over the fourfold exchange and reversal group."""
+    return (tensor + tensor.transpose(2, 3, 0, 1) + tensor.transpose(1, 0, 3, 2) + tensor.transpose(3, 2, 1, 0)) / 4
+
+
+def fourfold_orbit(indices):
+    """Return the distinct positions related to ``indices`` by exchange and reversal."""
+    first, second, third, fourth = indices
+    return {
+        (first, second, third, fourth),
+        (third, fourth, first, second),
+        (second, first, fourth, third),
+        (fourth, third, second, first),
+    }
+
+
+def eightfold_orbit(indices):
+    """Return the distinct positions related to ``indices`` by the eightfold group."""
+    first, second, third, fourth = indices
+    return fourfold_orbit(indices) | fourfold_orbit((second, first, third, fourth))
+
+
+def create_dense_test_hamiltonian(one_alpha, two_aa, one_beta=None, two_ab=None, two_bb=None, *, core_energy=0.0):
+    """Create a dense Hamiltonian from 4-index tensors, unrestricted when beta integrals are given."""
+    num_orbitals = len(one_alpha)
+    empty = np.empty((0, 0))
+    if one_beta is None:
+        container = CanonicalFourCenterHamiltonianContainer(
+            one_alpha, two_aa.ravel(), create_test_orbitals(num_orbitals), core_energy, empty
+        )
+    else:
+        orbitals = Orbitals(
+            np.eye(num_orbitals), np.eye(num_orbitals), None, None, None, create_test_basis_set(num_orbitals)
+        )
+        container = CanonicalFourCenterHamiltonianContainer(
+            one_alpha, one_beta, two_aa.ravel(), two_ab.ravel(), two_bb.ravel(), orbitals, core_energy, empty, empty
+        )
+    return Hamiltonian(container)
+
+
+def fermionic_reference_matrix(one_alpha, one_beta, two_aa, two_ab, two_bb):
+    """Apply chemist-order ladder operators to blocked, little-endian occupations.
+
+    This is an independent occupation-basis reference for qubit mappers; it
+    reads every tensor literally, without assuming any permutation symmetry.
+    """
+    num_orbitals = len(one_alpha)
+    dimension = 1 << (2 * num_orbitals)
+    matrix = np.zeros((dimension, dimension), dtype=complex)
+
+    def accumulate(coefficient, operations):
+        """Add one ladder-operator product, applied right to left."""
+        if coefficient == 0:
+            return
+        for column in range(dimension):
+            state = column
+            phase = 1
+            for mode, creation in operations:
+                occupied = bool(state & (1 << mode))
+                if occupied == creation:
+                    break
+                phase *= (-1) ** ((state & ((1 << mode) - 1)).bit_count())
+                state ^= 1 << mode
+            else:
+                matrix[state, column] += coefficient * phase
+
+    for spin, one_body in enumerate((one_alpha, one_beta)):
+        for first, second in np.ndindex(one_body.shape):
+            accumulate(
+                one_body[first, second],
+                [(second + spin * num_orbitals, False), (first + spin * num_orbitals, True)],
+            )
+
+    for first_spin, second_spin in np.ndindex(2, 2):
+        if first_spin == second_spin:
+            tensor = two_aa if first_spin == 0 else two_bb
+        else:
+            tensor = two_ab if first_spin == 0 else two_ab.transpose(2, 3, 0, 1)
+        for first, second, third, fourth in np.ndindex(tensor.shape):
+            accumulate(
+                0.5 * tensor[first, second, third, fourth],
+                [
+                    (second + first_spin * num_orbitals, False),
+                    (fourth + second_spin * num_orbitals, False),
+                    (third + second_spin * num_orbitals, True),
+                    (first + first_spin * num_orbitals, True),
+                ],
+            )
+    return matrix
+
+
+def create_fourfold_test_hamiltonian(num_orbitals: int, restricted: bool):
+    """Random Hamiltonian with fourfold but not eightfold integrals, and its reference matrix."""
+    random = np.random.default_rng(706 + num_orbitals)
+    one_alpha, one_beta = random.normal(size=(2, num_orbitals, num_orbitals))
+    one_alpha = (one_alpha + one_alpha.T) / 2
+    one_beta = (one_beta + one_beta.T) / 2
+    two_aa, two_ab, two_bb = random.normal(size=(3,) + (num_orbitals,) * 4)
+    two_aa, two_bb = fourfold_average(two_aa), fourfold_average(two_bb)
+    assert not np.allclose(two_aa, two_aa.swapaxes(0, 1))
+    core_energy = 1.875
+
+    if restricted:
+        one_beta, two_ab, two_bb = one_alpha, two_aa, two_aa
+        hamiltonian = create_dense_test_hamiltonian(one_alpha, two_aa, core_energy=core_energy)
+    else:
+        two_ab = (two_ab + two_ab.transpose(1, 0, 3, 2)) / 2
+        assert not np.allclose(two_ab, two_ab.transpose(2, 3, 0, 1))
+        assert not np.allclose(two_ab, two_ab.swapaxes(0, 1))
+        hamiltonian = create_dense_test_hamiltonian(
+            one_alpha, two_aa, one_beta, two_ab, two_bb, core_energy=core_energy
+        )
+
+    assert hamiltonian.get_orbitals().is_restricted() == restricted
+    reference = fermionic_reference_matrix(one_alpha, one_beta, two_aa, two_ab, two_bb)
+    np.testing.assert_allclose(reference, reference.conj().T, atol=1e-12, rtol=0)
+    return hamiltonian, reference
+
+
+def create_non_hermitian_mixed_block_hamiltonian():
+    """Unrestricted Hamiltonian whose alpha-beta block breaks (pq|rs) = (qp|sr), and its reference matrix."""
+    num_orbitals = 3
+    random = np.random.default_rng(684)
+    one_alpha, one_beta = random.normal(size=(2, num_orbitals, num_orbitals))
+    one_alpha, one_beta = (one_alpha + one_alpha.T) / 2, (one_beta + one_beta.T) / 2
+    two_aa, two_bb = (fourfold_average(tensor) for tensor in random.normal(size=(2,) + (num_orbitals,) * 4))
+    two_ab = random.normal(size=(num_orbitals,) * 4)
+    assert not np.allclose(two_ab, two_ab.transpose(1, 0, 3, 2))
+    hamiltonian = create_dense_test_hamiltonian(one_alpha, two_aa, one_beta, two_ab, two_bb)
+    return hamiltonian, fermionic_reference_matrix(one_alpha, one_beta, two_aa, two_ab, two_bb)

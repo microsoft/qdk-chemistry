@@ -344,14 +344,19 @@ Returns:
       R"(
 Map a fermionic Hamiltonian to qubit Pauli terms using Majorana loops.
 
-When ``spin_symmetric`` is true, uses a spin-summed fast path that assumes
-identical integrals across spin channels (restricted orbitals). That path also
-needs 8-fold permutation symmetry; tensors carrying only the 4-fold subgroup
-``(pq|rs) == (qp|sr) == (rs|pq)`` fall back to the general spin-channel path.
-A Hermitian tensor not stored with ``(pq|rs) == (rs|pq)`` raises ``ValueError``
--- that swap leaves the operator unchanged, so use the bra-ket average -- as
-does a genuinely non-Hermitian tensor. When false, handles each spin channel
-independently (unrestricted orbitals).
+When ``spin_symmetric`` is true, the integrals must be identical across spin
+channels (restricted orbitals; not validated). 8-fold integrals use
+spin-summed excitations, and 4-fold integrals,
+``(pq|rs) == (qp|sr) == (rs|pq)``, use spin-summed symmetric and
+antisymmetric excitation pairs. A non-Hermitian tensor raises ``ValueError``,
+as does a Hermitian tensor not stored with ``(pq|rs) == (rs|pq)``; map its
+bra-ket average instead.
+
+When ``spin_symmetric`` is false (unrestricted orbitals), the excitation-pair
+split is used when ``aa`` and ``bb`` are 4-fold and ``ab`` satisfies
+``(pq|rs) == (qp|sr)``; otherwise every spin channel is looped over in full.
+Either split falls back to the full loop when integral screening would break
+the symmetry it needs.
 
 Returns ``(words, coefficients)`` where ``words`` is a list of sparse
 Pauli words.
@@ -377,32 +382,38 @@ Map a fermionic Hamiltonian to qubit Pauli terms.
 
 The two-body integrals are consumed in the native storage format of the
 Hamiltonian's container: Cholesky (three-center) and sparse containers are
-read directly without materializing the dense N^4 two-body tensor; any
-other container uses the dense path.
+read directly without reconstructing the dense N^4 two-body tensor; any
+other container uses the dense path. Integral symmetry selects the
+evaluation path as in the buffer-based overload.
 
-For Cholesky and dense containers, the returned ``(words, coefficients)``
-match the dense path for the same underlying integrals.  For sparse
-containers, stored entries are canonicalized and symmetry-expanded before
-mapping, so each permutation class must be stored exactly once (unambiguously
-a representative) or in full; a partially stored class raises ``ValueError``
-because the expansion would overwrite the zeros implied at its missing
-positions.
+Cholesky factors with pair-symmetric and pair-antisymmetric parts ``S`` and
+``A`` give 4-fold integrals exactly when ``S @ A.T == 0``; restricted factors
+that fail this check raise ``ValueError``.
+
+Sparse entries are read literally, with unstored positions equal to zero; a
+complete 4-fold suborbit needs no explicit zeros. As a deprecated shorthand, a
+nonzero entry that is the only stored member of a larger 8-fold orbit is
+expanded over the orbit, with a warning.
 
 The Hamiltonian's constant energy shift (nuclear repulsion / frozen core)
-is intentionally **not** included in the mapped operator, matching the
-buffer-based overload as invoked by ``QdkQubitMapper`` (which always
-passes ``core_energy=0.0``); callers that need the constant term must add
-it separately.
+is intentionally **not** included in the mapped operator; callers that need
+the constant term must add it separately.
 
 Args:
     mapping (MajoranaMapping): The Majorana-to-Pauli encoding (no tapering).
     hamiltonian (Hamiltonian): The fermionic Hamiltonian.
-    spin_symmetric (bool): Use the spin-summed restricted fast path.
+    spin_symmetric (bool): Whether the integrals are identical across spin
+      channels (restricted orbitals; not validated).
     threshold (float): Drop Pauli terms with magnitude below this value.
     integral_threshold (float): Skip integrals with magnitude below this value.
 
 Returns:
     tuple: ``(words, coefficients)`` where ``words`` is a list of sparse Pauli
     words and ``coefficients`` is a list of complex coefficients.
+
+Raises:
+    ValueError: If restricted two-body integrals define a non-Hermitian
+        operator or are Hermitian but not stored with ``(pq|rs) == (rs|pq)``,
+        or if restricted Cholesky factors fail the ``S @ A.T == 0`` check.
 )");
 }
