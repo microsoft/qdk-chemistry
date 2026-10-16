@@ -87,7 +87,8 @@ docs = [
   "sphinx-rtd-theme",
   "myst-parser",
   "breathe==4.36.0",
-  "sphinx-autodoc-typehints",
+  # sphinx-autodoc-typehints temporarily capped to avoid https://github.com/microsoft/qdk-chemistry/issues/779
+  "sphinx-autodoc-typehints<3.14",
   "sphinx-inline-tabs",
   "sphinxcontrib-napoleon",
   "sphinxcontrib-bibtex",
