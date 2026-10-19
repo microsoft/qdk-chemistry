@@ -12,6 +12,7 @@
 # which legitimately requires many return statements.
 
 import concurrent.futures
+import contextlib
 import functools
 import hashlib
 import inspect
@@ -387,7 +388,15 @@ def _jsonable_settings_dict(settings: dict[str, Any]) -> dict[str, Any]:
 
 
 def _run_algorithm(
-    algorithm, *args, cache=None, remote=None, remote_config=None, remote_timeout=120, overwrite=False, **kwargs
+    algorithm,
+    *args,
+    cache=None,
+    remote=None,
+    remote_config=None,
+    remote_timeout=120,
+    overwrite=False,
+    use_cache=True,
+    **kwargs,
 ):
     """Execute an algorithm with automatic caching.
 
@@ -397,6 +406,8 @@ def _run_algorithm(
     ``<scratch>/cache``).  If a user supplies their own cache (path,
     backend name, or ``CacheBackend`` instance), it is used instead —
     this includes shared caches, ``TieredCache``, CosmosDB, etc.
+    Pass ``use_cache=False`` to run in-process without a cache, for
+    results whose live Q# operations do not survive serialization.
 
     When *remote* is set and *remote_timeout* is not ``None``, the SDK
     call runs in a background thread.  If it completes within
@@ -412,12 +423,12 @@ def _run_algorithm(
     # never recomputed.  When the caller supplies an explicit cache it
     # takes precedence; otherwise a default FolderCache under
     # config.cache_dir is used.
-    if cache is not None:
+    if use_cache and cache is not None:
         resolved_cache = resolve_cache(cache)
-    elif _REMOTE_AVAILABLE:
+    elif use_cache and _REMOTE_AVAILABLE:
         resolved_cache = FolderCache(path=config.cache_dir)
     else:
-        # Remote module unavailable and no explicit cache — run without.
+        # Caching disabled, or remote module unavailable and no explicit cache — run without.
         return algorithm.run(*args, **kwargs)
 
     # If remote is a name string and remote_config is provided,
@@ -780,6 +791,7 @@ _TOOL_CATEGORIES: dict[str, list[str]] = {
         "run_energy_estimator",
         "estimate_circuit",
         "estimate_circuit_qre",
+        "estimate_qpe_circuit_qre",
     ],
     "qpe": [
         "run_time_evolution_builder",
@@ -789,7 +801,6 @@ _TOOL_CATEGORIES: dict[str, list[str]] = {
         "run_controlled_evolution_circuit_mapper",
         "run_circuit_executor",
         "run_hadamard_test",
-        "run_qpe_circuit_builder",
         "run_phase_estimation",
     ],
     "visualization": [
@@ -2343,6 +2354,63 @@ def estimate_circuit(
 _QRE_ARCHITECTURES = ("majorana",)
 
 
+def _validate_qre_arguments(architecture: str, error_rate: float, max_error: float) -> str | None:
+    """Return an error message for unsupported QRE preset arguments, or None."""
+    if architecture not in _QRE_ARCHITECTURES:
+        return f"Unsupported architecture '{architecture}'. Supported: {', '.join(_QRE_ARCHITECTURES)}."
+    if not 0 < error_rate < 1:
+        return f"error_rate must be strictly between 0 and 1; received {error_rate!r}."
+    if not 0 < max_error < 1:
+        return f"max_error must be strictly between 0 and 1; received {max_error!r}."
+    return None
+
+
+def _estimate_qre_preset(
+    circuit: data.Circuit,
+    name: str,
+    error_rate: float,
+    max_error: float,
+    num_ts_per_rotation: list[int] | None,
+    compute_distances: list[int] | None,
+    factory_distances: list[int] | None,
+    use_graph: bool,
+) -> dict | str:
+    """Run the Majorana ThreeAux qdk.qre preset on a circuit and return its Pareto table records."""
+    try:
+        from qdk.qre import PSSPC, LatticeSurgery, estimate  # noqa: PLC0415
+        from qdk.qre.models import Majorana, RoundBasedFactory, ThreeAux  # noqa: PLC0415
+    except ImportError as e:
+        return f"qdk.qre is unavailable ({e!s}). Install qdk-chemistry with the 'qre' extra."
+
+    compute_kwargs = {"distance": compute_distances} if compute_distances else {}
+    factory_kwargs = {"distance": factory_distances} if factory_distances else {}
+    psspc_kwargs = {"num_ts_per_rotation": num_ts_per_rotation} if num_ts_per_rotation else {}
+
+    try:
+        table = estimate(
+            circuit.get_qre_application(),
+            Majorana(error_rate=error_rate),
+            ThreeAux.q(**compute_kwargs) * RoundBasedFactory.q(use_cache=True, code_query=ThreeAux.q(**factory_kwargs)),
+            PSSPC.q(**psspc_kwargs) * LatticeSurgery.q(),
+            max_error=max_error,
+            use_graph=use_graph,
+            name=name,
+        )
+        table.add_factory_summary_column()
+        table.add_qubit_partition_column()
+        frame = table.as_frame()
+    except (RuntimeError, ValueError, TypeError) as e:
+        return f"QRE estimation failed: {e!s}"
+
+    for column in frame.select_dtypes(include="timedelta").columns:
+        frame[f"{column}_seconds"] = frame.pop(column).dt.total_seconds()
+
+    return {
+        "num_estimates": len(frame),
+        "estimates": json.loads(frame.to_json(orient="records", default_handler=str)),
+    }
+
+
 @app.tool()
 @_structured
 @validate_project
@@ -2365,53 +2433,33 @@ def estimate_circuit_qre(
     Requires the ``qre`` extra. Use direct ``qdk.qre`` code for other models.
     """
     architecture = architecture.lower().strip()
-    if architecture not in _QRE_ARCHITECTURES:
-        return f"Unsupported architecture '{architecture}'. Supported: {', '.join(_QRE_ARCHITECTURES)}."
-    if not 0 < error_rate < 1:
-        return f"error_rate must be strictly between 0 and 1; received {error_rate!r}."
-    if not 0 < max_error < 1:
-        return f"max_error must be strictly between 0 and 1; received {max_error!r}."
-
-    try:
-        from qdk.qre import PSSPC, LatticeSurgery, estimate  # noqa: PLC0415
-        from qdk.qre.models import Majorana, RoundBasedFactory, ThreeAux  # noqa: PLC0415
-    except ImportError as e:
-        return f"qdk.qre is unavailable ({e!s}). Install qdk-chemistry with the 'qre' extra."
+    error = _validate_qre_arguments(architecture, error_rate, max_error)
+    if error:
+        return error
 
     circuit_filename = _strip(circuit_filename)
     circuit, error = _load_or_error(circuit_filename, data.Circuit, "circuit")
     if error:
         return error
 
-    compute_kwargs = {"distance": compute_distances} if compute_distances else {}
-    factory_kwargs = {"distance": factory_distances} if factory_distances else {}
-    psspc_kwargs = {"num_ts_per_rotation": num_ts_per_rotation} if num_ts_per_rotation else {}
-
-    try:
-        application = circuit.get_qre_application()
-        table = estimate(
-            application,
-            Majorana(error_rate=error_rate),
-            ThreeAux.q(**compute_kwargs)
-            * RoundBasedFactory.q(use_cache=True, code_query=ThreeAux.q(**factory_kwargs)),
-            PSSPC.q(**psspc_kwargs) * LatticeSurgery.q(),
-            max_error=max_error,
-            use_graph=use_graph,
-            name=Path(circuit_filename).name,
-        )
-        table.add_factory_summary_column()
-        table.add_qubit_partition_column()
-        frame = table.as_frame()
-    except (RuntimeError, ValueError, TypeError) as e:
-        return f"QRE estimation failed: {e!s}"
-
+    estimates = _estimate_qre_preset(
+        circuit,
+        Path(circuit_filename).name,
+        error_rate,
+        max_error,
+        num_ts_per_rotation,
+        compute_distances,
+        factory_distances,
+        use_graph,
+    )
+    if isinstance(estimates, str):
+        return estimates
     return {
         "circuit_filename": circuit_filename,
         "architecture": architecture,
         "error_rate": error_rate,
         "max_error": max_error,
-        "num_estimates": len(frame),
-        "estimates": json.loads(frame.to_json(orient="records", default_handler=str)),
+        **estimates,
     }
 
 
@@ -2776,10 +2824,8 @@ def run_block_encoding_builder(
     energy_shift = getattr(metadata, "energy_shift", None)
     if energy_shift is not None:
         result["energy_shift"] = float(energy_shift)
-    try:
+    with contextlib.suppress(AttributeError, ValueError):
         result["lambda_eff"] = float(encoding.lambda_eff)
-    except (AttributeError, ValueError):
-        pass
 
     if target_energy_error is not None:
         query_lambda = result.get("lambda_eff", result.get("normalization"))
@@ -2793,82 +2839,74 @@ def run_block_encoding_builder(
 @app.tool()
 @_structured
 @validate_project
-def run_qpe_circuit_builder(
+def estimate_qpe_circuit_qre(
     project_name: str,
-    state_prep_circuit_filename: str,
+    wavefunction_filename: str,
     qubit_hamiltonian_filename: str,
-    out_circuit_filename: str,
     algorithm_name: str | None = None,
     settings: dict | None = None,
-    cache: str | None = None,
-    remote: str | None = None,
-    remote_config: dict | None = None,
-    remote_timeout: int = 120,
-    overwrite: bool = False,
-) -> str | dict[str, Any]:
-    """Build QPE circuits, such as qdk_unary with a sossa walk, without executing them and save each Circuit.
+    state_prep_algorithm_name: str | None = None,
+    state_prep_settings: dict | None = None,
+    architecture: str = "majorana",
+    error_rate: float = 1e-5,
+    max_error: float = 0.01,
+    num_ts_per_rotation: list[int] | None = None,
+    compute_distances: list[int] | None = None,
+    factory_distances: list[int] | None = None,
+    use_graph: bool = True,
+) -> dict | str:
+    """Build QPE circuits, such as qdk_unary with a sossa walk, in memory and estimate each with the qdk.qre preset.
 
-    A single circuit is saved to ``out_circuit_filename``; several circuits are
-    saved with an ``_<index>`` suffix on the stem. Use ``estimate_circuit_qre``
-    or ``estimate_circuit`` on the saved circuits for resource estimates.
+    Nothing is executed or saved: the walk circuits carry live Q# operations
+    that do not compile to QIR, so the state preparation from
+    ``wavefunction_filename`` and the ``qpe_circuit_builder`` both run
+    in-process without the cache. The QRE arguments match
+    ``estimate_circuit_qre``.
     """
-    state_prep_circuit_filename = _strip(state_prep_circuit_filename)
+    architecture = architecture.lower().strip()
+    error = _validate_qre_arguments(architecture, error_rate, max_error)
+    if error:
+        return error
+
+    wavefunction_filename = _strip(wavefunction_filename)
     qubit_hamiltonian_filename = _strip(qubit_hamiltonian_filename)
-    out_circuit_filename = _strip(out_circuit_filename)
-    try:
-        out_circuit_filename = ensure_filename_format(out_circuit_filename, "Circuit")
-    except FilenameFormatError as e:
-        return f"Invalid output filename: {e!s}"
+    wavefunction, error = _load_or_error(wavefunction_filename, data.Wavefunction, "wavefunction")
+    if error:
+        return error
+    qubit_hamiltonian, error = _load_or_error(qubit_hamiltonian_filename, data.QubitOperator, "qubit hamiltonian")
+    if error:
+        return error
 
-    state_prep_circuit, _err = _load_or_error(state_prep_circuit_filename, data.Circuit, "circuit")
-    if _err:
-        return _err
-
-    qubit_hamiltonian, _err = _load_or_error(qubit_hamiltonian_filename, data.QubitOperator, "qubit hamiltonian")
-    if _err:
-        return _err
-
+    state_prep = algorithms.create("state_prep", state_prep_algorithm_name)
+    _apply_settings(state_prep, state_prep_settings)
     circuit_builder = algorithms.create("qpe_circuit_builder", algorithm_name)
     _apply_settings(circuit_builder, settings)
 
     try:
-        circuits = _run_algorithm(
-            circuit_builder,
-            state_prep_circuit,
-            qubit_hamiltonian,
-            cache=cache,
-            remote=remote,
-            remote_config=remote_config,
-            remote_timeout=remote_timeout,
-            overwrite=overwrite,
-        )
+        state_prep_circuit = _run_algorithm(state_prep, wavefunction, use_cache=False)
+        circuits = _run_algorithm(circuit_builder, state_prep_circuit, qubit_hamiltonian, use_cache=False)
     except (RuntimeError, ValueError) as e:
         return f"QPE circuit builder failed: {e!s}"
-
     if isinstance(circuits, data.Circuit):
         circuits = [circuits]
-    if len(circuits) == 1:
-        filenames = [out_circuit_filename]
-    else:
-        stem, _, suffix = out_circuit_filename.partition(".")
-        filenames = [f"{stem}_{index}.{suffix}" for index in range(len(circuits))]
 
-    if not overwrite:
-        for filename in filenames:
-            existing_check = check_output_exists(filename, data.Circuit)
-            if existing_check:
-                return existing_check
+    results = []
+    for index, circuit in enumerate(circuits):
+        estimates = _estimate_qre_preset(
+            circuit,
+            f"{Path(qubit_hamiltonian_filename).name}[{index}]",
+            error_rate,
+            max_error,
+            num_ts_per_rotation,
+            compute_distances,
+            factory_distances,
+            use_graph,
+        )
+        if isinstance(estimates, str):
+            return estimates
+        results.append({"num_qubits": int(circuit.num_qubits), **estimates})
 
-    for circuit, filename in zip(circuits, filenames, strict=True):
-        try:
-            save_data_object(circuit, filename)
-        except (RuntimeError, ValueError) as e:
-            return f"Failed to save circuit to {filename}: {e!s}"
-
-    return {
-        "circuit_filenames": filenames,
-        "num_qubits": [int(circuit.num_qubits) for circuit in circuits],
-    }
+    return {"architecture": architecture, "error_rate": error_rate, "max_error": max_error, "circuits": results}
 
 
 @app.tool()
