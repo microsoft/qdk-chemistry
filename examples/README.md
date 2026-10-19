@@ -24,6 +24,7 @@ The table below summarizes which [optional extras](https://github.com/microsoft/
 | Example | Install command |
 |---------|----------------|
 | `qpe_stretched_n2.ipynb` | `pip install 'qdk-chemistry[jupyter,qiskit-extras,qre]'` |
+| `sossa_qre.ipynb` | `pip install 'qdk-chemistry[jupyter,qre]'` |
 | `state_prep_energy.ipynb` | `pip install 'qdk-chemistry[jupyter,qiskit-extras]'` |
 | `time_evolve_and_measure.ipynb` | `pip install 'qdk-chemistry[jupyter]'` |
 | `resource_estimation/estimation_ising_2d.ipynb` | `pip install 'qdk-chemistry[jupyter,qre]'` |
@@ -78,6 +79,7 @@ Download or clone the full `examples/` directory structure to run the examples.
 - `resource_estimation/estimation_magnets.ipynb`: Jupyter notebook demonstrating quantum resource estimation for quantum phase estimation of a J1–J2 Heisenberg model.
 - `resource_estimation/estimation_hubbard_2d.ipynb`: Jupyter notebook demonstrating quantum resource estimation for quantum phase estimation of a periodic 2D Fermi-Hubbard model with plaquette Trotterization.
 - `extended_hubbard.ipynb`: Jupyter notebook modeling cyclobutadiene with the Extended Hubbard model and estimating its energy with quantum phase estimation.
+- `sossa_qre.ipynb`: Jupyter notebook building a sum-of-squares spectrum amplification (SOSSA) block encoding from a double-factorized tensor hypercontraction (DFTHC) Hamiltonian, validating it with unary-iteration phase estimation on H2 and estimating fault-tolerant resources for an Fe2S2 active space.
 
 ## Companion datasets and assets
 
