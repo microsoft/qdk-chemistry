@@ -72,6 +72,25 @@ def _operation(name: str, args: str, *, controlled: bool = False, namespace: str
     return f"qs => {{ {namespace}.{name}({args.format(qs='qs')}); }}"
 
 
+@pytest.mark.parametrize("builder_name", ["qdk_standard", "qdk_iterative"])
+def test_qpe_declares_model_register_width(builder_name: str) -> None:
+    """Model-description QPE uses the plaquette mapper's declared control and system width."""
+    builder = create(
+        "qpe_circuit_builder",
+        builder_name,
+        num_bits=2,
+        unitary_builder=AlgorithmRef(
+            "hamiltonian_unitary_builder", "hubbard_plaquette", time=0.1, num_divisions=1, target_accuracy=0.0
+        ),
+        controlled_circuit_mapper=AlgorithmRef("controlled_circuit_mapper", "hubbard_plaquette"),
+    )
+    circuits = builder.run(identity_state_prep(8), _model(2))
+    num_phase = 2 if builder_name == "qdk_standard" else 1
+    assert all(circuit.num_qubits == 8 + num_phase for circuit in circuits)
+    result = create("circuit_executor", "qdk_sparse_state_simulator").run(circuits[0], shots=1)
+    assert result.bitstring_counts == {"0" * num_phase: 1}
+
+
 class TestHammingWeightPhasing:
     """Batched phase towers apply the same unitary as their separate rotations."""
 

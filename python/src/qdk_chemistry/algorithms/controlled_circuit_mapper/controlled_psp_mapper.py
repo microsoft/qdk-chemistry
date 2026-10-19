@@ -144,4 +144,5 @@ class ControlledPSPMapper(ControlledCircuitMapper):
         return Circuit(
             qsharp_factory=qsharp_factory,
             qsharp_op=QSHARP_UTILS.CircuitComposition.MakeSingleControlOp(repeated_op),
+            num_qubits=1 + num_system_qubits + num_block_ancillas,
         )

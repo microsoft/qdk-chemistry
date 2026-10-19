@@ -397,7 +397,8 @@ where :math:`\lambda \geq \|H\|` is a normalization factor (typically the L1 nor
 The Hamiltonian is encoded in the top-left block of the larger unitary — hence the name "block encoding."
 
 Block encodings are the foundation for quantum algorithms such as qubitization, QSVT, and quantum linear system solvers.
-QDK/Chemistry currently provides the **LCU** (Linear Combination of Unitaries) method for constructing block encodings.
+QDK/Chemistry provides **LCU** (Linear Combination of Unitaries) block encoding
+and **SOSSA** (sum-of-squares spectral amplification).
 
 .. _lcu-builder:
 
@@ -480,6 +481,122 @@ To use alias sampling for the PREPARE oracle, pass an
       :end-before: # end-cell-lcu-prepare
 
 The resulting :class:`~qdk_chemistry.data.UnitaryRepresentation` wraps an ``LCUContainer`` containing the Prepare and Select oracles.
+
+.. _sossa-builder:
+
+Sum-of-squares spectral amplification
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+.. rubric:: Factory name: ``"sossa"``
+
+The SOSSA builder :cite:`Low2025` takes the structured operator produced by
+the :ref:`sum-of-squares mapper <sum-of-squares-qubit-mapper>`.
+It returns a
+:class:`~qdk_chemistry.data.unitary_representation.containers.sossa.SOSSABlockEncodingContainer`
+with numerical PREPARE/SELECT data and normalization :math:`\Lambda`.
+The corresponding ``circuit_mapper`` / ``sossa`` emits
+
+.. math::
+
+   B = U^\dagger R_{\mathrm{inner}} U,\qquad
+   W = R_{\mathrm{outer}} B.
+
+The mapper returns :math:`B`, not the completed walk :math:`W`.
+:ref:`Unary QPE <unary-qpe-algorithm>` supplies the outer reflections.
+Only unit power, canonical blocked Jordan-Wigner ordering, and untapered
+input are supported by this circuit path. Standard and iterative QPE do
+not have a controlled SOSSA mapper.
+
+For a completed-walk eigenphase :math:`\varphi`, the energy decoder is
+
+.. math::
+
+   E = E_{\mathrm{shift}} + 2\Lambda\cos^2(\pi\varphi).
+
+This is a total energy, including the input Hamiltonian's core energy.
+The normalization must be positive and finite. Individual zero-weight
+generator rows remain valid when the total normalization is positive.
+
+.. _sossa-query-guidance:
+
+Reference energies and query precision
+"""""""""""""""""""""""""""""""""""""""
+
+The builder accepts either ``reference_ground_state_energy`` (a total
+energy) or ``reference_energy_gap``:
+
+.. math::
+
+   E_{\mathrm{gap}} = E_{\mathrm{ref}} - E_{\mathrm{shift}},\qquad
+   \lambda_{\mathrm{eff}}
+   = \sqrt{E_{\mathrm{gap}}(2\Lambda-E_{\mathrm{gap}})}.
+
+A supplied reference must satisfy :math:`0<E_{\mathrm{gap}}<2\Lambda`.
+Without either reference, the block encoding can still be built, but
+accessing ``lambda_eff`` raises an error.
+
+The factor container's ``get_lambda()``, the mapped normalization
+:math:`\Lambda`, and :math:`\lambda_{\mathrm{eff}}` are distinct quantities.
+The last is the local magnitude of the energy derivative with respect to
+the walk phase angle at the reference energy.
+For the unary cosine-window convention, a query-count guide is
+
+.. math::
+
+   p_{\mathrm{guide}}
+   = \left\lceil\frac{\pi s}{2\epsilon_{\mathrm{PEA}}}\right\rceil,
+   \qquad
+   s=\begin{cases}
+       \lambda & \text{LCU},\\
+       \lambda_{\mathrm{eff}} & \text{SOSSA near the reference}.
+     \end{cases}
+
+This uses a local sensitivity and the phase-estimation error convention of
+the query schedule :cite:`Babbush2018,Lee2021`.
+It is not a global, fixed-confidence energy-error guarantee.
+Reference uncertainty, branch selection, trial-state overlap, sampling,
+factorization, screening, coefficient rounding, and rotation synthesis
+must be accounted for separately.
+The caller sets a positive ``num_queries`` explicitly; it need not be a
+power of two, and the library does not select it automatically.
+
+See the executable :ref:`2.3 release example <release-v2.3.0>` for separate
+Hamiltonian factorization, SOS mapping, block encoding, trial-state
+preparation, and unary QPE.
+
+Circuit precision and shared registers
+""""""""""""""""""""""""""""""""""""""
+
+The SOSSA mapper selects ``outer_prepare_algorithm`` through an
+:class:`~qdk_chemistry.data.AlgorithmRef`.
+``inner_prepare_algorithm`` is ``"direct"`` or
+``"controlled_alias_sampling"``; ``select_algorithm`` is ``"direct"`` or
+``"qrom_phase_gradient"``.
+``coefficient_bit_precision`` and ``rotation_bit_precision`` control
+different approximations and do not define a total energy-error budget.
+The mapper applies ``coefficient_bit_precision`` to both outer and inner
+alias sampling. For an outer PREPARE exposing ``bits_precision`` or
+``allocate_phase_gradient``, it sets those to its coefficient precision
+and ``False``, respectively, overriding the nested values.
+For outer QROM preparation, set its ``rotation_bit_precision`` to agree
+with SELECT.
+
+The mapped :class:`~qdk_chemistry.data.Circuit` declares its complete
+argument width through ``num_qubits``.
+Its ``num_phase_gradient_ancillas`` metadata identifies a caller-owned
+suffix that must be initialized once and excluded from zero-state
+reflections. Shared PREPARE and SELECT gradients must have identical
+nonzero widths.
+Internal lookup scratch is not part of the caller-visible register.
+
+Outer alias preparation uses a power-of-two-padded coefficient vector.
+The conditional inner preparation uses :math:`B+1` entries and can require
+phase-safe general state synthesis for a non-power-of-two dimension.
+That cost belongs to both free-rider placement alternatives.
+Uncontrolled lookup adjoints can use measurement-based unlookup; a
+controlled adjoint may instead repeat the controlled forward lookup.
+These details affect emitted resources and should not be inferred from
+structural register widths alone.
 
 
 Related classes

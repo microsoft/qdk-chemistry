@@ -173,4 +173,8 @@ class ControlledPauliSequenceMapper(ControlledCircuitMapper):
             evo_params, layer_offsets, use_hamming_weight_phasing, max_batch_size
         )
 
-        return Circuit(qsharp_factory=qsharp_factory, qsharp_op=controlled_unitary_op)
+        return Circuit(
+            qsharp_factory=qsharp_factory,
+            qsharp_op=controlled_unitary_op,
+            num_qubits=1 + unitary_container.num_qubits,
+        )
