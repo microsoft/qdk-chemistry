@@ -96,7 +96,9 @@ def sos_project(project):
     )
     _ok(
         srv.create_majorana_mapping(
-            project_name=project, out_mapping_filename="jw.majorana_mapping.json", hamiltonian_filename="df.hamiltonian.json"
+            project_name=project,
+            out_mapping_filename="jw.majorana_mapping.json",
+            hamiltonian_filename="df.hamiltonian.json",
         )
     )
     mapped = _ok(
@@ -106,14 +108,6 @@ def sos_project(project):
             mapping_filename="jw.majorana_mapping.json",
             out_qubit_hamiltonian_filename="sos.qubit_operator.json",
             algorithm_name="sum_of_squares",
-        )
-    )
-    _ok(
-        srv.run_state_preparation(
-            project_name=project,
-            wavefunction_filename="hf.wavefunction.json",
-            out_circuit_filename="hf.circuit.json",
-            algorithm_name="sparse_isometry",
         )
     )
     return project, mapped["qubit_hamiltonian_filename"], energy
@@ -129,7 +123,9 @@ def test_hamiltonian_constructor_selects_cholesky_and_factorization_preserves_en
     )
     _ok(
         srv.run_hamiltonian_constructor(
-            project_name=project, orbitals_filename="dense.orbitals.json", out_hamiltonian_filename="dense.hamiltonian.json"
+            project_name=project,
+            orbitals_filename="dense.orbitals.json",
+            out_hamiltonian_filename="dense.hamiltonian.json",
         )
     )
     dense_energy, _ = _ok(
@@ -194,37 +190,56 @@ def test_block_encoding_builder_rejects_nonpositive_target_error(sos_project):
     assert "target_energy_error" in result["message"]
 
 
-def test_qpe_circuit_builder_saves_unary_sossa_circuit_and_qre_estimates_it(sos_project):
-    """The unary SOSSA QPE circuit is built without execution, saved, and estimated with qdk.qre."""
+def test_estimate_qpe_circuit_qre_builds_unary_sossa_circuit_in_memory(sos_project):
+    """The unary SOSSA QPE circuit is built in-process and estimated with qdk.qre without saving a circuit."""
     pytest.importorskip("qdk.qre")
     project, sos_file, _ = sos_project
+    project_dir = config.projects_dir / project
+    files_before = set(project_dir.iterdir())
 
-    built = _ok(
-        srv.run_qpe_circuit_builder(
+    result = _ok(
+        srv.estimate_qpe_circuit_qre(
             project_name=project,
-            state_prep_circuit_filename="hf.circuit.json",
+            wavefunction_filename="hf.wavefunction.json",
             qubit_hamiltonian_filename=sos_file,
-            out_circuit_filename="qpe.circuit.json",
             algorithm_name="qdk_unary",
             settings={
                 "num_queries": 3,
                 "unitary_builder": {"algorithm_name": "sossa"},
                 "circuit_mapper": _SOSSA_MAPPER,
             },
+            state_prep_algorithm_name="sparse_isometry",
+            error_rate=1e-6,
+            max_error=0.01,
         )
     )
-    assert built["circuit_filenames"] == ["qpe.circuit.json"]
-    assert built["num_qubits"][0] > 4
+    assert result["architecture"] == "majorana"
+    assert result["error_rate"] == 1e-6
+    [circuit] = result["circuits"]
+    assert circuit["num_qubits"] > 4
+    assert circuit["num_estimates"] == len(circuit["estimates"]) > 0
+    assert circuit["estimates"][0]["runtime_seconds"] > 0
+    assert set(project_dir.iterdir()) == files_before
 
-    estimate = _ok(
-        srv.estimate_circuit_qre(
-            project_name=project, circuit_filename="qpe.circuit.json", error_rate=1e-6, max_error=0.01
+
+def test_estimate_circuit_qre_estimates_stored_circuit(sos_project):
+    """A stored state-preparation circuit is estimated with the Majorana preset."""
+    pytest.importorskip("qdk.qre")
+    project, _, _ = sos_project
+    _ok(
+        srv.run_state_preparation(
+            project_name=project,
+            wavefunction_filename="hf.wavefunction.json",
+            out_circuit_filename="hf.circuit.json",
+            algorithm_name="sparse_isometry",
         )
     )
-    assert estimate["architecture"] == "majorana"
-    assert estimate["num_estimates"] == len(estimate["estimates"]) > 0
+    result = _ok(srv.estimate_circuit_qre(project_name=project, circuit_filename="hf.circuit.json", error_rate=1e-6))
+    assert result["circuit_filename"] == "hf.circuit.json"
+    assert result["num_estimates"] == len(result["estimates"]) > 0
 
 
+@pytest.mark.parametrize("tool", ["estimate_circuit_qre", "estimate_qpe_circuit_qre"])
 @pytest.mark.parametrize(
     ("kwargs", "message"),
     [
@@ -233,8 +248,16 @@ def test_qpe_circuit_builder_saves_unary_sossa_circuit_and_qre_estimates_it(sos_
         ({"max_error": 1.0}, "max_error"),
     ],
 )
-def test_estimate_circuit_qre_validates_arguments(project, kwargs, message):
-    """Invalid architecture and error arguments return an error envelope."""
-    result = srv.estimate_circuit_qre(project_name=project, circuit_filename="missing.circuit.json", **kwargs)
+def test_qre_tools_validate_arguments(project, tool, kwargs, message):
+    """Invalid architecture and error arguments return an error envelope before any file is read."""
+    files = (
+        {"circuit_filename": "missing.circuit.json"}
+        if tool == "estimate_circuit_qre"
+        else {
+            "wavefunction_filename": "missing.wavefunction.json",
+            "qubit_hamiltonian_filename": "missing.qubit_operator.json",
+        }
+    )
+    result = getattr(srv, tool)(project_name=project, **files, **kwargs)
     assert result["status"] == "error"
     assert message in result["message"]

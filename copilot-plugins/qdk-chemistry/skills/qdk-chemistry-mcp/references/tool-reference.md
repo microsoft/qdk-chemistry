@@ -124,7 +124,6 @@ the mapped energy frame; total molecular energy is
 | `run_block_encoding_builder` | Builds a block encoding, such as `sossa` or `lcu`, from a stored qubit operator without an evolution time, saves it, and returns its normalization, `lambda_eff` when defined, and an optional Heisenberg-limited query count for `target_energy_error`. |
 | `run_controlled_evolution_circuit_mapper` | Maps a stored time-evolution unitary to a controlled quantum circuit and saves the circuit. |
 | `run_circuit_executor` | Executes a stored circuit with the selected executor and saves executor data. |
-| `run_qpe_circuit_builder` | Builds the selected QPE circuits, such as `qdk_unary` over a `sossa` walk, for a state-preparation circuit and qubit operator without executing them, then saves each `Circuit`. |
 | `run_phase_estimation` | Runs the selected phase-estimation implementation for a state-preparation circuit and qubit Hamiltonian, then saves a `QpeResult` whose energies exclude `core_energy`. |
 | `run_evolution_circuit_builder` | Builds a circuit for a driven Hamiltonian $H(t)=H_0+f(t)H_1$ from the supplied piecewise-linear drive schedule. |
 | `run_hamiltonian_simulation` | Evolves a driven Hamiltonian, measures supplied observables, and saves the returned result pairs. |
@@ -137,7 +136,7 @@ separately.
 
 For resource studies of the unary-iteration builder, pass `qdk_unary` with a
 `num_queries` setting and nested `circuit_mapper` and `unitary_builder`
-settings to `run_qpe_circuit_builder`. The `suggested_num_queries` returned by
+settings to `estimate_qpe_circuit_qre`. The `suggested_num_queries` returned by
 `run_block_encoding_builder` is a starting value for `num_queries`.
 
 ## Circuit inspection and resource estimation
@@ -147,8 +146,11 @@ settings to `run_qpe_circuit_builder`. The `suggested_num_queries` returned by
 | `get_circuit_stats` | Reads a stored circuit and returns logical qubit count, operation counts, and circuit-depth metrics. |
 | `estimate_circuit` | Applies optional QDK estimator parameter objects to a stored circuit and returns one estimate or a batch inline. |
 | `estimate_circuit_qre` | Estimates a stored circuit with `qdk.qre` on a Majorana `ThreeAux` architecture at the supplied physical error rate and returns the Pareto table inline. |
+| `estimate_qpe_circuit_qre` | Builds QPE circuits, such as `qdk_unary` over a `sossa` walk, in memory from a stored wavefunction and qubit operator, then estimates each with the same `qdk.qre` preset. Nothing is executed or saved. |
 
-These tools inspect the exact circuit supplied by `circuit_filename`.
+These tools inspect the exact circuit supplied by `circuit_filename`, except
+`estimate_qpe_circuit_qre`, which builds its circuits in-process because block
+encoding walks carry Q# operations that do not compile to storable QIR.
 `get_circuit_stats` reports properties of the logical circuit.
 `estimate_circuit` reports logical and physical resources from the circuit's
 estimator and does not persist a separate QDK Chemistry result object.

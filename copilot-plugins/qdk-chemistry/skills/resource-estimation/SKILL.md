@@ -120,8 +120,14 @@ before reading resource counts.
 `max_error`, and optional lists `num_ts_per_rotation`, `compute_distances`, and
 `factory_distances` that sweep those parameters, plus `use_graph`. It returns
 the Pareto table, with factory-summary and qubit-partition columns, as inline
-records. It requires the `qre` extra. Use the direct code path for any other
-architecture, code, factory, or transform.
+records whose runtimes are reported as `runtime_seconds`. It requires the
+`qre` extra. Use the direct code path for any other architecture, code,
+factory, or transform.
+
+`estimate_qpe_circuit_qre` applies the same preset to QPE circuits it builds
+in memory from a stored wavefunction and qubit operator, such as `qdk_unary`
+over a `sossa` walk. Use it for block-encoding QPE, whose circuits cannot be
+saved because their Q# operations do not compile to QIR.
 
 ## Path 2: Generate direct `qdk.qre` code
 
@@ -200,8 +206,8 @@ Conceptually, generated code can:
    convert it to a data frame, compare several tables, or use `plot_estimates`
    to visualize physical-qubit/runtime Pareto fronts.
 
-Direct QDK code permits more customization than `estimate_circuit` and
-`estimate_circuit_qre`: an agent
+Direct QDK code permits more customization than `estimate_circuit`,
+`estimate_circuit_qre`, and `estimate_qpe_circuit_qre`: an agent
 can vary trace transforms, instruction implementations, code and factory
 families, independent parameter sweeps, architecture models, error composition,
 post-processing, graph pruning, custom result columns, and comparative plots.
