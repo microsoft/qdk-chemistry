@@ -700,10 +700,11 @@ def test_iterative_qpe_builder_pairs_largest_power_with_first_iteration(
         unitary_builder=AlgorithmRef("hamiltonian_unitary_builder", "trotter", time=problem.evolution_time),
         controlled_circuit_mapper=AlgorithmRef("controlled_circuit_mapper", "pauli_sequence"),
     )
-    builder.run(
+    circuits = builder.run(
         state_preparation=problem.state_prep,
         qubit_hamiltonian=problem.hamiltonian,
     )
+    assert all(circuit.num_qubits == 3 for circuit in circuits)
 
     # Execution order: largest power first (LSB) down to U^1 last (MSB).
     assert recorded_powers == [2 ** (problem.num_bits - iteration - 1) for iteration in range(problem.num_bits)]
@@ -854,6 +855,7 @@ def test_combined_iqpe_repeats_and_votes_inside_the_circuit(
     )
 
     assert len(circuits) == 1
+    assert circuits[0].num_qubits == 3
     qir = str(circuits[0].get_qir())
     assert qir.count("call void @__quantum__qis__mresetz__body") == num_bits * (mid_shots + 1)
     assert qir.count("call void @__quantum__rt__result_record_output") == num_bits

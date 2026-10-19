@@ -8,6 +8,7 @@
 import math
 import tempfile
 from pathlib import Path
+from unittest.mock import MagicMock
 
 import numpy as np
 import pytest
@@ -220,6 +221,117 @@ def test_estimate_qpe_circuit_qre_builds_unary_sossa_circuit_in_memory(sos_proje
     assert circuit["num_estimates"] == len(circuit["estimates"]) > 0
     assert circuit["estimates"][0]["runtime_seconds"] > 0
     assert set(project_dir.iterdir()) == files_before
+
+
+@pytest.mark.parametrize("num_circuits", [1, 2])
+def test_run_qpe_builder_passes_saved_circuits_to_estimator(
+    project: str, monkeypatch: pytest.MonkeyPatch, num_circuits: int
+) -> None:
+    """Builder filenames feed the stored-circuit estimator without executing QPE."""
+    state_prep = MagicMock(spec=data.Circuit)
+    wavefunction = MagicMock(spec=data.Wavefunction)
+    hamiltonian = MagicMock(spec=data.QubitOperator)
+    circuits = [MagicMock(spec=data.Circuit) for _ in range(num_circuits)]
+    stored = {"hf.wavefunction.json": wavefunction, "h.qubit_operator.json": hamiltonian}
+    monkeypatch.setattr(srv, "load_data_object", lambda filename, _cls: stored[filename])
+    monkeypatch.setattr(srv, "save_data_object", lambda circuit, filename: stored.update({filename: circuit}))
+    builder = MagicMock()
+    builder.run.return_value = circuits
+    state_prep_builder = MagicMock()
+    state_prep_builder.run.return_value = state_prep
+    create = MagicMock(side_effect=[state_prep_builder, builder])
+    monkeypatch.setattr(srv.algorithms, "create", create)
+    estimate = MagicMock(return_value={"num_estimates": 1, "estimates": [{}]})
+    monkeypatch.setattr(srv, "_estimate_qre_preset", estimate)
+    filenames = [f"iqpe_{index}.circuit.json" for index in range(num_circuits)]
+
+    result = _ok(
+        srv.run_qpe_builder(
+            project_name=project,
+            wavefunction_filename="hf.wavefunction.json",
+            qubit_hamiltonian_filename="h.qubit_operator.json",
+            out_circuit_filenames=filenames,
+            algorithm_name="qdk_iterative",
+            settings={"num_bits": num_circuits},
+        )
+    )
+    assert result == filenames
+    assert create.call_args.args == ("qpe_circuit_builder", "qdk_iterative")
+    state_prep_builder.run.assert_called_once_with(wavefunction)
+    builder.settings.return_value.set.assert_called_once_with("num_bits", num_circuits)
+    builder.run.assert_called_once_with(state_prep, hamiltonian)
+    for circuit, filename in zip(circuits, result, strict=True):
+        estimation = _ok(
+            srv.estimate_circuit_qre(
+                project_name=project,
+                circuit_filename=filename,
+                architecture="majorana",
+                error_rate=1e-6,
+            )
+        )
+        assert estimation["error_rate"] == 1e-6
+        assert estimate.call_args.args[:3] == (circuit, filename, 1e-6)
+
+
+def test_run_qpe_builder_serializes_iqpe_for_qre(project: str) -> None:
+    """A real one-bit IQPE circuit survives serialization and Majorana resource estimation."""
+    pytest.importorskip("qdk.qre")
+    project_dir = config.projects_dir / project
+    _ok(
+        srv.run_scf(
+            project_name=project,
+            structure_filename="h2.structure.json",
+            out_wavefunction_filename="hf.wavefunction.json",
+            charge=0,
+            spin_multiplicity=1,
+            basis_set="sto-3g",
+        )
+    )
+    data.QubitOperator(pauli_strings=["XXXX", "ZZZZ"], coefficients=[0.25, 0.5]).to_json_file(
+        str(project_dir / "h.qubit_hamiltonian.json")
+    )
+    filenames = _ok(
+        srv.run_qpe_builder(
+            project_name=project,
+            wavefunction_filename="hf.wavefunction.json",
+            qubit_hamiltonian_filename="h.qubit_hamiltonian.json",
+            out_circuit_filenames=["iqpe.circuit.json"],
+            algorithm_name="qdk_iterative",
+            state_prep_algorithm_name="sparse_isometry",
+            settings={"num_bits": 1, "unitary_builder": {"algorithm_name": "trotter", "time": 0.1}},
+        )
+    )
+    [filename] = filenames
+    assert data.Circuit.from_json_file(str(project_dir / filename)).num_qubits == 5
+    result = _ok(
+        srv.estimate_circuit_qre(
+            project_name=project,
+            circuit_filename=filename,
+            architecture="majorana",
+            error_rate=1e-6,
+        )
+    )
+    assert result["num_estimates"] == len(result["estimates"]) > 0
+
+
+@pytest.mark.parametrize("filenames", [[], ["same.json", "same.circuit.json"], ["one.json", "two.json"]])
+def test_run_qpe_builder_rejects_invalid_outputs(
+    project: str, monkeypatch: pytest.MonkeyPatch, filenames: list[str]
+) -> None:
+    """Empty, duplicate, and mismatched output lists never save a circuit."""
+    monkeypatch.setattr(srv, "_load_or_error", lambda *_args: (MagicMock(), None))
+    monkeypatch.setattr(srv, "_run_algorithm", lambda *_args, **_kwargs: [MagicMock(spec=data.Circuit)])
+    save = MagicMock()
+    monkeypatch.setattr(srv, "save_data_object", save)
+    result = srv.run_qpe_builder(
+        project_name=project,
+        wavefunction_filename="hf.wavefunction.json",
+        qubit_hamiltonian_filename="h.qubit_operator.json",
+        out_circuit_filenames=filenames,
+        algorithm_name="qdk_iterative",
+    )
+    assert result["status"] == "error", result
+    save.assert_not_called()
 
 
 def test_estimate_circuit_qre_estimates_stored_circuit(sos_project):

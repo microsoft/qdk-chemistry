@@ -794,6 +794,7 @@ _TOOL_CATEGORIES: dict[str, list[str]] = {
         "estimate_qpe_circuit_qre",
     ],
     "qpe": [
+        "run_qpe_builder",
         "run_time_evolution_builder",
         "run_block_encoding_builder",
         "run_evolution_circuit_builder",
@@ -2650,6 +2651,60 @@ def run_circuit_executor(
         return f"Failed to save executor data to {out_executor_data_filename}: {e!s}"
 
     return out_executor_data_filename
+
+
+@app.tool()
+@_structured
+@validate_project
+def run_qpe_builder(
+    project_name: str,
+    wavefunction_filename: str,
+    qubit_hamiltonian_filename: str,
+    out_circuit_filenames: list[str],
+    *,
+    algorithm_name: str | None = None,
+    settings: dict | None = None,
+    state_prep_algorithm_name: str | None = None,
+    state_prep_settings: dict | None = None,
+    overwrite: bool = False,
+) -> list[str] | str:
+    """Build and save QPE circuits without executing them; pass each returned filename to estimate_circuit_qre.
+
+    Supply one output filename per circuit produced by the selected builder.
+    Builders carrying live Q# operations that cannot be serialized must use
+    ``estimate_qpe_circuit_qre`` instead. Construction runs without caching.
+    """
+    if not out_circuit_filenames:
+        return "out_circuit_filenames must contain at least one filename."
+    filenames = []
+    for requested_filename in out_circuit_filenames:
+        filename, error = _prepare_output(requested_filename, "Circuit", data.Circuit, overwrite=overwrite)
+        if error:
+            return error
+        if filename in filenames:
+            return "out_circuit_filenames must contain distinct filenames."
+        filenames.append(filename)
+
+    wavefunction, error = _load_or_error(wavefunction_filename, data.Wavefunction, "wavefunction")
+    if error:
+        return error
+    qubit_hamiltonian, error = _load_or_error(qubit_hamiltonian_filename, data.QubitOperator, "qubit Hamiltonian")
+    if error:
+        return error
+
+    state_prep = algorithms.create("state_prep", state_prep_algorithm_name)
+    _apply_settings(state_prep, state_prep_settings)
+    builder = algorithms.create("qpe_circuit_builder", algorithm_name)
+    _apply_settings(builder, settings)
+    state_prep_circuit = _run_algorithm(state_prep, wavefunction, use_cache=False)
+    circuits = _run_algorithm(builder, state_prep_circuit, qubit_hamiltonian, use_cache=False)
+    if isinstance(circuits, data.Circuit):
+        circuits = [circuits]
+    if len(circuits) != len(filenames):
+        return f"The builder produced {len(circuits)} circuits; supply exactly that many out_circuit_filenames."
+    for circuit, filename in zip(circuits, filenames, strict=True):
+        save_data_object(circuit, filename)
+    return filenames
 
 
 @app.tool()
