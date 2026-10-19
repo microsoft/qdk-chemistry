@@ -764,6 +764,7 @@ _TOOL_CATEGORIES: dict[str, list[str]] = {
         "run_active_space_selector",
         "run_orbital_localization",
         "run_hamiltonian_constructor",
+        "run_hamiltonian_factorization",
         "run_multi_configuration_calculation",
         "run_multi_configuration_scf",
         "run_projected_multi_configuration_calculation",
@@ -778,14 +779,17 @@ _TOOL_CATEGORIES: dict[str, list[str]] = {
         "run_qubit_hamiltonian_solver",
         "run_energy_estimator",
         "estimate_circuit",
+        "estimate_circuit_qre",
     ],
     "qpe": [
         "run_time_evolution_builder",
+        "run_block_encoding_builder",
         "run_evolution_circuit_builder",
         "run_hamiltonian_simulation",
         "run_controlled_evolution_circuit_mapper",
         "run_circuit_executor",
         "run_hadamard_test",
+        "run_qpe_circuit_builder",
         "run_phase_estimation",
     ],
     "visualization": [
@@ -1310,13 +1314,19 @@ def run_hamiltonian_constructor(
     project_name: str,
     orbitals_filename: str,
     out_hamiltonian_filename: str,
+    algorithm_name: str | None = None,
+    settings: dict | None = None,
     cache: str | None = None,
     remote: str | None = None,
     remote_config: dict | None = None,
     remote_timeout: int = 120,
     overwrite: bool = False,
 ) -> str:
-    """Build and save a fermionic Hamiltonian from molecular Orbitals."""
+    """Build and save a fermionic Hamiltonian from molecular Orbitals.
+
+    Select ``algorithm_name="qdk_cholesky"`` to store Cholesky-decomposed
+    two-electron integrals, which ``run_hamiltonian_factorization`` requires.
+    """
     out_hamiltonian_filename, err = _prepare_output(
         out_hamiltonian_filename, "Hamiltonian", data.Hamiltonian, overwrite=overwrite
     )
@@ -1327,7 +1337,8 @@ def run_hamiltonian_constructor(
     if err:
         return err
 
-    ham_constructor = algorithms.create("hamiltonian_constructor")
+    ham_constructor = algorithms.create("hamiltonian_constructor", algorithm_name)
+    _apply_settings(ham_constructor, settings)
 
     # run
     hamiltonian = _run_algorithm(
@@ -1342,6 +1353,55 @@ def run_hamiltonian_constructor(
 
     # save to file
     save_data_object(hamiltonian, out_hamiltonian_filename)
+
+    return out_hamiltonian_filename
+
+
+@app.tool()
+@_structured
+@validate_project
+def run_hamiltonian_factorization(
+    project_name: str,
+    hamiltonian_filename: str,
+    out_hamiltonian_filename: str,
+    algorithm_name: str | None = None,
+    settings: dict | None = None,
+    cache: str | None = None,
+    remote: str | None = None,
+    remote_config: dict | None = None,
+    remote_timeout: int = 120,
+    overwrite: bool = False,
+) -> str:
+    """Factorize a stored Hamiltonian, such as double factorization, and save the factorized Hamiltonian.
+
+    The ``double_factorization`` implementation requires a Cholesky Hamiltonian
+    from ``run_hamiltonian_constructor`` with ``algorithm_name="qdk_cholesky"``;
+    its rank is set by that constructor's ``cholesky_tolerance``.
+    """
+    out_hamiltonian_filename, err = _prepare_output(
+        out_hamiltonian_filename, "Hamiltonian", data.Hamiltonian, overwrite=overwrite
+    )
+    if err:
+        return err
+
+    hamiltonian, err = _load_or_error(hamiltonian_filename, data.Hamiltonian, "hamiltonian")
+    if err:
+        return err
+
+    factorizer = algorithms.create("hamiltonian_factorization", algorithm_name)
+    _apply_settings(factorizer, settings)
+
+    factorized = _run_algorithm(
+        factorizer,
+        hamiltonian,
+        cache=cache,
+        remote=remote,
+        remote_config=remote_config,
+        remote_timeout=remote_timeout,
+        overwrite=overwrite,
+    )
+
+    save_data_object(factorized, out_hamiltonian_filename)
 
     return out_hamiltonian_filename
 
@@ -2280,6 +2340,81 @@ def estimate_circuit(
     return circuit.estimate(params).data()
 
 
+_QRE_ARCHITECTURES = ("majorana",)
+
+
+@app.tool()
+@_structured
+@validate_project
+def estimate_circuit_qre(
+    project_name: str,
+    circuit_filename: str,
+    architecture: str = "majorana",
+    error_rate: float = 1e-5,
+    max_error: float = 0.01,
+    num_ts_per_rotation: list[int] | None = None,
+    compute_distances: list[int] | None = None,
+    factory_distances: list[int] | None = None,
+    use_graph: bool = True,
+) -> dict | str:
+    """Estimate a stored Circuit with qdk.qre (QRE v3) on a Majorana ThreeAux architecture and return the Pareto table.
+
+    The ISA query is ``ThreeAux`` compute code times ``RoundBasedFactory`` over
+    ``ThreeAux``; the trace query is ``PSSPC`` times ``LatticeSurgery``. List
+    arguments sweep those parameters; omit them for the qdk.qre defaults.
+    Requires the ``qre`` extra. Use direct ``qdk.qre`` code for other models.
+    """
+    architecture = architecture.lower().strip()
+    if architecture not in _QRE_ARCHITECTURES:
+        return f"Unsupported architecture '{architecture}'. Supported: {', '.join(_QRE_ARCHITECTURES)}."
+    if not 0 < error_rate < 1:
+        return f"error_rate must be strictly between 0 and 1; received {error_rate!r}."
+    if not 0 < max_error < 1:
+        return f"max_error must be strictly between 0 and 1; received {max_error!r}."
+
+    try:
+        from qdk.qre import PSSPC, LatticeSurgery, estimate  # noqa: PLC0415
+        from qdk.qre.models import Majorana, RoundBasedFactory, ThreeAux  # noqa: PLC0415
+    except ImportError as e:
+        return f"qdk.qre is unavailable ({e!s}). Install qdk-chemistry with the 'qre' extra."
+
+    circuit_filename = _strip(circuit_filename)
+    circuit, error = _load_or_error(circuit_filename, data.Circuit, "circuit")
+    if error:
+        return error
+
+    compute_kwargs = {"distance": compute_distances} if compute_distances else {}
+    factory_kwargs = {"distance": factory_distances} if factory_distances else {}
+    psspc_kwargs = {"num_ts_per_rotation": num_ts_per_rotation} if num_ts_per_rotation else {}
+
+    try:
+        application = circuit.get_qre_application()
+        table = estimate(
+            application,
+            Majorana(error_rate=error_rate),
+            ThreeAux.q(**compute_kwargs)
+            * RoundBasedFactory.q(use_cache=True, code_query=ThreeAux.q(**factory_kwargs)),
+            PSSPC.q(**psspc_kwargs) * LatticeSurgery.q(),
+            max_error=max_error,
+            use_graph=use_graph,
+            name=Path(circuit_filename).name,
+        )
+        table.add_factory_summary_column()
+        table.add_qubit_partition_column()
+        frame = table.as_frame()
+    except (RuntimeError, ValueError, TypeError) as e:
+        return f"QRE estimation failed: {e!s}"
+
+    return {
+        "circuit_filename": circuit_filename,
+        "architecture": architecture,
+        "error_rate": error_rate,
+        "max_error": max_error,
+        "num_estimates": len(frame),
+        "estimates": json.loads(frame.to_json(orient="records", default_handler=str)),
+    }
+
+
 @app.tool()
 @_structured
 @validate_project
@@ -2560,6 +2695,180 @@ def run_phase_estimation(
         return f"Failed to save QPE result to {out_qpe_result_filename}: {e!s}"
 
     return out_qpe_result_filename
+
+
+@app.tool()
+@_structured
+@validate_project
+def run_block_encoding_builder(
+    project_name: str,
+    qubit_hamiltonian_filename: str,
+    out_unitary_filename: str,
+    algorithm_name: str | None = None,
+    settings: dict | None = None,
+    target_energy_error: float | None = None,
+    cache: str | None = None,
+    remote: str | None = None,
+    remote_config: dict | None = None,
+    remote_timeout: int = 120,
+    overwrite: bool = False,
+) -> str | dict[str, Any]:
+    """Build a block encoding, such as sossa or lcu, from a QubitOperator and return its normalization and query count.
+
+    Unlike ``run_time_evolution_builder``, no evolution time is set. When
+    ``target_energy_error`` (Hartree) is given, ``suggested_num_queries`` is the
+    Heisenberg-limited count ``ceil(pi * lambda / (2 * target_energy_error))``,
+    where ``lambda`` is ``lambda_eff`` when the builder defines it (for example
+    ``sossa`` with ``reference_ground_state_energy``) and the normalization otherwise.
+    """
+    qubit_hamiltonian_filename = _strip(qubit_hamiltonian_filename)
+    out_unitary_filename = _strip(out_unitary_filename)
+    try:
+        out_unitary_filename = ensure_filename_format(out_unitary_filename, "UnitaryRepresentation")
+    except FilenameFormatError as e:
+        return f"Invalid output filename: {e!s}"
+
+    if not overwrite:
+        existing_check = check_output_exists(out_unitary_filename, _UnitaryRepresentation)
+        if existing_check:
+            return existing_check
+
+    if target_energy_error is not None and not target_energy_error > 0:
+        return f"target_energy_error must be positive; received {target_energy_error!r}."
+
+    qubit_hamiltonian, _err = _load_or_error(qubit_hamiltonian_filename, data.QubitOperator, "qubit hamiltonian")
+    if _err:
+        return _err
+
+    builder = algorithms.create("hamiltonian_unitary_builder", algorithm_name)
+    _apply_settings(builder, settings)
+
+    try:
+        unitary = _run_algorithm(
+            builder,
+            qubit_hamiltonian,
+            cache=cache,
+            remote=remote,
+            remote_config=remote_config,
+            remote_timeout=remote_timeout,
+            overwrite=overwrite,
+        )
+    except (RuntimeError, ValueError) as e:
+        return f"Block encoding builder failed: {e!s}"
+
+    try:
+        save_data_object(unitary, out_unitary_filename)
+    except (RuntimeError, ValueError) as e:
+        return f"Failed to save block encoding to {out_unitary_filename}: {e!s}"
+
+    container = unitary.get_container()
+    # LCU walks wrap the block encoding that carries the normalization.
+    encoding = getattr(container, "block_encoding", container)
+    result: dict[str, Any] = {
+        "unitary_filename": out_unitary_filename,
+        "container_type": container.type,
+        "num_qubits": int(container.num_qubits),
+    }
+    normalization = getattr(encoding, "normalization", None)
+    if normalization is not None:
+        result["normalization"] = float(normalization)
+    metadata = getattr(encoding, "metadata", None)
+    energy_shift = getattr(metadata, "energy_shift", None)
+    if energy_shift is not None:
+        result["energy_shift"] = float(energy_shift)
+    try:
+        result["lambda_eff"] = float(encoding.lambda_eff)
+    except (AttributeError, ValueError):
+        pass
+
+    if target_energy_error is not None:
+        query_lambda = result.get("lambda_eff", result.get("normalization"))
+        if query_lambda is None:
+            return {**result, "warning": "The block encoding exposes no normalization to derive a query count from."}
+        result["suggested_num_queries"] = math.ceil(math.pi * query_lambda / (2 * target_energy_error))
+
+    return result
+
+
+@app.tool()
+@_structured
+@validate_project
+def run_qpe_circuit_builder(
+    project_name: str,
+    state_prep_circuit_filename: str,
+    qubit_hamiltonian_filename: str,
+    out_circuit_filename: str,
+    algorithm_name: str | None = None,
+    settings: dict | None = None,
+    cache: str | None = None,
+    remote: str | None = None,
+    remote_config: dict | None = None,
+    remote_timeout: int = 120,
+    overwrite: bool = False,
+) -> str | dict[str, Any]:
+    """Build QPE circuits, such as qdk_unary with a sossa walk, without executing them and save each Circuit.
+
+    A single circuit is saved to ``out_circuit_filename``; several circuits are
+    saved with an ``_<index>`` suffix on the stem. Use ``estimate_circuit_qre``
+    or ``estimate_circuit`` on the saved circuits for resource estimates.
+    """
+    state_prep_circuit_filename = _strip(state_prep_circuit_filename)
+    qubit_hamiltonian_filename = _strip(qubit_hamiltonian_filename)
+    out_circuit_filename = _strip(out_circuit_filename)
+    try:
+        out_circuit_filename = ensure_filename_format(out_circuit_filename, "Circuit")
+    except FilenameFormatError as e:
+        return f"Invalid output filename: {e!s}"
+
+    state_prep_circuit, _err = _load_or_error(state_prep_circuit_filename, data.Circuit, "circuit")
+    if _err:
+        return _err
+
+    qubit_hamiltonian, _err = _load_or_error(qubit_hamiltonian_filename, data.QubitOperator, "qubit hamiltonian")
+    if _err:
+        return _err
+
+    circuit_builder = algorithms.create("qpe_circuit_builder", algorithm_name)
+    _apply_settings(circuit_builder, settings)
+
+    try:
+        circuits = _run_algorithm(
+            circuit_builder,
+            state_prep_circuit,
+            qubit_hamiltonian,
+            cache=cache,
+            remote=remote,
+            remote_config=remote_config,
+            remote_timeout=remote_timeout,
+            overwrite=overwrite,
+        )
+    except (RuntimeError, ValueError) as e:
+        return f"QPE circuit builder failed: {e!s}"
+
+    if isinstance(circuits, data.Circuit):
+        circuits = [circuits]
+    if len(circuits) == 1:
+        filenames = [out_circuit_filename]
+    else:
+        stem, _, suffix = out_circuit_filename.partition(".")
+        filenames = [f"{stem}_{index}.{suffix}" for index in range(len(circuits))]
+
+    if not overwrite:
+        for filename in filenames:
+            existing_check = check_output_exists(filename, data.Circuit)
+            if existing_check:
+                return existing_check
+
+    for circuit, filename in zip(circuits, filenames, strict=True):
+        try:
+            save_data_object(circuit, filename)
+        except (RuntimeError, ValueError) as e:
+            return f"Failed to save circuit to {filename}: {e!s}"
+
+    return {
+        "circuit_filenames": filenames,
+        "num_qubits": [int(circuit.num_qubits) for circuit in circuits],
+    }
 
 
 @app.tool()

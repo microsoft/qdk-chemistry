@@ -9,8 +9,10 @@ description: 'Explains QDK circuit resource-estimation parameters, result forms,
 Choose between exactly two paths:
 
 1. **Stored-circuit tool path** — call `estimate_circuit` with the parameter
-   objects documented below. Use this for a concise estimate of an existing
-   project circuit.
+   objects documented below, or `estimate_circuit_qre` for the fixed
+   `qdk.qre` Majorana preset described in
+   [Majorana QRE preset](#majorana-qre-preset). Use this for a concise
+   estimate of an existing project circuit.
 2. **Direct QDK code path** — generate Python that uses `qdk.qre` directly,
    after inspecting the installed QDK API. Use this when the user needs more
    control over architectures, trace transforms, ISA enumeration, result
@@ -109,6 +111,18 @@ counts, physical counts, formatted counts, logical-qubit/QEC information,
 T-factory data, report data, and assumptions. Inspect status and error fields
 before reading resource counts.
 
+## Majorana QRE preset
+
+`estimate_circuit_qre` runs `qdk.qre.estimate` on a stored circuit's
+`get_qre_application()` with a fixed model: `Majorana(error_rate=...)`, a
+`ThreeAux` compute code with a `RoundBasedFactory` over `ThreeAux`, and a
+`PSSPC` times `LatticeSurgery` trace transform. It accepts `error_rate`,
+`max_error`, and optional lists `num_ts_per_rotation`, `compute_distances`, and
+`factory_distances` that sweep those parameters, plus `use_graph`. It returns
+the Pareto table, with factory-summary and qubit-partition columns, as inline
+records. It requires the `qre` extra. Use the direct code path for any other
+architecture, code, factory, or transform.
+
 ## Path 2: Generate direct `qdk.qre` code
 
 When the stored-circuit tool is too restrictive, generate a Python version of
@@ -163,7 +177,7 @@ frame = results.as_frame()
 figure = plot_estimates([results], runtime_unit="s")
 ```
 
-This is a code-generation path, not another MCP estimation function. The code
+This is a code-generation path, not the MCP estimation preset. The code
 is intentionally a skeleton: an agent should use what it learned from the
 installed QDK to replace its Majorana, `ThreeAux`, factory, transform, and sweep
 choices when the requested hardware model or scientific comparison differs.
@@ -186,7 +200,8 @@ Conceptually, generated code can:
    convert it to a data frame, compare several tables, or use `plot_estimates`
    to visualize physical-qubit/runtime Pareto fronts.
 
-Direct QDK code permits more customization than `estimate_circuit`: an agent
+Direct QDK code permits more customization than `estimate_circuit` and
+`estimate_circuit_qre`: an agent
 can vary trace transforms, instruction implementations, code and factory
 families, independent parameter sweeps, architecture models, error composition,
 post-processing, graph pruning, custom result columns, and comparative plots.

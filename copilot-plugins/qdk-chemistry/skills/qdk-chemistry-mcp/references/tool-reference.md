@@ -71,7 +71,8 @@ field, charge, or potential terms used by the selected model constructor.
 | `run_stability_checker` | Evaluates orbital-rotation stability for a stored wavefunction and returns a stability result. |
 | `run_active_space_selector` | Runs the selected active-space selector on a stored wavefunction and saves the resulting wavefunction. |
 | `run_orbital_localization` | Runs the selected localizer for supplied alpha and beta orbital index sets and saves the resulting wavefunction. |
-| `run_hamiltonian_constructor` | Builds one- and two-electron fermionic Hamiltonian terms from stored orbitals and saves the `Hamiltonian`. |
+| `run_hamiltonian_constructor` | Builds one- and two-electron fermionic Hamiltonian terms from stored orbitals with the selected constructor, such as `qdk_cholesky`, and saves the `Hamiltonian`. |
+| `run_hamiltonian_factorization` | Factorizes a stored Hamiltonian with the selected implementation, such as `double_factorization`, and saves the factorized `Hamiltonian`. |
 | `run_dynamical_correlation_calculator` | Runs the selected dynamical-correlation calculator for an ansatz and returns its energy with a saved wavefunction. |
 | `run_multi_configuration_calculation` | Runs the selected multi-configuration solver for a Hamiltonian and electron counts, returning an energy and saved wavefunction. |
 | `run_multi_configuration_scf` | Jointly optimizes orbitals and CI coefficients from active-space orbitals and saves the resulting wavefunction. |
@@ -91,6 +92,11 @@ optimizer, while the derivative implementation is represented by the nested
 `derivative_calculator` setting. Derivative and optimization tools save optional
 wavefunction or Hessian results only when the corresponding output filename is
 supplied and the calculation returns that data.
+
+`double_factorization` requires a Hamiltonian built by the `qdk_cholesky`
+constructor; that constructor's `cholesky_tolerance` sets the factorization
+rank. Map the factorized Hamiltonian with the `sum_of_squares` qubit mapper to
+obtain the operator consumed by the `sossa` block-encoding builder.
 
 ## Qubit mapping and state construction
 
@@ -115,8 +121,10 @@ the mapped energy frame; total molecular energy is
 | Tool | Operation and result |
 |---|---|
 | `run_time_evolution_builder` | Builds a `TimeEvolutionUnitary` representing $U=\exp(-iHt)$ for a stored qubit Hamiltonian and supplied evolution time, then saves it. |
+| `run_block_encoding_builder` | Builds a block encoding, such as `sossa` or `lcu`, from a stored qubit operator without an evolution time, saves it, and returns its normalization, `lambda_eff` when defined, and an optional Heisenberg-limited query count for `target_energy_error`. |
 | `run_controlled_evolution_circuit_mapper` | Maps a stored time-evolution unitary to a controlled quantum circuit and saves the circuit. |
 | `run_circuit_executor` | Executes a stored circuit with the selected executor and saves executor data. |
+| `run_qpe_circuit_builder` | Builds the selected QPE circuits, such as `qdk_unary` over a `sossa` walk, for a state-preparation circuit and qubit operator without executing them, then saves each `Circuit`. |
 | `run_phase_estimation` | Runs the selected phase-estimation implementation for a state-preparation circuit and qubit Hamiltonian, then saves a `QpeResult` whose energies exclude `core_energy`. |
 | `run_evolution_circuit_builder` | Builds a circuit for a driven Hamiltonian $H(t)=H_0+f(t)H_1$ from the supplied piecewise-linear drive schedule. |
 | `run_hamiltonian_simulation` | Evolves a driven Hamiltonian, measures supplied observables, and saves the returned result pairs. |
@@ -127,19 +135,30 @@ which nested fields are required and the valid values. The stepwise evolution,
 controlled-circuit, and executor tools expose those component operations
 separately.
 
+For resource studies of the unary-iteration builder, pass `qdk_unary` with a
+`num_queries` setting and nested `circuit_mapper` and `unitary_builder`
+settings to `run_qpe_circuit_builder`. The `suggested_num_queries` returned by
+`run_block_encoding_builder` is a starting value for `num_queries`.
+
 ## Circuit inspection and resource estimation
 
 | Tool | Operation and result |
 |---|---|
 | `get_circuit_stats` | Reads a stored circuit and returns logical qubit count, operation counts, and circuit-depth metrics. |
 | `estimate_circuit` | Applies optional QDK estimator parameter objects to a stored circuit and returns one estimate or a batch inline. |
+| `estimate_circuit_qre` | Estimates a stored circuit with `qdk.qre` on a Majorana `ThreeAux` architecture at the supplied physical error rate and returns the Pareto table inline. |
 
 These tools inspect the exact circuit supplied by `circuit_filename`.
 `get_circuit_stats` reports properties of the logical circuit.
 `estimate_circuit` reports logical and physical resources from the circuit's
-estimator and does not persist a separate QDK Chemistry result object. The
-`resource-estimation` skill documents its parameter objects and the separate
-programmatic `qdk.qre` architecture and ISA interface.
+estimator and does not persist a separate QDK Chemistry result object.
+`estimate_circuit_qre` is a fixed preset of the `qdk.qre` interface: a
+`ThreeAux` compute code with a `RoundBasedFactory` over `ThreeAux`, and a
+`PSSPC` times `LatticeSurgery` trace transform. Its optional list arguments
+sweep the rotation T-count and the compute and factory code distances. It
+requires the `qre` extra. The `resource-estimation` skill documents the
+`estimate_circuit` parameter objects and the programmatic `qdk.qre`
+architecture and ISA interface for studies beyond this preset.
 
 ## Remote jobs
 
