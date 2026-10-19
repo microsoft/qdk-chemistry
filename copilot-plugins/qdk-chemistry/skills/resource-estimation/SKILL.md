@@ -8,24 +8,116 @@ description: 'Explains QDK circuit resource-estimation parameters, result forms,
 
 Choose between exactly two paths:
 
-1. **Stored-circuit tool path** — call `estimate_circuit` with the parameter
-   objects documented below, or `estimate_circuit_qre` for the fixed
-   `qdk.qre` Majorana preset described in
-   [Majorana QRE preset](#majorana-qre-preset). Use this for a concise
-   estimate of an existing project circuit.
-2. **Direct QDK code path** — generate Python that uses `qdk.qre` directly,
+1. **Direct QDK code path** — generate Python that uses `qdk.qre` directly,
    after inspecting the installed QDK API. Use this when the user needs more
    control over architectures, trace transforms, ISA enumeration, result
    columns, comparisons, or plots.
+2. **Stored-circuit tool path** — calling `estimate_circuit` with the parameter
+   objects documented below is **deprecated**. Use `estimate_circuit_qre` for the fixed
+   `qdk.qre` Majorana preset described in
+   [Majorana QRE preset](#majorana-qre-preset). Use this for a concise
+   estimate of an existing project circuit.
 
 Do not present these as successive steps. They are alternative interfaces for
 different levels of control.
 
-## Path 1: Estimate a stored circuit
+## Path 1: Generate direct `qdk.qre` code
 
-Use `estimate_circuit` to apply the estimator exposed by a stored QDK Chemistry
-`Circuit`. The tool returns its result inline and does not create another
-project artifact.
+When the stored-circuit tool is too restrictive, generate a Python version of
+the workflow using `qdk.qre` directly. First inspect the installed `qdk.qre`
+modules, callable signatures, model classes, query constructors, instruction
+identifiers, property keys, and result-table methods. Do not infer the current
+API from this skill alone: QDK evolves independently of QDK Chemistry.
+
+After that inspection, generated code should have roughly this shape, adapted
+to the APIs actually present and with models, ranges, and transforms chosen for
+the requested study:
+
+```python
+from qdk.qre import LatticeSurgery, PSSPC, estimate, plot_estimates
+from qdk.qre.models import Majorana, RoundBasedFactory, ThreeAux
+
+# `circuit` may be loaded from a QDK Chemistry project or produced by a
+# chemistry circuit-building workflow.
+application = circuit.get_qre_application()
+
+# Describe physical operations independently of the logical circuit.
+architecture = Majorana(error_rate=physical_error_rate)
+
+# Transform application operations into logical operations supported by the
+# selected code. Lists ask QRE to enumerate alternatives.
+trace_query = (
+   application.q()
+   * PSSPC.q(num_ts_per_rotation=rotation_t_counts)
+   * LatticeSurgery.q(slow_down_factor=slow_down_factors)
+)
+
+# Enumerate compatible compute-code and magic-state-factory implementations.
+compute_code = ThreeAux.q(distance=compute_distances)
+factory_code = ThreeAux.q(distance=factory_distances)
+isa_query = compute_code * RoundBasedFactory.q(
+   code_query=factory_code,
+   use_cache=True,
+)
+
+results = estimate(
+   application=application,
+   architecture=architecture,
+   isa_query=isa_query,
+   trace_query=trace_query,
+   max_error=max_error,
+   use_graph=use_graph,
+   name=study_name,
+)
+
+# The table can be enriched, inspected, compared, or plotted.
+frame = results.as_frame()
+figure = plot_estimates([results], runtime_unit="s")
+```
+
+This is a code-generation path, not the MCP estimation preset. The code
+is intentionally a skeleton: an agent should use what it learned from the
+installed QDK to replace its Majorana, `ThreeAux`, factory, transform, and sweep
+choices when the requested hardware model or scientific comparison differs.
+
+Conceptually, generated code can:
+
+1. Load or construct a QDK Chemistry `Circuit`, then call
+   `get_qre_application()`.
+2. Select or construct an architecture containing physical-operation times and
+   error rates.
+3. Build a trace query from the application and compatible transforms. This may
+   sweep rotation-synthesis choices with `PSSPC` and logical-operation timing
+   choices with `LatticeSurgery` when the installed API supports them.
+4. Build an ISA query from compatible QEC and factory models. This may sweep
+   compute-code distances independently from factory code distances using
+   `ThreeAux` and `RoundBasedFactory` when those are suitable and available.
+5. Call `qdk.qre.estimate` with the application, architecture, ISA query, trace
+   query, and error limit.
+6. Enrich the returned table with query provenance and derived properties,
+   convert it to a data frame, compare several tables, or use `plot_estimates`
+   to visualize physical-qubit/runtime Pareto fronts.
+
+Direct QDK code permits more customization than `estimate_circuit` and
+`estimate_circuit_qre`: an agent
+can vary trace transforms, instruction implementations, code and factory
+families, independent parameter sweeps, architecture models, error composition,
+post-processing, graph pruning, custom result columns, and comparative plots.
+The generated architecture and query graph should follow the scientific
+question rather than copy the illustrative skeleton unchanged.
+
+Before generating code, inspect the installed `qdk.qre` API and the relevant
+model/query classes because this interface evolves independently of the stored
+circuit format. Keep architecture, QEC, factory, and trace assumptions visible
+in generated output. Use `use_graph=False` when completeness of the enumerated
+Pareto frontier is more important than pruning cost.
+
+## Path 2: Estimate a stored circuit
+
+**Deprecated:** `estimate_circuit` applies the estimator exposed by a stored
+QDK Chemistry `Circuit`. Use `estimate_circuit_qre` or the direct `qdk.qre`
+code path instead. The deprecated tool returns its result inline and does not
+create another project artifact.
 
 The tool accepts `project_name`, `circuit_filename`, and optional `params`.
 `params` is either one estimator-parameter object or a list of objects for a
@@ -122,94 +214,3 @@ before reading resource counts.
 the Pareto table, with factory-summary and qubit-partition columns, as inline
 records. It requires the `qre` extra. Use the direct code path for any other
 architecture, code, factory, or transform.
-
-## Path 2: Generate direct `qdk.qre` code
-
-When the stored-circuit tool is too restrictive, generate a Python version of
-the workflow using `qdk.qre` directly. First inspect the installed `qdk.qre`
-modules, callable signatures, model classes, query constructors, instruction
-identifiers, property keys, and result-table methods. Do not infer the current
-API from this skill alone: QDK evolves independently of QDK Chemistry.
-
-After that inspection, generated code should have roughly this shape, adapted
-to the APIs actually present and with models, ranges, and transforms chosen for
-the requested study:
-
-```python
-from qdk.qre import LatticeSurgery, PSSPC, estimate, plot_estimates
-from qdk.qre.models import Majorana, RoundBasedFactory, ThreeAux
-
-# `circuit` may be loaded from a QDK Chemistry project or produced by a
-# chemistry circuit-building workflow.
-application = circuit.get_qre_application()
-
-# Describe physical operations independently of the logical circuit.
-architecture = Majorana(error_rate=physical_error_rate)
-
-# Transform application operations into logical operations supported by the
-# selected code. Lists ask QRE to enumerate alternatives.
-trace_query = (
-   application.q()
-   * PSSPC.q(num_ts_per_rotation=rotation_t_counts)
-   * LatticeSurgery.q(slow_down_factor=slow_down_factors)
-)
-
-# Enumerate compatible compute-code and magic-state-factory implementations.
-compute_code = ThreeAux.q(distance=compute_distances)
-factory_code = ThreeAux.q(distance=factory_distances)
-isa_query = compute_code * RoundBasedFactory.q(
-   code_query=factory_code,
-   use_cache=True,
-)
-
-results = estimate(
-   application=application,
-   architecture=architecture,
-   isa_query=isa_query,
-   trace_query=trace_query,
-   max_error=max_error,
-   use_graph=use_graph,
-   name=study_name,
-)
-
-# The table can be enriched, inspected, compared, or plotted.
-frame = results.as_frame()
-figure = plot_estimates([results], runtime_unit="s")
-```
-
-This is a code-generation path, not the MCP estimation preset. The code
-is intentionally a skeleton: an agent should use what it learned from the
-installed QDK to replace its Majorana, `ThreeAux`, factory, transform, and sweep
-choices when the requested hardware model or scientific comparison differs.
-
-Conceptually, generated code can:
-
-1. Load or construct a QDK Chemistry `Circuit`, then call
-   `get_qre_application()`.
-2. Select or construct an architecture containing physical-operation times and
-   error rates.
-3. Build a trace query from the application and compatible transforms. This may
-   sweep rotation-synthesis choices with `PSSPC` and logical-operation timing
-   choices with `LatticeSurgery` when the installed API supports them.
-4. Build an ISA query from compatible QEC and factory models. This may sweep
-   compute-code distances independently from factory code distances using
-   `ThreeAux` and `RoundBasedFactory` when those are suitable and available.
-5. Call `qdk.qre.estimate` with the application, architecture, ISA query, trace
-   query, and error limit.
-6. Enrich the returned table with query provenance and derived properties,
-   convert it to a data frame, compare several tables, or use `plot_estimates`
-   to visualize physical-qubit/runtime Pareto fronts.
-
-Direct QDK code permits more customization than `estimate_circuit` and
-`estimate_circuit_qre`: an agent
-can vary trace transforms, instruction implementations, code and factory
-families, independent parameter sweeps, architecture models, error composition,
-post-processing, graph pruning, custom result columns, and comparative plots.
-The generated architecture and query graph should follow the scientific
-question rather than copy the illustrative skeleton unchanged.
-
-Before generating code, inspect the installed `qdk.qre` API and the relevant
-model/query classes because this interface evolves independently of the stored
-circuit format. Keep architecture, QEC, factory, and trace assumptions visible
-in generated output. Use `use_graph=False` when completeness of the enumerated
-Pareto frontier is more important than pruning cost.
