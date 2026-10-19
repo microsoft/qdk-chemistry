@@ -10,6 +10,7 @@ import json
 import numpy as np
 import pytest
 import scipy
+from qdk import qsharp
 
 try:
     from qdk._native import Circuit as QdkCircuitType
@@ -17,9 +18,11 @@ except ImportError:
     from qsharp._native import Circuit as QdkCircuitType
 
 
+from qdk_chemistry.algorithms import create
 from qdk_chemistry.algorithms.controlled_circuit_mapper.controlled_pauli_sequence_mapper import (
     ControlledPauliSequenceMapper,
 )
+from qdk_chemistry.data import LatticeGraph
 from qdk_chemistry.data.circuit import Circuit
 from qdk_chemistry.data.unitary_representation.base import UnitaryRepresentation
 from qdk_chemistry.data.unitary_representation.containers.pauli_product_formula import (
@@ -27,7 +30,15 @@ from qdk_chemistry.data.unitary_representation.containers.pauli_product_formula 
     PauliProductFormulaContainer,
 )
 from qdk_chemistry.plugins.qiskit import QDK_CHEMISTRY_HAS_QISKIT
+from qdk_chemistry.utils.model_hamiltonians import create_heisenberg_hamiltonian, create_ising_hamiltonian
+from qdk_chemistry.utils.qsharp import get_qsharp_context
 
+from .helpers import (
+    apply_operation,
+    assert_states_match_up_to_global_phase,
+    controlled_product_formula_state,
+    random_state,
+)
 from .reference_tolerances import float_comparison_absolute_tolerance, float_comparison_relative_tolerance
 
 if QDK_CHEMISTRY_HAS_QISKIT:
@@ -242,3 +253,176 @@ class TestPauliSequenceMapper:
 
         with pytest.raises(ValueError, match="length"):
             mapper.run(unitary_rep)
+
+
+def _map_sparse_formula(
+    terms: list[ExponentiatedPauliTerm],
+    repetitions: int,
+    num_qubits: int = 2,
+    targets: list[int] | None = None,
+    *,
+    layer_offsets: tuple[int, ...] | None = None,
+) -> Circuit:
+    """Map a formula without widening its support."""
+    container = PauliProductFormulaContainer(
+        terms, step_reps=repetitions, num_qubits=num_qubits, layer_offsets=layer_offsets
+    )
+    mapper = create("controlled_circuit_mapper", "pauli_sequence")
+    mapper.settings().set("control_indices", [num_qubits])
+    if targets is not None:
+        mapper.settings().set("target_indices", targets)
+    return mapper.run(UnitaryRepresentation(container=container))
+
+
+@pytest.mark.skipif(not QDK_CHEMISTRY_HAS_QISKIT, reason="Qiskit not available.")
+@pytest.mark.parametrize("layered", [False, True])
+@pytest.mark.parametrize("repetitions", [1, 3])
+@pytest.mark.parametrize(
+    ("empty", "targets"),
+    [(False, [0, 1]), (True, [0, 1]), (False, [4, 1])],
+    ids=["mixed", "empty", "reordered-noncontiguous"],
+)
+def test_sparse_controlled_matrix(repetitions: int, empty: bool, targets: list[int], layered: bool) -> None:
+    """Preserve order, sign, identity-relative phases, and spectator qubits exactly."""
+    terms = [
+        ExponentiatedPauliTerm({0: "X"}, -0.31),
+        ExponentiatedPauliTerm({1: "Z"}, 0.13),
+        ExponentiatedPauliTerm({0: "Y"}, 0.27),
+        ExponentiatedPauliTerm({1: "X", 0: "Z"}, -0.19),
+        ExponentiatedPauliTerm({}, 0.11),
+        ExponentiatedPauliTerm({0: "I", 1: "I"}, -0.23),
+    ]
+    if empty:
+        terms = []
+    layer_offsets = ((0,) if empty else (0, 2, 3, 6)) if layered else None
+    circuit = _map_sparse_formula(terms, repetitions, targets=targets, layer_offsets=layer_offsets)
+    width = max(2, *targets) + 1
+    assert len(json.loads(circuit.get_qsharp_circuit().json())["qubits"]) == width
+    paulis = {
+        "I": np.eye(2, dtype=complex),
+        "X": np.array([[0, 1], [1, 0]], dtype=complex),
+        "Y": np.array([[0, -1j], [1j, 0]], dtype=complex),
+        "Z": np.diag([1, -1]),
+    }
+    step = np.eye(2**width, dtype=complex)
+    for term in terms:
+        factors = {targets[index]: paulis[pauli] for index, pauli in term.pauli_term.items()}
+        factors[2] = np.diag([0, 1])  # exp(-i angle |1><1|_control tensor P).
+        generator = np.ones((1, 1), dtype=complex)
+        for qubit in reversed(range(width)):
+            generator = np.kron(generator, factors.get(qubit, paulis["I"]))
+        step = scipy.linalg.expm(-1j * term.angle * generator) @ step
+    expected = np.linalg.matrix_power(step, repetitions)
+    actual = Operator(circuit.get_qiskit_circuit()).data
+    # QIR elides circuit-global phase. Fix it using the control-off amplitude;
+    # the observable phase between control branches must still match exactly.
+    actual /= actual[0, 0]
+    np.testing.assert_allclose(
+        actual,
+        expected,
+        atol=float_comparison_absolute_tolerance,
+        rtol=float_comparison_relative_tolerance,
+    )
+
+
+@pytest.mark.parametrize("layered", [False, True])
+def test_wide_controlled_transport_stays_sparse(layered: bool) -> None:
+    """Transport support-sized lists and scalar repetitions, never expanded evolution."""
+    num_qubits = 40_000
+    terms = [
+        ExponentiatedPauliTerm({num_qubits - 1: "Y", 0: "X"}, -0.31),
+        ExponentiatedPauliTerm({num_qubits // 2: "Z"}, 0.27),
+        ExponentiatedPauliTerm({}, -0.19),
+    ]
+    circuit = _map_sparse_formula(terms, 1_000_000, num_qubits, layer_offsets=(0, 2, 3) if layered else None)
+    assert circuit._qsharp_factory is not None
+    payload = circuit._qsharp_factory.parameter
+    params = vars(payload["params"])
+    assert params == {
+        "pauliIndices": [[39_999, 0], [20_000], []],
+        "pauliOps": [[qsharp.Pauli.Y, qsharp.Pauli.X], [qsharp.Pauli.Z], []],
+        "pauliCoefficients": [-0.31, 0.27, -0.19],
+        "repetitions": 1_000_000,
+        "numPrefixTerms": 0,
+        "numSuffixTerms": 0,
+    }
+    assert isinstance(params["repetitions"], int)
+    assert payload["control"] == num_qubits
+    assert payload["systems"] == list(range(num_qubits))
+    assert payload["layerOffsets"] == ([0, 2, 3] if layered else [])
+
+
+def test_declared_layers_reduce_rotation_depth_without_changing_default() -> None:
+    """Declared layers reduce rotation rounds without adding qubits or rotations."""
+    assert create("controlled_circuit_mapper").name() == "pauli_sequence"
+    terms = [ExponentiatedPauliTerm({2 * i: "X", 2 * i + 1: "Y"}, 0.123) for i in range(6)]
+    counts = []
+    for layer_offsets in (None, (0, 6)):
+        circuit = _map_sparse_formula(terms, 2, num_qubits=12, layer_offsets=layer_offsets)
+        application = circuit.get_qre_application()
+        counts.append(dict(get_qsharp_context().logical_counts(application.entry_expr, *application.args)))
+    assert counts[0]["numQubits"] == counts[1]["numQubits"] == 13
+    assert counts[0]["rotationCount"] == counts[1]["rotationCount"] == 24
+    assert counts[1]["rotationDepth"] == 4
+    assert counts[1]["rotationDepth"] < counts[0]["rotationDepth"]
+
+
+def test_identity_terms_share_one_control_phase_per_layer() -> None:
+    """Identity terms in one declared layer cost the same rotations and depth as their merged term."""
+    system = [ExponentiatedPauliTerm({0: "X"}, 0.123), ExponentiatedPauliTerm({1: "Z"}, 0.321)]
+    counts = []
+    for identities in ([0.2, -0.05], [0.15]):
+        terms = [system[0], *(ExponentiatedPauliTerm({}, angle) for angle in identities), system[1]]
+        circuit = _map_sparse_formula(terms, 1, num_qubits=2, layer_offsets=(0, len(terms)))
+        application = circuit.get_qre_application()
+        logical = get_qsharp_context().logical_counts(application.entry_expr, *application.args)
+        counts.append((logical["rotationCount"], logical["rotationDepth"]))
+    assert counts[0] == counts[1]
+
+
+class TestHammingWeightPhasing:
+    """Equal-angle terms of a declared layer are phased through Hamming-weight registers."""
+
+    @pytest.mark.parametrize(
+        ("name", "hamiltonian", "support"),
+        [
+            # Each bond of the open 3-site chain is a singleton layer.
+            ("open-ising", create_ising_hamiltonian(LatticeGraph.chain(3, periodic=False), j=1.0, h=0.5), None),
+            # The field layer phases 8 X terms, and each bond color 4 ZZ terms.
+            ("transverse-ising", create_ising_hamiltonian(LatticeGraph.chain(8, periodic=True), j=1.0, h=0.5), None),
+            # Each bond color of the 16-site ring is a tower of 8 ZZ terms.
+            ("ising-bonds", create_ising_hamiltonian(LatticeGraph.chain(16, periodic=True), j=1.0, h=0.0), 16),
+            # XX, YY and ZZ towers of 8, each mapped onto Z by its own basis change.
+            (
+                "heisenberg",
+                create_heisenberg_hamiltonian(
+                    LatticeGraph.chain(16, periodic=True), jx=1.0, jy=1.0, jz=0.7, hx=0.0, hy=0.0, hz=0.0
+                ),
+                2,
+            ),
+        ],
+    )
+    @pytest.mark.parametrize("phasing", [True, False])
+    def test_spin_chain_matches_the_controlled_trotter_product(self, name, hamiltonian, support, phasing) -> None:
+        """Phased and unphased layers both apply exactly the controlled product of their rotations.
+
+        The control is in |+>, so a spurious phase on either control branch fails the comparison.
+        """
+        builder = create("hamiltonian_unitary_builder", "trotter")
+        builder.settings().update({"order": 1, "num_divisions": 2, "time": 0.6})
+        unitary = builder.run(hamiltonian)
+        container = unitary.get_container()
+        mapper = create("controlled_circuit_mapper", "pauli_sequence", use_hamming_weight_phasing=phasing)
+        circuit = mapper.run(unitary)
+        system = random_state(container.num_qubits, seed=len(name), support=support)
+        state = np.kron(np.ones(2) / np.sqrt(2), system)
+        actual = apply_operation(circuit._qsharp_op, state, split_control=True)
+        assert_states_match_up_to_global_phase(actual, controlled_product_formula_state(container, state), 1e-10)
+
+    @pytest.mark.parametrize("name", ["pauli_sequence", "cswap_pauli_sequence"])
+    def test_phasing_needs_layer_offsets(self, name: str) -> None:
+        """Phasing a formula without declared layers raises rather than silently leaving it unphased."""
+        container = PauliProductFormulaContainer([ExponentiatedPauliTerm({0: "Z"}, 0.1)], step_reps=1, num_qubits=1)
+        mapper = create("controlled_circuit_mapper", name, use_hamming_weight_phasing=True)
+        with pytest.raises(ValueError, match="layer_offsets"):
+            mapper.run(UnitaryRepresentation(container=container))

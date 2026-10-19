@@ -32,9 +32,9 @@ concurrency:
 
 permissions:
   contents: read
-  pull-requests: write
   checks: write
   statuses: write
+  code-quality: write
 
 jobs:
   coverage:
@@ -49,61 +49,60 @@ jobs:
           build-parallel: 32
           uarch: x86-64-v3
           python-version: '3.10'
-          cpp-test-threads: 2
-          python-test-threads: 2
+          cpp-omp-threads: 4
+          cpp-test-workers: 12
+          python-omp-threads: 4
+          python-test-workers: 8
         - os-name: Linux
           runner: [self-hosted, 1ES.Pool=1es-gh-Dads_v5-pool-wus2, 1ES.ImageOverride=Ubuntu24.04Nightly, 'JobId=qdk_chemistry-linux-py3.13-${{ github.run_id }}-${{ github.run_number }}-${{ github.run_attempt }}']
           build-parallel: 32
           uarch: x86-64-v3
           python-version: '3.13'
-          cpp-test-threads: 4
-          python-test-threads: 4
+          cpp-omp-threads: 4
+          cpp-test-workers: 12
+          python-omp-threads: 4
+          python-test-workers: 8
+          enable-coverage: true
         - os-name: Linux
           runner: [self-hosted, 1ES.Pool=1es-gh-Dads_v5-pool-wus2, 1ES.ImageOverride=Ubuntu24.04Nightly, 'JobId=qdk_chemistry-linux-py3.14-${{ github.run_id }}-${{ github.run_number }}-${{ github.run_attempt }}']
           build-parallel: 32
           uarch: x86-64-v3
           python-version: '3.14'
-          cpp-test-threads: 4
-          python-test-threads: 4
+          cpp-omp-threads: 4
+          cpp-test-workers: 12
+          python-omp-threads: 4
+          python-test-workers: 8
+          build-documentation: true
+        - os-name: Linux-arm64
+          runner: [self-hosted, 1ES.Pool=1es-gh-Dpds_v5-arm-pool, 1ES.ImageOverride=ubuntu-24.04-arm, 'JobId=qdk_chemistry-linux-arm64-py3.13-${{ github.run_id }}-${{ github.run_number }}-${{ github.run_attempt }}']
+          build-parallel: 32
+          uarch: armv8-a
+          python-version: '3.13'
+          cpp-omp-threads: 4
+          cpp-test-workers: 12
+          python-omp-threads: 4
+          python-test-workers: 8
         - os-name: macOS
           runner: macos-26-xlarge
           build-parallel: 5
           uarch: native
           python-version: '3.13'
-          cpp-test-threads: 4
-          python-test-threads: 4
+          cpp-omp-threads: 4
+          cpp-test-workers: 3
+          python-omp-threads: 2
+          python-test-workers: 3
     env:
       BUILD_DIR: cpp/build
       QSHARP_PYTHON_TELEMETRY: 'false'
       CMAKE_INSTALL_PREFIX: ${{ github.workspace }}/install
       CPP_DEPS_PREFIX: ${{ github.workspace }}/cpp_deps_install
+      EXACHEM_INSTALL_PREFIX: ${{ github.workspace }}/exachem_install
       CTEST_OUTPUT_ON_FAILURE: 1
       CMAKE_BUILD_PARALLEL_LEVEL: ${{ matrix.build-parallel }}
       QDK_UARCH: ${{ matrix.uarch }}
+      ENABLE_COVERAGE: ${{ matrix.enable-coverage }}
+      GLIBC_TUNABLES: glibc.rtld.optional_static_tls=65536
     steps:
-    - name: Free up disk space (Linux)
-      if: matrix.os-name == 'Linux'
-      run: |
-        echo "=== Disk space before cleanup ==="
-        df -h
-
-        # Remove unnecessary large packages commonly present on GitHub runners
-        sudo rm -rf /usr/share/dotnet || true
-        sudo rm -rf /usr/local/lib/android || true
-        sudo rm -rf /opt/ghc || true
-        sudo rm -rf /opt/hostedtoolcache/go || true
-        sudo rm -rf /opt/hostedtoolcache/Ruby || true
-
-        # Clean apt cache
-        sudo apt-get clean || true
-
-        echo "=== Disk space after cleanup ==="
-        df -h
-
-        echo "Workspace path: ${{ github.workspace }}"
-        echo "Space available:"
-        df -h "${{ github.workspace }}"
-
     - name: Checkout repository
       uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       with:
@@ -113,7 +112,7 @@ jobs:
       run: |
         echo "PATH=${{ github.workspace }}/install/bin:${{ github.workspace }}/install/lib:$PATH" >> $GITHUB_ENV
         echo "PYTHONPATH=${{ github.workspace }}/install/lib/python${{ matrix.python-version }}/site-packages:${{ github.workspace }}/install/lib:$PYTHONPATH" >> $GITHUB_ENV
-        echo "LD_LIBRARY_PATH=${{ github.workspace }}/install/lib:$LD_LIBRARY_PATH" >> $GITHUB_ENV
+        echo "LD_LIBRARY_PATH=${{ github.workspace }}/install/lib${LD_LIBRARY_PATH:+:${LD_LIBRARY_PATH}}" >> $GITHUB_ENV
 
     - name: Set up Python
       uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
@@ -123,7 +122,7 @@ jobs:
         cache-dependency-path: python/pyproject.toml
 
     - name: Install Linux system packages
-      if: matrix.os-name == 'Linux'
+      if: runner.os == 'Linux'
       run: |
         # Wait for any existing apt/dpkg processes to finish (e.g., unattended-upgrades)
         MAX_WAIT_SECONDS=300
@@ -154,7 +153,11 @@ jobs:
           pkg-config \
           doxygen \
           graphviz \
-          gcovr
+          gcovr \
+          gfortran \
+          libnuma-dev \
+          openmpi-bin \
+          libopenmpi-dev
 
     - name: Install macOS system packages
       if: matrix.os-name == 'macOS'
@@ -171,8 +174,7 @@ jobs:
           gcovr \
           nlohmann-json \
           bison \
-          flex \
-          googletest
+          flex
 
     - name: Cache Doxygen (macOS)
       if: matrix.os-name == 'macOS'
@@ -206,45 +208,83 @@ jobs:
       run: |
         echo "PATH=${{ github.workspace }}/doxygen_install/bin:$PATH" >> $GITHUB_ENV
 
-    - name: Cache C++ dependency install # Checks if manifest files or build script have changed to rebuild dependencies
+    - name: Cache C++ dependencies and ExaChem install # Checks if manifest files or build scripts have changed to rebuild dependencies
       id: cache-cpp-deps
       if: ${{ !inputs.rebuild_dep_cache }}
       uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
       with:
         path: |
           ${{ env.CPP_DEPS_PREFIX }}
+          ${{ env.EXACHEM_INSTALL_PREFIX }}
         key: >-
           cpp-deps-${{ runner.os }}-${{ matrix.uarch }}-
-          ${{ hashFiles('cpp/manifest/qdk-chemistry/cgmanifest.json', 'external/macis/manifest/cgmanifest.json', '.devcontainer/scripts/install_cpp_dependencies.sh') }}
+          ${{ hashFiles('cpp/manifest/qdk-chemistry/cgmanifest.json', 'external/macis/manifest/cgmanifest.json', '.pipelines/install-scripts/common.sh', '.pipelines/install-scripts/install-cpp-deps.sh', '.pipelines/install-scripts/install-blaspp.sh', '.pipelines/install-scripts/install-lapackpp.sh', '.pipelines/install-scripts/exachem/**') }}
 
     - name: Add C++ deps prefix to CMake search path
       run: |
-        echo "CMAKE_PREFIX_PATH=${{ env.CPP_DEPS_PREFIX }}:${CMAKE_PREFIX_PATH}" >> $GITHUB_ENV
-        echo "LD_LIBRARY_PATH=${{ env.CPP_DEPS_PREFIX }}/lib:${LD_LIBRARY_PATH}" >> $GITHUB_ENV
+        echo "CMAKE_PREFIX_PATH=${{ env.CPP_DEPS_PREFIX }}:${{ env.CMAKE_INSTALL_PREFIX }}:${CMAKE_PREFIX_PATH}" >> $GITHUB_ENV
+        echo "LD_LIBRARY_PATH=${{ env.CPP_DEPS_PREFIX }}/lib${LD_LIBRARY_PATH:+:${LD_LIBRARY_PATH}}" >> $GITHUB_ENV
         echo "PATH=${{ env.CPP_DEPS_PREFIX }}/bin:${PATH}" >> $GITHUB_ENV
 
-    - name: Install C++ dependencies
+    - name: Install C++ dependencies and ExaChem (Linux)
       if: steps.cache-cpp-deps.outputs.cache-hit != 'true' # Run the dependency build if we don't find the right hash in the cache
       env:
-        INSTALL_PREFIX: ${{ env.CPP_DEPS_PREFIX }}
         BUILD_DIR: ${{ github.workspace }}/cpp_deps_build
+        MARCH: ${{ matrix.uarch }}
         KEEP_BUILD_DIR: 1
       run: |
-        bash ${{ github.workspace }}/.devcontainer/scripts/install_cpp_dependencies.sh \
-          ${{ github.workspace }}/cpp/manifest/qdk-chemistry/cgmanifest.json \
-          ${{ github.workspace }}/external/macis/manifest/cgmanifest.json
+        # Cap only dependency/ExaChem builds here; the later qdk-chemistry build keeps matrix-level parallelism.
+        if [ "${{ matrix.os-name }}" == "macOS" ]; then
+          jobs="${{ matrix.build-parallel }}"
+          echo "macOS dependency build -> JOBS=$jobs"
+        else
+          cpu=$(command -v nproc >/dev/null 2>&1 && nproc || sysctl -n hw.logicalcpu)
+          if [ -r /proc/meminfo ]; then
+            ram_gb=$(( $(grep MemTotal /proc/meminfo | awk '{print $2}') / 1024 / 1024 ))
+          else
+            ram_gb=$(( $(sysctl -n hw.memsize) / 1024 / 1024 / 1024 ))
+          fi
+          jobs=$(awk "BEGIN { print int($ram_gb / 8) }")
+          [ "$jobs" -lt 1 ] && jobs=1
+          [ "$jobs" -gt "$cpu" ] && jobs=$cpu
+          echo "CPUs=$cpu RAM=${ram_gb}GB -> JOBS=$jobs"
+        fi
 
-    - name: Save C++ dependency cache
+        # macOS has no BLAS package installed, so let BLAS++ auto-detect Apple's Accelerate framework; Linux
+        # installs OpenBLAS via apt above.
+        if [ "${{ matrix.os-name }}" == "macOS" ]; then
+          BLAS_VENDOR=auto
+        else
+          BLAS_VENDOR=openblas
+        fi
+        INSTALL_PREFIX="${{ env.CPP_DEPS_PREFIX }}" \
+        JOBS="$jobs" \
+          bash ${{ github.workspace }}/.pipelines/install-scripts/install-cpp-deps.sh \
+          ${{ github.workspace }}/cpp/manifest/qdk-chemistry/cgmanifest.json \
+          ${{ github.workspace }}/external/macis/manifest/cgmanifest.json \
+          "$BLAS_VENDOR"
+
+        if [ "${{ matrix.os-name }}" == "Linux" ]; then
+          # A separate prefix from CPP_DEPS_PREFIX: TAMM's CMSB superbuild rebuilds its own BLAS/LAPACK, which
+          # would shadow the real OpenBLAS for the main build otherwise (caused SEGFAULTs).
+          INSTALL_PREFIX="${{ env.EXACHEM_INSTALL_PREFIX }}" \
+          BUILD_ROOT="${{ github.workspace }}/exachem_build" \
+          JOBS="$jobs" \
+            bash ${{ github.workspace }}/.pipelines/install-scripts/exachem/install-exachem.sh
+        fi
+
+    - name: Save C++ dependencies and ExaChem cache
       if: steps.cache-cpp-deps.outputs.cache-hit != 'true'
       uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
       with:
         path: |
           ${{ env.CPP_DEPS_PREFIX }}
+          ${{ env.EXACHEM_INSTALL_PREFIX }}
         key: >-
           cpp-deps-${{ runner.os }}-${{ matrix.uarch }}-
-          ${{ hashFiles('cpp/manifest/qdk-chemistry/cgmanifest.json', 'external/macis/manifest/cgmanifest.json', '.devcontainer/scripts/install_cpp_dependencies.sh') }}
+          ${{ hashFiles('cpp/manifest/qdk-chemistry/cgmanifest.json', 'external/macis/manifest/cgmanifest.json', '.pipelines/install-scripts/common.sh', '.pipelines/install-scripts/install-cpp-deps.sh', '.pipelines/install-scripts/install-blaspp.sh', '.pipelines/install-scripts/install-lapackpp.sh', '.pipelines/install-scripts/exachem/**') }}
 
-    - name: Configure C++ RelWithDebInfo/Coverage build
+    - name: Configure C++ CMake build
       run: |
         if [ "${{ matrix.os-name }}" == "macOS" ]; then
           TOOLCHAIN_FILE="${{ github.workspace }}/.pipelines/toolchains/macos.cmake"
@@ -257,27 +297,28 @@ jobs:
           -DCMAKE_BUILD_TYPE=RelWithDebInfo \
           -DCMAKE_INSTALL_PREFIX="$CMAKE_INSTALL_PREFIX" \
           -DQDK_UARCH="$QDK_UARCH" \
-          -DQDK_ENABLE_OPENMP=${{ matrix.os-name == 'Linux' && 'ON' || 'OFF' }} \
-          -DQDK_CHEMISTRY_ENABLE_COVERAGE=ON \
+          -DQDK_ENABLE_OPENMP=${{ runner.os == 'Linux' && 'ON' || 'OFF' }} \
+          -DQDK_CHEMISTRY_ENABLE_COVERAGE=${{ matrix.enable-coverage && 'ON' || 'OFF' }} \
           -DBUILD_TESTING=ON \
           -DMACIS_ENABLE_TESTS=ON
 
-    - name: Build C++ RelWithDebInfo/Coverage library
+    - name: Build C++ library
       run: cmake --build "$BUILD_DIR"
 
-    - name: Run C++ tests in RelWithDebInfo/Coverage mode with coverage
+    - name: Run C++ tests
       env:
-        OMP_NUM_THREADS: ${{ matrix.cpp-test-threads }}
+        OMP_NUM_THREADS: ${{ matrix.cpp-omp-threads }}
+        CTEST_WORKERS: ${{ matrix.cpp-test-workers }}
       run: |
-        mkdir -p test-results ${{ github.workspace }}/coverage-reports
+        mkdir -p test-results
         cd "$BUILD_DIR"
 
-        echo "=== Running C++ Tests in Debug Mode with Coverage ==="
+        echo "=== Running C++ Tests ==="
         set +e
         if [ "$QDK_UARCH" == "native" ]; then # Exclude particular test on macOS builds
-          ctest --output-on-failure --verbose --timeout 300 --output-junit ${{ github.workspace }}/test-results/ctest_results.xml -E "MACIS_SERIAL_TEST|AtomInitGuessEnergyConvergence"
+          ctest -j "$CTEST_WORKERS" --output-on-failure --verbose --timeout 600 --output-junit ${{ github.workspace }}/test-results/ctest_results.xml -E "MACIS_SERIAL_TEST|AtomInitGuessEnergyConvergence"
         else
-          ctest --output-on-failure --verbose --timeout 300 --output-junit ${{ github.workspace }}/test-results/ctest_results.xml -E "MACIS_SERIAL_TEST"
+          ctest -j "$CTEST_WORKERS" --output-on-failure --verbose --timeout 600 --output-junit ${{ github.workspace }}/test-results/ctest_results.xml -E "MACIS_SERIAL_TEST"
         fi
 
         CTEST_EXIT_CODE=$?
@@ -286,29 +327,6 @@ jobs:
         if [ $CTEST_EXIT_CODE -ne 0 ]; then
           echo "=== Some tests failed ==="
           echo "Exit code: $CTEST_EXIT_CODE"
-        fi
-
-        cd ${{ github.workspace }}
-
-        gcovr --root ${{ github.workspace }}/cpp \
-          --object-directory "${{ github.workspace }}/${BUILD_DIR}" \
-          --filter '${{ github.workspace }}/cpp/src/.*' \
-          --filter '${{ github.workspace }}/cpp/include/.*' \
-          --exclude '.*/tests/.*' \
-          --exclude '.*test.*\.cpp' \
-          --exclude '.*gtest.*' \
-          --exclude '.*gmock.*' \
-          --exclude '.*/external/.*' \
-          --html-details ${{ github.workspace }}/coverage-reports/cpp_coverage.html \
-          --xml ${{ github.workspace }}/coverage-reports/cpp_coverage.xml \
-          --txt ${{ github.workspace }}/coverage-reports/cpp_coverage.txt \
-          --merge-mode-functions=separate \
-          --gcov-ignore-parse-errors
-
-        echo "C++ Coverage Summary:"
-        cat ${{ github.workspace }}/coverage-reports/cpp_coverage.txt
-
-        if [ $CTEST_EXIT_CODE -ne 0 ]; then
           exit $CTEST_EXIT_CODE
         fi
 
@@ -325,18 +343,18 @@ jobs:
     - name: Install Python package
       working-directory: python
       env:
-        QDK_CHEMISTRY_ENABLE_COVERAGE: 1
+        QDK_CHEMISTRY_ENABLE_COVERAGE: ${{ matrix.enable-coverage && '1' || '0' }}
         CMAKE_BUILD_TYPE: RelWithDebInfo
       run: |
-        # Remove CMake files to build Python package without picking the installed library
-        rm -r ${{ github.workspace }}/install/lib/cmake/qdk
+        # Reuse the already-built C++ library via find_package(qdk) instead of rebuilding it from source. On the
+        # coverage leg this also means pytest's hits merge into the .gcda files ctest already wrote.
 
         # Install Python dependencies and build package
         # Use persistent build directory for coverage analysis
-        if [ "${{ matrix.python-version }}" = "3.13" ]; then
-          python -m pip install --prefix=${{ github.workspace }}/install -C build-dir="build/{wheel_tag}" .[test,docs]
+        if [ "${{ matrix.build-documentation }}" = "true" ]; then
+          python -m pip install --prefix=${{ github.workspace }}/install -C build-dir="build/{wheel_tag}" -v .[test,docs]
         else
-          python -m pip install --prefix=${{ github.workspace }}/install -C build-dir="build/{wheel_tag}" .[test]
+          python -m pip install --prefix=${{ github.workspace }}/install -C build-dir="build/{wheel_tag}" -v .[test]
         fi
 
         # Print installed packages for debugging
@@ -351,48 +369,100 @@ jobs:
         python -m ipykernel install --user --name python3 --display-name "Python 3"
 
     - name: Run Python tests
+      timeout-minutes: 90
       env:
-        OMP_NUM_THREADS: ${{ matrix.python-test-threads }}
+        OMP_NUM_THREADS: ${{ matrix.python-omp-threads }}
+        PYTHON_TEST_WORKERS: ${{ matrix.python-test-workers }}
         QDK_CHEMISTRY_RUN_SLOW_TESTS: ${{ ((github.event_name == 'workflow_dispatch' && inputs.run_slow_tests) || github.event_name == 'merge_group') && '1' || '0' }}
       working-directory: python
       run: |
         set -e
-        mkdir -p ../test-results ../coverage-reports
+        # Point ExaChem at its install prefix (basis files live in <prefix>/basis) and prepend its runtime paths.
+        if [ "${{ matrix.os-name }}" == "Linux" ]; then
+          export LIBINT_DATA_PATH="${{ env.EXACHEM_INSTALL_PREFIX }}"
+          export PATH="${{ env.EXACHEM_INSTALL_PREFIX }}/bin:${PATH}"
+          export LD_LIBRARY_PATH="${{ env.EXACHEM_INSTALL_PREFIX }}/lib:${{ env.EXACHEM_INSTALL_PREFIX }}/lib64${LD_LIBRARY_PATH:+:${LD_LIBRARY_PATH}}"
+        fi
 
-        BUILD_TEMP=$(find . -type d -path './build/cp*' -print -quit)
-        echo "Found build directory: $BUILD_TEMP"
+        mkdir -p ../test-results
+
+        XDIST_ARGS=()
+        if [ "$PYTHON_TEST_WORKERS" -gt 1 ]; then
+          XDIST_ARGS=(-n "$PYTHON_TEST_WORKERS" --dist=loadscope)
+        fi
+
+        COV_ARGS=()
+        if [ "$ENABLE_COVERAGE" = "true" ]; then
+          mkdir -p ../coverage-reports
+          COV_ARGS=(
+            --cov=qdk_chemistry
+            --cov-report=xml:../coverage-reports/python_coverage.xml
+            --cov-report=markdown:../coverage-reports/python_coverage.md
+          )
+        fi
 
         set +e
         set -o pipefail
         pytest \
-          --cov=qdk_chemistry \
-          --cov-report=xml:../coverage-reports/python_coverage.xml \
-          --cov-report=html:../coverage-reports/python_coverage_html \
-          --cov-report=term \
+          "${XDIST_ARGS[@]}" \
+          "${COV_ARGS[@]}" \
           --junitxml=../test-results/pytest_report.xml \
           -v \
           --tb=short \
-          2>&1 | tee ../coverage-reports/python_coverage.txt
+          2>&1 | if [ "$ENABLE_COVERAGE" = "true" ]; then tee ../coverage-reports/python_coverage.txt; else cat; fi
 
         PYTEST_EXIT_CODE=${PIPESTATUS[0]}
         set -e
 
-        echo "=== Python Test Output ==="
-        cat ../coverage-reports/python_coverage.txt
-
         if [ $PYTEST_EXIT_CODE -ne 0 ]; then
           echo "ERROR: Python tests failed with exit code $PYTEST_EXIT_CODE"
-        fi
-
-        if [ -n "$BUILD_TEMP" ] && [ -d "$BUILD_TEMP" ]; then
-          find "$BUILD_TEMP" -name "*.gcda" -exec cp {} coverage_build/ \; 2>/dev/null || true
         fi
 
         if [ $PYTEST_EXIT_CODE -ne 0 ]; then
           exit 1
         fi
 
+    # test-with-qdk-branch reuses this exact build (Linux/x86-64-v3/Python 3.13, the only leg it hardcodes)
+    # instead of independently repeating the same C++ deps + C++ + Python build itself. Gated on the same
+    # workflow_dispatch input that triggers test-with-qdk-branch, so regular push/PR runs (which never consume
+    # this artifact) don't pay for the extra upload.
+    - name: Upload install dir (for test-with-qdk-branch)
+      if: matrix.os-name == 'Linux' && matrix.python-version == '3.13' && github.event_name == 'workflow_dispatch' && inputs.test_with_qdk_branch
+      uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+      with:
+        name: qdk-chemistry-install-linux-x86-64-v3-py3.13
+        path: ${{ github.workspace }}/install
+        retention-days: 1
+
+    - name: Generate C++ coverage report
+      if: matrix.enable-coverage
+      run: |
+        # Run after the Python tests so pytest exercises the same coverage-instrumented binary ctest did,
+        # and their hits share $BUILD_DIR's .gcda files.
+        mkdir -p ${{ github.workspace }}/coverage-reports
+
+        gcovr --root ${{ github.workspace }}/cpp \
+          --object-directory "${{ github.workspace }}/${BUILD_DIR}" \
+          --filter '${{ github.workspace }}/cpp/src/.*' \
+          --filter '${{ github.workspace }}/cpp/include/.*' \
+          --exclude '.*/tests/.*' \
+          --exclude '.*test.*\.cpp' \
+          --exclude '.*gtest.*' \
+          --exclude '.*gmock.*' \
+          --exclude '.*/external/.*' \
+          --cobertura ${{ github.workspace }}/coverage-reports/cpp_coverage.cobertura.xml \
+          --txt ${{ github.workspace }}/coverage-reports/cpp_coverage.txt \
+          --markdown ${{ github.workspace }}/coverage-reports/cpp_coverage.md \
+          --markdown-heading-level 5 \
+          --markdown-title 'C++ Coverage Report' \
+          --merge-mode-functions=separate \
+          --gcov-ignore-parse-errors
+
+        echo "C++ Coverage Summary:"
+        cat ${{ github.workspace }}/coverage-reports/cpp_coverage.txt
+
     - name: Generate Pybind11 coverage report
+      if: matrix.enable-coverage
       working-directory: python
       run: |
         PYBIND_BUILD_DIR=$(find . -wholename "./build/cp*/CMakeFiles/_core.dir" | head -1)
@@ -407,123 +477,105 @@ jobs:
           --exclude '.*external.*' \
           --gcov-ignore-errors=no_working_dir_found \
           --gcov-ignore-errors=source_not_found \
-          --xml "../coverage-reports/pybind11_coverage.xml" \
+          --cobertura "../coverage-reports/pybind11_coverage.cobertura.xml" \
           --txt "../coverage-reports/pybind11_coverage.txt" \
-          --html-details "../coverage-reports/pybind11_coverage.html"
+          --markdown "../coverage-reports/pybind11_coverage.md" \
+          --markdown-heading-level 5 \
+          --markdown-title 'Pybind11 Coverage Report' \
+          2> >(grep -v 'Can not fix case of path' >&2 || true)
 
         echo "Pybind11 Coverage Summary:"
         cat ../coverage-reports/pybind11_coverage.txt
 
-    - name: Generate coverage statistics
+    - name: Add coverage report to job summary
+      if: matrix.enable-coverage
       run: |
         # Extract coverage percentages
-        CPP_COVERAGE=$(grep -oP 'TOTAL.*?\K[0-9.]+(?=%)' coverage-reports/cpp_coverage.txt | tail -1 || echo "0")
-        PYTHON_COVERAGE=$(grep -oP 'TOTAL.*?\K[0-9]+(?=%)' coverage-reports/python_coverage.txt | tail -1 || echo "0")
-        PYBIND11_COVERAGE=$(grep -oP 'TOTAL.*?\K[0-9.]+(?=%)' coverage-reports/pybind11_coverage.txt | tail -1 || echo "0")
+        extract_coverage() {
+          grep -E '^(TOTAL|\|[[:space:]]*\*{0,2}TOTAL\*{0,2}[[:space:]]*\|)' "$1" 2>/dev/null | tail -1 | grep -oE '[0-9]+(\.[0-9]+)?%' | head -1 | tr -d '%' || true
+        }
+        CPP_COVERAGE=$(extract_coverage coverage-reports/cpp_coverage.txt)
+        CPP_COVERAGE=${CPP_COVERAGE:-0}
+        PYTHON_COVERAGE=$(extract_coverage coverage-reports/python_coverage.md)
+        PYTHON_COVERAGE=${PYTHON_COVERAGE:-0}
+        PYBIND11_COVERAGE=$(extract_coverage coverage-reports/pybind11_coverage.txt)
+        PYBIND11_COVERAGE=${PYBIND11_COVERAGE:-0}
 
-        echo "CPP_COVERAGE=$CPP_COVERAGE" >> $GITHUB_ENV
-        echo "PYTHON_COVERAGE=$PYTHON_COVERAGE" >> $GITHUB_ENV
-        echo "PYBIND11_COVERAGE=$PYBIND11_COVERAGE" >> $GITHUB_ENV
-
-        # Create simple PR comment with just statistics
-        echo "## 📊 Coverage Summary" > pr-comment.md
-        echo "" >> pr-comment.md
-        echo "| Component | Coverage |" >> pr-comment.md
-        echo "|-----------|----------|" >> pr-comment.md
-        echo "| C++ Library | ${CPP_COVERAGE}% |" >> pr-comment.md
-        echo "| Python Package | ${PYTHON_COVERAGE}% |" >> pr-comment.md
+        report=coverage-reports/coverage-report.md
+        echo "## 📊 Coverage Summary" > "$report"
+        echo "" >> "$report"
+        echo "| Component | Coverage |" >> "$report"
+        echo "|-----------|----------|" >> "$report"
+        echo "| C++ Library | ${CPP_COVERAGE}% |" >> "$report"
+        echo "| Python Package | ${PYTHON_COVERAGE}% |" >> "$report"
         if [ "$PYBIND11_COVERAGE" != "0" ]; then
-          echo "| Pybind11 Bindings | ${PYBIND11_COVERAGE}% |" >> pr-comment.md
+          echo "| Pybind11 Bindings | ${PYBIND11_COVERAGE}% |" >> "$report"
         fi
-        echo "" >> pr-comment.md
-        echo "---" >> pr-comment.md
-        echo "" >> pr-comment.md
+        echo "" >> "$report"
 
-        echo "### Detailed Coverage Reports" >> pr-comment.md
-        echo "" >> pr-comment.md
-        echo "<details>" >> pr-comment.md
-        echo "<summary>C++ Coverage Details</summary>" >> pr-comment.md
-        echo "" >> pr-comment.md
-        echo '```' >> pr-comment.md
-        cat coverage-reports/cpp_coverage.txt >> pr-comment.md
-        echo '```' >> pr-comment.md
-        echo "</details>" >> pr-comment.md
-        echo "" >> pr-comment.md
+        echo "#### Detailed Coverage Reports" >> "$report"
+        echo "" >> "$report"
+        echo "<details><summary>C++ Coverage Details</summary>" >> "$report"
+        echo "" >> "$report"
+        # gcovr's markdown writer renders a real GFM table
+        cat coverage-reports/cpp_coverage.md >> "$report"
+        echo "</details>" >> "$report"
+        echo "" >> "$report"
 
-        if [ -f coverage-reports/python_coverage.txt ]; then
-          echo "<details>" >> pr-comment.md
-          echo "<summary>Python Coverage Details</summary>" >> pr-comment.md
-          echo "" >> pr-comment.md
-          echo '```' >> pr-comment.md
-          tail -50 coverage-reports/python_coverage.txt >> pr-comment.md
-          echo '```' >> pr-comment.md
-          echo "</details>" >> pr-comment.md
-          echo "" >> pr-comment.md
-        fi
+        echo "<details><summary>Python Coverage Details</summary>" >> "$report"
+        echo "" >> "$report"
+        cat coverage-reports/python_coverage.md >> "$report"
+        echo "</details>" >> "$report"
+        echo "" >> "$report"
 
-        if [ -f coverage-reports/pybind11_coverage.txt ]; then
-          echo "<details>" >> pr-comment.md
-          echo "<summary>Pybind11 Coverage Details</summary>" >> pr-comment.md
-          echo "" >> pr-comment.md
-          echo '```' >> pr-comment.md
-          cat coverage-reports/pybind11_coverage.txt >> pr-comment.md
-          echo '```' >> pr-comment.md
-          echo "</details>" >> pr-comment.md
-        fi
+        echo "<details><summary>Pybind11 Coverage Details</summary>" >> "$report"
+        echo "" >> "$report"
+        cat coverage-reports/pybind11_coverage.md >> "$report"
+        echo "</details>" >> "$report"
 
-    - name: Add coverage to job summary
-      run: |
-        # Create comprehensive summary with table and detailed reports
-        echo "## 📊 Coverage Summary" > coverage-summary.md
-        echo "" >> coverage-summary.md
-        echo "| Component | Coverage |" >> coverage-summary.md
-        echo "|-----------|----------|" >> coverage-summary.md
-        echo "| C++ Library | ${CPP_COVERAGE}% |" >> coverage-summary.md
-        echo "| Python Package | ${PYTHON_COVERAGE}% |" >> coverage-summary.md
-        if [ "$PYBIND11_COVERAGE" != "0" ]; then
-          echo "| Pybind11 Bindings | ${PYBIND11_COVERAGE}% |" >> coverage-summary.md
-        fi
-        echo "" >> coverage-summary.md
-        echo "---" >> coverage-summary.md
-        echo "" >> coverage-summary.md
+        cat "$report" >> "$GITHUB_STEP_SUMMARY"
 
-        echo "### Detailed Coverage Reports" >> coverage-summary.md
-        echo "" >> coverage-summary.md
-        echo "<details>" >> coverage-summary.md
-        echo "<summary>C++ Coverage Details</summary>" >> coverage-summary.md
-        echo "" >> coverage-summary.md
-        echo '```' >> coverage-summary.md
-        cat coverage-reports/cpp_coverage.txt >> coverage-summary.md
-        echo '```' >> coverage-summary.md
-        echo "</details>" >> coverage-summary.md
-        echo "" >> coverage-summary.md
+    - name: Retain coverage XML for benchmarks
+      if: always() && matrix.enable-coverage && github.event_name == 'workflow_dispatch'
+      uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+      with:
+        name: cobertura-xml-linux-py${{ matrix.python-version }}
+        path: |
+          coverage-reports/cpp_coverage.cobertura.xml
+          coverage-reports/pybind11_coverage.cobertura.xml
+          coverage-reports/python_coverage.xml
+        retention-days: 7
 
-        if [ -f coverage-reports/python_coverage.txt ]; then
-          echo "<details>" >> coverage-summary.md
-          echo "<summary>Python Coverage Details</summary>" >> coverage-summary.md
-          echo "" >> coverage-summary.md
-          echo '```' >> coverage-summary.md
-          tail -50 coverage-reports/python_coverage.txt >> coverage-summary.md
-          echo '```' >> coverage-summary.md
-          echo "</details>" >> coverage-summary.md
-          echo "" >> coverage-summary.md
-        fi
+    # Fork PRs are skipped by the action itself (no write access), not by this condition.
+    - name: Upload C++ code coverage
+      if: matrix.enable-coverage && (github.event_name == 'pull_request' || github.event_name == 'push')
+      uses: actions/upload-code-coverage@2b21a77928be8d5168c2b9581a67f2adbebacc52 # v1.4.4
+      with:
+        file: coverage-reports/cpp_coverage.cobertura.xml
+        language: C++
+        label: code-coverage/cpp
+        fail-on-error: false
 
-        if [ -f coverage-reports/pybind11_coverage.txt ]; then
-          echo "<details>" >> coverage-summary.md
-          echo "<summary>Pybind11 Coverage Details</summary>" >> coverage-summary.md
-          echo "" >> coverage-summary.md
-          echo '```' >> coverage-summary.md
-          cat coverage-reports/pybind11_coverage.txt >> coverage-summary.md
-          echo '```' >> coverage-summary.md
-          echo "</details>" >> coverage-summary.md
-        fi
+    - name: Upload Pybind11 code coverage
+      if: matrix.enable-coverage && (github.event_name == 'pull_request' || github.event_name == 'push')
+      uses: actions/upload-code-coverage@2b21a77928be8d5168c2b9581a67f2adbebacc52 # v1.4.4
+      with:
+        file: coverage-reports/pybind11_coverage.cobertura.xml
+        language: C++
+        label: code-coverage/pybind11
+        fail-on-error: false
 
-        # Add to job summary
-        cat coverage-summary.md >> $GITHUB_STEP_SUMMARY
+    - name: Upload Python code coverage
+      if: matrix.enable-coverage && (github.event_name == 'pull_request' || github.event_name == 'push')
+      uses: actions/upload-code-coverage@2b21a77928be8d5168c2b9581a67f2adbebacc52 # v1.4.4
+      with:
+        file: coverage-reports/python_coverage.xml
+        language: Python
+        label: code-coverage/python
+        fail-on-error: false
 
     - name: Build documentation
-      if: matrix.python-version == '3.13'
+      if: matrix.build-documentation
       working-directory: docs
       run: |
         set +e
@@ -544,13 +596,18 @@ jobs:
           exit $MAKE_EXIT_CODE
         fi
 
+    - name: Upload JUnit test results
+      if: always()
+      uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+      with:
+        name: junit-${{ matrix.os-name }}-py${{ matrix.python-version }}
+        path: test-results/*.xml
+        retention-days: 7
+
   coverage-windows:
     name: ${{ matrix.compiler }} - Build & test (Windows)
     runs-on: [self-hosted, 1ES.Pool=1es-gh-Dads_v5-pool-wus2, 1ES.ImageOverride=windows-2025-1espt, 'JobId=qdk_chemistry-win-${{ strategy.job-index }}-${{ github.run_id }}-${{ github.run_number }}-${{ github.run_attempt }}']
     timeout-minutes: 480
-    permissions:
-      contents: read
-      actions: write
     strategy:
       fail-fast: false
       matrix:
@@ -558,6 +615,9 @@ jobs:
     env:
       VCPKG_TRIPLET: x64-windows-static-md
       QDK_UARCH: x86-64-v3
+      CTEST_WORKERS: '12'
+      OMP_NUM_THREADS: '4'
+      PYTHON_TEST_WORKERS: '8'
       # Bump to force a rebuild of the cached dependencies.
       DEPS_CACHE_VERSION: v2
     steps:
@@ -702,13 +762,11 @@ jobs:
 
     - name: Run C++ tests
       shell: pwsh
-      env:
-        OMP_NUM_THREADS: '2'
       run: |
         Push-Location "cpp/build-${{ matrix.compiler }}"
         # Skip the vendored libint2's own tests: they build the dependency at
         # test time rather than exercising qdk. MACIS_SERIAL_TEST is excluded as on Linux.
-        ctest --output-on-failure --verbose --timeout 400 `
+        ctest -j $env:CTEST_WORKERS --output-on-failure --verbose --timeout 400 `
           --output-junit ctest_results.xml `
           -E "MACIS_SERIAL_TEST|libint2/unit|libint2/eritest"
         $code = $LASTEXITCODE
@@ -748,15 +806,30 @@ jobs:
 
     - name: Run Python tests
       shell: pwsh
+      timeout-minutes: 90
       env:
-        OMP_NUM_THREADS: '2'
         QDK_CHEMISTRY_RUN_SLOW_TESTS: ${{ ((github.event_name == 'workflow_dispatch' && inputs.run_slow_tests) || github.event_name == 'merge_group') && '1' || '0' }}
       run: |
+        New-Item -ItemType Directory -Force -Path test-results | Out-Null
         Push-Location python
-        pytest -v --tb=short
+        $xdistArgs = @()
+        if ([int]$env:PYTHON_TEST_WORKERS -gt 1) {
+          $xdistArgs = @("-n", $env:PYTHON_TEST_WORKERS, "--dist=loadscope")
+        }
+        pytest @xdistArgs --junitxml=..\test-results\pytest_report.xml -v --tb=short
         $code = $LASTEXITCODE
         Pop-Location
         if ($code -ne 0) { throw "pytest failed ($code)" }
+
+    - name: Upload JUnit test results
+      if: always()
+      uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+      with:
+        name: junit-windows-x64-${{ matrix.compiler }}
+        path: |
+          cpp\build-${{ matrix.compiler }}\ctest_results.xml
+          test-results\pytest_report.xml
+        retention-days: 7
 
   coverage-windows-arm64:
     name: ${{ matrix.compiler }} - Build & test (Windows ARM64)
@@ -771,6 +844,9 @@ jobs:
         compiler: [msvc, clang-cl]
     env:
       VCPKG_TRIPLET: arm64-windows-static-md
+      CTEST_WORKERS: '12'
+      OMP_NUM_THREADS: '4'
+      PYTHON_TEST_WORKERS: '8'
       # Leave QDK_UARCH unset: MSVC has no generic ARM64 /arch value, and
       # clang-cl auto-detects armv8-a.
       # Bump to force a rebuild of the cached dependencies.
@@ -813,11 +889,11 @@ jobs:
     - name: Set memory-aware build parallelism
       shell: pwsh
       run: |
-        # Match the x86_64 job: cap concurrency by available RAM (~8 GB/job) so
+        # Match the x86_64 job: cap concurrency by available RAM (~10 GB/job) so
         # that memory-hungry translation units don't exhaust the heap.
         $cpu = [int]$env:NUMBER_OF_PROCESSORS
         $ramGB = [math]::Round((Get-CimInstance Win32_ComputerSystem).TotalPhysicalMemory / 1GB)
-        $jobs = [math]::Min($cpu, [math]::Max(1, [math]::Floor($ramGB / 8)))
+        $jobs = [math]::Min($cpu, [math]::Max(1, [math]::Floor($ramGB / 10)))
         Write-Host "CPUs=$cpu RAM=${ramGB}GB -> CMAKE_BUILD_PARALLEL_LEVEL=$jobs"
         "CMAKE_BUILD_PARALLEL_LEVEL=$jobs" >> $env:GITHUB_ENV
         Get-PSDrive -PSProvider FileSystem | Format-Table Name, Used, Free
@@ -954,12 +1030,10 @@ jobs:
     - name: Run C++ tests
       shell: pwsh
       timeout-minutes: 75
-      env:
-        OMP_NUM_THREADS: '2'
       run: |
         Push-Location "cpp/build-${{ matrix.compiler }}"
         # Same exclusions as the x86_64 Windows job.
-        ctest --output-on-failure --verbose --timeout 400 `
+        ctest -j $env:CTEST_WORKERS --output-on-failure --verbose --timeout 400 `
           --output-junit ctest_results.xml `
           -E "MACIS_SERIAL_TEST|libint2/unit"
         $code = $LASTEXITCODE
@@ -1001,38 +1075,42 @@ jobs:
       shell: pwsh
       timeout-minutes: 90
       env:
-        OMP_NUM_THREADS: '2'
         QDK_CHEMISTRY_RUN_SLOW_TESTS: ${{ ((github.event_name == 'workflow_dispatch' && inputs.run_slow_tests) || github.event_name == 'merge_group') && '1' || '0' }}
       run: |
+        New-Item -ItemType Directory -Force -Path test-results | Out-Null
         Push-Location python
-        pytest -v --tb=short
+        $xdistArgs = @()
+        if ([int]$env:PYTHON_TEST_WORKERS -gt 1) {
+          $xdistArgs = @("-n", $env:PYTHON_TEST_WORKERS, "--dist=loadscope")
+        }
+        pytest @xdistArgs --junitxml=..\test-results\pytest_report.xml -v --tb=short
         $code = $LASTEXITCODE
         Pop-Location
         if ($code -ne 0) { throw "pytest failed ($code)" }
 
+    - name: Upload JUnit test results
+      if: always()
+      uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+      with:
+        name: junit-windows-arm64-${{ matrix.compiler }}
+        path: |
+          cpp\build-${{ matrix.compiler }}\ctest_results.xml
+          test-results\pytest_report.xml
+        retention-days: 7
+
   test-with-qdk-branch:
     name: Full Test with QDK Branch
-    if: ${{ github.event_name == 'workflow_dispatch' && inputs.test_with_qdk_branch }}
+    needs: coverage
+    if: ${{ github.event_name == 'workflow_dispatch' && inputs.test_with_qdk_branch && needs.coverage.result == 'success' }}
     runs-on: [self-hosted, 1ES.Pool=1es-gh-Dads_v5-pool-wus2, 1ES.ImageOverride=Ubuntu24.04Nightly]
     env:
-      BUILD_DIR: cpp/build
       QSHARP_PYTHON_TELEMETRY: 'false'
       CMAKE_INSTALL_PREFIX: ${{ github.workspace }}/install
-      CPP_DEPS_PREFIX: ${{ github.workspace }}/cpp_deps_install
-      CTEST_OUTPUT_ON_FAILURE: 1
-      CMAKE_BUILD_PARALLEL_LEVEL: 32
-      QDK_UARCH: x86-64-v3
+      OMP_NUM_THREADS: '4'
+      PYTHON_TEST_WORKERS: '8'
       QDK_BRANCH: main
+      GLIBC_TUNABLES: glibc.rtld.optional_static_tls=65536
     steps:
-    - name: Free up disk space
-      run: |
-        sudo rm -rf /usr/share/dotnet || true
-        sudo rm -rf /usr/local/lib/android || true
-        sudo rm -rf /opt/ghc || true
-        sudo rm -rf /opt/hostedtoolcache/go || true
-        sudo rm -rf /opt/hostedtoolcache/Ruby || true
-        sudo apt-get clean || true
-
     - name: Checkout repository
       uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       with:
@@ -1042,7 +1120,7 @@ jobs:
       run: |
         echo "PATH=${{ github.workspace }}/install/bin:${{ github.workspace }}/install/lib:$PATH" >> $GITHUB_ENV
         echo "PYTHONPATH=${{ github.workspace }}/install/lib/python3.13/site-packages:${{ github.workspace }}/install/lib:$PYTHONPATH" >> $GITHUB_ENV
-        echo "LD_LIBRARY_PATH=${{ github.workspace }}/install/lib:$LD_LIBRARY_PATH" >> $GITHUB_ENV
+        echo "LD_LIBRARY_PATH=${{ github.workspace }}/install/lib${LD_LIBRARY_PATH:+:${LD_LIBRARY_PATH}}" >> $GITHUB_ENV
 
     - name: Set up Python
       uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
@@ -1051,7 +1129,9 @@ jobs:
         cache: pip
         cache-dependency-path: python/pyproject.toml
 
-    - name: Install Linux system packages
+    # This job does not build C++/Python itself -- these packages are only needed to satisfy the built
+    # qdk_chemistry extension's runtime shared-library dependencies (OpenBLAS/HDF5/libgfortran).
+    - name: Install Linux runtime packages
       run: |
         MAX_WAIT_SECONDS=300
         WAIT_INTERVAL_SECONDS=5
@@ -1068,65 +1148,25 @@ jobs:
 
         sudo apt-get update
         sudo apt-get install -y \
-          build-essential \
-          ninja-build \
-          cmake \
-          libeigen3-dev \
-          libboost-all-dev \
           libhdf5-dev \
           libopenblas-dev \
-          libgfortran5 \
-          pkg-config
+          libgfortran5
 
-    - name: Cache C++ dependency install
-      id: cache-cpp-deps
-      uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+    # Reuses the coverage job's own Linux/x86-64-v3/Python-3.13 build (dependencies + C++ + Python install)
+    # Adds the "install qdk from branch" override and re-runs the Python test suite against it.
+    - name: Download coverage build (Linux x86-64-v3, Python 3.13)
+      uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
       with:
-        path: |
-          ${{ env.CPP_DEPS_PREFIX }}
-        key: >-
-          cpp-deps-Linux-x86-64-v3-
-          ${{ hashFiles('cpp/manifest/qdk-chemistry/cgmanifest.json', 'external/macis/manifest/cgmanifest.json', '.devcontainer/scripts/install_cpp_dependencies.sh') }}
+        name: qdk-chemistry-install-linux-x86-64-v3-py3.13
+        path: ${{ github.workspace }}/install
 
-    - name: Add C++ deps prefix to CMake search path
+    # actions/download-artifact doesn't preserve the executable bit, so install/bin/* (e.g. pytest) needs it
+    # restored before it can be run.
+    - name: Restore executable permissions
+      run: chmod -R +x "${{ github.workspace }}/install/bin"
+
+    - name: Test pre-installed qdk_chemistry package
       run: |
-        echo "CMAKE_PREFIX_PATH=${{ env.CPP_DEPS_PREFIX }}:${CMAKE_PREFIX_PATH}" >> $GITHUB_ENV
-        echo "LD_LIBRARY_PATH=${{ env.CPP_DEPS_PREFIX }}/lib:${LD_LIBRARY_PATH}" >> $GITHUB_ENV
-        echo "PATH=${{ env.CPP_DEPS_PREFIX }}/bin:${PATH}" >> $GITHUB_ENV
-
-    - name: Install C++ dependencies
-      if: steps.cache-cpp-deps.outputs.cache-hit != 'true'
-      env:
-        INSTALL_PREFIX: ${{ env.CPP_DEPS_PREFIX }}
-        BUILD_DIR: ${{ github.workspace }}/cpp_deps_build
-        KEEP_BUILD_DIR: 1
-      run: |
-        bash ${{ github.workspace }}/.devcontainer/scripts/install_cpp_dependencies.sh \
-          ${{ github.workspace }}/cpp/manifest/qdk-chemistry/cgmanifest.json \
-          ${{ github.workspace }}/external/macis/manifest/cgmanifest.json
-
-    - name: Configure and build C++
-      run: |
-        cmake -S cpp -B "$BUILD_DIR" \
-          -GNinja \
-          -DCMAKE_TOOLCHAIN_FILE="${{ github.workspace }}/.pipelines/toolchains/linux.cmake" \
-          -DCMAKE_BUILD_TYPE=Release \
-          -DCMAKE_INSTALL_PREFIX="$CMAKE_INSTALL_PREFIX" \
-          -DQDK_UARCH="$QDK_UARCH" \
-          -DQDK_ENABLE_OPENMP=ON \
-          -DBUILD_TESTING=OFF
-        cmake --build "$BUILD_DIR"
-
-    - name: Install C++ library
-      run: cmake --install "$BUILD_DIR" --prefix "$CMAKE_INSTALL_PREFIX"
-
-    - name: Install Python package
-      working-directory: python
-      env:
-        CMAKE_BUILD_TYPE: Release
-      run: |
-        rm -r ${{ github.workspace }}/install/lib/cmake/qdk
-        python -m pip install --prefix=${{ github.workspace }}/install -C build-dir="build/{wheel_tag}" .[test,docs]
         python -c "import qdk_chemistry; print('qdk_chemistry version:', qdk_chemistry.__version__)"
         python -m ipykernel install --user --name python3 --display-name "Python 3"
 
@@ -1134,26 +1174,28 @@ jobs:
       run: |
         git clone --depth 1 --branch "${QDK_BRANCH}" https://github.com/microsoft/qdk.git "${{ runner.temp }}/qdk"
         echo "QDK commit: $(git -C "${{ runner.temp }}/qdk" rev-parse HEAD)"
-        pip install --force-reinstall --no-deps "${{ runner.temp }}/qdk/source/qdk_package"
+        python -m pip install --prefix="$CMAKE_INSTALL_PREFIX" --force-reinstall --no-deps "${{ runner.temp }}/qdk/source/qdk_package"
         echo "Installed qdk from branch: ${QDK_BRANCH}"
+        python -c "import os, pathlib, qdk; path = pathlib.Path(qdk.__file__).resolve(); prefix = pathlib.Path(os.environ['CMAKE_INSTALL_PREFIX']).resolve(); print('Imported qdk from:', path); assert path.is_relative_to(prefix), f'qdk did not load from {prefix}'"
         python -m pip show qdk
 
     - name: Run Python tests
+      timeout-minutes: 90
       env:
-        OMP_NUM_THREADS: 4
         QDK_CHEMISTRY_RUN_SLOW_TESTS: ${{ ((github.event_name == 'workflow_dispatch' && inputs.run_slow_tests) || github.event_name == 'merge_group') && '1' || '0' }}
       working-directory: python
       run: |
         set -e
         mkdir -p ../test-results
-        pytest \
+        pytest -n "$PYTHON_TEST_WORKERS" --dist=loadscope \
           --junitxml=../test-results/pytest_report.xml \
           -v \
           --tb=short
 
     - name: Upload test results
       if: always()
-      uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+      uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
       with:
         name: qdk-branch-test-results
         path: test-results/
+        retention-days: 7

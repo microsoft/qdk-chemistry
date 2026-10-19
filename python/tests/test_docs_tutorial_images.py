@@ -111,6 +111,8 @@ def test_graphviz_sources_generate_accessible_svg_figures():
         dot_path = DIAGRAMS_DIR / dot_name
         dot_source = dot_path.read_text(encoding="utf-8")
         assert 'bgcolor="#FFFFFF"' in dot_source
+        if dot_name == "tutorial_qpe_iqpe_iteration.dot":
+            assert "U<SUP>2<SUP>m\u2212k\u22121</SUP></SUP>" in dot_source
         if dot_name == "tutorial_qpe_wavefunction_hierarchy.dot":
             assert "χ[μ]" not in dot_source
             assert "Φ(HF)" not in dot_source

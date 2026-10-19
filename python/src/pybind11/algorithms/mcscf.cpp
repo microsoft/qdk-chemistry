@@ -150,6 +150,15 @@ Returns:
 
 )");
 
+  multi_configuration_scf.def("aliases", &MultiConfigurationScf::aliases,
+                              R"(
+The algorithm's aliases.
+
+Returns:
+    list[str]: All registered names for the algorithm
+
+)");
+
   multi_configuration_scf.def("type_name", &MultiConfigurationScf::type_name,
                               R"(
 The algorithm's type name.

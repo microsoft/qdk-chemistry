@@ -1,4 +1,4 @@
-"""Azure AI Discovery SDK client helpers."""
+"""Microsoft Discovery SDK client helpers."""
 
 # --------------------------------------------------------------------------------------------
 # Copyright (c) Microsoft Corporation. All rights reserved.
@@ -15,19 +15,8 @@ from azure.core.polling import NoPolling
 DISCOVERY_SCOPE = "https://discovery.azure.com/.default"
 
 
-def create_credential(credential_mode: str) -> Any:
-    """Create the configured Azure credential."""
-    from azure.identity import AzureCliCredential, DefaultAzureCredential  # noqa: PLC0415
-
-    if credential_mode == "azure-cli":
-        return AzureCliCredential()
-    if credential_mode == "default":
-        return DefaultAzureCredential()
-    raise ValueError(f"unsupported Discovery credential mode {credential_mode!r}")
-
-
 def create_workspace_client(endpoint: str, credential: Any) -> Any:
-    """Create an Azure AI Discovery workspace client."""
+    """Create a Microsoft Discovery workspace client."""
     from azure.ai.discovery import WorkspaceClient  # noqa: PLC0415
 
     return WorkspaceClient(
@@ -47,11 +36,11 @@ class _OperationIdPolling(NoPolling):
         super().initialize(client, initial_response, deserialization_callback)
         operation_location = initial_response.http_response.headers.get("Operation-Location")
         if not operation_location:
-            raise RuntimeError("Discovery run submission returned no Operation-Location header")
+            raise RuntimeError("Microsoft Discovery run submission returned no Operation-Location header")
         operation_path = urlsplit(str(operation_location)).path.rstrip("/")
         self.operation_id = unquote(operation_path.rsplit("/", 1)[-1])
         if not self.operation_id:
-            raise RuntimeError("Discovery run submission returned an invalid Operation-Location header")
+            raise RuntimeError("Microsoft Discovery run submission returned an invalid Operation-Location header")
 
 
 def response_mapping(value: Any) -> dict[str, Any]:

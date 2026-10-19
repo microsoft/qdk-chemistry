@@ -5,13 +5,13 @@ This directory contains example scripts demonstrating how to use QDK/Chemistry f
 ## Version compatibility
 
 > **Important:** The `main` branch is the active development branch and may contain changes that are incompatible with the version of `qdk-chemistry` installed via pip.
-> If you installed `qdk-chemistry` from PyPI (e.g., `pip install qdk-chemistry`), check out the `stable/major.minor` branch corresponding to your installed version to ensure the examples work correctly.
-> For example, if you have `qdk-chemistry` `<major>.<minor>.x` installed:
+> If you installed `qdk-chemistry` from PyPI (e.g., `pip install qdk-chemistry`), check out the release tag corresponding to your exact installed version to ensure the examples work correctly.
+> For example, if you have `qdk-chemistry` `<major>.<minor>.<patch>` installed:
 >
 > ```bash
 > git clone https://github.com/microsoft/qdk-chemistry.git
 > cd qdk-chemistry
-> git checkout stable/<major>.<minor>
+> git checkout v<major>.<minor>.<patch>
 > ```
 >
 > You can check your installed version with `pip show qdk-chemistry`.
@@ -24,9 +24,13 @@ The table below summarizes which [optional extras](https://github.com/microsoft/
 | Example | Install command |
 |---------|----------------|
 | `qpe_stretched_n2.ipynb` | `pip install 'qdk-chemistry[jupyter,qiskit-extras,qre]'` |
+| `sossa_qre.ipynb` | `pip install 'qdk-chemistry[jupyter,qre]'` |
 | `state_prep_energy.ipynb` | `pip install 'qdk-chemistry[jupyter,qiskit-extras]'` |
 | `time_evolve_and_measure.ipynb` | `pip install 'qdk-chemistry[jupyter]'` |
-| `estimation_ising_2d.ipynb` | `pip install 'qdk-chemistry[jupyter,qre]'` |
+| `resource_estimation/estimation_ising_2d.ipynb` | `pip install 'qdk-chemistry[jupyter,qre]'` |
+| `resource_estimation/estimation_spin_liquids.ipynb` | `pip install 'qdk-chemistry[jupyter,qre]'` |
+| `resource_estimation/estimation_magnets.ipynb` | `pip install 'qdk-chemistry[jupyter,qre]'` |
+| `resource_estimation/estimation_hubbard_2d.ipynb` | `pip install 'qdk-chemistry[jupyter,qre]'` |
 | `extended_hubbard.ipynb` | `pip install 'qdk-chemistry[jupyter,plugins,qre]'` |
 | `factory_list.ipynb` | `pip install 'qdk-chemistry[jupyter,plugins]'` |
 | `interoperability/pennylane/` | `pip install pennylane` |
@@ -70,8 +74,12 @@ Download or clone the full `examples/` directory structure to run the examples.
 - `qpe_stretched_n2.ipynb`: Jupyter notebook demonstrating multi-reference quantum chemistry state preparation and iterative quantum phase estimation
 - `state_prep_energy.ipynb`: Jupyter notebook demonstrating quantum state preparation and energy calculation using quantum simulators.
 - `time_evolve_and_measure.ipynb`: Jupyter notebook simulating the time-dependent Hamiltonian and measuring an observable's expectation value.
-- `estimation_ising_2d.ipynb`: Jupyter notebook demonstrating quantum resource estimation for simulating a 2D Ising model Hamiltonian.
+- `resource_estimation/estimation_ising_2d.ipynb`: Jupyter notebook demonstrating quantum resource estimation for simulating a 2D Ising model Hamiltonian.
+- `resource_estimation/estimation_spin_liquids.ipynb`: Jupyter notebook demonstrating quantum resource estimation for simulating an extended Kitaev honeycomb model.
+- `resource_estimation/estimation_magnets.ipynb`: Jupyter notebook demonstrating quantum resource estimation for quantum phase estimation of a J1–J2 Heisenberg model.
+- `resource_estimation/estimation_hubbard_2d.ipynb`: Jupyter notebook demonstrating quantum resource estimation for quantum phase estimation of a periodic 2D Fermi-Hubbard model with plaquette Trotterization.
 - `extended_hubbard.ipynb`: Jupyter notebook modeling cyclobutadiene with the Extended Hubbard model and estimating its energy with quantum phase estimation.
+- `sossa_qre.ipynb`: Jupyter notebook building a sum-of-squares spectrum amplification (SOSSA) block encoding from a double-factorized tensor hypercontraction (DFTHC) Hamiltonian, validating it with unary-iteration phase estimation on H2 and estimating fault-tolerant resources for an Fe2S2 active space.
 
 ## Companion datasets and assets
 

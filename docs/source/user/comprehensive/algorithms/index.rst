@@ -87,16 +87,16 @@ The following table summarizes the available algorithm classes in QDK/Chemistry 
      - Orbitals → Stability
    * - :doc:`PhaseEstimation <phase_estimation>`
      - Quantum phase estimation
-     - Circuit + QubitOperator → QpeResult
+     - Circuit + HamiltonianDescription → QpeResult
    * - :doc:`QpeCircuitBuilder <qpe_circuit_builder>`
      - Phase estimation circuit composition
-     - Circuit + QubitOperator → Circuit list
+     - Circuit + HamiltonianDescription → Circuit list
    * - :doc:`EvolutionCircuitBuilder <evolution_circuit_builder>`
      - Time-evolution circuit composition
      - TimeDependentQubitHamiltonian + Circuit → Circuit
    * - :doc:`HamiltonianUnitaryBuilder <hamiltonian_unitary_builder>`
      - Hamiltonian simulation unitaries
-     - QubitOperator → UnitaryRepresentation
+     - HamiltonianDescription → UnitaryRepresentation
    * - :doc:`Propagator <propagator>`
      - Effective Hamiltonians for time-dependent evolution
      - TimeDependentQubitHamiltonian → QubitOperator

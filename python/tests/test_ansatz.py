@@ -26,12 +26,12 @@ from qdk_chemistry.data._spin_channels import spin_channel_matrix
 from qdk_chemistry.data._type_name import class_data_type_name
 from qdk_chemistry.data.symmetry import axes
 
+from .helpers import create_test_basis_set
 from .reference_tolerances import (
     float_comparison_absolute_tolerance,
     float_comparison_relative_tolerance,
     scf_energy_tolerance,
 )
-from .test_helpers import create_test_basis_set
 
 try:
     import pyscf  # noqa: F401

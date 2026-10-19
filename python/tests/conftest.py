@@ -29,6 +29,8 @@ from pathlib import Path
 
 import numpy as np
 import pytest
+from qdk import TargetProfile
+from qdk.qsharp import QSharpError
 
 from qdk_chemistry.algorithms import create
 from qdk_chemistry.data import (
@@ -40,8 +42,9 @@ from qdk_chemistry.data import (
     StateVectorContainer,
     Wavefunction,
 )
+from qdk_chemistry.utils.qsharp import create_qsharp_context
 
-from .test_helpers import create_fourfold_test_hamiltonian, create_test_orbitals
+from .helpers import create_fourfold_test_hamiltonian, create_test_orbitals
 
 # Dynamically add the build directory to Python path
 # This ensures the _core module can be found regardless of platform
@@ -73,6 +76,61 @@ if build_dir.exists():
                 break
         if lib_dir_found:
             break
+
+
+_RUN_SLOW_TESTS = os.getenv("QDK_CHEMISTRY_RUN_SLOW_TESTS", "").lower() in {"1", "true", "yes"}
+
+
+@pytest.fixture(scope="session", autouse=True)
+def isolate_worker_temporary_directory(tmp_path_factory):
+    """Keep native basis archive extraction private to each xdist worker."""
+    if os.getenv("PYTEST_XDIST_WORKER"):
+        with pytest.MonkeyPatch.context() as monkeypatch:
+            worker_temp = str(tmp_path_factory.mktemp("native"))
+            monkeypatch.setenv("TMPDIR", worker_temp)
+            monkeypatch.setenv("TMP", worker_temp)
+            monkeypatch.setenv("TEMP", worker_temp)
+            yield
+    else:
+        yield
+
+
+def pytest_collection_modifyitems(items):
+    """Skip slow-marked tests unless QDK_CHEMISTRY_RUN_SLOW_TESTS is set."""
+    if _RUN_SLOW_TESTS:
+        return
+
+    skip_slow = pytest.mark.skip(reason="Slow test. Set QDK_CHEMISTRY_RUN_SLOW_TESTS=1 to enable.")
+    for item in items:
+        if "slow" in item.keywords:
+            item.add_marker(skip_slow)
+
+
+@pytest.fixture(scope="session")
+def qsharp_test_context():
+    """Create a shared Q# context containing the test-only sources.
+
+    Building an ``ArithmeticOpTester`` here invalidates earlier testers, so use each one before building the next.
+    """
+    # Unrestricted: ArithmeticOpTester needs Std.ArithmeticTestUtils, which Adaptive_RIF does not resolve.
+    context = create_qsharp_context(target_profile=TargetProfile.Unrestricted)
+    paths = sorted((Path(__file__).parent / "qsharp").glob("*.qs"))
+    sources = [path.read_text(encoding="utf-8") for path in paths]
+    try:
+        context.eval("\n".join(sources))
+    except QSharpError as error:
+        layout, line = [], 1
+        for path, source in zip(paths, sources, strict=True):
+            layout.append(f"{path.name} at line {line}")
+            line += source.count("\n") + 1
+        raise RuntimeError(f"failed to evaluate the Q# test sources ({', '.join(layout)}): {error}") from error
+    return context
+
+
+@pytest.fixture(scope="session")
+def qsharp_test_utils(qsharp_test_context):
+    """Return the test-only Q# utilities namespace."""
+    return qsharp_test_context.code.QDKChemistry.TestUtils
 
 
 @pytest.fixture

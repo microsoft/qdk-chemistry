@@ -12,16 +12,16 @@ from qdk_chemistry import algorithms
 from qdk_chemistry.constants import ANGSTROM_TO_BOHR
 from qdk_chemistry.data import Structure
 
-from .reference_tolerances import (
-    ci_energy_tolerance,
-    entropy_tol,
-    float_comparison_relative_tolerance,
-)
-from .test_helpers import (
+from .helpers import (
     create_dense_test_hamiltonian,
     fermionic_reference_matrix,
     fourfold_average,
     non_fourfold_perturbation,
+)
+from .reference_tolerances import (
+    ci_energy_tolerance,
+    entropy_tol,
+    float_comparison_relative_tolerance,
 )
 
 try:

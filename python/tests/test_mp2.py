@@ -12,8 +12,8 @@ from qdk_chemistry.data import Ansatz, CanonicalFourCenterHamiltonianContainer, 
 from qdk_chemistry.data._spin_channels import spin_channel_vector
 from qdk_chemistry.data.symmetry import axes
 
+from .helpers import fermionic_reference_matrix, fourfold_average, non_fourfold_perturbation
 from .reference_tolerances import mp2_energy_tolerance
-from .test_helpers import fermionic_reference_matrix, fourfold_average, non_fourfold_perturbation
 
 
 def create_o2_molecule(bond_length=2.3):

@@ -1052,6 +1052,28 @@ TEST_F(BasisSetTest, ECPHDF5Serialization) {
   std::filesystem::remove(filename);
 }
 
+TEST_F(BasisSetTest, LegacyEcpSerializationVersion) {
+  // Version 0.1.0 stored the local ECP term at the highest angular momentum.
+  Structure structure(std::vector<Eigen::Vector3d>{{0.0, 0.0, 0.0}},
+                      std::vector<std::string>{"Ag"});
+  std::vector<Shell> shells;
+  shells.emplace_back(0, OrbitalType::S, std::vector{1.0}, std::vector{1.0});
+  std::vector<Shell> ecp_shells;
+  ecp_shells.emplace_back(0, OrbitalType::S, std::vector{10.0},
+                          std::vector{50.0}, std::vector{2});
+  ecp_shells.emplace_back(0, OrbitalType::P, std::vector{5.0},
+                          std::vector{20.0}, std::vector{2});
+  auto json = BasisSet("test-basis", shells, ecp_shells, structure).to_json();
+  json["version"] = "0.1.0";
+
+  auto loaded = BasisSet::from_json(json);
+  ASSERT_EQ(2u, loaded->get_num_ecp_shells());
+  for (const auto& shell : loaded->get_ecp_shells()) {
+    EXPECT_EQ(shell.exponents(0) == 5.0 ? OrbitalType::UL : OrbitalType::S,
+              shell.orbital_type);
+  }
+}
+
 TEST_F(BasisSetTest, IndexConversion) {
   std::vector<Shell> shells;
   shells.emplace_back(Shell(0, OrbitalType::S, std::vector{1.0},

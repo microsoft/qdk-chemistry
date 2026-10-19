@@ -40,7 +40,7 @@ from qdk_chemistry.utils.model_hamiltonians import (
     create_ppp_hamiltonian,
 )
 
-from .test_helpers import (
+from .helpers import (
     create_dense_test_hamiltonian,
     create_test_basis_set,
     create_test_orbitals,

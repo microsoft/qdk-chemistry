@@ -244,6 +244,10 @@ The PySCF implementation supports all common base settings. The following table 
      - int
      - ``4``
      - PySCF verbosity level for logging (0=silent, 4=info, 5=debug)
+   * - ``relativity``
+     - string
+     - ``""``
+     - One-electron operator reconstructed from the orbital basis: nonrelativistic (``""``), ``"sf-x2c"``, or ``"sf-x2c-contracted"``. Match the generating :doc:`SCF solver <scf_solver>` treatment; it cannot be inferred from the orbitals. X2C requires spherical all-electron AOs and uses QDK physical constants.
 
 .. note::
 

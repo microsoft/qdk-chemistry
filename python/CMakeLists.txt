@@ -168,6 +168,7 @@ pybind11_add_module(_core
     src/pybind11/data/pauli_operator.cpp
     src/pybind11/data/majorana_mapping.cpp
     src/pybind11/data/serialization.cpp
+    src/pybind11/data/lattice_geometry.cpp
     src/pybind11/data/lattice_graph.cpp
     src/pybind11/algorithms/localizer.cpp
     src/pybind11/algorithms/stability.cpp
@@ -182,6 +183,8 @@ pybind11_add_module(_core
     src/pybind11/algorithms/active_space.cpp
     src/pybind11/algorithms/dynamical_correlation_calculator.cpp
     src/pybind11/algorithms/effective_hamiltonian.cpp
+    src/pybind11/algorithms/hamiltonian_factorization.cpp
+    src/pybind11/algorithms/double_factorization.cpp
     src/pybind11/algorithms/davidson_solver.cpp
     src/pybind11/algorithms/syev_solver.cpp
     src/pybind11/utils/logger.cpp

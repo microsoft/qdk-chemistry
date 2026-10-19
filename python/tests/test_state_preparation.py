@@ -41,7 +41,7 @@ from qdk_chemistry.algorithms.state_preparation.sparse_isometry import (
 from qdk_chemistry.data import AlgorithmRef, Circuit, Configuration, StateVectorContainer, Wavefunction
 from qdk_chemistry.plugins.qiskit import QDK_CHEMISTRY_HAS_QISKIT
 
-from .test_helpers import create_test_orbitals
+from .helpers import create_test_orbitals
 
 
 @pytest.mark.skipif(not QDK_CHEMISTRY_HAS_QISKIT, reason="Qiskit dependencies not available")
@@ -75,6 +75,7 @@ def test_sparse_isometry_basic(wavefunction_4e4o):
     qsc_json = json.loads(qsc_json_str)
     num_qubits = len(qsc_json["qubits"])
     assert num_qubits == 2 * 4
+    assert circuit.num_qubits == num_qubits
     # Test composite StatePreparation gate has been correctly decomposed
     assert "StatePreparation" in qsc_json_str
     assert "Rz" in qsc_json_str  # decomposed into RZ gate
@@ -128,6 +129,7 @@ def test_sparse_isometry_single_reference_state():
 
     single_ref_circuit = prep.run(wavefunction)
     assert isinstance(single_ref_circuit, Circuit)
+    assert single_ref_circuit.num_qubits is not None
     single_ref_qsc = single_ref_circuit.get_qsharp_circuit()
     assert isinstance(single_ref_qsc, QdkCircuitType)
     single_ref_qsc_json_str = single_ref_qsc.json()

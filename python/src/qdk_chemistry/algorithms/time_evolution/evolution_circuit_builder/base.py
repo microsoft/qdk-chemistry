@@ -58,7 +58,8 @@ class EvolutionCircuitBuilderSettings(Settings):
             "dt",
             "float",
             0.0,
-            "Time step for time-dependent evolution. Each step is passed to the builder.",
+            "Time step for time-dependent evolution. Each step is passed to the builder. "
+            "For a static Hamiltonian, dt = total_time is sufficient.",
         )
 
 

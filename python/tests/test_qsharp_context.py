@@ -10,12 +10,13 @@ from __future__ import annotations
 import inspect
 import threading
 from pathlib import Path
+from types import SimpleNamespace
 from typing import TYPE_CHECKING
 
 import numpy as np
 import pytest
 from qdk import TargetProfile
-from qdk.qsharp import Pauli
+from qdk.qsharp import Pauli, QSharpError, Result
 
 import qdk_chemistry.utils.qsharp as qsharp_package
 from qdk_chemistry.algorithms.phase_estimation.circuit_builder.standard_builder import (
@@ -41,9 +42,19 @@ if TYPE_CHECKING:
 #: shipped staging list so that list, not a copy of it, is what the classification pins.
 _PORTABLE_MODULES = tuple(Path(name).stem for name in _BASE_PROFILE_FILES)
 
-#: Modules withheld from ``TargetProfile.Base``. They uncompute through measurement, which
-#: Base cannot express, so they are made to fail as missing rather than compile and mislead.
-_ADAPTIVE_ONLY_MODULES = ("UnaryIteration", "UnaryPhaseEstimation")
+#: Modules withheld from ``TargetProfile.Base``. Most uncompute through measurement, or use
+#: classical feed-forward, which Base cannot express, so they are made to fail as missing
+#: rather than compile and mislead.
+_ADAPTIVE_ONLY_MODULES = (
+    "CombinedIterationPhaseEstimation",
+    "UnaryIteration",
+    "UnaryPhaseEstimation",
+    "SelectSwap",
+    "AliasSamplingStatePrep",
+    "QROMStatePrep",
+    "PhaseGradient",
+    "SOSSAWalk",
+)
 
 
 @pytest.fixture(scope="module")
@@ -182,11 +193,106 @@ class TestTargetProfiles:
         vendored = {path.stem for path in (Path(qsharp_package.__file__).parent / "src").glob("*.qs")}
         assert vendored == set(_PORTABLE_MODULES) | set(_ADAPTIVE_ONLY_MODULES)
 
+    def test_adaptive_ri_loads_the_whole_project(self) -> None:
+        """Every non-Base profile compiles all sources, so one dynamic double breaks them all.
+
+        ``CombinedIterationPhaseEstimation`` once summed its feed-forward correction into a
+        mutable ``Double``, which Adaptive_RI rejects, taking down contexts that never touch
+        combined IQPE -- including ``target_name`` targets that infer the RI profile.
+        """
+        context = create_qsharp_context(target_profile=TargetProfile.Adaptive_RI)
+        assert hasattr(context.code.QDKChemistry.Utils, "CombinedIterationPhaseEstimation")
+
     def test_base_lowers_a_circuit_to_qir(self, base_context: qdk.Context) -> None:
         """The Base build exists to be lowered through QIR, so prove that it compiles."""
         utils = base_context.code.QDKChemistry.Utils
         state_prep = utils.StatePreparation.MakeStatePreparationCircuit
         assert "define" in str(base_context.compile(state_prep, [0], [1.0, 0.0], [], 1))
 
-        pauli_exp = utils.ControlledPauliExp.MakeRepControlledPauliExpCircuit
-        assert "define" in str(base_context.compile(pauli_exp, [[Pauli.X, Pauli.Z]], [0.5], 2, 0, [1, 2]))
+        # With phasing on, the equal-angle pair reaches the Sorted comparator and the controlled adder.
+        params = utils.PauliExp.RepPauliExpParams(
+            pauliIndices=[[0, 1], [2, 3], [4]],
+            pauliOps=[[Pauli.X, Pauli.Z], [Pauli.Z, Pauli.Z], [Pauli.Y]],
+            pauliCoefficients=[0.5, 0.5, 0.3],
+            repetitions=2,
+            numPrefixTerms=0,
+            numSuffixTerms=0,
+        )
+        systems = [1, 2, 3, 4, 5]
+        for phasing in (False, True):
+            pauli_exp = utils.ControlledPauliExp.MakeRepControlledPauliExpCircuit
+            assert "define" in str(base_context.compile(pauli_exp, params, [0, 3], phasing, -1, 0, systems))
+            swap_exp = utils.ControlledSwapPauliExp.MakeRepControlledSwapPauliExpCircuit
+            assert "define" in str(base_context.compile(swap_exp, params, [0, 3], phasing, -1, 0.0, 0, systems))
+
+
+class TestTestOnlySourcesAreNotShipped:
+    """Ensure test-only Q# declarations are not shipped."""
+
+    @staticmethod
+    def _walk_namespaces(namespace, prefix: str) -> Iterator[tuple[str, str, bool]]:
+        """Yield ``(path, name, is_namespace)`` for a compiled Q# namespace tree."""
+        for name in dir(namespace):
+            if name.startswith("_"):
+                continue
+            child = getattr(namespace, name)
+            path = f"{prefix}.{name}"
+            is_namespace = isinstance(child, SimpleNamespace)
+            yield path, name, is_namespace
+            if is_namespace:
+                yield from TestTestOnlySourcesAreNotShipped._walk_namespaces(child, path)
+
+    def test_every_test_only_declaration_uses_the_test_prefix(self, qsharp_test_utils) -> None:
+        """Test-only declarations use the ``Test`` prefix."""
+        unprefixed = [
+            path
+            for path, name, is_namespace in self._walk_namespaces(qsharp_test_utils, "TestUtils")
+            if not is_namespace and not name.startswith("Test")
+        ]
+        assert unprefixed == []
+
+    def test_a_production_context_cannot_reach_the_test_helpers(self) -> None:
+        """A user context must not be able to call the test drivers."""
+        chemistry = create_qsharp_context().code.QDKChemistry
+        assert not hasattr(chemistry, "TestUtils")
+        shipped_helpers = [
+            path
+            for path, name, is_namespace in self._walk_namespaces(chemistry.Utils, "Utils")
+            if not is_namespace and (name.startswith("Test") or name.endswith("ForTest"))
+        ]
+        assert shipped_helpers == []
+
+    def test_the_test_context_can_reach_them(self, qsharp_test_context: qdk.Context) -> None:
+        """Evaluating the test sources is what makes the drivers available to the Python tests."""
+        assert hasattr(qsharp_test_context.code.QDKChemistry, "TestUtils")
+
+
+@pytest.mark.parametrize("combined", [False, True])
+@pytest.mark.parametrize(
+    ("phase", "systems", "ancillas", "error"),
+    [
+        (0, [1], 1, None),
+        (0, [2], 1, None),
+        (2, [0], 1, None),
+        (-1, [1], 1, "phaseQubit must be within"),
+        (3, [1], 1, "phaseQubit must be within"),
+        (0, [-1], 1, "System qubit indices must be within"),
+        (0, [3], 1, "System qubit indices must be within"),
+        (0, [1, 1], 1, "System qubit indices must be unique"),
+        (1, [1], 1, "System qubit indices must be distinct"),
+        (0, [1], -1, "numAncillaQubits must be non-negative"),
+    ],
+)
+def test_iqpe_qubit_layout(combined: bool, phase: int, systems: list[int], ancillas: int, error: str | None) -> None:
+    """Both entry points support alternate layouts and reject invalid indices."""
+    unitary = "(phase, targets) => { CNOT(targets[0], targets[1]); Controlled Z([phase], targets[1]); }"
+    if combined:
+        call = f"CombinedIterationPhaseEstimation.RunFullIQPE(1, 1, _ => (), [{unitary}]"
+    else:
+        call = f"IterativePhaseEstimation.MakeIQPECircuit(_ => (), {unitary}, 0.0"
+    expression = f"QDKChemistry.Utils.{call}, {phase}, {systems}, {ancillas})"
+    if error is not None:
+        with pytest.raises(QSharpError, match=error):
+            get_qsharp_context().eval(expression)
+    else:
+        assert get_qsharp_context().eval(expression) == [Result.Zero]

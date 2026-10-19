@@ -28,7 +28,7 @@ __all__ = ["Job"]
 
 logger = logging.getLogger(__name__)
 
-_JOB_FILE_VERSION = 2
+_JOB_FILE_VERSION = 3
 
 
 def _prepare_persisted_value(value: Any, field: str) -> Any:
@@ -85,6 +85,8 @@ class Job:
                         are retrieved.
         output_is_tuple: Whether the retrieved result is a tuple.  ``None``
                  until results are retrieved.
+        owner:          Workspace and project permitted to manage the job
+                through MCP. ``None`` for unowned SDK jobs.
 
     """
 
@@ -103,6 +105,7 @@ class Job:
         input_hashes: dict[str, str] | None = None,
         output_hashes: list[dict[str, Any]] | None = None,
         output_is_tuple: bool | None = None,
+        owner: dict[str, str | None] | None = None,
     ):
         """Initialise a Job from its constituent parts.
 
@@ -119,6 +122,7 @@ class Job:
             input_hashes: Content hashes for submitted inputs.
             output_hashes: Content-hash descriptors for retrieved outputs.
             output_is_tuple: Whether the retrieved result is a tuple.
+            owner: Workspace and project permitted to manage this job through MCP.
 
         """
         self.job_id = job_id
@@ -133,6 +137,7 @@ class Job:
         self.input_hashes: dict[str, str] | None = input_hashes
         self.output_hashes: list[dict[str, Any]] | None = output_hashes
         self.output_is_tuple: bool | None = output_is_tuple
+        self.owner: dict[str, str | None] | None = owner
         self._active_backend: RemoteBackend | None = None
 
     # ── Serialisation ────────────────────────────────────────────────────
@@ -157,6 +162,8 @@ class Job:
             d["output_hashes"] = self.output_hashes
         if self.output_is_tuple is not None:
             d["output_is_tuple"] = self.output_is_tuple
+        if self.owner is not None:
+            d["owner"] = self.owner
         return _prepare_persisted_value(d, "metadata")
 
     def save(self, path: str | pathlib.Path | None = None) -> pathlib.Path:
@@ -229,6 +236,7 @@ class Job:
             input_hashes=data.get("input_hashes"),
             output_hashes=data.get("output_hashes"),
             output_is_tuple=data.get("output_is_tuple"),
+            owner=data.get("owner"),
         )
 
     @classmethod

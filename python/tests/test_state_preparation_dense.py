@@ -16,8 +16,8 @@ from qdk_chemistry.data import Circuit, Configuration, StateVectorContainer, Wav
 from qdk_chemistry.plugins.qiskit import QDK_CHEMISTRY_HAS_QISKIT, QDK_CHEMISTRY_HAS_QISKIT_AER
 from qdk_chemistry.utils.qsharp import create_qsharp_context
 
+from .helpers import create_test_orbitals
 from .reference_tolerances import estimator_energy_tolerance, float_comparison_absolute_tolerance
-from .test_helpers import create_test_orbitals
 
 try:
     from qdk._native import Circuit as QdkCircuitType

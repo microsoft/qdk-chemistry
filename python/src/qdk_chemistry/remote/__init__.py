@@ -9,7 +9,11 @@ Usage:
     >>>
     >>> scf = create("scf_solver")
     >>> backend = create_remote("local")
-    >>> energy, wfn = scf.run(structure, 0, 1, "cc-pvdz", remote=backend)
+    >>> backend.connect()
+    >>> try:
+    ...     energy, wfn = scf.run(structure, 0, 1, "cc-pvdz", remote=backend)
+    ... finally:
+    ...     backend.disconnect()
 
 """
 

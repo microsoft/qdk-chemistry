@@ -26,7 +26,7 @@ from qdk_chemistry.remote.serialization import (
     serialize_outputs,
 )
 
-from .test_helpers import create_test_orbitals
+from .helpers import create_test_orbitals
 
 
 @pytest.fixture
@@ -259,6 +259,7 @@ def test_input_round_trip(tmp_path, h2_structure):
         algorithm_name="qdk",
         settings={"max_iterations": 100},
         run_hash="run-hash",
+        owner={"workspace_root": "/workspace", "project_name": "project"},
         input_hashes={"args.arg_0": "structure-hash"},
         remote_cache={"name": "shared"},
     )
@@ -272,6 +273,7 @@ def test_input_round_trip(tmp_path, h2_structure):
     assert restored["kwargs"] == {"basis": "cc-pvdz"}
     assert restored["settings"] == {"max_iterations": 100}
     assert restored["run_hash"] == "run-hash"
+    assert restored["owner"] == {"workspace_root": "/workspace", "project_name": "project"}
     assert restored["input_hashes"] == {"args.arg_0": "structure-hash"}
     assert restored["remote_cache"] == {"name": "shared"}
     assert restored["remote_cache_transport"] is False

@@ -38,8 +38,8 @@ from qdk_chemistry.utils.qsharp import (
     use_qsharp_context,
 )
 
+from .helpers import create_random_wavefunction
 from .reference_tolerances import float_comparison_absolute_tolerance, float_comparison_relative_tolerance
-from .test_helpers import create_random_wavefunction
 
 
 def _matrix_qubit_counts(wf: Wavefunction) -> tuple[int, int]:
@@ -244,9 +244,9 @@ class TestSparseIsometryBinaryEncoding:
         [
             (6, 6, 20, 42, True, True),
             (6, 6, 20, 42, True, False),
-            (6, 6, 20, 42, False, True),
+            pytest.param(6, 6, 20, 42, False, True, marks=pytest.mark.slow),
             (6, 6, 30, 7, True, True),
-            (6, 6, 30, 7, False, True),
+            pytest.param(6, 6, 30, 7, False, True, marks=pytest.mark.slow),
         ],
         ids=[
             "6e6o_20det_binenc_negctrl",
@@ -835,7 +835,7 @@ class TestBinaryEncodingWithQPE:
             beta_bits = [int(bits[n - 1 - i]) for i in range(n_orbitals, n)]
             config_str = "".join(mapping[alpha_bits[k], beta_bits[k]] for k in range(n_orbitals))
             configs.append(Configuration.from_spin_half_string(config_str))
-        from .test_helpers import create_test_orbitals  # noqa: PLC0415
+        from .helpers import create_test_orbitals  # noqa: PLC0415
 
         orbitals = create_test_orbitals(n_orbitals)
         wf = Wavefunction(StateVectorContainer(top_amps, configs, orbitals))
