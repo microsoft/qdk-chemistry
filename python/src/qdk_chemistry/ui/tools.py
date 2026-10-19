@@ -19,6 +19,7 @@ import inspect
 import itertools
 import json
 import math
+import multiprocessing
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
@@ -801,6 +802,8 @@ _TOOL_CATEGORIES: dict[str, list[str]] = {
         "run_hamiltonian_simulation",
         "run_controlled_evolution_circuit_mapper",
         "run_circuit_executor",
+        "run_azure_quantum_demo",
+        "run_iqpe_azure_quantum_demo",
         "run_hadamard_test",
         "run_phase_estimation",
     ],
@@ -2651,6 +2654,182 @@ def run_circuit_executor(
         return f"Failed to save executor data to {out_executor_data_filename}: {e!s}"
 
     return out_executor_data_filename
+
+
+def _azure_quantum_demo_worker(
+    algorithm_type: str,
+    input_paths: list[tuple[str, str]],
+    *,
+    output_path: str,
+    settings: dict[str, Any],
+    seed: int,
+    shots: int | None,
+) -> dict[str, Any]:
+    """Run the process-wide demo patches only inside a dedicated child process."""
+    from qdk_chemistry.plugins.azure_quantum.demo import (  # noqa: PLC0415
+        DEMO_BACKEND_SETTINGS,
+        demo_azure_quantum,
+    )
+
+    inputs = [load_data_object(path, getattr(data, class_name)) for path, class_name in input_paths]
+    with demo_azure_quantum(seed=seed) as workspace:
+        if algorithm_type == "circuit_executor":
+            algorithm = algorithms.create(algorithm_type, "azure_quantum_backend")
+            _apply_settings(algorithm, DEMO_BACKEND_SETTINGS)
+            result = _run_algorithm(algorithm, *inputs, shots, use_cache=False)
+        else:
+            algorithm = algorithms.create("phase_estimation", "qdk_iterative")
+            _apply_settings(
+                algorithm,
+                {
+                    **settings,
+                    "circuit_executor": {"algorithm_name": "azure_quantum_backend", **DEMO_BACKEND_SETTINGS},
+                },
+            )
+            result = _run_algorithm(algorithm, *inputs, use_cache=False)
+        save_data_object(result, output_path)
+        return {
+            "data": result.to_json(),
+            "backend_display_name": "Azure Quantum local demo target",
+            "reporting_guidance": (
+                "Use backend_display_name to label results. Describe simulator and execution provenance once "
+                "in Methods, rather than repeating a cloud-versus-local disclaimer."
+            ),
+            "local_demo": True,
+            "submitted_to_azure": False,
+            "simulator": "qdk-full-state-cpu",
+            "seed": seed,
+            "jobs": [
+                {
+                    "job_id": job.id,
+                    "target": job.details.target,
+                    "status": job.details.status,
+                    "histogram": job.get_results_histogram(),
+                }
+                for job in workspace.list_jobs()
+            ],
+        }
+
+
+def _run_azure_quantum_demo(
+    algorithm_type: str,
+    input_files: list[tuple[str, str]],
+    output_filename: str,
+    settings: dict[str, Any],
+    *,
+    seed: int,
+    shots: int | None = None,
+) -> dict[str, Any]:
+    """Isolate demo workspace creation from other MCP requests and bypass caching."""
+    inputs = [(str(resolve_project_file(_strip(filename))), class_name) for filename, class_name in input_files]
+    output_path = str(resolve_project_file(output_filename))
+    with concurrent.futures.ProcessPoolExecutor(max_workers=1, mp_context=multiprocessing.get_context("spawn")) as pool:
+        result = pool.submit(
+            _azure_quantum_demo_worker,
+            algorithm_type,
+            inputs,
+            output_path=output_path,
+            settings=settings,
+            seed=seed,
+            shots=shots,
+        ).result()
+    return {"output_filename": output_filename, **result}
+
+
+@app.tool()
+@_structured
+@validate_project
+def run_azure_quantum_demo(
+    project_name: str,
+    circuit_filename: str,
+    shots: int,
+    out_executor_data_filename: str,
+    *,
+    seed: int = 42,
+    overwrite: bool = False,
+) -> dict | str:
+    """Execute a Circuit through AzureQuantumBackend on a local demo target; never submit to Azure.
+
+    Requires the azure-quantum extra. QIR runs on the QDK CPU full-state simulator
+    in an isolated process, without credentials, remote execution, or caching.
+    Returns the saved CircuitExecutorData filename, measurement counts, and demo
+    job provenance. Full-state memory grows exponentially with circuit width.
+    Label reports with backend_display_name; include execution provenance once
+    in Methods rather than repeating cloud-versus-local disclaimers.
+    """
+    if isinstance(shots, bool) or not isinstance(shots, int) or shots <= 0:
+        return "Invalid shots: must be a positive integer."
+    if isinstance(seed, bool) or not isinstance(seed, int) or seed < 0:
+        return "Invalid seed: must be a nonnegative integer."
+    output_filename, error = _prepare_output(
+        out_executor_data_filename, "CircuitExecutorData", _CircuitExecutorData, overwrite=overwrite
+    )
+    if error:
+        return error
+    return _run_azure_quantum_demo(
+        "circuit_executor", [(circuit_filename, "Circuit")], output_filename, {}, seed=seed, shots=shots
+    )
+
+
+@app.tool()
+@_structured
+@validate_project
+def run_iqpe_azure_quantum_demo(
+    project_name: str,
+    state_prep_circuit_filename: str,
+    qubit_hamiltonian_filename: str,
+    out_qpe_result_filename: str,
+    *,
+    num_bits: int,
+    evolution_time: float,
+    shots_per_bit: int = 3,
+    seed: int = 42,
+    unitary_builder_settings: dict | None = None,
+    overwrite: bool = False,
+) -> dict | str:
+    """Run IQPE through AzureQuantumBackend on a local demo target and save QpeResult; no Azure submission.
+
+    Requires the azure-quantum and qiskit-extras extras. Uses qiskit_iterative for saved circuits,
+    with one local QIR job per phase bit and majority voting over shots_per_bit.
+    evolution_time is in atomic units and must be finite and nonzero.
+    unitary_builder_settings configures the trotter unitary builder (one step
+    by default); num_bits and evolution_time are explicit. Returned energies
+    exclude core energy.
+    Runs in an isolated process without caching or credentials. Full-state
+    memory grows exponentially with circuit width.
+    Label reports with backend_display_name; include execution provenance once
+    in Methods rather than repeating cloud-versus-local disclaimers.
+    """
+    for name, value in (("num_bits", num_bits), ("shots_per_bit", shots_per_bit)):
+        if isinstance(value, bool) or not isinstance(value, int) or value <= 0:
+            return f"Invalid {name}: must be a positive integer."
+    if isinstance(evolution_time, bool) or not math.isfinite(evolution_time) or evolution_time == 0:
+        return "Invalid evolution_time: must be finite and nonzero."
+    if isinstance(seed, bool) or not isinstance(seed, int) or seed < 0:
+        return "Invalid seed: must be a nonnegative integer."
+    output_filename, error = _prepare_output(out_qpe_result_filename, "QpeResult", data.QpeResult, overwrite=overwrite)
+    if error:
+        return error
+    settings = {
+        "shots_per_bit": shots_per_bit,
+        "qpe_circuit_builder": {
+            "algorithm_name": "qiskit_iterative",
+            "num_bits": num_bits,
+            "unitary_builder": {
+                "algorithm_name": "trotter",
+                "num_divisions": 1,
+                **(unitary_builder_settings or {}),
+                "time": evolution_time,
+            },
+        },
+    }
+    return _run_azure_quantum_demo(
+        "phase_estimation",
+        [(state_prep_circuit_filename, "Circuit"), (qubit_hamiltonian_filename, "QubitOperator")],
+        output_filename,
+        settings,
+        seed=seed,
+    )
 
 
 @app.tool()

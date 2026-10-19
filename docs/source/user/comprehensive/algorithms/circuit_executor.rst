@@ -268,6 +268,54 @@ measurement result, there is no phase or energy to decode.
    Custom :class:`~qdk_chemistry.data.QuantumErrorProfile` noise models are not supported. Configure noise through the target's own ``input_params`` instead.
 
 
+Local demo execution through MCP
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+The MCP tools ``run_azure_quantum_demo`` and ``run_iqpe_azure_quantum_demo``
+exercise :class:`~qdk_chemistry.plugins.azure_quantum.circuit_executor.AzureQuantumBackend`
+without Azure credentials or a workspace connection. They submit QIR to the local
+``demo.target``, backed by QDK CPU full-state simulation, rather than to Azure.
+Both tools run in an isolated process, bypass caching, and return
+``local_demo=True``, ``submitted_to_azure=False``, and local job histograms.
+The ``backend_display_name`` field provides the standard report label,
+``"Azure Quantum local demo target"``. The ``reporting_guidance`` field asks
+assistants to describe simulator and execution provenance once in Methods
+rather than repeating cloud-versus-local disclaimers. These presentation hints
+do not change the execution provenance.
+Full-state memory grows exponentially with circuit width; use small inputs.
+
+``run_azure_quantum_demo`` requires the ``azure-quantum`` extra. It accepts a
+saved :class:`~qdk_chemistry.data.Circuit`, ``shots``, and an output filename for
+:class:`~qdk_chemistry.data.CircuitExecutorData`. Measurement counts are returned
+inline as well as saved.
+
+``run_iqpe_azure_quantum_demo`` additionally requires ``qiskit-extras`` to compose
+saved circuits with the ``qiskit_iterative`` builder. Supply a state-preparation
+circuit, a :class:`~qdk_chemistry.data.QubitOperator`, and explicit ``num_bits``
+and ``evolution_time`` (atomic units). For example:
+
+.. code-block:: python
+
+   run_iqpe_azure_quantum_demo(
+       project_name="h2",
+       state_prep_circuit_filename="hf.circuit.json",
+       qubit_hamiltonian_filename="h2.qubit_hamiltonian.json",
+       out_qpe_result_filename="iqpe.qpe_result.json",
+       num_bits=1,
+       evolution_time=1.0,
+       shots_per_bit=3,
+       seed=42,
+       unitary_builder_settings={"num_divisions": 4, "order": 2},
+   )
+
+This runs one local job per phase bit and saves a
+:class:`~qdk_chemistry.data.QpeResult`. The Trotter unitary uses one step by
+default; ``unitary_builder_settings`` controls its approximation. Returned
+energies exclude the Hamiltonian's core energy. A one-bit example demonstrates
+the workflow, not a precision molecular energy calculation. Use
+``overwrite=True`` to replace an existing valid result.
+
+
 Related classes
 ---------------
 
