@@ -9,6 +9,7 @@ import math
 from collections.abc import Mapping
 
 from qdk_chemistry.algorithms.circuit_mapper.pauli_sequence_mapper import _pauli_evolution_parameters
+from qdk_chemistry.algorithms.term_grouper.vacuum_annihilating import _anticommuting_masks, _index_word
 from qdk_chemistry.data.circuit import Circuit, QsharpFactoryData
 from qdk_chemistry.data.unitary_representation.base import UnitaryRepresentation
 from qdk_chemistry.data.unitary_representation.containers.pauli_product_formula import PauliProductFormulaContainer
@@ -47,7 +48,7 @@ def _vacuum_eigenphase(terms: list[tuple[Mapping[int, str], float]], atol: float
         The imprinted phase, or ``None`` when the vacuum is not an eigenstate of the product.
 
     """
-    block: list[tuple[int, int]] = []  # symplectic (X, Z) bit masks of the terms in the open block
+    block: dict[int, dict[str, dict[int, int]]] = {}  # term ordinals of the open block, by qubit and axis
     contributions: dict[int, list[complex]] = {}
     leaked: list[float] = []
     diagonal: list[float] = []
@@ -59,7 +60,8 @@ def _vacuum_eigenphase(terms: list[tuple[Mapping[int, str], float]], atol: float
             leaked.append(abs(residual))
         return math.fsum(leaked) <= atol
 
-    for pauli_map, angle in terms:
+    for index, (pauli_map, angle) in enumerate(terms):
+        word = {qubit: axis for qubit, axis in pauli_map.items() if axis != "I"}
         x_mask = z_mask = 0
         for qubit, axis in pauli_map.items():
             if axis in ("X", "Y"):
@@ -67,13 +69,12 @@ def _vacuum_eigenphase(terms: list[tuple[Mapping[int, str], float]], atol: float
             if axis in ("Y", "Z"):
                 z_mask |= 1 << qubit
 
-        # Two Pauli strings commute iff they anticommute on an even number of qubits.
-        if any(((x_mask & z) ^ (z_mask & x)).bit_count() % 2 for x, z in block):
+        if _anticommuting_masks(word, block):
             if not close_block():
                 return None
             block.clear()
             contributions.clear()
-        block.append((x_mask, z_mask))
+        _index_word(word, index, block)
 
         if x_mask:
             # P|0...0> = i^{n_Y}|b>, with b the bit pattern of the X/Y support.

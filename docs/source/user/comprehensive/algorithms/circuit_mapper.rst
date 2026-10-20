@@ -184,13 +184,10 @@ fermionic term are exponentiated as one contiguous block:
    \approx \prod_i e^{-it P_i}|0\ldots0\rangle = |0\ldots0\rangle .
 
 The :ref:`vacuum-annihilating term grouper <algorithms-term-grouper>` (factory name
-``"vacuum_annihilating"``) produces that ordering. A Pauli factor *flips* a qubit when it
-exchanges :math:`|0\rangle` and :math:`|1\rangle`, which :math:`X` and :math:`Y` do and
-:math:`I` and :math:`Z` do not. Terms flipping the same qubits are the only ones that can
-cancel, so the grouper walks them in order and closes a group as soon as the accumulated
-amplitude :math:`\sum_j c_j i^{n_Y^{(j)}}` vanishes — each emitted group therefore annihilates
-the vacuum outright. Groups are restricted to one :math:`Y`-count parity so that their members
-commute and can be exponentiated term by term.
+``"vacuum_annihilating"``) supports :class:`~qdk_chemistry.data.LayeredPartition`: terms within
+each outer group commute and each group preserves the vacuum, with disjoint-support layers. It preserves
+compatible incoming groups and layers, repairing group boundaries when needed to keep cancellation
+partners together. For flat or unpartitioned inputs, it constructs disjoint layers from Pauli supports.
 
 The mapper validates its input product formula and raises a :class:`ValueError` when the
 ordering is not vacuum preserving, rather than returning a wrong result.
@@ -202,10 +199,10 @@ ordering is not vacuum preserving, rather than returning a wrong result.
 
 .. rubric:: Hamming-weight phasing
 
-With ``use_hamming_weight_phasing``, the evolution on the vacuum register is phased as in the
-:ref:`Pauli sequence mapper <pauli-sequence-mapper>`, but uncontrolled, since the swap sandwich
-supplies the control. The vacuum-annihilating grouper declares no ``layer_offsets``, so its output
-cannot be phased.
+With ``use_hamming_weight_phasing``, HWP is supported for formulas built from a
+:class:`~qdk_chemistry.data.LayeredPartition`, as in the
+:ref:`Pauli sequence mapper <pauli-sequence-mapper>`. The evolution on the vacuum register is
+uncontrolled, since the swap sandwich supplies the control.
 
 .. rubric:: Settings
 

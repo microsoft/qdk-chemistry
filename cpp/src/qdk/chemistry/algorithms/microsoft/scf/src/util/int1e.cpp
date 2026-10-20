@@ -479,6 +479,9 @@ void OneBodyIntegral::integral_(size_t nresults, EngineFactory engine_fn,
 #else
   int nthreads = 1;
 #endif
+  // Constructing engines can grow Libint's shared cache; do it serially.
+  std::vector<std::unique_ptr<OneBodyIntegralEngine>> engines(nthreads);
+  for (auto& engine : engines) engine = engine_fn();
 #ifdef ENABLE_NVTX3
   nvtx3::scoped_range r{"int1e"};
 #endif
@@ -493,7 +496,7 @@ void OneBodyIntegral::integral_(size_t nresults, EngineFactory engine_fn,
 #endif
     int world_thread_size = mpi_.world_size * nthreads;
     int world_thread_id = mpi_.world_rank * nthreads + local_thread_id;
-    auto engine = engine_fn();
+    auto& engine = engines[local_thread_id];
     if (engine->nopers() < nresults) {
       throw std::invalid_argument(
           "Integral engine provides fewer components than requested");
@@ -727,6 +730,9 @@ void OneBodyIntegral::integral_deriv_(EngineFactory engine_fn,
 #else
   int nthreads = 1;
 #endif
+  // Constructing engines can grow Libint's shared cache; do it serially.
+  std::vector<std::unique_ptr<OneBodyIntegralEngine>> engines(nthreads);
+  for (auto& engine : engines) engine = engine_fn();
 #ifdef ENABLE_NVTX3
   nvtx3::scoped_range r{"int1e_deriv"};
 #endif
@@ -741,7 +747,7 @@ void OneBodyIntegral::integral_deriv_(EngineFactory engine_fn,
 #endif
     int world_thread_size = mpi_.world_size * nthreads;
     int world_thread_id = mpi_.world_rank * nthreads + local_thread_id;
-    auto engine = engine_fn();
+    auto& engine = engines[local_thread_id];
 
     for (size_t p = world_thread_id; p < shell_pairs_.size();
          p += world_thread_size) {

@@ -29,7 +29,7 @@ from qdk_chemistry.algorithms.hamiltonian_unitary_builder.time_evolution.zassenh
 )
 from qdk_chemistry.algorithms.qubit_mapper.sum_of_squares import SumOfSquaresQubitMapper
 from qdk_chemistry.data import (
-    FactorizedHamiltonianContainer,
+    DFTHCHamiltonianContainer,
     Hamiltonian,
     MajoranaMapping,
     QubitOperator,
@@ -197,6 +197,14 @@ class TestPauliDecompositionContainer:
 class TestSumOfSquaresContainer:
     """Serialization and the validation the SOS blocks and metadata enforce."""
 
+    def test_summary_describes_system_and_generators(self) -> None:
+        """The summary labels the generator counts and energy shift."""
+        summary = _sum_of_squares_container().get_summary()
+
+        assert "One-body generators" in summary
+        assert "Spin-free generators" in summary
+        assert "Energy shift" in summary
+
     def test_json_roundtrip(self) -> None:
         """Complex LCU coefficients and Givens angles survive a JSON round-trip.
 
@@ -332,7 +340,7 @@ class TestSumOfSquaresContainer:
         assert container.two_body.angles.shape != container.two_body.coeffs.shape
 
 
-def _factorized_with_one_body(h1: np.ndarray) -> FactorizedHamiltonianContainer:
+def _factorized_with_one_body(h1: np.ndarray) -> DFTHCHamiltonianContainer:
     """Build a small factorized Hamiltonian carrying a chosen one-body matrix."""
     n = h1.shape[0]
     rng = np.random.default_rng(1)
@@ -340,7 +348,7 @@ def _factorized_with_one_body(h1: np.ndarray) -> FactorizedHamiltonianContainer:
     for b in range(2):
         v = rng.standard_normal(n)
         u[b * n : (b + 1) * n] = v / np.linalg.norm(v)
-    return FactorizedHamiltonianContainer(
+    return DFTHCHamiltonianContainer(
         one_body_integrals=h1,
         u_matrices=u,
         w_matrices=rng.standard_normal(2),
