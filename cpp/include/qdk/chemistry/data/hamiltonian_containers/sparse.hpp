@@ -291,7 +291,7 @@ class SparseHamiltonianContainer : public HamiltonianContainer {
  private:
   void hash_update(qdk::chemistry::utils::HashContext& ctx) const override;
   /// Serialization version
-  static constexpr const char* SERIALIZATION_VERSION = "0.2.0";
+  static constexpr const char* SERIALIZATION_VERSION = "0.3.0";
 
   /// Sparse storage of one-body integrals
   Eigen::SparseMatrix<double> _one_body_sparse;
