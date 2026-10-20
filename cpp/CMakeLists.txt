@@ -105,6 +105,9 @@ include(cmake/qdk-uarch.cmake)
 # Handle TPL dependencies
 include(cmake/third_party.cmake)
 
+# BLAS thread-control backend selection
+include(cmake/qdk-blas-threads.cmake)
+
 # Handle GPU dependencies
 if(QDK_CHEMISTRY_ENABLE_GPU)
   include(${CMAKE_CURRENT_LIST_DIR}/cmake/cuda.cmake)

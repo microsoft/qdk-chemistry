@@ -59,7 +59,7 @@ void bind_lattice_graph(pybind11::module &m) {
 
   py::class_<BondFlavorDefinition, py::smart_holder>(
       m, "BondFlavorDefinition", "Semantic label for a shell-axis class.")
-      .def(py::init<std::uint64_t, Eigen::RowVectorXd, BondFlavorId>(),
+      .def(py::init<std::uint64_t, Eigen::RowVectorXd, std::uint64_t>(),
            py::arg("shell"), py::arg("axis"), py::arg("flavor"), R"(
 Define a semantic label to resolve onto lattice graph edges.
 
@@ -79,23 +79,24 @@ Args:
   py::class_<EdgeLabel, py::smart_holder>(
       m, "EdgeLabel",
       "Geometric shell and optional semantic flavor of an edge.")
-      .def(
-          py::init([](std::uint64_t shell, std::optional<BondFlavorId> flavor) {
-            return EdgeLabel{shell, flavor};
-          }),
-          py::arg("shell"), py::arg("flavor") = py::none(), R"(
+      .def(py::init(
+               [](std::uint64_t shell, std::optional<std::uint64_t> flavor) {
+                 return EdgeLabel{shell, flavor};
+               }),
+           py::arg("shell"), py::arg("flavor") = py::none(), R"(
 Label one edge with its neighbor shell and optional semantic flavor.
 
 Args:
     shell (int): One-based neighbor shell index, at most ``2**53``.
-    flavor (int | None, optional): Opaque non-negative semantic label. Defaults to None.
+    flavor (int | None, optional): Opaque non-negative semantic label, at most ``2**53``. Defaults to None.
 )")
       .def_property_readonly(
           "shell", [](const EdgeLabel &self) { return self.shell; },
           "int: One-based radial shell index, at most ``2**53``.")
       .def_property_readonly(
           "flavor", [](const EdgeLabel &self) { return self.flavor; },
-          "int | None: Opaque non-negative semantic label, or None.")
+          "int | None: Opaque non-negative semantic label, at most ``2**53``, "
+          "or None.")
       .def("__eq__", [](const EdgeLabel &self,
                         const EdgeLabel &other) { return self == other; })
       .def("__repr__", [](const EdgeLabel &self) {
@@ -221,15 +222,16 @@ Materialize selected geometric shells as labelled edges.
 
 Shells rank the distinct distances present on this geometry, including periodic
 images, so a thin patch can lack a bulk-lattice shell and number the longer
-distances differently. Each physical connection becomes one edge of weight
-``weight``; the geometry is not retained. Edges are colored greedily with
-``coloring_seed`` and 32 trials.
+distances differently. Each periodic image of a connection adds ``weight`` to
+the edge between its sites, so a site pair joined by several images of one
+shell and flavor gets the sum; the geometry is not retained. Edges are colored
+greedily with ``coloring_seed`` and 32 trials.
 
 Args:
     geometry (LatticeGeometry): Source Cartesian geometry.
     shells (list[int], optional): Positive shell indices; duplicates are ignored. Defaults to [1].
     bond_flavors (list[BondFlavorDefinition], optional): Shell-axis labels resolved onto edges. Defaults to [].
-    weight (float, optional): Finite weight of every edge. Defaults to 1.0.
+    weight (float, optional): Finite weight added by every periodic image of an edge. Defaults to 1.0.
     tolerance (float, optional): Positive distance and axis tolerance, less than 1, the lattice unit length. Defaults to 1e-9.
     coloring_seed (int, optional): PRNG seed for greedy edge coloring. Defaults to 0.
 
@@ -237,7 +239,7 @@ Returns:
     LatticeGraph: Graph whose edges carry their shell and flavor.
 
 Raises:
-    ValueError: If a site neighbors its own periodic image, several periodic images join one site pair, or a bond axis lies within the tolerance of several flavor axes of its shell.
+    ValueError: If a site neighbors its own periodic image, periodic images of different shells or flavors join one site pair, the summed weight of an edge is not finite, or a bond axis lies within the tolerance of several flavor axes of its shell.
 )",
       py::arg("geometry"), py::arg("shells") = std::vector<std::uint64_t>{1},
       py::arg("bond_flavors") = std::vector<BondFlavorDefinition>{},
@@ -401,7 +403,9 @@ With periodic boundary condition:
 Args:
     n (int): Number of sites.
     periodic (bool, optional): If True, add an edge between the first and
-        last site (ring topology). Requires n > 2. Defaults to False.
+        last site (ring topology). Requires n > 2; for smaller n no wrap bond
+        is added, so use ``from_geometry(LatticeGeometry.chain(2, periodic=True))``
+        for a two-site ring that counts both images. Defaults to False.
     t (float, optional): Hopping weight for all edges. Defaults to 1.0.
 
 Returns:

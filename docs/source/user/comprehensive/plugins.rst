@@ -81,6 +81,7 @@ In addition to the native implementations packaged within QDK/Chemistry, plugins
 - `Qiskit <https://www.ibm.com/quantum/qiskit>`_ — Quantum algorithm primitives
 - `OpenFermion <https://quantumai.google/openfermion>`_ — Quantum algorithm primitives
 - `geomeTRIC <https://github.com/leeping/geomeTRIC>`_ — Molecular geometry optimization
+- `Azure Quantum <https://azure.microsoft.com/products/quantum>`_ — Circuit execution on remote targets
 
 These plugins are enabled automatically when the corresponding package is installed.
 

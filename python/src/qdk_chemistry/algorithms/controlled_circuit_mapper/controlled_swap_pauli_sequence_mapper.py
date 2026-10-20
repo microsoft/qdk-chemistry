@@ -9,12 +9,17 @@ import math
 from collections.abc import Mapping
 
 from qdk_chemistry.algorithms.circuit_mapper.pauli_sequence_mapper import _pauli_evolution_parameters
+from qdk_chemistry.algorithms.term_grouper.vacuum_annihilating import _anticommuting_masks, _index_word
 from qdk_chemistry.data.circuit import Circuit, QsharpFactoryData
 from qdk_chemistry.data.unitary_representation.base import UnitaryRepresentation
 from qdk_chemistry.data.unitary_representation.containers.pauli_product_formula import PauliProductFormulaContainer
 from qdk_chemistry.utils.qsharp import QSHARP_UTILS
 
-from .base import ControlledCircuitMapper, ControlledCircuitMapperSettings
+from .base import ControlledCircuitMapper
+from .controlled_pauli_sequence_mapper import (
+    ControlledPauliSequenceMapperSettings,
+    _hamming_weight_phasing_parameters,
+)
 
 __all__: list[str] = [
     "ControlledSwapPauliSequenceMapper",
@@ -43,7 +48,7 @@ def _vacuum_eigenphase(terms: list[tuple[Mapping[int, str], float]], atol: float
         The imprinted phase, or ``None`` when the vacuum is not an eigenstate of the product.
 
     """
-    block: list[tuple[int, int]] = []  # symplectic (X, Z) bit masks of the terms in the open block
+    block: dict[int, dict[str, dict[int, int]]] = {}  # term ordinals of the open block, by qubit and axis
     contributions: dict[int, list[complex]] = {}
     leaked: list[float] = []
     diagonal: list[float] = []
@@ -55,7 +60,8 @@ def _vacuum_eigenphase(terms: list[tuple[Mapping[int, str], float]], atol: float
             leaked.append(abs(residual))
         return math.fsum(leaked) <= atol
 
-    for pauli_map, angle in terms:
+    for index, (pauli_map, angle) in enumerate(terms):
+        word = {qubit: axis for qubit, axis in pauli_map.items() if axis != "I"}
         x_mask = z_mask = 0
         for qubit, axis in pauli_map.items():
             if axis in ("X", "Y"):
@@ -63,13 +69,12 @@ def _vacuum_eigenphase(terms: list[tuple[Mapping[int, str], float]], atol: float
             if axis in ("Y", "Z"):
                 z_mask |= 1 << qubit
 
-        # Two Pauli strings commute iff they anticommute on an even number of qubits.
-        if any(((x_mask & z) ^ (z_mask & x)).bit_count() % 2 for x, z in block):
+        if _anticommuting_masks(word, block):
             if not close_block():
                 return None
             block.clear()
             contributions.clear()
-        block.append((x_mask, z_mask))
+        _index_word(word, index, block)
 
         if x_mask:
             # P|0...0> = i^{n_Y}|b>, with b the bit pattern of the X/Y support.
@@ -91,8 +96,11 @@ def _vacuum_eigenphase(terms: list[tuple[Mapping[int, str], float]], atol: float
     return -math.fsum(diagonal)
 
 
-class ControlledSwapPauliSequenceMapperSettings(ControlledCircuitMapperSettings):
+class ControlledSwapPauliSequenceMapperSettings(ControlledPauliSequenceMapperSettings):
     """Settings for the :class:`ControlledSwapPauliSequenceMapper`.
+
+    Inherits the Hamming-weight phasing settings of
+    :class:`~qdk_chemistry.algorithms.controlled_circuit_mapper.ControlledPauliSequenceMapperSettings`.
 
     Attributes:
         vacuum_preservation_tolerance: Absolute tolerance on the amplitude leaked out of the vacuum,
@@ -148,6 +156,10 @@ class ControlledSwapPauliSequenceMapper(ControlledCircuitMapper):
     say ``XX, Z0, YY, I`` for :math:`H = \tfrac12(XX + YY) + \tfrac12(I - Z_0)`, leaks half the
     vacuum amplitude.
 
+    **Hamming-weight phasing.** With ``use_hamming_weight_phasing``, the evolution on the vacuum
+    register is phased as in :class:`~qdk_chemistry.algorithms.controlled_circuit_mapper.ControlledPauliSequenceMapper`.
+    Phasing is off by default.
+
     Notes:
         * Applies to particle-conserving Hamiltonians.
         * The requirement is on the mapped operator, not the encoding: after qubit tapering the
@@ -186,6 +198,8 @@ class ControlledSwapPauliSequenceMapper(ControlledCircuitMapper):
             ValueError: If the unitary container type is not supported.
             ValueError: If multiple control qubits are provided.
             ValueError: If the product formula ordering is not vacuum preserving.
+            ValueError: If phasing is on and the batch cap is neither -1 nor positive.
+            ValueError: If phasing is on and the formula declares no ``layer_offsets``.
 
         """
         unitary_container = unitary.get_container()
@@ -199,12 +213,18 @@ class ControlledSwapPauliSequenceMapper(ControlledCircuitMapper):
         if len(control_indices) != 1:
             raise ValueError("ControlledSwapPauliSequenceMapper currently only supports a single control qubit.")
 
+        use_hamming_weight_phasing, max_batch_size, layer_offsets = _hamming_weight_phasing_parameters(
+            self._settings, unitary_container
+        )
         target_indices = self._get_target_indices(unitary)
 
         vacuum_phase = self._vacuum_phase(unitary_container)
 
         controlled_evo_params = QSHARP_UTILS.ControlledSwapPauliExp.RepControlledSwapPauliExpParams(
             evolution=QSHARP_UTILS.PauliExp.RepPauliExpParams(**_pauli_evolution_parameters(unitary_container)),
+            layerOffsets=layer_offsets,
+            useHammingWeightPhasing=use_hamming_weight_phasing,
+            maxBatchSize=max_batch_size,
             vacuumPhase=vacuum_phase,
             control=control_indices[0],
             systems=target_indices,

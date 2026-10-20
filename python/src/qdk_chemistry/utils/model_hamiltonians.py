@@ -55,7 +55,15 @@ class KitaevBondFlavor(IntEnum):
 
 
 def kitaev_honeycomb_bond_flavors() -> list[BondFlavorDefinition]:
-    """Return the standard honeycomb shell-axis flavor mapping."""
+    """Return the standard honeycomb shell-axis flavor mapping for shells 1 to 3.
+
+    A second-neighbor bond takes the flavor of the nearest-neighbor bond perpendicular to it, and a third-neighbor
+    bond that of the parallel nearest-neighbor bond.
+
+    Returns:
+        list[BondFlavorDefinition]: Flavor definitions for :meth:`~qdk_chemistry.data.LatticeGraph.from_geometry`.
+
+    """
     root_three = np.sqrt(3.0)
     return [
         BondFlavorDefinition(1, np.array([0.5, root_three / 2]), KitaevBondFlavor.X),
@@ -334,6 +342,7 @@ def create_kitaev_hamiltonian(
 ) -> QubitOperator:
     r"""Create a flavored Kitaev-Heisenberg-Gamma model on a lattice.
 
+    The nearest-neighbor bond Hamiltonian follows :cite:`Rau2014`, with the :math:`\Gamma'` term of :cite:`RauKee2014`.
     For a connection of flavor :math:`\gamma`, with :math:`(\alpha,\beta)` denoting the other two spin components,
 
     .. math::
@@ -365,7 +374,9 @@ def create_kitaev_hamiltonian(
     defines :math:`\mathbf{S}_{abc}=D\mathbf{S}_{xyz}` for the lattice-specific crystallographic frame.
     The returned operator uses Pauli matrices, so two-body coefficients include
     :math:`S_i^\mu S_j^\nu=\sigma_i^\mu\sigma_j^\nu/4`, while field coefficients include
-    :math:`S_i^\mu=\sigma_i^\mu/2`.
+    :math:`S_i^\mu=\sigma_i^\mu/2`. :func:`create_heisenberg_hamiltonian` and :func:`create_ising_hamiltonian` take
+    Pauli coefficients instead, so ``create_kitaev_hamiltonian(graph, 0, 0, 0, j=J)`` equals
+    ``create_heisenberg_hamiltonian(graph, J / 4, J / 4, J / 4)``.
 
     Args:
         graph: Interaction graph whose active edges carry X/Y/Z flavors.

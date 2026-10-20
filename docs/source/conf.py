@@ -237,17 +237,16 @@ nitpick_ignore_regex = [
     (r"py:class", r"azure\.core\.polling\._poller\.(_SansIONoPolling|PollingMethod)"),
     (r"py:obj", r"azure\.core\.polling\._poller\.PollingReturnType_co"),
     (r"py:class", r"^QdkCircuitType$"),  # internal type alias for qsharp circuit
+    (
+        r"py:class",
+        r"^CircuitGenerationMethod$",
+    ),  # qsharp enum, no intersphinx inventory
     (r"py:class", r"^PlanExpr$"),  # Zassenhaus type aliases
     (r"py:class", r"^PlanTerm$"),
     (r"py:class", r"^CommutatorPlan$"),
     (
         r"py:class",
         r"^qdk_chemistry\.utils\.zassenhaus_generation\.(PlanExpr|PlanTerm|CommutatorPlan)$",
-    ),
-    (r"py:class", r"^(PauliFactor|PauliWord)$"),  # Sparse Pauli type aliases
-    (
-        r"py:class",
-        r"^qdk_chemistry\.data\.qubit_operator\.containers\.sparse_pauli_decomposition\.(PauliFactor|PauliWord)$",
     ),
     (r"cpp:identifier", r"uint8_t"),  # C standard type, not in Sphinx C++ domain
 ]

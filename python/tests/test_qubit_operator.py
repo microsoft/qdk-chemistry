@@ -983,4 +983,4 @@ class TestSparseQubitOperator:
         grouped = registry.create("term_grouper", strategy).run(sparse)
 
         assert grouped.pauli_strings is sparse.pauli_strings
-        assert sorted(index for group in grouped.term_partition.groups for index in group) == [0, 1, 2]
+        assert sorted(grouped.term_partition.all_indices()) == [0, 1, 2]
