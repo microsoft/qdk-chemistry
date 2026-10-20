@@ -39,7 +39,7 @@ _SUPPORTED_ENCODINGS: dict[str, type] = {
 }
 
 # Relative to the largest integral, as in the native mapper's symmetry checks.
-_TWO_BODY_SYMMETRY_TOLERANCE = 1e-8
+_TWO_BODY_SYMMETRY_TOLERANCE = 1e-5
 
 
 class QiskitQubitMapperSettings(QubitMapperSettings):

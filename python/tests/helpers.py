@@ -648,14 +648,19 @@ def create_fourfold_test_hamiltonian(num_orbitals: int, restricted: bool):
     return hamiltonian, reference
 
 
-def create_non_hermitian_mixed_block_hamiltonian():
-    """Unrestricted Hamiltonian whose alpha-beta block breaks (pq|rs) = (qp|sr), and its reference matrix."""
+def create_non_hermitian_mixed_block_hamiltonian(asymmetry=1.0):
+    """Unrestricted Hamiltonian whose alpha-beta block breaks (pq|rs) = (qp|sr), and its reference matrix.
+
+    ``asymmetry`` scales the part of the alpha-beta block that breaks the symmetry.
+    """
     num_orbitals = 3
     random = np.random.default_rng(684)
     one_alpha, one_beta = random.normal(size=(2, num_orbitals, num_orbitals))
     one_alpha, one_beta = (one_alpha + one_alpha.T) / 2, (one_beta + one_beta.T) / 2
     two_aa, two_bb = (fourfold_average(tensor) for tensor in random.normal(size=(2,) + (num_orbitals,) * 4))
     two_ab = random.normal(size=(num_orbitals,) * 4)
-    assert not np.allclose(two_ab, two_ab.transpose(1, 0, 3, 2))
+    hermitian_part = (two_ab + two_ab.transpose(1, 0, 3, 2)) / 2
+    two_ab = hermitian_part + asymmetry * (two_ab - hermitian_part)
+    assert not np.array_equal(two_ab, two_ab.transpose(1, 0, 3, 2))
     hamiltonian = create_dense_test_hamiltonian(one_alpha, two_aa, one_beta, two_ab, two_bb)
     return hamiltonian, fermionic_reference_matrix(one_alpha, one_beta, two_aa, two_ab, two_bb)
