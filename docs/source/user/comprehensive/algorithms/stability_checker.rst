@@ -247,7 +247,7 @@ The PySCF implementation supports all common base settings. The following table 
    * - ``relativity``
      - string
      - ``""``
-     - One-electron operator reconstructed from the orbital basis: nonrelativistic (``""``), ``"sf-x2c"``, or ``"sf-x2c-contracted"``. Match the generating :doc:`SCF solver <scf_solver>` treatment; it cannot be inferred from the orbitals. X2C requires spherical all-electron AOs and uses QDK physical constants.
+     - One-electron operator reconstructed from the orbital basis: nonrelativistic (``""``), ``"sf-x2c"``, or ``"sf-x2c-contracted"``. X2C requires spherical all-electron AOs and uses QDK physical constants.
 
 .. note::
 

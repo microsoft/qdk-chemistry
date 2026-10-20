@@ -118,10 +118,8 @@ Spin-model Hamiltonian builders produce this representation with
 and serialization operate on these factors; full-width Pauli labels are
 generated when requested.
 
-Product formulas retain repeated bodies together with one-time prefix and
-suffix segments. Opt-in ``trotter`` settings ``fuse_group_boundaries`` and
-``minimize_pauli_exponentials`` can reduce the number of Pauli exponentials
-while preserving this compact representation.
+Trotter product formulas can fuse matching group boundaries to reduce
+circuit gate counts.
 
 Trotter construction preserves layers from a
 :class:`~qdk_chemistry.data.LayeredPartition`. The controlled
@@ -163,13 +161,6 @@ These are scalar-relativistic, one-electron treatments: two-electron
 integrals are unchanged and spin-orbit coupling is not included.
 They require spherical, all-electron basis sets (:term:`ECPs <ECP>` and
 Cartesian :term:`AOs <AO>` are not supported).
-Analytic nuclear gradients and polarizabilities are not available with X2C enabled.
-
-The ``relativity`` value is not stored in
-:class:`~qdk_chemistry.data.Orbitals`. To reconstruct the same Hamiltonian,
-set matching values on the ``qdk`` and ``qdk_cholesky`` Hamiltonian
-constructors and on PySCF stability analysis and MCSCF.
-Their default is nonrelativistic, and a mismatch is not detected.
 
 This release also corrects local ECP handling in integral evaluation and
 PySCF basis conversion, and fixes BLAS thread handling around GauXC

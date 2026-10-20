@@ -62,7 +62,6 @@ change the meaning of ``get_one_body_integrals()``.
      + \frac14 \sum_{r,c}
        \left(|WB^{rc}| + \sum_b |W_{rbc}|\right)^2.
 
-This is a factorization diagnostic, not an energy or an exact operator norm.
 The :ref:`SOSSA builder <sossa-builder>` computes its normalization from the
 mapped generators. Without screening the two expressions agree; screening
 can change both the represented operator and its normalization.
