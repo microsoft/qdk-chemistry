@@ -30,6 +30,7 @@ from .helpers import (
     create_test_hamiltonian,
     create_test_orbitals,
     fermionic_reference_matrix,
+    fourfold_average,
 )
 
 _PAULI_ID_TO_CHAR = {0: "I", 1: "X", 2: "Y", 3: "Z"}
@@ -869,6 +870,23 @@ class TestFourFoldReference:
         """A non-Hermitian alpha-beta block maps to its literal operator."""
         hamiltonian, reference = create_non_hermitian_mixed_block_hamiltonian()
         assert not np.allclose(reference, reference.conj().T)
+        operator = create("qubit_mapper", "qdk").run(hamiltonian, MajoranaMapping.jordan_wigner(6))
+        np.testing.assert_allclose(operator.to_matrix(), reference, atol=1e-11, rtol=0)
+
+    @pytest.mark.parametrize("storage", ["dense", "sparse"])
+    def test_fourfold_part_below_rejection_tolerance_is_mapped(self, storage: str) -> None:
+        """The 8-fold path is taken only at round-off level, so a small fourfold part is kept."""
+        random = np.random.default_rng(706)
+        fourfold = fourfold_average(random.normal(size=(3,) * 4))
+        exchanged = fourfold.transpose(1, 0, 2, 3)
+        tensor = (fourfold + exchanged) / 2 + 5e-6 * (fourfold - exchanged) / 2
+        one_body = np.diag([0.5, -0.2, 0.1])
+        if storage == "sparse":
+            entries = {tuple(indices): tensor[tuple(indices)] for indices in np.argwhere(tensor)}
+            hamiltonian = Hamiltonian(SparseHamiltonianContainer(one_body, entries, 0.0))
+        else:
+            hamiltonian = create_dense_test_hamiltonian(one_body, tensor)
+        reference = fermionic_reference_matrix(one_body, one_body, tensor, tensor, tensor)
         operator = create("qubit_mapper", "qdk").run(hamiltonian, MajoranaMapping.jordan_wigner(6))
         np.testing.assert_allclose(operator.to_matrix(), reference, atol=1e-11, rtol=0)
 

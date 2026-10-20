@@ -1142,7 +1142,10 @@ MajoranaMapResult majorana_map_hamiltonian(
   if (spin_symmetric) {
     pair_split = detail::require_fourfold_two_body(
                      eri_aaaa, n_spatial, "majorana_map_hamiltonian") ==
-                 detail::TwoBodySymmetry::FourFold;
+                     detail::TwoBodySymmetry::FourFold ||
+                 detail::classify_two_body_symmetry(
+                     eri_aaaa, n_spatial, detail::eightfold_path_tolerance) !=
+                     detail::TwoBodySymmetry::EightFold;
   } else {
     auto supports_split = [n_spatial](const double* tensor) {
       const auto symmetry = detail::classify_two_body_symmetry(
@@ -1164,6 +1167,8 @@ MajoranaMapResult majorana_map_hamiltonian_cholesky(
     const double* h1_beta, const double* three_center_aa,
     const double* three_center_bb, std::size_t n_spatial, std::size_t naux,
     bool spin_symmetric, double threshold, double integral_threshold) {
+  // A 4-fold part enters the integrals quadratically in the factor asymmetry,
+  // which this check bounds by 1e-5, so no tighter 8-fold check is needed.
   const auto alpha_symmetry = detail::cholesky_two_body_symmetry(
       three_center_aa, n_spatial, naux, detail::two_body_symmetry_tolerance);
   if (spin_symmetric &&
@@ -1275,7 +1280,10 @@ MajoranaMapResult majorana_map_hamiltonian_sparse(
         "/ 2 at both positions.");
   }
   const bool pair_split =
-      classification.symmetry == detail::TwoBodySymmetry::FourFold;
+      classification.symmetry == detail::TwoBodySymmetry::FourFold ||
+      detail::classify_sparse_two_body_symmetry(
+          tensor, detail::eightfold_path_tolerance)
+              .symmetry != detail::TwoBodySymmetry::EightFold;
 
   provider.map_.reserve(tensor.size());
   std::set<detail::TwoBodyKey> canonical_keys;

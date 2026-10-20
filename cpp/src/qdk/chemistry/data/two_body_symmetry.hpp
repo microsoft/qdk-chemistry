@@ -26,6 +26,12 @@ namespace qdk::chemistry::data::detail {
 /// the same relative tolerance when it infers this symmetry.
 inline constexpr double two_body_symmetry_tolerance = 1e-5;
 
+/// Relative residual up to which restricted mapping takes the 8-fold path,
+/// which drops any part without 8-fold symmetry.  Ordinary round-off is at
+/// most 9e-12 (cc-pVQZ); the 4-fold path is exact for 8-fold input too, so
+/// anything above this takes it instead of being dropped.
+inline constexpr double eightfold_path_tolerance = 1e-10;
+
 using TwoBodyKey = std::array<std::size_t, 4>;
 
 inline double max_abs(const double* values, std::size_t count) {
