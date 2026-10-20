@@ -20,7 +20,22 @@
 // Local implementation details
 #include "utils.hpp"
 
+#ifdef QDK_CHEMISTRY_ASCI_EXECUTION_HEADER
+#include QDK_CHEMISTRY_ASCI_EXECUTION_HEADER
+#endif
+
 namespace qdk::chemistry::algorithms::microsoft {
+
+void MacisAsciSettings::_configure_execution_settings() {
+#ifdef QDK_CHEMISTRY_ASCI_EXECUTION_HEADER
+  asci_extension::configure_settings(
+      [this](const std::string& key, const data::SettingValue& value,
+             const std::string& description,
+             std::optional<data::Constraint> constraint = std::nullopt) {
+        set_default(key, value, description, constraint);
+      });
+#endif
+}
 
 /**
  * @brief Helper struct for CASCI calculation dispatch
@@ -162,12 +177,18 @@ struct asci_helper {
       E_casci = ham_gen.matrix_element(dets[0], dets[0]);
       C_casci = {1.0};
 
+      std::unique_ptr<macis::ASCIExecutionContext<N>> execution;
+#ifdef QDK_CHEMISTRY_ASCI_EXECUTION_HEADER
+      execution = asci_extension::make_context<N>(ham_gen, settings_);
+#endif
+
       // Growth phase
       QDK_LOGGER().debug("Starting MACIS ASCI growth phase.");
       std::tie(E_casci, dets, C_casci) = macis::asci_grow<N, int64_t>(
           asci_settings, mcscf_settings, E_casci, std::move(dets),
           std::move(C_casci), ham_gen,
-          num_molecular_orbitals MACIS_MPI_CODE(, MPI_COMM_WORLD));
+          num_molecular_orbitals MACIS_MPI_CODE(, MPI_COMM_WORLD),
+          execution.get());
       QDK_LOGGER().debug(
           "Completed MACIS ASCI growth phase with {} determinants.",
           dets.size());
@@ -178,7 +199,8 @@ struct asci_helper {
         std::tie(E_casci, dets, C_casci) = macis::asci_refine<N, int64_t>(
             asci_settings, mcscf_settings, E_casci, std::move(dets),
             std::move(C_casci), ham_gen,
-            num_molecular_orbitals MACIS_MPI_CODE(, MPI_COMM_WORLD));
+            num_molecular_orbitals MACIS_MPI_CODE(, MPI_COMM_WORLD),
+            execution.get());
         QDK_LOGGER().debug(
             "Completed MACIS ASCI refinement phase with {} determinants.",
             dets.size());

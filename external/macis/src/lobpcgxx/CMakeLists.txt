@@ -106,7 +106,7 @@ set_target_properties( lobpcgxx PROPERTIES EXPORT_NAME lobpcgxx )
 # Install Headers
 install(
   DIRECTORY   ${PROJECT_SOURCE_DIR}/include
-  DESTINATION ${CMAKE_INSTALL_PREFIX}
+  DESTINATION .
   FILES_MATCHING PATTERN "*.hpp"
 )
 

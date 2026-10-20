@@ -75,7 +75,16 @@ target_link_libraries(macis PUBLIC mdspan)
 if(MACIS_ENABLE_OPENMP)
   include(macis-ips4o)
   target_include_directories(macis SYSTEM PUBLIC
-    $<BUILD_INTERFACE:${ips4o_SOURCE_DIR}>)
+    $<BUILD_INTERFACE:${ips4o_SOURCE_DIR}>
+    $<INSTALL_INTERFACE:include/macis/third_party/ips4o>)
+  # Header consumers must retain the same parallel-sort path after installation.
+  install(FILES ${ips4o_SOURCE_DIR}/ips4o.hpp
+    DESTINATION include/macis/third_party/ips4o)
+  install(DIRECTORY ${ips4o_SOURCE_DIR}/ips4o
+    DESTINATION include/macis/third_party/ips4o
+    FILES_MATCHING PATTERN "*.hpp")
+  install(FILES ${ips4o_SOURCE_DIR}/LICENSE
+    DESTINATION share/licenses/macis/ips4o)
   # libatomic is a GCC/Clang runtime; it does not exist on Windows (MSVC and
   # clang-cl provide atomics intrinsically) or on Apple.
   if(NOT APPLE AND NOT WIN32)
@@ -105,7 +114,7 @@ export(EXPORT macis-targets
 # Install staic headers
 install(
   DIRECTORY   ${PROJECT_SOURCE_DIR}/include
-  DESTINATION ${CMAKE_INSTALL_PREFIX}
+  DESTINATION .
   FILES_MATCHING PATTERN "*.hpp"
 )
 # Install generated headers

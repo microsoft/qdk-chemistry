@@ -46,21 +46,76 @@ template <typename WfnT>
 void reorder_ci_on_coeff(std::vector<WfnT>& dets, std::vector<double>& C) {
   size_t nlocal = C.size();
   size_t ndets = dets.size();
-  std::vector<uint64_t> idx(nlocal);
-  std::iota(idx.begin(), idx.end(), 0);
-  std::sort(idx.begin(), idx.end(),
-            [&](auto i, auto j) { return std::abs(C[i]) > std::abs(C[j]); });
+  // Sorting (|C|, index) pairs on |C| performs the same comparisons as
+  // sorting indices through C, hence yields the same permutation, without
+  // the indirect loads.
+  std::vector<std::pair<double, uint64_t>> key(nlocal);
+  for (size_t i = 0; i < nlocal; ++i) key[i] = {std::abs(C[i]), i};
+  std::sort(key.begin(), key.end(),
+            [](const auto& a, const auto& b) { return a.first > b.first; });
 
   std::vector<double> reorder_C(nlocal);
   std::vector<WfnT> reorder_dets(ndets);
   assert(nlocal == ndets);
+#pragma omp parallel for schedule(static)
   for (size_t i = 0; i < ndets; ++i) {
-    reorder_C[i] = C[idx[i]];
-    reorder_dets[i] = dets[idx[i]];
+    reorder_C[i] = C[key[i].second];
+    reorder_dets[i] = dets[key[i].second];
   }
 
   C = std::move(reorder_C);
   dets = std::move(reorder_dets);
+}
+
+/**
+ * @brief Copy the determinants with |C| >= t, and their coefficients, in
+ * their order in dets
+ *
+ * @tparam WfnT Wavefunction type representing quantum determinants
+ * @param[in] dets Vector of determinants
+ * @param[in] C Vector of CI coefficients of dets
+ * @param[in] t Threshold on |C|
+ * @param[out] sel_dets Determinants with |C| >= t
+ * @param[out] sel_C Their coefficients
+ */
+template <typename WfnT>
+void select_ci_on_coeff(const std::vector<WfnT>& dets,
+                        const std::vector<double>& C, double t,
+                        std::vector<WfnT>& sel_dets,
+                        std::vector<double>& sel_C) {
+  const size_t n = C.size();
+  int nt = 1;
+#ifdef _OPENMP
+  nt = omp_get_max_threads();
+#endif
+  // each thread copies its selections of the same static partition of [0, n)
+  // in which it counted them
+  std::vector<size_t> off(nt + 1, 0);
+#pragma omp parallel num_threads(nt)
+  {
+    int tid = 0;
+#ifdef _OPENMP
+    tid = omp_get_thread_num();
+#endif
+    size_t m = 0;
+#pragma omp for schedule(static)
+    for (size_t i = 0; i < n; ++i) m += std::abs(C[i]) >= t;
+    off[tid + 1] = m;
+#pragma omp barrier
+#pragma omp single
+    {
+      for (int k = 0; k < nt; ++k) off[k + 1] += off[k];
+      sel_dets.resize(off[nt]);
+      sel_C.resize(off[nt]);
+    }
+    size_t p = off[tid];
+#pragma omp for schedule(static)
+    for (size_t i = 0; i < n; ++i)
+      if (std::abs(C[i]) >= t) {
+        sel_dets[p] = dets[i];
+        sel_C[p++] = C[i];
+      }
+  }
 }
 
 /**
