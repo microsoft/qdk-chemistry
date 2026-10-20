@@ -59,6 +59,9 @@ class SparseHamiltonianContainer : public HamiltonianContainer {
   /**
    * @brief Construct from sparse one-body integrals and sparse two-body map.
    *
+   * As a deprecated shorthand, a nonzero entry that is the only stored member
+   * of a larger 8-fold permutation class is expanded over that class.
+   *
    * @param one_body_integrals Sparse one-body integral matrix [n x n]
    * @param two_body_integrals Sparse two-body integral map
    * @param core_energy Scalar energy offset (default 0.0)
@@ -216,15 +219,15 @@ class SparseHamiltonianContainer : public HamiltonianContainer {
   /**
    * @brief Save Hamiltonian to an FCIDUMP file
    *
+   * Writes one record per 8-fold permutation class.
+   *
    * @param filename Path to FCIDUMP file to create/overwrite
    * @param nalpha Number of alpha electrons
    * @param nbeta Number of beta electrons
    * @throws std::runtime_error if the Hamiltonian is unrestricted, its
    *         two-body integrals lack the 8-fold permutation symmetry that
    *         FCIDUMP readers reconstruct (unstored entries are zero), or the
-   *         file cannot be opened. A nonzero entry that is the only stored
-   *         member of a larger permutation class is still expanded over the
-   *         class, with a deprecation warning.
+   *         file cannot be opened.
    */
   void to_fcidump_file(const std::string& filename, size_t nalpha,
                        size_t nbeta) const override;
@@ -250,8 +253,8 @@ class SparseHamiltonianContainer : public HamiltonianContainer {
    * @brief Whether a two-body map uses the deprecated 8-fold shorthand.
    *
    * In that shorthand, a nonzero entry that is the only stored member of a
-   * larger 8-fold permutation class stands for the whole class. Mapping and
-   * FCIDUMP export still expand such entries, with a warning.
+   * larger 8-fold permutation class stands for the whole class. The
+   * TwoBodyMap constructor expands such entries.
    *
    * @param two_body_integrals Sparse two-body map.
    * @return True if any entry relies on the shorthand.

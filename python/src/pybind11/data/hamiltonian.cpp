@@ -856,7 +856,7 @@ Args:
 
 Warns:
     DeprecationWarning: If a nonzero entry is the only stored member of a larger
-        8-fold permutation class; such an entry still stands for its whole class.
+        8-fold permutation class; such an entry is expanded over its class.
 )",
       py::arg("one_body_integrals"), py::arg("two_body_integrals"),
       py::arg("core_energy") = 0.0,
@@ -1031,7 +1031,8 @@ Returns:
 
   sparse_container.def(
       "to_fcidump_file", &SparseHamiltonianContainer::to_fcidump_file, R"(
-Save the Hamiltonian to an FCIDUMP file.
+Save the Hamiltonian to an FCIDUMP file, with one record per 8-fold permutation
+class.
 
 Args:
     filename (str): Path to the output file.
@@ -1041,9 +1042,7 @@ Args:
 Raises:
     RuntimeError: If I/O error occurs, the Hamiltonian is unrestricted, or its
         two-body integrals lack the 8-fold permutation symmetry that FCIDUMP
-        readers reconstruct (unstored entries are zero). A nonzero entry that
-        is the only stored member of a larger permutation class is still
-        expanded over the class, with a deprecation warning.
+        readers reconstruct (unstored entries are zero).
 )",
       py::arg("filename"), py::arg("nalpha"), py::arg("nbeta"));
 

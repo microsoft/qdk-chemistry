@@ -236,10 +236,8 @@ compressed form:
   suborbit needs no explicit zeros for the rest of its 8-fold orbit. To build
   entries from symmetry representatives, use
   :meth:`~qdk_chemistry.data.SparseHamiltonianContainer.expand_symmetry_representatives`
-  with :class:`~qdk_chemistry.data.TwoBodyPermutationGroup`. As a deprecated
-  shorthand, a nonzero entry that is the only stored member of a larger 8-fold
-  orbit is still expanded over that orbit, with a warning. Entry order does not
-  affect the result.
+  with :class:`~qdk_chemistry.data.TwoBodyPermutationGroup`. Entry order does
+  not affect the result.
 - :class:`~qdk_chemistry.data.CholeskyHamiltonianContainer` — the three-center
   (Cholesky / density-fitted) factors are kept in their
   :math:`O(N^2 \cdot n_\text{aux})` form and the auxiliary index is contracted
@@ -253,7 +251,7 @@ compressed form:
 In all cases the result is a :class:`~qdk_chemistry.data.QubitOperator` that
 is numerically equivalent, term by term, to the dense
 :class:`~qdk_chemistry.data.CanonicalFourCenterHamiltonianContainer` path for
-the same integrals (after the deprecated sparse expansion). The behaviour of
+the same integrals. The behaviour of
 ``run()`` and the shape of the returned operator are unchanged, and the
 selection is fully automatic based on the container type. The
 :class:`~qdk_chemistry.data.CanonicalFourCenterHamiltonianContainer` continues

@@ -10,7 +10,6 @@
 #include <cmath>
 #include <cstddef>
 #include <map>
-#include <qdk/chemistry/utils/logger.hpp>
 #include <stdexcept>
 #include <string>
 #include <utility>
@@ -396,27 +395,15 @@ inline std::vector<TwoBodyKey> lone_eightfold_representatives(
   return lone;
 }
 
-/// Expands every lone eightfold representative over its class, and logs a
-/// deprecation warning naming `consumer` if there were any.
+/// Expands every lone eightfold representative over its class.
 inline void expand_legacy_eightfold_representatives(
-    SparseTwoBodyTensor& tensor, const std::string& consumer) {
-  const auto lone = lone_eightfold_representatives(tensor);
-  if (lone.empty()) return;
-  for (const auto& key : lone) {
+    SparseTwoBodyTensor& tensor) {
+  for (const auto& key : lone_eightfold_representatives(tensor)) {
     const double value = tensor.at(key);
     for (const auto& position : eightfold_orbit(key)) {
       tensor.emplace(position, value);
     }
   }
-  const std::size_t expanded = lone.size();
-  QDK_LOGGER().warn(
-      "{}: {} sparse two-body {} expanded over a larger 8-fold permutation "
-      "class in which {} the only stored member. This shorthand is "
-      "deprecated: store every class member, or call "
-      "SparseHamiltonianContainer.expand_symmetry_representatives with "
-      "TwoBodyPermutationGroup.EightFold.",
-      consumer, expanded, expanded == 1 ? "entry was" : "entries were",
-      expanded == 1 ? "it is" : "each is");
 }
 
 }  // namespace qdk::chemistry::data::detail

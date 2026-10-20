@@ -3,7 +3,6 @@
 // license information.
 
 #include <gtest/gtest.h>
-#include <spdlog/sinks/ostream_sink.h>
 
 #include <Eigen/Dense>
 #include <algorithm>
@@ -11,8 +10,6 @@
 #include <complex>
 #include <qdk/chemistry/data/lattice_graph.hpp>
 #include <qdk/chemistry/data/majorana_mapping.hpp>
-#include <qdk/chemistry/utils/logger.hpp>
-#include <sstream>
 #include <stdexcept>
 #include <string>
 #include <unordered_map>
@@ -67,30 +64,6 @@ void expect_real_term(
   EXPECT_NEAR(it->second.real(), expected, 1e-12);
   EXPECT_NEAR(it->second.imag(), 0.0, 1e-12);
 }
-
-/// Collects warnings from the global QDK logger for its lifetime.
-class LogCapture {
- public:
-  LogCapture()
-      : sink_(std::make_shared<spdlog::sinks::ostream_sink_mt>(stream_)),
-        previous_(utils::Logger::get_global_level()) {
-    utils::Logger::set_global_level(utils::LogLevel::warn);
-    utils::Logger::get()->sinks().push_back(sink_);
-  }
-  ~LogCapture() {
-    auto& sinks = utils::Logger::get()->sinks();
-    sinks.erase(std::remove(sinks.begin(), sinks.end(), sink_), sinks.end());
-    utils::Logger::set_global_level(previous_);
-  }
-  LogCapture(const LogCapture&) = delete;
-  LogCapture& operator=(const LogCapture&) = delete;
-  std::string str() const { return stream_.str(); }
-
- private:
-  std::ostringstream stream_;
-  std::shared_ptr<spdlog::sinks::ostream_sink_mt> sink_;
-  utils::LogLevel previous_;
-};
 
 }  // namespace qdk::chemistry::tests::test_support
 
@@ -212,21 +185,19 @@ TEST(MajoranaMapEngineTest, SymmetryToleranceScalesWithIntegralMagnitude) {
                                            /*integral_threshold=*/0.0));
 }
 
-TEST(MajoranaMapEngineTest, SparseLegacyRepresentativesLogDeprecation) {
+TEST(MajoranaMapEngineTest, SparseEntriesAreReadLiterally) {
   const auto mapping = MajoranaMapping::jordan_wigner(4);
   const double one_body[4] = {1.0, 0.3, 0.3, 0.5};
-  // Each entry is the only stored member of its 8-fold class.
+  // Each entry is the only stored member of its 8-fold class; only the
+  // container constructor expands that deprecated shorthand.
   const int indices[8] = {0, 1, 0, 1, 1, 1, 0, 0};
   const double values[2] = {0.7, 0.4};
 
-  test_support::LogCapture log;
-  const auto result = majorana_map_hamiltonian_sparse(
-      mapping, 0.5, one_body, one_body, indices, values, /*num_entries=*/2,
-      /*n_spatial=*/2, /*spin_symmetric=*/true, /*threshold=*/0.0,
-      /*integral_threshold=*/0.0);
-  EXPECT_FALSE(result.words.empty());
-  EXPECT_NE(log.str().find("2 sparse two-body entries"), std::string::npos);
-  EXPECT_NE(log.str().find("deprecated"), std::string::npos);
+  EXPECT_THROW(majorana_map_hamiltonian_sparse(
+                   mapping, 0.5, one_body, one_body, indices, values,
+                   /*num_entries=*/2, /*n_spatial=*/2, /*spin_symmetric=*/true,
+                   /*threshold=*/0.0, /*integral_threshold=*/0.0),
+               std::invalid_argument);
 }
 
 TEST(MajoranaMapEngineTest, TwoBodyIntegralsProduceAdditionalTerms) {

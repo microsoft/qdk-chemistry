@@ -391,9 +391,7 @@ Cholesky factors with pair-symmetric and pair-antisymmetric parts ``S`` and
 that fail this check raise ``ValueError``.
 
 Sparse entries are read literally, with unstored positions equal to zero; a
-complete 4-fold suborbit needs no explicit zeros. As a deprecated shorthand, a
-nonzero entry that is the only stored member of a larger 8-fold orbit is
-expanded over the orbit, with a warning.
+complete 4-fold suborbit needs no explicit zeros.
 
 The Hamiltonian's constant energy shift (nuclear repulsion / frozen core)
 is intentionally **not** included in the mapped operator; callers that need

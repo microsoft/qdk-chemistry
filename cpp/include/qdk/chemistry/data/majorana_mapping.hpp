@@ -457,12 +457,6 @@ MajoranaMapResult majorana_map_hamiltonian_cholesky(
  * classified like dense restricted integrals.  A complete 4-fold suborbit
  * therefore needs no explicit zeros for the rest of its 8-fold orbit.
  *
- * As a deprecated shorthand, a nonzero entry that is the only stored member
- * of a larger 8-fold orbit is expanded over that orbit, and a warning is
- * logged. Read literally, such an entry is never 4-fold symmetric and would
- * be rejected, so the expansion cannot change the meaning of an accepted
- * tensor.
- *
  * Duplicate entries for the same position must agree exactly; conflicting
  * duplicates are rejected. The result is independent of entry order.
  *

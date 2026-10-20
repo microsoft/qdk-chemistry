@@ -508,7 +508,8 @@ class TestSparseLiteralEntries:
         for indices in eightfold_orbit(seed):
             tensor[indices] = 0.7
         with pytest.warns(DeprecationWarning, match="deprecated"):
-            stored, _dense, reference = _sparse_pair({seed: 0.7}, tensor)
+            stored, dense, reference = _sparse_pair({seed: 0.7}, tensor)
+        np.testing.assert_array_equal(stored.get_two_body_integrals()[0], dense.get_two_body_integrals()[0])
         np.testing.assert_allclose(_native(stored).to_matrix(), reference, atol=1e-11, rtol=0)
 
     @pytest.mark.parametrize("seed", [(0, 1, 0, 1), (0, 1, 0, 2)], ids=["repeated-four", "eight"])

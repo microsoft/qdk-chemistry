@@ -36,6 +36,36 @@ static SparseMapBlock<4, double> to_sparse_block(
   return block;
 }
 
+static detail::SparseTwoBodyTensor to_tensor(
+    const SparseHamiltonianContainer::TwoBodyMap& map) {
+  detail::SparseTwoBodyTensor tensor;
+  for (const auto& [index, value] : map) {
+    const auto& [p, q, r, s] = index;
+    tensor.emplace(detail::TwoBodyKey{static_cast<std::size_t>(p),
+                                      static_cast<std::size_t>(q),
+                                      static_cast<std::size_t>(r),
+                                      static_cast<std::size_t>(s)},
+                   value);
+  }
+  return tensor;
+}
+
+// Expands the deprecated shorthand in which a nonzero entry that is the only
+// stored member of a larger 8-fold class stands for the whole class.
+static SparseHamiltonianContainer::TwoBodyMap expand_eightfold_shorthand(
+    SparseHamiltonianContainer::TwoBodyMap map) {
+  auto tensor = to_tensor(map);
+  detail::expand_legacy_eightfold_representatives(tensor);
+  for (const auto& [key, value] : tensor) {
+    map.emplace(
+        SparseHamiltonianContainer::TwoBodyIndex{
+            static_cast<int>(key[0]), static_cast<int>(key[1]),
+            static_cast<int>(key[2]), static_cast<int>(key[3])},
+        value);
+  }
+  return map;
+}
+
 namespace detail {
 /**
  * @brief Pack two 32-bit unsigned indices into a single double via bitwise
@@ -78,7 +108,8 @@ SparseHamiltonianContainer::SparseHamiltonianContainer(
     : SparseHamiltonianContainer(
           Eigen::SparseMatrix<double>(one_body_integrals),
           make_spin_diagonal_rank4_sbsm<double>(
-              to_sparse_block(std::move(two_body_integrals)),
+              to_sparse_block(
+                  expand_eightfold_shorthand(std::move(two_body_integrals))),
               static_cast<std::size_t>(one_body_integrals.rows())),
           core_energy, type) {}
 
@@ -502,8 +533,14 @@ SparseHamiltonianContainer::from_hdf5(H5::Group& group) {
       return std::make_unique<SparseHamiltonianContainer>(
           std::move(one_body_sparse), core_energy, type);
     }
+    // Stored entries are literal, so bypass the shorthand expansion of the
+    // TwoBodyMap constructor.
     return std::make_unique<SparseHamiltonianContainer>(
-        std::move(one_body_sparse), std::move(two_body_map), core_energy, type);
+        std::move(one_body_sparse),
+        make_spin_diagonal_rank4_sbsm<double>(
+            to_sparse_block(std::move(two_body_map)),
+            static_cast<std::size_t>(n_orb)),
+        core_energy, type);
 
   } catch (const H5::Exception& e) {
     throw std::runtime_error(
@@ -524,8 +561,8 @@ void SparseHamiltonianContainer::to_fcidump_file(const std::string& filename,
 
   // Ordinary FCIDUMP readers reconstruct the eight permutations of every
   // two-electron record, so the stored tensor must have 8-fold symmetry.
+  detail::SparseTwoBodyTensor tensor;
   if (has_two_body_integrals()) {
-    detail::SparseTwoBodyTensor tensor;
     for (const auto& [idx, value] : _two_body_sparse->block(
              {axes::alpha(), axes::alpha(), axes::alpha(), axes::alpha()})) {
       tensor.emplace(detail::TwoBodyKey{static_cast<std::size_t>(idx[0]),
@@ -534,7 +571,6 @@ void SparseHamiltonianContainer::to_fcidump_file(const std::string& filename,
                                         static_cast<std::size_t>(idx[3])},
                      value);
     }
-    detail::expand_legacy_eightfold_representatives(tensor, "to_fcidump_file");
     if (detail::classify_sparse_two_body_symmetry(
             tensor, detail::two_body_symmetry_tolerance)
             .symmetry != detail::TwoBodySymmetry::EightFold) {
@@ -580,13 +616,11 @@ void SparseHamiltonianContainer::to_fcidump_file(const std::string& filename,
     file << std::setw(4) << l << "\n";
   };
 
-  // Write two-body integrals from sparse map (1-based indices)
-  if (has_two_body_integrals()) {
-    for (const auto& [idx, val] : _two_body_sparse->block(
-             {axes::alpha(), axes::alpha(), axes::alpha(), axes::alpha()})) {
-      if (std::abs(val) < print_thresh) continue;
-      formatted_line(idx[0] + 1, idx[1] + 1, idx[2] + 1, idx[3] + 1, val);
-    }
+  // One record per 8-fold class, in the dense writer's canonical order.
+  for (const auto& [key, val] : tensor) {
+    if (key != detail::eightfold_canonical(key)) continue;
+    if (std::abs(val) < print_thresh) continue;
+    formatted_line(key[0] + 1, key[1] + 1, key[2] + 1, key[3] + 1, val);
   }
 
   // Write one-body integrals from sparse matrix (lower triangle, 1-based)
@@ -607,16 +641,8 @@ bool SparseHamiltonianContainer::uses_eightfold_shorthand(
     const TwoBodyMap& two_body_integrals) {
   QDK_LOG_TRACE_ENTERING();
 
-  detail::SparseTwoBodyTensor tensor;
-  for (const auto& [index, value] : two_body_integrals) {
-    const auto& [p, q, r, s] = index;
-    tensor.emplace(detail::TwoBodyKey{static_cast<std::size_t>(p),
-                                      static_cast<std::size_t>(q),
-                                      static_cast<std::size_t>(r),
-                                      static_cast<std::size_t>(s)},
-                   value);
-  }
-  return !detail::lone_eightfold_representatives(tensor).empty();
+  return !detail::lone_eightfold_representatives(to_tensor(two_body_integrals))
+              .empty();
 }
 
 SparseHamiltonianContainer::TwoBodyMap

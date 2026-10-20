@@ -90,9 +90,7 @@ class QdkQubitMapper(QubitMapper):
       mostly-zero integrals of lattice / model Hamiltonians. Entries are read
       literally, with unstored positions equal to zero; use
       :meth:`~qdk_chemistry.data.SparseHamiltonianContainer.expand_symmetry_representatives`
-      to build them from symmetry representatives. As a deprecated shorthand,
-      a nonzero entry that is the only stored member of a larger 8-fold orbit
-      is expanded over the orbit, with a warning.
+      to build them from symmetry representatives.
     * :class:`~qdk_chemistry.data.CholeskyHamiltonianContainer`: the
       three-center factors are kept in their ``O(N**2 * naux)`` form and the
       auxiliary index is contracted one ``(pq|.)`` row at a time, so the dense
@@ -100,7 +98,7 @@ class QdkQubitMapper(QubitMapper):
     * All other containers use the dense engine path.
 
     In all cases the result is numerically equivalent to mapping the dense
-    integrals (after the deprecated sparse expansion). The Hamiltonian's core
+    integrals. The Hamiltonian's core
     energy is not included in the output operator.
 
     The mapper uses canonical blocked spin-orbital ordering internally:

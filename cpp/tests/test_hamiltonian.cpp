@@ -1348,9 +1348,9 @@ TEST_F(HamiltonianTest, SparseContainerTwoBodyElementAccess) {
   EXPECT_DOUBLE_EQ(h.get_two_body_element(0, 0, 0, 1), 2.0);
   EXPECT_DOUBLE_EQ(h.get_two_body_element(1, 1, 1, 1), 4.0);
   EXPECT_DOUBLE_EQ(h.get_two_body_element(0, 1, 1, 0), 5.0);
-  // Non-stored entries return 0
-  EXPECT_DOUBLE_EQ(h.get_two_body_element(1, 0, 0, 0), 0.0);
-  EXPECT_DOUBLE_EQ(h.get_two_body_element(0, 1, 0, 1), 0.0);
+  // Positions outside every stored 8-fold class return 0
+  EXPECT_DOUBLE_EQ(h.get_two_body_element(0, 0, 1, 1), 0.0);
+  EXPECT_DOUBLE_EQ(h.get_two_body_element(1, 1, 0, 1), 0.0);
 }
 
 TEST_F(HamiltonianTest, SparseContainerSparseAccessors) {
@@ -1820,6 +1820,19 @@ TEST_F(HamiltonianTest, FCIDUMPSerialization) {
       "      1.5000000000000000e+00    0    0    0    0";
 
   EXPECT_TRUE(fcidump_content == reference_fcidump_contents);
+
+  // A sparse twin stores every permutation but writes the same records.
+  const std::string sparse_filename = "test.sparse.hamiltonian.fcidump";
+  Hamiltonian(std::make_unique<SparseHamiltonianContainer>(one_body, two_body,
+                                                           core_energy))
+      .to_fcidump_file(sparse_filename, 1, 1);
+  {
+    std::ifstream sparse_file(sparse_filename);
+    std::stringstream sparse_buffer;
+    sparse_buffer << sparse_file.rdbuf();
+    EXPECT_EQ(sparse_buffer.str(), reference_fcidump_contents + "\n");
+  }
+  std::filesystem::remove(sparse_filename);
 }
 
 TEST_F(HamiltonianTest, FCIDUMPRejectsFourFoldTwoBodySymmetry) {
@@ -1873,8 +1886,8 @@ TEST_F(HamiltonianTest, SparseContainerFCIDUMPRequiresEightfoldClasses) {
   EXPECT_THROW(fourfold.to_fcidump_file(filename, 1, 1), std::runtime_error);
   EXPECT_FALSE(std::filesystem::exists(filename));
 
-  // The deprecated shorthand stands for its whole 8-fold class, which is also
-  // what FCIDUMP readers reconstruct from it.
+  // The deprecated shorthand is expanded over its 8-fold class at
+  // construction.
   Hamiltonian legacy(std::make_unique<SparseHamiltonianContainer>(
       sparse_one_body,
       SparseHamiltonianContainer::TwoBodyMap{{{0, 1, 0, 1}, 0.7}},
@@ -1882,6 +1895,36 @@ TEST_F(HamiltonianTest, SparseContainerFCIDUMPRequiresEightfoldClasses) {
   EXPECT_NO_THROW(legacy.to_fcidump_file(filename, 1, 1));
   EXPECT_TRUE(std::filesystem::exists(filename));
   std::filesystem::remove(filename);
+}
+
+TEST(SparseHamiltonianContainerTest, ConstructorExpandsEightfoldShorthand) {
+  using Map = SparseHamiltonianContainer::TwoBodyMap;
+  const Eigen::SparseMatrix<double> one_body(3, 3);
+  // A lone (01|02) stands for its class; a complete fourfold suborbit and a
+  // one-member class are literal.
+  const Map literal{
+      {{0, 1, 0, 1}, 0.7}, {{1, 0, 1, 0}, 0.7}, {{2, 2, 2, 2}, 0.3}};
+  Map stored = literal;
+  stored[{0, 1, 0, 2}] = 0.5;
+  Map expected = SparseHamiltonianContainer::expand_symmetry_representatives(
+      {{{0, 1, 0, 2}, 0.5}}, TwoBodyPermutationGroup::EightFold);
+  expected.insert(literal.begin(), literal.end());
+  EXPECT_EQ(
+      SparseHamiltonianContainer(one_body, stored).sparse_two_body_integrals(),
+      expected);
+
+  // Loading reads entries literally, such as a lone one from dense input.
+  Eigen::VectorXd dense = Eigen::VectorXd::Zero(81);
+  dense(((0 * 3 + 1) * 3 + 0) * 3 + 2) = 0.5;
+  const std::string filename = "test.literal.hamiltonian.h5";
+  Hamiltonian(std::make_unique<SparseHamiltonianContainer>(
+                  Eigen::MatrixXd::Zero(3, 3), dense))
+      .to_hdf5_file(filename);
+  const auto loaded = Hamiltonian::from_hdf5_file(filename);
+  std::filesystem::remove(filename);
+  EXPECT_EQ(loaded->get_container<SparseHamiltonianContainer>()
+                .sparse_two_body_integrals(),
+            (Map{{{0, 1, 0, 2}, 0.5}}));
 }
 
 TEST(SparseHamiltonianContainerTest, ExpandsSymmetryRepresentatives) {

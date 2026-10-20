@@ -1253,9 +1253,6 @@ MajoranaMapResult majorana_map_hamiltonian_sparse(
     }
   }
 
-  detail::expand_legacy_eightfold_representatives(
-      tensor, "majorana_map_hamiltonian_sparse");
-
   const auto classification = detail::classify_sparse_two_body_symmetry(
       tensor, detail::two_body_symmetry_tolerance);
   const auto& [p, q, r, s] = classification.witness;
