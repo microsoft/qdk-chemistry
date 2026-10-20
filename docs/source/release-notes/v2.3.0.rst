@@ -43,15 +43,14 @@ description of a sum-of-squares spectral-amplification (SOSSA) block encoding
    :start-after: # start-cell-sossa
    :end-before: # end-cell-sossa
 
-The supported circuit path uses canonical, untapered, blocked Jordan-Wigner
-ordering and unary phase estimation. Custom Jordan-Wigner tables and mode
+The SOSSA circuit path in version 2.3 uses canonical, untapered, blocked
+Jordan-Wigner ordering and unary phase estimation. Custom Jordan-Wigner tables and mode
 permutations are not recognized or lowered.
 
 The SOSSA mapper emits the block encoding. Unary QPE supplies the reflections
 that form the walk and realizes signed walk powers from a single query chain.
 This can reduce walk-query counts at fixed phase precision relative to
-standard QPE. Standard and iterative QPE are not supported for SOSSA in this
-release.
+standard QPE.
 
 SOSSA includes the core energy in its scalar shift. Its decoded energies are
 **total energies**; do not add ``get_core_energy()`` again.
@@ -145,7 +144,8 @@ Static inputs to driven evolution can be represented by
 :class:`~qdk_chemistry.data.DrivenQubitHamiltonian` with no drive terms.
 
 Standard QPE adds ``phase_state="sine"`` alongside the existing uniform
-phase-register state.
+phase-register state. The sine window can reduce phase-estimation
+uncertainty relative to uniform preparation :cite:`Babbush2018`.
 See :doc:`../user/comprehensive/algorithms/hamiltonian_unitary_builder` and
 :doc:`../user/comprehensive/algorithms/qpe_circuit_builder`.
 

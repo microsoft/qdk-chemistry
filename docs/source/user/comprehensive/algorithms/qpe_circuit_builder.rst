@@ -208,19 +208,9 @@ The mapper's declared width includes its caller-supplied work register,
 not just the index dimensions stored in the unitary description.
 Compatible shared gradients are initialized once around the query schedule
 and are not part of the reflected zero register.
-Execution uses the sparse-state simulator; the resulting Q# circuit can
-also be passed to :meth:`~qdk_chemistry.data.Circuit.estimate`.
 
-A positive ``compute_capacity`` emits
-``EnableMemoryComputeArchitecture(capacity, LeastRecentlyUsed())`` for the
-resource estimator. The capacity describes logical compute-region qubits;
-the memory/compute model accounts for placement and movement, subject to
-the selected estimator backend's support.
-It is not a CPU-thread limit, simulator-memory limit, or query count.
-The builder warns that memory/compute placement counts may be inaccurate;
-do not treat a positive qubit count alone as verification of movement costs.
-Choose the capacity from the architecture being modeled rather than from
-the host machine.
+For memory/compute placement, see the `QDK resource-estimation documentation
+<https://learn.microsoft.com/en-us/azure/quantum/qre-custom-applications>`_.
 
 Circuit Composition Details
 ----------------------------

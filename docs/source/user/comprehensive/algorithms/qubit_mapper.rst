@@ -321,14 +321,12 @@ particle, hole, and spin-free generators:
 
 The scalar shift includes core energy.
 The ``threshold`` setting screens adjusted one-body eigenvalues below its
-non-negative magnitude cutoff (default ``1e-12``). It is not a global bound
-on Hamiltonian error.
+non-negative magnitude cutoff (default ``1e-12``).
 
 The supported circuit workflow uses
 :meth:`~qdk_chemistry.data.MajoranaMapping.jordan_wigner` over twice the
 number of active spatial orbitals, with blocked spin ordering and no tapering.
-Validation checks the mapping name and dimensions, not equivalence of a
-custom Pauli table to canonical Jordan-Wigner. Custom tables and reordered
+Custom tables and reordered
 modes are not supported by the SOSSA circuit path.
 
 The output is numerical generator data, not an executable circuit.

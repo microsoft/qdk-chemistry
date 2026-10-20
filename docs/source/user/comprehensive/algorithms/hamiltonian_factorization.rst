@@ -6,17 +6,19 @@ Hamiltonian factorization
 It consumes the supplied numerical integrals rather than reconstructing a
 Hamiltonian from its orbitals.
 
-Overview
---------
+Available implementations
+-------------------------
+
+Double factorization
+~~~~~~~~~~~~~~~~~~~~
+
+.. rubric:: Factory name: ``"double_factorization"``
 
 Double factorization :cite:`vonBurg2021` diagonalizes each molecular-orbital
 Cholesky vector into weighted orbital projectors. The result is stored in a
 :class:`~qdk_chemistry.data.DFTHCHamiltonianContainer`, which also represents
 the more general double-factorized tensor-hypercontraction (DFTHC) form
 :cite:`Low2025`.
-
-Using the HamiltonianFactorization
-----------------------------------
 
 Construct compatible Cholesky input with the
 :doc:`HamiltonianConstructor <hamiltonian_constructor>`, then factorize it:
@@ -39,14 +41,6 @@ and Hamiltonian type are preserved.
 First-stage accuracy remains controlled by the Cholesky producer's settings,
 including ``cholesky_tolerance`` and ``eri_threshold``; the factorizer does
 not perform another four-index decomposition.
-
-Available implementations
--------------------------
-
-Double factorization
-~~~~~~~~~~~~~~~~~~~~
-
-.. rubric:: Factory name: ``"double_factorization"``
 
 :class:`~qdk_chemistry.algorithms.DoubleFactorization` produces ordinary DF
 data with :math:`B=N`, :math:`C=1`, and zero identity weights ``WB``.

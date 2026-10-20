@@ -502,10 +502,10 @@ The corresponding ``circuit_mapper`` / ``sossa`` emits
    W = R_{\mathrm{outer}} B.
 
 The mapper returns :math:`B`, not the completed walk :math:`W`.
-:ref:`Unary QPE <unary-qpe-algorithm>` supplies the outer reflections.
-Only unit power, canonical blocked Jordan-Wigner ordering, and untapered
-input are supported by this circuit path. Standard and iterative QPE do
-not have a controlled SOSSA mapper.
+In version 2.3, SOSSA integrates with :ref:`unary QPE <unary-qpe-algorithm>`,
+which supplies the outer reflections.
+This circuit path requires unit power, canonical blocked Jordan-Wigner
+ordering, and untapered input.
 
 For a completed-walk eigenphase :math:`\varphi`, the energy decoder is
 
@@ -533,7 +533,7 @@ energy) or ``reference_energy_gap``:
 
 A supplied reference must satisfy :math:`0<E_{\mathrm{gap}}<2\Lambda`.
 Without either reference, the block encoding can still be built, but
-accessing ``lambda_eff`` raises an error.
+accessing ``lambda_eff`` for a query-count estimate raises an error.
 
 The factor container's ``get_lambda()``, the mapped normalization
 :math:`\Lambda`, and :math:`\lambda_{\mathrm{eff}}` are distinct quantities.
@@ -557,21 +557,42 @@ It is not a global, fixed-confidence energy-error guarantee.
 Reference uncertainty, branch selection, trial-state overlap, sampling,
 factorization, screening, coefficient rounding, and rotation synthesis
 must be accounted for separately.
-The caller sets a positive ``num_queries`` explicitly; it need not be a
+The unary phase-estimation caller sets a positive ``num_queries`` explicitly; it need not be a
 power of two, and the library does not select it automatically.
 
-See the executable :ref:`2.3 release example <release-v2.3.0>` for separate
-Hamiltonian factorization, SOS mapping, block encoding, trial-state
-preparation, and unary QPE.
+See the `SOSSA resource-estimation notebook
+<https://github.com/microsoft/qdk-chemistry/blob/main/examples/sossa_qre.ipynb>`_
+for factorization, simulation, and resource estimation, or the
+:ref:`2.3 release example <release-v2.3.0>` for a compact resource-estimation workflow.
 
 Circuit precision and shared registers
 """"""""""""""""""""""""""""""""""""""
 
-The SOSSA mapper selects ``outer_prepare_algorithm`` through an
-:class:`~qdk_chemistry.data.AlgorithmRef`.
-``inner_prepare_algorithm`` is ``"direct"`` or
-``"controlled_alias_sampling"``; ``select_algorithm`` is ``"direct"`` or
-``"qrom_phase_gradient"``.
+.. rubric:: SOSSA circuit mapper settings
+
+.. list-table::
+   :header-rows: 1
+   :widths: 25 15 60
+
+   * - Setting
+     - Type
+     - Description
+   * - ``outer_prepare_algorithm``
+     - :class:`~qdk_chemistry.data.AlgorithmRef`
+     - Outer PREPARE implementation. Default: ``state_prep`` / ``alias_sampling``.
+   * - ``inner_prepare_algorithm``
+     - str
+     - Inner PREPARE implementation: ``"direct"`` or ``"controlled_alias_sampling"``. Default: ``"controlled_alias_sampling"``.
+   * - ``select_algorithm``
+     - str
+     - SELECT implementation: ``"direct"`` or ``"qrom_phase_gradient"``. Default: ``"qrom_phase_gradient"``.
+   * - ``coefficient_bit_precision``
+     - int
+     - Alias-sampling coefficient precision, from 1 through 30. Default: 10.
+   * - ``rotation_bit_precision``
+     - int
+     - Givens-rotation angle precision, from 1 through 30. Default: 10.
+
 ``coefficient_bit_precision`` and ``rotation_bit_precision`` control
 different approximations and do not define a total energy-error budget.
 The mapper applies ``coefficient_bit_precision`` to both outer and inner
@@ -588,16 +609,6 @@ suffix that must be initialized once and excluded from zero-state
 reflections. Shared PREPARE and SELECT gradients must have identical
 nonzero widths.
 Internal lookup scratch is not part of the caller-visible register.
-
-Outer alias preparation uses a power-of-two-padded coefficient vector.
-The conditional inner preparation uses :math:`B+1` entries and can require
-phase-safe general state synthesis for a non-power-of-two dimension.
-That cost belongs to both free-rider placement alternatives.
-Uncontrolled lookup adjoints can use measurement-based unlookup; a
-controlled adjoint may instead repeat the controlled forward lookup.
-These details affect emitted resources and should not be inferred from
-structural register widths alone.
-
 
 Related classes
 ---------------

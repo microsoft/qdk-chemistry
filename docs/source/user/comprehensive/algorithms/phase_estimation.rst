@@ -14,7 +14,10 @@ QDK/Chemistry supports the following unitary constructions for QPE:
 
 - **Time evolution** — :math:`U = e^{-iHt}` constructed via :ref:`Trotter-Suzuki decomposition <trotter-builder>`. Energy is recovered as :math:`E = -\theta / t` where :math:`\theta = 2\pi\varphi` is mapped to :math:`(-\pi, \pi]`.
 - **Qubitization** — The walk operator :math:`W` constructed via :ref:`LCU block encoding <lcu-builder>`. Energy is recovered as :math:`E = \lambda \cos(\theta)` where :math:`\lambda` is the L1 norm of the Hamiltonian.
-- **SOSSA** — Unary QPE completes the walk from a :ref:`sum-of-squares block encoding <sossa-builder>`. Total energy is recovered as :math:`E = E_{\mathrm{shift}} + \Lambda(1+\cos\theta)`.
+- **SOSSA** — The :ref:`sum-of-squares block encoding <sossa-builder>` :math:`B` encodes
+  :math:`\widetilde{H} = (H - E_{\mathrm{shift}} I)/\Lambda - I`.
+  Unary QPE supplies the reflections that complete the walk. Total energy is recovered as
+  :math:`E = E_{\mathrm{shift}} + \Lambda(1+\cos\theta)`.
 
 The QPE algorithm itself is agnostic to how the unitary is constructed — the choice of unitary builder determines the phase-to-energy mapping used in post-processing.
 

@@ -247,16 +247,27 @@ QROM-based state preparation
 :class:`~qdk_chemistry.algorithms.state_preparation.qrom_state_prep.QROMStatePreparation`
 prepares real amplitudes using multiplexed rotations
 :cite:`Shende2006`. Their angles are loaded through quantum read-only memory
-(QROM), whose lookup construction is described in section III.C of
-:cite:`Babbush2018`.
+(QROM) :cite:`Babbush2018`.
 Inputs may have signed real amplitudes; nonzero imaginary parts and
 non-finite or all-zero coefficients are rejected.
 
-``rotation_bit_precision`` controls the angle table precision and accepts
-integers from 1 through 30, with a default of 10.
-By default, ``allocate_phase_gradient=True`` allocates, prepares, and
-unprepares a phase-gradient register inside the operation.
-With ``False``, the operation instead expects an already prepared gradient
+.. rubric:: Settings
+
+.. list-table::
+   :header-rows: 1
+   :widths: 25 15 60
+
+   * - Setting
+     - Type
+     - Description
+   * - ``rotation_bit_precision``
+     - int
+     - Angle-table precision, from 1 through 30. Default: 10.
+   * - ``allocate_phase_gradient``
+     - bool
+     - Allocate, prepare, and unprepare the phase-gradient register inside the operation. Default: ``True``.
+
+With ``allocate_phase_gradient=False``, the operation expects an already prepared gradient
 after its state register. The returned
 :class:`~qdk_chemistry.data.circuit.CircuitMetadata` declares its width in
 ``num_phase_gradient_ancillas``.
