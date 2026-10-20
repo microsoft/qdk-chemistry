@@ -54,7 +54,6 @@ The general DFTHC container stores normalized real basis rows
 ``U[R, B, N]``, weights ``W[R, B, C]``, and identity weights ``WB[R, C]``.
 Its ordinary-DF constructor infers the dimensions and supplies zero ``WB``
 when that argument is omitted.
-General DFTHC fitting is not implemented by this algorithm.
 
 The container stores conventional one-electron integrals.
 ``get_h1_prime()`` derives the adjusted one-body matrix needed for the

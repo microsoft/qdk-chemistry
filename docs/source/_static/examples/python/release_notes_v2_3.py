@@ -35,11 +35,6 @@ num_orbitals = factorized.get_container().get_num_orbitals()
 operator = create("qubit_mapper", "sum_of_squares", threshold=0.0).run(
     factorized, MajoranaMapping.jordan_wigner(2 * num_orbitals)
 )
-unitary_builder = AlgorithmRef(
-    "hamiltonian_unitary_builder",
-    "sossa",
-    reference_ground_state_energy=reference_energy,
-)
 unitary = create(
     "hamiltonian_unitary_builder",
     "sossa",
@@ -52,40 +47,33 @@ container = unitary.get_container()
 ################################################################################
 # start-cell-unary-sossa
 trial_state = create("state_prep", "sparse_isometry").run(reference_wavefunction)
-epsilon_pea = (
-    0.1  # Illustrative phase-estimation budget in Hartree, not a total error bound.
+unitary_builder = AlgorithmRef(
+    "hamiltonian_unitary_builder",
+    "sossa",
+    reference_ground_state_energy=reference_energy,
 )
-num_queries_guide = ceil(pi * container.lambda_eff / (2 * epsilon_pea))
-num_queries = 7  # A deliberately coarse grid keeps this executable example small.
-reference_gap = reference_energy - container.metadata.energy_shift
+epsilon_pea = 1e-3  # Phase-estimation energy target in Hartree (1 mEh).
+num_queries = ceil(pi * container.lambda_eff / (2 * epsilon_pea))
 
-qpe = create(
-    "phase_estimation",
+qpe_builder = create(
+    "qpe_circuit_builder",
     "qdk_unary",
-    shots=3,
-    resolve_positive_branch=reference_gap > container.normalization,
-    qpe_circuit_builder=AlgorithmRef(
-        "qpe_circuit_builder",
-        "qdk_unary",
-        num_queries=num_queries,
-        compute_capacity=-1,
-        unitary_builder=unitary_builder,
-        circuit_mapper=AlgorithmRef(
-            "circuit_mapper",
-            "sossa",
-            outer_prepare_algorithm=AlgorithmRef("state_prep", "dense_pure_state"),
-            inner_prepare_algorithm="direct",
-            select_algorithm="direct",
-            coefficient_bit_precision=8,
-            rotation_bit_precision=8,
-        ),
+    num_queries=num_queries,
+    compute_capacity=-1,
+    unitary_builder=unitary_builder,
+    circuit_mapper=AlgorithmRef(
+        "circuit_mapper",
+        "sossa",
+        outer_prepare_algorithm=AlgorithmRef("state_prep", "dense_pure_state"),
+        inner_prepare_algorithm="direct",
+        select_algorithm="direct",
+        coefficient_bit_precision=8,
+        rotation_bit_precision=8,
     ),
-    circuit_executor=AlgorithmRef("circuit_executor", "qdk_sparse_state_simulator"),
 )
-result = qpe.run(trial_state, operator)
-print(f"Query guide: {num_queries_guide}; explicitly chosen queries: {num_queries}")
-print(f"CASCI total energy: {reference_energy:.8f} Hartree")
-print(f"SOSSA total energy: {result.resolved_energy:.8f} Hartree")
-print(f"Measured counts: {result.bitstring_counts}")
+circuit = qpe_builder.run(trial_state, operator)[0]
+print(f"Phase-estimation target: {epsilon_pea} Hartree; queries: {num_queries}")
+logical_counts = circuit.estimate().logical_counts
+print(f"Logical counts: {logical_counts}")
 # end-cell-unary-sossa
 ################################################################################
