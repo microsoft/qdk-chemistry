@@ -36,7 +36,7 @@ from qdk_chemistry.data import (
     Wavefunction,
 )
 from qdk_chemistry.data.circuit import QsharpFactoryData
-from qdk_chemistry.utils.qsharp import QSHARP_UTILS
+from qdk_chemistry.utils.qsharp import QSHARP_UTILS, get_qsharp_context
 
 from .helpers import (
     create_random_factorized_hamiltonian,
@@ -820,6 +820,12 @@ class TestControlledSOSSAMapper:
         )
         assert gradient == expected
 
+    def test_target_indices_are_rejected(self):
+        """The walk acts on a fixed register, so an explicit target layout is refused rather than ignored."""
+        unitary = SOSSABuilder().run(self._operator())
+        with pytest.raises(ValueError, match="does not support target_indices"):
+            create("controlled_circuit_mapper", "sossa", target_indices=[0]).run(unitary)
+
 
 @pytest.mark.parametrize(
     ("select_algorithm", "prepare_consumes_gradient"),
@@ -879,6 +885,94 @@ def test_controlled_walk_qpe_measures_the_walk_phase(select_algorithm, prepare_c
     assert abs(counts.get("1", 0) - shots * probability_one) <= tolerance, (
         f"expected about {shots * probability_one:.1f} of {shots} shots on 1, got {counts}"
     )
+
+
+def test_controlled_walk_with_alias_sampling_inner_prepare():
+    """The default controlled alias-sampling inner PREPARE is identity with control off and keeps the walk phase.
+
+    The coefficient precision is kept small because the simulation cost grows quickly with it.
+    """
+    mapper_settings = {
+        "outer_prepare_algorithm": AlgorithmRef("state_prep", "dense_pure_state"),
+        "inner_prepare_algorithm": "controlled_alias_sampling",
+        "select_algorithm": "direct",
+        "coefficient_bit_precision": 2,
+        "rotation_bit_precision": _EXACT_PHASE_ROTATION_BITS,
+    }
+    # Define the test operation before building the walk: evaluating new Q# invalidates earlier closures.
+    context = get_qsharp_context()
+    context.eval(
+        "operation SOSSAWalkTestControlOff(walk : (Qubit, Qubit[]) => Unit is Adj, numSystemQubits : Int, "
+        "numQubits : Int) : Result[] {"
+        " use control = Qubit(); use targets = Qubit[numQubits];"
+        " within { ApplyToEachA(Ry(0.7, _), targets[...numSystemQubits - 1]); }"
+        " apply { walk(control, targets); }"
+        " MResetEachZ([control] + targets) }"
+    )
+    problem = _exact_walk_phase_problem(3.0 / 8.0, prepare_consumes_gradient=False)
+    unitary = SOSSABuilder().run(problem["operator"])
+    walk = create("controlled_circuit_mapper", "sossa", **mapper_settings).run(unitary)
+    assert walk.metadata.num_phase_gradient_ancillas == 0
+    num_system_qubits = unitary.get_num_system_qubits()
+
+    # Control off: rotate the system into a generic state, apply the walk, undo the rotation, and expect |0...0>.
+    control_off = Circuit(
+        qsharp_factory=QsharpFactoryData(
+            program=context.code.SOSSAWalkTestControlOff,
+            parameter={"walk": walk._qsharp_op, "numSystemQubits": num_system_qubits, "numQubits": walk.num_qubits},
+        )
+    )
+    counts = create("circuit_executor", "qdk_sparse_state_simulator", seed=7).run(control_off, shots=8).bitstring_counts
+    assert counts == {"0" * (1 + walk.num_qubits): 8}, f"control-off walk is not the identity: {counts}"
+
+    # Standard QPE: the eigenvalues of W are exp(+-2 pi i 3/8), i.e. bins 011 and 101 of a 3-bit register.
+    # Alias sampling quantizes the inner coefficients to coefficient_bit_precision bits, which can move the
+    # walk phase slightly, so allow a small fraction of shots to leak off those bins.
+    (circuit,) = create(
+        "qpe_circuit_builder",
+        "qdk_standard",
+        num_bits=3,
+        unitary_builder=AlgorithmRef("hamiltonian_unitary_builder", "sossa"),
+        controlled_circuit_mapper=AlgorithmRef("controlled_circuit_mapper", "sossa", **mapper_settings),
+    ).run(state_preparation=problem["state_prep"], qubit_hamiltonian=problem["operator"])
+    shots = 16
+    counts = create("circuit_executor", "qdk_sparse_state_simulator", seed=7).run(circuit, shots=shots).bitstring_counts
+    on_peak = counts.get("011", 0) + counts.get("101", 0)
+    assert on_peak >= shots - 1, f"shots leaked off 3/8 and 5/8: {counts}"
+    assert min(counts.get("011", 0), counts.get("101", 0)) > 0, f"expected both +-phi peaks: {counts}"
+
+
+def test_subspace_marking_allocates_the_walk_scratch_and_shared_gradient():
+    """QPE subspace marking sizes its ancillas from the QPE register, not from the SOSSA container."""
+    mapper_settings = {
+        "outer_prepare_algorithm": AlgorithmRef("state_prep", "dense_pure_state"),
+        "inner_prepare_algorithm": "direct",
+        "select_algorithm": "qrom_phase_gradient",
+        "rotation_bit_precision": _EXACT_PHASE_ROTATION_BITS,
+    }
+    operator = _exact_walk_phase_problem(3.0 / 8.0, prepare_consumes_gradient=False)["operator"]
+    unitary = SOSSABuilder().run(operator)
+    walk = create("controlled_circuit_mapper", "sossa", **mapper_settings).run(unitary)
+    num_system_qubits = unitary.get_num_system_qubits()
+    assert walk.num_qubits > unitary.get_num_qubits(), "the walk must need registers the container omits"
+
+    bound = unitary.get_container().eigenvalue_from_phase(3.0 / 8.0)
+    oracle = create(
+        "amplitude_amplification_oracle",
+        "qdk_qpe_subspace",
+        energy_lower_bound=bound,
+        qpe_circuit_builder=AlgorithmRef(
+            "qpe_circuit_builder",
+            "qdk_standard",
+            num_bits=3,
+            unitary_builder=AlgorithmRef("hamiltonian_unitary_builder", "sossa"),
+            controlled_circuit_mapper=AlgorithmRef("controlled_circuit_mapper", "sossa", **mapper_settings),
+        ),
+    ).run(operator)
+
+    assert oracle._qsharp_factory.parameter["numSignalAncillas"] == walk.num_qubits - num_system_qubits
+    counts = create("circuit_executor", "qdk_sparse_state_simulator", seed=7).run(oracle, shots=4).bitstring_counts
+    assert sum(counts.values()) == 4
 
 
 # ═══════════════════════════════════════════════════════════════════════════════

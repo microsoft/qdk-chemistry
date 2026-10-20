@@ -212,6 +212,7 @@ class QdkStandardQpeCircuitBuilder(StandardQpeCircuitBuilder):
                 parameter=standard_parameters,
             ),
             qsharp_op=qpe_op,
+            num_qubits=num_bits + num_system_qubits + num_ancilla_qubits + num_shared_ancillas,
         )
 
     def _phase_state_op(self, num_bits: int):

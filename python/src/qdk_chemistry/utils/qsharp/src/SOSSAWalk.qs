@@ -509,25 +509,28 @@ namespace QDKChemistry.Utils.SOSSAWalk {
     ) : Unit is Adj {
         let regs = SOSSAWalkRegistersOf(layout, allQubits);
         let walkAncillas = regs.outerReg + regs.innerReg + regs.spinReg;
-        use innerScratch = Qubit[layout.numInnerQubits - layout.numReflectInner];
         for _ in 1..power {
             if BeginEstimateCaching("ControlledSOSSAWalk", SingleVariant()) {
-                ApplySOSSABlockEncoding(
-                    [control],
-                    outerPrepareOp,
-                    freeRiderOp,
-                    innerPrepareOp,
-                    selectOp,
-                    layout.numReflectInner,
-                    layout.numOuterIndexQubits,
-                    layout.numOuterPrepareGradientQubits,
-                    layout.numFreeRiderQubits,
-                    regs.outerReg,
-                    regs.innerReg + innerScratch,
-                    regs.spinReg,
-                    regs.systemReg,
-                    regs.phaseGradientReg,
-                );
+                {
+                    // The block encoding returns the inner scratch to |0⟩, so release it before Ref_a.
+                    use innerScratch = Qubit[layout.numInnerQubits - layout.numReflectInner];
+                    ApplySOSSABlockEncoding(
+                        [control],
+                        outerPrepareOp,
+                        freeRiderOp,
+                        innerPrepareOp,
+                        selectOp,
+                        layout.numReflectInner,
+                        layout.numOuterIndexQubits,
+                        layout.numOuterPrepareGradientQubits,
+                        layout.numFreeRiderQubits,
+                        regs.outerReg,
+                        regs.innerReg + innerScratch,
+                        regs.spinReg,
+                        regs.systemReg,
+                        regs.phaseGradientReg,
+                    );
+                }
                 Controlled Reflect([control], walkAncillas);
                 EndEstimateCaching();
             }

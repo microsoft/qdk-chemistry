@@ -171,6 +171,15 @@ class SOSSABlockEncodingContainer(BlockEncodingContainer):
     power, and by the ``qdk_standard`` and ``qdk_iterative`` builders through the ``sossa``
     ``controlled_circuit_mapper``, which completes the walk and controls its powers.
 
+    .. warning::
+
+        A system eigenstate is an equal mix of the walk eigenvectors at :math:`\pm\phi`.
+        Standard QPE returns :math:`\phi` or :math:`1 - \phi`, which decode to the same
+        energy. Iterative QPE, in both per-bit and combined mode, re-prepares the state for
+        every sample, so the bits it feeds forward come from either branch. Its result is
+        reliable only when :math:`\phi` is exact at ``num_bits``. Use ``qdk_standard`` or
+        ``qdk_unary`` for general SOSSA energy estimation.
+
     :meth:`eigenvalue_from_phase` decodes the phase of the completed walk, whose
     spectrum is :math:`e^{\pm i \arccos(E_k/\Lambda - 1)}`.
 

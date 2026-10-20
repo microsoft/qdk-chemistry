@@ -88,7 +88,7 @@ class ControlledSOSSAMapper(ControlledCircuitMapper):
 
         Raises:
             ValueError: If the container is not a :class:`SOSSABlockEncodingContainer`, the control is
-                not a single qubit at index 0, or the power is not positive.
+                not a single qubit at index 0, ``target_indices`` is set, or the power is not positive.
 
         """
         container = unitary.get_container()
@@ -97,6 +97,11 @@ class ControlledSOSSAMapper(ControlledCircuitMapper):
         control_indices = self._get_control_indices()
         if len(control_indices) != 1 or control_indices[0] != 0:
             raise ValueError("ControlledSOSSAMapper only supports a single control qubit at index 0.")
+        if self._settings.get("target_indices"):
+            raise ValueError(
+                "ControlledSOSSAMapper acts on a fixed [system | ancillas | phase gradient] target register "
+                "and does not support target_indices."
+            )
         if container.power < 1:
             raise ValueError(f"The controlled SOSSA walk requires a positive power, got {container.power}.")
 
