@@ -43,8 +43,8 @@ description of a sum-of-squares spectral-amplification (SOSSA) block encoding
    :start-after: # start-cell-sossa
    :end-before: # end-cell-sossa
 
-The SOSSA circuit path in version 2.3 uses canonical, untapered, blocked
-Jordan-Wigner ordering and unary phase estimation. Custom Jordan-Wigner tables and mode
+The supported circuit path uses canonical, untapered, blocked Jordan-Wigner
+ordering and unary phase estimation. Custom Jordan-Wigner tables and mode
 permutations are not recognized or lowered.
 
 The SOSSA mapper emits the block encoding. Unary QPE supplies the reflections

@@ -502,8 +502,7 @@ The corresponding ``circuit_mapper`` / ``sossa`` emits
    W = R_{\mathrm{outer}} B.
 
 The mapper returns :math:`B`, not the completed walk :math:`W`.
-In version 2.3, SOSSA integrates with :ref:`unary QPE <unary-qpe-algorithm>`,
-which supplies the outer reflections.
+:ref:`Unary QPE <unary-qpe-algorithm>` supplies the outer reflections.
 This circuit path requires unit power, canonical blocked Jordan-Wigner
 ordering, and untapered input.
 
@@ -563,7 +562,7 @@ power of two, and the library does not select it automatically.
 See the `SOSSA resource-estimation notebook
 <https://github.com/microsoft/qdk-chemistry/blob/main/examples/sossa_qre.ipynb>`_
 for factorization, simulation, and resource estimation, or the
-:ref:`2.3 release example <release-v2.3.0>` for a compact resource-estimation workflow.
+:ref:`compact resource-estimation example <release-v2.3.0>`.
 
 Circuit precision and shared registers
 """"""""""""""""""""""""""""""""""""""
