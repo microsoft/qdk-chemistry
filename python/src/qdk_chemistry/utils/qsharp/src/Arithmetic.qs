@@ -18,7 +18,7 @@ namespace QDKChemistry.Utils.Arithmetic {
     /// The little-endian addend, returned unchanged.
     /// ## ys
     /// The little-endian register incremented by `xs`, as long as `xs`.
-    operation RippleCarryCGIncByLEWithCarryAction(
+    internal operation RippleCarryCGIncByLEWithCarryAction(
         carryAction : Qubit => Unit is Adj,
         xs : Qubit[],
         ys : Qubit[]

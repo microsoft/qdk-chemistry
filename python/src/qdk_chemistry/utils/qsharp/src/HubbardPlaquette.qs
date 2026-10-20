@@ -35,8 +35,8 @@ namespace QDKChemistry.Utils.HubbardPlaquette {
         useHammingWeightPhasing : Bool,
         /// Largest tower phased through a single Hamming-weight register, or -1 for no cap.
         maxBatchSize : Int,
-        /// Whether each Hamming weight is phased by one addition into a catalyst.
-        usePhaseGradient : Bool,
+        /// Whether to add each Hamming weight into a catalyst instead of using the `Rz` ladder.
+        useCatalyst : Bool,
     }
 
     /// # Summary
@@ -419,7 +419,7 @@ namespace QDKChemistry.Utils.HubbardPlaquette {
             let pink = PlaquetteSection(params.width, params.height, true);
             let gold = PlaquetteSection(params.width, params.height, false);
             let cap = params.maxBatchSize;
-            let catalyzed = params.useHammingWeightPhasing and params.usePhaseGradient;
+            let catalyzed = params.useHammingWeightPhasing and params.useCatalyst;
             // Each catalyst holds a qubit per place value of its largest weight; the hopping one
             // holds one more, the qubit dropped to double its angle.
             let interactionPlaces = catalyzed and params.interactionAngle != 0.0
