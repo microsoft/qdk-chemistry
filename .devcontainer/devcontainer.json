@@ -76,8 +76,7 @@
         }
     },
     "remoteEnv": {
-        "CPATH": "/usr/include/hdf5/serial:/usr/include/eigen3",
-        "GLIBC_TUNABLES": "glibc.rtld.optional_static_tls=65536"
+        "CPATH": "/usr/include/hdf5/serial:/usr/include/eigen3"
     },
     "postCreateCommand": "bash .devcontainer/scripts/post_create.sh",
     "remoteUser": "vscode"
