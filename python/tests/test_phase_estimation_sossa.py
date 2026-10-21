@@ -803,14 +803,14 @@ class TestControlledSOSSAMapper:
 
     @pytest.mark.parametrize("select_algorithm", ["direct", "qrom_phase_gradient"])
     def test_walk_acts_on_the_block_encoding_register(self, select_algorithm):
-        """Controlled-W^p declares the block encoding's width and gradient, independent of p."""
+        """Controlled-W^p declares the block encoding's width plus its control and gradient, independent of p."""
         operator = self._operator()
         block = create("circuit_mapper", "sossa", select_algorithm=select_algorithm).run(SOSSABuilder().run(operator))
         walk = create("controlled_circuit_mapper", "sossa", select_algorithm=select_algorithm).run(
             SOSSABuilder(power=4).run(operator)
         )
 
-        assert walk.num_qubits == block.num_qubits
+        assert walk.num_qubits == 1 + block.num_qubits
         gradient = walk.metadata.num_phase_gradient_ancillas
         assert gradient == block.metadata.num_phase_gradient_ancillas
         expected = (
@@ -919,11 +919,15 @@ def test_controlled_walk_with_alias_sampling_inner_prepare():
     control_off = Circuit(
         qsharp_factory=QsharpFactoryData(
             program=context.code.SOSSAWalkTestControlOff,
-            parameter={"walk": walk._qsharp_op, "numSystemQubits": num_system_qubits, "numQubits": walk.num_qubits},
+            parameter={
+                "walk": walk._qsharp_op,
+                "numSystemQubits": num_system_qubits,
+                "numQubits": walk.num_qubits - 1,
+            },
         )
     )
     counts = create("circuit_executor", "qdk_sparse_state_simulator", seed=7).run(control_off, shots=8).bitstring_counts
-    assert counts == {"0" * (1 + walk.num_qubits): 8}, f"control-off walk is not the identity: {counts}"
+    assert counts == {"0" * walk.num_qubits: 8}, f"control-off walk is not the identity: {counts}"
 
     # Standard QPE: the eigenvalues of W are exp(+-2 pi i 3/8), i.e. bins 011 and 101 of a 3-bit register.
     # Alias sampling quantizes the inner coefficients to coefficient_bit_precision bits, which can move the
@@ -970,7 +974,7 @@ def test_subspace_marking_allocates_the_walk_scratch_and_shared_gradient():
         ),
     ).run(operator)
 
-    assert oracle._qsharp_factory.parameter["numSignalAncillas"] == walk.num_qubits - num_system_qubits
+    assert oracle._qsharp_factory.parameter["numSignalAncillas"] == walk.num_qubits - 1 - num_system_qubits
     counts = create("circuit_executor", "qdk_sparse_state_simulator", seed=7).run(oracle, shots=4).bitstring_counts
     assert sum(counts.values()) == 4
 

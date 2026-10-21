@@ -5,6 +5,7 @@
 # Licensed under the MIT License. See LICENSE.txt in the project root for license information.
 # --------------------------------------------------------------------------------------------
 
+import warnings
 from abc import abstractmethod
 from typing import Any
 
@@ -54,6 +55,9 @@ class QpeCircuitBuilderSettings(Settings):
 
 class QpeCircuitBuilder(Algorithm):
     """Abstract base class for phase estimation circuit builders."""
+
+    #: Whether the builder prepares the phase gradient its controlled unitaries declare and shares it among them.
+    _shares_phase_gradient: bool = False
 
     def __init__(
         self,
@@ -113,10 +117,12 @@ class QpeCircuitBuilder(Algorithm):
             power: The power to which the unitary should be raised.
 
         Returns:
-            A tuple of (circuit, num_ancilla_qubits, num_system_qubits) where circuit implements
-            controlled-:math:`U^{\\text{power}}`, num_ancilla_qubits is the number of ancilla
-            qubits used by the unitary beyond the system qubits and the phase gradient it declares,
-            and num_system_qubits is the width of the system register.
+            The controlled circuit, work width, and system width; work excludes the system, the control,
+            and the shared phase gradient that phase estimation appends itself.
+
+        Raises:
+            ValueError: If callable width is too small, or the circuit requests a shared phase gradient
+                that this builder does not initialize.
 
         """
         unitary_builder = self._create_nested("unitary_builder")
@@ -126,12 +132,26 @@ class QpeCircuitBuilder(Algorithm):
         circuit_mapper = self._create_nested("controlled_circuit_mapper")
         circuit_mapper.settings().update("control_indices", [0])
         circuit = circuit_mapper.run(unitary_rep)
-        # A mapper that knows its target width declares it; the container's width omits scratch the
-        # mapper chose, such as a phase gradient.
-        num_target_qubits = unitary_rep.get_num_qubits() if circuit.num_qubits is None else circuit.num_qubits
-        # Phase estimation appends the shared gradient itself, so it is not an ancilla of the unitary.
-        num_ancilla_qubits = num_target_qubits - num_system_qubits - circuit.metadata.num_phase_gradient_ancillas
-        return circuit, num_ancilla_qubits, num_system_qubits
+        width = circuit.num_qubits
+        if width is None:
+            warnings.warn(
+                f"Controlled circuit mapper '{circuit_mapper.name()}' does not declare num_qubits. "
+                "Falling back to the unitary representation's width is deprecated; declare the full "
+                "callable width, including its control and working qubits.",
+                DeprecationWarning,
+                stacklevel=2,
+            )
+            width = unitary_rep.get_num_qubits() + 1
+        num_gradient_qubits = circuit.metadata.num_phase_gradient_ancillas
+        if num_gradient_qubits and not self._shares_phase_gradient:
+            raise ValueError("This QPE builder does not initialize shared phase gradient ancillas.")
+        minimum_width = num_system_qubits + 1 + num_gradient_qubits
+        if width < minimum_width:
+            raise ValueError(
+                f"The controlled circuit declares {width} qubits, but requires at least "
+                f"{minimum_width} including its control and phase gradient."
+            )
+        return circuit, width - minimum_width, num_system_qubits
 
     def _controlled_circuit_and_widths(
         self,

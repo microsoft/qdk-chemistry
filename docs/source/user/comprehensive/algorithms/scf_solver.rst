@@ -289,7 +289,7 @@ This hybrid approach combines the speed of :term:`DIIS` for typical systems with
    * - ``relativity``
      - string
      - ``""``
-     - Relativistic treatment: ``""`` for nonrelativistic integrals, ``"sf-x2c"`` for spin-free X2C with basis decontraction and exact recontraction, or ``"sf-x2c-contracted"`` for spin-free X2C in the supplied contracted basis. Both X2C options use the one-electron approximation, leaving :term:`ERIs <ERI>` unchanged and excluding spin-orbit coupling. They require spherical all-electron basis sets (no ECPs or Cartesian AOs); analytic nuclear gradients and polarizabilities are unavailable. Use the same value for downstream :doc:`Hamiltonian construction <hamiltonian_constructor>`, PySCF :doc:`stability analysis <stability_checker>`, and :doc:`MCSCF <mcscf>` because :doc:`Orbitals <../data/orbitals>` do not retain the relativistic treatment.
+     - Relativistic treatment: ``""`` for nonrelativistic integrals, ``"sf-x2c"`` for spin-free X2C with basis decontraction and exact recontraction, or ``"sf-x2c-contracted"`` for spin-free X2C in the supplied contracted basis. Both X2C options use the one-electron approximation, leaving :term:`ERIs <ERI>` unchanged and excluding spin-orbit coupling. They require spherical all-electron basis sets (no ECPs or Cartesian AOs); analytic nuclear gradients and polarizabilities are unavailable.
    * - ``fock_reset_steps``
      - int
      - ``1073741824``

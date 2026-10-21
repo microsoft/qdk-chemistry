@@ -9,12 +9,16 @@ from __future__ import annotations
 
 import json
 from dataclasses import dataclass
-from unittest.mock import Mock, call
+from unittest.mock import Mock, call, patch
 
 import numpy as np
 import pytest
 from qdk.test_utils import dump_operation_on_state
 
+from qdk_chemistry.algorithms import create
+from qdk_chemistry.algorithms.circuit_executor.qdk import QdkSparseStateSimulator
+from qdk_chemistry.algorithms.circuit_mapper.psp_mapper import PSPMapper
+from qdk_chemistry.algorithms.controlled_circuit_mapper import ControlledPauliSequenceMapper, ControlledPSPMapper
 from qdk_chemistry.algorithms.phase_estimation.circuit_builder.iterative_builder import (
     QdkIterativeQpeCircuitBuilder,
     _validate_iteration_inputs,
@@ -22,6 +26,7 @@ from qdk_chemistry.algorithms.phase_estimation.circuit_builder.iterative_builder
 from qdk_chemistry.algorithms.phase_estimation.circuit_builder.standard_builder import (
     QdkStandardQpeCircuitBuilder,
 )
+from qdk_chemistry.algorithms.state_preparation import identity_state_prep
 from qdk_chemistry.data import (
     AlgorithmRef,
     Circuit,
@@ -33,6 +38,185 @@ from qdk_chemistry.data import (
 from qdk_chemistry.data.circuit import CircuitMetadata, QsharpFactoryData
 from qdk_chemistry.data.unitary_representation.containers.base import UnitaryContainer
 from qdk_chemistry.utils.qsharp import QSHARP_UTILS, get_qsharp_context
+
+
+@pytest.mark.parametrize("prepare", ["dense_pure_state", "alias_sampling"])
+@pytest.mark.parametrize("builder_type", [QdkStandardQpeCircuitBuilder, QdkIterativeQpeCircuitBuilder])
+def test_lcu_qpe_supplies_prepare_work_qubits(prepare: str, builder_type: type) -> None:
+    """LCU QPE executes the declared PREPARE register, including alias garbage."""
+    hamiltonian = QubitOperator(["X", "Z"], np.array([0.5, 0.5]))
+    energy, vectors = np.linalg.eigh(np.array([[0.5, 0.5], [0.5, -0.5]]))
+    state_params = {
+        "rowMap": [0],
+        "stateVector": vectors[:, 0].tolist(),
+        "expansionOps": [],
+        "numQubits": 1,
+    }
+    state_prep = Circuit(
+        qsharp_factory=QsharpFactoryData(
+            program=QSHARP_UTILS.StatePreparation.MakeStatePreparationCircuit, parameter=state_params
+        ),
+        qsharp_op=QSHARP_UTILS.StatePreparation.MakeStatePreparationOp(state_params),
+        num_qubits=1,
+    )
+    prepare_ref = (
+        AlgorithmRef("state_prep", prepare, bits_precision=2)
+        if prepare == "alias_sampling"
+        else AlgorithmRef("state_prep", prepare)
+    )
+    builder = builder_type(
+        num_bits=3,
+        unitary_builder=AlgorithmRef("hamiltonian_unitary_builder", "lcu", quantum_walk=True),
+        controlled_circuit_mapper=AlgorithmRef(
+            "controlled_circuit_mapper", "prepare_select_prepare", prepare=prepare_ref
+        ),
+    )
+    if isinstance(builder, QdkIterativeQpeCircuitBuilder):
+        builder.settings().set("num_iteration", 0)
+    circuit = builder.run(state_prep, hamiltonian)[0]
+    result = QdkSparseStateSimulator().run(circuit, shots=8)
+    num_prepare = 7 if prepare == "alias_sampling" else 1
+    num_phase = 1 if isinstance(builder, QdkIterativeQpeCircuitBuilder) else 3
+    assert circuit.num_qubits == num_phase + 1 + num_prepare
+
+    if isinstance(builder, QdkStandardQpeCircuitBuilder):
+        state = np.asarray(
+            dump_operation_on_state(circuit._qsharp_op, circuit.num_qubits, context=get_qsharp_context())
+        )
+        probabilities = np.sum(np.abs(state.reshape(8, -1)) ** 2, axis=1)
+        # The phase register is little-endian, while dumped state indices are big-endian.
+        probabilities = probabilities[[int(f"{index:03b}"[::-1], 2) for index in range(8)]]
+        np.testing.assert_allclose(probabilities, [0, 0, 0, 0.5, 0, 0.5, 0, 0], atol=1e-10)
+        np.testing.assert_allclose(np.cos(2 * np.pi * np.array([3, 5]) / 8), energy[0], atol=1e-10)
+        assert set(result.bitstring_counts) <= {"011", "101"}
+    else:
+        assert result.bitstring_counts == {"1": 8}
+
+
+@pytest.mark.parametrize("prepare", ["dense_pure_state", "alias_sampling"])
+def test_combined_lcu_iqpe_supplies_prepare_work_qubits(prepare: str) -> None:
+    """Combined IQPE preserves the mapper's work register through every adaptive round."""
+    prepare_ref = (
+        AlgorithmRef("state_prep", prepare, bits_precision=2)
+        if prepare == "alias_sampling"
+        else AlgorithmRef("state_prep", prepare)
+    )
+    builder = QdkIterativeQpeCircuitBuilder(
+        num_bits=3,
+        combine_iterations=True,
+        unitary_builder=AlgorithmRef("hamiltonian_unitary_builder", "lcu", quantum_walk=True),
+        controlled_circuit_mapper=AlgorithmRef(
+            "controlled_circuit_mapper", "prepare_select_prepare", prepare=prepare_ref
+        ),
+    )
+    circuit = builder.run(identity_state_prep(1), QubitOperator(["I", "Z"], np.array([0.5, 0.5])))[0]
+    assert circuit.num_qubits == 2 + (7 if prepare == "alias_sampling" else 1)
+    assert QdkSparseStateSimulator().run(circuit, shots=8).bitstring_counts == {"000": 8}
+
+
+@pytest.mark.parametrize("mapper", ["pauli_sequence", "cswap_pauli_sequence"])
+@pytest.mark.parametrize("builder_type", [QdkStandardQpeCircuitBuilder, QdkIterativeQpeCircuitBuilder])
+def test_trotter_qpe_preserves_phase_and_callable_width(mapper: str, builder_type: type) -> None:
+    """A single Z term has phase 1/8; CSWAP scratch remains internal."""
+    hamiltonian = QubitOperator(["Z"], np.array([-0.5]))
+    builder = builder_type(
+        num_bits=3,
+        unitary_builder=AlgorithmRef("hamiltonian_unitary_builder", "trotter", time=float(np.pi / 2)),
+        controlled_circuit_mapper=AlgorithmRef("controlled_circuit_mapper", mapper),
+    )
+    if isinstance(builder, QdkIterativeQpeCircuitBuilder):
+        builder.settings().set("num_iteration", 0)
+    circuit = builder.run(identity_state_prep(1), hamiltonian)[0]
+    assert circuit.num_qubits == (2 if isinstance(builder, QdkIterativeQpeCircuitBuilder) else 4)
+    if isinstance(builder, QdkStandardQpeCircuitBuilder):
+        state = np.asarray(
+            dump_operation_on_state(circuit._qsharp_op, circuit.num_qubits, context=get_qsharp_context())
+        )
+        probabilities = np.sum(np.abs(state.reshape(8, -1)) ** 2, axis=1)
+        probabilities = probabilities[[int(f"{index:03b}"[::-1], 2) for index in range(8)]]
+        np.testing.assert_allclose(probabilities, [0, 1, 0, 0, 0, 0, 0, 0], atol=1e-10)
+    else:
+        assert QdkSparseStateSimulator().run(circuit, shots=8).bitstring_counts == {"1": 8}
+
+
+@pytest.mark.parametrize("mode", ["standard", "iterative", "combined"])
+def test_qpe_preserves_legacy_mapper_width_with_warning(mode: str) -> None:
+    """Mappers without width metadata retain the previous allocation and still execute."""
+    map_unitary = ControlledPSPMapper._run_impl
+
+    def legacy_mapper(mapper: ControlledPSPMapper, unitary: UnitaryRepresentation) -> Circuit:
+        mapped = map_unitary(mapper, unitary)
+        return Circuit(qsharp_factory=mapped._qsharp_factory, qsharp_op=mapped._qsharp_op)
+
+    builder_type = QdkStandardQpeCircuitBuilder if mode == "standard" else QdkIterativeQpeCircuitBuilder
+    builder = builder_type(
+        num_bits=2,
+        unitary_builder=AlgorithmRef("hamiltonian_unitary_builder", "lcu", quantum_walk=True),
+        controlled_circuit_mapper=AlgorithmRef("controlled_circuit_mapper", "prepare_select_prepare"),
+    )
+    if mode != "standard":
+        builder.settings().update({"num_iteration": 0, "combine_iterations": mode == "combined"})
+    with (
+        patch.object(ControlledPSPMapper, "_run_impl", legacy_mapper),
+        pytest.warns(DeprecationWarning, match="num_qubits.*deprecated"),
+    ):
+        circuit = builder.run(identity_state_prep(1), QubitOperator(["I", "Z"], np.array([0.5, 0.5])))[0]
+
+    assert circuit.num_qubits == (4 if mode == "standard" else 3)
+    result = QdkSparseStateSimulator().run(circuit, shots=1)
+    assert result.bitstring_counts == {("0" if mode == "iterative" else "00"): 1}
+
+
+@pytest.mark.parametrize(
+    ("width", "gradient", "shares_gradient", "message"),
+    [
+        (1, 0, True, "including its control"),
+        (2, 1, True, "including its control and phase gradient"),
+        (3, 1, False, "shared phase gradient"),
+    ],
+)
+def test_qpe_rejects_incompatible_mapper_requirements(
+    width: int, gradient: int, shares_gradient: bool, message: str
+) -> None:
+    """Explicitly incompatible callable requirements do not use the legacy fallback."""
+    mapped = Circuit(
+        qasm="OPENQASM 3.0;",
+        num_qubits=width,
+        metadata=CircuitMetadata(num_phase_gradient_ancillas=gradient),
+    )
+    with (
+        patch.object(ControlledPauliSequenceMapper, "run", return_value=mapped),
+        patch.object(QdkStandardQpeCircuitBuilder, "_shares_phase_gradient", shares_gradient),
+        pytest.raises(ValueError, match=message),
+    ):
+        QdkStandardQpeCircuitBuilder(num_bits=1).run(identity_state_prep(1), QubitOperator(["Z"], np.array([1.0])))
+
+
+def test_standard_qpe_rejects_incompatible_power_widths() -> None:
+    """Controlled powers must agree on the target register shared by standard QPE."""
+    builder = QdkStandardQpeCircuitBuilder(num_bits=2)
+    with (
+        patch.object(
+            builder,
+            "_create_controlled_circuit",
+            side_effect=[
+                (Circuit(qasm="OPENQASM 3.0;", num_qubits=3), 1),
+                (Circuit(qasm="OPENQASM 3.0;", num_qubits=4), 2),
+            ],
+        ),
+        pytest.raises(ValueError, match="same system and ancilla widths"),
+    ):
+        builder.run(identity_state_prep(1), QubitOperator(["Z"], np.array([1.0])))
+
+
+def test_unary_qpe_rejects_missing_block_encoding_operation() -> None:
+    """An absent block operation fails before it can enter the unary schedule."""
+    builder = create("qpe_circuit_builder", "qdk_unary", num_queries=3)
+    with (
+        patch.object(PSPMapper, "run", return_value=Circuit(qasm="OPENQASM 3.0;", num_qubits=2)),
+        pytest.raises(RuntimeError, match="Block encoding has no Q# operation"),
+    ):
+        builder.run(identity_state_prep(1), QubitOperator(["X", "Z"], np.array([0.5, 0.5])))
 
 
 @dataclass(frozen=True)
@@ -506,8 +690,9 @@ def _stub_nested(
     )
     circuit_mapper = Mock()
     circuit_mapper.run.return_value = Mock(
+        spec=Circuit,
         _qsharp_op=object(),
-        num_qubits=None,
+        num_qubits=1 + num_qubits,
         metadata=CircuitMetadata(num_phase_gradient_ancillas=num_gradient_qubits),
     )
     nested = {"unitary_builder": unitary_builder, "controlled_circuit_mapper": circuit_mapper}
@@ -515,17 +700,18 @@ def _stub_nested(
     return unitary_builder, circuit_mapper
 
 
-def test_controlled_circuit_takes_system_width_from_unitary(monkeypatch: pytest.MonkeyPatch) -> None:
-    """QPE sizes a model's system register from its unitary, so the unitary's ancillas are counted."""
+def test_controlled_circuit_uses_system_and_callable_widths(monkeypatch: pytest.MonkeyPatch) -> None:
+    """QPE takes the system width from the unitary and the work register from the mapper."""
     builder = QdkStandardQpeCircuitBuilder(num_bits=2)
     unitary_builder, circuit_mapper = _stub_nested(builder, monkeypatch, num_qubits=5, num_system_qubits=3)
+    circuit_mapper.run.return_value.num_qubits = 9
     model = FermiHubbardModelHamiltonianDescription(LatticeGeometry.chain(3), t=1.0, u=4.0)
 
     circuit, num_ancilla_qubits = builder._create_controlled_circuit(model, power=1)
 
     unitary_builder.run.assert_called_once_with(model)
     assert circuit is circuit_mapper.run.return_value
-    assert num_ancilla_qubits == 2
+    assert num_ancilla_qubits == 5
     assert builder._num_system_qubits(model, unitary_builder.run.return_value) == 3
 
 
@@ -616,9 +802,13 @@ def test_combined_model_unitary_rejects_mismatched_system_widths(
 ) -> None:
     """Combined rounds must agree on the model's system width even when ancilla counts match."""
     builder = QdkIterativeQpeCircuitBuilder(num_bits=2, combine_iterations=True)
-    unitary_builder, _ = _stub_nested(builder, monkeypatch, num_qubits=5, num_system_qubits=3)
+    unitary_builder, circuit_mapper = _stub_nested(builder, monkeypatch, num_qubits=5, num_system_qubits=3)
     unitary_builder.run.side_effect = [
         UnitaryRepresentation(Mock(spec=UnitaryContainer, num_qubits=width + 2, num_system_qubits=width))
+        for width in system_widths
+    ]
+    circuit_mapper.run.side_effect = [
+        Mock(spec=Circuit, _qsharp_op=object(), num_qubits=width + 3, metadata=CircuitMetadata())
         for width in system_widths
     ]
     model = FermiHubbardModelHamiltonianDescription(LatticeGeometry.chain(3), t=1.0, u=4.0)

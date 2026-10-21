@@ -46,8 +46,8 @@ class ControlledSOSSAMapper(ControlledCircuitMapper):
     unconditionally and its PREPARE oracles need no controlled form.
 
     The returned operation takes the control qubit and the ``[system | ancillas | phase gradient]``
-    target register. The circuit declares that target width as ``num_qubits`` and the gradient
-    suffix in its metadata, so phase estimation prepares the gradient once and shares it.
+    target register. The circuit declares the control plus that target as ``num_qubits`` and the
+    gradient suffix in its metadata, so phase estimation prepares the gradient once and shares it.
 
     """
 
@@ -83,7 +83,7 @@ class ControlledSOSSAMapper(ControlledCircuitMapper):
             unitary: The unitary representation containing the SOSSA block encoding.
 
         Returns:
-            Circuit: The controlled walk, declaring the target register width and the phase
+            Circuit: The controlled walk, declaring its width including the control and the phase
             gradient qubits its caller must prepare.
 
         Raises:
@@ -112,6 +112,6 @@ class ControlledSOSSAMapper(ControlledCircuitMapper):
                 parameter={**ops, "layout": register_layout, "power": container.power},
             ),
             qsharp_op=QSHARP_UTILS.SOSSAWalk.MakeControlledSOSSAWalkOp(*ops.values(), register_layout, container.power),
-            num_qubits=regs["num_system_qubits"] + regs["num_ancilla_qubits"],
+            num_qubits=1 + regs["num_system_qubits"] + regs["num_ancilla_qubits"],
             metadata=CircuitMetadata(num_phase_gradient_ancillas=regs["num_phase_gradient_qubits"]),
         )

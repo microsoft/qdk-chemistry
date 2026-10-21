@@ -230,6 +230,8 @@ class QdkUnaryQpeCircuitBuilder(QpeCircuitBuilder):
             raise ValueError(f"Requires a non-empty ancilla register to reflect about, got {num_ancilla_qubits}.")
 
         apply_reflection = QSHARP_UTILS.PrepSelPrep.MakeAncillaReflectionOp(num_system_qubits, num_ancilla_qubits)
+        if block_encoding_op is None:
+            raise RuntimeError("Block encoding has no Q# operation.")
         state_prep_op = state_preparation._qsharp_op  # noqa: SLF001
         if state_prep_op is None:
             raise RuntimeError("State preparation has no Q# operation.")

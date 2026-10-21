@@ -58,6 +58,8 @@ class QdkIterativeQpeCircuitBuilder(IterativeQpeCircuitBuilder):
 
     """
 
+    _shares_phase_gradient = True
+
     def __init__(
         self,
         num_bits: int = -1,
@@ -243,7 +245,8 @@ class QdkIterativeQpeCircuitBuilder(IterativeQpeCircuitBuilder):
             qsharp_factory=QsharpFactoryData(
                 program=QSHARP_UTILS.IterativePhaseEstimation.MakeIQPECircuit,
                 parameter=iterative_parameters,
-            )
+            ),
+            num_qubits=1 + num_system_qubits + num_ancilla_qubits + num_shared_ancillas,
         )
 
     def _create_full_circuit(
@@ -342,7 +345,8 @@ class QdkIterativeQpeCircuitBuilder(IterativeQpeCircuitBuilder):
             qsharp_factory=QsharpFactoryData(
                 program=QSHARP_UTILS.CombinedIterationPhaseEstimation.RunFullIQPE,
                 parameter=iterative_parameters,
-            )
+            ),
+            num_qubits=1 + num_system_qubits + num_ancilla_qubits + num_shared_ancillas,
         )
 
     def name(self) -> str:
