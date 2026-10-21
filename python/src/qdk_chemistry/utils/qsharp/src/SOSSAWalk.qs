@@ -44,7 +44,7 @@ namespace QDKChemistry.Utils.SOSSAWalk {
     import QDKChemistry.Utils.PrepSelPrep.Reflect;
     import QDKChemistry.Utils.SelectSwap.ApplyBranchPhaseFixup, QDKChemistry.Utils.SelectSwap.SelectSwapCost2D;
     import QDKChemistry.Utils.SelectSwap.ComputeOptimalSwapBits, QDKChemistry.Utils.SelectSwap.SelectSwapAliased;
-    import QDKChemistry.Utils.SelectSwapDirty.ComputeOptimalDirtySwapBits, QDKChemistry.Utils.SelectSwapDirty.SelectSwapDirtyBorrowedQubits, QDKChemistry.Utils.SelectSwapDirty.SelectSwapDirty;
+    import QDKChemistry.Utils.SelectSwapDirty.ComputeOptimalDirtySwapBits, QDKChemistry.Utils.SelectSwapDirty.SelectSwapDirty;
     import QDKChemistry.Utils.SelectSwapDirty.SelectSwapDirtyCost2D;
     import QDKChemistry.Utils.UnaryIteration.AddressQubits;
 

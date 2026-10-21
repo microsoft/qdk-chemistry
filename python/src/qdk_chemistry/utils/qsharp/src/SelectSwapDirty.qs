@@ -6,7 +6,6 @@
 /// Reference: Berry et al. (arXiv:1902.02134) App. A Thm 1; Low et al. (arXiv:1812.00954).
 namespace QDKChemistry.Utils.SelectSwapDirty {
 
-    import Std.Arrays.All;
     import Std.Arrays.Chunks;
     import Std.Arrays.Flattened;
     import Std.Arrays.IsEmpty;
@@ -25,7 +24,6 @@ namespace QDKChemistry.Utils.SelectSwapDirty {
     import QDKChemistry.Utils.SelectSwap.SwapDataOutputs;
     import QDKChemistry.Utils.SelectSwap.MaxSelectableSwapBits;
     import QDKChemistry.Utils.SelectSwap.MeasurementUnlookupCost;
-    import QDKChemistry.Utils.SelectSwap.SelectSwap2D;
 
     /// Toffoli cost of one borrowed `SelectSwap2D` load and its uncompute: Berry et al.'s
     /// `2*ceil(d/K) + 4*b*(K-1)` forward pass, plus one measurement erasure of the target.

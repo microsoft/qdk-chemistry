@@ -61,13 +61,15 @@ class SOSSAMapperSettings(Settings):
             (1, 30),
         )
         self._set_default(
-            "num_givens_rotation_batches",
+            "max_givens_rotation_batches",
             "int",
             1,
-            "Maximum number of passes SELECT makes over the N-1 Givens angles. 1 is the cheapest in Toffolis "
-            "and the widest in qubits. More passes shrink the rotation register to "
-            "ceil((N-1)/num_givens_rotation_batches) angles, at one extra table lookup per batch in each direction. "
-            "SELECT makes the fewest passes that register allows, which can be fewer than requested.",
+            "Upper bound J on the number of passes the 'qrom_phase_gradient' SELECT makes over the N-1 "
+            "Givens angles. The 'direct' SELECT loads no angle table and ignores it. 1 keeps every angle "
+            "resident, which is the cheapest in Toffolis and the widest in qubits. A larger J shrinks the "
+            "rotation register to ceil((N-1)/J) angles, at one extra table lookup per batch in each "
+            "direction. SELECT makes the fewest passes that register allows, ceil((N-1)/ceil((N-1)/J)), "
+            "which can be fewer than J: 19 angles with J = 6 run 5 passes of 4.",
             (1, 4096),
         )
         self._set_default(
@@ -82,17 +84,20 @@ class SOSSAMapperSettings(Settings):
             "network on borrowed dirty qubits that are provably idle across the load, so it costs no "
             "width at all, but it pays roughly two to three times the Toffolis of the clean network at "
             "equal width. Every method falls back to a plain lookup at shapes where its own cost model "
-            "says no network pays.",
+            "says no network pays. 'select_swap' and 'dirty_select_swap' choose their swap widths "
+            "under max_swap_address_bits.",
             ["select", "select_swap", "dirty_select_swap"],
         )
         self._set_default(
-            "max_swap_bits",
+            "max_swap_address_bits",
             "int",
             -1,
-            "Ceiling on the swap width k of the Givens rotation and inner alias-sampling QROAMs. -1 "
-            "leaves each loader's own "
-            "selector alone, 0 forces plain select, and a positive value limits each selector to "
-            "widths at or below it.",
+            "Upper bound on the address width k of each QROAM swap network, which routes 2^k data words; "
+            "it does not count data or scratch qubits. It applies to the Givens rotation tables of the "
+            "'qrom_phase_gradient' SELECT and the inner table of the 'controlled_alias_sampling' PREPARE, "
+            "and only when lookup_method is 'select_swap' or 'dirty_select_swap'; 'select' always uses "
+            "width 0 and ignores it. -1 leaves each loader's cost model to choose, 0 forces plain select, "
+            "and a positive value limits each loader to widths at or below it.",
             (-1, 30),
         )
 
@@ -184,7 +189,7 @@ class SOSSAMapper(CircuitMapper):
                 coefficients,
                 free_rider_data,
                 coeff_bits,
-                self._max_swap_bits,
+                self._max_swap_address_bits,
                 available_dirty,
             )
         if algorithm == "direct":
@@ -219,11 +224,11 @@ class SOSSAMapper(CircuitMapper):
             raise ValueError(f"Unsupported SOSSA inner PREPARE algorithm '{inner_algorithm}'.")
 
         num_angles = max(meta.num_spatial_orbitals - 1, 0)
-        num_givens_rotation_batches = int(self._settings.get("num_givens_rotation_batches"))
-        if 0 < num_angles < num_givens_rotation_batches:
+        max_givens_rotation_batches = int(self._settings.get("max_givens_rotation_batches"))
+        if 0 < num_angles < max_givens_rotation_batches:
             raise ValueError(
-                f"num_givens_rotation_batches must be at most the {num_angles} rotation angles of a "
-                f"{meta.num_spatial_orbitals}-orbital system, got {num_givens_rotation_batches}"
+                f"max_givens_rotation_batches must be at most the {num_angles} rotation angles of a "
+                f"{meta.num_spatial_orbitals}-orbital system, got {max_givens_rotation_batches}"
             )
 
         select_data = {
@@ -235,10 +240,10 @@ class SOSSAMapper(CircuitMapper):
             "OneBodyRotationAngles": container.select.one_body_rotation_angles.tolist(),
             "TwoBodyRotationAngles": container.select.two_body_rotation_angles.tolist(),
             "rotationBitPrecision": rot_bits,
-            # Narrowest lambda within num_givens_rotation_batches passes; 6 on 19 angles gives lambda 4, so 5 passes.
-            "rotationBatchSize": -(-num_angles // num_givens_rotation_batches),
+            # Narrowest lambda within max_givens_rotation_batches passes; 6 on 19 angles gives lambda 4, so 5 passes.
+            "rotationBatchSize": -(-num_angles // max_givens_rotation_batches),
             "borrowDirty": self._borrow_dirty,
-            "maxSwapBits": self._max_swap_bits,
+            "maxSwapBits": self._max_swap_address_bits,
             "numFreeRiderBits": num_free_rider_bits,
             "signQubitIndex": sign_qubit_index,
         }
@@ -363,7 +368,9 @@ class SOSSAMapper(CircuitMapper):
         outer_prepare_op = outer_prepare_circuit._qsharp_op  # noqa: SLF001
         # Resolved per run (settings stay mutable); "select" is a width-0 cap, so only borrowing is passed on.
         lookup_method = self._settings.get("lookup_method")
-        self._max_swap_bits = 0 if lookup_method == "select" else int(self._settings.get("max_swap_bits"))
+        self._max_swap_address_bits = (
+            0 if lookup_method == "select" else int(self._settings.get("max_swap_address_bits"))
+        )
         self._borrow_dirty = lookup_method == "dirty_select_swap"
         inner_prepare_op, free_rider_op = self._build_inner_oracles(container)
         select_op = self._build_select(container)

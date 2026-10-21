@@ -791,16 +791,16 @@ class TestSOSSAResourceEstimation:
         assert num_qubits == 486
 
     def test_fe2s2_streamed_logical_resource_estimate(self):
-        """Pin the streamed Fe2S2 cost used by the example."""
+        """Pin the streamed Fe2S2 cost with the default ``select_swap`` lookup."""
         # Fewest passes reaching the 379-qubit PREPARE floor, which needs lambda <= 19 - ceil((486 - 379) / 15) = 11.
-        num_qubits, toffoli_count = self._fe2s2_logical_counts(num_givens_rotation_batches=2)
+        num_qubits, toffoli_count = self._fe2s2_logical_counts(max_givens_rotation_batches=2)
 
         assert num_qubits == 379
         assert toffoli_count == pytest.approx(59_498_563, rel=0.01)
 
     def test_fe2s2_streamed_select_logical_resource_estimate(self):
-        """Pin the streamed Fe2S2 cost with the plain ``select`` lookup, as the example's streamed cell runs it."""
-        num_qubits, toffoli_count = self._fe2s2_logical_counts(num_givens_rotation_batches=2, lookup_method="select")
+        """Pin the streamed Fe2S2 cost with the plain ``select`` lookup, as the example runs it."""
+        num_qubits, toffoli_count = self._fe2s2_logical_counts(max_givens_rotation_batches=2, lookup_method="select")
 
         assert num_qubits == 350
         assert toffoli_count == pytest.approx(79_954_669, rel=0.01)

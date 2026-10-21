@@ -253,7 +253,7 @@ class TestInnerPrep:
         bit_precision = 6
         inner_mapper = _make_sossa_mapper(inner_algorithm=algorithm, coefficient_bit_precision=bit_precision)
         # Calling the builder directly skips _run_impl, which is what normally resolves these.
-        inner_mapper._max_swap_bits = inner_mapper.settings().get("max_swap_bits")
+        inner_mapper._max_swap_address_bits = inner_mapper.settings().get("max_swap_address_bits")
         inner_mapper._borrow_dirty = False
         with use_qsharp_context(qsharp_test_context):
             inner_op, _ = inner_mapper._build_inner_oracles(container)
@@ -612,7 +612,7 @@ class TestSelectFullFidelity:
         num_copies: int = 1,
         rotation_batch_size: int = 0,
         lookup_method: str = "select",
-        max_swap_bits: int = -1,
+        max_swap_address_bits: int = -1,
     ) -> dict:
         rng = np.random.default_rng(42 + N)
 
@@ -634,7 +634,7 @@ class TestSelectFullFidelity:
             "rotationBatchSize": rotation_batch_size,
             # Mirrors SOSSAMapper._run_impl: "select" is a swap network capped at width 0.
             "borrowDirty": lookup_method == "dirty_select_swap",
-            "maxSwapBits": 0 if lookup_method == "select" else max_swap_bits,
+            "maxSwapBits": 0 if lookup_method == "select" else max_swap_address_bits,
             "numFreeRiderBits": 2 + rank_bits,
             "signQubitIndex": -1,
         }
@@ -869,26 +869,26 @@ class TestSOSSAWalkLogicalCounts:
         )
 
 
-class TestNumGivensRotationBatchesSetting:
-    """The ``num_givens_rotation_batches`` setting's one bound the settings range cannot see."""
+class TestMaxGivensRotationBatchesSetting:
+    """The ``max_givens_rotation_batches`` setting's one bound the settings range cannot see."""
 
     def test_it_rejects_more_passes_than_there_are_angles(self):
         """Two passes over N = 2's single angle would otherwise clamp silently to one."""
         mapper = _make_sossa_mapper()
-        mapper.settings().set("num_givens_rotation_batches", 2)
-        with pytest.raises(ValueError, match="num_givens_rotation_batches must be at most"):
+        mapper.settings().set("max_givens_rotation_batches", 2)
+        with pytest.raises(ValueError, match="max_givens_rotation_batches must be at most"):
             mapper.run(_build_sossa_unitary(num_orbitals=2))
 
 
-class TestMaxSwapBitsSetting:
-    """The ``max_swap_bits`` setting's contract, without paying for an estimate."""
+class TestMaxSwapAddressBitsSetting:
+    """The ``max_swap_address_bits`` setting's contract, without paying for an estimate."""
 
     def test_it_defaults_to_the_sentinel_and_accepts_only_the_declared_range(self):
         """``-1`` (uncapped) is the default, ``0`` is plain select, and widths outside ``[-1, 30]`` are rejected."""
-        assert SOSSAMapper().settings().get("max_swap_bits") == -1
+        assert SOSSAMapper().settings().get("max_swap_address_bits") == -1
         for swap_bits in (-1, 0, 1, 2, 3, 30):
-            ref = AlgorithmRef("circuit_mapper", "sossa", max_swap_bits=swap_bits)
-            assert ref.settings.get("max_swap_bits") == swap_bits
+            ref = AlgorithmRef("circuit_mapper", "sossa", max_swap_address_bits=swap_bits)
+            assert ref.settings.get("max_swap_address_bits") == swap_bits
         for swap_bits in (-2, 31):
             with pytest.raises(ValueError, match="out of allowed range"):
-                AlgorithmRef("circuit_mapper", "sossa", max_swap_bits=swap_bits)
+                AlgorithmRef("circuit_mapper", "sossa", max_swap_address_bits=swap_bits)
