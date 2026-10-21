@@ -86,10 +86,8 @@ class SOSSAMapper(CircuitMapper):
     shared ancilla and is excluded from the reflected zero register.
 
     Unary QPE controls walk iterations through its own index register. Iterative and
-    standard QPE query controlled walk powers instead, which the ``sossa``
-    ``controlled_circuit_mapper``
-    (:class:`~qdk_chemistry.algorithms.controlled_circuit_mapper.controlled_sossa_mapper.ControlledSOSSAMapper`)
-    builds from the same oracles.
+    standard QPE query controlled walk powers instead from
+    :class:`~qdk_chemistry.algorithms.controlled_circuit_mapper.controlled_sossa_mapper.ControlledSOSSAMapper`.
     """
 
     def __init__(self):
