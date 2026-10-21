@@ -18,6 +18,7 @@ from qdk_chemistry.data import (
     Settings,
     UnitaryRepresentation,
 )
+from qdk_chemistry.data.unitary_representation.containers.sossa import SOSSABlockEncodingContainer
 from qdk_chemistry.utils.qsharp import QSHARP_UTILS
 
 __all__: list[str] = [
@@ -121,13 +122,14 @@ class QpeCircuitBuilder(Algorithm):
             and the shared phase gradient that phase estimation appends itself.
 
         Raises:
-            ValueError: If callable width is too small, or the circuit requests a shared phase gradient
-                that this builder does not initialize.
+            ValueError: If the builder does not support the unitary representation, the callable width is
+                too small, or the circuit requests a shared phase gradient that this builder does not initialize.
 
         """
         unitary_builder = self._create_nested("unitary_builder")
         unitary_builder.settings().update("power", power)
         unitary_rep = unitary_builder.run(qubit_hamiltonian)
+        self._validate_unitary(unitary_rep)
         num_system_qubits = self._num_system_qubits(qubit_hamiltonian, unitary_rep)
         circuit_mapper = self._create_nested("controlled_circuit_mapper")
         circuit_mapper.settings().update("control_indices", [0])
@@ -152,6 +154,14 @@ class QpeCircuitBuilder(Algorithm):
                 f"{minimum_width} including its control and phase gradient."
             )
         return circuit, width - minimum_width, num_system_qubits
+
+    def _validate_unitary(self, unitary_rep: UnitaryRepresentation) -> None:
+        """Reject a unitary representation this builder cannot estimate.
+
+        Args:
+            unitary_rep: The unitary representation the controlled circuit is built from.
+
+        """
 
     def _controlled_circuit_and_widths(
         self,
@@ -299,6 +309,27 @@ class IterativeQpeCircuitBuilder(QpeCircuitBuilder):
     (Kitaev-style) quantum phase estimation algorithm.
 
     """
+
+    def _validate_unitary(self, unitary_rep: UnitaryRepresentation) -> None:
+        r"""Reject the SOSSA walk, whose eigenstates defeat the phase feedback.
+
+        A system eigenstate is an equal mix of the walk eigenvectors at :math:`\pm\phi`, and every
+        sample re-prepares that mix. Feedback that corrects one branch mis-corrects the other, so
+        a bit is right with probability :math:`(1 + \cos^2\Phi)/2` for feedback angle :math:`\Phi`,
+        which approaches 1/2 for general :math:`\phi`.
+
+        Args:
+            unitary_rep: The unitary representation the controlled circuit is built from.
+
+        Raises:
+            ValueError: If ``unitary_rep`` holds a SOSSA block encoding.
+
+        """
+        if isinstance(unitary_rep.get_container(), SOSSABlockEncodingContainer):
+            raise ValueError(
+                "Iterative phase estimation does not support the SOSSA block encoding: its phase feedback "
+                "cannot separate the walk eigenvalues at +phi and -phi. Use qdk_standard or qdk_unary."
+            )
 
 
 class StandardQpeCircuitBuilder(QpeCircuitBuilder):

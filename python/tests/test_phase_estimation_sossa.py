@@ -4,7 +4,7 @@ Tests the full pipeline:
     DFTHCHamiltonianContainer → SOSSABuilder → UnitaryRepresentation
     → SOSSAMapper → Circuit → unary-iteration QPE → energy
 
-and standard and iterative QPE through ControlledSOSSAMapper.
+and standard QPE through ControlledSOSSAMapper, which iterative QPE rejects.
 """
 
 # --------------------------------------------------------------------------------------------
@@ -21,7 +21,6 @@ import pytest
 
 from qdk_chemistry.algorithms import available, create
 from qdk_chemistry.algorithms.hamiltonian_unitary_builder.block_encoding.sossa import SOSSABuilder
-from qdk_chemistry.algorithms.phase_estimation.iterative_phase_estimation import IterativePhaseEstimation
 from qdk_chemistry.algorithms.phase_estimation.standard_phase_estimation import StandardPhaseEstimation
 from qdk_chemistry.algorithms.phase_estimation.unary_phase_estimation import UnaryPhaseEstimation
 from qdk_chemistry.algorithms.state_preparation.qrom_state_prep import QROMStatePreparation
@@ -778,7 +777,7 @@ class TestSOSSAQPEIntegration:
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
-# Standard and iterative QPE through the controlled walk
+# Standard QPE through the controlled walk
 # ═══════════════════════════════════════════════════════════════════════════════
 
 
@@ -836,7 +835,7 @@ class TestControlledSOSSAMapper:
     ],
 )
 def test_controlled_walk_qpe_measures_the_walk_phase(select_algorithm, prepare_consumes_gradient):
-    """Standard and iterative QPE through the controlled SOSSA walk measure phi or 1 - phi exactly."""
+    """Standard QPE through the controlled SOSSA walk measures phi or 1 - phi exactly."""
     walk = {
         "unitary_builder": AlgorithmRef("hamiltonian_unitary_builder", "sossa"),
         "controlled_circuit_mapper": AlgorithmRef(
@@ -849,35 +848,24 @@ def test_controlled_walk_qpe_measures_the_walk_phase(select_algorithm, prepare_c
         ),
     }
     three_eighths = _exact_walk_phase_problem(3.0 / 8.0, prepare_consumes_gradient)
-    quarter = _exact_walk_phase_problem(1.0 / 4.0, prepare_consumes_gradient)
 
-    # IQPE feedback is deterministic only at phi = 1/4; standard QPE uses 3/8, which a sign flip would move.
-    for qpe, builder_name, problem, phases in [
-        (StandardPhaseEstimation(shots=8), "qdk_standard", three_eighths, (3.0 / 8.0, 5.0 / 8.0)),
-        (IterativePhaseEstimation(shots_per_bit=3), "qdk_iterative", quarter, (1.0 / 4.0, 3.0 / 4.0)),
-        (
-            IterativePhaseEstimation(shots_per_bit=3, combine_iterations=True),
-            "qdk_iterative",
-            quarter,
-            (1.0 / 4.0, 3.0 / 4.0),
-        ),
-    ]:
-        qpe.settings().set("qpe_circuit_builder", AlgorithmRef("qpe_circuit_builder", builder_name, num_bits=3, **walk))
-        qpe.settings().set("circuit_executor", AlgorithmRef("circuit_executor", "qdk_sparse_state_simulator", seed=7))
-        result = qpe.run(qubit_hamiltonian=problem["operator"], state_preparation=problem["state_prep"])
-        assert any(result.phase_fraction == pytest.approx(phase, abs=1e-12) for phase in phases), (
-            f"{builder_name} measured phase {result.phase_fraction}, not one of {phases}"
-        )
-        assert result.raw_energy == pytest.approx(problem["energy"], abs=1e-9)
+    qpe = StandardPhaseEstimation(shots=8)
+    qpe.settings().set("qpe_circuit_builder", AlgorithmRef("qpe_circuit_builder", "qdk_standard", num_bits=3, **walk))
+    qpe.settings().set("circuit_executor", AlgorithmRef("circuit_executor", "qdk_sparse_state_simulator", seed=7))
+    result = qpe.run(qubit_hamiltonian=three_eighths["operator"], state_preparation=three_eighths["state_prep"])
+    assert any(result.phase_fraction == pytest.approx(phase, abs=1e-12) for phase in (3.0 / 8.0, 5.0 / 8.0)), (
+        f"measured phase {result.phase_fraction}, not 3/8 or 5/8"
+    )
+    assert result.raw_energy == pytest.approx(three_eighths["energy"], abs=1e-9)
 
-    # The drivers keep only the peak, so read every shot of the circuits directly.
+    # The driver keeps only the peak, so read every shot of the circuits directly.
     inputs = {"state_preparation": three_eighths["state_prep"], "qubit_hamiltonian": three_eighths["operator"]}
     (circuit,) = create("qpe_circuit_builder", "qdk_standard", num_bits=3, **walk).run(**inputs)
     counts = create("circuit_executor", "qdk_sparse_state_simulator", seed=7).run(circuit, shots=16).bitstring_counts
     assert set(counts) <= {"011", "101"}, f"shots leaked off 3/8 and 5/8: {counts}"
 
-    # A power-1 iteration without feedback measures 1 with probability (1 - cos 2 pi phi) / 2.
-    (circuit,) = create("qpe_circuit_builder", "qdk_iterative", num_bits=1, num_iteration=0, **walk).run(**inputs)
+    # A one-bit register measures 1 with probability (1 - cos 2 pi phi) / 2.
+    (circuit,) = create("qpe_circuit_builder", "qdk_standard", num_bits=1, **walk).run(**inputs)
     shots = 64
     counts = create("circuit_executor", "qdk_sparse_state_simulator", seed=7).run(circuit, shots=shots).bitstring_counts
     probability_one = 0.5 * (1.0 - math.cos(2.0 * math.pi * 3.0 / 8.0))
@@ -885,6 +873,28 @@ def test_controlled_walk_qpe_measures_the_walk_phase(select_algorithm, prepare_c
     assert abs(counts.get("1", 0) - shots * probability_one) <= tolerance, (
         f"expected about {shots * probability_one:.1f} of {shots} shots on 1, got {counts}"
     )
+
+
+@pytest.mark.parametrize("combine_iterations", [False, True])
+def test_iterative_qpe_rejects_the_controlled_walk(combine_iterations):
+    """Iterative QPE refuses the SOSSA walk, whose +-phi branches its phase feedback cannot separate."""
+    problem = _exact_walk_phase_problem(3.0 / 8.0, prepare_consumes_gradient=False)
+    builder = create(
+        "qpe_circuit_builder",
+        "qdk_iterative",
+        num_bits=3,
+        combine_iterations=combine_iterations,
+        unitary_builder=AlgorithmRef("hamiltonian_unitary_builder", "sossa"),
+        controlled_circuit_mapper=AlgorithmRef(
+            "controlled_circuit_mapper",
+            "sossa",
+            outer_prepare_algorithm=AlgorithmRef("state_prep", "dense_pure_state"),
+            inner_prepare_algorithm="direct",
+            select_algorithm="direct",
+        ),
+    )
+    with pytest.raises(ValueError, match="Iterative phase estimation does not support the SOSSA block encoding"):
+        builder.run(state_preparation=problem["state_prep"], qubit_hamiltonian=problem["operator"])
 
 
 def test_controlled_walk_with_alias_sampling_inner_prepare():

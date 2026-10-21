@@ -32,7 +32,7 @@ class ControlledSOSSAMapperSettings(ControlledCircuitMapperSettings):
 
 
 class ControlledSOSSAMapper(ControlledCircuitMapper):
-    r"""Controlled SOSSA quantum walk :cite:`Low2025` for standard and iterative phase estimation.
+    r"""Controlled SOSSA quantum walk :cite:`Low2025` for standard phase estimation.
 
     Emits controlled-:math:`W^{\text{power}}` for the walk
 
@@ -48,6 +48,8 @@ class ControlledSOSSAMapper(ControlledCircuitMapper):
     The returned operation takes the control qubit and the ``[system | ancillas | phase gradient]``
     target register. The circuit declares the control plus that target as ``num_qubits`` and the
     gradient suffix in its metadata, so phase estimation prepares the gradient once and shares it.
+    Iterative builders reject the walk; see
+    :class:`~qdk_chemistry.data.unitary_representation.containers.sossa.SOSSABlockEncodingContainer`.
 
     """
 
