@@ -25,6 +25,10 @@
 
 #include "qdk/chemistry/algorithms/microsoft/effective_hamiltonian/swpt2_kernel.hpp"
 
+#ifdef _OPENMP
+#include <omp.h>
+#endif
+
 namespace {
 
 namespace sw = qdk::chemistry::algorithms::microsoft::swpt2;
@@ -431,10 +435,44 @@ TEST(Swpt2KernelTest, RestoresCallerContextAndReusesPlans) {
 }
 
 TEST(Swpt2KernelTest, DerivationStatistics) {
-  const auto statistics = sw::downfold_statistics();
-  EXPECT_EQ(statistics.projected_terms, 102);
-  EXPECT_EQ(statistics.contractions, 420);
-  EXPECT_EQ(statistics.maximum_rank, 4);
+  for (const auto& [inactive, active, virtuals] :
+       {std::array<std::size_t, 3>{10, 10, 10}, {2, 4, 60}, {30, 6, 200}}) {
+    const auto statistics = sw::downfold_statistics(inactive, active, virtuals);
+    EXPECT_EQ(statistics.projected_terms, 102);
+    EXPECT_EQ(statistics.contractions, 420);
+    EXPECT_EQ(statistics.maximum_rank, 4);
+  }
+}
+
+TEST(Swpt2KernelTest, ThreadCountDoesNotChangeResults) {
+#ifndef _OPENMP
+  GTEST_SKIP() << "OpenMP is disabled";
+#else
+  // Large enough that the Fock, diagnostic and operand loops all run threaded.
+  std::vector<int> virtuals;
+  for (int orbital = 8; orbital < 36; ++orbital) virtuals.push_back(orbital);
+  auto inputs = make_case({4, 5, 6, 7}, {0, 1, 2, 3}, virtuals);
+  populate_two_body(inputs);
+  const Eigen::MatrixXd density = make_density(inputs, 3);
+  const sw::RegularizerOptions regularizer{0.8};
+  const int threads = omp_get_max_threads();
+  omp_set_num_threads(1);
+  const auto serial = run_native(inputs, regularizer, density);
+  const Eigen::MatrixXd serial_fock = sw::generalized_fock_matrix(
+      inputs.one_body[0], inputs.integrals, density, inputs.norb());
+  omp_set_num_threads(4);
+  const auto parallel = run_native(inputs, regularizer, density);
+  const Eigen::MatrixXd parallel_fock = sw::generalized_fock_matrix(
+      inputs.one_body[0], inputs.integrals, density, inputs.norb());
+  omp_set_num_threads(threads);
+  EXPECT_EQ(serial.scalar, parallel.scalar);
+  for (int spin = 0; spin < 2; ++spin)
+    EXPECT_TRUE(serial.one_body[spin] == parallel.one_body[spin]);
+  EXPECT_TRUE(serial.two_body == parallel.two_body);
+  EXPECT_EQ(serial.min_denominator, parallel.min_denominator);
+  EXPECT_EQ(serial.max_amplitude, parallel.max_amplitude);
+  EXPECT_TRUE(serial_fock == parallel_fock);
+#endif
 }
 
 TEST(Swpt2KernelTest, RejectsMalformedDimensionsAndPartitions) {
@@ -1010,7 +1048,8 @@ TEST(Swpt2KernelTest, DISABLED_FullKernelBenchmark) {
   ASSERT_GE(external_count, 1);
   ASSERT_LE(external_count, 4);
   const auto setup_start = Clock::now();
-  const auto statistics = sw::downfold_statistics();
+  const auto statistics = sw::downfold_statistics(
+      external_count, active_counts.front(), external_count);
   const double setup_ms = elapsed(setup_start);
   ASSERT_EQ(statistics.projected_terms, 102);
   ASSERT_EQ(statistics.contractions, 420);

@@ -376,7 +376,7 @@ std::shared_ptr<data::Hamiltonian> SchriefferWolffPT2Constructor::_run_impl(
   // kernel fold them onto the reference instead; it is read in the
   // semicanonical basis, so it had to follow the rotation above. Below three
   // active electrons a three-body operator has no matrix elements at all, so
-  // folding would only add reference-specific terms at several times the cost.
+  // folding would only add reference-specific terms.
   const bool fold_pays = window_roles.active_electrons > 2;
   const bool fold_requested = _settings->get<bool>("fold_above_two_body");
   const bool fold = fold_requested && fold_pays;

@@ -219,8 +219,10 @@ The amplitude diagnostic uses undamped couplings, with the denominator floored a
 :math:`10^{-8}\,E_h`. Large occupation or charge-rounding errors and amplitudes
 above one trigger warnings. These are diagnostics, not convergence guarantees.
 
-SeQuant derives contraction plans on the first downfold with a nonempty external
-space and reuses them within the process. This adds a one-time setup cost.
+SeQuant derives the contraction equations on the first downfold with a nonempty
+external space and reuses them within the process. Contraction orders are chosen
+for the inactive, active, and virtual dimensions and rebuilt when they change.
+This adds a setup cost.
 Numerical cost and memory depend on the window, kept space, and density fold.
 Evaluation uses spatial spin blocks; memory includes the dense integrals,
 contraction workspace, and cached plans.

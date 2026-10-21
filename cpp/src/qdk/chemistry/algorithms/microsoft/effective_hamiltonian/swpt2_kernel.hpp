@@ -18,8 +18,7 @@
 // Representation: separate spatial alpha/beta one-body blocks and chemist
 // two-body integrals (pq|rs), with spin resolved by SeQuant contractions.
 // Spatial two-body tensors are stored flat in C-order
-// (index = ((p*norb + q)*norb + r)*norb + s); no dense n_so^4 spin-orbital
-// tensor is materialized.
+// (index = ((p*norb + q)*norb + r)*norb + s).
 //
 // References:
 //   Schrieffer & Wolff, Phys. Rev. 149, 491 (1966)
@@ -108,7 +107,10 @@ struct DerivationStatistics {
   std::size_t projected_terms = 0, contractions = 0, maximum_rank = 0;
 };
 
-DerivationStatistics downfold_statistics();
+/// Statistics of the contraction plans for the given role extents.
+DerivationStatistics downfold_statistics(std::size_t inactive,
+                                         std::size_t active,
+                                         std::size_t virtuals);
 
 DownfoldResult downfold(
     const Eigen::MatrixXd& one_alpha, const Eigen::MatrixXd& one_beta,

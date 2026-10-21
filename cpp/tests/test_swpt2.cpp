@@ -786,7 +786,7 @@ TEST(SchriefferWolffPT2Test,
   EXPECT_TRUE(std::isfinite(E_sw_no_semicanon));
 }
 
-TEST(SchriefferWolffPT2Test, RejectsUnrestrictedHfReference) {
+TEST(SchriefferWolffPT2Test, RejectsUnrestrictedHfInputs) {
   auto oxygen = testing::create_o2_structure();
   auto scf = ScfSolverFactory::create();
   auto [energy, reference] = scf->run(oxygen, 0, 3, "sto-3g");
@@ -798,17 +798,27 @@ TEST(SchriefferWolffPT2Test, RejectsUnrestrictedHfReference) {
   auto ham = HamiltonianConstructorFactory::create();
   auto window_hamiltonian = ham->run(restricted_reference->get_orbitals());
   auto swpt2 = EffectiveHamiltonianConstructorFactory::create("qdk_swpt2");
+  const auto p_indices = testing::restricted_index_set(
+      restricted_reference->get_orbitals()->get_num_molecular_orbitals(),
+      std::vector<std::size_t>{0});
 
   try {
-    swpt2->run(
-        reference, window_hamiltonian,
-        testing::restricted_index_set(
-            restricted_reference->get_orbitals()->get_num_molecular_orbitals(),
-            std::vector<std::size_t>{0}));
+    swpt2->run(reference, window_hamiltonian, p_indices);
     FAIL() << "Expected an unrestricted-reference error";
   } catch (const std::invalid_argument& error) {
     EXPECT_NE(std::string(error.what())
                   .find("does not support unrestricted reference orbitals"),
+              std::string::npos);
+  }
+
+  auto unrestricted_hamiltonian = ham->run(reference->get_orbitals());
+  ASSERT_TRUE(unrestricted_hamiltonian->is_unrestricted());
+  try {
+    swpt2->run(reference, unrestricted_hamiltonian, p_indices);
+    FAIL() << "Expected an unrestricted-Hamiltonian error";
+  } catch (const std::runtime_error& error) {
+    EXPECT_NE(std::string(error.what())
+                  .find("does not support unrestricted orbitals"),
               std::string::npos);
   }
 }

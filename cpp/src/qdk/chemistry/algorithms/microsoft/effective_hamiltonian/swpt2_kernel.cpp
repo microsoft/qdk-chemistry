@@ -9,6 +9,7 @@
 #include <SeQuant/core/eval/backends/btas/eval_expr.hpp>
 #include <SeQuant/core/eval/backends/btas/result.hpp>
 #include <SeQuant/core/eval/eval.hpp>
+#include <SeQuant/core/index_space_registry.hpp>
 #include <SeQuant/core/io/shorthands.hpp>
 #include <SeQuant/core/optimize/optimize.hpp>
 #include <SeQuant/core/wick.hpp>
@@ -17,6 +18,8 @@
 #include <algorithm>
 #include <cmath>
 #include <map>
+#include <memory>
+#include <mutex>
 #include <span>
 #include <stdexcept>
 #include <string>
@@ -30,6 +33,9 @@ namespace {
 inline Eigen::Index n4(int n) {
   return static_cast<Eigen::Index>(n) * n * n * n;
 }
+
+// Smaller loops run serially; starting threads would dominate their cost.
+constexpr Eigen::Index min_parallel_work = Eigen::Index{1} << 16;
 }  // namespace
 
 // ===========================================================================
@@ -58,13 +64,17 @@ Eigen::MatrixXd generalized_fock_matrix(const Eigen::MatrixXd& h1,
         "generalized_fock_matrix: inconsistent tensor dimensions");
 
   Eigen::MatrixXd fock = h1;
+#pragma omp parallel for collapse(2) \
+    schedule(static) if (n4(norb) >= min_parallel_work)
   for (int p = 0; p < norb; ++p)
-    for (int q = 0; q < norb; ++q)
+    for (int q = 0; q < norb; ++q) {
+      double value = fock(p, q);
       for (int r = 0; r < norb; ++r)
         for (int s = 0; s < norb; ++s)
-          fock(p, q) +=
-              density(r, s) * (two_body(idx4(p, q, r, s, norb)) -
-                               0.5 * two_body(idx4(p, r, s, q, norb)));
+          value += density(r, s) * (two_body(idx4(p, q, r, s, norb)) -
+                                    0.5 * two_body(idx4(p, r, s, q, norb)));
+      fock(p, q) = value;
+    }
   return 0.5 * (fock + fock.transpose()).eval();
 }
 
@@ -211,6 +221,19 @@ namespace {
 namespace sq = sequant;
 using Tensor = btas::Tensor<double>;
 
+struct Term {
+  sq::ResultExpr result;
+  int rank;
+  int spin;
+  bool folded;
+};
+
+struct Equations {
+  std::shared_ptr<sq::IndexSpaceRegistry> spaces;
+  std::vector<Term> terms;
+  std::size_t projected_terms = 0;
+};
+
 struct Plan {
   sq::EvalNodeBTAS tree;
   int rank;
@@ -218,9 +241,9 @@ struct Plan {
   bool folded;
 };
 
-struct Equations {
+struct Plans {
   std::vector<Plan> plans;
-  DerivationStatistics statistics;
+  std::size_t maximum_rank = 0;
 };
 
 // Group by output body rank, one-body spin, and number of density contractions.
@@ -349,7 +372,7 @@ sq::ExprPtr normal_ordered_operand(const std::string& roles, int offset,
 void accumulate_projected_term(const sq::Product& product,
                                const std::vector<DensityPattern>& folding,
                                EquationSums& sums,
-                               DerivationStatistics& statistics) {
+                               std::size_t& projected_terms) {
   std::vector<sq::Index> output;
   std::vector<sq::Tensor> sources;
   for (const auto& factor : product.factors()) {
@@ -365,15 +388,15 @@ void accumulate_projected_term(const sq::Product& product,
     }
   }
 
-  // Projection leaves only active residual operators. Fold rank three before
-  // building numerical tensors, so no rank-six intermediate is materialized.
+  // Projection leaves only active residual operators; rank three is folded
+  // here, symbolically.
   const int residual_rank = output.size() / 2;
   if (residual_rank > 3 ||
       std::any_of(output.begin(), output.end(), [](const auto& index) {
         return index.space().base_key()[0] != L'u';
       }))
     return;
-  ++statistics.projected_terms;
+  ++projected_terms;
   std::vector<DensityPattern> reductions;
   if (residual_rank == 3) {
     reductions = folding;
@@ -494,11 +517,12 @@ void accumulate_projected_term(const sq::Product& product,
 
 Equations derive() {
   const auto folding = density_patterns();
-  auto context = sq::set_scoped_default_context(
-      {.index_space_registry_shared_ptr =
-           sq::mbpt::make_min_mr_spaces(sq::mbpt::SpinConvention::Default),
-       .vacuum = sq::Vacuum::SingleProduct});
   Equations equations;
+  equations.spaces =
+      sq::mbpt::make_min_mr_spaces(sq::mbpt::SpinConvention::Default);
+  auto context = sq::set_scoped_default_context(
+      {.index_space_registry_shared_ptr = equations.spaces,
+       .vacuum = sq::Vacuum::SingleProduct});
   EquationSums sums;
   const std::array roles{off_diagonal_blocks(1), off_diagonal_blocks(2)};
 
@@ -530,13 +554,11 @@ Equations derive() {
             for (const auto& term : summands(expansion)) {
               if (!term->is<sq::Product>()) continue;
               accumulate_projected_term(term->as<sq::Product>(), folding, sums,
-                                        equations.statistics);
+                                        equations.projected_terms);
             }
           }
         }
 
-  // Canonical sums become reusable BTAS plans; density-folded terms are
-  // optimized for space as well as time to avoid high-rank intermediates.
   for (auto& [key, sum] : sums) {
     const auto [rank, spin, density_order] = key;
     const auto expression = sum.make_expr(true);
@@ -551,19 +573,10 @@ Equations derive() {
           rank == 0 ? sq::ResultExpr(sq::Variable(L"E"), term)
                     : sq::ResultExpr(
                           sq::Tensor(L"F", sq::bra(bra), sq::ket(ket)), term);
-      if (density_order != 0)
-        sq::optimize(result, {.objective_function =
-                                  sq::ObjectiveFunction::DenseSpaceTime});
-      auto tree = sq::binarize<sq::EvalExprBTAS>(result);
-      tree.visit([&](const auto& node) {
-        equations.statistics.maximum_rank = std::max(
-            equations.statistics.maximum_rank, node->canon_indices().size());
-      });
-      equations.plans.push_back(
-          {std::move(tree), rank, spin, density_order != 0});
+      equations.terms.push_back(
+          {std::move(result), rank, spin, density_order != 0});
     }
   }
-  equations.statistics.contractions = equations.plans.size();
   return equations;
 }
 
@@ -571,10 +584,63 @@ const Equations& reusable_equations() {
   static const Equations equations = derive();
   return equations;
 }
+
+Plans build_plans(const Equations& equations,
+                  const std::array<std::size_t, 3>& extents) {
+  auto context = sq::set_scoped_default_context(
+      {.index_space_registry_shared_ptr = equations.spaces,
+       .vacuum = sq::Vacuum::SingleProduct});
+  const auto extent = [&extents](const sq::Index& index) -> std::size_t {
+    const wchar_t role = index.space().base_key()[0];
+    return extents[role == L'i' ? 0 : role == L'u' ? 1 : 2];
+  };
+  Plans plans;
+  for (const auto& term : equations.terms) {
+    auto result = term.result;
+    result.expression() = result.expression()->clone();
+    // Only density-folded products have more than two tensor factors.
+    if (term.folded)
+      sq::optimize(result,
+                   {.objective_function = sq::ObjectiveFunction::DenseSpaceTime,
+                    .idx_to_extent = extent});
+    auto tree = sq::binarize<sq::EvalExprBTAS>(result);
+    tree.visit([&](const auto& node) {
+      plans.maximum_rank =
+          std::max(plans.maximum_rank, node->canon_indices().size());
+    });
+    plans.plans.push_back({std::move(tree), term.rank, term.spin, term.folded});
+  }
+  return plans;
+}
+
+std::shared_ptr<const Plans> reusable_plans(std::size_t inactive,
+                                            std::size_t active,
+                                            std::size_t virtuals) {
+  // Plans touching an empty role are skipped, so empty roles share extent one.
+  const std::array<std::size_t, 3> extents{std::max<std::size_t>(inactive, 1),
+                                           std::max<std::size_t>(active, 1),
+                                           std::max<std::size_t>(virtuals, 1)};
+  // Plan sets are large, so only the latest extents are kept.
+  static std::mutex mutex;
+  static std::array<std::size_t, 3> cached_extents{};
+  static std::shared_ptr<const Plans> cached;
+  const std::lock_guard lock(mutex);
+  if (!cached || cached_extents != extents) {
+    cached.reset();
+    cached = std::make_shared<const Plans>(
+        build_plans(reusable_equations(), extents));
+    cached_extents = extents;
+  }
+  return cached;
+}
 }  // namespace
 
-DerivationStatistics downfold_statistics() {
-  return reusable_equations().statistics;
+DerivationStatistics downfold_statistics(std::size_t inactive,
+                                         std::size_t active,
+                                         std::size_t virtuals) {
+  const auto& equations = reusable_equations();
+  return {equations.projected_terms, equations.terms.size(),
+          reusable_plans(inactive, active, virtuals)->maximum_rank};
 }
 
 DownfoldResult downfold(
@@ -672,15 +738,21 @@ DownfoldResult downfold(
   if (inactive.empty() && virtuals.empty()) return result;
 
   // Diagnostics use raw couplings, before normal ordering or damping.
-  const auto track = [&](double coupling, double delta) {
-    if (coupling == 0.0) return;
-    result.min_denominator = std::min(result.min_denominator, std::abs(delta));
-    result.max_amplitude = std::max(
-        result.max_amplitude,
-        std::abs(coupling) / std::max(std::abs(delta), bare_denominator_floor));
-  };
+  double min_denominator = result.min_denominator;
+  double max_amplitude = result.max_amplitude;
+#pragma omp parallel for collapse(2) schedule(static) \
+    reduction(min : min_denominator)                  \
+    reduction(max : max_amplitude) if (n4(norb) >= min_parallel_work)
   for (int first = 0; first < norb; ++first)
     for (int second = 0; second < norb; ++second) {
+      const auto track = [&](double coupling, double delta) {
+        if (coupling == 0.0) return;
+        min_denominator = std::min(min_denominator, std::abs(delta));
+        max_amplitude =
+            std::max(max_amplitude,
+                     std::abs(coupling) /
+                         std::max(std::abs(delta), bare_denominator_floor));
+      };
       if (orbital_roles[first] != orbital_roles[second])
         for (const auto& block : one_body)
           track(block(first, second), energies(first) - energies(second));
@@ -697,6 +769,8 @@ DownfoldResult downfold(
           track(direct - integral(first, fourth, second, third), delta);
         }
     }
+  result.min_denominator = min_denominator;
+  result.max_amplitude = max_amplitude;
   using OperandKey = std::tuple<std::wstring, std::vector<wchar_t>>;
   std::map<OperandKey, sq::ResultPtr> operand_cache;
   const auto evaluate_leaf =
@@ -716,20 +790,28 @@ DownfoldResult downfold(
     const OperandKey key{std::wstring(source.label()), block_roles};
     if (operand_cache.contains(key)) return operand_cache.at(key);
     const bool is_generator = source.label()[0] == L'S';
+    const bool is_density = source.label() == L"D";
+    const bool is_one_body = source.bra_rank() == 1;
+    const auto& one_body_block =
+        (is_generator ? generator_one_body
+                      : normal_ordered_one_body)[source.label().back() == L'1'];
     Tensor values{btas::Range{extents}};
-    for (const auto& index : values.range()) {
+    const auto size = static_cast<std::ptrdiff_t>(values.size());
+#pragma omp parallel for schedule(static) if (size >= min_parallel_work)
+    for (std::ptrdiff_t ordinal = 0; ordinal < size; ++ordinal) {
+      // BTAS tensors are row-major.
       std::array<int, 4> orbital{};
-      for (std::size_t axis = 0; axis < orbitals.size(); ++axis)
-        orbital[axis] = orbitals[axis]->at(index[axis]);
+      auto rest = static_cast<std::size_t>(ordinal);
+      for (std::size_t axis = orbitals.size(); axis-- > 0;) {
+        orbital[axis] = (*orbitals[axis])[rest % extents[axis]];
+        rest /= extents[axis];
+      }
       double value;
-      if (source.label() == L"D") {
+      if (is_density) {
         // D is spin traced; a spin-diagonal Gaussian contraction uses D/2.
         value = 0.5 * reference_density(orbital[1], orbital[0]);
-      } else if (source.bra_rank() == 1) {
-        const int spin = source.label().back() == L'1';
-        const auto& block =
-            is_generator ? generator_one_body : normal_ordered_one_body;
-        value = block[spin](orbital[0], orbital[1]);
+      } else if (is_one_body) {
+        value = one_body_block(orbital[0], orbital[1]);
       } else {
         // Symbolic (bra, ket) slots map to spatial chemist (pq|rs) order.
         value = integral(orbital[0], orbital[2], orbital[1], orbital[3]);
@@ -737,14 +819,18 @@ DownfoldResult downfold(
           value *=
               inverse_two_body(orbital[0], orbital[1], orbital[2], orbital[3]);
       }
-      values(index) = value;
+      values.data()[ordinal] = value;
     }
     auto value =
         sq::eval_result<sq::ResultTensorBTAS<Tensor>>(std::move(values));
     operand_cache.emplace(key, value);
     return value;
   };
-  for (const auto& plan : reusable_equations().plans) {
+  // SeQuant's BTAS evaluation updates a process-wide label map, so plans run
+  // serially.
+  const auto plans =
+      reusable_plans(inactive.size(), active.size(), virtuals.size());
+  for (const auto& plan : plans->plans) {
     if (plan.folded && reference_density.size() == 0) continue;
     bool empty = false;
     plan.tree.visit([&](const auto& node) {
