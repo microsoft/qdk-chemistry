@@ -285,10 +285,10 @@ Each layer of the plaquette step is a tower of same-angle :math:`R_z` rotations,
      - Whether to phase each tower of same-angle rotations through a Hamming-weight register. When False, every term is its own rotation. Default is True.
    * - ``max_hamming_weight_phasing_batch_size``
      - int
-     - Largest tower of same-angle rotations phased through one Hamming-weight register. A smaller cap needs fewer scratch qubits but more rotations. Every batch is phased as given, so use a cap of at least 8: shorter batches save too few rotations to be worth the extra Toffolis and scratch qubits. Ignored when ``use_hamming_weight_phasing`` is False. When set to -1 (default), there is no cap.
-   * - ``use_phase_gradient``
-     - bool
-     - Phase each Hamming weight by one addition into a catalyst prepared once per angle (default ``True``), or synthesize each place value as its own :math:`R_z` when ``False``. Ignored when ``use_hamming_weight_phasing`` is False.
+     - Largest tower of same-angle rotations phased through one Hamming-weight register. A smaller cap needs fewer scratch qubits but more rotations. Every batch is phased as given, so on the :math:`R_z` ladder (``hamming_weight_phasing_method`` ``"rz_ladder"``) use a cap of at least 8, as shorter batches save too few rotations to be worth the extra Toffolis and scratch qubits. Ignored when ``use_hamming_weight_phasing`` is False. When set to -1 (default), there is no cap.
+   * - ``hamming_weight_phasing_method``
+     - str
+     - How each Hamming weight is phased: ``"catalyst"`` (default) adds it into a catalyst, a generalized phase gradient prepared once per angle, and ``"rz_ladder"`` synthesizes each place value as its own :math:`R_z`. Ignored when ``use_hamming_weight_phasing`` is False.
 
 Related classes
 ---------------

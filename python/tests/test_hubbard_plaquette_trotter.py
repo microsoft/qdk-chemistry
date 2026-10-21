@@ -259,7 +259,7 @@ class TestPhaseEstimationAccuracy:
         shots = {"shots_per_bit": 15} if method == "qdk_iterative" else {"shots": 3}
         # The catalysts would outgrow the full-state simulator, so exact phase estimation uses the
         # rotation ladder. The catalyst is checked exactly in TestPlaquetteCircuit.
-        mapper_settings = {"use_phase_gradient": False} if mapper == "hubbard_plaquette" else {}
+        mapper_settings = {"hamming_weight_phasing_method": "rz_ladder"} if mapper == "hubbard_plaquette" else {}
         qpe = create(
             "phase_estimation",
             method,
@@ -364,15 +364,26 @@ class TestPlaquetteCircuit:
         for actual in phased:
             assert np.allclose(actual, plain, atol=1e-10)
 
-    def test_the_catalyst_matches_plain_rotations(self):
-        """At 2x2, phasing every tower under control through the catalysts matches plain rotations.
+    @pytest.mark.parametrize(
+        ("width", "height", "state"),
+        [
+            (2, 2, random_state(9, seed=5)),
+            # The simulator carries the catalysts' superposition, which multiplies its cost, so 4x2
+            # starts from one system basis state with the control set.
+            pytest.param(4, 2, np.kron([0.0, 1.0], random_state(16, seed=11, support=1)), marks=pytest.mark.slow),
+        ],
+        ids=["2x2", "4x2"],
+    )
+    def test_the_catalyst_matches_plain_rotations(self, width, height, state):
+        """Phasing every tower under control through the catalysts matches plain rotations.
 
-        The towers are phased whole or in short batches. The simulator carries the catalysts'
-        superposition, which multiplies its cost, so this runs on the smallest lattice rather than at 4x2.
+        The towers are phased whole or in short batches. Only at 4x2 does the gold tiling hold
+        plaquettes, so only there is the gold layer's catalyst exercised.
         """
-        state = random_state(9, seed=5)
         plain, *phased = (
-            apply_operation(_evolution(_params(2, 2, 0.3, 0.4, 2, use_hwp=use_hwp, cap=cap), controlled=True), state)
+            apply_operation(
+                _evolution(_params(width, height, 0.3, 0.4, 2, use_hwp=use_hwp, cap=cap), controlled=True), state
+            )
             for use_hwp, cap in ((False, -1), (True, -1), (True, 3))
         )
         for actual in phased:
@@ -555,6 +566,27 @@ class TestStepCountAndShift:
         assert np.allclose(gap, gap[0], atol=1e-10)
         shift = shifted.eigenvalue_from_phase(0.125) - unshifted.eigenvalue_from_phase(0.125)
         assert shift == pytest.approx(gap[0])
+
+    @pytest.mark.parametrize("power_strategy", ["repeat", "rescale"])
+    def test_powered_evolution_decodes_the_unpowered_energy(self, power_strategy):
+        """A phase of U^power decodes to the same shifted energy under either power strategy."""
+        energy, time, power = -1.3, 0.3, 3
+        container = (
+            HubbardPlaquetteTrotter(
+                order=2,
+                time=time,
+                power=power,
+                power_strategy=power_strategy,
+                num_divisions=2,
+                target_accuracy=0.0,
+                num_electrons=6,
+            )
+            .run(_model(2, u=8.0))
+            .get_container()
+        )
+        phase = (-energy * time * power / (2 * math.pi)) % 1.0
+        # (epsilon + U/2) eta - U M / 4 = 4 * 6 - 8 * 4 / 4 = 16.
+        assert container.eigenvalue_from_phase(phase) == pytest.approx(energy + 16.0)
 
 
 _BODY = {"width": 4, "height": 4, "interaction_angle": 0.1, "hopping_angle": 0.2, "step_reps": 1}

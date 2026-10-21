@@ -139,7 +139,7 @@ namespace QDKChemistry.Utils.HammingWeightPhasing {
     /// A register `PrepareCatalyst(theta, catalyst)` prepared, with a qubit per place value of the
     /// largest batch's weight, which is returned in that state; or empty to synthesize every place
     /// value as an `Rz`. Unused when `useHammingWeightPhasing` is false.
-    operation HammingWeightPhase(
+    internal operation HammingWeightPhase(
         theta : Double,
         pauliOps : Pauli[][],
         targets : Qubit[][],
@@ -186,7 +186,8 @@ namespace QDKChemistry.Utils.HammingWeightPhasing {
     }
 
     /// Adds `weight` into a catalyst `PrepareCatalyst(theta, catalyst)` prepared, which multiplies
-    /// it by e^{2i·theta·weight} and returns the catalyst unchanged.
+    /// it by e^{2i·theta·weight} and returns the catalyst unchanged. This is the generalized phase
+    /// gradient addition of catalyzed Hamming-weight phasing (Supplementary Fig. 3 of :cite:`Kan2025`).
     internal operation AddIntoCatalyst(theta : Double, weight : Qubit[], catalyst : Qubit[]) : Unit is Adj + Ctl {
         body (...) {
             let places = Length(weight);

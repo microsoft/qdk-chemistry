@@ -26,15 +26,16 @@ class ControlledHubbardPlaquetteMapperSettings(ControlledCircuitMapperSettings):
         max_hamming_weight_phasing_batch_size: Largest tower of equal-angle rotations phased
             through one Hamming-weight register, or ``-1`` for no cap.
             A smaller cap needs fewer scratch qubits but more rotations.
-            Every batch is phased as given, so use a cap of at least 8: shorter batches save too
-            few rotations to be worth the extra Toffolis and scratch qubits.
+            Every batch is phased as given, so on the ``Rz`` ladder (``hamming_weight_phasing_method``
+            ``"rz_ladder"``) use a cap of at least 8, as shorter batches save too few rotations to be
+            worth the extra Toffolis and scratch qubits.
             Ignored when ``use_hamming_weight_phasing`` is ``False``.
             Defaults to ``-1``.
-        use_phase_gradient: Whether each Hamming weight is phased by one addition into a catalyst,
-            a generalized phase gradient the evolution prepares once per angle, or by synthesizing
-            each of its place values as its own ``Rz`` (the original rotation ladder).
+        hamming_weight_phasing_method: How each Hamming weight is phased: ``"catalyst"`` adds it into
+            a catalyst, a generalized phase gradient the evolution prepares once per angle, and
+            ``"rz_ladder"`` synthesizes each of its place values as its own ``Rz``.
             Ignored when ``use_hamming_weight_phasing`` is ``False``.
-            Defaults to ``True``.
+            Defaults to ``"catalyst"``.
 
     """
 
@@ -54,18 +55,19 @@ class ControlledHubbardPlaquetteMapperSettings(ControlledCircuitMapperSettings):
             -1,
             "Largest tower of equal-angle rotations phased through one Hamming-weight register. "
             "A smaller cap needs fewer scratch qubits but more rotations. Every batch is phased as "
-            "given, so use a cap of at least 8: shorter batches save too few rotations to be worth "
-            "the extra Toffolis and scratch qubits. Ignored when use_hamming_weight_phasing is False. "
-            "Set to -1 for no cap.",
+            "given, so on the Rz ladder (hamming_weight_phasing_method 'rz_ladder') use a cap of at "
+            "least 8, as shorter batches save too few rotations to be worth the extra Toffolis and "
+            "scratch qubits. Ignored when use_hamming_weight_phasing is False. Set to -1 for no cap.",
         )
         self._set_default(
-            "use_phase_gradient",
-            "bool",
-            True,
-            "Phase each Hamming weight by one addition into a catalyst, a generalized phase gradient "
+            "hamming_weight_phasing_method",
+            "string",
+            "catalyst",
+            "How each Hamming weight is phased. 'catalyst' adds it into a generalized phase gradient "
             "the evolution prepares once per angle, trading the place-value rotations of every tower "
-            "for one rotation and Toffolis. Set to False for the original ladder of synthesized Rz "
-            "rotations, which needs no catalyst. Ignored when use_hamming_weight_phasing is False.",
+            "for one rotation and Toffolis. 'rz_ladder' synthesizes each place value as its own Rz, "
+            "which needs no catalyst. Ignored when use_hamming_weight_phasing is False.",
+            ["catalyst", "rz_ladder"],
         )
 
 
@@ -124,7 +126,7 @@ class ControlledHubbardPlaquetteMapper(ControlledCircuitMapper):
             repetitions=container.step_reps,
             useHammingWeightPhasing=use_hamming_weight_phasing,
             maxBatchSize=max_batch_size,
-            usePhaseGradient=bool(self._settings.get("use_phase_gradient")),
+            useCatalyst=self._settings.get("hamming_weight_phasing_method") == "catalyst",
         )
         targets = self._get_target_indices(evolution)
         return Circuit(
