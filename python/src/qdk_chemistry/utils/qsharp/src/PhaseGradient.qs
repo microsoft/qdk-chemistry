@@ -13,9 +13,15 @@
 namespace QDKChemistry.Utils.PhaseGradient {
 
     import Std.Arithmetic.RippleCarryCGIncByLE;
+    import Std.Arrays.Mapped;
     import Std.Canon.ApplyQFT;
+    import Std.Convert.IntAsBoolArray;
+    import Std.Convert.IntAsDouble;
     import Std.Core.Length;
     import Std.Diagnostics.Fact;
+    import Std.Math.AbsD;
+    import Std.Math.PI;
+    import Std.Math.Round;
 
     /// Prepares the phase gradient state |φ⟩ = (1/√2^n) Σ_k exp(-2πi·k/2^n) |k⟩_LE.
     ///
@@ -89,5 +95,19 @@ namespace QDKChemistry.Utils.PhaseGradient {
         } apply {
             RzViaPhaseGradient(targetQubit, angleQubits, phaseGradient);
         }
+    }
+
+    /// Returns the `bits`-bit word x = Round(2^b · angle / (4π)) mod 2^b for which
+    /// `RyViaPhaseGradient` applies Ry(angle).
+    function QuantizeRyAngle(angle : Double, bits : Int) : Int {
+        Fact(AbsD(angle) <= 4.0 * PI(), "QuantizeRyAngle: angle must be finite and within [-4π, 4π]");
+        let scale = 1 <<< bits;
+        let raw = Round(IntAsDouble(scale) * angle / (4.0 * PI()));
+        ((raw % scale) + scale) % scale
+    }
+
+    /// Quantizes each angle with `QuantizeRyAngle` into a lookup table of `bits`-bit words.
+    function QuantizeRyAngles(angles : Double[], bits : Int) : Bool[][] {
+        Mapped(angle -> IntAsBoolArray(QuantizeRyAngle(angle, bits), bits), angles)
     }
 }
