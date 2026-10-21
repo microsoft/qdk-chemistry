@@ -1,0 +1,50 @@
+// Copyright (c) Microsoft Corporation. All rights reserved.
+// Licensed under the MIT License. See LICENSE.txt in the project root for
+// license information.
+
+namespace QDKChemistry.TestUtils.UnitarySynthesisTests {
+    import Std.Arrays.IndexRange;
+    import Std.Math.MaxI;
+    import QDKChemistry.Utils.PhaseGradient.PreparePhaseGradientState;
+    import QDKChemistry.Utils.UnitarySynthesis.ApplyRealUnitaryViaGivens;
+    import QDKChemistry.Utils.UnitarySynthesis.GivensDecomposition;
+    import QDKChemistry.Utils.UnitarySynthesis.QuantizeGivensDecomposition;
+
+    /// Returns an operation on [controls | target] that sets each control from `controlBits`,
+    /// applies Ry(prepAngles[k]) to target qubit k, and then applies `givens` to the target
+    /// controlled on every control.
+    function TestMakeGivensOp(
+        givens : GivensDecomposition,
+        prepAngles : Double[],
+        controlBits : Bool[],
+        rotationBits : Int,
+    ) : Qubit[] => Unit {
+        (qs) => {
+            let numControls = Length(controlBits);
+            let controls = qs[...numControls - 1];
+            let target = qs[numControls...];
+            for k in IndexRange(controlBits) {
+                if controlBits[k] {
+                    X(controls[k]);
+                }
+            }
+            for k in IndexRange(prepAngles) {
+                Ry(prepAngles[k], target[k]);
+            }
+            let numAddresses = MaxI(1, 1 <<< (Length(target) - 1));
+            use phaseGradient = Qubit[rotationBits];
+            use angleReg = Qubit[rotationBits];
+            within {
+                PreparePhaseGradientState(phaseGradient);
+            } apply {
+                ApplyRealUnitaryViaGivens(
+                    QuantizeGivensDecomposition(givens, numAddresses, rotationBits),
+                    controls,
+                    target,
+                    phaseGradient,
+                    angleReg
+                );
+            }
+        }
+    }
+}
