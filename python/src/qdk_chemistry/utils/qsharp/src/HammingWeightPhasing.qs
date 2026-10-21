@@ -113,16 +113,15 @@ namespace QDKChemistry.Utils.HammingWeightPhasing {
     }
 
     /// # Summary
-    /// Applies exp(-i·theta·P_t) for every term P_t, phasing the tower through its Hamming weight
-    /// :cite:`Kan2025`.
+    /// Applies the same-angle rotation exp(-i·theta·P_t) to every term P_t through their Hamming
+    /// weight :cite:`Kan2025`.
     ///
     /// # Description
-    /// Each term is rotated onto a single Z, so the tower applies e^{-i·theta·count} e^{2i·theta·w},
-    /// where an adder tree computes the Hamming weight w of those qubits for each batch of at most
-    /// `maxBatchSize` terms. Without a catalyst, each place value of w is its own `Rz`, and one
-    /// `R(PauliI, …)` supplies the constant phase. With a catalyst, adding w into it kicks back
-    /// e^{2i·theta·w} for one `R1` on the adder's carry-out, and the constant phase is left to the
-    /// caller.
+    /// Each term is mapped onto a single Z, and an adder tree sums those qubits into a Hamming
+    /// weight w for each batch of at most `maxBatchSize` terms. If a catalyst prepared at `theta` is
+    /// given, adding w into it applies e^{2i·theta·w}, and the constant phase e^{-i·theta·count} is
+    /// left to the caller. Otherwise each place value of w gets its own `Rz`, and the constant phase
+    /// is applied here.
     ///
     /// # Input
     /// ## theta
@@ -136,9 +135,9 @@ namespace QDKChemistry.Utils.HammingWeightPhasing {
     /// ## maxBatchSize
     /// Largest tower phased through a single Hamming-weight register, or -1 for no cap.
     /// ## catalyst
-    /// A register `PrepareCatalyst(theta, catalyst)` prepared, with a qubit per place value of the
-    /// largest batch's weight, which is returned in that state; or empty to synthesize every place
-    /// value as an `Rz`. Unused when `useHammingWeightPhasing` is false.
+    /// A register prepared by `PrepareCatalyst(theta, _)`, with at least one qubit per place value
+    /// of the largest batch's weight, and returned unchanged; or empty for the `Rz` ladder. Unused
+    /// when `useHammingWeightPhasing` is false.
     internal operation HammingWeightPhase(
         theta : Double,
         pauliOps : Pauli[][],
@@ -185,8 +184,8 @@ namespace QDKChemistry.Utils.HammingWeightPhasing {
         }
     }
 
-    /// Adds `weight` into a catalyst `PrepareCatalyst(theta, catalyst)` prepared, which multiplies
-    /// it by e^{2i·theta·weight} and returns the catalyst unchanged. This is the generalized phase
+    /// Adds `weight` into a catalyst prepared by `PrepareCatalyst(theta, _)`, which multiplies it by
+    /// e^{2i·theta·weight} and returns the catalyst unchanged. This is the generalized phase
     /// gradient addition of catalyzed Hamming-weight phasing (Supplementary Fig. 3 of :cite:`Kan2025`).
     internal operation AddIntoCatalyst(theta : Double, weight : Qubit[], catalyst : Qubit[]) : Unit is Adj + Ctl {
         body (...) {
