@@ -44,6 +44,7 @@ Exposed classes are:
 - :class:`QpeResult`: Result of quantum phase estimation workflows, including phase, energy, and metadata.
 - :class:`QuantumErrorProfile`: Information about quantum gates and error properties.
 - :class:`QubitOperator`: Molecular electronic Hamiltonians mapped to qubits.
+- :class:`RealUnitaryContainer`: Container for a real orthogonal matrix or isometry, stored dense or sparse.
 - :class:`Settings`: Configuration settings for quantum chemistry calculations.
 - :class:`SettingValue`: Type-safe variant for storing different setting value types.
 - :class:`Shell`: Individual shell within a basis set.
@@ -143,6 +144,7 @@ from qdk_chemistry.data.time_dependent_qubit_hamiltonian.driven import DrivenQub
 from qdk_chemistry.data.unitary_representation.base import UnitaryRepresentation
 from qdk_chemistry.data.unitary_representation.containers.base import UnitaryContainer
 from qdk_chemistry.data.unitary_representation.containers.pauli_product_formula import PauliProductFormulaContainer
+from qdk_chemistry.data.unitary_representation.containers.real_unitary import RealUnitaryContainer
 
 # Give Users the option to use "Error" suffix for exceptions if they prefer
 SettingNotFoundError = SettingNotFound
@@ -197,6 +199,7 @@ __all__ = [
     "QuantumErrorProfile",
     "QubitHamiltonian",
     "QubitOperator",
+    "RealUnitaryContainer",
     "SettingNotFound",
     "SettingNotFoundError",
     "SettingTypeMismatch",
