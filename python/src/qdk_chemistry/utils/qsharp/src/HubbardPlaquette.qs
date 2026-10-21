@@ -412,11 +412,14 @@ namespace QDKChemistry.Utils.HubbardPlaquette {
             let cap = params.maxBatchSize;
             let catalyzed = params.useHammingWeightPhasing and params.useCatalyst;
             // Each catalyst holds a qubit per place value of its largest weight; the hopping one
-            // holds one more, the qubit dropped to double its angle.
+            // holds one more if a full-angle layer runs, the qubit dropped to double its angle.
             let interactionPlaces = catalyzed and params.interactionAngle != 0.0
                 ? BitSizeI(HammingWeightBatchSize(sites, cap)) | 0;
+            let fullAngleHopping = Length(gold) > 0 or params.repetitions > 1;
             let hoppingPlaces = catalyzed and params.hoppingAngle != 0.0
-                ? BitSizeI(HammingWeightBatchSize(2 * MaxInt([Length(pink), Length(gold)]), cap)) + 1 | 0;
+                ? BitSizeI(HammingWeightBatchSize(2 * MaxInt([Length(pink), Length(gold)]), cap))
+                + (fullAngleHopping ? 1 | 0)
+                | 0;
             use interaction = Qubit[interactionPlaces];
             use hopping = Qubit[hoppingPlaces];
             let doubled = hoppingPlaces > 0 ? hopping[1...] | [];
@@ -463,8 +466,9 @@ namespace QDKChemistry.Utils.HubbardPlaquette {
                 );
             }
             if catalyzed {
-                // Every interaction tower left out e^{-i·(U/2)·sites} and every hopping tower
-                // e^{i·kappa·plaquettes}, which sum to these per step; `R(PauliI, g)` is e^{-ig/2}.
+                // Every interaction tower left out e^{-i·(interactionAngle/2)·sites} and every
+                // hopping tower e^{i·kappa·plaquettes}, which sum to these per step; `R(PauliI, g)`
+                // is e^{-ig/2}.
                 let perStep = params.interactionAngle * IntAsDouble(sites)
                     - params.hoppingAngle * IntAsDouble(Length(pink) + Length(gold));
                 if perStep != 0.0 {

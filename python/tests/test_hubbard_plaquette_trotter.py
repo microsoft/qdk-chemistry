@@ -384,24 +384,27 @@ class TestPlaquetteCircuit:
             assert np.allclose(actual, plain, atol=1e-10)
 
     @pytest.mark.parametrize(
-        ("width", "height", "state"),
+        ("width", "height", "reps", "state"),
         [
-            (2, 2, random_state(9, seed=5)),
+            (2, 2, 1, random_state(9, seed=5)),
+            (2, 2, 2, random_state(9, seed=5)),
             # The simulator carries the catalysts' superposition, which multiplies its cost, so 4x2
             # starts from one system basis state with the control set.
-            pytest.param(4, 2, np.kron([0.0, 1.0], random_state(16, seed=11, support=1)), marks=pytest.mark.slow),
+            pytest.param(4, 2, 2, np.kron([0.0, 1.0], random_state(16, seed=11, support=1)), marks=pytest.mark.slow),
         ],
-        ids=["2x2", "4x2"],
+        ids=["2x2-one-step", "2x2", "4x2"],
     )
-    def test_the_catalyst_matches_plain_rotations(self, width, height, state):
+    def test_the_catalyst_matches_plain_rotations(self, width, height, reps, state):
         """Phasing every tower under control through the catalysts matches plain rotations.
 
         The towers are phased whole or in short batches. Only at 4x2 does the gold tiling hold
-        plaquettes, so only there is the gold layer's catalyst exercised.
+        plaquettes, so only there is the gold layer's catalyst exercised. A single 2x2 step runs
+        no full-angle hopping layer, so its hopping catalyst holds no qubit to double the angle.
         """
         plain, *phased = (
             apply_operation(
-                _evolution(_params(width, height, 0.3, 0.4, 2, use_hwp=use_hwp, cap=cap), controlled=True), state
+                _evolution(_params(width, height, 0.3, 0.4, reps, use_hwp=use_hwp, cap=cap), controlled=True),
+                state,
             )
             for use_hwp, cap in ((False, -1), (True, -1), (True, 3))
         )
@@ -470,23 +473,25 @@ class TestPauliProductFormulaOutput:
 
 
 # Logical counts of the benchmark circuit in examples/resource_estimation/estimation_hubbard_2d.ipynb.
-# Every tower takes an adder tree, and its weight is added into a catalyst prepared once per angle,
-# which turns the place-value rotations of every tower into one rotation and Toffolis.
+# Every tower takes an adder tree, and its weight is added into a catalyst prepared once for the
+# interaction layers and once for the hopping layers, which turns the place-value rotations of
+# every tower into one rotation and Toffolis.
 _COUNT_KEYS = ("numQubits", "rotationCount", "rotationDepth", "tCount", "cczCount", "ccixCount", "measurementCount")
 _BENCHMARK_COUNTS = {
     2: (34, 131632, 131433, 697995, 1177641, 0, 1177651),
     4: (78, 24549, 24274, 758427, 592250, 0, 592260),
 }
 
-#: Rotation synthesis rounds transcendental angles, so the rotation counts drift by a few units
-#: across platforms. The catalyst leaves few rotations at L=4, where a relative tolerance
+#: Logical counts treat a rotation by a multiple of pi/4 as a Clifford or T gate, and floating-point
+#: angles land on or just off those multiples differently across platforms, so the rotation counts
+#: drift by a few units. The catalyst leaves few rotations at L=4, where a relative tolerance
 #: alone would not absorb that drift, so they also get an absolute tolerance.
 _ROTATION_RELATIVE_TOLERANCE = 1e-4
 _ROTATION_ABSOLUTE_TOLERANCE = 16
 
 
 def _assert_counts_match_the_pins(counts: Mapping[str, float], size: int) -> None:
-    """Exact, except rotations get a tolerance for cross-platform synthesis drift."""
+    """Exact, except rotations get a tolerance for cross-platform drift in their angles."""
     mismatches = {
         key: (counts.get(key, 0), pinned)
         for key, pinned in zip(_COUNT_KEYS, _BENCHMARK_COUNTS[size], strict=True)

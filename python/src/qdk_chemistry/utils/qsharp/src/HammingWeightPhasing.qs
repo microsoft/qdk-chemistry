@@ -215,7 +215,8 @@ namespace QDKChemistry.Utils.HammingWeightPhasing {
         }
     }
 
-    /// Prepares the catalyst `HammingWeightPhase` adds Hamming weights into at `theta`.
+    /// Prepares the catalyst Σ_k e^{-2i·theta·k}|k⟩ (little-endian) that `HammingWeightPhase` adds
+    /// Hamming weights into.
     internal operation PrepareCatalyst(theta : Double, catalyst : Qubit[]) : Unit is Adj + Ctl {
         for j in 0..Length(catalyst) - 1 {
             H(catalyst[j]);
