@@ -20,6 +20,7 @@ import numpy as np
 import pytest
 
 from qdk_chemistry.algorithms import available, create
+from qdk_chemistry.algorithms.amplitude_amplification.qpe_subspace import QPESubspaceMarking
 from qdk_chemistry.algorithms.hamiltonian_unitary_builder.block_encoding.sossa import SOSSABuilder
 from qdk_chemistry.algorithms.phase_estimation.standard_phase_estimation import StandardPhaseEstimation
 from qdk_chemistry.algorithms.phase_estimation.unary_phase_estimation import UnaryPhaseEstimation
@@ -987,6 +988,21 @@ def test_subspace_marking_allocates_the_walk_scratch_and_shared_gradient():
     assert oracle._qsharp_factory.parameter["numSignalAncillas"] == walk.num_qubits - 1 - num_system_qubits
     counts = create("circuit_executor", "qdk_sparse_state_simulator", seed=7).run(oracle, shots=4).bitstring_counts
     assert sum(counts.values()) == 4
+
+
+@pytest.mark.parametrize("phase_bin", [1, 2, 3])
+def test_subspace_marks_both_conjugate_walk_bins_at_an_exact_energy_bound(phase_bin):
+    """A bound at a bin's own energy marks that bin and its +-phi partner alike."""
+    operator = _exact_walk_phase_problem(3.0 / 8.0, prepare_consumes_gradient=False)["operator"]
+    container = SOSSABuilder().run(operator).get_container()
+    bound = container.eigenvalue_from_phase(phase_bin / 8)
+
+    marked = {
+        b for start, stop in QPESubspaceMarking._marked_phase_bins(bound, container, 3) for b in range(start, stop)
+    }
+
+    assert {phase_bin, 8 - phase_bin} <= marked
+    assert all((8 - b) % 8 in marked for b in marked)
 
 
 # ═══════════════════════════════════════════════════════════════════════════════

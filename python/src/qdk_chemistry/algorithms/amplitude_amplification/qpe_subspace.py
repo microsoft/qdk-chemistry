@@ -13,6 +13,7 @@ from qdk_chemistry.data import AlgorithmRef, Circuit, QubitOperator, Settings
 from qdk_chemistry.data.circuit import QsharpFactoryData
 from qdk_chemistry.data.unitary_representation.containers.base import UnitaryContainer
 from qdk_chemistry.data.unitary_representation.containers.quantum_walk import QuantumWalkContainer
+from qdk_chemistry.data.unitary_representation.containers.sossa import SOSSABlockEncodingContainer
 from qdk_chemistry.utils import Logger
 from qdk_chemistry.utils.qsharp import QSHARP_UTILS
 
@@ -112,7 +113,7 @@ class QPESubspaceMarking(Algorithm):
         for phase_bin in range(phase_bin_count):
             canonical_bin = (
                 min(phase_bin, phase_bin_count - phase_bin)
-                if isinstance(container, QuantumWalkContainer)
+                if isinstance(container, QuantumWalkContainer | SOSSABlockEncodingContainer)
                 else phase_bin
             )
             if container.eigenvalue_from_phase(canonical_bin / phase_bin_count) < energy_lower_bound:
