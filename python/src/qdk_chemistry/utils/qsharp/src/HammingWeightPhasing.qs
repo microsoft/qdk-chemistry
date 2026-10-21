@@ -165,7 +165,6 @@ namespace QDKChemistry.Utils.HammingWeightPhasing {
                 let places = Length(finalBits);
                 use scratch = Qubit[Length(schedule)];
                 let work = inputs + scratch;
-                // Under control, only the phasing of the weight is controlled, not the adder tree.
                 within {
                     ComputeHammingWeight(opBatches[index], batch, schedule, work);
                 } apply {
@@ -174,7 +173,6 @@ namespace QDKChemistry.Utils.HammingWeightPhasing {
                         for j in 0..places - 1 {
                             Rz(2.0 * theta * IntAsDouble(1 <<< j), weight[j]);
                         }
-                        // The ladder's angles sum to 2·theta·(2^places - 1). Under control this phase is not global.
                         R(PauliI, 2.0 * theta * IntAsDouble(size - ((1 <<< places) - 1)), inputs[0]);
                     } else {
                         AddIntoCatalyst(theta, weight, catalyst);
@@ -184,9 +182,8 @@ namespace QDKChemistry.Utils.HammingWeightPhasing {
         }
     }
 
-    /// Adds `weight` into a catalyst prepared by `PrepareCatalyst(theta, _)`, which multiplies it by
-    /// e^{2i·theta·weight} and returns the catalyst unchanged. This is the generalized phase
-    /// gradient addition of catalyzed Hamming-weight phasing (Supplementary Fig. 3 of :cite:`Kan2025`).
+    /// Adds `weight` into a catalyst prepared by `PrepareCatalyst(theta, _)`, phasing it by
+    /// e^{2i·theta·weight} (Supplementary Fig. 3 of :cite:`Kan2025`).
     internal operation AddIntoCatalyst(theta : Double, weight : Qubit[], catalyst : Qubit[]) : Unit is Adj + Ctl {
         body (...) {
             let places = Length(weight);
