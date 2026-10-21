@@ -287,6 +287,73 @@ Each layer of the plaquette step is a tower of same-angle :math:`R_z` rotations,
      - int
      - Largest tower of same-angle rotations phased through one Hamming-weight register. A smaller cap needs fewer scratch qubits but more rotations. Every batch is phased as given, so use a cap of at least 8: shorter batches save too few rotations to be worth the extra Toffolis and scratch qubits. Ignored when ``use_hamming_weight_phasing`` is False. When set to -1 (default), there is no cap.
 
+.. _unitary-synthesis-mapper:
+
+Unitary synthesis mapper
+------------------------
+
+.. rubric:: Algorithm type: ``"circuit_mapper"``, factory name: ``"unitary_synthesis"``
+
+:class:`~qdk_chemistry.algorithms.circuit_mapper.UnitarySynthesisMapper` is an *uncontrolled* circuit mapper.
+It compiles an explicit real matrix into a Q# operation.
+Its input is a :class:`~qdk_chemistry.data.UnitaryRepresentation` holding a :class:`~qdk_chemistry.data.RealUnitaryContainer`, a dense or sparse real matrix :math:`M` with :math:`2^n` rows and :math:`m` orthonormal columns.
+A square :math:`M` is an orthogonal unitary; otherwise :math:`M` is an isometry, and the circuit realizes an orthogonal :math:`U` whose first :math:`m` columns equal :math:`M`.
+
+Entry ``M[r, c]`` is :math:`\langle r|U|c\rangle` for little-endian basis states: bit :math:`k` of an index is qubit :math:`k` of the register.
+The container rejects complex entries, non-orthonormal columns, and row counts that are not powers of two.
+
+.. rubric:: Methods
+
+``"dense"`` (default)
+   Isometry synthesis by cosine-sine decompositions :cite:`Rupprecht2026`.
+   The low ``num_input_qubits`` qubits form the input register, and the remaining one or two qubits start in :math:`|0\rangle`.
+   The first decomposition leaves a right factor :math:`V` that acts on the input register.
+   With ``omit_right_factor`` the circuit leaves :math:`V` out and realizes :math:`M V^{\mathsf T}` on its first :math:`m` columns.
+   :meth:`~qdk_chemistry.algorithms.circuit_mapper.UnitarySynthesisMapper.right_factor` returns that :math:`V`, so a caller can absorb it into a preceding operation.
+   The same matrix is available from C++ as ``qdk::chemistry::utils::dense_isometry_right_factor``.
+
+``"block_sparse"``
+   The factorization :math:`U = P_r B P_c`, with row and column permutations :math:`P_r, P_c` loaded by QROAM :cite:`Berry2025` and a block-diagonal orthogonal :math:`B`.
+   Columns share a block when they share a nonzero row, so the cost follows the block sizes rather than the matrix dimension.
+
+Both methods apply orthogonal factors as layers of Givens rotations :cite:`Clements2016`.
+Rotation angles are quantized to ``rotation_bit_precision`` bits and applied by phase-gradient addition.
+The decompositions adapt the reference implementation of :cite:`Rupprecht2026Zenodo`.
+
+.. rubric:: Settings
+
+.. list-table::
+   :header-rows: 1
+   :widths: 25 15 60
+
+   * - Setting
+     - Type
+     - Description
+   * - ``method``
+     - str
+     - ``"dense"`` (default) or ``"block_sparse"``.
+   * - ``rotation_bit_precision``
+     - int
+     - Bits of rotation-angle precision, from 1 to 30. Default is 10.
+   * - ``allocate_phase_gradient``
+     - bool
+     - Whether the operation allocates its own phase-gradient register. When False, the operation acts on :math:`[\text{target} \mid \text{phase gradient}]`, and the caller prepares the trailing ``rotation_bit_precision`` qubits with ``PreparePhaseGradientState`` and may share them across operations. Default is True.
+   * - ``omit_right_factor``
+     - bool
+     - Whether the dense method leaves the right factor :math:`V` out of the circuit. Default is False. Not allowed with ``"block_sparse"``.
+   * - ``num_input_qubits``
+     - int
+     - Input register width of the dense method. It must hold the :math:`m` columns and leave at most two added qubits. -1 (default) selects the smallest such register.
+
+.. rubric:: Usage
+
+.. tab:: Python API
+
+   .. literalinclude:: ../../../_static/examples/python/circuit_mapper.py
+      :language: python
+      :start-after: # start-cell-unitary-synthesis
+      :end-before: # end-cell-unitary-synthesis
+
 Related classes
 ---------------
 
