@@ -239,7 +239,11 @@ class ControlledSwapPauliSequenceMapper(ControlledCircuitMapper):
             controlled_evo_params
         )
 
-        return Circuit(qsharp_factory=qsharp_factory, qsharp_op=controlled_unitary_op)
+        return Circuit(
+            qsharp_factory=qsharp_factory,
+            qsharp_op=controlled_unitary_op,
+            num_qubits=1 + unitary_container.num_qubits,
+        )
 
     def _vacuum_phase(self, container: PauliProductFormulaContainer) -> float:
         r"""Return the vacuum phase of the prefix terms, repeated body, and suffix terms.

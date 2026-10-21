@@ -125,14 +125,22 @@ class QdkStandardQpeCircuitBuilder(StandardQpeCircuitBuilder):
         # Build one controlled circuit per ancilla with power=2^k,
         # respecting the unitary builder's power_strategy (e.g. "rescale").
         # ancillas[0] = MSB controls U^(2^(n-1)), ancillas[n-1] = LSB controls U^1.
-        ctrl_unitary_circuits = []
+        ctrl_unitary_circuits: list[Circuit] = []
         num_ancilla_qubits = 0
         num_system_qubits = 0
         for k in range(num_bits):
             power = 2 ** (num_bits - 1 - k)
-            circuit, num_ancilla_qubits, num_system_qubits = self._controlled_circuit_and_widths(
+            circuit, required_ancillas, required_system = self._controlled_circuit_and_widths(
                 qubit_hamiltonian, power=power
             )
+            if ctrl_unitary_circuits and (
+                required_ancillas != num_ancilla_qubits or required_system != num_system_qubits
+            ):
+                raise ValueError(
+                    "Standard QPE requires all controlled powers to have the same system and ancilla widths."
+                )
+            num_ancilla_qubits = required_ancillas
+            num_system_qubits = required_system
             ctrl_unitary_circuits.append(circuit)
 
         if state_preparation._qsharp_op and all(c._qsharp_op for c in ctrl_unitary_circuits):  # noqa: SLF001
@@ -201,6 +209,7 @@ class QdkStandardQpeCircuitBuilder(StandardQpeCircuitBuilder):
                 parameter=standard_parameters,
             ),
             qsharp_op=qpe_op,
+            num_qubits=num_bits + num_system_qubits + num_ancilla_qubits,
         )
 
     def _phase_state_op(self, num_bits: int):

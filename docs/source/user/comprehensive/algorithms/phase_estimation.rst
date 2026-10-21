@@ -10,10 +10,14 @@ Overview
 Quantum Phase Estimation (:term:`QPE`) is one of the foundational quantum algorithms for chemistry.
 Given a unitary :math:`U` and an initial state :math:`|\psi\rangle` that has significant overlap with an eigenstate of :math:`U`, :term:`QPE` measures the eigenphase :math:`\varphi` such that :math:`U|\psi\rangle = e^{2\pi i \varphi}|\psi\rangle`.
 
-QDK/Chemistry supports two types of unitaries for QPE:
+QDK/Chemistry supports the following unitary constructions for QPE:
 
 - **Time evolution** — :math:`U = e^{-iHt}` constructed via :ref:`Trotter-Suzuki decomposition <trotter-builder>`. Energy is recovered as :math:`E = -\theta / t` where :math:`\theta = 2\pi\varphi` is mapped to :math:`(-\pi, \pi]`.
 - **Qubitization** — The walk operator :math:`W` constructed via :ref:`LCU block encoding <lcu-builder>`. Energy is recovered as :math:`E = \lambda \cos(\theta)` where :math:`\lambda` is the L1 norm of the Hamiltonian.
+- **SOSSA** — The :ref:`sum-of-squares block encoding <sossa-builder>` :math:`B` encodes
+  :math:`\widetilde{H} = (H - E_{\mathrm{shift}} I)/\Lambda - I`.
+  Unary QPE supplies the reflections that complete the walk. Total energy is recovered as
+  :math:`E = E_{\mathrm{shift}} + \Lambda(1+\cos\theta)`.
 
 The QPE algorithm itself is agnostic to how the unitary is constructed — the choice of unitary builder determines the phase-to-energy mapping used in post-processing.
 
@@ -284,7 +288,14 @@ The circuit structure consists of :cite:`Babbush2018` :cite:`Lee2021`:
 3. Apply an inverse Quantum Fourier Transform (iQFT) to the phase register
 4. Measure all phase qubits
 
-The walk's spectrum is :math:`e^{\pm i \arccos(E/\lambda)}`, so a measured bin cannot distinguish the two signs: ``resolve_positive_branch`` picks which one is reported, and both are always returned in the result's ``branching`` tuple.
+The signed-power schedule measures a doubled walk phase.
+For LCU, this folds :math:`E` and :math:`-E` together.
+For SOSSA, the two candidates are mirrored about
+:math:`E_{\mathrm{shift}}+\Lambda`.
+``resolve_positive_branch=False`` selects the lower-energy half of the
+band; ``True`` selects the upper half. Both candidates are returned in
+``branching``. Trial-state overlap does not by itself resolve this ambiguity;
+select the branch using independent information.
 
 .. rubric:: Settings
 
@@ -309,7 +320,7 @@ Nested algorithm configuration (via ``qpe_circuit_builder``):
 See :doc:`qpe_circuit_builder` for configuring:
 
 - ``num_queries`` — Number of walk queries :math:`p`; need not be a power of two
-- ``unitary_builder`` → ``quantum_walk`` — Required; the unary path has no Trotter equivalent
+- ``unitary_builder`` — An LCU builder with ``quantum_walk=True`` or the ``sossa`` builder; the unary path has no Trotter equivalent
 - ``circuit_mapper`` — Circuit synthesis strategy, which must expose the block encoding's ancilla reflection
 
 .. tab:: Python API (Unary-iteration configuration)
@@ -319,6 +330,11 @@ See :doc:`qpe_circuit_builder` for configuring:
       :start-after: # start-cell-configure-unary
       :end-before: # end-cell-configure-unary
 
+
+The SOSSA path supports canonical blocked Jordan-Wigner input and the
+sparse-state simulator. Standard and iterative SOSSA QPE are not supported.
+See :ref:`sossa-query-guidance` for explicit query selection and the
+:ref:`2.3 example <release-v2.3.0>` for a complete workflow.
 
 Phase-to-energy extraction
 ---------------------------
@@ -332,7 +348,10 @@ When QPE acts on :math:`U = e^{-iHt}`, the phase angle :math:`\theta = 2\pi\varp
 
 .. math::
 
-   E = \frac{\theta}{t}
+   E = -\frac{\theta}{t}
+
+For a stored powered or composed representation, :math:`t` is the total
+evolution time represented by that container.
 
 Aliasing can be resolved by enumerating candidates :math:`E_{\mathrm{raw}} + k \cdot 2\pi/t` and selecting the one closest to a reference energy (e.g., :term:`CASCI`).
 
@@ -366,6 +385,22 @@ This wraps the raw block encoding in a quantum walk operator :math:`W = (2|0\ran
 
 See :doc:`../data/qpe_result` for the full data class documentation.
 
+
+Sum-of-squares spectral amplification
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+For the completed SOSSA walk,
+
+.. math::
+
+   E = E_{\mathrm{shift}} + 2\Lambda\cos^2(\pi\varphi).
+
+Here :math:`\varphi` is the canonical walk phase, not the raw doubled unary
+measurement. The unary estimator performs that conversion and reports the
+chosen branch in ``resolved_energy``.
+The scalar shift already includes core energy; no additional core-energy
+correction is needed.
+Measured histograms remain available in ``bitstring_counts``.
 
 Related classes
 ---------------

@@ -1,6 +1,6 @@
 ---
 name: visualization
-version: 'v2.2.1'
+version: 'v2.3.0'
 description: 'Describes QDK Chemistry visualization tools, their inputs, and their outputs.'
 ---
 

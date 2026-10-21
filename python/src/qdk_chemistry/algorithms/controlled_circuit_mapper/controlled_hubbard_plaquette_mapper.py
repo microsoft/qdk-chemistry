@@ -135,4 +135,5 @@ class ControlledHubbardPlaquetteMapper(ControlledCircuitMapper):
                 parameter={"params": params, "control": control_indices[0], "systems": targets},
             ),
             qsharp_op=QSHARP_UTILS.HubbardPlaquette.MakeRepControlledPlaquetteExpOp(params),
+            num_qubits=1 + container.num_qubits,
         )

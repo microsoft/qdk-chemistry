@@ -1,6 +1,6 @@
 ---
 name: qdk-chemistry-overview
-version: 'v2.2.1'
+version: 'v2.3.0'
 description: 'Describes the QDK Chemistry interfaces and the artifact types they read and write.'
 ---
 

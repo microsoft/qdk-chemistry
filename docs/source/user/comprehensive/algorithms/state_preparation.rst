@@ -237,7 +237,48 @@ where :math:`\tilde{p}` is the target distribution discretized to :math:`\mu` bi
      - Description
    * - ``bits_precision``
      - int
-     - Number of bits :math:`\mu` of precision for the alias table's keep probabilities. Each prepared probability is within :math:`1/(L 2^{\mu})` of the target for :math:`L` coefficients. The upper bound of 30 is a sanity limit as :math:`2^{-30}` is far below chemical accuracy. Default is 10.
+     - Number of bits :math:`\mu` for the alias table's keep probabilities, in the range 1 through 30. Default is 10. This setting is not a bound on the complete algorithm's energy error.
+
+QROM-based state preparation
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+.. rubric:: Factory name: ``"qrom"``
+
+:class:`~qdk_chemistry.algorithms.state_preparation.qrom_state_prep.QROMStatePreparation`
+prepares real amplitudes using multiplexed rotations
+:cite:`Shende2006`. Their angles are loaded through quantum read-only memory
+(QROM) :cite:`Babbush2018`.
+Inputs may have signed real amplitudes; nonzero imaginary parts and
+non-finite or all-zero coefficients are rejected.
+
+.. rubric:: Settings
+
+.. list-table::
+   :header-rows: 1
+   :widths: 25 15 60
+
+   * - Setting
+     - Type
+     - Description
+   * - ``rotation_bit_precision``
+     - int
+     - Angle-table precision, from 1 through 30. Default: 10.
+   * - ``allocate_phase_gradient``
+     - bool
+     - Allocate, prepare, and unprepare the phase-gradient register inside the operation. Default: ``True``.
+
+With ``allocate_phase_gradient=False``, the operation expects an already prepared gradient
+after its state register. The returned
+:class:`~qdk_chemistry.data.circuit.CircuitMetadata` declares its width in
+``num_phase_gradient_ancillas``.
+Composing algorithms may configure this setting themselves; the SOSSA
+mapper requests a shared outer gradient.
+
+A composing caller must preserve that gradient and exclude it from
+reflections about zero. :ref:`Unary QPE <unary-qpe-algorithm>` can initialize
+and share a compatible gradient between trial-state preparation and its
+block encoding. Standard and iterative QPE do not initialize shared
+gradients; use a self-contained preparation for those paths.
 
 Related classes
 ---------------

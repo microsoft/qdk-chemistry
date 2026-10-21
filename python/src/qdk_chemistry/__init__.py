@@ -45,14 +45,9 @@ import subprocess
 import sys
 import warnings
 
-_STATIC_TLS_REMEDY = (
-    "Native libraries in this process need more static thread-local storage than glibc reserves by default. "
-    "Set GLIBC_TUNABLES=glibc.rtld.optional_static_tls=65536 in the environment, restart Python, and try again."
-)
-
 
 def _import_core() -> None:
-    """Import the native extension with actionable loader failure messages."""
+    """Import the native extension with an actionable Windows failure message."""
     try:
         importlib.import_module("qdk_chemistry._core")
     except ModuleNotFoundError:
@@ -65,8 +60,6 @@ def _import_core() -> None:
                 "includes ARM64), restart Python, and try again: "
                 "https://aka.ms/vc14/vc_redist.x64.exe"
             ) from exc
-        if "static TLS" in str(exc):
-            raise ImportError(f"QDK/Chemistry could not load its native extension. {_STATIC_TLS_REMEDY}") from exc
         raise
 
 
@@ -160,16 +153,8 @@ def _load_bundled_plugin(plugin_name: str, disable_env_var: str) -> None:
     try:
         plugin = importlib.import_module(f"qdk_chemistry.plugins.{plugin_name}")
         plugin.load()
-    except ModuleNotFoundError:
+    except ImportError:
         return
-    except ImportError as exc:
-        remedy = f"{_STATIC_TLS_REMEDY} " if "static TLS" in str(exc) else ""
-        warnings.warn(
-            f"Automatic loading of bundled plugin {plugin_name!r} failed: {exc}. {remedy}"
-            f"Set {disable_env_var}=1 before importing qdk_chemistry to disable automatic loading of this plugin.",
-            UserWarning,
-            stacklevel=2,
-        )
     except _DuplicateRegistrationError as exc:
         warnings.warn(
             f"Automatic loading of bundled plugin {plugin_name!r} failed due to a duplicate registration: {exc}. "
