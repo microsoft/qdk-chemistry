@@ -239,10 +239,59 @@ where :math:`\tilde{p}` is the target distribution discretized to :math:`\mu` bi
      - int
      - Number of bits :math:`\mu` of precision for the alias table's keep probabilities. Each prepared probability is within :math:`1/(L 2^{\mu})` of the target for :math:`L` coefficients. The upper bound of 30 is a sanity limit as :math:`2^{-30}` is far below chemical accuracy. Default is 10.
 
+.. _matrix-product-state:
+
+Matrix Product State
+~~~~~~~~~~~~~~~~~~~~
+
+.. rubric:: Factory name: ``"matrix_product_state"``
+
+This method prepares a matrix product state (MPS) stored in an :class:`~qdk_chemistry.data.MPSContainer` following :cite:`Berry2025` and :cite:`Rupprecht2026`.
+The MPS must be real and right-canonical with orthogonality center at site 0, with open boundaries, and either the physical basis ``('0', 'u', 'd', '2')`` on every site or the physical basis ``('0', '1')`` on every site.
+The physical basis is loaded in the blocked Jordan-Wigner layout.
+An ancilla register of :math:`\max(1, \lceil \log_2 \chi \rceil)` qubits carries the virtual bond of maximal dimension :math:`\chi`.
+Every site isometry, excluding site 0, which is prepared as the initial state, maps the left bond held in the ancilla register to the qubits of its site and its right bond.
+The nested ``unitary_synthesis`` setting holds an :class:`~qdk_chemistry.data.AlgorithmRef` to the :ref:`unitary synthesis mapper <unitary-synthesis-mapper>`, whose ``method`` setting selects the dense or block-sparse synthesis of every site isometry.
+The preparer sets the mapper's ``num_input_qubits`` to the ancilla register width.
+For the dense method it also sets ``omit_right_factor`` and absorbs the right factor of each site isometry into the preceding site, or into the initial state for site 1.
+Givens decomposition converts the orthogonal factors into adjacent rotations and sign corrections for the circuit.
+A final layer of CZ gates applies the fermionic signs of reordering these modes into qubit order.
+It relies on the container's validation of adjacent bond spaces.
+To obtain preparation data without building a circuit, call ``preparer.generate_matrix_product_state_preparation_data(mps_container)``.
+This instance method accepts only an ``MPSContainer`` and uses the preparer's ``unitary_synthesis`` setting.
+Its sites are the synthesis data of the mapper's circuits, which the Q# structs ``DenseIsometrySynthesis`` and ``SparseIsometrySynthesis`` in ``QDKChemistry.Utils.IsometrySynthesis`` hold.
+
+.. tab:: Python API
+
+   .. literalinclude:: ../../../_static/examples/python/state_preparation.py
+      :language: python
+      :start-after: # start-cell-configure-matrix-product-state
+      :end-before: # end-cell-configure-matrix-product-state
+
+.. rubric:: Settings
+
+.. list-table::
+   :header-rows: 1
+   :widths: 25 25 50
+
+   * - Setting
+     - Type
+     - Description
+   * - ``allocate_phase_gradient``
+     - bool
+     - Whether the circuit allocates and prepares its own phase gradient register. If False, the operation takes ``rotation_bit_precision`` trailing qubits holding a phase gradient state owned by the caller. Default is True.
+   * - ``rotation_bit_precision``
+     - int
+     - Size of the phase gradient register, which sets the precision of every rotation angle. The upper bound of 30 is a sanity limit as :math:`2^{-30}` is far below chemical accuracy. Default is 10.
+   * - ``unitary_synthesis``
+     - AlgorithmRef
+     - Circuit mapper that synthesizes every site isometry. It must be the ``"unitary_synthesis"`` circuit mapper, whose ``method`` setting is ``"dense"`` or ``"block_sparse"``. Its ``rotation_bit_precision`` and ``allocate_phase_gradient`` settings are unused, as all sites share this preparer's phase gradient register. Default is ``AlgorithmRef("circuit_mapper", "unitary_synthesis")``, the dense method.
+
 Related classes
 ---------------
 
 - :class:`~qdk_chemistry.data.Wavefunction`: Input wavefunction for circuit construction
+- :class:`~qdk_chemistry.data.MPSContainer`: Matrix product state input for the MPS-based methods
 - :class:`~qdk_chemistry.data.Circuit`: Output circuit that prepares the wavefunction on qubits
 
 Further reading

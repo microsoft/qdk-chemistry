@@ -57,6 +57,8 @@ _ADAPTIVE_ONLY_MODULES = (
     "Arithmetic",
     "UnitarySynthesis",
     "IsometrySynthesis",
+    "MPSSequential",
+    "MPSSparse",
 )
 
 
