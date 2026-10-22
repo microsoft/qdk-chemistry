@@ -160,7 +160,7 @@ struct EffectiveHamiltonianConstructorFactory
     return "effective_hamiltonian_constructor";
   }
   static void register_default_instances();
-  static std::string default_algorithm_name() { return ""; }
+  static std::string default_algorithm_name() { return "qdk_swpt2"; }
 };
 
 }  // namespace qdk::chemistry::algorithms
