@@ -17,9 +17,8 @@
 #include <libint2.hpp>
 #include <nlohmann/json.hpp>
 #include <optional>
-#include <qdk/chemistry/utils/archive.hpp>
+#include <qdk/chemistry/utils/basis_archive.hpp>
 #include <qdk/chemistry/utils/logger.hpp>
-#include <regex>
 #include <unordered_map>
 
 #include "util/macros.h"
@@ -254,22 +253,15 @@ BasisSet::BasisSet(std::shared_ptr<Molecule> mol, const std::string& path,
     : mol(mol), mode(mode), pure(pure) {
   QDK_LOG_TRACE_ENTERING();
 
-  std::string normalized_path =
-      std::regex_replace(path, std::regex("\\*"), "_st_");
-  normalized_path =
-      std::regex_replace(normalized_path, std::regex("/"), "_sl_");
+  std::string normalized_path = utils::BasisArchive::stem(path);
   std::filesystem::path bs_path(normalized_path);
-  std::optional<utils::ArchiveDirectory> archive;
+  std::optional<utils::BasisArchive> archive;
   if (!std::filesystem::exists(bs_path)) {
     name = normalized_path;
-    const auto compressed_path = QDKChemistryConfig::get_resources_dir() /
-                                 "compressed" / (name + ".tar.gz");
     // An unknown name falls through to the "not supported" error below.
-    if (std::filesystem::exists(compressed_path)) {
-      archive.emplace();
-      archive->extract(compressed_path);
-      bs_path =
-          archive->file(std::filesystem::path("basis") / (name + ".json"));
+    if (utils::BasisArchive::exists(name)) {
+      archive.emplace(name);
+      bs_path = archive->json();
     }
   } else {
     name = bs_path.stem().string();

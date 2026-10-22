@@ -1,5 +1,5 @@
 target_sources(chemistry PRIVATE
-    archive.cpp
+    basis_archive.cpp
     cube_generator.cpp
     hash_context.cpp
     valence_space.cpp

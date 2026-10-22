@@ -10,7 +10,7 @@
 #include <map>
 #include <qdk/chemistry/data/basis_set.hpp>
 #include <qdk/chemistry/data/structure.hpp>
-#include <qdk/chemistry/utils/archive.hpp>
+#include <qdk/chemistry/utils/basis_archive.hpp>
 #include <qdk/chemistry/utils/logger.hpp>
 #include <regex>
 #include <set>
@@ -144,13 +144,8 @@ std::tuple<std::vector<Shell>, std::vector<Shell>, size_t>
 get_basis_for_nuclear_charge(const double nuclear_charge,
                              std::string basis_set_name,
                              const size_t atom_index) {
-  const auto normalized_name = normalize_basis_set_name(basis_set_name);
-  const auto file_path = scf::QDKChemistryConfig::get_resources_dir() /
-                         "compressed" / (normalized_name + ".tar.gz");
-  utils::ArchiveDirectory archive;
-  archive.extract(file_path);
-  std::ifstream fin(archive.file(std::filesystem::path("basis") /
-                                 (normalized_name + ".json")));
+  const utils::BasisArchive archive(basis_set_name);
+  std::ifstream fin(archive.json());
   auto data = nlohmann::json::parse(fin);
 
   // extract basis set information for each nuclear charge

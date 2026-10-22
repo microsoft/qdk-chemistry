@@ -4,20 +4,19 @@
 
 #include "scf/guess.h"
 
-#include <qdk/chemistry/scf/config.h>
 #include <qdk/chemistry/scf/core/types.h>
 
 #include <Eigen/Dense>
 #include <algorithm>
 #include <cstdlib>
+#include <exception>
 #include <filesystem>
 #include <fstream>
 #include <iostream>
 #include <map>
 #include <optional>
-#include <qdk/chemistry/utils/archive.hpp>
+#include <qdk/chemistry/utils/basis_archive.hpp>
 #include <qdk/chemistry/utils/logger.hpp>
-#include <system_error>
 #include <vector>
 
 #include "scf_algorithm/asahf.h"
@@ -26,20 +25,22 @@
 namespace qdk::chemistry::scf {
 void atom_guess(const BasisSet& obs, const Molecule& mol, double* D) {
   QDK_LOG_TRACE_ENTERING();
-  // Precomputed atomic guesses ship in the basis archive next to the basis
-  // JSON. Names that are not a single path component never select an archive.
   const auto guess_name = obs.name + (obs.pure ? "_pure" : "_cart");
-  const std::filesystem::path name(obs.name);
-  const auto archive_path = QDKChemistryConfig::get_resources_dir() /
-                            "compressed" / (obs.name + ".tar.gz");
-  std::error_code error;
-  std::optional<utils::ArchiveDirectory> archive;
+  // Only a basis named by its archive stem uses the precomputed guess; other
+  // spellings (e.g. "6-31g*") compute it, so their converged results are
+  // unchanged. The precomputed guess is optional, so failing to read it falls
+  // back to computing the guess.
+  std::optional<utils::BasisArchive> archive;
   std::optional<std::filesystem::path> guess_chk;
-  if (!obs.name.empty() && name.filename() == name &&
-      std::filesystem::is_regular_file(archive_path, error)) {
-    archive.emplace();
-    archive->extract(archive_path);
-    guess_chk = archive->find(std::filesystem::path("guess") / guess_name);
+  try {
+    if (utils::BasisArchive::stem(obs.name) == obs.name &&
+        utils::BasisArchive::exists(obs.name)) {
+      archive.emplace(obs.name);
+      guess_chk = archive->guess(obs.pure);
+    }
+  } catch (const std::exception& error) {
+    QDK_LOGGER().warn("Cannot read guess file {}: {}", guess_name,
+                      error.what());
   }
 
   int N = obs.num_atomic_orbitals;

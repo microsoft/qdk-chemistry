@@ -3,6 +3,7 @@
 // license information.
 
 #include <gtest/gtest.h>
+#include <qdk/chemistry/scf/config.h>
 #include <qdk/chemistry/scf/core/basis_set.h>
 #include <qdk/chemistry/scf/core/molecule.h>
 #include <qdk/chemistry/scf/util/blas_threads.h>
@@ -20,6 +21,7 @@
 #include <map>
 #include <memory>
 #include <mutex>
+#include <qdk/chemistry/utils/basis_archive.hpp>
 #include <string>
 #include <thread>
 #include <vector>
@@ -679,6 +681,38 @@ TEST(AtomGuessTest, MismatchedFileGuessFallsBackToGeneratedGuess) {
     EXPECT_TRUE(D_mismatched.isApprox(D_generated, conv_thresh))
         << basis_name << " shells named " << guess_name;
   }
+}
+
+TEST(AtomGuessTest, UnreadableArchiveFallsBackToGeneratedGuess) {
+  auto mol = make_o2();
+  double conv_thresh = SCFConfig().scf_algorithm.density_threshold;
+  auto basis =
+      BasisSet::from_database_json(mol, "sto-3g", BasisMode::PSI4, true, false);
+  int N = basis->num_atomic_orbitals;
+  basis->name = "custom_basis_for_testing";
+  RowMajorMatrix D_generated = RowMajorMatrix::Zero(N, N);
+  atom_guess(*basis, *mol, D_generated.data());
+
+  const auto original = QDKChemistryConfig::get_resources_dir();
+  struct RestoreResources {
+    std::filesystem::path path;
+    ~RestoreResources() { QDKChemistryConfig::set_resources_dir(path); }
+  } restore{original};
+  // The archive exists, so it selects the precomputed guess, but tar cannot
+  // read it.
+  const auto resources =
+      std::filesystem::temp_directory_path() / "unreadable_resources";
+  std::filesystem::create_directories(resources / "compressed");
+  std::ofstream(resources / "compressed" / "sto-3g.tar.gz") << "not an archive";
+  QDKChemistryConfig::set_resources_dir(resources);
+  ASSERT_TRUE(qdk::chemistry::utils::BasisArchive::exists("sto-3g"));
+  EXPECT_THROW(qdk::chemistry::utils::BasisArchive("sto-3g"),
+               std::runtime_error);
+
+  basis->name = "sto-3g";
+  RowMajorMatrix D_fallback = RowMajorMatrix::Zero(N, N);
+  EXPECT_NO_THROW(atom_guess(*basis, *mol, D_fallback.data()));
+  EXPECT_TRUE(D_fallback.isApprox(D_generated, conv_thresh));
 }
 
 //==============================================================================

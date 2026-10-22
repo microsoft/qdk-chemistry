@@ -2,7 +2,9 @@
 // Licensed under the MIT License. See LICENSE.txt in the project root for
 // license information.
 
-#include "archive.hpp"
+#include "basis_archive.hpp"
+
+#include <qdk/chemistry/scf/config.h>
 
 #include <cerrno>
 #include <cstdlib>
@@ -10,7 +12,6 @@
 #include <qdk/chemistry/utils/logger.hpp>
 #include <random>
 #include <stdexcept>
-#include <string>
 #include <system_error>
 #include <utility>
 #include <vector>
@@ -39,7 +40,20 @@ extern char** environ;
 
 namespace qdk::chemistry::utils {
 
-ArchiveDirectory::ArchiveDirectory() {
+namespace {
+
+// Shipped archive for a stem, or an empty path when the stem is not a single
+// file name and so cannot name one.
+std::filesystem::path archive_path(const std::string& stem) {
+  const std::filesystem::path name = stem + ".tar.gz";
+  if (stem.empty() || stem.find('\0') != std::string::npos ||
+      name.has_root_path() || name.filename() != name) {
+    return {};
+  }
+  return scf::QDKChemistryConfig::get_resources_dir() / "compressed" / name;
+}
+
+std::filesystem::path create_private_directory() {
   const auto root = std::filesystem::temp_directory_path();
   std::random_device device;
 #ifdef _WIN32
@@ -48,7 +62,7 @@ ArchiveDirectory::ArchiveDirectory() {
   if (!ConvertStringSecurityDescriptorToSecurityDescriptorW(
           L"D:P(A;OICI;FA;;;OW)", SDDL_REVISION_1, &descriptor, nullptr)) {
     throw std::system_error(GetLastError(), std::system_category(),
-                            "Cannot create archive directory permissions");
+                            "Cannot create basis archive permissions");
   }
   const std::unique_ptr<void, decltype(&LocalFree)> security(descriptor,
                                                              &LocalFree);
@@ -60,46 +74,38 @@ ArchiveDirectory::ArchiveDirectory() {
                              std::to_string(device()));
 #ifdef _WIN32
     if (CreateDirectoryW(candidate.c_str(), &attributes)) {
-      _path = std::move(candidate);
-      return;
+      return candidate;
     }
     const auto error = GetLastError();
     if (error != ERROR_ALREADY_EXISTS) {
       throw std::system_error(error, std::system_category(),
-                              "Cannot create private archive directory");
+                              "Cannot create basis archive directory");
     }
 #else
     if (::mkdir(candidate.c_str(), S_IRWXU) == 0) {
-      _path = std::move(candidate);
-      return;
+      return candidate;
     }
     if (errno != EEXIST) {
       throw std::system_error(errno, std::generic_category(),
-                              "Cannot create private archive directory");
+                              "Cannot create basis archive directory");
     }
 #endif
   }
-  throw std::runtime_error("Cannot create a unique archive directory");
+  throw std::runtime_error("Cannot create a unique basis archive directory");
 }
 
-ArchiveDirectory::~ArchiveDirectory() {
+void remove_directory(const std::filesystem::path& path) {
   std::error_code error;
-  std::filesystem::remove_all(_path, error);
+  std::filesystem::remove_all(path, error);
   if (error) {
-    QDK_LOGGER().warn("Cannot remove archive directory {}: {}", _path.string(),
-                      error.message());
+    QDK_LOGGER().warn("Cannot remove basis archive directory {}: {}",
+                      path.string(), error.message());
   }
 }
 
-void ArchiveDirectory::extract(const std::filesystem::path& archive) const {
-  if (!std::filesystem::is_regular_file(archive)) {
-    throw std::invalid_argument("Basis set file does not exist: " +
-                                archive.string());
-  }
-  // Archive directory entries may change extraction-root permissions, so keep
-  // that root underneath the private directory rather than extracting into it.
-  const auto contents = _path / "contents";
-  std::filesystem::create_directory(contents);
+// Runs tar with an argument vector, so no shell parses the paths.
+void run_tar(const std::filesystem::path& archive,
+             const std::filesystem::path& destination) {
   // This fixed capability probe contains no archive or caller-supplied text.
 #ifdef _WIN32
   static const bool force_local =
@@ -114,7 +120,7 @@ void ArchiveDirectory::extract(const std::filesystem::path& archive) const {
     arguments.emplace_back(L"--force-local");
   }
   arguments.insert(arguments.end(), {L"-xzf", archive.generic_wstring(), L"-C",
-                                     contents.generic_wstring()});
+                                     destination.generic_wstring()});
   for (auto& argument : arguments) {
     // The Windows CRT joins argv into a command line; quote for its parser,
     // not for cmd.exe (which is never used for the extraction).
@@ -154,7 +160,7 @@ void ArchiveDirectory::extract(const std::filesystem::path& archive) const {
     arguments.emplace_back("--force-local");
   }
   arguments.insert(arguments.end(),
-                   {"-xzf", archive.string(), "-C", contents.string()});
+                   {"-xzf", archive.string(), "-C", destination.string()});
   std::vector<char*> argv;
   for (auto& argument : arguments) {
     argv.push_back(argument.data());
@@ -186,9 +192,12 @@ void ArchiveDirectory::extract(const std::filesystem::path& archive) const {
 #endif
 }
 
-std::optional<std::filesystem::path> ArchiveDirectory::find(
-    const std::filesystem::path& relative) const {
-  const auto root = std::filesystem::weakly_canonical(_path / "contents");
+// Extracted file, or nullopt if absent. Throws if it resolves outside the
+// extraction directory, e.g. through a symlink stored in the archive.
+std::optional<std::filesystem::path> find_extracted(
+    const std::filesystem::path& contents,
+    const std::filesystem::path& relative) {
+  const auto root = std::filesystem::weakly_canonical(contents);
   const auto path = std::filesystem::weakly_canonical(root / relative);
   const auto within = path.lexically_relative(root);
   if (within.empty() || within.is_absolute() || *within.begin() == "..") {
@@ -203,14 +212,66 @@ std::optional<std::filesystem::path> ArchiveDirectory::find(
   return path;
 }
 
-std::filesystem::path ArchiveDirectory::file(
-    const std::filesystem::path& relative) const {
-  auto path = find(relative);
+}  // namespace
+
+std::string BasisArchive::stem(const std::string& basis_name) {
+  std::string stem;
+  for (const char character : basis_name) {
+    if (character == '*') {
+      stem += "_st_";
+    } else if (character == '/') {
+      stem += "_sl_";
+    } else {
+      stem += character;
+    }
+  }
+  return stem;
+}
+
+bool BasisArchive::exists(const std::string& basis_name) {
+  const auto archive = archive_path(stem(basis_name));
+  std::error_code error;
+  return !archive.empty() && std::filesystem::is_regular_file(archive, error);
+}
+
+BasisArchive::BasisArchive(const std::string& basis_name)
+    : _stem(stem(basis_name)) {
+  const auto archive = archive_path(_stem);
+  std::error_code error;
+  if (archive.empty() || !std::filesystem::is_regular_file(archive, error)) {
+    throw std::invalid_argument(
+        "Basis set file does not exist: " +
+        (archive.empty() ? basis_name : archive.string()));
+  }
+  _path = create_private_directory();
+  try {
+    // Archive directory entries may change the extraction root's permissions,
+    // so the root sits underneath the private directory.
+    const auto contents = _path / "contents";
+    std::filesystem::create_directory(contents);
+    run_tar(archive, contents);
+  } catch (...) {
+    remove_directory(_path);
+    throw;
+  }
+}
+
+BasisArchive::~BasisArchive() { remove_directory(_path); }
+
+std::filesystem::path BasisArchive::json() const {
+  const auto relative = std::filesystem::path("basis") / (_stem + ".json");
+  auto path = find_extracted(_path / "contents", relative);
   if (!path) {
     throw std::invalid_argument("Basis set JSON file does not exist: " +
                                 (_path / "contents" / relative).string());
   }
   return *path;
+}
+
+std::optional<std::filesystem::path> BasisArchive::guess(bool pure) const {
+  return find_extracted(
+      _path / "contents",
+      std::filesystem::path("guess") / (_stem + (pure ? "_pure" : "_cart")));
 }
 
 }  // namespace qdk::chemistry::utils
