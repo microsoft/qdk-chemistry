@@ -125,7 +125,7 @@ The generator :math:`S` is calculated from
 
    [F_0, S] = H_{\mathrm{OD}},
 
-where :math:`F_0` -- the spin-free generalized Fock operator based on the input
+where :math:`F_0` -- the generalized Fock operator of the input
 reference wavefunction -- is used to approximate :math:`H_{\mathrm{BD}}`, which
 allows for efficient computation of :math:`S`. This results in
 
@@ -133,26 +133,31 @@ allows for efficient computation of :math:`S`. This results in
 
    S = \sum_{T} \frac{c_T}{\Delta_T}\,\hat{T},
    \qquad
-   \Delta_T = \sum_{\mathrm{creations}} \varepsilon_p
-            - \sum_{\mathrm{annihilations}} \varepsilon_p,
+   \Delta_T = \sum_{\mathrm{creations}} \varepsilon_{p\sigma}
+            - \sum_{\mathrm{annihilations}} \varepsilon_{p\sigma},
 
 where :math:`c_T` are the coefficients of the operator terms :math:`\hat{T}` in
 :math:`H_{\mathrm{OD}} = \sum_T c_T\,\hat{T}`, and the orbital energies
-:math:`\varepsilon_p` are the diagonal elements of the generalized Fock matrix:
+:math:`\varepsilon_{p\sigma}` of spin :math:`\sigma` are the diagonal elements of the
+generalized Fock matrices:
 
 .. math::
 
-   \varepsilon_p = F_{pp},\qquad F_{pq} = h_{pq}
-          + \sum_{rs} \gamma_{rs}\left[(pq|rs) - \tfrac{1}{2}(pr|sq)\right].
+   \varepsilon_{p\sigma} = F^\sigma_{pp},\qquad F^\sigma_{pq} = h^\sigma_{pq}
+          + \sum_{\tau}\sum_{rs} \gamma^\tau_{rs}(pq|rs)^{\sigma\tau}
+          - \sum_{rs} \gamma^\sigma_{rs}(pr|sq)^{\sigma\sigma}.
 
-:math:`\gamma` is the reference's spin-traced 1-RDM over :math:`W`.
-The restricted, spin-averaged construction preserves spin symmetry and uses common
-orbital energies, :math:`\varepsilon_{p\alpha} = \varepsilon_{p\beta}`.
+:math:`\gamma^\sigma` is the reference's 1-RDM of spin :math:`\sigma` over :math:`W`.
+For restricted orbitals, the spin-traced 1-RDM :math:`\gamma` is split evenly,
+:math:`\gamma^\alpha = \gamma^\beta = \gamma/2`. This spin-averaged construction
+preserves spin symmetry and uses common orbital energies,
+:math:`\varepsilon_{p\alpha} = \varepsilon_{p\beta}`. Unrestricted orbitals use the
+reference's per-spin 1-RDMs, so the orbital energies can differ between spins.
 
-By default, ``semicanonicalize`` diagonalizes :math:`F` within the inactive,
+By default, ``semicanonicalize`` diagonalizes each :math:`F^\sigma` within the inactive,
 active, and virtual blocks. Integrals and density are rotated consistently,
 and the emitted integrals are rotated back. With this option disabled, the
-denominators use the diagonal of :math:`F` in the supplied basis.
+denominators use the diagonals of :math:`F^\sigma` in the supplied basis.
 
 Near-degenerate channels give a small :math:`\Delta_T` and a large amplitude, which can make the
 perturbative expansion unreliable. ``regularizer_sigma2`` damps them by replacing the
@@ -178,40 +183,45 @@ Even well-separated channels are damped; increase :math:`\sigma` to approach the
 bare amplitudes.
 
 The kept space :math:`P` is defined by the ``p_indices`` argument. The reference wavefunction
-only supplies the density matrix :math:`\gamma`, and is independent of :math:`P`.
+only supplies the density matrices :math:`\gamma^\sigma`, and is independent of :math:`P`.
 Every orbital in :math:`Q = W \setminus P` is folded, as doubly
-occupied if its reference occupation rounds to two and as empty if it rounds to zero. Rounding
+occupied if its spin-traced reference occupation rounds to two and as empty if it rounds to zero. Rounding
 an occupation that is far from 2 or 0 perturbs the mean field the active space feels, so
 ``max_folded_occupation_deviation`` bounds how far it may stray before the downfold is
-rejected. The active space keeps whatever electrons the folded orbitals do not take.
+rejected. A singly occupied orbital therefore cannot be folded and must be kept in :math:`P`.
+The active space keeps whatever electrons the folded orbitals do not take.
 
 The commutator :math:`[S, H_{\mathrm{OD}}]` generates three-body terms that the emitted
 two-body operator cannot carry. With ``fold_above_two_body``, reference-1-RDM pair
 contractions reduce these to lower-rank terms :cite:`Kutzelnigg1997`.
-This Gaussian approximation recovers ordinary Wick contractions for a spin-paired
-determinant and neglects connected higher density cumulants for correlated or
-spin-averaged open-shell references. The residual three-body operator is discarded.
+This Gaussian approximation recovers ordinary Wick contractions for a determinant in
+its own orbitals, closed-shell restricted or unrestricted. It neglects connected higher
+density cumulants for correlated references and spin-averaged open-shell references.
+The residual three-body operator is discarded.
 Folding can improve accuracy but adds cost; it is skipped when the retained space
 contains at most two electrons.
 
-The reference enters only through :math:`\gamma`, so what is accepted is a property of the
-input, not of the method that produced it: any restricted orbital set works, canonical or
-not. RHF, ROHF, CAS, localized and natural orbitals all qualify, including UHF natural
-orbitals carried as restricted orbitals with their 1-RDM. Rejected are unrestricted
-orbitals, and any singly occupied orbital outside the reference active space, which could
-only be folded on an arbitrary rounding.
+The reference enters only through :math:`\gamma^\sigma`, so what is accepted is a property of the
+input, not of the method that produced it: any restricted or unrestricted orbital set
+works, canonical or not. RHF, ROHF, CAS, localized and natural orbitals all qualify,
+including UHF natural orbitals carried as restricted orbitals with their 1-RDM. Unrestricted
+orbitals, such as UHF, give an unrestricted effective Hamiltonian; the input Hamiltonian's
+active space, ``p_indices`` and the reference active space must then select the same orbital
+indices in both spins, and both spins of a folded index are folded together. Rejected is any
+singly occupied orbital outside the reference active space, which could only be folded on an
+arbitrary rounding.
 The reference and the input Hamiltonian must share the same molecular-orbital basis, and the
 orbitals the Hamiltonian folded into its core energy must be exactly the reference core
-orbitals outside :math:`W`, since otherwise that core energy and :math:`\gamma` describe
+orbitals outside :math:`W`, since otherwise that core energy and :math:`\gamma^\sigma` describe
 different states.
 
 .. warning::
 
-   The emitted two-body block is only **4-fold** symmetric. Hermiticity
-   :math:`(pq|rs) = (qp|sr)` and electron exchange :math:`(pq|rs) = (rs|pq)` survive the
-   transformation, but the bra swap :math:`(pq|rs) = (qp|rs)` of a genuine Coulomb integral
+   The emitted two-body blocks are only **4-fold** symmetric. Hermiticity
+   :math:`(pq|rs) = (qp|sr)` and electron exchange :math:`(pq|rs) = (rs|pq)` hold as for the
+   input integrals, but the bra swap :math:`(pq|rs) = (qp|rs)` of a genuine Coulomb integral
    does not: the commutator is not an electron-repulsion operator. Consumers must be given
-   the full dense :math:`n^4` block.
+   the full dense :math:`n^4` blocks.
 
 The constructor logs regularization, active electron count, folded-occupation
 deviation, minimum coupled denominator, and maximum raw amplitude.
@@ -224,7 +234,7 @@ external space and reuses them within the process. Contraction orders are chosen
 for the inactive, active, and virtual dimensions and rebuilt when they change.
 This adds a setup cost.
 Numerical cost and memory depend on the window, kept space, and density fold.
-Evaluation uses spatial spin blocks; memory includes the dense integrals,
+Evaluation uses per-spin spatial blocks; memory includes the dense integrals,
 contraction workspace, and cached plans.
 
 .. rubric:: Settings
@@ -234,7 +244,7 @@ contraction workspace, and cached plans.
    :math:`E_h^{-2}`; ``0`` selects the guarded bare pseudoinverse.
 
 ``semicanonicalize`` (bool, default ``True``)
-   Diagonalize the generalized Fock matrix blockwise before forming denominators.
+   Diagonalize each spin's generalized Fock matrix blockwise before forming denominators.
 
 ``fold_above_two_body`` (bool, default ``True``)
    Approximate the three-body terms using reference-1-RDM pair contractions

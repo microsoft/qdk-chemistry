@@ -36,6 +36,26 @@ inline Eigen::Index n4(int n) {
 
 // Smaller loops run serially; starting threads would dominate their cost.
 constexpr Eigen::Index min_parallel_work = Eigen::Index{1} << 16;
+
+// Chemist (pq|rs) with p, q of spin `left` and r, s of spin `right`.
+double chemist(const TwoBodyBlocks& two_body, int left, int right, int p, int q,
+               int r, int s, int norb) {
+  if (left == right) return two_body[2 * left].get()(idx4(p, q, r, s, norb));
+  return left == 0 ? two_body[1].get()(idx4(p, q, r, s, norb))
+                   : two_body[1].get()(idx4(r, s, p, q, norb));
+}
+
+// Identical spin blocks make the operator spin free.
+bool spin_symmetric(const std::array<Eigen::MatrixXd, 2>& one_body,
+                    const TwoBodyBlocks& two_body,
+                    const std::array<Eigen::MatrixXd, 2>& density) {
+  const auto same = [](const Eigen::VectorXd& left,
+                       const Eigen::VectorXd& right) {
+    return &left == &right || left == right;
+  };
+  return one_body[0] == one_body[1] && density[0] == density[1] &&
+         same(two_body[0], two_body[1]) && same(two_body[1], two_body[2]);
+}
 }  // namespace
 
 // ===========================================================================
@@ -54,28 +74,64 @@ double regularized_inverse(double delta, const RegularizerOptions& reg) {
   return 1.0 / delta;
 }
 
-Eigen::MatrixXd generalized_fock_matrix(const Eigen::MatrixXd& h1,
-                                        const Eigen::VectorXd& two_body,
-                                        const Eigen::MatrixXd& density,
-                                        int norb) {
-  if (h1.rows() != norb || h1.cols() != norb || density.rows() != norb ||
-      density.cols() != norb || two_body.size() != n4(norb))
+std::array<Eigen::MatrixXd, 2> generalized_fock_matrices(
+    const std::array<Eigen::MatrixXd, 2>& one_body,
+    const TwoBodyBlocks& two_body,
+    const std::array<Eigen::MatrixXd, 2>& density, int norb) {
+  bool consistent = true;
+  for (int spin = 0; spin < 2; ++spin)
+    consistent = consistent && one_body[spin].rows() == norb &&
+                 one_body[spin].cols() == norb &&
+                 density[spin].rows() == norb && density[spin].cols() == norb;
+  for (const auto& block : two_body)
+    consistent = consistent && block.get().size() == n4(norb);
+  if (!consistent)
     throw std::invalid_argument(
-        "generalized_fock_matrix: inconsistent tensor dimensions");
+        "generalized_fock_matrices: inconsistent tensor dimensions");
 
-  Eigen::MatrixXd fock = h1;
-#pragma omp parallel for collapse(2) \
-    schedule(static) if (n4(norb) >= min_parallel_work)
-  for (int p = 0; p < norb; ++p)
-    for (int q = 0; q < norb; ++q) {
-      double value = fock(p, q);
-      for (int r = 0; r < norb; ++r)
-        for (int s = 0; s < norb; ++s)
-          value += density(r, s) * (two_body(idx4(p, q, r, s, norb)) -
-                                    0.5 * two_body(idx4(p, r, s, q, norb)));
-      fock(p, q) = value;
-    }
-  return 0.5 * (fock + fock.transpose()).eval();
+  using RowMajorMatrix =
+      Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic, Eigen::RowMajor>;
+  const Eigen::Index pairs = static_cast<Eigen::Index>(norb) * norb;
+  // C-order (pq|rs) storage is a row-major matrix over the pairs (pq), (rs).
+  const auto pair_matrix = [pairs](const Eigen::VectorXd& block) {
+    return Eigen::Map<const RowMajorMatrix>(block.data(), pairs, pairs);
+  };
+  std::array<Eigen::VectorXd, 2> pair_density;
+  for (int spin = 0; spin < 2; ++spin) {
+    const RowMajorMatrix row_major = density[spin];
+    pair_density[spin] =
+        Eigen::Map<const Eigen::VectorXd>(row_major.data(), pairs);
+  }
+  const auto mixed = pair_matrix(two_body[1]);
+
+  std::array<Eigen::MatrixXd, 2> fock = one_body;
+  const bool spin_free = spin_symmetric(one_body, two_body, density);
+  for (int spin = 0; spin < (spin_free ? 1 : 2); ++spin) {
+    const auto same = pair_matrix(two_body[2 * spin]);
+    // The beta-alpha Coulomb block is the transposed aabb block.
+    const Eigen::VectorXd coulomb =
+        same * pair_density[spin] +
+        (spin == 0 ? Eigen::VectorXd(mixed * pair_density[1])
+                   : Eigen::VectorXd(mixed.transpose() * pair_density[0]));
+    RowMajorMatrix exchange = RowMajorMatrix::Zero(norb, norb);
+#pragma omp parallel for schedule(static) if (n4(norb) >= min_parallel_work)
+    for (int p = 0; p < norb; ++p)
+      for (int r = 0; r < norb; ++r) {
+        const Eigen::Index pair = static_cast<Eigen::Index>(p) * norb + r;
+        for (int s = 0; s < norb; ++s) {
+          const double weight = density[spin](r, s);
+          // (pr|sq) is contiguous in q.
+          const double* row = same.data() + pair * pairs + s * norb;
+          for (int q = 0; q < norb; ++q) exchange(p, q) += weight * row[q];
+        }
+      }
+    auto& block = fock[spin];
+    block +=
+        Eigen::Map<const RowMajorMatrix>(coulomb.data(), norb, norb) - exchange;
+    block = 0.5 * (block + block.transpose()).eval();
+  }
+  if (spin_free) fock[1] = fock[0];
+  return fock;
 }
 
 Eigen::MatrixXd semicanonical_rotation(
@@ -129,8 +185,16 @@ Eigen::MatrixXd rotate_one_body(const Eigen::MatrixXd& one_body,
 
 Eigen::VectorXd rotate_two_body(const Eigen::VectorXd& two_body,
                                 const Eigen::MatrixXd& rotation, int norb) {
-  if (rotation.rows() != norb || rotation.cols() != norb ||
-      two_body.size() != n4(norb))
+  return rotate_two_body(two_body, rotation, rotation, norb);
+}
+
+Eigen::VectorXd rotate_two_body(const Eigen::VectorXd& two_body,
+                                const Eigen::MatrixXd& first_pair,
+                                const Eigen::MatrixXd& second_pair, int norb) {
+  for (const auto* rotation : {&first_pair, &second_pair})
+    if (rotation->rows() != norb || rotation->cols() != norb)
+      throw std::invalid_argument("rotate_two_body: inconsistent dimensions");
+  if (two_body.size() != n4(norb))
     throw std::invalid_argument("rotate_two_body: inconsistent dimensions");
 
   using RowMajorMatrix =
@@ -142,6 +206,7 @@ Eigen::VectorXd rotate_two_body(const Eigen::VectorXd& two_body,
   Eigen::VectorXd current = two_body;
   Eigen::VectorXd next(n4(norb));
   for (int pass = 0; pass < 4; ++pass) {
+    const auto& rotation = pass < 2 ? first_pair : second_pair;
     const Eigen::Map<const RowMajorMatrix> in(current.data(), n, n3);
     const Eigen::MatrixXd transformed = rotation.transpose() * in;
     Eigen::Map<RowMajorMatrix>(next.data(), n3, n) = transformed.transpose();
@@ -224,7 +289,7 @@ using Tensor = btas::Tensor<double>;
 struct Term {
   sq::ResultExpr result;
   int rank;
-  int spin;
+  int spin_case;
   bool folded;
 };
 
@@ -237,7 +302,7 @@ struct Equations {
 struct Plan {
   sq::EvalNodeBTAS tree;
   int rank;
-  int spin;
+  int spin_case;
   bool folded;
 };
 
@@ -246,9 +311,25 @@ struct Plans {
   std::size_t maximum_rank = 0;
 };
 
-// Group by output body rank, one-body spin, and number of density contractions.
+// Group by output body rank, spin case and number of density contractions. The
+// spin case is alpha or beta for one-body outputs and aaaa, aabb or bbbb for
+// two-body outputs.
 using EquationSums =
     std::map<std::tuple<int, int, int>, sq::HashingAccumulator>;
+
+// Spin of output slot `axis`; aabb outputs order alpha before beta per pair.
+bool output_is_beta(int rank, int spin_case, int axis) {
+  if (rank == 1) return spin_case == 1;
+  return spin_case == 1 ? axis % 2 == 1 : spin_case == 2;
+}
+
+sq::Index output_index(int rank, int spin_case, int axis) {
+  // Ordinals 21..24 stay clear of the operand indices 1..8.
+  const sq::Index index(L"u_" + std::to_wstring(21 + axis));
+  return output_is_beta(rank, spin_case, axis)
+             ? sq::mbpt::make_spinbeta(index)
+             : sq::mbpt::make_spinalpha(index);
+}
 
 std::span<const sq::ExprPtr> summands(const sq::ExprPtr& expression) {
   if (expression->is<sq::Sum>()) {
@@ -407,94 +488,78 @@ void accumulate_projected_term(const sq::Product& product,
     reductions.push_back(std::move(identity));
   }
 
-  std::vector<sq::Index> indices;
+  auto source_product = sq::ex<sq::Constant>(product.scalar());
   for (const auto& source : sources) {
     if (source.label() != L"S" && source.label() != L"V")
       throw std::runtime_error("SW-PT2: unreduced source contraction");
-    for (const auto& index : source.const_braket_indices())
-      if (std::find(indices.begin(), indices.end(), index) == indices.end())
-        indices.push_back(index);
+    source_product *=
+        source.bra_rank() == 1
+            ? sq::ex<sq::Tensor>(source)
+            : sq::ex<sq::Tensor>(
+                  source.label(), sq::bra(source.bra()), sq::ket(source.ket()),
+                  sq::TensorSymmetries{.perm = sq::Symmetry::Antisymm});
   }
 
-  // Resolve alpha/beta assignments symbolically; all numerical leaves remain
-  // spatial tensors. Each operand must conserve its spin population.
-  for (unsigned assignment = 0; assignment < (1u << indices.size());
-       ++assignment) {
-    const auto spin = [&](const sq::Index& index) {
-      return static_cast<int>(
-          (assignment >> (std::find(indices.begin(), indices.end(), index) -
-                          indices.begin())) &
-          1u);
+  // SeQuant enumerates the spin cases that conserve spin in every operand and
+  // keeps the labels, so each traced term is one spin block.
+  sq::container::svector<sq::container::svector<sq::Index>> output_groups;
+  for (const auto& index : output) output_groups.push_back({index});
+  auto traced = sq::mbpt::spintrace(source_product, output_groups,
+                                    /*spinfree_index_spaces=*/false);
+  sq::expand(traced);
+  sq::rapid_simplify(traced);
+  for (const auto& term : summands(traced)) {
+    if (!term->is<sq::Product>()) continue;
+    // Spin tracing may rename a dummy to the number of an output with the
+    // other spin, so only once-occurring indices identify the outputs.
+    std::map<sq::Index, int> occurrences;
+    for (const auto& factor : term->as<sq::Product>().factors())
+      for (const auto& index : factor->as<sq::Tensor>().const_braket_indices())
+        ++occurrences[index];
+    std::map<sq::Index, sq::Index> labelled;
+    for (const auto& [index, count] : occurrences)
+      if (count == 1) labelled.emplace(sq::mbpt::make_spinfree(index), index);
+    const auto spin = [&](int axis) {
+      return sq::mbpt::to_spin(labelled.at(output[axis]).space().qns()) ==
+             sq::mbpt::Spin::beta;
     };
-    if (std::any_of(sources.begin(), sources.end(), [&](const auto& source) {
-          int change = 0;
-          for (const auto& index : source.bra()) change += spin(index);
-          for (const auto& index : source.ket()) change -= spin(index);
-          return change != 0;
-        }))
-      continue;
-    std::map<sq::Index, sq::Index> spin_indices;
-    for (const auto& index : indices)
-      spin_indices.emplace(index, spin(index) == 0
-                                      ? sq::mbpt::make_spinalpha(index)
-                                      : sq::mbpt::make_spinbeta(index));
-    auto expression = sq::ex<sq::Constant>(product.scalar());
-    for (auto source : sources) {
-      source.transform_indices(spin_indices);
-      source.reset_tags();
-      if (source.bra_rank() == 1) {
-        source.set_label(std::wstring(source.label()) +
-                         (sq::mbpt::to_spin(source.bra()[0].space().qns()) ==
-                                  sq::mbpt::Spin::beta
-                              ? L"1"
-                              : L"0"));
-        expression *= sq::ex<sq::Tensor>(source);
-      } else {
-        expression *= sq::mbpt::expand_antisymm(sq::Tensor(
-            source.label(), sq::bra(source.bra()), sq::ket(source.ket()),
-            sq::TensorSymmetries{.perm = sq::Symmetry::Antisymm}));
-      }
-    }
-    sq::expand(expression);
-    sq::rapid_simplify(expression);
-    const auto spatial_coefficient = sq::mbpt::remove_spin(expression);
 
     for (const auto& reduction : reductions) {
       if (std::any_of(reduction.pairs.begin(), reduction.pairs.end(),
                       [&](const auto& pair) {
-                        return spin(output[pair.first]) !=
-                               spin(output[pair.second]);
+                        return spin(pair.first) != spin(pair.second);
                       }))
         continue;
-      std::vector<sq::Index> target;
-      for (const int axis : reduction.remaining) target.push_back(output[axis]);
+      std::vector<int> target(reduction.remaining);
       const int rank = target.size() / 2;
-      double phase = reduction.coefficient;
       if (rank == 1 && spin(target[0]) != spin(target[1])) continue;
+      double phase = reduction.coefficient;
+      int spin_case = rank == 1 ? spin(target[0]) : 0;
       if (rank == 2) {
-        // Store only the alpha-beta two-body channel; antisymmetry fixes the
-        // signs when a creator or annihilator pair needs to be swapped.
-        if (spin(target[0]) == spin(target[1]) ||
-            spin(target[2]) == spin(target[3]))
-          continue;
-        for (const int axis : {0, 2})
-          if (spin(target[axis]) == 1) {
-            std::swap(target[axis], target[axis + 1]);
-            phase = -phase;
-          }
+        if (spin(target[0]) == spin(target[1])) {
+          spin_case = spin(target[0]) ? 2 : 0;
+        } else {
+          // aabb outputs put alpha first in both pairs; each swap flips sign.
+          spin_case = 1;
+          for (const int axis : {0, 2})
+            if (spin(target[axis])) {
+              std::swap(target[axis], target[axis + 1]);
+              phase = -phase;
+            }
+        }
       }
-      expression = sq::ex<sq::Constant>(phase) * spatial_coefficient->clone();
+      auto expression = sq::ex<sq::Constant>(phase) * term->clone();
       for (const auto& [creator, annihilator] : reduction.pairs)
         expression *= sq::ex<sq::Tensor>(
-            L"D", sq::bra{output[annihilator]}, sq::ket{output[creator]},
+            L"D", sq::bra{labelled.at(output[annihilator])},
+            sq::ket{labelled.at(output[creator])},
             sq::TensorSymmetries{.hermiticity = sq::Hermiticity::Hermitian});
 
       // Give equivalent free outputs the same names before combining terms.
-      // Ordinals 21..24 stay clear of the operand indices 1..8.
       std::map<sq::Index, sq::Index> output_names;
       for (std::size_t axis = 0; axis < target.size(); ++axis)
-        output_names.emplace(target[axis],
-                             sq::Index(L"u_" + std::to_wstring(21 + axis)));
+        output_names.emplace(labelled.at(output[target[axis]]),
+                             output_index(rank, spin_case, axis));
       expression->visit(
           [&](sq::ExprPtr& factor) {
             if (!factor->is<sq::Tensor>()) return;
@@ -504,8 +569,7 @@ void accumulate_projected_term(const sq::Product& product,
           true);
       sq::expand(expression);
       sq::rapid_simplify(expression);
-      auto& sum =
-          sums[{rank, rank == 1 ? spin(target[0]) : 0, reduction.pairs.size()}];
+      auto& sum = sums[{rank, spin_case, reduction.pairs.size()}];
       for (auto summand : summands(expression)) {
         sq::canonicalize(summand);
         sq::rapid_simplify(summand);
@@ -560,12 +624,12 @@ Equations derive() {
         }
 
   for (auto& [key, sum] : sums) {
-    const auto [rank, spin, density_order] = key;
+    const auto [rank, spin_case, density_order] = key;
     const auto expression = sum.make_expr(true);
     std::vector<sq::Index> bra, ket;
     for (int axis = 0; axis < rank; ++axis) {
-      bra.emplace_back(L"u_" + std::to_wstring(21 + axis));
-      ket.emplace_back(L"u_" + std::to_wstring(21 + rank + axis));
+      bra.push_back(output_index(rank, spin_case, axis));
+      ket.push_back(output_index(rank, spin_case, rank + axis));
     }
     for (const auto& term : summands(expression)) {
       if (term->is_zero()) continue;
@@ -574,7 +638,7 @@ Equations derive() {
                     : sq::ResultExpr(
                           sq::Tensor(L"F", sq::bra(bra), sq::ket(ket)), term);
       equations.terms.push_back(
-          {std::move(result), rank, spin, density_order != 0});
+          {std::move(result), rank, spin_case, density_order != 0});
     }
   }
   return equations;
@@ -586,7 +650,7 @@ const Equations& reusable_equations() {
 }
 
 Plans build_plans(const Equations& equations,
-                  const std::array<std::size_t, 3>& extents) {
+                  const std::array<std::size_t, 3>& extents, bool spin_free) {
   auto context = sq::set_scoped_default_context(
       {.index_space_registry_shared_ptr = equations.spaces,
        .vacuum = sq::Vacuum::SingleProduct});
@@ -596,6 +660,8 @@ Plans build_plans(const Equations& equations,
   };
   Plans plans;
   for (const auto& term : equations.terms) {
+    // Spin-free input needs only the alpha one-body and aabb outputs.
+    if (spin_free && term.spin_case != (term.rank == 2 ? 1 : 0)) continue;
     auto result = term.result;
     result.expression() = result.expression()->clone();
     // Only density-folded products have more than two tensor factors.
@@ -608,28 +674,32 @@ Plans build_plans(const Equations& equations,
       plans.maximum_rank =
           std::max(plans.maximum_rank, node->canon_indices().size());
     });
-    plans.plans.push_back({std::move(tree), term.rank, term.spin, term.folded});
+    plans.plans.push_back(
+        {std::move(tree), term.rank, term.spin_case, term.folded});
   }
   return plans;
 }
 
 std::shared_ptr<const Plans> reusable_plans(std::size_t inactive,
                                             std::size_t active,
-                                            std::size_t virtuals) {
+                                            std::size_t virtuals,
+                                            bool spin_free) {
   // Plans touching an empty role are skipped, so empty roles share extent one.
   const std::array<std::size_t, 3> extents{std::max<std::size_t>(inactive, 1),
                                            std::max<std::size_t>(active, 1),
                                            std::max<std::size_t>(virtuals, 1)};
-  // Plan sets are large, so only the latest extents are kept.
+  // Plan sets are large, so only the latest one is kept.
   static std::mutex mutex;
   static std::array<std::size_t, 3> cached_extents{};
+  static bool cached_spin_free = false;
   static std::shared_ptr<const Plans> cached;
   const std::lock_guard lock(mutex);
-  if (!cached || cached_extents != extents) {
+  if (!cached || cached_extents != extents || cached_spin_free != spin_free) {
     cached.reset();
     cached = std::make_shared<const Plans>(
-        build_plans(reusable_equations(), extents));
+        build_plans(reusable_equations(), extents, spin_free));
     cached_extents = extents;
+    cached_spin_free = spin_free;
   }
   return cached;
 }
@@ -640,24 +710,31 @@ DerivationStatistics downfold_statistics(std::size_t inactive,
                                          std::size_t virtuals) {
   const auto& equations = reusable_equations();
   return {equations.projected_terms, equations.terms.size(),
-          reusable_plans(inactive, active, virtuals)->maximum_rank};
+          reusable_plans(inactive, active, virtuals, false)->maximum_rank};
 }
 
-DownfoldResult downfold(
-    const Eigen::MatrixXd& one_alpha, const Eigen::MatrixXd& one_beta,
-    const Eigen::VectorXd& integrals, const Eigen::VectorXd& energies,
-    const std::vector<int>& active, const std::vector<int>& inactive,
-    const std::vector<int>& virtuals, const RegularizerOptions& regularizer,
-    double core_energy, const Eigen::MatrixXd& reference_density) {
-  const int norb = energies.size();
+DownfoldResult downfold(const std::array<Eigen::MatrixXd, 2>& one_body,
+                        const TwoBodyBlocks& two_body,
+                        const std::array<Eigen::VectorXd, 2>& energies,
+                        const std::vector<int>& active,
+                        const std::vector<int>& inactive,
+                        const std::vector<int>& virtuals,
+                        const RegularizerOptions& regularizer,
+                        double core_energy,
+                        const std::array<Eigen::MatrixXd, 2>& density) {
+  const int norb = energies[0].size();
   const int active_count = active.size();
-  const Eigen::Index tensor_size =
-      static_cast<Eigen::Index>(norb) * norb * norb * norb;
-  if (norb <= 0 || active_count == 0 || one_alpha.rows() != norb ||
-      one_alpha.cols() != norb || one_beta.rows() != norb ||
-      one_beta.cols() != norb || integrals.size() != tensor_size ||
-      (reference_density.size() != 0 &&
-       (reference_density.rows() != norb || reference_density.cols() != norb)))
+  const bool fold = density[0].size() != 0;
+  bool consistent = norb > 0 && active_count > 0;
+  for (int spin = 0; spin < 2; ++spin)
+    consistent =
+        consistent && energies[spin].size() == norb &&
+        one_body[spin].rows() == norb && one_body[spin].cols() == norb &&
+        (fold ? density[spin].rows() == norb && density[spin].cols() == norb
+              : density[spin].size() == 0);
+  for (const auto& block : two_body)
+    consistent = consistent && block.get().size() == n4(norb);
+  if (!consistent)
     throw std::invalid_argument(
         "SW-PT2: inconsistent spatial tensor dimensions");
   const std::map<wchar_t, const std::vector<int>*> roles{
@@ -674,52 +751,67 @@ DownfoldResult downfold(
       orbital_roles.end())
     throw std::invalid_argument(
         "SW-PT2: spatial roles do not cover the window");
-  const auto integral = [&](int first, int second, int third, int fourth) {
-    return integrals(idx4(first, second, third, fourth, norb));
+  // A spin-free operator needs only its alpha one-body and aabb blocks.
+  const bool spin_free =
+      spin_symmetric(one_body, two_body, density) && energies[0] == energies[1];
+  const auto integral = [&](int left, int right, int p, int q, int r, int s) {
+    return chemist(two_body, left, right, p, q, r, s, norb);
   };
-  const auto inverse_two_body = [&](int first, int second, int third,
-                                    int fourth) {
-    const double creators = energies(first) + energies(second);
+  const auto inverse_two_body = [&](double first, double second, double third,
+                                    double fourth) {
+    const double creators = first + second;
     // Keep creator-first arithmetic at the bare cutoff; average annihilator
     // orders to preserve their exchange symmetry despite roundoff.
-    return 0.5 *
-           (regularized_inverse(creators - energies(third) - energies(fourth),
-                                regularizer) +
-            regularized_inverse(creators - energies(fourth) - energies(third),
-                                regularizer));
+    return 0.5 * (regularized_inverse(creators - third - fourth, regularizer) +
+                  regularized_inverse(creators - fourth - third, regularizer));
   };
-  const std::array<Eigen::Ref<const Eigen::MatrixXd>, 2> one_body{one_alpha,
-                                                                  one_beta};
   // Normal order against the filled inactive space, not the density used for
   // the generalized Fock. Each generator trace must be regularized separately.
-  std::array<Eigen::MatrixXd, 2> normal_ordered_one_body{one_alpha, one_beta};
-  std::array<Eigen::MatrixXd, 2> generator_one_body{one_alpha, one_beta};
-  for (int row = 0; row < norb; ++row)
-    for (int col = 0; col < norb; ++col) {
-      for (auto& block : generator_one_body)
-        block(row, col) *=
-            regularized_inverse(energies(row) - energies(col), regularizer);
-      for (const int occupied : inactive) {
-        const double trace = 2 * integral(row, col, occupied, occupied) -
-                             integral(row, occupied, occupied, col);
-        for (int spin = 0; spin < 2; ++spin) {
+  std::array<Eigen::MatrixXd, 2> normal_ordered_one_body = one_body;
+  std::array<Eigen::MatrixXd, 2> generator_one_body = one_body;
+  for (int spin = 0; spin < 2; ++spin) {
+    const auto& eps = energies[spin];
+    for (int row = 0; row < norb; ++row)
+      for (int col = 0; col < norb; ++col) {
+        generator_one_body[spin](row, col) *=
+            regularized_inverse(eps(row) - eps(col), regularizer);
+        for (const int occupied : inactive) {
+          // Coulomb with both spins of the occupied orbital, exchange with one.
+          double trace = 0.0, generator_trace = 0.0;
+          for (int other = 0; other < 2; ++other) {
+            const double coulomb =
+                integral(spin, other, row, col, occupied, occupied);
+            trace += coulomb;
+            generator_trace +=
+                coulomb * inverse_two_body(eps(row), energies[other](occupied),
+                                           energies[other](occupied), eps(col));
+          }
+          const double exchange =
+              integral(spin, spin, row, occupied, occupied, col);
+          trace -= exchange;
+          generator_trace -=
+              exchange * inverse_two_body(eps(row), eps(occupied),
+                                          eps(occupied), eps(col));
           normal_ordered_one_body[spin](row, col) += trace;
-          generator_one_body[spin](row, col) +=
-              trace * inverse_two_body(row, occupied, occupied, col);
+          generator_one_body[spin](row, col) += generator_trace;
         }
       }
-    }
+  }
 
   // Start with P H_BD P; the contraction plans add 1/2 P [S, H_OD] P below.
   DownfoldResult result;
   result.scalar = core_energy;
-  for (const int occupied : inactive) {
-    result.scalar +=
-        one_body[0](occupied, occupied) + one_body[1](occupied, occupied);
-    for (const int other : inactive)
-      result.scalar += 2 * integral(occupied, occupied, other, other) -
-                       integral(occupied, other, other, occupied);
-  }
+  for (const int occupied : inactive)
+    for (int spin = 0; spin < 2; ++spin) {
+      result.scalar += one_body[spin](occupied, occupied);
+      for (const int other : inactive) {
+        for (int partner = 0; partner < 2; ++partner)
+          result.scalar +=
+              0.5 * integral(spin, partner, occupied, occupied, other, other);
+        result.scalar -=
+            0.5 * integral(spin, spin, occupied, other, other, occupied);
+      }
+    }
   for (int spin = 0; spin < 2; ++spin) {
     result.one_body[spin].resize(active_count, active_count);
     for (int row = 0; row < active_count; ++row)
@@ -727,14 +819,21 @@ DownfoldResult downfold(
         result.one_body[spin](row, col) =
             normal_ordered_one_body[spin](active[row], active[col]);
   }
-  result.two_body.resize(n4(active_count));
-  for (int first = 0; first < active_count; ++first)
-    for (int second = 0; second < active_count; ++second)
-      for (int third = 0; third < active_count; ++third)
-        for (int fourth = 0; fourth < active_count; ++fourth)
-          result.two_body(idx4(first, second, third, fourth, active_count)) =
-              integral(active[first], active[second], active[third],
-                       active[fourth]);
+  const auto active_block = [&](int left, int right) {
+    Eigen::VectorXd block(n4(active_count));
+    for (int first = 0; first < active_count; ++first)
+      for (int second = 0; second < active_count; ++second)
+        for (int third = 0; third < active_count; ++third)
+          for (int fourth = 0; fourth < active_count; ++fourth)
+            block(idx4(first, second, third, fourth, active_count)) =
+                integral(left, right, active[first], active[second],
+                         active[third], active[fourth]);
+    return block;
+  };
+  result.two_body = active_block(0, 1);
+  result.same_spin_two_body =
+      spin_free ? std::array{result.two_body, result.two_body}
+                : std::array{active_block(0, 0), active_block(1, 1)};
   if (inactive.empty() && virtuals.empty()) return result;
 
   // Diagnostics use raw couplings, before normal ordering or damping.
@@ -754,24 +853,38 @@ DownfoldResult downfold(
                          std::max(std::abs(delta), bare_denominator_floor));
       };
       if (orbital_roles[first] != orbital_roles[second])
-        for (const auto& block : one_body)
-          track(block(first, second), energies(first) - energies(second));
+        for (int spin = 0; spin < (spin_free ? 1 : 2); ++spin)
+          track(one_body[spin](first, second),
+                energies[spin](first) - energies[spin](second));
       for (int third = 0; third < norb; ++third)
         for (int fourth = 0; fourth < norb; ++fourth) {
           if (!changes_occupation({orbital_roles[first], orbital_roles[second],
                                    orbital_roles[third],
                                    orbital_roles[fourth]}))
             continue;
-          const double direct = integral(first, third, second, fourth);
-          const double delta = energies(first) + energies(second) -
-                               energies(third) - energies(fourth);
-          track(direct, delta);
-          track(direct - integral(first, fourth, second, third), delta);
+          // Particles (first, third) and (second, fourth); beta-alpha repeats
+          // alpha-beta with the particles swapped.
+          const auto track_pair = [&](int spin, int partner) {
+            const double direct =
+                integral(spin, partner, first, third, second, fourth);
+            const double delta =
+                energies[spin](first) + energies[partner](second) -
+                energies[spin](third) - energies[partner](fourth);
+            track(spin == partner ? direct - integral(spin, spin, first, fourth,
+                                                      second, third)
+                                  : direct,
+                  delta);
+          };
+          track_pair(0, 0);
+          track_pair(0, 1);
+          // Beta-beta repeats alpha-alpha for spin-free input.
+          if (!spin_free) track_pair(1, 1);
         }
     }
   result.min_denominator = min_denominator;
   result.max_amplitude = max_amplitude;
-  using OperandKey = std::tuple<std::wstring, std::vector<wchar_t>>;
+  using OperandKey =
+      std::tuple<std::wstring, std::vector<wchar_t>, std::vector<int>>;
   std::map<OperandKey, sq::ResultPtr> operand_cache;
   const auto evaluate_leaf =
       [&](const sq::EvalNodeBTAS& node) -> sq::ResultPtr {
@@ -780,21 +893,27 @@ DownfoldResult downfold(
           node->as_constant().value<double>());
     const auto& source = node->as_tensor();
     std::vector<wchar_t> block_roles;
+    std::vector<int> spins;
     std::vector<const std::vector<int>*> orbitals;
     std::vector<std::size_t> extents;
     for (const auto& index : source.const_braket_indices()) {
       block_roles.push_back(index.space().base_key()[0]);
+      spins.push_back(!spin_free && sq::mbpt::to_spin(index.space().qns()) ==
+                                        sq::mbpt::Spin::beta);
       orbitals.push_back(roles.at(block_roles.back()));
       extents.push_back(orbitals.back()->size());
     }
-    const OperandKey key{std::wstring(source.label()), block_roles};
+    const OperandKey key{std::wstring(source.label()), block_roles, spins};
     if (operand_cache.contains(key)) return operand_cache.at(key);
-    const bool is_generator = source.label()[0] == L'S';
+    const bool is_generator = source.label() == L"S";
     const bool is_density = source.label() == L"D";
     const bool is_one_body = source.bra_rank() == 1;
+    // Two-body slots (0, 2) and (1, 3) belong to the same particle.
+    const int spin = spins[0], partner = is_one_body ? spin : spins[1];
     const auto& one_body_block =
-        (is_generator ? generator_one_body
-                      : normal_ordered_one_body)[source.label().back() == L'1'];
+        (is_generator ? generator_one_body : normal_ordered_one_body)[spin];
+    const auto& eps = energies[spin];
+    const auto& partner_eps = energies[partner];
     Tensor values{btas::Range{extents}};
     const auto size = static_cast<std::ptrdiff_t>(values.size());
 #pragma omp parallel for schedule(static) if (size >= min_parallel_work)
@@ -808,16 +927,16 @@ DownfoldResult downfold(
       }
       double value;
       if (is_density) {
-        // D is spin traced; a spin-diagonal Gaussian contraction uses D/2.
-        value = 0.5 * reference_density(orbital[1], orbital[0]);
+        value = density[spin](orbital[1], orbital[0]);
       } else if (is_one_body) {
         value = one_body_block(orbital[0], orbital[1]);
       } else {
-        // Symbolic (bra, ket) slots map to spatial chemist (pq|rs) order.
-        value = integral(orbital[0], orbital[2], orbital[1], orbital[3]);
+        // Symbolic (bra, ket) slots map to chemist (pq|rs) order.
+        value = integral(spin, partner, orbital[0], orbital[2], orbital[1],
+                         orbital[3]);
         if (is_generator)
-          value *=
-              inverse_two_body(orbital[0], orbital[1], orbital[2], orbital[3]);
+          value *= inverse_two_body(eps(orbital[0]), partner_eps(orbital[1]),
+                                    eps(orbital[2]), partner_eps(orbital[3]));
       }
       values.data()[ordinal] = value;
     }
@@ -828,10 +947,10 @@ DownfoldResult downfold(
   };
   // SeQuant's BTAS evaluation updates a process-wide label map, so plans run
   // serially.
-  const auto plans =
-      reusable_plans(inactive.size(), active.size(), virtuals.size());
+  const auto plans = reusable_plans(inactive.size(), active.size(),
+                                    virtuals.size(), spin_free);
   for (const auto& plan : plans->plans) {
-    if (plan.folded && reference_density.size() == 0) continue;
+    if (plan.folded && !fold) continue;
     bool empty = false;
     plan.tree.visit([&](const auto& node) {
       if (!node.leaf() || !node->is_tensor()) return;
@@ -852,16 +971,26 @@ DownfoldResult downfold(
                                       plan.tree->canon_indices().end(), index) -
                             plan.tree->canon_indices().begin());
     for (const auto& index : values.range()) {
+      const auto at = [&](int axis) { return index[output_axes[axis]]; };
       if (plan.rank == 1) {
-        result.one_body[plan.spin](index[output_axes[0]],
-                                   index[output_axes[1]]) += values(index);
-      } else {
-        // Chemist storage reverses the annihilator pair, giving the minus sign.
-        result.two_body(idx4(index[output_axes[0]], index[output_axes[2]],
-                             index[output_axes[1]], index[output_axes[3]],
-                             active_count)) -= values(index);
+        result.one_body[plan.spin_case](at(0), at(1)) += values(index);
+        continue;
       }
+      // Chemist storage reverses the annihilator pair, giving the minus sign.
+      if (plan.spin_case == 1) {
+        result.two_body(idx4(at(0), at(2), at(1), at(3), active_count)) -=
+            values(index);
+        continue;
+      }
+      // A same-spin block also takes the copy with the particles exchanged.
+      auto& block = result.same_spin_two_body[plan.spin_case / 2];
+      block(idx4(at(0), at(2), at(1), at(3), active_count)) -= values(index);
+      block(idx4(at(1), at(3), at(0), at(2), active_count)) -= values(index);
     }
+  }
+  if (spin_free) {
+    result.one_body[1] = result.one_body[0];
+    result.same_spin_two_body = {result.two_body, result.two_body};
   }
   return result;
 }

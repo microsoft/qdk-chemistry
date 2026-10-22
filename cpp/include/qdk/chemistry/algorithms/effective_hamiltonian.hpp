@@ -22,9 +22,7 @@ namespace qdk::chemistry::algorithms {
  * specified target P-space.
  *
  * @c p_indices holds absolute molecular-orbital indices, drawn from the same
- * index universe as @c data::Orbitals::active_indices(). They select the target
- * space out of the input Hamiltonian's active window, independently of the
- * reference wavefunction's own active space.
+ * index universe as @c data::Orbitals::active_indices().
  *
  * The returned Hamiltonian is expressed over P and must satisfy:
  * - its orbitals have @c active_indices() equal to @c p_indices;

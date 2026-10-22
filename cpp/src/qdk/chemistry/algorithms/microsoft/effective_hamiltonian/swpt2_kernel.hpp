@@ -12,12 +12,11 @@
 // instead builds a regularized generator, which solves that equation only
 // approximately. In either case the implemented
 // approximation is H_eff = H_BD + 1/2 [S, H_OD], projected onto the reference
-// external occupation and truncated to <= 2-body. The projected commutator is
-// evaluated by SeQuant-derived contractions over spatial spin blocks.
+// external occupation and truncated to <= 2-body. SeQuant spin-traces the
+// projected commutator into contractions over spatial alpha/beta blocks.
 //
-// Representation: separate spatial alpha/beta one-body blocks and chemist
-// two-body integrals (pq|rs), with spin resolved by SeQuant contractions.
-// Spatial two-body tensors are stored flat in C-order
+// Representation: per-spin one-body blocks and chemist aaaa, aabb and bbbb
+// two-body blocks (pq|rs), stored flat in C-order
 // (index = ((p*norb + q)*norb + r)*norb + s).
 //
 // References:
@@ -36,6 +35,7 @@
 #include <Eigen/Dense>
 #include <array>
 #include <cstddef>
+#include <functional>
 #include <limits>
 #include <unordered_set>
 #include <vector>
@@ -69,15 +69,19 @@ struct RegularizerOptions {
 /// Regularized inverse energy denominator.
 double regularized_inverse(double delta, const RegularizerOptions& reg);
 
-/// Spin-free generalized Fock matrix
-/// F_pq = h_pq + sum_rs D_rs [(pq|rs) - 1/2 (pr|sq)]. Its diagonal supplies the
-/// denominator energies; the density is spin-traced, so eps_alpha == eps_beta
-/// and H0 preserves S^2. High-spin states are realized by the active-space
-/// solve, not by polarizing this reference.
-Eigen::MatrixXd generalized_fock_matrix(const Eigen::MatrixXd& h1,
-                                        const Eigen::VectorXd& two_body,
-                                        const Eigen::MatrixXd& density,
-                                        int norb);
+/// Chemist aaaa, aabb and bbbb two-body blocks, which may alias.
+using TwoBodyBlocks =
+    std::array<std::reference_wrapper<const Eigen::VectorXd>, 3>;
+
+/// Generalized Fock matrices from per-spin 1-RDMs D^s,
+/// F^s_pq = h^s_pq + sum_t sum_rs D^t_rs (pq|rs)^st - sum_rs D^s_rs (pr|sq)^ss.
+/// Their diagonals supply the denominator energies. A restricted caller splits
+/// the spin-traced density evenly, so eps_alpha == eps_beta and H0 preserves
+/// S^2; high-spin states are then realized by the active-space solve.
+std::array<Eigen::MatrixXd, 2> generalized_fock_matrices(
+    const std::array<Eigen::MatrixXd, 2>& one_body,
+    const TwoBodyBlocks& two_body,
+    const std::array<Eigen::MatrixXd, 2>& density, int norb);
 
 /// Block-diagonal orthogonal rotation that diagonalizes each Fock sub-block.
 /// Blocks contain spatial-orbital indices and must be disjoint. Blocks whose
@@ -95,10 +99,19 @@ Eigen::MatrixXd rotate_one_body(const Eigen::MatrixXd& one_body,
 Eigen::VectorXd rotate_two_body(const Eigen::VectorXd& two_body,
                                 const Eigen::MatrixXd& rotation, int norb);
 
+/// Transform chemist integrals whose (pq) and (rs) pairs rotate separately,
+/// as the aabb block of unrestricted orbitals does.
+Eigen::VectorXd rotate_two_body(const Eigen::VectorXd& two_body,
+                                const Eigen::MatrixXd& first_pair,
+                                const Eigen::MatrixXd& second_pair, int norb);
+
 struct DownfoldResult {
   double scalar = 0.0;
   std::array<Eigen::MatrixXd, 2> one_body;
+  /// Chemist aabb block; the spin-free integrals for spin-symmetric input.
   Eigen::VectorXd two_body;
+  /// Chemist aaaa and bbbb blocks, which are fixed only up to exchange.
+  std::array<Eigen::VectorXd, 2> same_spin_two_body;
   double min_denominator = std::numeric_limits<double>::infinity();
   double max_amplitude = 0.0;
 };
@@ -112,21 +125,17 @@ DerivationStatistics downfold_statistics(std::size_t inactive,
                                          std::size_t active,
                                          std::size_t virtuals);
 
-DownfoldResult downfold(
-    const Eigen::MatrixXd& one_alpha, const Eigen::MatrixXd& one_beta,
-    const Eigen::VectorXd& integrals, const Eigen::VectorXd& energies,
-    const std::vector<int>& active, const std::vector<int>& inactive,
-    const std::vector<int>& virtuals, const RegularizerOptions& regularizer,
-    double core_energy, const Eigen::MatrixXd& reference_density = {});
-
-/// Downfolded active-space operator as compact spatial (chemist) integrals,
-/// ready to feed a qdk CanonicalFourCenter Hamiltonian.
-struct ActiveHamiltonian {
-  int norb = 0;              ///< number of active spatial orbitals
-  double core_energy = 0.0;  ///< scalar (folded core + downfold shift)
-  Eigen::MatrixXd one_body;  ///< (norb, norb) spatial one-body
-  Eigen::VectorXd two_body;  ///< (norb^4,) chemist (pq|rs), C-order
-};
+/// Spin-blocked downfold. `density` holds the per-spin reference 1-RDMs used
+/// to fold terms above two-body; leave it empty to discard them.
+DownfoldResult downfold(const std::array<Eigen::MatrixXd, 2>& one_body,
+                        const TwoBodyBlocks& two_body,
+                        const std::array<Eigen::VectorXd, 2>& energies,
+                        const std::vector<int>& active,
+                        const std::vector<int>& inactive,
+                        const std::vector<int>& virtuals,
+                        const RegularizerOptions& regularizer,
+                        double core_energy,
+                        const std::array<Eigen::MatrixXd, 2>& density = {});
 
 /// Window roles chosen by the folding policy, plus the rounding diagnostics a
 /// caller needs to judge how much the fold perturbed the reference density.

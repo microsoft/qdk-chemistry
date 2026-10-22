@@ -38,8 +38,18 @@ struct OneBodyCase {
   std::array<Eigen::MatrixXd, 2> one_body;
   Eigen::VectorXd energies;
   Eigen::VectorXd integrals;
+  // Unequal spin blocks; when empty, `energies` and `integrals` serve both.
+  Eigen::VectorXd beta_energies;
+  std::array<Eigen::VectorXd, 2> same_spin_integrals;
 
   int norb() const { return energies.size(); }
+  const Eigen::VectorXd& spin_energies(int spin) const {
+    return spin == 1 && beta_energies.size() != 0 ? beta_energies : energies;
+  }
+  const Eigen::VectorXd& same_spin(int spin) const {
+    return same_spin_integrals[spin].size() != 0 ? same_spin_integrals[spin]
+                                                 : integrals;
+  }
 };
 
 OneBodyCase make_case(std::vector<int> active, std::vector<int> inactive,
@@ -89,6 +99,36 @@ void populate_two_body(OneBodyCase& inputs) {
   inputs.integrals = std::move(integrals);
 }
 
+// Distinct aaaa, aabb and bbbb blocks and beta energies. Same-spin blocks keep
+// all eight permutation symmetries, aabb only those within each particle.
+void make_unrestricted(OneBodyCase& inputs) {
+  const int norb = inputs.norb();
+  std::mt19937 generator(7);
+  std::uniform_real_distribution<double> coupling(-0.02, 0.02);
+  const auto random_block = [&](bool same_spin) {
+    Eigen::VectorXd block(norb * norb * norb * norb);
+    for (int first = 0; first < norb; ++first)
+      for (int second = first; second < norb; ++second)
+        for (int third = 0; third < norb; ++third)
+          for (int fourth = third; fourth < norb; ++fourth) {
+            const double value = coupling(generator);
+            for (const auto& [p, q] :
+                 {std::pair{first, second}, std::pair{second, first}})
+              for (const auto& [r, s] :
+                   {std::pair{third, fourth}, std::pair{fourth, third}}) {
+                block(sw::idx4(p, q, r, s, norb)) = value;
+                if (same_spin) block(sw::idx4(r, s, p, q, norb)) = value;
+              }
+          }
+    return block;
+  };
+  inputs.same_spin_integrals = {random_block(true), random_block(true)};
+  inputs.integrals = random_block(false);
+  inputs.beta_energies = inputs.energies;
+  for (int orbital = 0; orbital < norb; ++orbital)
+    inputs.beta_energies(orbital) += 0.07 * std::cos(1.3 * orbital);
+}
+
 Eigen::MatrixXd make_density(const OneBodyCase& inputs, int kind) {
   const int norb = inputs.norb();
   Eigen::MatrixXd density = Eigen::MatrixXd::Zero(norb, norb);
@@ -113,14 +153,55 @@ Eigen::MatrixXd make_density(const OneBodyCase& inputs, int kind) {
   return density;
 }
 
+// A spin-traced `reference_density` splits evenly unless `beta_density` is
+// given, in which case `reference_density` is the alpha density.
+std::array<Eigen::MatrixXd, 2> spin_densities(
+    const Eigen::MatrixXd& reference_density,
+    const Eigen::MatrixXd& beta_density) {
+  if (beta_density.size() != 0) return {reference_density, beta_density};
+  std::array<Eigen::MatrixXd, 2> density;
+  if (reference_density.size() != 0)
+    density.fill(Eigen::MatrixXd(0.5 * reference_density));
+  return density;
+}
+
 sw::DownfoldResult run_native(const OneBodyCase& inputs,
                               const sw::RegularizerOptions& regularizer,
                               const Eigen::MatrixXd& reference_density = {},
-                              double core_energy = 0.17) {
-  return sw::downfold(inputs.one_body[0], inputs.one_body[1], inputs.integrals,
-                      inputs.energies, inputs.active, inputs.inactive,
-                      inputs.virtuals, regularizer, core_energy,
-                      reference_density);
+                              double core_energy = 0.17,
+                              const Eigen::MatrixXd& beta_density = {}) {
+  return sw::downfold(
+      inputs.one_body,
+      {std::cref(inputs.same_spin(0)), std::cref(inputs.integrals),
+       std::cref(inputs.same_spin(1))},
+      {inputs.spin_energies(0), inputs.spin_energies(1)}, inputs.active,
+      inputs.inactive, inputs.virtuals, regularizer, core_energy,
+      spin_densities(reference_density, beta_density));
+}
+
+// Integrals and energies are shared by both spins; one-body blocks may differ.
+sw::DownfoldResult shared_integral_downfold(
+    const Eigen::MatrixXd& alpha, const Eigen::MatrixXd& beta,
+    const Eigen::VectorXd& integrals, const Eigen::VectorXd& energies,
+    const std::vector<int>& active, const std::vector<int>& inactive,
+    const std::vector<int>& virtuals, const sw::RegularizerOptions& regularizer,
+    double core_energy) {
+  return sw::downfold(
+      {alpha, beta},
+      {std::cref(integrals), std::cref(integrals), std::cref(integrals)},
+      {energies, energies}, active, inactive, virtuals, regularizer,
+      core_energy);
+}
+
+// The generalized Fock matrix of a spin-traced density and spin-free integrals.
+Eigen::MatrixXd spin_free_fock(const Eigen::MatrixXd& one_body,
+                               const Eigen::VectorXd& integrals,
+                               const Eigen::MatrixXd& density, int norb) {
+  const Eigen::MatrixXd half = 0.5 * density;
+  return sw::generalized_fock_matrices(
+      {one_body, one_body},
+      {std::cref(integrals), std::cref(integrals), std::cref(integrals)},
+      {half, half}, norb)[0];
 }
 
 struct FockParts {
@@ -191,8 +272,10 @@ FockParts fock_parts(const OneBodyCase& inputs,
       for (const int index : annihilators) change -= roles[index / 2] == role;
       off_diagonal = off_diagonal || change != 0;
     }
-    for (const int index : creators) delta += inputs.energies(index / 2);
-    for (const int index : annihilators) delta -= inputs.energies(index / 2);
+    for (const int index : creators)
+      delta += inputs.spin_energies(index % 2)(index / 2);
+    for (const int index : annihilators)
+      delta -= inputs.spin_energies(index % 2)(index / 2);
     const double inverse =
         regularizer.sigma2 == 0.0
             ? (std::abs(delta) < 1e-8 ? 0.0 : 1.0 / delta)
@@ -224,10 +307,12 @@ FockParts fock_parts(const OneBodyCase& inputs,
                {2 * second + spin});
   const auto ordered = [&](int first, int second, int third, int fourth) {
     if (first % 2 != fourth % 2 || second % 2 != third % 2) return 0.0;
-    const double integral = inputs.integrals(
-        sw::idx4(first / 2, fourth / 2, second / 2, third / 2, norb));
-    if (first % 2 == second % 2) return 0.5 * integral;
-    return first % 2 == 0 ? integral : 0.0;
+    const bool same_spin = first % 2 == second % 2;
+    if (!same_spin && first % 2 != 0) return 0.0;
+    const double integral =
+        (same_spin ? inputs.same_spin(first % 2) : inputs.integrals)(
+            sw::idx4(first / 2, fourth / 2, second / 2, third / 2, norb));
+    return same_spin ? 0.5 * integral : integral;
   };
   const int spin_count = 2 * norb;
   for (int first = 0; first < spin_count; ++first)
@@ -242,10 +327,12 @@ FockParts fock_parts(const OneBodyCase& inputs,
   return result;
 }
 
-sw::DownfoldResult project_fock_reference(const OneBodyCase& inputs,
-                                          const FockParts& parts,
-                                          const Eigen::MatrixXd& density = {}) {
+sw::DownfoldResult project_fock_reference(
+    const OneBodyCase& inputs, const FockParts& parts,
+    const Eigen::MatrixXd& density = {},
+    const Eigen::MatrixXd& beta_density = {}) {
   using Matrix = Eigen::MatrixXd;
+  const auto spin_density = spin_densities(density, beta_density);
   const int count = inputs.active.size(), spin_count = 2 * count;
   const int dimension = 1 << spin_count;
   unsigned external = 0;
@@ -322,9 +409,8 @@ sw::DownfoldResult project_fock_reference(const OneBodyCase& inputs,
             const int annihilator = remaining[partner].first;
             if (remaining[partner].second || creator % 2 != annihilator % 2)
               continue;
-            const double contraction =
-                0.5 * density(inputs.active[creator / 2],
-                              inputs.active[annihilator / 2]);
+            const double contraction = spin_density[creator % 2](
+                inputs.active[creator / 2], inputs.active[annihilator / 2]);
             if (contraction == 0.0) continue;
             auto reduced = remaining;
             reduced.erase(reduced.begin() + partner);
@@ -363,6 +449,25 @@ sw::DownfoldResult project_fock_reference(const OneBodyCase& inputs,
           result.two_body(sw::idx4(first, second, third, fourth, count)) =
               sign * (folded(bra, ket) - one_body(bra, ket));
         }
+  // Same-spin elements fix only the exchange-antisymmetrized combination.
+  for (int spin = 0; spin < 2; ++spin) {
+    auto& block = result.same_spin_two_body[spin];
+    block = Eigen::VectorXd::Zero(count * count * count * count);
+    for (int first = 0; first < count; ++first)
+      for (int second = 0; second < count; ++second)
+        for (int third = 0; third < count; ++third)
+          for (int fourth = 0; fourth < count; ++fourth) {
+            if (first == third || second == fourth) continue;
+            const unsigned bra =
+                (1u << (2 * first + spin)) | (1u << (2 * third + spin));
+            const unsigned ket =
+                (1u << (2 * second + spin)) | (1u << (2 * fourth + spin));
+            const double sign =
+                (first < third ? 0.5 : -0.5) * (second < fourth ? 1.0 : -1.0);
+            block(sw::idx4(first, second, third, fourth, count)) =
+                sign * (folded(bra, ket) - one_body(bra, ket));
+          }
+  }
   result.min_denominator = parts.min_denominator;
   result.max_amplitude = parts.max_amplitude;
   return result;
@@ -371,9 +476,25 @@ sw::DownfoldResult project_fock_reference(const OneBodyCase& inputs,
 sw::DownfoldResult fock_reference(const OneBodyCase& inputs,
                                   const sw::RegularizerOptions& regularizer,
                                   const Eigen::MatrixXd& density = {},
-                                  double core_energy = 0.17) {
-  return project_fock_reference(
-      inputs, fock_parts(inputs, regularizer, core_energy), density);
+                                  double core_energy = 0.17,
+                                  const Eigen::MatrixXd& beta_density = {}) {
+  return project_fock_reference(inputs,
+                                fock_parts(inputs, regularizer, core_energy),
+                                density, beta_density);
+}
+
+// The particle-exchange-antisymmetrized same-spin block, which unlike the
+// block itself does not depend on the representation.
+Eigen::VectorXd antisymmetrized(const Eigen::VectorXd& block, int count) {
+  Eigen::VectorXd result(block.size());
+  for (int first = 0; first < count; ++first)
+    for (int second = 0; second < count; ++second)
+      for (int third = 0; third < count; ++third)
+        for (int fourth = 0; fourth < count; ++fourth)
+          result(sw::idx4(first, second, third, fourth, count)) =
+              block(sw::idx4(first, second, third, fourth, count)) -
+              block(sw::idx4(first, fourth, third, second, count));
+  return result;
 }
 
 void compare(const sw::DownfoldResult& actual,
@@ -386,6 +507,16 @@ void compare(const sw::DownfoldResult& actual,
         5e-12 * (1.0 + expected.one_body[spin].cwiseAbs().maxCoeff()));
   EXPECT_LT((actual.two_body - expected.two_body).cwiseAbs().maxCoeff(),
             5e-12 * (1.0 + expected.two_body.cwiseAbs().maxCoeff()));
+  const int count = expected.one_body[0].rows();
+  for (int spin = 0; spin < 2; ++spin) {
+    const auto reference =
+        antisymmetrized(expected.same_spin_two_body[spin], count);
+    EXPECT_LT(
+        (antisymmetrized(actual.same_spin_two_body[spin], count) - reference)
+            .cwiseAbs()
+            .maxCoeff(),
+        5e-12 * (1.0 + reference.cwiseAbs().maxCoeff()));
+  }
   EXPECT_DOUBLE_EQ(actual.min_denominator, expected.min_denominator);
   EXPECT_DOUBLE_EQ(actual.max_amplitude, expected.max_amplitude);
 }
@@ -397,6 +528,7 @@ Eigen::MatrixXd fock_matrix(const sw::DownfoldResult& result) {
   auto inputs = make_case(active, {}, {});
   inputs.one_body = result.one_body;
   inputs.integrals = result.two_body;
+  inputs.same_spin_integrals = result.same_spin_two_body;
   return fock_parts(inputs, {}, result.scalar).diagonal;
 }
 
@@ -410,14 +542,14 @@ TEST(Swpt2KernelTest, RestoresCallerContextAndReusesPlans) {
   one_body << -0.5, 0.1, 0.1, 2.0;
   const Eigen::VectorXd integrals = Eigen::VectorXd::Zero(16);
   const Eigen::VectorXd energies = one_body.diagonal();
-  const auto identity = sw::downfold(one_body, one_body, integrals, energies,
-                                     {0, 1}, {}, {}, {}, 0.4);
+  const auto identity = shared_integral_downfold(
+      one_body, one_body, integrals, energies, {0, 1}, {}, {}, {}, 0.4);
   EXPECT_EQ(sequant::get_default_context(), original_context);
   EXPECT_DOUBLE_EQ(identity.scalar, 0.4);
   EXPECT_LT((identity.one_body[0] - one_body).norm(), 1e-14);
   const sw::RegularizerOptions regularizer{0.8};
-  const auto first = sw::downfold(one_body, one_body, integrals, energies, {0},
-                                  {}, {1}, regularizer, 0.4);
+  const auto first = shared_integral_downfold(
+      one_body, one_body, integrals, energies, {0}, {}, {1}, regularizer, 0.4);
   EXPECT_EQ(sequant::get_default_context(), original_context);
   EXPECT_NEAR(first.one_body[0](0, 0),
               -0.5 + 0.01 * sw::regularized_inverse(-2.5, regularizer), 1e-14);
@@ -426,8 +558,8 @@ TEST(Swpt2KernelTest, RestoresCallerContextAndReusesPlans) {
            sequant::mbpt::SpinConvention::Legacy),
        .vacuum = sequant::Vacuum::SingleProduct});
   const auto alternate = sequant::get_default_context();
-  const auto second = sw::downfold(one_body, one_body, integrals, energies, {0},
-                                   {}, {1}, regularizer, 0.4);
+  const auto second = shared_integral_downfold(
+      one_body, one_body, integrals, energies, {0}, {}, {1}, regularizer, 0.4);
   EXPECT_EQ(sequant::get_default_context(), alternate);
   EXPECT_NEAR(second.scalar, first.scalar, 1e-14);
   EXPECT_LT((second.one_body[0] - first.one_body[0]).norm(), 1e-14);
@@ -439,7 +571,7 @@ TEST(Swpt2KernelTest, DerivationStatistics) {
        {std::array<std::size_t, 3>{10, 10, 10}, {2, 4, 60}, {30, 6, 200}}) {
     const auto statistics = sw::downfold_statistics(inactive, active, virtuals);
     EXPECT_EQ(statistics.projected_terms, 102);
-    EXPECT_EQ(statistics.contractions, 420);
+    EXPECT_EQ(statistics.contractions, 984);
     EXPECT_EQ(statistics.maximum_rank, 4);
   }
 }
@@ -458,17 +590,20 @@ TEST(Swpt2KernelTest, ThreadCountDoesNotChangeResults) {
   const int threads = omp_get_max_threads();
   omp_set_num_threads(1);
   const auto serial = run_native(inputs, regularizer, density);
-  const Eigen::MatrixXd serial_fock = sw::generalized_fock_matrix(
+  const Eigen::MatrixXd serial_fock = spin_free_fock(
       inputs.one_body[0], inputs.integrals, density, inputs.norb());
   omp_set_num_threads(4);
   const auto parallel = run_native(inputs, regularizer, density);
-  const Eigen::MatrixXd parallel_fock = sw::generalized_fock_matrix(
+  const Eigen::MatrixXd parallel_fock = spin_free_fock(
       inputs.one_body[0], inputs.integrals, density, inputs.norb());
   omp_set_num_threads(threads);
   EXPECT_EQ(serial.scalar, parallel.scalar);
   for (int spin = 0; spin < 2; ++spin)
     EXPECT_TRUE(serial.one_body[spin] == parallel.one_body[spin]);
   EXPECT_TRUE(serial.two_body == parallel.two_body);
+  for (int spin = 0; spin < 2; ++spin)
+    EXPECT_TRUE(serial.same_spin_two_body[spin] ==
+                parallel.same_spin_two_body[spin]);
   EXPECT_EQ(serial.min_denominator, parallel.min_denominator);
   EXPECT_EQ(serial.max_amplitude, parallel.max_amplitude);
   EXPECT_TRUE(serial_fock == parallel_fock);
@@ -648,6 +783,12 @@ TEST(Swpt2KernelTest, ArbitraryOrbitalRelabelingIsCovariant) {
                   1e-12);
       EXPECT_LT((actual.two_body - original.two_body).cwiseAbs().maxCoeff(),
                 1e-12);
+      for (int spin = 0; spin < 2; ++spin)
+        EXPECT_LT((antisymmetrized(actual.same_spin_two_body[spin], 2) -
+                   antisymmetrized(original.same_spin_two_body[spin], 2))
+                      .cwiseAbs()
+                      .maxCoeff(),
+                  1e-12);
       EXPECT_DOUBLE_EQ(actual.min_denominator, original.min_denominator);
       EXPECT_DOUBLE_EQ(actual.max_amplitude, original.max_amplitude);
     }
@@ -704,6 +845,63 @@ TEST(Swpt2KernelTest, MultipleExternalOrbitalsMatchFockSpace) {
       }
   }
   EXPECT_EQ(cases, 12);
+}
+
+TEST(Swpt2KernelTest, UnrestrictedBlocksMatchFockSpace) {
+  int cases = 0;
+  double spin_asymmetry = 0.0;
+  for (auto inputs :
+       {make_case({0, 2}, {1}, {3}), make_case({0, 2, 4}, {1}, {3}),
+        make_case({0, 3}, {1, 4}, {2}), make_case({0, 2, 3, 4}, {}, {1})}) {
+    make_unrestricted(inputs);
+    const Eigen::MatrixXd alpha = 0.5 * make_density(inputs, 2);
+    const Eigen::MatrixXd beta = 0.5 * make_density(inputs, 3);
+    for (const bool folded : {false, true})
+      for (const double sigma : {0.0, 0.8}) {
+        SCOPED_TRACE("case=" + std::to_string(cases++) +
+                     " fold=" + std::to_string(folded) +
+                     " sigma=" + std::to_string(sigma));
+        const sw::RegularizerOptions regularizer{sigma};
+        const Eigen::MatrixXd density = folded ? alpha : Eigen::MatrixXd{};
+        const Eigen::MatrixXd beta_density = folded ? beta : Eigen::MatrixXd{};
+        const auto actual =
+            run_native(inputs, regularizer, density, 0.17, beta_density);
+        compare(actual, fock_reference(inputs, regularizer, density, 0.17,
+                                       beta_density));
+        const int count = inputs.active.size();
+        // Every block is Hermitian; the same-spin blocks are also symmetric
+        // under electron exchange, as the restricted output is.
+        const auto violation = [count](const Eigen::VectorXd& block,
+                                       bool exchange) {
+          double worst = 0.0;
+          for (int p = 0; p < count; ++p)
+            for (int q = 0; q < count; ++q)
+              for (int r = 0; r < count; ++r)
+                for (int s = 0; s < count; ++s) {
+                  const double value = block(sw::idx4(p, q, r, s, count));
+                  worst = std::max(
+                      worst,
+                      std::abs(value - block(sw::idx4(q, p, s, r, count))));
+                  if (exchange)
+                    worst = std::max(
+                        worst,
+                        std::abs(value - block(sw::idx4(r, s, p, q, count))));
+                }
+          return worst;
+        };
+        EXPECT_LT(violation(actual.two_body, false), 1e-12);
+        for (const auto& block : actual.same_spin_two_body)
+          EXPECT_LT(violation(block, true), 1e-12);
+        spin_asymmetry =
+            std::max(spin_asymmetry,
+                     (antisymmetrized(actual.same_spin_two_body[0], count) -
+                      antisymmetrized(actual.same_spin_two_body[1], count))
+                         .cwiseAbs()
+                         .maxCoeff());
+      }
+  }
+  EXPECT_EQ(cases, 16);
+  EXPECT_GT(spin_asymmetry, 1e-6);
 }
 
 TEST(Swpt2KernelTest, IndependentFockSpace) {
@@ -794,9 +992,9 @@ TEST(Swpt2KernelTest, ClosedShellMp2Limit) {
   populate_two_body(inputs);
   Eigen::MatrixXd density = Eigen::MatrixXd::Zero(inputs.norb(), inputs.norb());
   for (const int orbital : inputs.active) density(orbital, orbital) = 2.0;
-  const auto mean_field = sw::generalized_fock_matrix(
-      Eigen::MatrixXd::Zero(inputs.norb(), inputs.norb()), inputs.integrals,
-      density, inputs.norb());
+  const auto mean_field =
+      spin_free_fock(Eigen::MatrixXd::Zero(inputs.norb(), inputs.norb()),
+                     inputs.integrals, density, inputs.norb());
   inputs.one_body[0] =
       Eigen::MatrixXd(inputs.energies.asDiagonal()) - mean_field;
   inputs.one_body[1] = inputs.one_body[0];
@@ -867,9 +1065,9 @@ TEST(Swpt2KernelTest, VirtualExternalSpaceConvergesAsCouplingShrinks) {
     set_integral(0, 2, 1, 1, 0.10 * coupling_scale);
     Eigen::MatrixXd density = Eigen::MatrixXd::Zero(3, 3);
     density(0, 0) = 2.0;
-    inputs.energies = sw::generalized_fock_matrix(inputs.one_body[0],
-                                                  inputs.integrals, density, 3)
-                          .diagonal();
+    inputs.energies =
+        spin_free_fock(inputs.one_body[0], inputs.integrals, density, 3)
+            .diagonal();
     const auto ground = [](const Eigen::MatrixXd& matrix, int count) {
       Eigen::MatrixXd sector(count * count, count * count);
       for (int first = 0; first < count; ++first)
@@ -980,8 +1178,8 @@ TEST(Swpt2KernelTest, SemicanonicalCovariance) {
   const auto run = [&](const Eigen::MatrixXd& one_body,
                        const Eigen::VectorXd& integrals,
                        const Eigen::MatrixXd& reference_density, double sigma) {
-    const auto fock = sw::generalized_fock_matrix(
-        one_body, integrals, reference_density, inputs.norb());
+    const auto fock =
+        spin_free_fock(one_body, integrals, reference_density, inputs.norb());
     const auto rotation = sw::semicanonical_rotation(
         fock, {inputs.inactive, inputs.active, inputs.virtuals}, 1e-14);
     auto prepared = inputs;
@@ -999,6 +1197,8 @@ TEST(Swpt2KernelTest, SemicanonicalCovariance) {
       block = sw::rotate_one_body(block, active_rotation.transpose());
     result.two_body =
         sw::rotate_two_body(result.two_body, active_rotation.transpose(), 2);
+    for (auto& block : result.same_spin_two_body)
+      block = sw::rotate_two_body(block, active_rotation.transpose(), 2);
     return result;
   };
   Eigen::MatrixXd basis =
@@ -1021,6 +1221,8 @@ TEST(Swpt2KernelTest, SemicanonicalCovariance) {
       block = sw::rotate_one_body(block, active_basis.transpose());
     rotated.two_body =
         sw::rotate_two_body(rotated.two_body, active_basis.transpose(), 2);
+    for (auto& block : rotated.same_spin_two_body)
+      block = sw::rotate_two_body(block, active_basis.transpose(), 2);
     EXPECT_NEAR(original.scalar, rotated.scalar, 1e-11);
     for (int spin = 0; spin < 2; ++spin)
       EXPECT_LT((original.one_body[spin] - rotated.one_body[spin])
@@ -1029,6 +1231,12 @@ TEST(Swpt2KernelTest, SemicanonicalCovariance) {
                 1e-11);
     EXPECT_LT((original.two_body - rotated.two_body).cwiseAbs().maxCoeff(),
               1e-11);
+    for (int spin = 0; spin < 2; ++spin)
+      EXPECT_LT((antisymmetrized(original.same_spin_two_body[spin], 2) -
+                 antisymmetrized(rotated.same_spin_two_body[spin], 2))
+                    .cwiseAbs()
+                    .maxCoeff(),
+                1e-11);
     EXPECT_NEAR(original.min_denominator, rotated.min_denominator, 1e-11);
     EXPECT_NEAR(original.max_amplitude, rotated.max_amplitude, 1e-11);
   }
@@ -1052,7 +1260,7 @@ TEST(Swpt2KernelTest, DISABLED_FullKernelBenchmark) {
       external_count, active_counts.front(), external_count);
   const double setup_ms = elapsed(setup_start);
   ASSERT_EQ(statistics.projected_terms, 102);
-  ASSERT_EQ(statistics.contractions, 420);
+  ASSERT_EQ(statistics.contractions, 984);
   ASSERT_EQ(statistics.maximum_rank, 4);
   std::cout << "full_kernel_setup_ms=" << setup_ms
             << " projected_terms=" << statistics.projected_terms
@@ -1072,37 +1280,43 @@ TEST(Swpt2KernelTest, DISABLED_FullKernelBenchmark) {
     auto inputs = make_case(active, inactive, virtuals);
     populate_two_body(inputs);
     const sw::RegularizerOptions regularizer{0.8};
-    for (const auto& [mode, kind] :
-         {std::pair{"discard", 0}, std::pair{"determinant", 1},
-          std::pair{"dense", 3}}) {
-      const Eigen::MatrixXd density =
-          kind == 0 ? Eigen::MatrixXd{} : make_density(inputs, kind);
-      const auto timed_run = [&] {
-        const auto begin = Clock::now();
-        auto result = run_native(inputs, regularizer, density);
-        const double milliseconds = elapsed(begin);
-        return std::pair{std::move(result), milliseconds};
-      };
-      const auto [cold_result, first_ms] = timed_run();
-      std::vector<double> timings;
-      double checksum = 0.0;
-      for (int repeat = 0; repeat < 3; ++repeat) {
-        const auto [result, milliseconds] = timed_run();
-        timings.push_back(milliseconds);
-        checksum += result.scalar + result.one_body[0].squaredNorm() +
-                    result.one_body[1].squaredNorm() +
-                    result.two_body.squaredNorm();
-        compare(result, cold_result);
+    // make_case's alpha and beta one-body blocks differ; equal blocks take the
+    // spin-free path.
+    auto spin_free_inputs = inputs;
+    spin_free_inputs.one_body[1] = spin_free_inputs.one_body[0];
+    for (const bool spin_free : {true, false})
+      for (const auto& [mode, kind] :
+           {std::pair{"discard", 0}, std::pair{"determinant", 1},
+            std::pair{"dense", 3}}) {
+        const auto& case_inputs = spin_free ? spin_free_inputs : inputs;
+        const Eigen::MatrixXd density =
+            kind == 0 ? Eigen::MatrixXd{} : make_density(case_inputs, kind);
+        const auto timed_run = [&] {
+          const auto begin = Clock::now();
+          auto result = run_native(case_inputs, regularizer, density);
+          const double milliseconds = elapsed(begin);
+          return std::pair{std::move(result), milliseconds};
+        };
+        const auto [cold_result, first_ms] = timed_run();
+        std::vector<double> timings;
+        double checksum = 0.0;
+        for (int repeat = 0; repeat < 3; ++repeat) {
+          const auto [result, milliseconds] = timed_run();
+          timings.push_back(milliseconds);
+          checksum += result.scalar + result.one_body[0].squaredNorm() +
+                      result.one_body[1].squaredNorm() +
+                      result.two_body.squaredNorm();
+          compare(result, cold_result);
+        }
+        EXPECT_TRUE(std::isfinite(checksum));
+        std::sort(timings.begin(), timings.end());
+        std::cout << std::fixed << std::setprecision(4)
+                  << "full_kernel_active=" << active_count
+                  << " external=" << external_count << " mode=" << mode
+                  << " spin_free=" << spin_free << " sequant_ms=" << timings[1]
+                  << " sequant_first_ms=" << first_ms
+                  << " checksum=" << checksum << '\n';
       }
-      EXPECT_TRUE(std::isfinite(checksum));
-      std::sort(timings.begin(), timings.end());
-      std::cout << std::fixed << std::setprecision(4)
-                << "full_kernel_active=" << active_count
-                << " external=" << external_count << " mode=" << mode
-                << " sequant_ms=" << timings[1]
-                << " sequant_first_ms=" << first_ms << " checksum=" << checksum
-                << '\n';
-    }
   }
 }
 
@@ -1137,8 +1351,7 @@ TEST(Swpt2KernelTest, GeneralizedFockFromDefinition) {
   Eigen::VectorXd integrals(count * count * count * count);
   for (int index = 0; index < integrals.size(); ++index)
     integrals(index) = 0.2 * std::sin(0.37 * index);
-  const auto result =
-      sw::generalized_fock_matrix(one_body, integrals, density, count);
+  const auto result = spin_free_fock(one_body, integrals, density, count);
   Eigen::MatrixXd expected = one_body;
   for (int row = 0; row < count; ++row)
     for (int col = 0; col < count; ++col)
@@ -1152,6 +1365,47 @@ TEST(Swpt2KernelTest, GeneralizedFockFromDefinition) {
                 .cwiseAbs()
                 .maxCoeff(),
             1e-12);
+
+  // Per spin: Coulomb with both densities, exchange with its own.
+  std::array<Eigen::VectorXd, 3> blocks;
+  for (int block = 0; block < 3; ++block) {
+    blocks[block].resize(integrals.size());
+    for (int index = 0; index < integrals.size(); ++index)
+      blocks[block](index) = 0.2 * std::sin(0.37 * index + 0.4 * block);
+  }
+  const std::array<Eigen::MatrixXd, 2> spin_one_body{one_body, 1.3 * one_body};
+  const std::array<Eigen::MatrixXd, 2> spin_density{0.6 * density,
+                                                    0.4 * density.transpose()};
+  const auto spin_result = sw::generalized_fock_matrices(
+      spin_one_body,
+      {std::cref(blocks[0]), std::cref(blocks[1]), std::cref(blocks[2])},
+      spin_density, count);
+  const auto chemist = [&](int left, int right, int p, int q, int r, int s) {
+    if (left == right) return blocks[2 * left](sw::idx4(p, q, r, s, count));
+    return left == 0 ? blocks[1](sw::idx4(p, q, r, s, count))
+                     : blocks[1](sw::idx4(r, s, p, q, count));
+  };
+  for (int spin = 0; spin < 2; ++spin) {
+    Eigen::MatrixXd spin_expected = spin_one_body[spin];
+    for (int row = 0; row < count; ++row)
+      for (int col = 0; col < count; ++col)
+        for (int first = 0; first < count; ++first)
+          for (int second = 0; second < count; ++second) {
+            for (int other = 0; other < 2; ++other)
+              spin_expected(row, col) +=
+                  spin_density[other](first, second) *
+                  chemist(spin, other, row, col, first, second);
+            spin_expected(row, col) -=
+                spin_density[spin](first, second) *
+                chemist(spin, spin, row, first, second, col);
+          }
+    EXPECT_LT((spin_result[spin] -
+               0.5 * (spin_expected + spin_expected.transpose()).eval())
+                  .cwiseAbs()
+                  .maxCoeff(),
+              1e-12);
+  }
+  EXPECT_GT((spin_result[0] - spin_result[1]).cwiseAbs().maxCoeff(), 1e-3);
 }
 
 TEST(Swpt2KernelTest, InactiveFockFoldMeanField) {
@@ -1164,8 +1418,8 @@ TEST(Swpt2KernelTest, InactiveFockFoldMeanField) {
   integrals(sw::idx4(1, 0, 0, 1, 2)) = 0.2;
   integrals(sw::idx4(1, 1, 1, 1, 2)) = 0.5;
   const Eigen::VectorXd energies = one_body.diagonal();
-  const auto result = sw::downfold(one_body, one_body, integrals, energies, {0},
-                                   {1}, {}, {}, 0.7);
+  const auto result = shared_integral_downfold(one_body, one_body, integrals,
+                                               energies, {0}, {1}, {}, {}, 0.7);
   EXPECT_NEAR(result.scalar, 0.7 - 1.0 + 0.5, 1e-12);
   for (const auto& block : result.one_body)
     EXPECT_NEAR(block(0, 0), 0.3 + 2.0 - 0.2, 1e-12);
@@ -1180,8 +1434,8 @@ TEST(Swpt2KernelTest, EmptyExternalSpaceIsIdentity) {
   for (int index = 0; index < integrals.size(); ++index)
     integrals(index) = 0.03 * std::cos(index);
   const std::vector<int> active{1, 0};
-  const auto result =
-      sw::downfold(alpha, beta, integrals, energies, active, {}, {}, {}, 0.7);
+  const auto result = shared_integral_downfold(alpha, beta, integrals, energies,
+                                               active, {}, {}, {}, 0.7);
   EXPECT_DOUBLE_EQ(result.scalar, 0.7);
   for (int row = 0; row < 2; ++row)
     for (int col = 0; col < 2; ++col) {
@@ -1212,8 +1466,8 @@ TEST(Swpt2KernelTest, SecondOrderLevelShifts) {
     const std::vector<int> virtuals =
         virtual_external ? std::vector<int>{1} : std::vector<int>{};
     const auto result =
-        sw::downfold(one_body, one_body, Eigen::VectorXd::Zero(16), energies,
-                     {0}, inactive, virtuals, {}, 0.0);
+        shared_integral_downfold(one_body, one_body, Eigen::VectorXd::Zero(16),
+                                 energies, {0}, inactive, virtuals, {}, 0.0);
     for (const auto& block : result.one_body)
       EXPECT_NEAR(block(0, 0),
                   active_energy + 0.04 / (active_energy - external_energy),
@@ -1291,12 +1545,11 @@ TEST(Swpt2KernelTest, SemicanonicalPrimitivesAreCovariantAndReversible) {
   basis(1, 1) = basis(2, 2) = std::cos(0.37);
   basis(1, 2) = -std::sin(0.37);
   basis(2, 1) = std::sin(0.37);
-  const auto fock =
-      sw::generalized_fock_matrix(one_body, integrals, density, count);
+  const auto fock = spin_free_fock(one_body, integrals, density, count);
   const auto rotated =
-      sw::generalized_fock_matrix(sw::rotate_one_body(one_body, basis),
-                                  sw::rotate_two_body(integrals, basis, count),
-                                  sw::rotate_one_body(density, basis), count);
+      spin_free_fock(sw::rotate_one_body(one_body, basis),
+                     sw::rotate_two_body(integrals, basis, count),
+                     sw::rotate_one_body(density, basis), count);
   EXPECT_LT((rotated - basis.transpose() * fock * basis).cwiseAbs().maxCoeff(),
             1e-11);
   const auto semicanonical =
@@ -1322,6 +1575,28 @@ TEST(Swpt2KernelTest, SemicanonicalPrimitivesAreCovariantAndReversible) {
             1e-12);
   EXPECT_EQ(sw::semicanonical_rotation(diagonal, {{0}, {1, 2}, {3}}, 1e-10),
             Eigen::MatrixXd::Identity(count, count));
+
+  // aabb integrals rotate their (pq) and (rs) pairs separately.
+  const Eigen::MatrixXd second = semicanonical * basis;
+  const auto mixed = sw::rotate_two_body(integrals, basis, second, count);
+  double mixed_error = 0.0;
+  for (int p = 0; p < count; ++p)
+    for (int q = 0; q < count; ++q)
+      for (int r = 0; r < count; ++r)
+        for (int s = 0; s < count; ++s) {
+          double expected = 0.0;
+          for (int a = 0; a < count; ++a)
+            for (int b = 0; b < count; ++b)
+              for (int c = 0; c < count; ++c)
+                for (int d = 0; d < count; ++d)
+                  expected += basis(a, p) * basis(b, q) * second(c, r) *
+                              second(d, s) *
+                              integrals(sw::idx4(a, b, c, d, count));
+          mixed_error =
+              std::max(mixed_error,
+                       std::abs(mixed(sw::idx4(p, q, r, s, count)) - expected));
+        }
+  EXPECT_LT(mixed_error, 1e-14);
 }
 
 }  // namespace

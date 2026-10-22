@@ -18,8 +18,8 @@ namespace qdk::chemistry::algorithms::microsoft {
  *
  * `regularizer_sigma2` damps the energy denominators; zero selects a guarded
  * bare pseudoinverse that omits coupled channels below the fixed 1e-8 Eh
- * denominator floor. The current denominator operator is a semicanonical,
- * spin-free generalized Fock.
+ * denominator floor. The denominator operator is a semicanonical generalized
+ * Fock, spin-free for restricted orbitals.
  */
 class SchriefferWolffPT2Settings : public qdk::chemistry::data::Settings {
  public:
@@ -35,8 +35,8 @@ class SchriefferWolffPT2Settings : public qdk::chemistry::data::Settings {
         "the downfold into a full DSRG calculation.",
         data::BoundConstraint<double>{0.0, std::numeric_limits<double>::max()});
     set_default("semicanonicalize", true,
-                "Diagonalize the generalized Fock independently within the "
-                "inactive, active, and virtual blocks before forming Fock "
+                "Diagonalize each spin's generalized Fock independently within "
+                "the inactive, active, and virtual blocks before forming Fock "
                 "denominators.");
     set_default(
         "fold_above_two_body", true,
@@ -69,27 +69,33 @@ class SchriefferWolffPT2Settings : public qdk::chemistry::data::Settings {
  *
  * The commutator also generates three-body terms, which a Hamiltonian cannot
  * hold. Rather than discarding them, `fold_above_two_body` contracts them with
- * the reference 1-RDM and keeps what falls to two-body. For a Gaussian
- * reference these are the ordinary Wick contractions, but the residual
- * three-body operator is still discarded. For a correlated reference the
+ * the reference 1-RDM and keeps what falls to two-body. For a determinant in
+ * its own orbitals, restricted closed-shell or unrestricted, these are the
+ * ordinary Wick contractions, but the residual three-body operator is still
+ * discarded. For a correlated or spin-averaged open-shell reference the
  * approximation additionally neglects the two-body and higher density
  * cumulants.
  *
- * The implementation assumes a common restricted MO basis, however it was
- * produced: RHF, ROHF, CAS, localized and natural orbitals all qualify. Every
- * singly occupied orbital must lie in the reference active space. Noncanonical
- * orbitals are semicanonicalized independently within inactive, active, and
- * virtual blocks. Intruder diagnostics are logged, with an additional warning
- * for large raw amplitudes.
+ * Any restricted MO basis qualifies, however it was produced: RHF, ROHF, CAS,
+ * localized and natural orbitals. Its spin-traced density is split evenly
+ * between the spins, so the denominators and the result stay spin-free.
+ * Unrestricted orbitals use per-spin densities and Fock matrices and give an
+ * unrestricted result. The window, `p_indices` and the reference active space
+ * must select the same orbital indices in both spins. Every singly occupied
+ * orbital must lie in the reference active space.
+ * Noncanonical orbitals are semicanonicalized independently within inactive,
+ * active, and virtual blocks. Intruder diagnostics are logged, with an
+ * additional warning for large raw amplitudes.
  *
- * The emitted two-body block is only 4-fold symmetric: hermiticity and electron
- * exchange survive, the bra swap `(pq|rs) = (qp|rs)` does not. Consumers must
- * read the full dense norb^4 block, not the canonical 8-fold-unique elements.
+ * The emitted two-body blocks are only 4-fold symmetric: hermiticity and
+ * electron exchange hold as for the input integrals, the bra swap
+ * `(pq|rs) = (qp|rs)` does not. Consumers must read the full dense norb^4
+ * blocks, not the canonical 8-fold-unique elements.
  *
  * The window W is the input Hamiltonian's own active space, so that Hamiltonian
  * must be built over the whole window; a P-only active-space Hamiltonian has
  * already folded away the couplings this transforms. The reference supplies
- * only the density over W (its active 1-RDM, with inactive orbitals doubly
+ * only the density over W (its active 1-RDMs, with inactive orbitals doubly
  * occupied and the rest empty), never the partition: P comes from `p_indices`
  * alone and need not coincide with the reference active space. Occupations of
  * folded orbitals are rounded, bounded by `max_folded_occupation_deviation`.

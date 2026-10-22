@@ -370,6 +370,7 @@ TEST(SchriefferWolffPT2Test, ReproducesMp2WhenEveryOccupiedOrbitalIsActive) {
   auto H_eff = swpt2->run(reference, H_window,
                           testing::restricted_index_set(norb, occupied));
   ASSERT_NE(H_eff, nullptr);
+  EXPECT_TRUE(H_eff->is_restricted());
 
   const auto [T_a, T_b] = H_eff->get_one_body_integrals();
   const auto [g_eff, g_eff_ab, g_eff_bb] = H_eff->get_two_body_integrals();
@@ -786,40 +787,155 @@ TEST(SchriefferWolffPT2Test,
   EXPECT_TRUE(std::isfinite(E_sw_no_semicanon));
 }
 
-TEST(SchriefferWolffPT2Test, RejectsUnrestrictedHfInputs) {
-  auto oxygen = testing::create_o2_structure();
+// For a UHF doublet with every occupied orbital but the folded core kept, P
+// holds a single empty spin orbital, so no double excitation fits inside it
+// and the reference determinant's energy in H_eff is the UMP2 energy. Rotating
+// each spin's orbitals differently within its occupied active orbitals and
+// folded virtuals must not change that.
+TEST(SchriefferWolffPT2Test, ReproducesUmp2ForUnrestrictedDoublet) {
+  namespace qcd = qdk::chemistry::data;
   auto scf = ScfSolverFactory::create();
-  auto [energy, reference] = scf->run(oxygen, 0, 3, "sto-3g");
-  ASSERT_TRUE(reference->get_orbitals()->is_unrestricted());
-  auto [restricted_energy, restricted_reference] =
-      scf->run(oxygen, 0, 1, "sto-3g");
-  ASSERT_TRUE(restricted_reference->get_orbitals()->is_restricted());
+  // UMP2 uses the SCF orbital energies, so agreement tracks SCF convergence.
+  scf->settings().set("convergence_threshold", 1e-9);
+  scf->settings().set("enable_gdm", false);
+  auto [E_uhf, wfn_uhf] =
+      scf->run(testing::create_water_structure(), 1, 2, "sto-3g");
+  const auto orbitals = wfn_uhf->get_orbitals();
+  ASSERT_TRUE(orbitals->is_unrestricted());
+  const int norb = static_cast<int>(orbitals->get_num_molecular_orbitals());
+  const auto [na, nb] = wfn_uhf->get_active_num_electrons();
+  ASSERT_EQ(na, nb + 1);
+  ASSERT_GE(norb, static_cast<int>(na) + 2);
+  std::vector<size_t> kept(na - 1);
+  std::iota(kept.begin(), kept.end(), size_t{1});
+  const int kept_beta = static_cast<int>(nb) - 1;
 
   auto ham = HamiltonianConstructorFactory::create();
-  auto window_hamiltonian = ham->run(restricted_reference->get_orbitals());
-  auto swpt2 = EffectiveHamiltonianConstructorFactory::create("qdk_swpt2");
-  const auto p_indices = testing::restricted_index_set(
-      restricted_reference->get_orbitals()->get_num_molecular_orbitals(),
-      std::vector<std::size_t>{0});
+  auto H_full = ham->run(orbitals);
+  auto ansatz = std::make_shared<qcd::Ansatz>(*H_full, *wfn_uhf);
+  const double E_ump2 = std::get<0>(
+      DynamicalCorrelationCalculatorFactory::create("qdk_mp2_calculator")
+          ->run(ansatz));
+  EXPECT_LT(E_ump2, E_uhf - 1e-3) << "the correlation being matched is noise";
 
+  const auto reference_energy =
+      [&](const std::shared_ptr<qcd::Wavefunction>& reference,
+          const std::shared_ptr<qcd::Hamiltonian>& window) {
+        auto swpt2 =
+            EffectiveHamiltonianConstructorFactory::create("qdk_swpt2");
+        swpt2->settings().set("regularizer_sigma2", 0.0);  // MP denominators
+        const auto H_eff =
+            swpt2->run(reference, window,
+                       testing::unrestricted_index_set(norb, kept, kept));
+        EXPECT_TRUE(H_eff->is_unrestricted());
+        const auto [T_a, T_b] = H_eff->get_one_body_integrals();
+        const auto [g_aa, g_ab, g_bb] = H_eff->get_two_body_integrals();
+        EXPECT_GT((T_a - T_b).cwiseAbs().maxCoeff(), 1e-3);
+        const int m = static_cast<int>(T_a.rows());
+        const auto H_so = build_spin_orbital_tensors(
+            T_a, T_b, g_aa, g_ab, g_bb, H_eff->get_core_energy(), m);
+        std::vector<int> occupied;
+        for (int orbital = 0; orbital < m; ++orbital) {
+          occupied.push_back(2 * orbital);
+          if (orbital < kept_beta) occupied.push_back(2 * orbital + 1);
+        }
+        return fci_ground_energy(H_so.core_energy, H_so.one_body, H_so.two_body,
+                                 2 * m, occupied, m, kept_beta);
+      };
+  EXPECT_NEAR(reference_energy(wfn_uhf, H_full), E_ump2, 1e-9);
+
+  const auto givens = [norb](int first, int second, double angle) {
+    Eigen::MatrixXd rotation = Eigen::MatrixXd::Identity(norb, norb);
+    rotation(first, first) = rotation(second, second) = std::cos(angle);
+    rotation(first, second) = -std::sin(angle);
+    rotation(second, first) = std::sin(angle);
+    return rotation;
+  };
+  const int first_virtual = static_cast<int>(na);
+  const Eigen::MatrixXd alpha = orbitals->coefficients()->block(
+                                    {qcd::axes::alpha(), qcd::axes::alpha()}) *
+                                givens(1, 3, 0.3) *
+                                givens(first_virtual, first_virtual + 1, 0.5);
+  const Eigen::MatrixXd beta =
+      orbitals->coefficients()->block({qcd::axes::beta(), qcd::axes::beta()}) *
+      givens(1, 2, -0.2) * givens(first_virtual, first_virtual + 1, 0.25);
+  std::vector<size_t> all(norb);
+  std::iota(all.begin(), all.end(), size_t{0});
+  auto rotated = std::make_shared<qcd::Orbitals>(
+      alpha, beta, std::nullopt, std::nullopt, orbitals->get_overlap_matrix(),
+      orbitals->get_basis_set(),
+      testing::unrestricted_index_set(norb, all, all),
+      testing::unrestricted_index_set(norb, {}, {}));
+  // The rotations keep occupied and empty orbitals apart, so the per-spin
+  // 1-RDMs stay diagonal.
+  const auto [occupation_alpha, occupation_beta] =
+      wfn_uhf->get_active_orbital_occupations();
+  qcd::Wavefunction::DeterminantVector determinants{
+      qcd::Configuration::from_spin_half_string(
+          std::string(nb, '2') + 'u' +
+          std::string(static_cast<size_t>(norb) - na, '0'))};
+  auto reference = std::make_shared<qcd::Wavefunction>(
+      std::make_unique<qcd::StateVectorContainer>(
+          Eigen::VectorXd(Eigen::VectorXd::Ones(1)), determinants, rotated,
+          std::nullopt,
+          std::optional<qcd::StateVectorContainer::MatrixVariant>{
+              Eigen::MatrixXd(occupation_alpha.asDiagonal())},
+          std::optional<qcd::StateVectorContainer::MatrixVariant>{
+              Eigen::MatrixXd(occupation_beta.asDiagonal())},
+          std::nullopt, std::nullopt, std::nullopt, std::nullopt));
+  ASSERT_TRUE(reference->has_one_rdm_spin_dependent());
+  EXPECT_NEAR(reference_energy(reference, ham->run(rotated)), E_ump2, 1e-9);
+}
+
+// The reference active space places both spins' densities, so differing alpha
+// and beta active orbitals are rejected rather than misread.
+TEST(SchriefferWolffPT2Test, RejectsSpinDependentReferenceActiveSpace) {
+  namespace qcd = qdk::chemistry::data;
+  const auto orbitals =
+      std::get<1>(ScfSolverFactory::create()->run(
+                      testing::create_water_structure(), 1, 2, "sto-3g"))
+          ->get_orbitals();
+  const size_t norb = orbitals->get_num_molecular_orbitals();
+  ASSERT_EQ(norb, 7);
+  const Eigen::MatrixXd alpha =
+      orbitals->coefficients()->block({qcd::axes::alpha(), qcd::axes::alpha()});
+  const Eigen::MatrixXd beta =
+      orbitals->coefficients()->block({qcd::axes::beta(), qcd::axes::beta()});
+  const auto with_active = [&](const std::vector<size_t>& active_alpha,
+                               const std::vector<size_t>& active_beta) {
+    return std::make_shared<qcd::Orbitals>(
+        alpha, beta, std::nullopt, std::nullopt, orbitals->get_overlap_matrix(),
+        orbitals->get_basis_set(),
+        testing::unrestricted_index_set(norb, active_alpha, active_beta),
+        testing::unrestricted_index_set(norb, {}, {}));
+  };
+  auto window = HamiltonianConstructorFactory::create()->run(
+      with_active({0, 1, 2, 3, 4, 5, 6}, {0, 1, 2, 3, 4, 5, 6}));
+  Eigen::VectorXd occupation_alpha(6), occupation_beta(6);
+  occupation_alpha << 1, 1, 1, 1, 1, 0;
+  occupation_beta << 1, 1, 1, 1, 0, 1;
+  qcd::Wavefunction::DeterminantVector determinants{
+      qcd::Configuration::from_spin_half_string("2222ud")};
+  auto reference = std::make_shared<qcd::Wavefunction>(
+      std::make_unique<qcd::StateVectorContainer>(
+          Eigen::VectorXd(Eigen::VectorXd::Ones(1)), determinants,
+          with_active({0, 1, 2, 3, 4, 5}, {0, 1, 2, 3, 4, 6}), std::nullopt,
+          std::optional<qcd::StateVectorContainer::MatrixVariant>{
+              Eigen::MatrixXd(occupation_alpha.asDiagonal())},
+          std::optional<qcd::StateVectorContainer::MatrixVariant>{
+              Eigen::MatrixXd(occupation_beta.asDiagonal())},
+          std::nullopt, std::nullopt, std::nullopt, std::nullopt));
+
+  const std::vector<size_t> kept{3, 4, 5, 6};
   try {
-    swpt2->run(reference, window_hamiltonian, p_indices);
-    FAIL() << "Expected an unrestricted-reference error";
+    EffectiveHamiltonianConstructorFactory::create("qdk_swpt2")
+        ->run(reference, window,
+              testing::unrestricted_index_set(norb, kept, kept));
+    FAIL() << "Expected a spin-dependent active space error";
   } catch (const std::invalid_argument& error) {
-    EXPECT_NE(std::string(error.what())
-                  .find("does not support unrestricted reference orbitals"),
-              std::string::npos);
-  }
-
-  auto unrestricted_hamiltonian = ham->run(reference->get_orbitals());
-  ASSERT_TRUE(unrestricted_hamiltonian->is_unrestricted());
-  try {
-    swpt2->run(reference, unrestricted_hamiltonian, p_indices);
-    FAIL() << "Expected an unrestricted-Hamiltonian error";
-  } catch (const std::runtime_error& error) {
-    EXPECT_NE(std::string(error.what())
-                  .find("does not support unrestricted orbitals"),
-              std::string::npos);
+    EXPECT_NE(
+        std::string(error.what()).find("same orbitals in both spin channels"),
+        std::string::npos);
   }
 }
 
