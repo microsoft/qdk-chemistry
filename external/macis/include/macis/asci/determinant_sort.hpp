@@ -8,6 +8,7 @@
  */
 
 #pragma once
+#include <exception>
 #include <macis/asci/determinant_contributions.hpp>
 #if __has_include(<boost/sort/pdqsort/pdqsort.hpp>)
 #define MACIS_USE_BOOST_SORT
@@ -91,6 +92,7 @@ void select_ci_on_coeff(const std::vector<WfnT>& dets,
   // each thread copies its selections of the same static partition of [0, n)
   // in which it counted them
   std::vector<size_t> off(nt + 1, 0);
+  std::exception_ptr resize_error;
 #pragma omp parallel num_threads(nt)
   {
     int tid = 0;
@@ -105,17 +107,24 @@ void select_ci_on_coeff(const std::vector<WfnT>& dets,
 #pragma omp single
     {
       for (int k = 0; k < nt; ++k) off[k + 1] += off[k];
-      sel_dets.resize(off[nt]);
-      sel_C.resize(off[nt]);
-    }
-    size_t p = off[tid];
-#pragma omp for schedule(static)
-    for (size_t i = 0; i < n; ++i)
-      if (std::abs(C[i]) >= t) {
-        sel_dets[p] = dets[i];
-        sel_C[p++] = C[i];
+      try {
+        sel_dets.resize(off[nt]);
+        sel_C.resize(off[nt]);
+      } catch (...) {
+        resize_error = std::current_exception();
       }
+    }
+    if (!resize_error) {
+      size_t p = off[tid];
+#pragma omp for schedule(static)
+      for (size_t i = 0; i < n; ++i)
+        if (std::abs(C[i]) >= t) {
+          sel_dets[p] = dets[i];
+          sel_C[p++] = C[i];
+        }
+    }
   }
+  if (resize_error) std::rethrow_exception(resize_error);
 }
 
 /**

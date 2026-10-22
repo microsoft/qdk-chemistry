@@ -13,6 +13,7 @@
 #include <macis/asci/grow.hpp>
 #include <macis/asci/refine.hpp>
 #include <macis/hamiltonian_generator/sorted_double_loop.hpp>
+#include <new>
 #include <thread>
 
 #include "ut_common.hpp"
@@ -281,4 +282,46 @@ TEST_CASE("ASCI constraint work providers preserve the partition",
                         2, norb, ns_beta, nd_beta, unique_alpha, 4, 0, -1, work,
                         invalid_triplets),
                     std::invalid_argument);
+}
+
+TEMPLATE_TEST_CASE("ASCI core selection preserves order and coefficients",
+                   "[asci_execution][asci_core_selection]", macis::wfn_t<64>,
+                   macis::wfn_t<512>) {
+  const std::vector<TestType> dets = {8, 2, 1, 4, 16};
+  const std::vector<double> C = {0.2, -0.5, 0.5, 0.0, -0.8};
+  std::vector<TestType> selected_dets;
+  std::vector<double> selected_C;
+
+  macis::select_ci_on_coeff(dets, C, 0.5, selected_dets, selected_C);
+  REQUIRE(selected_dets == std::vector<TestType>{2, 1, 16});
+  REQUIRE(selected_C == std::vector<double>{-0.5, 0.5, -0.8});
+
+  macis::select_ci_on_coeff(dets, C, 1.0, selected_dets, selected_C);
+  REQUIRE(selected_dets.empty());
+  REQUIRE(selected_C.empty());
+
+  macis::select_ci_on_coeff(dets, C, 0.0, selected_dets, selected_C);
+  REQUIRE(selected_dets == dets);
+  REQUIRE(selected_C == C);
+
+  macis::select_ci_on_coeff(std::vector<TestType>{}, {}, 0.5, selected_dets,
+                            selected_C);
+  REQUIRE(selected_dets.empty());
+  REQUIRE(selected_C.empty());
+}
+
+TEST_CASE("ASCI core selection propagates resize failures",
+          "[asci_execution][asci_core_selection]") {
+  struct ThrowingDeterminant {
+    explicit ThrowingDeterminant(bool fail = true) {
+      if (fail) throw std::bad_alloc{};
+    }
+  };
+  const std::vector<ThrowingDeterminant> dets = {ThrowingDeterminant{false}};
+  std::vector<ThrowingDeterminant> selected_dets;
+  std::vector<double> selected_C;
+
+  REQUIRE_THROWS_AS(
+      macis::select_ci_on_coeff(dets, {1.0}, 0.5, selected_dets, selected_C),
+      std::bad_alloc);
 }
