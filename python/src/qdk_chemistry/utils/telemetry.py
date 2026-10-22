@@ -24,12 +24,11 @@ import locale
 import logging
 import os
 import platform
-import sys
 import time
 import urllib.error
 import urllib.request
 import warnings
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from importlib.metadata import PackageNotFoundError, version
 from queue import Empty, SimpleQueue
 from threading import Thread
@@ -44,12 +43,6 @@ except PackageNotFoundError:
     # Package is not installed (e.g. running from source tree).
     # Use a dev sentinel - telemetry does not require the real version.
     QDK_CHEMISTRY_VERSION = "0.0.0+local"
-
-if sys.version_info >= (3, 11):
-    from datetime import UTC
-else:
-    # Backport for Python 3.10
-    UTC = timezone.utc
 
 # Application Insights configuration
 AIKEY = os.environ.get("QSHARP_PYTHON_AI_KEY") or "95d25b22-8b6d-448e-9677-78ad4047a95a"
