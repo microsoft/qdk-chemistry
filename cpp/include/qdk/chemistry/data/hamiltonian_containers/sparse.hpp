@@ -193,10 +193,11 @@ class SparseHamiltonianContainer : public HamiltonianContainer {
    * @brief Deserialize Hamiltonian data from HDF5 group
    * @param group HDF5 group to read data from
    * @return Unique pointer to Hamiltonian loaded from group
-   * @throws std::invalid_argument if the stored orbital count, dataset shapes
-   *         or types, indices, or metadata attributes are invalid
-   * @throws std::runtime_error if a required dataset cannot be read or the
-   *         serialization version is unsupported
+   * @throws std::invalid_argument if the stored orbital count, the shape or
+   *         element type of an integral dataset, or an index is invalid, or a
+   *         metadata attribute is not scalar
+   * @throws std::runtime_error if required data is missing or cannot be read,
+   *         or the serialization version is unsupported
    */
   static std::unique_ptr<SparseHamiltonianContainer> from_hdf5(
       H5::Group& group);
@@ -205,10 +206,10 @@ class SparseHamiltonianContainer : public HamiltonianContainer {
    * @brief Load Hamiltonian from JSON
    * @param j JSON object containing Hamiltonian data
    * @return Unique pointer to Hamiltonian loaded from JSON
-   * @throws std::invalid_argument if the stored orbital count, triplets,
-   *         indices, or two-body extents are invalid
-   * @throws std::runtime_error if a required field is missing or has the
-   *         wrong JSON type, or the serialization version is unsupported
+   * @throws std::invalid_argument if the stored orbital count, the one-body
+   *         triplets, an index, or a two-body extent is invalid
+   * @throws std::runtime_error if required data is missing or has the wrong
+   *         JSON type, or the serialization version is unsupported
    */
   static std::unique_ptr<SparseHamiltonianContainer> from_json(
       const nlohmann::json& j);
