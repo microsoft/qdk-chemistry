@@ -51,10 +51,12 @@ steps:
 - pwsh: |
     python "$(System.DefaultWorkingDirectory)\.pipelines\pip-scripts\versioning.py" `
       --version-file "$(System.DefaultWorkingDirectory)\VERSION" `
-      --dev-tag ${{ parameters.devTag }}
+      --dev-tag "$env:QDK_DEV_TAG"
     Get-Content "$(System.DefaultWorkingDirectory)\VERSION"
   displayName: Validate/Set Development Version for Wheels
   condition: ne('${{ parameters.devTag }}', 'None')
+  env:
+    QDK_DEV_TAG: ${{ parameters.devTag }}
 
 # Import the VS developer environment (INCLUDE, LIB, PATH, etc.) so that
 # cl.exe and the MSVC linker are available to all subsequent steps.
@@ -115,16 +117,22 @@ steps:
     $pythonEnv = if ('${{ parameters.arch }}' -eq 'arm64') { 'venv' } else { 'conda' }
     & "$(System.DefaultWorkingDirectory)\.pipelines\pip-scripts\build-pip-wheels-windows.ps1" `
         -SrcDir         "$(System.DefaultWorkingDirectory)" `
-        -March          "${{ parameters.march }}" `
-        -BuildType      "${{ parameters.buildType }}" `
-        -BuildTesting   "${{ parameters.buildTesting }}" `
-        -EnableCoverage "${{ parameters.enableCoverage }}" `
+        -March          "$env:QDK_MARCH" `
+        -BuildType      "$env:QDK_BUILD_TYPE" `
+        -BuildTesting   "$env:QDK_BUILD_TESTING" `
+        -EnableCoverage "$env:QDK_ENABLE_COVERAGE" `
         -ClPath         "$(CL_PATH)" `
         -Triplet        "$(VCPKG_TRIPLET)" `
         -PythonEnv      $pythonEnv `
-        -PythonVersion  "${{ parameters.pythonVersion }}" `
-        -DevTag         "${{ parameters.devTag }}"
+        -PythonVersion  "$env:QDK_PYTHON_VERSION" `
+        -DevTag         "$env:QDK_DEV_TAG"
   displayName: Build C++ library, run tests, build Python wheel
   env:
+    QDK_MARCH: ${{ parameters.march }}
+    QDK_BUILD_TYPE: ${{ parameters.buildType }}
+    QDK_BUILD_TESTING: ${{ parameters.buildTesting }}
+    QDK_ENABLE_COVERAGE: ${{ parameters.enableCoverage }}
+    QDK_PYTHON_VERSION: ${{ parameters.pythonVersion }}
+    QDK_DEV_TAG: ${{ parameters.devTag }}
     SYSTEM_ACCESSTOKEN: $(System.AccessToken)
     OMP_NUM_THREADS: '2'
