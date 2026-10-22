@@ -181,6 +181,23 @@ double fci_ground_energy(double e0, const Eigen::MatrixXd& f,
   return es.eigenvalues()(0);
 }
 
+// Lowest energy of `hamiltonian` among determinants of `spin_orbitals` (alpha
+// 2p, beta 2p+1), or of all spin orbitals if none are given.
+double ground_energy(const qdk::chemistry::data::Hamiltonian& hamiltonian,
+                     int na, int nb, std::vector<int> spin_orbitals = {}) {
+  const auto [alpha, beta] = hamiltonian.get_one_body_integrals();
+  const auto [aaaa, aabb, bbbb] = hamiltonian.get_two_body_integrals();
+  const int norb = static_cast<int>(alpha.rows());
+  const auto tensors = build_spin_orbital_tensors(
+      alpha, beta, aaaa, aabb, bbbb, hamiltonian.get_core_energy(), norb);
+  if (spin_orbitals.empty()) {
+    spin_orbitals.resize(2 * norb);
+    std::iota(spin_orbitals.begin(), spin_orbitals.end(), 0);
+  }
+  return fci_ground_energy(tensors.core_energy, tensors.one_body,
+                           tensors.two_body, 2 * norb, spin_orbitals, na, nb);
+}
+
 TEST(SchriefferWolffPT2Test, FactoryRegistration) {
   const auto available = EffectiveHamiltonianConstructorFactory::available();
   EXPECT_NE(std::find(available.begin(), available.end(), "qdk_swpt2"),
@@ -279,35 +296,13 @@ TEST(SchriefferWolffPT2Test, DownfoldRunsEndToEndWater) {
   const auto [gb, gb_ab, gb_bb] = H_P->get_two_body_integrals();
   EXPECT_GT((ge - gb).norm(), 1e-6);
 
-  // The emitted effective two-body is only 4-fold symmetric (the bra-swap
-  // (pq|rs)=(qp|rs) is broken by the downfold). This asserts that the
-  // data-layer consumption path is faithful anyway: MACIS on H_eff must
-  // reproduce, to machine precision, an independent full-CI evaluation of the
-  // *same* emitted integrals. It confirms CanonicalFourCenter stores the dense
-  // n^4 block and that MACIS relies only on particle-exchange symmetry
-  // (pq|rs)=(rs|pq), which the effective tensor preserves -- so no 8-fold
-  // symmetrization is required.
-  {
-    const auto [T_a, T_b] = H_eff->get_one_body_integrals();
-    const int m = static_cast<int>(T_a.rows());
-    const auto H_so = build_spin_orbital_tensors(T_a, T_a, ge, ge, ge,
-                                                 H_eff->get_core_energy(), m);
-    std::vector<int> orbs(2 * m);
-    for (int i = 0; i < 2 * m; ++i) orbs[i] = i;
-    const double E_kernel_fci = fci_ground_energy(
-        H_so.core_energy, H_so.one_body, H_so.two_body, 2 * m, orbs, 2, 2);
-    EXPECT_NEAR(E_sw, E_kernel_fci, 1e-9);
-  }
+  // MACIS must reproduce a full CI of the same emitted integrals, which are
+  // only 4-fold symmetric, so the container must hand it the dense block.
+  EXPECT_NEAR(E_sw, ground_energy(*H_eff, 2, 2), 1e-9);
 
-  // Contrast: disabling regularization (bare second-order PT) hits the
-  // small-denominator near-intruder and fails to recover. The active space
-  // keeps the active LUMO (orbital 5) while the folded external orbital 6 is a
-  // *near-degenerate* virtual (eps_5=+0.47, eps_6=+0.59), so the pp-ladder
-  // dressing of the active (5,5) pair has denominator 2(eps_6-eps_5) ~ 0.24 Eh
-  // and bare PT2 overshoots. The default sigma^2 regularizer is what tames it.
-  // (Root cause is the partition splitting two near-degenerate virtuals across
-  // active/external -- NOT the container/solver, and NOT the MP denominators,
-  // which are exact for this canonical closed-shell reference.)
+  // Bare denominators hit the near-intruder from the near-degenerate virtual
+  // pair split across P and Q (eps_5 = +0.47, eps_6 = +0.59); the default
+  // regularizer is what recovers the correlation.
   auto swpt2_bare = EffectiveHamiltonianConstructorFactory::create("qdk_swpt2");
   swpt2_bare->settings().set("regularizer_sigma2", 0.0);
   auto H_eff_bare = swpt2_bare->run(reference, H_window, P_set);
@@ -316,31 +311,11 @@ TEST(SchriefferWolffPT2Test, DownfoldRunsEndToEndWater) {
   EXPECT_GT(E_sw_bare, E_sw);  // regularization lowers the energy vs bare PT2
 }
 
-// The MP2 limit, where the downfold has a closed-form answer to compare
-// against. Put every occupied orbital in the active space, leave the inactive
-// set empty, fold all the virtuals, and switch the regularizer off. Nothing in
-// H_BD can change the virtual occupation, so <HF|H_BD|HF> is E_HF; and
-// Brillouin kills the singles channel of <HF| 1/2 [S, H_OD] |HF>, leaving
-// exactly the doubles sum that defines MP2. Rank-3 terms of the commutator do
-// contribute at ten electrons, but the reference density here is the idempotent
-// HF one, for which the fold onto two-body is exact on the reference
-// determinant. The active space comes out completely filled, so its CI space is
-// a single determinant and the emitted Hamiltonian's ground state *is* that
-// expectation value.
-//
-// This is the one test in the suite that checks the downfold against physics
-// rather than against a second expansion of the same commutator: the reference
-// number comes from the repository's MP2 calculator, which shares only the SCF
-// and integral layers with this code path.
-//
-// Bare denominators log a large-amplitude warning on this window, and MP2 does
-// not, which is consistent rather than contradictory: the offending channel is
-// semi-internal (eps_5 + eps_1 - 2 eps_4 = 0.043 Eh here), and MP2 has no such
-// channel -- its own oo->vv denominators bottom out at 1.7 Eh. That channel is
-// blocked on the reference determinant, so it cannot move the number compared
-// here, but it is a real feature of the emitted operator. The agreement below
-// therefore constrains the doubles channel and the fold; the independent
-// kernel matrix tests cover the semi-internal channels separately.
+// MP2 limit: with every occupied orbital active, no inactive space, all
+// virtuals folded and bare denominators, the reference determinant's energy in
+// H_eff is E_HF + E_MP2. Brillouin removes the singles, and the fold is exact
+// for the idempotent HF density. The reference value comes from the MP2
+// calculator, which shares only the SCF and integral layers with this code.
 TEST(SchriefferWolffPT2Test, ReproducesMp2WhenEveryOccupiedOrbitalIsActive) {
   namespace qcd = qdk::chemistry::data;
   auto water = testing::create_water_structure();
@@ -371,17 +346,8 @@ TEST(SchriefferWolffPT2Test, ReproducesMp2WhenEveryOccupiedOrbitalIsActive) {
                           testing::restricted_index_set(norb, occupied));
   ASSERT_NE(H_eff, nullptr);
   EXPECT_TRUE(H_eff->is_restricted());
-
-  const auto [T_a, T_b] = H_eff->get_one_body_integrals();
-  const auto [g_eff, g_eff_ab, g_eff_bb] = H_eff->get_two_body_integrals();
-  const int m = static_cast<int>(T_a.rows());
-  const auto H_so = build_spin_orbital_tensors(T_a, T_a, g_eff, g_eff, g_eff,
-                                               H_eff->get_core_energy(), m);
-  std::vector<int> orbs(2 * m);
-  std::iota(orbs.begin(), orbs.end(), 0);
-  const double E_downfold =
-      fci_ground_energy(H_so.core_energy, H_so.one_body, H_so.two_body, 2 * m,
-                        orbs, static_cast<int>(na), static_cast<int>(nb));
+  const int n_alpha = static_cast<int>(na), n_beta = static_cast<int>(nb);
+  const double E_downfold = ground_energy(*H_eff, n_alpha, n_beta);
 
   auto H_full = ham->run(orbitals);
   auto ansatz = std::make_shared<qcd::Ansatz>(*H_full, *wfn_hf);
@@ -392,23 +358,13 @@ TEST(SchriefferWolffPT2Test, ReproducesMp2WhenEveryOccupiedOrbitalIsActive) {
   EXPECT_LT(E_mp2, E_hf - 1e-3) << "the correlation being matched is not noise";
   EXPECT_NEAR(E_downfold, E_mp2, 1e-9);
 
-  // The identity above is not free: at ten active electrons the rank-3 part of
-  // the commutator has a large expectation in the reference, and only the fold
-  // onto the reference density recovers it. Dropping it moves the answer by
-  // several Hartree, so the agreement above is a real constraint on the fold.
+  // Without the fold, the rank-3 terms move the energy by several Hartree.
   auto unfolded = EffectiveHamiltonianConstructorFactory::create("qdk_swpt2");
   unfolded->settings().set("regularizer_sigma2", 0.0);
   unfolded->settings().set("fold_above_two_body", false);
   auto H_unfolded = unfolded->run(
       reference, H_window, testing::restricted_index_set(norb, occupied));
-  const auto [U_a, U_b] = H_unfolded->get_one_body_integrals();
-  const auto [g_u, g_u_ab, g_u_bb] = H_unfolded->get_two_body_integrals();
-  const auto U_so = build_spin_orbital_tensors(
-      U_a, U_a, g_u, g_u, g_u, H_unfolded->get_core_energy(), m);
-  const double E_unfolded =
-      fci_ground_energy(U_so.core_energy, U_so.one_body, U_so.two_body, 2 * m,
-                        orbs, static_cast<int>(na), static_cast<int>(nb));
-  EXPECT_GT(std::abs(E_unfolded - E_mp2), 1.0);
+  EXPECT_GT(std::abs(ground_energy(*H_unfolded, n_alpha, n_beta) - E_mp2), 1.0);
 }
 
 // The window Hamiltonian's own folded core must be exactly the reference core
@@ -829,18 +785,14 @@ TEST(SchriefferWolffPT2Test, ReproducesUmp2ForUnrestrictedDoublet) {
                        testing::unrestricted_index_set(norb, kept, kept));
         EXPECT_TRUE(H_eff->is_unrestricted());
         const auto [T_a, T_b] = H_eff->get_one_body_integrals();
-        const auto [g_aa, g_ab, g_bb] = H_eff->get_two_body_integrals();
         EXPECT_GT((T_a - T_b).cwiseAbs().maxCoeff(), 1e-3);
         const int m = static_cast<int>(T_a.rows());
-        const auto H_so = build_spin_orbital_tensors(
-            T_a, T_b, g_aa, g_ab, g_bb, H_eff->get_core_energy(), m);
         std::vector<int> occupied;
         for (int orbital = 0; orbital < m; ++orbital) {
           occupied.push_back(2 * orbital);
           if (orbital < kept_beta) occupied.push_back(2 * orbital + 1);
         }
-        return fci_ground_energy(H_so.core_energy, H_so.one_body, H_so.two_body,
-                                 2 * m, occupied, m, kept_beta);
+        return ground_energy(*H_eff, m, kept_beta, occupied);
       };
   EXPECT_NEAR(reference_energy(wfn_uhf, H_full), E_ump2, 1e-9);
 
@@ -939,18 +891,10 @@ TEST(SchriefferWolffPT2Test, RejectsSpinDependentReferenceActiveSpace) {
   }
 }
 
-// Natural orbitals are the basis in which the reference 1-RDM is diagonal, so
-// they are both a supported input and the one basis where folding a
-// fractionally occupied orbital drops no off-diagonal density.
-//
-// Stretched LiH supplies two same-symmetry active sigma orbitals, giving a
-// non-diagonal CAS 1-RDM in the canonical HF basis (~0.24 here) and a
-// nontrivial natural-orbital rotation. Stretching also drives the occupations
-// strongly fractional (1.86/0.14), the regime covered by the fold's rounding
-// guard.
-//
-// The rotation to natural orbitals lies entirely inside P, so
-// semicanonicalization must remove it and the downfolded spectrum must match.
+// Natural orbitals diagonalize the reference 1-RDM. Stretched LiH gives a
+// strongly correlated CAS (occupations 1.86/0.14) whose 1-RDM is non-diagonal
+// in the canonical basis. The rotation to natural orbitals lies inside P, so
+// semicanonicalization must remove it and the spectrum must match.
 TEST(SchriefferWolffPT2Test, AcceptsNaturalOrbitalReference) {
   namespace qcd = qdk::chemistry::data;
   std::vector<Eigen::Vector3d> coords = {{0, 0, 0}, {0, 0, 3.0}};

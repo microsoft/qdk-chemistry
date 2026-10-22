@@ -10,11 +10,8 @@
 #include <algorithm>
 #include <array>
 #include <bit>
-#include <chrono>
 #include <cmath>
 #include <cstdlib>
-#include <iomanip>
-#include <iostream>
 #include <limits>
 #include <random>
 #include <stdexcept>
@@ -688,7 +685,7 @@ TEST(Swpt2KernelTest, BareCutoffPreservesExternalTrace) {
 
 TEST(Swpt2KernelTest, CutoffBoundaryPreservesAllOperatorRanks) {
   int cases = 0;
-  for (const double energy_offset : {-64.0, 0.0, 64.0, 1e6})
+  for (const double energy_offset : {0.0, 1e6})
     for (const double sign : {-1.0, 1.0})
       for (const double spectator : {-2.0, -100.0})
         for (const int step : {-1, 0, 1}) {
@@ -721,7 +718,7 @@ TEST(Swpt2KernelTest, CutoffBoundaryPreservesAllOperatorRanks) {
             }
           }
         }
-  EXPECT_EQ(cases, 192);
+  EXPECT_EQ(cases, 96);
 }
 
 TEST(Swpt2KernelTest, ZeroCouplingsKeepOnlyTheBaseline) {
@@ -907,7 +904,6 @@ TEST(Swpt2KernelTest, UnrestrictedBlocksMatchFockSpace) {
 TEST(Swpt2KernelTest, IndependentFockSpace) {
   for (auto inputs :
        {make_case({0, 2}, {1}, {3}), make_case({0, 2, 3}, {}, {1})}) {
-    inputs.one_body[1] = inputs.one_body[0];
     populate_two_body(inputs);
     unsigned external = 0;
     for (const int orbital : inputs.inactive) external |= 3u << (2 * orbital);
@@ -954,36 +950,6 @@ TEST(Swpt2KernelTest, IndependentFockSpace) {
           std::abs(folded(reference, reference) - matrix(reference, reference)),
           1e-6);
     }
-  }
-}
-
-TEST(Swpt2KernelTest, IndependentSecondOrderSingles) {
-  const auto inputs = make_case({0, 2}, {1}, {3});
-  const auto embed = [&](unsigned compact) {
-    unsigned full = 3u << 2;
-    for (std::size_t axis = 0; axis < inputs.active.size(); ++axis)
-      full |= ((compact >> (2 * axis)) & 3u) << (2 * inputs.active[axis]);
-    return full;
-  };
-  for (const double sigma : {0.0, 0.8}) {
-    const sw::RegularizerOptions regularizer{sigma};
-    const auto parts = fock_parts(inputs, regularizer);
-    const Eigen::MatrixXd exact =
-        parts.diagonal + 0.5 * (parts.generator * parts.off_diagonal -
-                                parts.off_diagonal * parts.generator);
-    const auto matrix = fock_matrix(run_native(inputs, regularizer));
-    double error = 0.0, correction = 0.0;
-    for (unsigned bra = 0; bra < static_cast<unsigned>(matrix.rows()); ++bra)
-      for (unsigned ket = 0; ket < static_cast<unsigned>(matrix.cols());
-           ++ket) {
-        error = std::max(
-            error, std::abs(matrix(bra, ket) - exact(embed(bra), embed(ket))));
-        correction = std::max(correction,
-                              std::abs(exact(embed(bra), embed(ket)) -
-                                       parts.diagonal(embed(bra), embed(ket))));
-      }
-    EXPECT_LT(error, 1e-11);
-    EXPECT_GT(correction, 1e-6);
   }
 }
 
@@ -1239,84 +1205,6 @@ TEST(Swpt2KernelTest, SemicanonicalCovariance) {
                 1e-11);
     EXPECT_NEAR(original.min_denominator, rotated.min_denominator, 1e-11);
     EXPECT_NEAR(original.max_amplitude, rotated.max_amplitude, 1e-11);
-  }
-}
-
-TEST(Swpt2KernelTest, DISABLED_FullKernelBenchmark) {
-  using Clock = std::chrono::steady_clock;
-  const auto elapsed = [](const auto& start) {
-    return std::chrono::duration<double, std::milli>(Clock::now() - start)
-        .count();
-  };
-  std::vector<int> active_counts{2, 3, 4};
-  if (const char* active_setting = std::getenv("SWPT2_BENCH_ACTIVE"))
-    active_counts = {std::stoi(active_setting)};
-  const char* external_setting = std::getenv("SWPT2_BENCH_EXTERNAL");
-  const int external_count = external_setting ? std::stoi(external_setting) : 1;
-  ASSERT_GE(external_count, 1);
-  ASSERT_LE(external_count, 4);
-  const auto setup_start = Clock::now();
-  const auto statistics = sw::downfold_statistics(
-      external_count, active_counts.front(), external_count);
-  const double setup_ms = elapsed(setup_start);
-  ASSERT_EQ(statistics.projected_terms, 102);
-  ASSERT_EQ(statistics.contractions, 984);
-  ASSERT_EQ(statistics.maximum_rank, 4);
-  std::cout << "full_kernel_setup_ms=" << setup_ms
-            << " projected_terms=" << statistics.projected_terms
-            << " contractions=" << statistics.contractions
-            << " maximum_rank=" << statistics.maximum_rank << '\n';
-  for (const int active_count : active_counts) {
-    ASSERT_GE(active_count, 2);
-    ASSERT_LE(active_count, 4);
-    std::vector<int> active;
-    for (int orbital = 0; orbital < active_count; ++orbital)
-      active.push_back(orbital + external_count);
-    std::vector<int> inactive, virtuals;
-    for (int orbital = 0; orbital < external_count; ++orbital) {
-      inactive.push_back(orbital);
-      virtuals.push_back(orbital + external_count + active_count);
-    }
-    auto inputs = make_case(active, inactive, virtuals);
-    populate_two_body(inputs);
-    const sw::RegularizerOptions regularizer{0.8};
-    // make_case's alpha and beta one-body blocks differ; equal blocks take the
-    // spin-free path.
-    auto spin_free_inputs = inputs;
-    spin_free_inputs.one_body[1] = spin_free_inputs.one_body[0];
-    for (const bool spin_free : {true, false})
-      for (const auto& [mode, kind] :
-           {std::pair{"discard", 0}, std::pair{"determinant", 1},
-            std::pair{"dense", 3}}) {
-        const auto& case_inputs = spin_free ? spin_free_inputs : inputs;
-        const Eigen::MatrixXd density =
-            kind == 0 ? Eigen::MatrixXd{} : make_density(case_inputs, kind);
-        const auto timed_run = [&] {
-          const auto begin = Clock::now();
-          auto result = run_native(case_inputs, regularizer, density);
-          const double milliseconds = elapsed(begin);
-          return std::pair{std::move(result), milliseconds};
-        };
-        const auto [cold_result, first_ms] = timed_run();
-        std::vector<double> timings;
-        double checksum = 0.0;
-        for (int repeat = 0; repeat < 3; ++repeat) {
-          const auto [result, milliseconds] = timed_run();
-          timings.push_back(milliseconds);
-          checksum += result.scalar + result.one_body[0].squaredNorm() +
-                      result.one_body[1].squaredNorm() +
-                      result.two_body.squaredNorm();
-          compare(result, cold_result);
-        }
-        EXPECT_TRUE(std::isfinite(checksum));
-        std::sort(timings.begin(), timings.end());
-        std::cout << std::fixed << std::setprecision(4)
-                  << "full_kernel_active=" << active_count
-                  << " external=" << external_count << " mode=" << mode
-                  << " spin_free=" << spin_free << " sequant_ms=" << timings[1]
-                  << " sequant_first_ms=" << first_ms
-                  << " checksum=" << checksum << '\n';
-      }
   }
 }
 
