@@ -20,6 +20,7 @@ and never written as separate files.
 from __future__ import annotations
 
 import json
+import logging
 import os
 import pathlib
 import tempfile
@@ -37,6 +38,8 @@ if TYPE_CHECKING:
     from qdk_chemistry.data.base import DataClass
     from qdk_chemistry.remote.job import Job
 
+logger = logging.getLogger(__name__)
+
 
 def _resolve_dataclass_type(type_name: str) -> type[DataClass] | None:
     """Find the DataClass loader whose wire-format identifier matches *type_name*."""
@@ -46,10 +49,13 @@ def _resolve_dataclass_type(type_name: str) -> type[DataClass] | None:
 class FolderCache(CacheBackend):
     """Content-addressed folder cache.
 
+    Cache paths, including nested references, must remain within the cache root.
+    These checks do not authenticate manifests or make serialized objects safe
+    to load from an untrusted writer.
+
     Args:
         path: Directory to use as the cache root.  Created on first write.
-        is_shared: ``True`` when this directory is a network mount
-            reachable from remote compute nodes.
+        is_shared: ``True`` when this directory is a network mount reachable from remote compute nodes.
 
     """
 
@@ -70,9 +76,23 @@ class FolderCache(CacheBackend):
 
     @staticmethod
     def _validate_key(key: str, label: str = "key") -> None:
-        """Reject keys containing path separators or glob metacharacters."""
-        if not key or any(c in key for c in ("/", "\\", "..", "*", "?", "[", "]")):
+        """Reject unsafe cache filename components."""
+        if (
+            not isinstance(key, str)
+            or not key
+            or any(c in key for c in ("/", "\\", "..", "*", "?", "[", "]", ":", "\0"))
+        ):
             raise ValueError(f"Invalid cache {label}: {key!r}")
+
+    def _within_root(self, path: pathlib.Path) -> bool:
+        """Return whether *path* resolves inside the configured root."""
+        return path.resolve().is_relative_to(self._root.resolve())
+
+    def _checked_path(self, path: pathlib.Path) -> pathlib.Path:
+        """Reject cache paths that resolve outside the configured root."""
+        if not self._within_root(path):
+            raise ValueError(f"Cache path escapes cache root: {path}")
+        return path
 
     def _job_path(self, run_hash: str) -> pathlib.Path:
         self._validate_key(run_hash, "run_hash")
@@ -84,6 +104,9 @@ class FolderCache(CacheBackend):
 
         p = self._job_path(run_hash)
         if not p.exists():
+            return None
+        if not self._within_root(p):
+            logger.warning("Ignoring cached job outside the cache root: %s", p)
             return None
         try:
             return Job.load(p)
@@ -98,34 +121,50 @@ class FolderCache(CacheBackend):
 
     # ── Data blobs ───────────────────────────────────────────────────────
 
-    def get_data(self, content_hash: str) -> Any | None:  # noqa: PLR0911
-        """Retrieve cached data by its content hash, or ``None``."""
-        self._validate_key(content_hash, "content_hash")
+    def _data_entry(self, content_hash: str) -> tuple[str, pathlib.Path] | None:
+        """Return the kind and path of the entry that stores *content_hash*, or ``None``."""
         generic_list_path = self._root / f"{content_hash}.list.json"
         if generic_list_path.exists():
-            return self._get_generic_data_list(generic_list_path)
+            return "sequence", generic_list_path
         # Check for list manifest first — escape literal brackets so glob
         # doesn't treat them as a character class.
         list_matches = sorted(self._root.glob(f"{content_hash}.list[[]*].json"))
         if list_matches:
-            return self._get_data_list(list_matches[0])
+            return "list", list_matches[0]
         array_path = self._root / f"{content_hash}.ndarray.npy"
         if array_path.exists():
-            try:
-                return np.load(array_path, allow_pickle=False)
-            except (OSError, ValueError):
-                return None
+            return "ndarray", array_path
         # Glob for <content_hash>.*.h5 — the type name is in the filename
         matches = sorted(self._root.glob(f"{content_hash}.*.h5"))
-        if not matches:
+        if matches:
+            return "dataclass", matches[0]
+        return None
+
+    def get_data(self, content_hash: str) -> Any | None:  # noqa: PLR0911
+        """Retrieve cached data by its content hash, or ``None``."""
+        self._validate_key(content_hash, "content_hash")
+        entry = self._data_entry(content_hash)
+        if entry is None:
             return None
-        filepath = matches[0]
+        kind, path = entry
+        if not self._within_root(path):
+            logger.warning("Ignoring cached data outside the cache root: %s", path)
+            return None
+        if kind == "sequence":
+            return self._get_generic_data_list(path)
+        if kind == "list":
+            return self._get_data_list(path)
+        if kind == "ndarray":
+            try:
+                return np.load(path, allow_pickle=False)
+            except (OSError, ValueError):
+                return None
         # Extract type name from filename: <hash>.<type_name>.h5
-        type_name = filepath.name.removeprefix(f"{content_hash}.").removesuffix(".h5")
+        type_name = path.name.removeprefix(f"{content_hash}.").removesuffix(".h5")
         dataclass_type = _resolve_dataclass_type(type_name)
         if dataclass_type is None:
             return None
-        return dataclass_type.from_hdf5_file(str(filepath))  # type: ignore[attr-defined]
+        return dataclass_type.from_hdf5_file(str(path))  # type: ignore[attr-defined]
 
     def _get_data_list(self, manifest_path: pathlib.Path) -> list | None:
         """Reconstruct a list of DataClass objects from a manifest."""
@@ -133,26 +172,32 @@ class FolderCache(CacheBackend):
             manifest = json.loads(manifest_path.read_text())
             dataclass_type = _resolve_dataclass_type(manifest["type"])
             item_hashes = manifest["items"]
-        except (json.JSONDecodeError, KeyError, OSError):
-            return None
-        if dataclass_type is None:
-            return None
-        items = []
-        for item_hash in item_hashes:
-            matches = sorted(self._root.glob(f"{item_hash}.*.h5"))
-            if not matches:
+            if not isinstance(item_hashes, list):
+                raise ValueError("Cached list items must be a list of keys")
+            for item_hash in item_hashes:
+                self._validate_key(item_hash, "content_hash")
+            if dataclass_type is None:
                 return None
-            items.append(dataclass_type.from_hdf5_file(str(matches[0])))  # type: ignore[attr-defined]
-        return items  # type: ignore[return-value]
+            paths = []
+            for item_hash in item_hashes:
+                matches = sorted(self._root.glob(f"{item_hash}.*.h5"))
+                if not matches:
+                    return None
+                paths.append(self._checked_path(matches[0]))
+        except (json.JSONDecodeError, KeyError, OSError, TypeError, ValueError) as exc:
+            logger.warning("Ignoring invalid cached list manifest %s: %s", manifest_path, exc)
+            return None
+        return [dataclass_type.from_hdf5_file(str(path)) for path in paths]  # type: ignore[attr-defined]
 
     def _get_generic_data_list(self, manifest_path: pathlib.Path) -> list | tuple | None:
         """Reconstruct a nested list or tuple result from a generic manifest."""
         try:
             manifest = json.loads(manifest_path.read_text())
             if manifest.get("kind") != "sequence" or manifest.get("sequence_type") not in {"list", "tuple"}:
-                return None
+                raise ValueError("Invalid cached sequence manifest")
             data = self._node_to_data(manifest)
-        except (json.JSONDecodeError, KeyError, OSError, TypeError, ValueError):
+        except (json.JSONDecodeError, KeyError, OSError, TypeError, ValueError) as exc:
+            logger.warning("Ignoring invalid cached sequence manifest %s: %s", manifest_path, exc)
             return None
         return data if isinstance(data, list | tuple) else None
 
@@ -267,15 +312,17 @@ class FolderCache(CacheBackend):
                 return tuple(items)
             raise ValueError(f"Unknown cached sequence type: {sequence_type!r}")
         if kind == "dataclass":
+            self._validate_key(node["hash"], "content_hash")
             dataclass_type = _resolve_dataclass_type(node["type"])
             if dataclass_type is None:
                 raise ValueError(f"Unknown cached data type: {node['type']!r}")
-            path = self._root / f"{node['hash']}.{node['type']}.h5"
+            path = self._checked_path(self._root / f"{node['hash']}.{node['type']}.h5")
             if not path.exists():
                 raise FileNotFoundError(path)
             return dataclass_type.from_hdf5_file(str(path))  # type: ignore[attr-defined]
         if kind == "ndarray":
-            path = self._root / f"{node['hash']}.ndarray.npy"
+            self._validate_key(node["hash"], "content_hash")
+            path = self._checked_path(self._root / f"{node['hash']}.ndarray.npy")
             if not path.exists():
                 raise FileNotFoundError(path)
             return np.load(path, allow_pickle=False)
@@ -286,12 +333,8 @@ class FolderCache(CacheBackend):
         self._validate_key(content_hash, "content_hash")
         if shared_only and not self.is_shared:
             return False
-        return (
-            bool(list(self._root.glob(f"{content_hash}.*.h5")))
-            or (self._root / f"{content_hash}.ndarray.npy").exists()
-            or bool(list(self._root.glob(f"{content_hash}.list[[]*].json")))
-            or (self._root / f"{content_hash}.list.json").exists()
-        )
+        entry = self._data_entry(content_hash)
+        return entry is not None and self._within_root(entry[1])
 
     def to_config(self) -> dict:
         """Return kwargs to reconstruct this FolderCache."""
@@ -321,12 +364,12 @@ class FolderCache(CacheBackend):
         generic_manifest = self._root / f"{content_hash}.list.json"
         if generic_manifest.exists():
             try:
-                manifest = json.loads(generic_manifest.read_text())
+                manifest = json.loads(self._checked_path(generic_manifest).read_text())
                 self._collect_data_nodes(manifest, child_nodes)
-            except (json.JSONDecodeError, OSError, KeyError, TypeError):
+            except (json.JSONDecodeError, OSError, KeyError, TypeError, ValueError) as exc:
                 # Best-effort cleanup: retain any collected child nodes and
                 # continue deleting even when the manifest is corrupt or unreadable.
-                pass
+                logger.warning("Ignoring invalid cached sequence references in %s: %s", generic_manifest, exc)
             try:
                 generic_manifest.unlink()
                 deleted = True
@@ -336,8 +379,9 @@ class FolderCache(CacheBackend):
         list_matches = list(self._root.glob(f"{content_hash}.list[[]*].json"))
         for manifest_path in list_matches:
             try:
-                manifest = json.loads(manifest_path.read_text())
-            except (json.JSONDecodeError, OSError):
+                manifest = json.loads(self._checked_path(manifest_path).read_text())
+            except (json.JSONDecodeError, OSError, ValueError) as exc:
+                logger.warning("Ignoring invalid cached list manifest %s: %s", manifest_path, exc)
                 try:
                     manifest_path.unlink()
                     deleted = True
@@ -346,6 +390,11 @@ class FolderCache(CacheBackend):
                 continue
 
             for item_hash in manifest.get("items", []):
+                try:
+                    self._validate_key(item_hash, "content_hash")
+                except ValueError as exc:
+                    logger.warning("Ignoring invalid cached list reference in %s: %s", manifest_path, exc)
+                    continue
                 child_nodes.add(("dataclass", item_hash))
             try:
                 manifest_path.unlink()
@@ -387,9 +436,11 @@ class FolderCache(CacheBackend):
         """Collect data blobs referenced by a generic manifest node."""
         kind = node.get("kind")
         if kind == "dataclass":
+            FolderCache._validate_key(node["hash"], "content_hash")
             nodes.add((kind, node["hash"]))
             return
         if kind == "ndarray":
+            FolderCache._validate_key(node["hash"], "content_hash")
             nodes.add((kind, node["hash"]))
             return
         if kind == "sequence":
@@ -401,15 +452,19 @@ class FolderCache(CacheBackend):
         nodes: set[tuple[str, str]] = set()
         for manifest_path in self._root.glob("*.list.json"):
             try:
-                manifest = json.loads(manifest_path.read_text())
+                manifest = json.loads(self._checked_path(manifest_path).read_text())
                 self._collect_data_nodes(manifest, nodes)
-            except (json.JSONDecodeError, OSError, KeyError, TypeError):
+            except (json.JSONDecodeError, OSError, KeyError, TypeError, ValueError) as exc:
+                logger.warning("Ignoring invalid cached sequence references in %s: %s", manifest_path, exc)
                 continue
         for manifest_path in self._root.glob("*.list[[]*].json"):
             try:
-                manifest = json.loads(manifest_path.read_text())
-                nodes.update(("dataclass", item_hash) for item_hash in manifest["items"])
-            except (json.JSONDecodeError, OSError, KeyError, TypeError):
+                manifest = json.loads(self._checked_path(manifest_path).read_text())
+                for item_hash in manifest["items"]:
+                    self._validate_key(item_hash, "content_hash")
+                    nodes.add(("dataclass", item_hash))
+            except (json.JSONDecodeError, OSError, KeyError, TypeError, ValueError) as exc:
+                logger.warning("Ignoring invalid cached list references in %s: %s", manifest_path, exc)
                 continue
         return nodes
 

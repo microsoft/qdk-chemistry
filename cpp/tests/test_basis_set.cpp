@@ -3,6 +3,7 @@
 // license information.
 
 #include <gtest/gtest.h>
+#include <qdk/chemistry/scf/config.h>
 
 #include <Eigen/Dense>
 #include <cmath>
@@ -12,6 +13,7 @@
 #include <qdk/chemistry/algorithms/scf.hpp>
 #include <qdk/chemistry/data/basis_set.hpp>
 #include <qdk/chemistry/data/structure.hpp>
+#include <qdk/chemistry/utils/basis_archive.hpp>
 #include <stdexcept>
 #include <string>
 #include <vector>
@@ -1867,6 +1869,103 @@ TEST_F(BasisSetTest, BasisSetNameNormalization) {
   EXPECT_EQ("sto-3g", detail::denormalize_basis_set_name("sto-3g"));
   EXPECT_EQ("def2-TZVP", detail::normalize_basis_set_name("def2-TZVP"));
   EXPECT_EQ("def2-TZVP", detail::denormalize_basis_set_name("def2-TZVP"));
+}
+
+TEST_F(BasisSetTest, BasisArchiveStemsSelectShippedArchives) {
+  using qdk::chemistry::utils::BasisArchive;
+  EXPECT_EQ("6-31g_st_", BasisArchive::stem("6-31g*"));
+  EXPECT_EQ("cc-pvtz_sl_dk", BasisArchive::stem("cc-pvtz/dk"));
+  EXPECT_EQ("6-311+g", BasisArchive::stem("6-311+g"));
+  EXPECT_EQ("6-31g_st_", BasisArchive::stem("6-31g_st_"));
+
+  EXPECT_TRUE(BasisArchive::exists("sto-3g"));
+  EXPECT_TRUE(BasisArchive::exists("6-31g*"));
+  EXPECT_TRUE(BasisArchive::exists("6-311+g"));
+  EXPECT_FALSE(BasisArchive::exists(""));
+  EXPECT_FALSE(BasisArchive::exists("../compressed/sto-3g"));
+  EXPECT_FALSE(BasisArchive::exists("..\\compressed\\sto-3g"));
+  EXPECT_FALSE(BasisArchive::exists("invalid-basis-set-name"));
+  EXPECT_THROW(BasisArchive("invalid-basis-set-name"), std::invalid_argument);
+}
+
+TEST_F(BasisSetTest, BasisArchiveDirectoriesArePrivateAndScoped) {
+  std::filesystem::path first_file;
+  std::filesystem::path second_file;
+  {
+    const qdk::chemistry::utils::BasisArchive first("sto-3g");
+    const qdk::chemistry::utils::BasisArchive second("sto-3g");
+    first_file = first.json();
+    second_file = second.json();
+    EXPECT_NE(first_file, second_file);
+    EXPECT_TRUE(std::filesystem::is_regular_file(first_file));
+    EXPECT_TRUE(std::filesystem::is_regular_file(second_file));
+    EXPECT_TRUE(first.guess(true).has_value());
+    EXPECT_TRUE(first.guess(false).has_value());
+#ifndef _WIN32
+    const auto root = first_file.parent_path().parent_path().parent_path();
+    const auto permissions = std::filesystem::status(root).permissions();
+    EXPECT_EQ(permissions & (std::filesystem::perms::group_all |
+                             std::filesystem::perms::others_all),
+              std::filesystem::perms::none);
+#endif
+  }
+  EXPECT_FALSE(std::filesystem::exists(first_file));
+  EXPECT_FALSE(std::filesystem::exists(second_file));
+}
+
+TEST_F(BasisSetTest, BasisArchivePathIsNotShellCode) {
+  using qdk::chemistry::scf::QDKChemistryConfig;
+  const auto read_json = [] {
+    const qdk::chemistry::utils::BasisArchive archive("sto-3g");
+    std::ifstream stream(archive.json());
+    return nlohmann::json::parse(stream);
+  };
+  const auto resources = QDKChemistryConfig::get_resources_dir();
+  struct RestoreResources {
+    std::filesystem::path path;
+    ~RestoreResources() {
+      qdk::chemistry::scf::QDKChemistryConfig::set_resources_dir(path);
+    }
+  } restore{resources};
+  const auto expected = read_json();
+
+  std::vector<std::string> names{
+      "literal $(printf unused) %USERPROFILE% ; & ' resources"};
+#ifndef _WIN32
+  names.emplace_back("literal:resources");
+#endif
+  for (const auto& name : names) {
+    const auto literal = std::filesystem::temp_directory_path() / name;
+    std::filesystem::create_directories(literal / "compressed");
+    std::filesystem::copy_file(
+        resources / "compressed" / "sto-3g.tar.gz",
+        literal / "compressed" / "sto-3g.tar.gz",
+        std::filesystem::copy_options::overwrite_existing);
+    QDKChemistryConfig::set_resources_dir(literal);
+    EXPECT_EQ(expected, read_json());
+  }
+}
+
+TEST_F(BasisSetTest, BasisArchiveRejectsExternalSymlinks) {
+  const qdk::chemistry::utils::BasisArchive first("sto-3g");
+  const qdk::chemistry::utils::BasisArchive second("sto-3g");
+  const auto first_file = first.json();
+  std::filesystem::remove(first_file);
+  std::error_code error;
+  std::filesystem::create_symlink(second.json(), first_file, error);
+  if (error) {
+    GTEST_SKIP() << "Symlink creation is unavailable: " << error.message();
+  }
+  EXPECT_THROW(first.json(), std::invalid_argument);
+}
+
+TEST_F(BasisSetTest, FromBasisNameKeepsPlusInArchiveName) {
+  auto structure = testing::create_water_structure();
+  EXPECT_EQ(19u, BasisSet::from_basis_name("6-311g", structure)
+                     ->get_num_atomic_orbitals());
+  // The diffuse sp shell on oxygen adds four functions.
+  EXPECT_EQ(23u, BasisSet::from_basis_name("6-311+g", structure)
+                     ->get_num_atomic_orbitals());
 }
 
 TEST_F(BasisSetTest, DataTypeName) {

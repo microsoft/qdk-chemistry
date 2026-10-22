@@ -1,4 +1,5 @@
 target_sources(chemistry PRIVATE
+    basis_archive.cpp
     cube_generator.cpp
     hash_context.cpp
     valence_space.cpp
@@ -6,3 +7,7 @@ target_sources(chemistry PRIVATE
     golden_section.cpp
     logger.cpp
 )
+
+if(WIN32)
+    target_link_libraries(chemistry PRIVATE advapi32)
+endif()

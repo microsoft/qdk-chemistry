@@ -9,9 +9,12 @@
 #include <array>
 #include <blas.hh>
 #include <cmath>
+#include <cstdint>
+#include <cstring>
 #include <filesystem>
 #include <fstream>
 #include <lapack.hh>
+#include <limits>
 #include <map>
 #include <nlohmann/json.hpp>
 #include <numeric>
@@ -1492,6 +1495,251 @@ TEST_F(HamiltonianTest, SparseContainerHDF5Serialization) {
   EXPECT_TRUE(h_two_aaaa.isApprox(hl_two_aaaa, testing::hdf5_tolerance));
 
   std::filesystem::remove(filename);
+}
+
+TEST_F(HamiltonianTest,
+       SparseContainerJSONRejectsMalformedDimensionsAndIndices) {
+  SparseHamiltonianContainer container(one_body, core_energy);
+  const auto valid = container.to_json();
+  for (const auto& index :
+       std::vector<nlohmann::json>{-1, 2, 0.5, true, nullptr,
+                                   std::numeric_limits<std::uint64_t>::max()}) {
+    for (int slot = 0; slot < 2; ++slot) {
+      auto malformed = valid;
+      malformed["one_body_integrals_alpha_sparse"][0][slot] = index;
+      EXPECT_THROW(SparseHamiltonianContainer::from_json(malformed),
+                   std::invalid_argument);
+    }
+  }
+  for (const auto& count : std::vector<nlohmann::json>{
+           -1, 2.5, true, std::numeric_limits<int>::max(),
+           std::numeric_limits<std::uint64_t>::max()}) {
+    auto malformed = valid;
+    malformed["num_orbitals"] = count;
+    EXPECT_THROW(SparseHamiltonianContainer::from_json(malformed),
+                 std::invalid_argument);
+  }
+  auto malformed = valid;
+  malformed["one_body_integrals_alpha_sparse"] = {{0, 0}};
+  EXPECT_THROW(SparseHamiltonianContainer::from_json(malformed),
+               std::invalid_argument);
+
+  // One-body integrals are read only from the sparse triplets.
+  auto dense = valid;
+  dense.erase("one_body_integrals_alpha_sparse");
+  dense["one_body_integrals_alpha"] = {{1.0, 0.0}, {0.0, 1.0}};
+  EXPECT_THROW(SparseHamiltonianContainer::from_json(dense),
+               std::runtime_error);
+}
+
+TEST_F(HamiltonianTest, SparseContainerRejectsDenseTwoBodySizeMismatch) {
+  const Eigen::MatrixXd three = Eigen::MatrixXd::Identity(3, 3);
+  for (const Eigen::Index size : {0, 10, 80, 82}) {
+    const Eigen::VectorXd values = Eigen::VectorXd::Zero(size);
+    EXPECT_THROW(SparseHamiltonianContainer(three, values, core_energy),
+                 std::invalid_argument)
+        << size;
+  }
+  const Eigen::MatrixXd empty(0, 0);
+  const Eigen::VectorXd one = Eigen::VectorXd::Zero(1);
+  EXPECT_THROW(SparseHamiltonianContainer(empty, one, core_energy),
+               std::invalid_argument);
+  EXPECT_NO_THROW(SparseHamiltonianContainer(one_body, two_body, core_energy));
+}
+
+TEST_F(HamiltonianTest, SparseContainerRejectsInconsistentTwoBodyExtents) {
+  Eigen::SparseMatrix<double> h1(2, 2);
+  h1.insert(0, 0) = 1.0;
+  SparseMapBlock<4, double> entries;
+  entries[{2, 2, 2, 2}] = 1.0;
+  const auto h2 = make_spin_diagonal_rank4_sbsm<double>(entries, 3);
+  EXPECT_THROW(SparseHamiltonianContainer(h1, h2, 0.0), std::invalid_argument);
+
+  auto json = SparseHamiltonianContainer(h1, 0.0).to_json();
+  json["two_body_integrals"] = h2->to_json();
+  EXPECT_THROW(SparseHamiltonianContainer::from_json(json),
+               std::invalid_argument);
+
+  SparseHamiltonianContainer::TwoBodyMap oversized_index;
+  oversized_index[{std::numeric_limits<std::size_t>::max(), 0, 0, 0}] = 1.0;
+  EXPECT_THROW(SparseHamiltonianContainer(h1, oversized_index, 0.0),
+               std::invalid_argument);
+}
+
+TEST_F(HamiltonianTest, SparseContainerHDF5RejectsMalformedDatasetShapes) {
+  SparseHamiltonianContainer container(one_body, core_energy);
+  H5::FileAccPropList properties;
+  properties.setCore(65536, false);
+  for (const bool two_body_dataset : {false, true}) {
+    const auto* name = two_body_dataset ? "two_body_integrals_sparse"
+                                        : "one_body_integrals_alpha_sparse";
+    const hsize_t width = two_body_dataset ? 3 : 2;
+    // Only the packed width is read; this includes rejecting the unpacked
+    // [row, col, value] and [p, q, r, s, value] layouts.
+    const std::vector<std::vector<hsize_t>> shapes{{},
+                                                   {1},
+                                                   {1, 0},
+                                                   {1, width - 1},
+                                                   {1, width + 1},
+                                                   {1, width + 2},
+                                                   {0, width + 1},
+                                                   {1, width, 1}};
+    for (const auto& dims : shapes) {
+      H5::H5File file("sparse-invalid-shape.h5", H5F_ACC_TRUNC,
+                      H5::FileCreatPropList::DEFAULT, properties);
+      auto group = file.createGroup("container");
+      container.to_hdf5(group);
+      if (group.nameExists(name)) {
+        group.unlink(name);
+      }
+      auto space = dims.empty() ? H5::DataSpace(H5S_SCALAR)
+                                : H5::DataSpace(static_cast<int>(dims.size()),
+                                                dims.data());
+      group.createDataSet(name, H5::PredType::NATIVE_DOUBLE, space);
+      EXPECT_THROW(SparseHamiltonianContainer::from_hdf5(group),
+                   std::invalid_argument);
+    }
+  }
+}
+
+TEST_F(HamiltonianTest, SparseContainerHDF5BoundsRowsBeforeReading) {
+  SparseHamiltonianContainer container(one_body, two_body, core_energy);
+  H5::FileAccPropList properties;
+  properties.setCore(65536, false);
+  for (const bool two_body_dataset : {false, true}) {
+    H5::H5File file("sparse-row-bound.h5", H5F_ACC_TRUNC,
+                    H5::FileCreatPropList::DEFAULT, properties);
+    auto group = file.createGroup("container");
+    container.to_hdf5(group);
+    const auto* name = two_body_dataset ? "two_body_integrals_sparse"
+                                        : "one_body_integrals_alpha_sparse";
+    group.unlink(name);
+    // Unwritten chunks are not stored, so the file stays small while it
+    // declares more rows than the reader accepts.
+    const hsize_t dims[] = {hsize_t{1} << 31,
+                            two_body_dataset ? hsize_t{3} : hsize_t{2}};
+    const hsize_t chunk[] = {1, dims[1]};
+    H5::DSetCreatPropList chunked;
+    chunked.setChunk(2, chunk);
+    auto dataset = group.createDataSet(name, H5::PredType::NATIVE_DOUBLE,
+                                       H5::DataSpace(2, dims), chunked);
+    if (!two_body_dataset) {
+      const int n = 2;
+      auto attribute = dataset.createAttribute(
+          "num_orbitals", H5::PredType::NATIVE_INT, H5::DataSpace(H5S_SCALAR));
+      attribute.write(H5::PredType::NATIVE_INT, &n);
+    }
+    EXPECT_THROW(SparseHamiltonianContainer::from_hdf5(group),
+                 std::invalid_argument);
+  }
+}
+
+TEST_F(HamiltonianTest, SparseContainerHDF5RejectsNonNativePackedTypes) {
+  SparseHamiltonianContainer container(one_body, two_body, core_energy);
+  H5::FileAccPropList properties;
+  properties.setCore(65536, false);
+  const auto* swapped = H5::PredType::NATIVE_DOUBLE.getOrder() == H5T_ORDER_LE
+                            ? &H5::PredType::IEEE_F64BE
+                            : &H5::PredType::IEEE_F64LE;
+  for (const bool two_body_dataset : {false, true}) {
+    const auto* name = two_body_dataset ? "two_body_integrals_sparse"
+                                        : "one_body_integrals_alpha_sparse";
+    const hsize_t dims[] = {1, two_body_dataset ? hsize_t{3} : hsize_t{2}};
+    for (const auto* type :
+         {&H5::PredType::NATIVE_INT, &H5::PredType::NATIVE_FLOAT, swapped}) {
+      H5::H5File file("sparse-packed-type.h5", H5F_ACC_TRUNC,
+                      H5::FileCreatPropList::DEFAULT, properties);
+      auto group = file.createGroup("container");
+      container.to_hdf5(group);
+      group.unlink(name);
+      group.createDataSet(name, *type, H5::DataSpace(2, dims));
+      EXPECT_THROW(SparseHamiltonianContainer::from_hdf5(group),
+                   std::invalid_argument);
+    }
+  }
+}
+
+TEST_F(HamiltonianTest, SparseContainerHDF5RejectsMalformedScalarAttributes) {
+  SparseHamiltonianContainer container(one_body, core_energy);
+  H5::FileAccPropList properties;
+  properties.setCore(65536, false);
+  for (const bool orbital_count : {false, true}) {
+    H5::H5File file("sparse-invalid-attribute.h5", H5F_ACC_TRUNC,
+                    H5::FileCreatPropList::DEFAULT, properties);
+    auto group = file.createGroup("container");
+    container.to_hdf5(group);
+    const hsize_t dims[] = {2};
+    H5::DataSpace array_space(1, dims);
+    if (orbital_count) {
+      auto dataset = group.openDataSet("one_body_integrals_alpha_sparse");
+      dataset.removeAttr("num_orbitals");
+      dataset.createAttribute("num_orbitals", H5::PredType::NATIVE_INT,
+                              array_space);
+    } else {
+      auto metadata = group.openGroup("metadata");
+      metadata.removeAttr("core_energy");
+      metadata.createAttribute("core_energy", H5::PredType::NATIVE_DOUBLE,
+                               array_space);
+    }
+    EXPECT_THROW(SparseHamiltonianContainer::from_hdf5(group),
+                 std::invalid_argument);
+  }
+  for (const long long count :
+       {-1LL, static_cast<long long>(std::numeric_limits<int>::max()),
+        std::numeric_limits<long long>::max()}) {
+    H5::H5File file("sparse-invalid-count.h5", H5F_ACC_TRUNC,
+                    H5::FileCreatPropList::DEFAULT, properties);
+    auto group = file.createGroup("container");
+    container.to_hdf5(group);
+    auto dataset = group.openDataSet("one_body_integrals_alpha_sparse");
+    dataset.removeAttr("num_orbitals");
+    auto attribute = dataset.createAttribute(
+        "num_orbitals", H5::PredType::NATIVE_LLONG, H5::DataSpace(H5S_SCALAR));
+    attribute.write(H5::PredType::NATIVE_LLONG, &count);
+    EXPECT_THROW(SparseHamiltonianContainer::from_hdf5(group),
+                 std::invalid_argument);
+  }
+}
+
+TEST_F(HamiltonianTest, SparseContainerHDF5RejectsInvalidPackedIndices) {
+  SparseHamiltonianContainer container(one_body, two_body, core_energy);
+  H5::FileAccPropList properties;
+  properties.setCore(65536, false);
+  for (const bool two_body_dataset : {false, true}) {
+    H5::H5File file("sparse-invalid-packed-index.h5", H5F_ACC_TRUNC,
+                    H5::FileCreatPropList::DEFAULT, properties);
+    auto group = file.createGroup("container");
+    container.to_hdf5(group);
+    const auto* name = two_body_dataset ? "two_body_integrals_sparse"
+                                        : "one_body_integrals_alpha_sparse";
+    auto dataset = group.openDataSet(name);
+    const auto space = dataset.getSpace();
+    std::vector<double> entries(space.getSimpleExtentNpoints());
+    dataset.read(entries.data(), H5::PredType::NATIVE_DOUBLE);
+    const std::uint32_t indices[] = {0,
+                                     std::numeric_limits<std::uint32_t>::max()};
+    static_assert(sizeof(indices) == sizeof(double));
+    std::memcpy(entries.data(), indices, sizeof(double));
+    dataset.write(entries.data(), H5::PredType::NATIVE_DOUBLE);
+    EXPECT_THROW(SparseHamiltonianContainer::from_hdf5(group),
+                 std::invalid_argument);
+  }
+}
+
+TEST_F(HamiltonianTest, SparseContainerHDF5ReadsTwoBodyOnlyFromDataset) {
+  SparseHamiltonianContainer container(one_body, core_energy);
+  H5::FileAccPropList properties;
+  properties.setCore(65536, false);
+  H5::H5File file("sparse-two-body-group.h5", H5F_ACC_TRUNC,
+                  H5::FileCreatPropList::DEFAULT, properties);
+  auto group = file.createGroup("container");
+  container.to_hdf5(group);
+  EXPECT_FALSE(
+      SparseHamiltonianContainer::from_hdf5(group)->has_two_body_integrals());
+
+  group.createGroup("two_body_integrals_sparse");
+  EXPECT_THROW(SparseHamiltonianContainer::from_hdf5(group),
+               std::runtime_error);
 }
 
 TEST_F(HamiltonianTest, SparseContainerFCIDUMP) {
