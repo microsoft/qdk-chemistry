@@ -4,7 +4,6 @@
 
 #include <H5Cpp.h>
 
-#include <limits>
 #include <qdk/chemistry/data/symmetry/symmetry_blocked_sparse_map.hpp>
 
 #include "../json_serialization.hpp"
@@ -52,15 +51,7 @@ SymmetryBlockedSparseMap<Rank, Scalar>::from_json(const nlohmann::json& j) {
     for (const auto& e : entry.at("entries")) {
       IndexTuple idx{};
       for (std::size_t i = 0; i < Rank; ++i) {
-        // Check before narrowing, or out-of-range values wrap into range.
-        const auto& index = e.at(i);
-        if (!index.is_number_integer() || index < 0 ||
-            index > std::numeric_limits<unsigned>::max()) {
-          throw std::invalid_argument(
-              "SymmetryBlockedSparseMap entry index must be an unsigned "
-              "integer.");
-        }
-        idx[i] = index.template get<unsigned>();
+        idx[i] = detail::json_integer<unsigned>(e.at(i));
       }
       (*sparse_block)[idx] = e.at(Rank).template get<Scalar>();
     }
