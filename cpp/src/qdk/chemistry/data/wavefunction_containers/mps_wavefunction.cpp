@@ -12,7 +12,6 @@
 #include <qdk/chemistry/data/wavefunction_containers/mps_wavefunction.hpp>
 #include <stdexcept>
 #include <type_traits>
-#include <unordered_map>
 #include <utility>
 #include <variant>
 
@@ -25,39 +24,6 @@ constexpr auto index_limit =
     static_cast<std::size_t>(std::numeric_limits<Eigen::Index>::max());
 constexpr std::array<const char*, 3> order_keys{
     "left_sector_order", "physical_sector_order", "right_sector_order"};
-
-template <typename Extents>
-std::size_t total_extent(const Extents& extents) {
-  std::size_t total = 0;
-  for (const auto& [label, extent] : extents) {
-    if (extent == 0 || extent > index_limit - total) {
-      throw std::invalid_argument(
-          "MPS sector extents must be positive and fit Eigen::Index.");
-    }
-    total += extent;
-  }
-  return total;
-}
-
-template <typename Extents>
-std::unordered_map<SymmetryLabel, std::size_t> sector_offsets(
-    const Extents& extents, const std::vector<SymmetryLabel>& order) {
-  if (order.size() != extents.size()) {
-    throw std::invalid_argument(
-        "MPS sector order must contain every sector exactly once.");
-  }
-  std::unordered_map<SymmetryLabel, std::size_t> offsets;
-  std::size_t offset = 0;
-  for (const auto& label : order) {
-    const auto extent = extents.find(label);
-    if (extent == extents.end() || !offsets.emplace(label, offset).second) {
-      throw std::invalid_argument(
-          "MPS sector order contains a missing or duplicate sector.");
-    }
-    offset += extent->second;
-  }
-  return offsets;
-}
 
 std::vector<Configuration> default_physical_basis(std::size_t dimension) {
   std::vector<Configuration> basis;
@@ -181,26 +147,45 @@ MPSSite::MPSSite(TensorPtr tensor, SectorOrders sector_orders,
   if (!_tensor) {
     throw std::invalid_argument("MPS site requires a tensor.");
   }
-  if (_physical_basis.empty()) {
-    _physical_basis = default_physical_basis(physical_dimension());
-  }
   _validate();
 }
 
-void MPSSite::_validate() const {
+void MPSSite::_validate() {
   std::visit(
       [&](const auto& tensor) {
         for (std::size_t slot = 0; slot < 3; ++slot) {
-          if (total_extent(tensor.extents()[slot]) == 0) {
+          const auto& extents = tensor.extents()[slot];
+          const auto& order = _sector_orders[slot];
+          if (extents.empty()) {
             throw std::invalid_argument("MPS index spaces must be nonempty.");
           }
+          if (order.size() != extents.size()) {
+            throw std::invalid_argument(
+                "MPS sector order must contain every sector exactly once.");
+          }
+          auto& offsets = _sector_offsets[slot];
+          std::size_t offset = 0;
+          for (const auto& label : order) {
+            const auto extent = extents.find(label);
+            if (extent == extents.end() ||
+                !offsets.emplace(label, static_cast<Eigen::Index>(offset))
+                     .second) {
+              throw std::invalid_argument(
+                  "MPS sector order contains a missing or duplicate sector.");
+            }
+            if (extent->second == 0 || extent->second > index_limit - offset) {
+              throw std::invalid_argument(
+                  "MPS sector extents must be positive and fit Eigen::Index.");
+            }
+            offset += extent->second;
+          }
+          _dimensions[slot] = offset;
           for (const auto& axis : tensor.symmetries()[slot]->axes()) {
             if (axis.equivalent()) {
               throw std::invalid_argument(
                   "MPS axes must not enable equivalent-sector aliasing.");
             }
           }
-          sector_offsets(tensor.extents()[slot], _sector_orders[slot]);
         }
         for (const auto& [labels, block] : tensor.blocks()) {
           const auto left = tensor.extents()[0].at(labels[0]);
@@ -219,6 +204,9 @@ void MPSSite::_validate() const {
       },
       *_tensor);
 
+  if (_physical_basis.empty()) {
+    _physical_basis = default_physical_basis(physical_dimension());
+  }
   if (_physical_basis.size() != physical_dimension()) {
     throw std::invalid_argument(
         "MPS physical basis size must match the physical dimension.");
@@ -248,17 +236,9 @@ void MPSSite::_validate() const {
   }
 }
 
-std::size_t MPSSite::_dimension(std::size_t slot) const {
-  return std::visit(
-      [slot](const auto& tensor) {
-        return total_extent(tensor.extents()[slot]);
-      },
-      *_tensor);
-}
-
-std::size_t MPSSite::left_bond_dimension() const { return _dimension(0); }
-std::size_t MPSSite::physical_dimension() const { return _dimension(1); }
-std::size_t MPSSite::right_bond_dimension() const { return _dimension(2); }
+std::size_t MPSSite::left_bond_dimension() const { return _dimensions[0]; }
+std::size_t MPSSite::physical_dimension() const { return _dimensions[1]; }
+std::size_t MPSSite::right_bond_dimension() const { return _dimensions[2]; }
 bool MPSSite::is_complex() const { return _tensor->index() == 1; }
 
 MPSSite::DenseMatrixVariant MPSSite::to_dense() const {
@@ -275,11 +255,7 @@ MPSSite::DenseMatrixVariant MPSSite::to_dense() const {
             std::remove_const_t<typename TensorType::BlockPtr::element_type>;
         Matrix dense = Matrix::Zero(static_cast<Eigen::Index>(left * physical),
                                     static_cast<Eigen::Index>(right));
-        std::array<std::unordered_map<SymmetryLabel, std::size_t>, 3> offsets;
-        for (std::size_t slot = 0; slot < 3; ++slot) {
-          offsets[slot] =
-              sector_offsets(tensor.extents()[slot], _sector_orders[slot]);
-        }
+        const auto& offsets = _sector_offsets;
         for (const auto& [labels, block] : tensor.blocks()) {
           const auto local_left = tensor.extents()[0].at(labels[0]);
           const auto local_physical = tensor.extents()[1].at(labels[1]);
@@ -330,18 +306,11 @@ MPSContainer::MPSContainer(
 }
 
 void MPSContainer::_validate() const {
-  if (_sites.empty() || !_orbitals) {
+  if (!_orbitals) {
     throw std::invalid_argument(
         "MPS requires nonempty sites and a mode basis.");
   }
-  for (const auto& site : _sites) {
-    if (!site) {
-      throw std::invalid_argument("MPS site pointers must not be null.");
-    }
-    if (site->is_complex() != _sites.front()->is_complex()) {
-      throw std::invalid_argument("MPS sites must use one scalar type.");
-    }
-  }
+  validate_sites(_sites);
   const ConfigurationSet mode_space(std::vector<Configuration>{}, _orbitals,
                                     Wavefunction::DEFAULT_SECTOR);
   if (mode_space.num_modes() != num_sites()) {
@@ -362,22 +331,36 @@ void MPSContainer::_validate() const {
           "MPS site order must be a permutation of active-mode slots.");
     }
   }
-  if (_sites.front()->left_bond_dimension() != 1 ||
-      _sites.back()->right_bond_dimension() != 1) {
+}
+
+void MPSContainer::validate_sites(const std::vector<SitePtr>& sites) {
+  if (sites.empty()) {
+    throw std::invalid_argument("MPS requires nonempty sites.");
+  }
+  for (const auto& site : sites) {
+    if (!site) {
+      throw std::invalid_argument("MPS site pointers must not be null.");
+    }
+    if (site->is_complex() != sites.front()->is_complex()) {
+      throw std::invalid_argument("MPS sites must use one scalar type.");
+    }
+  }
+  if (sites.front()->left_bond_dimension() != 1 ||
+      sites.back()->right_bond_dimension() != 1) {
     throw std::invalid_argument("MPS outer bond dimensions must be one.");
   }
-  for (std::size_t i = 0; i + 1 < num_sites(); ++i) {
+  for (std::size_t i = 0; i + 1 < sites.size(); ++i) {
     std::visit(
         [&](const auto& left, const auto& right) {
           if (*left.symmetries()[2] != *right.symmetries()[0] ||
               left.extents()[2] != right.extents()[0] ||
-              _sites[i]->right_sector_order() !=
-                  _sites[i + 1]->left_sector_order()) {
+              sites[i]->right_sector_order() !=
+                  sites[i + 1]->left_sector_order()) {
             throw std::invalid_argument(
                 "Adjacent MPS sites have incompatible bond spaces.");
           }
         },
-        _sites[i]->tensor(), _sites[i + 1]->tensor());
+        sites[i]->tensor(), sites[i + 1]->tensor());
   }
 }
 

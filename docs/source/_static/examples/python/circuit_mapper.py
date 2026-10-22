@@ -1,4 +1,4 @@
-"""Controlled circuit mapper usage examples."""
+"""Circuit mapper usage examples."""
 
 # --------------------------------------------------------------------------------------------
 # Copyright (c) Microsoft Corporation. All rights reserved.
@@ -98,6 +98,31 @@ cswap_mapper = create(
 circuit = cswap_mapper.run(evolution)
 print("Controlled evolution circuit generated via the CSWAP sandwich")
 # end-cell-cswap
+################################################################################
+
+################################################################################
+# start-cell-unitary-synthesis
+import numpy as np
+from qdk_chemistry.algorithms import create
+from qdk_chemistry.data import RealUnitaryContainer, UnitaryRepresentation
+from scipy.stats import ortho_group
+
+# 1. A real 8x3 isometry: three orthonormal columns on three qubits. Column c is the
+#    image of the little-endian basis state |c>.
+isometry = ortho_group.rvs(8, random_state=7)[:, :3]
+unitary = UnitaryRepresentation(RealUnitaryContainer(isometry))
+
+# 2. Synthesize it with cosine-sine decompositions.
+mapper = create("circuit_mapper", "unitary_synthesis", rotation_bit_precision=12)
+circuit = mapper.run(unitary)
+
+# 3. Leave the right factor V out of the circuit and apply it elsewhere: the
+#    circuit now realizes isometry @ V.T on its first columns.
+omitting_mapper = create("circuit_mapper", "unitary_synthesis", omit_right_factor=True)
+omitted_circuit = omitting_mapper.run(unitary)
+right_factor = omitting_mapper.right_factor(unitary)
+print("Right factor shape:", right_factor.shape)
+# end-cell-unitary-synthesis
 ################################################################################
 
 ################################################################################

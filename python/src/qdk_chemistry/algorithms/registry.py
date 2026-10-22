@@ -914,6 +914,7 @@ def _register_python_algorithms():
         PauliSequenceMapper,
         PSPMapper,
         SOSSAMapper,
+        UnitarySynthesisMapper,
     )
     from qdk_chemistry.algorithms.controlled_circuit_mapper import (  # noqa: PLC0415
         ControlledPauliSequenceMapper,
@@ -967,7 +968,10 @@ def _register_python_algorithms():
     from qdk_chemistry.algorithms.qubit_hamiltonian_solver import DenseMatrixSolver, SparseMatrixSolver  # noqa: PLC0415
     from qdk_chemistry.algorithms.qubit_mapper import QdkQubitMapper  # noqa: PLC0415
     from qdk_chemistry.algorithms.qubit_mapper.sum_of_squares import SumOfSquaresQubitMapper  # noqa: PLC0415
-    from qdk_chemistry.algorithms.state_preparation import SparseIsometryStatePreparation  # noqa: PLC0415
+    from qdk_chemistry.algorithms.state_preparation import (  # noqa: PLC0415
+        MatrixProductStatePreparation,
+        SparseIsometryStatePreparation,
+    )
     from qdk_chemistry.algorithms.state_preparation.alias_sampling import AliasSamplingStatePreparation  # noqa: PLC0415
     from qdk_chemistry.algorithms.state_preparation.dense_pure_state import DensePureStatePreparation  # noqa: PLC0415
     from qdk_chemistry.algorithms.state_preparation.qrom_state_prep import QROMStatePreparation  # noqa: PLC0415
@@ -986,6 +990,7 @@ def _register_python_algorithms():
     # Must precede SparseIsometryStatePreparation, whose settings resolve it by name at construction.
     register(lambda: DensePureStatePreparation())
     register(lambda: SparseIsometryStatePreparation())
+    register(lambda: MatrixProductStatePreparation())
     register(lambda: DenseMatrixSolver())
     register(lambda: SparseMatrixSolver())
     register(lambda: QdkQubitMapper())
@@ -1008,6 +1013,7 @@ def _register_python_algorithms():
     register(lambda: ControlledPauliSequenceMapper())
     register(lambda: ControlledSwapPauliSequenceMapper())
     register(lambda: SOSSAMapper())
+    register(lambda: UnitarySynthesisMapper())
     register(lambda: SOSSABuilder())
     register(lambda: SumOfSquaresQubitMapper())
     register(lambda: EulerIntegrator())
