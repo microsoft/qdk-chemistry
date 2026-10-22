@@ -386,7 +386,8 @@ namespace QDKChemistry.Utils.HubbardPlaquette {
     /// # Description
     /// Each step is `pink(s/2) I(s/2) gold(s) I(s/2) pink(s/2)`, so the half-angle pink layers of
     /// neighbouring steps merge, leaving one half-angle pink boundary at each end. This is the "PIG"
-    /// ordering of Eqs. (16a)-(16b) in :cite:`Apel2026`, not Eq. (D2) of :cite:`Campbell2022`.
+    /// ordering of Eqs. (16a)-(16b) in :cite:`Apel2026`, which merges the more expensive hopping
+    /// layers, not Eq. (D2) of :cite:`Campbell2022`, which puts the interaction outermost.
     ///
     /// The modes are routed into pink order at the start and back at the end, so only the gold
     /// layers route. Both orders keep the spin-up modes ahead of their spin-down partners, so the

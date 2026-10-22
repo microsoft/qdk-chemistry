@@ -391,15 +391,17 @@ class TestPlaquetteCircuit:
             # The simulator carries the catalysts' superposition, which multiplies its cost, so 4x2
             # starts from one system basis state with the control set.
             pytest.param(4, 2, 2, np.kron([0.0, 1.0], random_state(16, seed=11, support=1)), marks=pytest.mark.slow),
+            pytest.param(4, 2, 1, np.kron([0.0, 1.0], random_state(16, seed=11, support=1)), marks=pytest.mark.slow),
         ],
-        ids=["2x2-one-step", "2x2", "4x2"],
+        ids=["2x2-one-step", "2x2", "4x2", "4x2-one-step"],
     )
     def test_the_catalyst_matches_plain_rotations(self, width, height, reps, state):
         """Phasing every tower under control through the catalysts matches plain rotations.
 
         The towers are phased whole or in short batches. Only at 4x2 does the gold tiling hold
         plaquettes, so only there is the gold layer's catalyst exercised. A single 2x2 step runs
-        no full-angle hopping layer, so its hopping catalyst holds no qubit to double the angle.
+        no full-angle hopping layer, so its hopping catalyst holds no qubit to double the angle,
+        while a single 4x2 step still runs the full-angle gold layer.
         """
         plain, *phased = (
             apply_operation(
