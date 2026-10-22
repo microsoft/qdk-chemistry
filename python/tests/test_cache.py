@@ -10,6 +10,7 @@ from __future__ import annotations
 import importlib.metadata
 import json
 import logging
+import sys
 from typing import Any
 from unittest.mock import Mock
 
@@ -183,6 +184,23 @@ class TestFolderCacheJobs:
         # Job should be gone but data blob should still be present
         assert folder_cache.get_job("run_abc") is None
         assert folder_cache.get_data("hash_wfn_result") is not None
+
+    def test_job_symlink_outside_root_is_miss(self, folder_cache, cache_dir, tmp_path, sample_job, caplog):
+        """A job record that resolves outside the cache is a logged miss, and deleting it removes only the link."""
+        FolderCache(tmp_path / "outside").put_job("run1", sample_job)
+        outside = tmp_path / "outside" / "run1.job.json"
+        cache_dir.mkdir()
+        try:
+            (cache_dir / "run1.job.json").symlink_to(outside)
+        except OSError as exc:
+            pytest.skip(f"Symlink creation is not supported: {exc}")
+
+        with caplog.at_level(logging.WARNING, logger=folder_module.__name__):
+            assert folder_cache.get_job("run1") is None
+        assert "outside the cache root" in caplog.text
+
+        assert folder_cache.delete_job("run1")
+        assert outside.exists()
 
 
 # ── FolderCache: DataClass blobs ─────────────────────────────────────────────
@@ -493,7 +511,34 @@ class TestFolderCacheData:
         with caplog.at_level(logging.WARNING, logger=folder_module.__name__):
             assert folder_cache.get_data("list_hash") is None
 
-        assert "Invalid cache type_name" in caplog.text
+        assert "Unknown cached data type" in caplog.text
+
+    @pytest.mark.skipif(sys.platform == "win32", reason="Windows file names cannot contain ':'")
+    @pytest.mark.parametrize("manifest_kind", ["legacy", "dataclass"])
+    def test_registered_type_name_with_colon_loads(self, folder_cache, cache_dir, monkeypatch, manifest_kind):
+        """Type names follow the registration rules, which allow ':' unlike cache keys."""
+        cache_dir.mkdir()
+        blob = cache_dir / "item_hash.vendor:orbitals.h5"
+        blob.write_bytes(b"stub")
+        loader = Mock()
+        loader.from_hdf5_file.return_value = "loaded"
+        monkeypatch.setattr(
+            folder_module, "_resolve_dataclass_type", lambda name: loader if name == "vendor:orbitals" else None
+        )
+        if manifest_kind == "legacy":
+            manifest: dict[str, Any] = {"type": "vendor:orbitals", "items": ["item_hash"]}
+            path = cache_dir / "list_hash.list[vendor:orbitals].json"
+        else:
+            manifest = {
+                "kind": "sequence",
+                "sequence_type": "list",
+                "items": [{"kind": "dataclass", "hash": "item_hash", "type": "vendor:orbitals"}],
+            }
+            path = cache_dir / "list_hash.list.json"
+        path.write_text(json.dumps(manifest))
+
+        assert folder_cache.get_data("list_hash") == ["loaded"]
+        loader.from_hdf5_file.assert_called_once_with(str(blob))
 
     @pytest.mark.parametrize("manifest_kind", ["legacy", "dataclass", "ndarray"])
     def test_delete_nested_reference_cannot_escape_root(self, folder_cache, cache_dir, tmp_path, manifest_kind):
@@ -518,8 +563,8 @@ class TestFolderCacheData:
         assert folder_cache.delete_data("list_hash")
         assert outside.read_bytes() == b"preserve"
 
-    def test_data_symlink_cannot_escape_root(self, folder_cache, cache_dir, tmp_path):
-        """A cache blob symlink cannot redirect loading outside the cache."""
+    def test_data_symlink_outside_root_is_miss(self, folder_cache, cache_dir, tmp_path, caplog):
+        """A cache blob symlink that leaves the cache is a logged miss, and the next tier serves the data."""
         cache_dir.mkdir()
         outside = tmp_path / "outside.ndarray.npy"
         np.save(outside, np.array([1.0]), allow_pickle=False)
@@ -528,8 +573,15 @@ class TestFolderCacheData:
         except OSError as exc:
             pytest.skip(f"Symlink creation is not supported: {exc}")
 
-        with pytest.raises(ValueError, match="escapes cache root"):
-            folder_cache.get_data("array_hash")
+        with caplog.at_level(logging.WARNING, logger=folder_module.__name__):
+            assert folder_cache.get_data("array_hash") is None
+        assert "outside the cache root" in caplog.text
+        assert not folder_cache.has_data("array_hash")
+
+        shared = FolderCache(tmp_path / "shared")
+        shared.put_data("array_hash", np.array([2.0]))
+        np.testing.assert_array_equal(TieredCache([folder_cache, shared]).get_data("array_hash"), [2.0])
+        np.testing.assert_array_equal(np.load(outside), [1.0])
 
 
 # ── FolderCache: clear ───────────────────────────────────────────────────────

@@ -84,15 +84,19 @@ class FolderCache(CacheBackend):
         ):
             raise ValueError(f"Invalid cache {label}: {key!r}")
 
+    def _within_root(self, path: pathlib.Path) -> bool:
+        """Return whether *path* resolves inside the configured root."""
+        return path.resolve().is_relative_to(self._root.resolve())
+
     def _checked_path(self, path: pathlib.Path) -> pathlib.Path:
         """Reject cache paths that resolve outside the configured root."""
-        if not path.resolve().is_relative_to(self._root.resolve()):
+        if not self._within_root(path):
             raise ValueError(f"Cache path escapes cache root: {path}")
         return path
 
     def _job_path(self, run_hash: str) -> pathlib.Path:
         self._validate_key(run_hash, "run_hash")
-        return self._checked_path(self._root / f"{run_hash}.job.json")
+        return self._root / f"{run_hash}.job.json"
 
     def get_job(self, run_hash: str) -> Job | None:
         """Retrieve job metadata by *run_hash*, or ``None`` on miss."""
@@ -100,6 +104,9 @@ class FolderCache(CacheBackend):
 
         p = self._job_path(run_hash)
         if not p.exists():
+            return None
+        if not self._within_root(p):
+            logger.warning("Ignoring cached job outside the cache root: %s", p)
             return None
         try:
             return Job.load(p)
@@ -114,40 +121,55 @@ class FolderCache(CacheBackend):
 
     # ── Data blobs ───────────────────────────────────────────────────────
 
-    def get_data(self, content_hash: str) -> Any | None:  # noqa: PLR0911
-        """Retrieve cached data by its content hash, or ``None``."""
-        self._validate_key(content_hash, "content_hash")
-        generic_list_path = self._checked_path(self._root / f"{content_hash}.list.json")
+    def _data_entry(self, content_hash: str) -> tuple[str, pathlib.Path] | None:
+        """Return the kind and path of the entry that stores *content_hash*, or ``None``."""
+        generic_list_path = self._root / f"{content_hash}.list.json"
         if generic_list_path.exists():
-            return self._get_generic_data_list(generic_list_path)
+            return "sequence", generic_list_path
         # Check for list manifest first — escape literal brackets so glob
         # doesn't treat them as a character class.
         list_matches = sorted(self._root.glob(f"{content_hash}.list[[]*].json"))
         if list_matches:
-            return self._get_data_list(self._checked_path(list_matches[0]))
-        array_path = self._checked_path(self._root / f"{content_hash}.ndarray.npy")
+            return "list", list_matches[0]
+        array_path = self._root / f"{content_hash}.ndarray.npy"
         if array_path.exists():
-            try:
-                return np.load(array_path, allow_pickle=False)
-            except (OSError, ValueError):
-                return None
+            return "ndarray", array_path
         # Glob for <content_hash>.*.h5 — the type name is in the filename
         matches = sorted(self._root.glob(f"{content_hash}.*.h5"))
-        if not matches:
+        if matches:
+            return "dataclass", matches[0]
+        return None
+
+    def get_data(self, content_hash: str) -> Any | None:  # noqa: PLR0911
+        """Retrieve cached data by its content hash, or ``None``."""
+        self._validate_key(content_hash, "content_hash")
+        entry = self._data_entry(content_hash)
+        if entry is None:
             return None
-        filepath = self._checked_path(matches[0])
+        kind, path = entry
+        if not self._within_root(path):
+            logger.warning("Ignoring cached data outside the cache root: %s", path)
+            return None
+        if kind == "sequence":
+            return self._get_generic_data_list(path)
+        if kind == "list":
+            return self._get_data_list(path)
+        if kind == "ndarray":
+            try:
+                return np.load(path, allow_pickle=False)
+            except (OSError, ValueError):
+                return None
         # Extract type name from filename: <hash>.<type_name>.h5
-        type_name = filepath.name.removeprefix(f"{content_hash}.").removesuffix(".h5")
+        type_name = path.name.removeprefix(f"{content_hash}.").removesuffix(".h5")
         dataclass_type = _resolve_dataclass_type(type_name)
         if dataclass_type is None:
             return None
-        return dataclass_type.from_hdf5_file(str(filepath))  # type: ignore[attr-defined]
+        return dataclass_type.from_hdf5_file(str(path))  # type: ignore[attr-defined]
 
     def _get_data_list(self, manifest_path: pathlib.Path) -> list | None:
         """Reconstruct a list of DataClass objects from a manifest."""
         try:
-            manifest = json.loads(self._checked_path(manifest_path).read_text())
-            self._validate_key(manifest["type"], "type_name")
+            manifest = json.loads(manifest_path.read_text())
             dataclass_type = _resolve_dataclass_type(manifest["type"])
             item_hashes = manifest["items"]
             if not isinstance(item_hashes, list):
@@ -170,7 +192,7 @@ class FolderCache(CacheBackend):
     def _get_generic_data_list(self, manifest_path: pathlib.Path) -> list | tuple | None:
         """Reconstruct a nested list or tuple result from a generic manifest."""
         try:
-            manifest = json.loads(self._checked_path(manifest_path).read_text())
+            manifest = json.loads(manifest_path.read_text())
             if manifest.get("kind") != "sequence" or manifest.get("sequence_type") not in {"list", "tuple"}:
                 raise ValueError("Invalid cached sequence manifest")
             data = self._node_to_data(manifest)
@@ -291,7 +313,6 @@ class FolderCache(CacheBackend):
             raise ValueError(f"Unknown cached sequence type: {sequence_type!r}")
         if kind == "dataclass":
             self._validate_key(node["hash"], "content_hash")
-            self._validate_key(node["type"], "type_name")
             dataclass_type = _resolve_dataclass_type(node["type"])
             if dataclass_type is None:
                 raise ValueError(f"Unknown cached data type: {node['type']!r}")
@@ -312,12 +333,8 @@ class FolderCache(CacheBackend):
         self._validate_key(content_hash, "content_hash")
         if shared_only and not self.is_shared:
             return False
-        return (
-            bool(list(self._root.glob(f"{content_hash}.*.h5")))
-            or (self._root / f"{content_hash}.ndarray.npy").exists()
-            or bool(list(self._root.glob(f"{content_hash}.list[[]*].json")))
-            or (self._root / f"{content_hash}.list.json").exists()
-        )
+        entry = self._data_entry(content_hash)
+        return entry is not None and self._within_root(entry[1])
 
     def to_config(self) -> dict:
         """Return kwargs to reconstruct this FolderCache."""
