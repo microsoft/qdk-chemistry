@@ -44,6 +44,15 @@ enum class SpinChannel { aa, bb, aaaa, aabb, bbbb };
  * Note that this class does not store two-electron integrals; derived classes
  * are expected to implement storage and access for these integrals.
  *
+ * Two-electron integrals are real, in chemist notation (pq|rs), and represent
+ * the operator literally, with the beta-alpha block given by
+ * (pq|rs)_ba = (rs|pq)_ab. Restricted integrals and the same-spin blocks of a
+ * Hermitian Hamiltonian are expected to have the 4-fold permutation symmetry
+ * (pq|rs) = (rs|pq) = (qp|sr); the alpha-beta block need only satisfy
+ * (pq|rs) = (qp|sr). The additional 8-fold symmetry of ordinary
+ * electron-repulsion integrals is not assumed; consumers that need it check
+ * for it and reject other input.
+ *
  * This class implies that all inactive orbitals are fully occupied when
  * constructing inactive-orbital contributions to the constant energy term and
  * inactive Fock matrix.
@@ -294,8 +303,10 @@ class HamiltonianContainer {
    * @param filename Path to FCIDUMP file to create/overwrite
    * @param nalpha Number of alpha electrons
    * @param nbeta Number of beta electrons
-   * @throws std::runtime_error if I/O error occurs or Hamiltonian is
-   * unrestricted
+   * @throws std::runtime_error if I/O error occurs, the Hamiltonian is
+   * unrestricted, or its two-body integrals lack 8-fold permutation symmetry
+   * @throws std::invalid_argument if the active space has differing alpha and
+   * beta sizes
    */
   virtual void to_fcidump_file(const std::string& filename, size_t nalpha,
                                size_t nbeta) const;
@@ -632,7 +643,10 @@ class Hamiltonian : public DataClass,
    * @param filename Path to FCIDUMP file to create/overwrite
    * @param nalpha Number of alpha electrons
    * @param nbeta Number of beta electrons
-   * @throws std::runtime_error if I/O error occurs
+   * @throws std::runtime_error if I/O error occurs, the Hamiltonian is
+   * unrestricted, or its two-body integrals lack 8-fold permutation symmetry
+   * @throws std::invalid_argument if the active space has differing alpha and
+   * beta sizes
    */
   void to_fcidump_file(const std::string& filename, size_t nalpha,
                        size_t nbeta) const;

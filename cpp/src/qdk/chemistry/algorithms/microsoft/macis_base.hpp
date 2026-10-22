@@ -55,6 +55,20 @@ macis::MCSCFSettings get_mcscf_settings_(const data::Settings& settings_);
  */
 macis::ASCISettings get_asci_settings_(const data::Settings& settings_);
 
+/**
+ * @brief Reject two-body integrals that MACIS would silently misinterpret.
+ *
+ * MACIS assumes (pq|rs) = (rs|pq) and (pq|rs) = (qp|sr); other tensors
+ * yield wrong energies rather than an error.
+ *
+ * @param hamiltonian Restricted Hamiltonian to validate.
+ * @param solver Solver name used in the error message.
+ * @throws std::invalid_argument if the two-body integrals define a
+ *         non-Hermitian operator or are not stored with (pq|rs) = (rs|pq).
+ */
+void validate_macis_two_body_symmetry(const data::Hamiltonian& hamiltonian,
+                                      const std::string& solver);
+
 /** @brief Dispatch calculation to an implementation specialized by wavefunction
  * bitset size.
  *

@@ -25,13 +25,21 @@ from qdk_chemistry.data import (
     Orbitals,
     OrbitalType,
     Shell,
+    SparseHamiltonianContainer,
     Structure,
+    TwoBodyPermutationGroup,
 )
 from qdk_chemistry.data._spin_channels import spin_channel_indices, spin_channel_matrix
 from qdk_chemistry.data._type_name import class_data_type_name
 from qdk_chemistry.data.symmetry import SymmetryProduct, axes
 
-from .helpers import create_test_basis_set, create_test_hamiltonian, create_test_orbitals
+from .helpers import (
+    create_test_basis_set,
+    create_test_hamiltonian,
+    create_test_orbitals,
+    eightfold_orbit,
+    fourfold_orbit,
+)
 from .reference_tolerances import (
     float_comparison_absolute_tolerance,
     float_comparison_relative_tolerance,
@@ -1162,6 +1170,33 @@ class TestCholeskyHamiltonian:
             rtol=float_comparison_relative_tolerance,
             atol=float_comparison_absolute_tolerance,
         )
+
+
+class TestSparseHamiltonianContainer:
+    """Tests for building literal sparse two-body entries."""
+
+    def test_expand_symmetry_representatives_builds_literal_entries(self):
+        """Expanded representatives give the literal tensor and reject conflicting values."""
+        representatives = {(0, 1, 0, 2): 0.7, (1, 0, 0, 2): -0.2, (1, 1, 2, 2): 0.3}
+        entries = SparseHamiltonianContainer.expand_symmetry_representatives(
+            representatives, TwoBodyPermutationGroup.FourFold
+        )
+        tensor = np.zeros((3,) * 4)
+        for indices, value in representatives.items():
+            for member in fourfold_orbit(indices):
+                tensor[member] = value
+        assert set(entries) == {member for indices in representatives for member in fourfold_orbit(indices)}
+        stored = Hamiltonian(SparseHamiltonianContainer(np.eye(3), entries, 0.0))
+        np.testing.assert_array_equal(stored.get_two_body_integrals()[0], tensor.ravel())
+
+        eightfold = SparseHamiltonianContainer.expand_symmetry_representatives(
+            {(0, 1, 0, 2): 0.7}, TwoBodyPermutationGroup.EightFold
+        )
+        assert eightfold == dict.fromkeys(eightfold_orbit((0, 1, 0, 2)), 0.7)
+        with pytest.raises(ValueError, match="different values"):
+            SparseHamiltonianContainer.expand_symmetry_representatives(
+                {(0, 1, 0, 2): 0.7, (1, 0, 0, 2): -0.2}, TwoBodyPermutationGroup.EightFold
+            )
 
 
 def test_hamiltonian_data_type_name():

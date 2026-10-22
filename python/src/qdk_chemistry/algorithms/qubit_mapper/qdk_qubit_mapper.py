@@ -71,25 +71,35 @@ class QdkQubitMapper(QubitMapper):
     output :class:`~qdk_chemistry.data.QubitOperator`, not for dispatch.
 
     Both restricted (RHF) and unrestricted (UHF) Hamiltonians are supported.
-    For unrestricted systems, the engine handles all four spin-channel ERI
-    blocks (aa, ab, ba, bb) independently.
+    Restricted two-body tensors with 8-fold permutation symmetry use
+    spin-summed excitations. Tensors with only the 4-fold symmetry
+    ``(pq|rs) == (qp|sr) == (rs|pq)``, as produced by downfolding, use
+    spin-summed symmetric and antisymmetric excitation pairs. A non-Hermitian
+    restricted tensor raises ``ValueError``, as does a Hermitian one not stored
+    with ``(pq|rs) == (rs|pq)``; map its bra-ket average instead. Unrestricted
+    inputs use the excitation-pair split when ``aa`` and ``bb`` are 4-fold and
+    ``ab`` satisfies ``(pq|rs) == (qp|sr)``, and loop over every spin channel in
+    full otherwise.
 
     The two-body integrals are consumed in the native storage format of the
     Hamiltonian's container (the C++ engine dispatches on the container type):
 
     * :class:`~qdk_chemistry.data.SparseHamiltonianContainer`: the engine
-      iterates only the stored non-zero ``(p, q, r, s)`` entries, so both
-      memory and runtime improve for the mostly-zero integrals of lattice /
-      model Hamiltonians.
+      iterates the stored ``(p, q, r, s)`` entries rather than the full
+      ``N**4`` index space, so both memory and runtime improve for the
+      mostly-zero integrals of lattice / model Hamiltonians. Entries are read
+      literally, with unstored positions equal to zero; use
+      :meth:`~qdk_chemistry.data.SparseHamiltonianContainer.expand_symmetry_representatives`
+      to build them from symmetry representatives.
     * :class:`~qdk_chemistry.data.CholeskyHamiltonianContainer`: the
       three-center factors are kept in their ``O(N**2 * naux)`` form and the
       auxiliary index is contracted one ``(pq|.)`` row at a time, so the dense
-      ``N**4`` tensor is never built and peak additional memory is a single
-      ``N**2`` row.
+      ``N**4`` tensor is never reconstructed.
     * All other containers use the dense engine path.
 
-    In all cases the result is numerically equivalent (term-by-term, to within
-    ``1e-12``) to the dense path.
+    In all cases the result is numerically equivalent to mapping the dense
+    integrals. The Hamiltonian's core
+    energy is not included in the output operator.
 
     The mapper uses canonical blocked spin-orbital ordering internally:
     qubits 0..N-1 for alpha spin, qubits N..2N-1 for beta spin (where N is the
@@ -147,6 +157,10 @@ class QdkQubitMapper(QubitMapper):
 
         Returns:
             QubitOperator: The qubit operator with Pauli strings and coefficients.
+
+        Raises:
+            ValueError: If restricted two-body integrals define a non-Hermitian operator, or are
+                Hermitian but not stored with ``(pq|rs) == (rs|pq)``.
 
         """
         Logger.trace_entering()

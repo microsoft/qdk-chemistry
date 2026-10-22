@@ -10,7 +10,11 @@ import pytest
 
 from qdk_chemistry.plugins.qiskit import QDK_CHEMISTRY_HAS_QISKIT_NATURE
 
-from .helpers import create_test_basis_set, create_test_hamiltonian
+from .helpers import (
+    create_non_hermitian_mixed_block_hamiltonian,
+    create_test_basis_set,
+    create_test_hamiltonian,
+)
 from .reference_tolerances import (
     float_comparison_absolute_tolerance,
     float_comparison_relative_tolerance,
@@ -137,3 +141,29 @@ def test_qiskit_unrestricted_jw_matches_qdk():
     all_keys = set(d_qdk) | set(d_qis)
     max_diff = max(abs(d_qdk.get(k, 0) - d_qis.get(k, 0)) for k in all_keys)
     assert max_diff < 1e-10, f"UHF JW max coefficient diff: {max_diff}"
+
+
+def test_qiskit_fourfold_jordan_wigner_full_matrix(fourfold_hamiltonian):
+    """Fourfold, non-eightfold integrals reproduce the independent reference matrix."""
+    hamiltonian, reference = fourfold_hamiltonian
+    mapping = MajoranaMapping.jordan_wigner(2 * hamiltonian.get_one_body_integrals()[0].shape[0])
+    operator = create("qubit_mapper", "qiskit").run(hamiltonian, mapping)
+
+    assert operator.num_qubits == mapping.num_modes
+    np.testing.assert_allclose(operator.to_matrix(), reference, atol=1e-11, rtol=0)
+
+
+def test_qiskit_rejects_non_hermitian_mixed_block():
+    """Qiskit cannot represent a non-Hermitian mixed block, so it raises instead."""
+    hamiltonian, _reference = create_non_hermitian_mixed_block_hamiltonian()
+    with pytest.raises(ValueError, match="non-Hermitian"):
+        create("qubit_mapper", "qiskit").run(hamiltonian, MajoranaMapping.jordan_wigner(6))
+
+
+def test_qiskit_accepts_mixed_block_asymmetry_within_native_tolerance():
+    """Asymmetry the native mapper attributes to round-off is accepted by Qiskit too."""
+    hamiltonian, _reference = create_non_hermitian_mixed_block_hamiltonian(asymmetry=1e-6)
+    mapping = MajoranaMapping.jordan_wigner(6)
+    native = create("qubit_mapper", "qdk").run(hamiltonian, mapping)
+    qiskit = create("qubit_mapper", "qiskit").run(hamiltonian, mapping)
+    np.testing.assert_allclose(qiskit.to_matrix(), native.to_matrix(), atol=1e-5, rtol=0)

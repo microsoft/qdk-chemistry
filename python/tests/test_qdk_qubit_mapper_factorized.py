@@ -22,6 +22,7 @@ from typing import ClassVar
 
 import numpy as np
 import pytest
+from scipy.sparse import csc_matrix
 
 from qdk_chemistry.algorithms import create
 from qdk_chemistry.data import (
@@ -31,13 +32,22 @@ from qdk_chemistry.data import (
     LatticeGraph,
     MajoranaMapping,
     Orbitals,
+    SparseHamiltonianContainer,
+    Symmetries,
 )
 from qdk_chemistry.utils.model_hamiltonians import (
     create_hubbard_hamiltonian,
     create_ppp_hamiltonian,
 )
 
-from .helpers import create_test_basis_set, create_test_orbitals
+from .helpers import (
+    create_dense_test_hamiltonian,
+    create_test_basis_set,
+    create_test_orbitals,
+    eightfold_orbit,
+    fermionic_reference_matrix,
+    fourfold_orbit,
+)
 
 try:
     import pyscf
@@ -358,3 +368,193 @@ class TestSparseFastPath:
         qh_dense = mapper.run(dense, mapping)
 
         _assert_term_by_term_equivalent(qh_dense, qh_sparse)
+
+
+# ─── Fourfold storage against an independent reference ─────────────────────
+
+
+def _native(hamiltonian: Hamiltonian, mapping: MajoranaMapping | None = None):
+    """Map with the native mapper, using Jordan-Wigner by default."""
+    if mapping is None:
+        mapping = MajoranaMapping.jordan_wigner(2 * len(hamiltonian.get_one_body_integrals()[0]))
+    return create("qubit_mapper", "qdk").run(hamiltonian, mapping)
+
+
+def _fourfold_cholesky_pair(restricted: bool, layout: str = "rotated"):
+    """Cholesky Hamiltonian with pair-antisymmetric factors, its dense twin, and the reference matrix."""
+    symmetric_alpha = np.array([[0.8, 0.2], [0.2, 0.3]])
+    symmetric_beta = np.array([[0.1, -0.4], [-0.4, 0.7]])
+    antisymmetric_alpha = np.array([[0.0, 0.5], [-0.5, 0.0]])
+    antisymmetric_beta = np.array([[0.0, -0.3], [0.3, 0.0]])
+    if layout == "pure-antisymmetric":
+        symmetric_alpha = np.zeros((2, 2))
+        symmetric_beta = np.zeros((2, 2))
+    rotation = np.array([[1.0, -1.0], [1.0, 1.0]]) / np.sqrt(2)
+    if layout in ("rank-deficient", "wide"):
+        num_auxiliary = 3 if layout == "rank-deficient" else 7
+        rotation = np.linalg.qr(np.random.default_rng(706).normal(size=(num_auxiliary, 2)))[0].T
+    factors_alpha = np.column_stack((symmetric_alpha.ravel(), antisymmetric_alpha.ravel())) @ rotation
+    factors_beta = np.column_stack((symmetric_beta.ravel(), antisymmetric_beta.ravel())) @ rotation
+    one_alpha = np.array([[1.0, 0.3], [0.3, 0.5]])
+    one_beta = np.array([[0.4, -0.2], [-0.2, -0.1]])
+    if restricted:
+        factors_beta, one_beta = factors_alpha, one_alpha
+    two_aa = (factors_alpha @ factors_alpha.T).reshape((2,) * 4)
+    two_ab = (factors_alpha @ factors_beta.T).reshape((2,) * 4)
+    two_bb = (factors_beta @ factors_beta.T).reshape((2,) * 4)
+    for tensor in (two_aa, two_ab, two_bb):
+        np.testing.assert_allclose(tensor, tensor.transpose(1, 0, 3, 2), atol=1e-12, rtol=0)
+    assert not np.allclose(two_aa, two_aa.swapaxes(0, 1))
+    if not restricted:
+        assert not np.allclose(two_aa, two_bb)
+    if not restricted and layout != "pure-antisymmetric":
+        assert not np.allclose(two_ab, two_ab.transpose(2, 3, 0, 1))
+    empty = np.empty((0, 0))
+    if restricted:
+        dense = create_dense_test_hamiltonian(one_alpha, two_aa)
+        container = CholeskyHamiltonianContainer(one_alpha, factors_alpha, dense.get_orbitals(), 0.0, empty)
+    else:
+        dense = create_dense_test_hamiltonian(one_alpha, two_aa, one_beta, two_ab, two_bb)
+        container = CholeskyHamiltonianContainer(
+            one_alpha, one_beta, factors_alpha, factors_beta, dense.get_orbitals(), 0.0, empty, empty
+        )
+    stored = Hamiltonian(container)
+    for actual, expected in zip(stored.get_two_body_integrals(), (two_aa, two_ab, two_bb), strict=True):
+        np.testing.assert_allclose(actual, expected.ravel(), atol=1e-12, rtol=0)
+    reference = fermionic_reference_matrix(one_alpha, one_beta, two_aa, two_ab, two_bb)
+    return stored, dense, reference
+
+
+def _sparse_pair(entries: dict, tensor: np.ndarray):
+    """Sparse Hamiltonian from ``entries``, its dense twin from ``tensor``, and the reference matrix."""
+    num_orbitals = tensor.shape[0]
+    one_body = np.diag(np.linspace(1.0, -0.5, num_orbitals)) + 0.1 * np.ones((num_orbitals, num_orbitals))
+    stored = Hamiltonian(SparseHamiltonianContainer(csc_matrix(one_body), entries, 0.0))
+    dense = create_dense_test_hamiltonian(one_body, tensor)
+    reference = fermionic_reference_matrix(one_body, one_body, tensor, tensor, tensor)
+    return stored, dense, reference
+
+
+def _full_sparse_pair(seed: tuple, zero_suborbit: bool = False, mixed: bool = False):
+    """Sparse pair storing the whole eightfold class of ``seed`` with unequal fourfold suborbits."""
+    num_orbitals = 3 if mixed else max(seed) + 1
+    primary = fourfold_orbit(seed)
+    entries = {
+        indices: 0.7 if indices in primary else (0.0 if zero_suborbit else -0.2) for indices in eightfold_orbit(seed)
+    }
+    tensor = np.zeros((num_orbitals,) * 4)
+    for indices, value in entries.items():
+        tensor[indices] = value
+    if mixed:
+        representative = (0, 1, 1, 2)
+        assert not (eightfold_orbit(seed) & eightfold_orbit(representative))
+        entries[representative] = 0.125
+        for indices in eightfold_orbit(representative):
+            tensor[indices] = 0.125
+    return _sparse_pair(entries, tensor)
+
+
+class TestCholeskyFourFold:
+    """Cholesky factors with pair-antisymmetric parts map to the literal fourfold operator."""
+
+    @pytest.mark.parametrize("restricted", [True, False], ids=["restricted", "unrestricted"])
+    @pytest.mark.parametrize("layout", ["rotated", "pure-antisymmetric", "rank-deficient", "wide"])
+    def test_full_matrix(self, restricted: bool, layout: str) -> None:
+        """Cholesky and dense containers both reproduce the reference matrix."""
+        stored, dense, reference = _fourfold_cholesky_pair(restricted, layout)
+        np.testing.assert_allclose(reference, reference.conj().T, atol=1e-12, rtol=0)
+        np.testing.assert_allclose(_native(dense).to_matrix(), reference, atol=1e-11, rtol=0)
+        np.testing.assert_allclose(_native(stored).to_matrix(), reference, atol=1e-11, rtol=0)
+
+    def test_restricted_cross_components_rejected(self) -> None:
+        """Factors whose symmetric and antisymmetric parts mix give a non-Hermitian tensor."""
+        symmetric = np.array([[0.8, 0.2], [0.2, 0.3]])
+        antisymmetric = np.array([[0.0, 0.5], [-0.5, 0.0]])
+        factors = (symmetric + antisymmetric).reshape(4, 1)
+        tensor = (factors @ factors.T).reshape((2,) * 4)
+        assert not np.allclose(tensor, tensor.transpose(1, 0, 3, 2))
+        container = CholeskyHamiltonianContainer(np.eye(2), factors, create_test_orbitals(2), 0.0, np.empty((0, 0)))
+        with pytest.raises(ValueError, match="non-Hermitian"):
+            _native(Hamiltonian(container))
+
+
+class TestSparseLiteralEntries:
+    """Sparse two-body entries are literal: absent positions are zero."""
+
+    @pytest.mark.parametrize(
+        "seed", [(0, 1, 0, 1), (0, 1, 0, 2), (0, 0, 0, 0), (0, 0, 1, 1)], ids=["repeated-four", "eight", "one", "two"]
+    )
+    def test_complete_class_full_matrix(self, seed: tuple) -> None:
+        """A fully stored class maps literally and matches its dense view."""
+        stored, dense, reference = _full_sparse_pair(seed)
+        np.testing.assert_allclose(
+            stored.get_two_body_integrals()[0], dense.get_two_body_integrals()[0], atol=1e-12, rtol=0
+        )
+        np.testing.assert_allclose(_native(dense).to_matrix(), reference, atol=1e-11, rtol=0)
+        np.testing.assert_allclose(_native(stored).to_matrix(), reference, atol=1e-11, rtol=0)
+
+    @pytest.mark.parametrize("seed", [(0, 1, 0, 1), (0, 1, 0, 2)], ids=["repeated-four", "eight"])
+    def test_full_class_mixed_with_eightfold_representative(self, seed: tuple) -> None:
+        """A literal fourfold class and a deprecated single representative can coexist."""
+        with pytest.warns(DeprecationWarning, match="deprecated"):
+            stored, dense, reference = _full_sparse_pair(seed, zero_suborbit=True, mixed=True)
+        np.testing.assert_allclose(_native(dense).to_matrix(), reference, atol=1e-11, rtol=0)
+        np.testing.assert_allclose(_native(stored).to_matrix(), reference, atol=1e-11, rtol=0)
+
+    @pytest.mark.parametrize("seed", [(0, 1, 0, 1), (0, 1, 0, 2)], ids=["repeated-four", "eight"])
+    def test_legacy_representative_expands_with_warning(self, seed: tuple) -> None:
+        """A deprecated single representative stands for its whole eightfold class."""
+        tensor = np.zeros((max(seed) + 1,) * 4)
+        for indices in eightfold_orbit(seed):
+            tensor[indices] = 0.7
+        with pytest.warns(DeprecationWarning, match="deprecated"):
+            stored, dense, reference = _sparse_pair({seed: 0.7}, tensor)
+        np.testing.assert_array_equal(stored.get_two_body_integrals()[0], dense.get_two_body_integrals()[0])
+        np.testing.assert_allclose(_native(stored).to_matrix(), reference, atol=1e-11, rtol=0)
+
+    @pytest.mark.parametrize("seed", [(0, 1, 0, 1), (0, 1, 0, 2)], ids=["repeated-four", "eight"])
+    @pytest.mark.parametrize("invalid", ["nonhermitian", "partial"])
+    def test_invalid_classes_rejected(self, seed: tuple, invalid: str) -> None:
+        """Classes that are not fourfold when read literally are rejected."""
+        primary = fourfold_orbit(seed)
+        entries = {indices: 0.7 if indices in primary else 0.0 for indices in eightfold_orbit(seed)}
+        if invalid == "partial":
+            del entries[sorted(entries)[-1]]
+        else:
+            entries[seed] += 0.25
+        stored = Hamiltonian(SparseHamiltonianContainer(csc_matrix(np.eye(max(seed) + 1)), entries))
+        with pytest.raises(ValueError, match="non-Hermitian"):
+            _native(stored)
+
+    @pytest.mark.parametrize("seed", [(0, 1, 0, 1), (0, 1, 0, 2)], ids=["repeated-four", "eight"])
+    def test_fourfold_suborbit_without_zeros_full_matrix(self, seed: tuple) -> None:
+        """A complete fourfold suborbit needs no explicit zeros for the rest of its class."""
+        entries = dict.fromkeys(fourfold_orbit(seed), 0.7)
+        tensor = np.zeros((max(seed) + 1,) * 4)
+        for indices, value in entries.items():
+            tensor[indices] = value
+        stored, dense, reference = _sparse_pair(entries, tensor)
+        np.testing.assert_allclose(_native(dense).to_matrix(), reference, atol=1e-11, rtol=0)
+        np.testing.assert_allclose(_native(stored).to_matrix(), reference, atol=1e-11, rtol=0)
+
+
+class TestFourFoldStorageEncodings:
+    """Fourfold Cholesky and sparse storage match the dense path beyond Jordan-Wigner."""
+
+    @pytest.mark.parametrize("storage", ["restricted-cholesky", "unrestricted-cholesky", "sparse"])
+    @pytest.mark.parametrize("tapered", [False, True], ids=["bravyi-kitaev", "parity-tapered"])
+    def test_storage_matches_dense(self, storage: str, tapered: bool) -> None:
+        """Stored and dense containers map to the same coefficients."""
+        if storage == "sparse":
+            stored, dense, _reference = _full_sparse_pair((0, 1, 0, 1), zero_suborbit=True)
+        else:
+            stored, dense, _reference = _fourfold_cholesky_pair(storage == "restricted-cholesky")
+        num_modes = 2 * len(dense.get_one_body_integrals()[0])
+        if tapered:
+            mapping = MajoranaMapping.parity(num_modes, Symmetries(n_alpha=1, n_beta=1))
+        else:
+            mapping = MajoranaMapping.bravyi_kitaev(num_modes)
+        expected = _native(dense, mapping)
+        actual = _native(stored, mapping)
+        assert actual.encoding == expected.encoding
+        _assert_term_by_term_equivalent(expected, actual, atol=1e-11)

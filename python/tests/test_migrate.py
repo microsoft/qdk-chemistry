@@ -36,7 +36,9 @@ from qdk_chemistry.data import (
 )
 from qdk_chemistry.data._spin_channels import spin_channel_matrix, spin_channel_vector
 from qdk_chemistry.data.symmetry import axes
-from qdk_chemistry.migrate import _orbitals, _wavefunction
+from qdk_chemistry.migrate import _orbitals, _sbt, _wavefunction
+
+from .helpers import eightfold_orbit
 
 RNG = np.random.default_rng(20240101)
 
@@ -562,10 +564,15 @@ def test_sparse(tmp_path, fmt):
     flat = np.asarray(aaaa).reshape(norb, norb, norb, norb)
     assert abs(flat[0, 0, 1, 1] - 0.7) < 1e-12
     assert abs(flat[0, 1, 1, 0] - 0.3) < 1e-12
+    # Legacy entries stand for their whole 8-fold class.
+    assert abs(flat[1, 1, 0, 0] - 0.7) < 1e-12
+    assert abs(flat[1, 0, 1, 0] - 0.3) < 1e-12
 
 
-def _write_v1_sparse_hdf5(path, norb, one_body, two_body, *, norb_on_one_body=True, norb_in_metadata=False):
-    """Write a v1 sparse-container HDF5 file, controlling where num_orbitals lives."""
+def _write_v1_sparse_hdf5(
+    path, norb, one_body, two_body, *, norb_on_one_body=True, norb_in_metadata=False, version="0.1.0"
+):
+    """Write a v1 sparse-container HDF5 file, whose layout 0.2.0 kept, controlling where num_orbitals lives."""
 
     def pack(a, b):
         return np.array([a, b], dtype=np.uint32).view(np.float64)[0]
@@ -575,7 +582,7 @@ def _write_v1_sparse_hdf5(path, norb, one_body, two_body, *, norb_on_one_body=Tr
     with h5py.File(path, "w") as handle:
         handle.attrs["version"] = "0.1.0"
         group = handle.create_group("container")
-        group.attrs["version"] = "0.1.0"
+        group.attrs["version"] = version
         group.attrs["container_type"] = "sparse"
         metadata = group.create_group("metadata")
         metadata.attrs["core_energy"] = 2.5
@@ -616,6 +623,48 @@ def test_sparse_missing_num_orbitals_raises(tmp_path):
     src = tmp_path / "e.hamiltonian.h5"
     _write_v1_sparse_hdf5(src, 3, [[0, 1, 1.0]], [[0, 0, 1, 1, 0.7]], norb_on_one_body=False, norb_in_metadata=False)
     with pytest.raises(migrate.MigrationError, match="num_orbitals"):
+        migrate.convert_file(src, tmp_path / "e_new.hamiltonian.h5")
+
+
+@pytest.mark.parametrize("fmt", ["json", "hdf5"])
+def test_sparse_0_2_0_stores_every_eightfold_class_member(tmp_path, fmt):
+    """Version 0.2.0 read each entry, including partial classes, as its whole 8-fold class."""
+    norb = 3
+    two_body = [[0, 1, 0, 2, 0.5], [0, 0, 1, 1, 0.7], [2, 2, 2, 2, 0.3], [1, 2, 1, 2, -0.1], [2, 1, 1, 2, -0.1]]
+    suffix = "json" if fmt == "json" else "h5"
+    src = tmp_path / f"e.hamiltonian.{suffix}"
+    if fmt == "json":
+        container = {
+            "version": "0.2.0",
+            "container_type": "sparse",
+            "core_energy": 2.5,
+            "type": "Hermitian",
+            "is_restricted": True,
+            "num_orbitals": norb,
+            "has_one_body_integrals": True,
+            "one_body_integrals_alpha_sparse": [[0, 0, 1.0]],
+            "two_body_integrals": _sbt.sparse_rank4_dict(two_body, norb),
+        }
+        src.write_text(json.dumps({"version": "0.1.0", "container": container}))
+    else:
+        _write_v1_sparse_hdf5(src, norb, [[0, 0, 1.0]], two_body, version="0.2.0")
+
+    dst = tmp_path / f"e_new.hamiltonian.{suffix}"
+    migrate.convert_file(src, dst)
+    expected = np.zeros((norb,) * 4)
+    for *indices, value in two_body:
+        for member in eightfold_orbit(tuple(indices)):
+            expected[member] = value
+    actual = np.asarray(Hamiltonian.from_file(str(dst), fmt).get_two_body_integrals()[0])
+    np.testing.assert_array_equal(actual.reshape(expected.shape), expected)
+
+
+def test_sparse_inconsistent_eightfold_class_refused(tmp_path):
+    """A class whose stored members differ has no unambiguous 0.2.0 meaning."""
+    src = tmp_path / "e.hamiltonian.h5"
+    two_body = [[0, 1, 0, 1, 0.7], [1, 0, 1, 0, 0.7], [0, 1, 1, 0, -0.2]]
+    _write_v1_sparse_hdf5(src, 2, [[0, 0, 1.0]], two_body, version="0.2.0")
+    with pytest.raises(migrate.MigrationError, match="cannot be migrated unambiguously"):
         migrate.convert_file(src, tmp_path / "e_new.hamiltonian.h5")
 
 

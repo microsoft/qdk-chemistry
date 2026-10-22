@@ -73,6 +73,10 @@ registered make the following changes:
   sets and the AO overlap are carried across unchanged.
 - :class:`~qdk_chemistry.data.Hamiltonian` — the four-center, Cholesky, and
   sparse containers all upgrade their integral storage to symmetry-blocked form.
+  Earlier sparse containers, including version ``0.2.0``, read each two-body
+  entry as standing for its whole 8-fold permutation class; the migrated
+  container stores every class member, and a class whose stored values differ
+  is refused.
 - :class:`~qdk_chemistry.data.Wavefunction` — the single-determinant,
   complete-active-space, and selected-CI containers upgrade to the
   state-vector container; the MP2 and coupled-cluster containers upgrade to the
