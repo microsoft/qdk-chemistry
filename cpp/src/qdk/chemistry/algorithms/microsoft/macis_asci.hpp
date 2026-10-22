@@ -180,12 +180,16 @@ class MacisAsciSettings : public MacisSettings {
     set_default<size_t>("dynamic_bit_masking_num_masks", 0,
                         "Number of bit masks for dynamic_bit_masking generator "
                         "(0 = use generator default)");
+    _configure_execution_settings();
   }
 
   /**
    * @brief Virtual destructor
    */
   virtual ~MacisAsciSettings() = default;
+
+ private:
+  void _configure_execution_settings();
 };
 
 class MacisAsci : public Macis {

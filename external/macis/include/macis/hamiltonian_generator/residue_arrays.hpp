@@ -43,6 +43,8 @@ class ResidueArrayHamiltonianGenerator
   ResidueArrayHamiltonianGenerator(Args&&... args)
       : base_type(std::forward<Args>(args)...) {}
 
+  bool csr_threshold_inclusive() const override { return true; }
+
   // ---- Pair-based RDM override (spin-dependent only) ----
 
   void form_rdms_spin_dep(full_det_iterator bra_begin,
