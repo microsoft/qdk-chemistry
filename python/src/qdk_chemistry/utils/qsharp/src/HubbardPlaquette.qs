@@ -389,7 +389,8 @@ namespace QDKChemistry.Utils.HubbardPlaquette {
     /// ordering of Eqs. (16a)-(16b) in :cite:`Apel2026`, not Eq. (D2) of :cite:`Campbell2022`.
     ///
     /// The modes are routed into pink order at the start and back at the end, so only the gold
-    /// layers route.
+    /// layers route. Both orders keep the spin-up modes ahead of their spin-down partners, so the
+    /// on-site pairs stay one register half apart.
     ///
     /// With a catalyst, one is prepared for the interaction layers and one for the hopping layers.
     /// Dropping the hopping catalyst's first qubit doubles its angle for the full-angle layers. The

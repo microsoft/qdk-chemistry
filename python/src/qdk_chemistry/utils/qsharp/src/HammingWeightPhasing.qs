@@ -173,6 +173,7 @@ namespace QDKChemistry.Utils.HammingWeightPhasing {
                         for j in 0..places - 1 {
                             Rz(2.0 * theta * IntAsDouble(1 <<< j), weight[j]);
                         }
+                        // The ladder's angles sum to 2·theta·(2^places - 1). Under control this phase is not global.
                         R(PauliI, 2.0 * theta * IntAsDouble(size - ((1 <<< places) - 1)), inputs[0]);
                     } else {
                         AddIntoCatalyst(theta, weight, catalyst);
