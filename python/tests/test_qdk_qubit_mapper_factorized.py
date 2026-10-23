@@ -61,8 +61,7 @@ def _sum_coefficients_by_pauli(qh) -> dict:
     Coefficients are summed per Pauli string so the comparison is correct even
     if an operator ever emits the same Pauli string in more than one term
     (rather than silently overwriting, as a plain ``dict(zip(...))`` would).
-    ``strict=True`` enforces equal lengths (and is required by the repo's
-    ``B905`` lint rule; the project already targets Python >= 3.10).
+    ``strict=True`` enforces equal lengths.
     """
     acc: dict = {}
     for label, coeff in zip(qh.pauli_strings, qh.coefficients, strict=True):

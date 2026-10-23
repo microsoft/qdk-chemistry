@@ -45,10 +45,10 @@ jobs:
       matrix:
         include:
         - os-name: Linux
-          runner: [self-hosted, 1ES.Pool=1es-gh-Dads_v5-pool-wus2, 1ES.ImageOverride=Ubuntu24.04Nightly, 'JobId=qdk_chemistry-linux-py3.10-${{ github.run_id }}-${{ github.run_number }}-${{ github.run_attempt }}']
+          runner: [self-hosted, 1ES.Pool=1es-gh-Dads_v5-pool-wus2, 1ES.ImageOverride=Ubuntu24.04Nightly, 'JobId=qdk_chemistry-linux-py3.11-${{ github.run_id }}-${{ github.run_number }}-${{ github.run_attempt }}']
           build-parallel: 32
           uarch: x86-64-v3
-          python-version: '3.10'
+          python-version: '3.11'
           cpp-omp-threads: 4
           cpp-test-workers: 12
           python-omp-threads: 4

@@ -18,7 +18,7 @@ Most users should start with the PyPI install.
 
 ### Prerequisites
 
-- Python 3.10 or newer
+- Python 3.11 or newer
 - pip (on Ubuntu/Debian you may need `sudo apt install python3-pip python3-venv`)
 
 Prebuilt wheels are published for the following platforms:
@@ -169,8 +169,7 @@ pytest python/tests
 ### Notes for Windows Users
 
 Windows is a supported platform on both x86_64 and arm64: the project is built and tested on both
-architectures in CI, and wheels are published for both (x86_64 from Python 3.10, arm64 from Python
-3.11, which is the first version CPython ships a win-arm64 build for). The following caveats apply
+architectures in CI, and wheels are published for both from Python 3.11 onwards. The following caveats apply
 to native Windows installs; none of them apply under
 [WSL](https://learn.microsoft.com/windows/wsl/install).
 
@@ -277,7 +276,7 @@ each library; they are all declared in [`vcpkg.json`](vcpkg.json), so a single
 
 | Dependency | Description | Requirements | Source Location | Ubuntu / Debian | Redhat | Windows |
 |------------|-------------|--------------------|-----------------|-----------------|---------|-----------------|
-| Python 3 | Python interpreter and package tools | Version 3.10+ | [source](https://www.python.org/) | `apt install python3 python3-pip python3-venv` | `dnf install python3 python3-pip` | `winget install --id Python.Python.3.12 -e -s winget` |
+| Python 3 | Python interpreter and package tools | Version 3.11+ | [source](https://www.python.org/) | `apt install python3 python3-pip python3-venv` | `dnf install python3 python3-pip` | `winget install --id Python.Python.3.12 -e -s winget` |
 | CMake | Build system manager | Version > 3.15 | [source](https://github.com/Kitware/CMake) | `apt install cmake` | `dnf install cmake` | VS Build Tools |
 | Ninja | Build tool used for the Windows builds | N/A | [source](https://github.com/ninja-build/ninja) | `apt install ninja-build` | `dnf install ninja-build` | VS Build Tools |
 | Eigen | C++ linear algebra templates | Version > 3.4.0 | [source](https://libeigen.gitlab.io/) | `apt install libeigen3-dev` | `dnf install eigen3-devel` | `eigen3` |
