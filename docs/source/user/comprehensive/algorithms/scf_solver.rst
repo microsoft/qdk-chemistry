@@ -199,7 +199,19 @@ SCF Convergence Algorithms in QDK
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 Achieving stable :term:`SCF` convergence is a non-trivial problem in computational chemistry.
-QDK/Chemistry implements two complementary algorithms that can be used independently or in combination.
+The native QDK/Chemistry solver uses :term:`DIIS` alone or a hybrid strategy that switches from :term:`DIIS` to :term:`GDM`.
+
+.. rubric:: Linearly dependent basis functions
+
+The native solver removes overlap eigenvectors below its linear-dependence threshold.
+Consequently, the number of molecular orbitals can be smaller than the number of atomic orbitals.
+Both :term:`DIIS` and the :term:`GDM` phase of the hybrid optimize within this retained space.
+Calculations fail explicitly if the retained space cannot accommodate the electron occupations.
+The atomic initial guess also uses the retained shell dimensions.
+
+For restricted open-shell Hartree-Fock, the effective MO Fock matrix is lifted back to an AO-shaped matrix using the coefficient matrix's thin-QR pseudoinverse.
+This reproduces the effective operator within the retained MO space; it does not reconstruct discarded AO components.
+Empty closed, open, or virtual orbital subspaces are allowed; :term:`GDM` continues to optimize rotations between the remaining nonempty subspaces.
 
 .. rubric:: Direct Inversion in the Iterative Subspace (DIIS)
 
@@ -211,6 +223,7 @@ However, it can fail for challenging cases such as open-shell systems or molecul
 
 When :term:`DIIS` encounters difficulties, the :term:`GDM` algorithm provides a robust alternative :cite:`VanVoorhis2002`.
 Rather than extrapolating Fock matrices, :term:`GDM` directly minimizes the energy with respect to orbital rotation parameters using a quasi-Newton optimization approach.
+The native solver runs :term:`GDM` only after at least one :term:`DIIS` update, which supplies the initial orbitals, energy, and energy change.
 
 The key insight of :term:`GDM` is to parameterize orbital changes through unitary rotations, which converts the constrained optimization problem of determining the energy-minimizing set of orthonormal orbitals into an unconstrained optimization over exponentials :cite:`Higham2005` of anti-Hermitian matrices.
 This allows the use of standard nonlinear optimization techniques while preserving orbital orthonormality.

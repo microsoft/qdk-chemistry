@@ -8,6 +8,7 @@
 #include <Eigen/Dense>
 #include <algorithm>
 #include <iostream>
+#include <limits>
 #include <memory>
 #include <optional>
 #include <qdk/chemistry/algorithms/scf.hpp>
@@ -21,12 +22,94 @@
 #include <stdexcept>
 #include <vector>
 
+#include "../src/qdk/chemistry/algorithms/microsoft/scf/src/util/similarity_transform.h"
 #include "../src/qdk/chemistry/algorithms/microsoft/utils.hpp"
 #include "ut_common.hpp"
 
 using namespace qdk::chemistry::data;
 using namespace qdk::chemistry::algorithms;
 using namespace qdk::chemistry::utils;
+
+namespace qdk::chemistry::scf {
+
+TEST(QrPseudoinverseTest, SquareAndRectangularFockRoundTrips) {
+  RowMajorMatrix coefficients(5, 3);
+  coefficients << 1.0, 0.2, -0.3, 0.4, 1.5, 0.6, -0.2, 0.3, 1.1, 0.7, -0.4, 0.2,
+      -0.5, 0.1, 0.8;
+  RowMajorMatrix fock_mo(3, 3);
+  fock_mo << -1.0, 0.3, -0.2, 0.3, 0.5, 0.1, -0.2, 0.1, 1.2;
+
+  for (int num_ao : {3, 5}) {
+    const RowMajorMatrix C = coefficients.topRows(num_ao);
+    const RowMajorMatrix C_plus = qr_pseudoinverse(C);
+    EXPECT_EQ(C_plus.rows(), 3);
+    EXPECT_EQ(C_plus.cols(), num_ao);
+    EXPECT_TRUE((C_plus * C).isApprox(RowMajorMatrix::Identity(3, 3), 1e-12));
+    EXPECT_TRUE((C * C_plus * C).isApprox(C, 1e-12));
+    EXPECT_TRUE((C_plus * C * C_plus).isApprox(C_plus, 1e-12));
+    const RowMajorMatrix projector = C * C_plus;
+    EXPECT_TRUE(projector.isApprox(projector.transpose(), 1e-12));
+
+    const RowMajorMatrix fock_ao = C_plus.transpose() * fock_mo * C_plus;
+    EXPECT_TRUE(fock_ao.isApprox(fock_ao.transpose(), 1e-12));
+    EXPECT_TRUE((C.transpose() * fock_ao * C).isApprox(fock_mo, 1e-12));
+    if (num_ao == 3) {
+      const RowMajorMatrix inverse = C.inverse();
+      EXPECT_TRUE(C_plus.isApprox(inverse, 1e-12));
+      EXPECT_TRUE(
+          fock_ao.isApprox(inverse.transpose() * fock_mo * inverse, 1e-12));
+    }
+  }
+}
+
+TEST(QrPseudoinverseTest, IllConditionedFullColumnRank) {
+  RowMajorMatrix seed(5, 3);
+  seed << 1.0, 2.0, 3.0, 3.0, -1.0, 2.0, 2.0, 3.0, -1.0, -1.0, 2.0, 1.0, 2.0,
+      1.0, 3.0;
+  const RowMajorMatrix Q =
+      seed.householderQr().householderQ() * RowMajorMatrix::Identity(5, 3);
+  RowMajorMatrix C = Q;
+  C.col(1) *= 1e-3;
+  C.col(2) *= 1e-6;
+  const RowMajorMatrix C_plus = qr_pseudoinverse(C);
+  EXPECT_TRUE(C_plus.allFinite());
+  EXPECT_TRUE((C_plus * C).isApprox(RowMajorMatrix::Identity(3, 3), 1e-9));
+  EXPECT_TRUE((C * C_plus).isApprox(Q * Q.transpose(), 1e-9));
+}
+
+TEST(QrPseudoinverseTest, MatchesCanonicalOverlapDual) {
+  RowMajorMatrix seed(4, 4);
+  seed << 1, 2, 3, 4, 2, -1, 1, 3, 3, 1, -2, 1, 4, 3, 1, -1;
+  const RowMajorMatrix U = seed.householderQr().householderQ();
+  Eigen::Vector4d overlap_eigenvalues(0.0, 0.25, 1.0, 2.0);
+  const RowMajorMatrix S = U * overlap_eigenvalues.asDiagonal() * U.transpose();
+  const RowMajorMatrix C = U.rightCols(3) * overlap_eigenvalues.tail(3)
+                                                .array()
+                                                .sqrt()
+                                                .inverse()
+                                                .matrix()
+                                                .asDiagonal();
+  EXPECT_TRUE(
+      (C.transpose() * S * C).isApprox(RowMajorMatrix::Identity(3, 3), 1e-12));
+  EXPECT_TRUE(qr_pseudoinverse(C).isApprox(C.transpose() * S, 1e-12));
+}
+
+TEST(QrPseudoinverseTest, RejectsInvalidInputs) {
+  EXPECT_THROW(qr_pseudoinverse(RowMajorMatrix(3, 0)), std::invalid_argument);
+  EXPECT_THROW(qr_pseudoinverse(RowMajorMatrix::Ones(2, 3)),
+               std::invalid_argument);
+  EXPECT_THROW(qr_pseudoinverse(RowMajorMatrix::Zero(4, 2)),
+               std::runtime_error);
+  EXPECT_THROW(qr_pseudoinverse(RowMajorMatrix::Ones(4, 2)),
+               std::runtime_error);
+  RowMajorMatrix C = RowMajorMatrix::Identity(3, 2);
+  C(0, 0) = std::numeric_limits<double>::quiet_NaN();
+  EXPECT_THROW(qr_pseudoinverse(C), std::invalid_argument);
+  C(0, 0) = std::numeric_limits<double>::infinity();
+  EXPECT_THROW(qr_pseudoinverse(C), std::invalid_argument);
+}
+
+}  // namespace qdk::chemistry::scf
 
 TEST(MicrosoftUtilsTest, ParsesRelativity) {
   using qdk::chemistry::scf::Relativity;
