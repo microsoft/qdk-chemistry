@@ -1,8 +1,3 @@
-# --------------------------------------------------------------------------------------------
-# Copyright (c) Microsoft Corporation. All rights reserved.
-# Licensed under the MIT License. See LICENSE.txt in the project root for license information.
-# --------------------------------------------------------------------------------------------
-
 """Export qdk-chemistry SCF data to ExaChem's serial HDF5 format.
 
 Writes MO coefficients and density matrices as HDF5 files compatible with
@@ -28,6 +23,8 @@ Gaussian-94 file in qdk-chemistry's native shell order and ExaChem is pointed at
 it via the ``LIBINT_DATA_PATH`` environment variable.  ExaChem then builds its AO
 basis with the identical inter-shell order and identical basis parameters, so
 the *only* remaining difference is the within-shell m-component ordering.
+Effective core potentials are written next to the basis the same way (see
+:func:`write_qdk_ecp`).
 
 That within-shell ordering is **not** encoded in the basis file -- it reflects a
 qdk-chemistry AO-layout convention: qdk-chemistry represents p orbitals in
@@ -37,6 +34,11 @@ momentum already matches (s is a single function; d/f/g are spherical in both),
 so ``_within_shell_m_reorder`` applies exactly that p-only swap (permuting
 d/f/g corrupts the imported reference).
 """
+
+# --------------------------------------------------------------------------------------------
+# Copyright (c) Microsoft Corporation. All rights reserved.
+# Licensed under the MIT License. See LICENSE.txt in the project root for license information.
+# --------------------------------------------------------------------------------------------
 
 from __future__ import annotations
 
@@ -55,6 +57,7 @@ __all__ = [
     "export_scf_files",
     "write_exachem_matrix",
     "write_qdk_basis_g94",
+    "write_qdk_ecp",
 ]
 
 if TYPE_CHECKING:
@@ -91,6 +94,7 @@ def ecp_name_to_exachem(name: str) -> str:
 
     ExaChem stores an ECP shared by several basis sets once: every def2 basis set uses ``def2-ecp``, and
     LANL2DZ and LANL2DZdp use ``lanl2dz_ecp``. Other names are spelled as in :func:`basis_name_to_exachem`.
+    The result names both ExaChem's library file and the file written by :func:`write_qdk_ecp`.
 
     Args:
         name: ECP name, as returned by :meth:`~qdk_chemistry.data.BasisSet.get_ecp_name`.
@@ -229,6 +233,69 @@ def write_qdk_basis_g94(basis_set: BasisSet, elements: list, basis_data_dir: str
     return Path(basis_data_dir)
 
 
+def write_qdk_ecp(basis_set: BasisSet, elements: list, basis_data_dir: str | Path, ecp_name: str) -> Path:
+    """Write qdk-chemistry's effective core potentials as an ExaChem ``.ecp`` file.
+
+    The counterpart of :func:`write_qdk_basis_g94` for ECPs. ExaChem builds whose basis lookup honors
+    ``LIBINT_DATA_PATH`` read ``<LIBINT_DATA_PATH>/basis/<name>.ecp``; others read their own library file of that
+    name, so ``ecp_name`` must be ExaChem's library name (see :func:`ecp_name_to_exachem`). Each element's block
+    lists qdk-chemistry's ECP shells, one radial power, exponent, and coefficient per line, with the local term
+    (``OrbitalType.UL``) as ExaChem's ``ul`` channel; an ECP without a local term gets a zero one.
+
+    Args:
+        basis_set: A :class:`~qdk_chemistry.data.BasisSet` instance carrying ECP shells.
+        elements: Element symbols in molecule (atom) order.
+        basis_data_dir: Directory to write into; the file is placed at ``<basis_data_dir>/basis/<ecp_name>.ecp``.
+        ecp_name: ECP name (used for the file name).
+
+    Returns:
+        The ``basis_data_dir`` path, to be used as ``LIBINT_DATA_PATH``.
+
+    Raises:
+        ValueError: If the ECP name is not a safe file name or atoms of one element carry different ECPs.
+
+    """
+    Logger.trace_entering()
+    # ecp_name becomes a file name, so reject anything that could escape the basis dir.
+    if not ecp_name or "/" in ecp_name or "\\" in ecp_name or ".." in ecp_name:
+        raise ValueError(f"Invalid ECP name for an ExaChem ECP file name: {ecp_name!r}")
+
+    # One block per element, so every atom of an element must carry the same ECP.
+    blocks: list[str] = []
+    seen: dict[str, tuple] = {}
+    for atom_idx, core_electrons in enumerate(basis_set.get_ecp_electrons()):
+        if not core_electrons:
+            continue
+        elem = str(elements[atom_idx]).strip().title()
+        channels = [
+            (sh.get_angular_momentum(), [int(n) for n in sh.rpowers], list(sh.exponents), list(sh.coefficients))
+            for sh in basis_set.get_ecp_shells_for_atom(atom_idx)
+        ]
+        if elem in seen:
+            if (core_electrons, channels) != seen[elem]:
+                raise ValueError(f"ExaChem needs one ECP per element, but the {elem} atoms carry different ECPs.")
+            continue
+        seen[elem] = (core_electrons, channels)
+        lines = [f"{elem} nelec {core_electrons}"]
+        if all(channel[0] >= 0 for channel in channels):
+            # ExaChem treats "ul" as the highest channel, so without one the highest semi-local term would turn local.
+            lines += [f"{elem} ul", f"2   {1.0: .14E}   {0.0: .14E}"]
+        for angular_momentum, rpowers, exponents, coefficients in sorted(channels, key=lambda channel: channel[0]):
+            lines.append(f"{elem} {'ul' if angular_momentum < 0 else _L_SYMBOL[angular_momentum]}")
+            lines.extend(
+                f"{n}   {e: .14E}   {c: .14E}" for n, e, c in zip(rpowers, exponents, coefficients, strict=True)
+            )
+        blocks.append("\n".join(lines))
+
+    basis_dir = Path(basis_data_dir) / "basis"
+    basis_dir.mkdir(parents=True, exist_ok=True)
+    ecp_path = basis_dir / f"{ecp_name}.ecp"
+    # ExaChem reads from the first line containing "ECP" to the first containing "END", so no header comment.
+    ecp_path.write_text("ECP\n" + "\n".join(blocks) + "\nEND\n")
+    Logger.info(f"Wrote qdk-chemistry ECP for ExaChem: {ecp_path}")
+    return Path(basis_data_dir)
+
+
 def write_exachem_matrix(filepath: str | Path, matrix: np.ndarray) -> None:
     """Write a matrix in ExaChem's serial-IO HDF5 format.
 
@@ -269,10 +336,10 @@ def export_scf_files(
     basis_name: str,
     elements: list,
     basis_data_dir: str | Path,
-    ao_tilesize: int = 30,
-    runcontext_prefix: str | Path | None = None,
+    runcontext_prefix: str | Path,
     mo_coeff_beta: np.ndarray | None = None,
     density_beta: np.ndarray | None = None,
+    ecp_name: str | None = None,
 ) -> list[Path]:
     """Write SCF restart files for ExaChem's ``noscf`` mode.
 
@@ -283,9 +350,10 @@ def export_scf_files(
     qdk-chemistry's own basis is written to ``basis_data_dir`` (see
     :func:`write_qdk_basis_g94`) so ExaChem reads it via ``LIBINT_DATA_PATH``,
     giving both codes an identical inter-shell order and identical basis
-    parameters.  The AO rows/columns of the MO coefficient and density matrices
-    are then corrected for the within-shell p-component ordering only
-    (``_within_shell_m_reorder``).
+    parameters, and its ECP is written next to it when ``ecp_name`` is given
+    (see :func:`write_qdk_ecp`).  The AO rows/columns of the MO coefficient and
+    density matrices are then corrected for the within-shell p-component
+    ordering only (``_within_shell_m_reorder``).
 
     For a restricted (closed-shell) reference, pass only the alpha quantities;
     ExaChem reads the total density from ``.alpha.density`` (so ``density_alpha``
@@ -297,30 +365,32 @@ def export_scf_files(
         files_prefix: Path prefix for output files; files are named ``<prefix>.alpha.movecs`` etc.
         mo_coeff_alpha: Alpha MO coefficient matrix, shape ``(nbf, nmo)``.
         density_alpha: Alpha (or total, for restricted) AO density matrix, shape ``(nbf, nbf)``.
-        ao_tilesize: AO tile size for ExaChem (default: 30).
-        runcontext_prefix: Path prefix for the run context JSON. If None, uses ``files_prefix``.
+        runcontext_prefix: Path prefix for the run context JSON.
         basis_set: A :class:`~qdk_chemistry.data.BasisSet` instance (required for the basis export and AO reorder).
         mo_coeff_beta: Beta MO coefficients (unrestricted), shape ``(nbf, nmo)``; None writes no beta files.
         density_beta: Beta AO density (unrestricted), shape ``(nbf, nbf)``; None writes no beta density.
         basis_name: Basis set name (e.g. ``"cc-pvdz"``); used for the written ``.g94`` file name.
         elements: Element symbols in molecule (atom) order.
         basis_data_dir: Directory receiving qdk-chemistry's basis as a Gaussian-94 file for ExaChem to read.
+        ecp_name: ExaChem ECP name (e.g. ``"def2-ecp"``); if given, qdk-chemistry's ECP is also written for ExaChem.
 
     Returns:
         List of paths to the created files.
 
     Raises:
-        ValueError: If the basis cannot be written for ExaChem (see :func:`write_qdk_basis_g94`).
+        ValueError: If :func:`write_qdk_basis_g94` or :func:`write_qdk_ecp` rejects the basis set.
 
     """
     Logger.trace_entering()
     files_prefix = Path(files_prefix)
     files_prefix.parent.mkdir(parents=True, exist_ok=True)
 
-    # Feed qdk-chemistry's own basis to ExaChem (read via LIBINT_DATA_PATH) so the
+    # Feed qdk-chemistry's own basis and ECP to ExaChem (read via LIBINT_DATA_PATH) so the
     # inter-shell order and basis parameters match exactly; only the within-shell
     # p-component order then needs correcting.
     write_qdk_basis_g94(basis_set, elements, basis_data_dir, basis_name)
+    if ecp_name is not None:
+        write_qdk_ecp(basis_set, elements, basis_data_dir, ecp_name)
     perm = _within_shell_m_reorder(basis_set)
     mo_coeff_alpha = mo_coeff_alpha[perm, :]
     density_alpha = density_alpha[np.ix_(perm, perm)]
@@ -350,12 +420,12 @@ def export_scf_files(
         write_exachem_matrix(beta_density_path, density_beta)
         created.append(beta_density_path)
 
-    # Run context JSON (required by ExaChem's scf_restart to read ao_tilesize)
-    rc_prefix = Path(runcontext_prefix) if runcontext_prefix is not None else files_prefix
+    # ExaChem's SCF restart aborts unless this matches its AO tile size (30 by default).
+    rc_prefix = Path(runcontext_prefix)
     rc_prefix.parent.mkdir(parents=True, exist_ok=True)
     runcontext_path = Path(str(rc_prefix) + ".runcontext.json")
 
-    run_context = {"ao_tilesize": ao_tilesize}
+    run_context = {"ao_tilesize": 30}
     runcontext_path.write_text(json.dumps(run_context, indent=2))
     created.append(runcontext_path)
 

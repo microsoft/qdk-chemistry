@@ -1,18 +1,18 @@
-# --------------------------------------------------------------------------------------------
-# Copyright (c) Microsoft Corporation. All rights reserved.
-# Licensed under the MIT License. See LICENSE.txt in the project root for license information.
-# --------------------------------------------------------------------------------------------
-
 """Parsers for ExaChem CCSD output formats.
 
 ExaChem writes its converged coupled-cluster results in two places:
 
-1. **stdout** -- the SCF and CCSD/CCSD(T) energy summaries, parsed by
-   :func:`parse_ccsdt_energy` into :class:`CcsdtEnergies`.
+1. **stdout** -- the SCF and CCSD energies, parsed by
+   :func:`parse_ccsd_energies` into :class:`CcsdEnergies`.
 2. **T-amplitude text files** -- written when ``CC.PRINT.tamplitudes`` is
    enabled, parsed by :func:`parse_ccsd_amplitudes_restricted` and
    :func:`parse_ccsd_amplitudes_unrestricted`.
 """
+
+# --------------------------------------------------------------------------------------------
+# Copyright (c) Microsoft Corporation. All rights reserved.
+# Licensed under the MIT License. See LICENSE.txt in the project root for license information.
+# --------------------------------------------------------------------------------------------
 
 from __future__ import annotations
 
@@ -25,73 +25,48 @@ import numpy as np
 from qdk_chemistry.utils import Logger
 
 __all__ = [
-    "CcsdtEnergies",
+    "CcsdEnergies",
     "parse_ccsd_amplitudes_restricted",
     "parse_ccsd_amplitudes_unrestricted",
-    "parse_ccsdt_energy",
+    "parse_ccsd_energies",
 ]
 
 if TYPE_CHECKING:
+    from collections.abc import Iterator
     from pathlib import Path
 
 
 @dataclass
-class CcsdtEnergies:
-    """Energies parsed from an ExaChem CCSD(T) run.
-
-    All energies are absolute totals (including nuclear repulsion) in Hartree,
-    except the ``*_correction`` and ``*_correlation`` fields. The perturbative
-    triples result is ``ccsd_pt_total`` (the canonical "CCSD(T)" energy); the
-    ``ccsd_bracket_t_*`` fields hold the related "CCSD[T]" bracket variant.
-    """
+class CcsdEnergies:
+    """Energies parsed from an ExaChem CCSD run, as totals (including nuclear repulsion) in Hartree."""
 
     scf_total: float | None = None
     """SCF total energy of the reference that ExaChem correlated."""
 
-    ccsd_correlation: float | None = None
-    """CCSD correlation energy."""
-
     ccsd_total: float | None = None
     """CCSD total energy."""
 
-    ccsd_bracket_t_correction: float | None = None
-    """[T] correction energy (bracket variant)."""
 
-    ccsd_bracket_t_total: float | None = None
-    """CCSD[T] total energy."""
+def parse_ccsd_energies(stdout: str) -> CcsdEnergies:
+    """Parse the SCF and CCSD energies from ExaChem stdout.
 
-    ccsd_pt_correction: float | None = None
-    """(T) perturbative correction energy."""
-
-    ccsd_pt_total: float | None = None
-    """CCSD(T) total energy (the canonical result)."""
-
-
-def parse_ccsdt_energy(stdout: str) -> CcsdtEnergies:
-    """Parse the SCF, CCSD and CCSD(T) energies from ExaChem stdout.
-
-    ExaChem prints the SCF, CCSD and CCSD(T)/CCSD[T] energies as labeled lines (at
-    15-digit precision). This extracts them into a :class:`CcsdtEnergies`.
+    ExaChem prints the SCF and CCSD energies as labeled lines (at 15-digit
+    precision). This extracts them into a :class:`CcsdEnergies`.
 
     Args:
         stdout: Captured ExaChem stdout text.
 
     Returns:
-        Parsed :class:`CcsdtEnergies`. Fields that could not be found are ``None``.
+        Parsed :class:`CcsdEnergies`. Fields that could not be found are ``None``.
 
     """
     Logger.trace_entering()
     num = r"(-?\d+\.\d+)"
     patterns = {
         "scf_total": rf"\bTotal SCF energy\s*=\s*{num}",
-        "ccsd_correlation": rf"\bCCSD correlation energy / hartree\s*=\s*{num}",
         "ccsd_total": rf"\bCCSD total energy / hartree\s*=\s*{num}",
-        "ccsd_bracket_t_correction": rf"\bCCSD\[T\] correction energy / hartree\s*=\s*{num}",
-        "ccsd_bracket_t_total": rf"\bCCSD\[T\] total energy / hartree\s*=\s*{num}",
-        "ccsd_pt_correction": rf"\bCCSD\(T\) correction energy / hartree\s*=\s*{num}",
-        "ccsd_pt_total": rf"\bCCSD\(T\) total energy / hartree\s*=\s*{num}",
     }
-    energies = CcsdtEnergies()
+    energies = CcsdEnergies()
     for field_name, pattern in patterns.items():
         match = re.search(pattern, stdout)
         if match:
@@ -99,22 +74,27 @@ def parse_ccsdt_energy(stdout: str) -> CcsdtEnergies:
     return energies
 
 
-def _read_amplitude_file(path: str | Path, shape: tuple[int, ...]) -> np.ndarray:
-    """Read a TAMM ``print_max_above_threshold`` text file into a dense array.
+def _amplitude_entries(path: str | Path, rank: int) -> Iterator[tuple[tuple[int, ...], float]]:
+    """Yield the ``(indices, value)`` entries of a TAMM ``print_max_above_threshold`` text file.
 
     Each non-empty line is ``idx0 idx1 ... value``; entries not listed are exact
     zeros (TAMM only writes amplitudes whose magnitude exceeds the print
-    threshold).  The returned array has the given ``shape``.
+    threshold).
     """
     Logger.trace_entering()
-    arr = np.zeros(shape, dtype=float)
     with open(path) as f:
         for line in f:
             parts = line.split()
-            if len(parts) != len(shape) + 1:
-                continue
-            idx = tuple(int(p) for p in parts[:-1])
-            arr[idx] = float(parts[-1])
+            if len(parts) == rank + 1:
+                yield tuple(map(int, parts[:-1])), float(parts[-1])
+
+
+def _read_amplitude_file(path: str | Path, shape: tuple[int, ...]) -> np.ndarray:
+    """Read a TAMM ``print_max_above_threshold`` text file into a dense array of the given ``shape``."""
+    Logger.trace_entering()
+    arr = np.zeros(shape, dtype=float)
+    for idx, value in _amplitude_entries(path, len(shape)):
+        arr[idx] = value
     return arr
 
 
@@ -177,14 +157,22 @@ def parse_ccsd_amplitudes_unrestricted(
 
     """
     Logger.trace_entering()
-    no, nv = noa + nob, nva + nvb
-    t1 = _read_amplitude_file(t1_path, (nv, no))  # (vir_mso, occ_mso)
-    t2 = _read_amplitude_file(t2_path, (nv, nv, no, no))  # (v1, v2, o1, o2)
-    va, vb = slice(0, nva), slice(nva, nv)
-    oa, ob = slice(0, noa), slice(noa, no)
-    t1_aa = np.ascontiguousarray(t1[va, oa].transpose(1, 0))
-    t1_bb = np.ascontiguousarray(t1[vb, ob].transpose(1, 0))
-    t2_aaaa = np.ascontiguousarray(t2[va, va, oa, oa].transpose(2, 3, 0, 1))
-    t2_abab = np.ascontiguousarray(t2[va, vb, oa, ob].transpose(2, 3, 0, 1))
-    t2_bbbb = np.ascontiguousarray(t2[vb, vb, ob, ob].transpose(2, 3, 0, 1))
+    t1_aa, t1_bb = np.zeros((noa, nva)), np.zeros((nob, nvb))
+    for (a, i), value in _amplitude_entries(t1_path, 2):
+        if a < nva and i < noa:
+            t1_aa[i, a] = value
+        elif a >= nva and i >= noa:
+            t1_bb[i - noa, a - nva] = value
+
+    t2_aaaa = np.zeros((noa, noa, nva, nva))
+    t2_abab = np.zeros((noa, nob, nva, nvb))
+    t2_bbbb = np.zeros((nob, nob, nvb, nvb))
+    # Filling the blocks directly avoids a dense MSO tensor; the abba, baab and baba blocks repeat abab up to sign.
+    for (a, b, i, j), value in _amplitude_entries(t2_path, 4):
+        if a < nva and b < nva and i < noa and j < noa:
+            t2_aaaa[i, j, a, b] = value
+        elif a < nva <= b and i < noa <= j:
+            t2_abab[i, j - noa, a, b - nva] = value
+        elif a >= nva and b >= nva and i >= noa and j >= noa:
+            t2_bbbb[i - noa, j - noa, a - nva, b - nva] = value
     return t1_aa, t1_bb, t2_aaaa, t2_abab, t2_bbbb

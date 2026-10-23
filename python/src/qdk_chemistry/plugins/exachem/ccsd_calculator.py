@@ -1,19 +1,14 @@
-# --------------------------------------------------------------------------------------------
-# Copyright (c) Microsoft Corporation. All rights reserved.
-# Licensed under the MIT License. See LICENSE.txt in the project root for license information.
-# --------------------------------------------------------------------------------------------
-
-"""ExaChem CCSD dynamical-correlation calculator with T-amplitude read-in.
+"""ExaChem CCSD dynamical-correlation calculator.
 
 Implements the :class:`~qdk_chemistry.algorithms.DynamicalCorrelationCalculator`
 interface to run ExaChem's CCSD method (Coupled Cluster Singles and Doubles) as
-an external MPI process, then reads the converged T1/T2 cluster amplitudes back
-into a qdk-chemistry :class:`~qdk_chemistry.data.AmplitudeContainer`.
+an external MPI process.
 
-The calculator enables ExaChem's ``CC.PRINT.tamplitudes`` option so the T1/T2
-tensors are written as text files (``<prefix>.print_t1amp.txt`` /
+When ``store_amplitudes`` is set, the calculator enables ExaChem's ``CC.PRINT.tamplitudes``
+option so the T1/T2 tensors are written as text files (``<prefix>.print_t1amp.txt`` /
 ``<prefix>.print_t2amp.txt``), parses them, and returns a wavefunction carrying
-the amplitudes -- mirroring the PySCF coupled-cluster calculator's contract.
+the amplitudes in a qdk-chemistry :class:`~qdk_chemistry.data.AmplitudeContainer`
+-- mirroring the PySCF coupled-cluster calculator's contract.
 
 Both restricted (RHF) and unrestricted (UHF) references are supported. ExaChem
 requires an unrestricted reference whenever the multiplicity exceeds one.
@@ -23,10 +18,16 @@ References:
 
 """
 
+# --------------------------------------------------------------------------------------------
+# Copyright (c) Microsoft Corporation. All rights reserved.
+# Licensed under the MIT License. See LICENSE.txt in the project root for license information.
+# --------------------------------------------------------------------------------------------
+
 from __future__ import annotations
 
 import glob
 import shutil
+import sys
 import tempfile
 from pathlib import Path
 from typing import TYPE_CHECKING
@@ -37,11 +38,11 @@ from qdk_chemistry.algorithms import DynamicalCorrelationCalculator
 from qdk_chemistry.data import AmplitudeContainer, AmplitudeType, BasisSet, Settings, Wavefunction
 from qdk_chemistry.data._spin_channels import spin_channel_indices, spin_channel_matrix
 from qdk_chemistry.data.symmetry import axes
-from qdk_chemistry.plugins.exachem.cli import CcsdInputConfig, ExachemResult, run_exachem
+from qdk_chemistry.plugins.exachem.cli import CcsdInputConfig, ExachemRunError, run_exachem
 from qdk_chemistry.plugins.exachem.conversion import (
     parse_ccsd_amplitudes_restricted,
     parse_ccsd_amplitudes_unrestricted,
-    parse_ccsdt_energy,
+    parse_ccsd_energies,
 )
 from qdk_chemistry.plugins.exachem.scf_export import basis_name_to_exachem, ecp_name_to_exachem, export_scf_files
 from qdk_chemistry.utils import Logger
@@ -72,10 +73,10 @@ class ExachemCcsdSettings(Settings):
     Attributes:
         mpi_ranks (int): Number of MPI processes; ExaChem's default GA runtime needs at least 2 (default: 2).
         mpi_bind_to (str): Binding policy per rank; empty defers to the launcher (default: ``"core"``).
-        timeout (int): Subprocess timeout in seconds (default: 3600).
+        timeout_secs (int): Maximum seconds to wait for ExaChem to finish (default: 3600).
         ccsd_threshold (float): CCSD convergence threshold (default: 1e-6).
         cd_diagtol (float): Cholesky decomposition diagonal tolerance (default: 1e-5).
-        store_amplitudes (bool): Read the T1/T2 amplitudes back into the returned wavefunction.
+        store_amplitudes (bool): Read the T1/T2 amplitudes back into the returned wavefunction (default: False).
 
     """
 
@@ -84,37 +85,43 @@ class ExachemCcsdSettings(Settings):
         Logger.trace_entering()
         super().__init__()
         self._set_default(
-            "mpi_ranks", "int", 2, "Number of MPI processes; ExaChem's default GA runtime needs at least 2"
+            "mpi_ranks",
+            "int",
+            2,
+            "Number of MPI processes; ExaChem's default GA runtime needs at least 2",
+            limit=(1, sys.maxsize),
         )
         self._set_default(
             "mpi_bind_to", "string", "core", "Binding policy for each MPI rank; empty defers to the launcher default"
         )
-        self._set_default("timeout", "int", 3600, "Maximum seconds to wait for ExaChem to finish")
+        self._set_default(
+            "timeout_secs", "int", 3600, "Maximum seconds to wait for ExaChem to finish", limit=(1, sys.maxsize)
+        )
         self._set_default("ccsd_threshold", "double", 1e-6, "CCSD convergence threshold")
         self._set_default("cd_diagtol", "double", 1e-5, "Cholesky decomposition diagonal tolerance")
         self._set_default(
             "store_amplitudes",
             "bool",
-            True,
+            False,
             "Read the converged T1/T2 amplitudes into the returned wavefunction",
         )
 
 
 class ExachemCcsdCalculator(DynamicalCorrelationCalculator):
-    """CCSD calculator via ExaChem CLI that returns the cluster amplitudes.
+    """CCSD calculator that runs ExaChem as an external MPI program.
 
-    Runs ExaChem's CCSD implementation as an external MPI process on the Ansatz's
-    pre-computed MO coefficients (``noscf`` restart), then reads the converged
+    Runs ExaChem's CCSD implementation on the Ansatz's pre-computed MO coefficients
+    (``noscf`` restart) and, when ``store_amplitudes`` is set, reads the converged
     T1/T2 amplitudes into an :class:`~qdk_chemistry.data.AmplitudeContainer`.
 
     Follows the same ``run(ansatz)`` contract as the PySCF coupled-cluster
-    calculator, returning ``(total_energy, wavefunction, None)`` where
-    ``wavefunction`` carries the CCSD amplitudes.
+    calculator, returning ``(total_energy, wavefunction, None)``.
 
-    The Ansatz must be backed by a named molecular :class:`~qdk_chemistry.data.BasisSet` (ExaChem looks the
-    name up in its own library), and ``ExaChem`` must be on ``PATH``. Effective core potentials are taken from
-    ExaChem's own library by name; a run whose ExaChem SCF energy differs from the Ansatz reference energy
-    raises instead of returning. If the orbitals define an active space, only the active orbitals are correlated.
+    The Ansatz must be backed by a named molecular :class:`~qdk_chemistry.data.BasisSet`. qdk-chemistry writes that
+    basis, and any effective core potentials, to files that ExaChem reads; a run whose ExaChem SCF energy differs
+    from the Ansatz reference energy raises instead of returning. If the orbitals define an active space, only the
+    active orbitals are correlated. The plugin registers this calculator only if ``ExaChem`` and an MPI launcher
+    (``mpirun`` or ``srun``) are on ``PATH`` when it loads.
     """
 
     def __init__(self):
@@ -147,8 +154,7 @@ class ExachemCcsdCalculator(DynamicalCorrelationCalculator):
         Raises:
             ValueError: If the Ansatz lacks a named molecular basis set or has different active orbitals per spin.
             ExachemNotFoundError: If ExaChem or the MPI launcher is not found.
-            ExachemRunError: If ExaChem fails.
-            RuntimeError: If ExaChem's SCF energy differs from the Ansatz reference or its CCSD outputs are missing.
+            ExachemRunError: If ExaChem fails, its SCF energy differs from the reference, or its outputs are missing.
 
         """
         Logger.trace_entering()
@@ -203,7 +209,7 @@ class ExachemCcsdCalculator(DynamicalCorrelationCalculator):
             scf_files_prefix = scf_dir / scf_prefix_name
             runcontext_prefix = scf_type_dir / scf_prefix_name
 
-            # Feed ExaChem qdk-chemistry's own basis (written here and read via
+            # Feed ExaChem qdk-chemistry's own basis and ECP (written here and read via
             # LIBINT_DATA_PATH) so both codes share an identical inter-shell order and
             # basis parameters; the AO export then only needs the within-shell p-swap.
             basis_data_dir = work_path / "qdk_libint_basis"
@@ -219,10 +225,10 @@ class ExachemCcsdCalculator(DynamicalCorrelationCalculator):
                     basis_name=exachem_basis,
                     elements=list(symbols),
                     basis_data_dir=basis_data_dir,
-                    ao_tilesize=30,
                     runcontext_prefix=runcontext_prefix,
                     mo_coeff_beta=mo_coeff_beta,
                     density_beta=np.asarray(density_beta),
+                    ecp_name=exachem_ecp if atom_ecp else None,
                 )
             else:
                 total_occ = np.asarray(alpha_occ) + np.asarray(beta_occ)
@@ -235,8 +241,8 @@ class ExachemCcsdCalculator(DynamicalCorrelationCalculator):
                     basis_name=exachem_basis,
                     elements=list(symbols),
                     basis_data_dir=basis_data_dir,
-                    ao_tilesize=30,
                     runcontext_prefix=runcontext_prefix,
+                    ecp_name=exachem_ecp if atom_ecp else None,
                 )
             Logger.info(f"Exported SCF data for noscf CCSD ({scf_type}) to {scf_dir}")
 
@@ -248,39 +254,36 @@ class ExachemCcsdCalculator(DynamicalCorrelationCalculator):
                 atom_ecp=atom_ecp,
                 charge=charge,
                 multiplicity=multiplicity,
-                units="bohr",
                 ccsd_threshold=s.get("ccsd_threshold"),
                 cd_diagtol=s.get("cd_diagtol"),
                 freeze_core=freeze_core,
                 freeze_virtual=freeze_virtual,
                 scf_type=scf_type,
-                noscf=True,
                 write_amplitudes=store_amplitudes,
                 input_prefix=input_prefix,
             )
 
-            result: ExachemResult = run_exachem(
+            stdout = run_exachem(
                 config,
                 nprocs=s.get("mpi_ranks"),
                 work_dir=work_path,
                 mpi_bind_to=s.get("mpi_bind_to"),
-                timeout=s.get("timeout"),
-                scf_files_prefix=scf_files_prefix,
+                timeout_secs=s.get("timeout_secs"),
                 libint_data_path=basis_data_dir,
             )
 
-            energies = parse_ccsdt_energy(result.stdout)
+            energies = parse_ccsd_energies(stdout)
             # ExaChem ends many fatal errors with exit status 0, so errors quote its last output lines.
-            stdout_tail = "\n".join(result.stdout.strip().splitlines()[-5:])
+            stdout_tail = "\n".join(stdout.strip().splitlines()[-5:])
             reference_energy = ansatz.calculate_energy()
             # Catches any basis, ECP, or charge mismatch; matching runs agree to about 1e-12 Eh.
             if energies.scf_total is None or abs(energies.scf_total - reference_energy) > 1e-6:
-                raise RuntimeError(
+                raise ExachemRunError(
                     f"ExaChem's SCF energy ({energies.scf_total}) does not match the Ansatz reference energy "
                     f"({reference_energy:.10f}). ExaChem output ends with:\n{stdout_tail}"
                 )
             if energies.ccsd_total is None:
-                raise RuntimeError(
+                raise ExachemRunError(
                     "ExaChem completed but the CCSD total energy could not be parsed. "
                     f"ExaChem output ends with:\n{stdout_tail}"
                 )
@@ -288,7 +291,7 @@ class ExachemCcsdCalculator(DynamicalCorrelationCalculator):
 
             # Build the returned wavefunction, optionally carrying the amplitudes.
             cc_container = self._build_amplitude_container(
-                result.work_dir,
+                work_path,
                 orbitals,
                 wavefunction,
                 n_alpha,
@@ -313,7 +316,7 @@ class ExachemCcsdCalculator(DynamicalCorrelationCalculator):
         t1 = glob.glob(str(Path(work_dir) / "**" / "*print_t1amp.txt"), recursive=True)
         t2 = glob.glob(str(Path(work_dir) / "**" / "*print_t2amp.txt"), recursive=True)
         if not t1 or not t2:
-            raise RuntimeError(
+            raise ExachemRunError(
                 "ExaChem CCSD completed but the T-amplitude files "
                 "(*.print_t1amp.txt / *.print_t2amp.txt) were not found in "
                 f"{work_dir}. Ensure CC.PRINT.tamplitudes was enabled."

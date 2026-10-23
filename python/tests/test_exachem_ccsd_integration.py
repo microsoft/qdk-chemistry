@@ -17,7 +17,7 @@ convergence thresholds. Both restricted (RHF) and unrestricted (UHF) references
 are exercised, and an effective-core-potential case is checked against native PySCF.
 
 Each ExaChem run goes through MPI, so those tests are marked ``slow`` and are skipped when ``ExaChem`` (found on
-``PATH``), an MPI runtime, or PySCF is missing. The basis-export checks need none of them.
+``PATH``), an MPI runtime, or PySCF is missing. The remaining checks need none of them.
 """
 
 # --------------------------------------------------------------------------------------------
@@ -28,16 +28,33 @@ Each ExaChem run goes through MPI, so those tests are marked ``slow`` and are sk
 from __future__ import annotations
 
 import shutil
+from typing import TYPE_CHECKING
 
 import numpy as np
 import pytest
 
 import qdk_chemistry.plugins.exachem as exachem_plugin
 from qdk_chemistry.algorithms import create
-from qdk_chemistry.data import Ansatz, BasisSet, Structure
-from qdk_chemistry.plugins.exachem.scf_export import basis_name_to_exachem, ecp_name_to_exachem, write_qdk_basis_g94
+from qdk_chemistry.data import Ansatz, AOType, BasisSet, Structure
+from qdk_chemistry.plugins.exachem import ccsd_calculator
+from qdk_chemistry.plugins.exachem.cli import (
+    ExachemNotFoundError,
+    ExachemRunError,
+    find_exachem_binary,
+    find_mpi_launcher,
+)
+from qdk_chemistry.plugins.exachem.conversion import parse_ccsd_amplitudes_unrestricted
+from qdk_chemistry.plugins.exachem.scf_export import (
+    basis_name_to_exachem,
+    ecp_name_to_exachem,
+    write_qdk_basis_g94,
+    write_qdk_ecp,
+)
 
 from .reference_tolerances import mp2_energy_tolerance, rdm_tolerance
+
+if TYPE_CHECKING:
+    from pathlib import Path
 
 exachem_plugin.load()
 
@@ -187,6 +204,32 @@ def assert_exachem_matches_pyscf(
     assert_amplitudes_close(wavefunction.get_container(), reference_wavefunction.get_container())
 
 
+def read_exachem_ecp(path: Path) -> dict[str, tuple[int, dict[str, list[tuple[int, float, float]]]]]:
+    """Read an ExaChem ``.ecp`` file.
+
+    Args:
+        path: Path of the ``.ecp`` file.
+
+    Returns:
+        ``{element: (core electrons, {channel: [(radial power, exponent, coefficient), ...]})}``.
+
+    """
+    lines = path.read_text().splitlines()
+    assert lines[0] == "ECP"
+    assert lines[-1] == "END"
+    ecps: dict[str, tuple[int, dict[str, list[tuple[int, float, float]]]]] = {}
+    element = channel = ""
+    for tokens in map(str.split, lines[1:-1]):
+        if len(tokens) == 3 and tokens[1] == "nelec":
+            element = tokens[0]
+            ecps[element] = (int(tokens[2]), {})
+        elif len(tokens) == 2:
+            channel = tokens[1]
+        else:
+            ecps[element][1].setdefault(channel, []).append((int(tokens[0]), float(tokens[1]), float(tokens[2])))
+    return ecps
+
+
 # ---------------------------------------------------------------------------
 # Tests
 # ---------------------------------------------------------------------------
@@ -236,7 +279,7 @@ class TestCcsdUnrestricted:
 class TestCcsdEffectiveCorePotential:
     """Compare ExaChem with native PySCF for basis sets that carry ECPs.
 
-    The PySCF plugin is not the reference here: it does not reproduce qdk's reference energy for these systems.
+    Native PySCF uses its own ECP library, so it independently checks the ECP ExaChem runs with.
     """
 
     @pytest.mark.parametrize("basis", ["def2-svp", "lanl2dz"])
@@ -303,7 +346,7 @@ class TestBasisExport:
         ansatz = Ansatz(create("hamiltonian_constructor").run(wavefunction.get_orbitals()), wavefunction)
 
         with pytest.raises(ValueError, match="named basis set"):
-            create("dynamical_correlation_calculator", "exachem_ccsd").run(ansatz)
+            ccsd_calculator.ExachemCcsdCalculator().run(ansatz)
 
     def test_rejects_different_shells_on_atoms_of_one_element(self, tmp_path):
         structure = Structure.from_xyz(H2O)
@@ -311,3 +354,137 @@ class TestBasisExport:
 
         with pytest.raises(ValueError, match="one basis per element"):
             write_qdk_basis_g94(basis_set, structure.get_atomic_symbols(), tmp_path, "sto-3g")
+
+    def test_writes_qdk_ecp(self, tmp_path):
+        structure = Structure.from_xyz(HI)
+        basis_set = BasisSet.from_basis_name("def2-svp", structure)
+
+        write_qdk_ecp(basis_set, structure.get_atomic_symbols(), tmp_path, "def2-ecp")
+
+        ecps = read_exachem_ecp(tmp_path / "basis" / "def2-ecp.ecp")
+        assert list(ecps) == ["I"]
+        core_electrons, channels = ecps["I"]
+        assert core_electrons == 28
+        assert list(channels) == ["ul", "S", "P", "D"]
+        for shell in basis_set.get_ecp_shells_for_atom(1):
+            angular_momentum = shell.get_angular_momentum()
+            channel = "ul" if angular_momentum < 0 else "SPD"[angular_momentum]
+            expected = np.column_stack([shell.rpowers, shell.exponents, shell.coefficients])
+            np.testing.assert_allclose(channels[channel], expected, rtol=1e-14)
+
+    def test_rejects_different_ecps_on_atoms_of_one_element(self, tmp_path):
+        structure = Structure.from_xyz("2\nI2\nI 0 0 0\nI 0 0 2.67\n")
+        basis_set = BasisSet.from_index_map({0: "def2-svp", 1: "lanl2dz"}, structure)
+
+        with pytest.raises(ValueError, match="one ECP per element"):
+            write_qdk_ecp(basis_set, structure.get_atomic_symbols(), tmp_path, "def2-ecp")
+
+    def test_writes_zero_local_term_for_ecps_without_one(self, tmp_path):
+        structure = Structure.from_xyz(HI)
+        library_basis = BasisSet.from_basis_name("def2-svp", structure)
+        semi_local = [shell for shell in library_basis.get_ecp_shells() if shell.get_angular_momentum() >= 0]
+        basis_set = BasisSet(
+            "def2-svp",
+            library_basis.get_shells(),
+            "def2-svp",
+            semi_local,
+            list(library_basis.get_ecp_electrons()),
+            structure,
+            AOType.Spherical,
+        )
+
+        write_qdk_ecp(basis_set, structure.get_atomic_symbols(), tmp_path, "def2-ecp")
+
+        _, channels = read_exachem_ecp(tmp_path / "basis" / "def2-ecp.ecp")["I"]
+        assert list(channels) == ["ul", "S", "P", "D"]
+        assert channels["ul"] == [(2, 1.0, 0.0)]
+
+
+class TestAmplitudeParsing:
+    """Check how ExaChem's amplitude files are read back."""
+
+    def test_unrestricted_amplitudes_split_into_spin_blocks(self, tmp_path):
+        noa, nob, nva, nvb = 2, 1, 1, 2
+        occupied_spin = np.repeat([0, 1], [noa, nob])
+        virtual_spin = np.repeat([0, 1], [nva, nvb])
+        rng = np.random.default_rng(seed=7)
+        # ExaChem writes only the spin-conserving entries of its spin-orbital tensors.
+        t1 = rng.standard_normal((nva + nvb, noa + nob)) * (virtual_spin[:, None] == occupied_spin[None, :])
+        conserving = (
+            virtual_spin[:, None, None, None] + virtual_spin[None, :, None, None]
+            == occupied_spin[None, None, :, None] + occupied_spin[None, None, None, :]
+        )
+        t2 = rng.standard_normal(conserving.shape) * conserving
+        t1_path, t2_path = tmp_path / "t1.txt", tmp_path / "t2.txt"
+        t1_path.write_text("".join(f"{a} {i} {t1[a, i]:.17g}\n" for a, i in np.argwhere(t1)) + "\n")
+        t2_path.write_text("".join(f"{a} {b} {i} {j} {t2[a, b, i, j]:.17g}\n" for a, b, i, j in np.argwhere(t2)))
+
+        va, vb, oa, ob = slice(None, nva), slice(nva, None), slice(None, noa), slice(noa, None)
+        expected = (
+            t1[va, oa].T,
+            t1[vb, ob].T,
+            t2[va, va, oa, oa].transpose(2, 3, 0, 1),
+            t2[va, vb, oa, ob].transpose(2, 3, 0, 1),
+            t2[vb, vb, ob, ob].transpose(2, 3, 0, 1),
+        )
+        blocks = parse_ccsd_amplitudes_unrestricted(t1_path, t2_path, noa, nob, nva, nvb)
+        for block, expected_block in zip(blocks, expected, strict=True):
+            np.testing.assert_array_equal(block, expected_block)
+
+
+class TestErrors:
+    """Check the errors raised when ExaChem is missing or its output cannot be used."""
+
+    def test_missing_programs_raise_not_found(self, monkeypatch, tmp_path):
+        monkeypatch.setenv("PATH", str(tmp_path))
+
+        with pytest.raises(ExachemNotFoundError, match="ExaChem binary"):
+            find_exachem_binary()
+        with pytest.raises(ExachemNotFoundError, match="MPI launcher"):
+            find_mpi_launcher()
+
+    @pytest.mark.parametrize(
+        ("output", "match"),
+        [
+            pytest.param("", "SCF energy", id="no_scf_energy"),
+            pytest.param("Total SCF energy = {scf:.12f}\n", "CCSD total energy", id="no_ccsd_energy"),
+            pytest.param(
+                "Total SCF energy = {scf:.12f}\nCCSD total energy / hartree = {scf:.12f}\n",
+                "T-amplitude files",
+                id="no_amplitude_files",
+            ),
+        ],
+    )
+    def test_unusable_output_raises_run_error(self, monkeypatch, output: str, match: str):
+        ansatz = build_ansatz(H2, "sto-3g", 0, 1, "restricted")
+        stdout = output.format(scf=ansatz.calculate_energy())
+        monkeypatch.setattr(ccsd_calculator, "run_exachem", lambda *_args, **_kwargs: stdout)
+        calculator = ccsd_calculator.ExachemCcsdCalculator()
+        calculator.settings().set("store_amplitudes", True)
+
+        with pytest.raises(ExachemRunError, match=match):
+            calculator.run(ansatz)
+
+
+class TestPluginLoading:
+    """Check that the plugin registers its calculator only when ExaChem can run."""
+
+    @pytest.mark.parametrize(
+        ("on_path", "registered"),
+        [
+            pytest.param({"ExaChem", "mpirun"}, ["exachem_ccsd"], id="exachem_and_mpirun"),
+            pytest.param({"mpirun"}, [], id="no_exachem"),
+            pytest.param({"ExaChem"}, [], id="no_mpi_launcher"),
+        ],
+    )
+    def test_registers_only_when_exachem_and_mpi_are_on_path(
+        self, monkeypatch, on_path: set[str], registered: list[str]
+    ):
+        factories: list = []
+        monkeypatch.setattr(exachem_plugin, "_loaded", False)
+        monkeypatch.setattr(shutil, "which", lambda name: f"/usr/bin/{name}" if name in on_path else None)
+        monkeypatch.setattr("qdk_chemistry.algorithms.register", factories.append)
+
+        exachem_plugin.load()
+
+        assert [factory().name() for factory in factories] == registered
