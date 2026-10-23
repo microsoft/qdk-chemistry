@@ -27,6 +27,7 @@ from qdk_chemistry.algorithms.hamiltonian_unitary_builder.time_evolution.qdrift_
     qdrift_samples_campbell,
 )
 from qdk_chemistry.data import QubitOperator, UnitaryRepresentation
+from qdk_chemistry.data.qubit_operator.containers.pauli_decomposition import PauliDecompositionContainer
 from qdk_chemistry.data.unitary_representation.containers.pauli_product_formula import (
     ExponentiatedPauliTerm,
     PauliProductFormulaContainer,
@@ -230,6 +231,10 @@ class QDrift(TimeEvolutionBuilder):
             UnitaryRepresentation: The unitary representation built by qDRIFT sampling.
 
         """
+        if not isinstance(qubit_hamiltonian, QubitOperator):
+            raise TypeError(
+                f"The {self.name()!r} builder takes a QubitOperator, got {type(qubit_hamiltonian).__name__}."
+            )
         effective_time, power_repetitions = self._resolve_power()
         time: float = effective_time
         seed: int = self._settings.get("seed")
@@ -237,7 +242,7 @@ class QDrift(TimeEvolutionBuilder):
         weight_threshold: float = self._settings.get("weight_threshold")
 
         container_type = qubit_hamiltonian.get_container_type()
-        if container_type != "pauli_decomposition":
+        if not isinstance(qubit_hamiltonian.get_container(), PauliDecompositionContainer):
             raise ValueError(
                 f"qDRIFT time evolution requires a Pauli decomposition qubit operator; "
                 f"got the {container_type!r} representation."
@@ -271,7 +276,7 @@ class QDrift(TimeEvolutionBuilder):
                 step_terms=terms,
                 step_reps=power_repetitions,
                 num_qubits=qubit_hamiltonian.num_qubits,
-                scale=time,
+                scale=time * power_repetitions,
             )
         )
 

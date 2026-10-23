@@ -1,7 +1,7 @@
 """Integration tests for unary-iteration QPE with the SOSSA block encoding.
 
 Tests the full pipeline:
-    FactorizedHamiltonianContainer → SOSSABuilder → UnitaryRepresentation
+    DFTHCHamiltonianContainer → SOSSABuilder → UnitaryRepresentation
     → SOSSAMapper → Circuit → unary-iteration QPE → energy
 """
 
@@ -24,7 +24,7 @@ from qdk_chemistry.data import (
     AlgorithmRef,
     Circuit,
     Configuration,
-    FactorizedHamiltonianContainer,
+    DFTHCHamiltonianContainer,
     Hamiltonian,
     MajoranaMapping,
     StateVectorContainer,
@@ -33,12 +33,12 @@ from qdk_chemistry.data import (
 from qdk_chemistry.data.circuit import QsharpFactoryData
 from qdk_chemistry.utils.qsharp import QSHARP_UTILS
 
-from .reference_tolerances import ci_energy_tolerance
-from .test_helpers import (
+from .helpers import (
     create_random_factorized_hamiltonian,
     create_test_orbitals,
     factorized_hamiltonian_to_sossa_operator,
 )
+from .reference_tolerances import ci_energy_tolerance
 
 # ═══════════════════════════════════════════════════════════════════════════════
 # Test Hamiltonian construction (small DFTHC-like H2 data)
@@ -46,7 +46,7 @@ from .test_helpers import (
 
 
 #: The factorized H2 shipped with the examples, which the SOSSA notebook also loads.
-H2_DFTHC_EXAMPLE = Path(__file__).resolve().parent / "test_data" / "h2_dfthc_r2_b2_c1.hamiltonian.json"
+H2_DFTHC_EXAMPLE = Path(__file__).resolve().parents[2] / "examples" / "data" / "h2_dfthc_r2_b2_c1.hamiltonian.json"
 
 
 def _build_h2_dfthc_data():
@@ -132,7 +132,7 @@ def _dfthc_m_matrices(basis_vectors, two_body_weights):
 
 
 def _h1_majorana(h1, basis_vectors, two_body_weights, identity_weight):
-    """Replicate ``FactorizedHamiltonianContainer::get_h1_prime`` (Eq. 36).
+    """Replicate ``DFTHCHamiltonianContainer::get_h1_prime`` (Eq. 36).
 
     The SOS generators are built from the *normal-ordering corrected* one-body
     matrix, not from the bare ``h1``::
@@ -396,7 +396,7 @@ def _run_sossa_unary_qpe(num_queries, mapper_kwargs=None, shots=100, seed=202508
         nbeta=1,
     )
 
-    fh = FactorizedHamiltonianContainer(
+    fh = DFTHCHamiltonianContainer(
         one_body_integrals=data["h1"],
         u_matrices=data["basis_vectors"].flatten(),
         w_matrices=data["two_body_weights"].flatten(),
@@ -512,7 +512,7 @@ class TestSOSSAQPEIntegration:
             atol=1e-10,
         )
 
-        fh = FactorizedHamiltonianContainer(
+        fh = DFTHCHamiltonianContainer(
             one_body_integrals=data["h1"],
             u_matrices=data["basis_vectors"].flatten(),
             w_matrices=data["two_body_weights"].flatten(),
@@ -543,7 +543,7 @@ class TestSOSSAQPEIntegration:
         data = _build_h2_dfthc_data()
         n_orb = data["N"]
         orbitals = create_test_orbitals(n_orb)
-        fh = FactorizedHamiltonianContainer(
+        fh = DFTHCHamiltonianContainer(
             one_body_integrals=data["h1"],
             u_matrices=data["basis_vectors"].flatten(),
             w_matrices=data["two_body_weights"].flatten(),
@@ -604,7 +604,7 @@ class TestSOSSAQPEIntegration:
         # The shipped file's core energy is used rather than 0 so that the "total energy"
         # half of the contract is actually under test: with a zero core, passing an
         # active-space-only energy would be indistinguishable from passing a total one.
-        fh = FactorizedHamiltonianContainer(
+        fh = DFTHCHamiltonianContainer(
             one_body_integrals=data["h1"],
             u_matrices=data["basis_vectors"].flatten(),
             w_matrices=data["two_body_weights"].flatten(),
@@ -659,14 +659,20 @@ class TestSOSSAQPEIntegration:
         "mapper_overrides",
         [
             {},
-            {
-                "outer_prepare_algorithm": "alias_sampling",
-                "coefficient_bit_precision": 4,
-            },
-            {
-                "inner_prepare_algorithm": "controlled_alias_sampling",
-                "coefficient_bit_precision": 4,
-            },
+            pytest.param(
+                {
+                    "outer_prepare_algorithm": "alias_sampling",
+                    "coefficient_bit_precision": 4,
+                },
+                marks=pytest.mark.slow,
+            ),
+            pytest.param(
+                {
+                    "inner_prepare_algorithm": "controlled_alias_sampling",
+                    "coefficient_bit_precision": 4,
+                },
+                marks=pytest.mark.slow,
+            ),
         ],
         ids=["direct", "alias_outer", "alias_inner"],
     )
@@ -674,6 +680,7 @@ class TestSOSSAQPEIntegration:
         """QPE over 8 phase bins of the H2 data, with the direct backends and each alias variant."""
         _run_sossa_unary_qpe(num_queries=7, mapper_kwargs=mapper_overrides)
 
+    @pytest.mark.slow
     def test_unary_qpe_recovers_the_h2_ground_state_energy(self):
         """Recover the H2 ground-state energy end-to-end with unary-iteration QPE.
 

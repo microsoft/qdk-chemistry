@@ -5,14 +5,17 @@
 # Licensed under the MIT License. See LICENSE.txt in the project root for license information.
 # --------------------------------------------------------------------------------------------
 
+import warnings
 from abc import abstractmethod
 
 from qdk_chemistry.algorithms.base import Algorithm, AlgorithmFactory
 from qdk_chemistry.data import (
     AlgorithmRef,
     Circuit,
+    HamiltonianDescription,
     QubitOperator,
     Settings,
+    UnitaryRepresentation,
 )
 
 __all__: list[str] = [
@@ -81,31 +84,99 @@ class QpeCircuitBuilder(Algorithm):
     def _run_impl(
         self,
         state_preparation: Circuit,
-        qubit_hamiltonian: QubitOperator,
+        qubit_hamiltonian: HamiltonianDescription,
     ) -> list[Circuit]:
         """Build phase estimation circuits.
 
         Args:
             state_preparation: The circuit that prepares the initial state.
-            qubit_hamiltonian: The qubit Hamiltonian for which to build circuits.
+            qubit_hamiltonian: The Hamiltonian description the unitary builder takes.
 
         Returns:
             A list of quantum circuits for phase estimation.
 
         """
 
-    def _create_controlled_circuit(
+    def _build_controlled_unitary(
         self,
-        qubit_hamiltonian: QubitOperator,
+        qubit_hamiltonian: HamiltonianDescription,
         power: int,
-    ) -> tuple[Circuit, int]:
-        r"""Create the controlled circuit for the given Hamiltonian and power.
+    ) -> tuple[Circuit, int, int]:
+        r"""Build the controlled unitary once, with the widths of its registers.
 
         Sets the ``power`` on the unitary builder so it produces :math:`U^{\\text{power}}`
         according to its ``power_strategy``, then maps the result to a controlled circuit.
 
         Args:
-            qubit_hamiltonian: The qubit Hamiltonian to evolve under.
+            qubit_hamiltonian: The Hamiltonian description the unitary builder takes.
+            power: The power to which the unitary should be raised.
+
+        Returns:
+            The controlled circuit, work width, and system width; work excludes the system and control.
+
+        Raises:
+            ValueError: If callable width is too small or shared ancillas are unsupported.
+
+        """
+        unitary_builder = self._create_nested("unitary_builder")
+        unitary_builder.settings().update("power", power)
+        unitary_rep = unitary_builder.run(qubit_hamiltonian)
+        num_system_qubits = self._num_system_qubits(qubit_hamiltonian, unitary_rep)
+        circuit_mapper = self._create_nested("controlled_circuit_mapper")
+        circuit_mapper.settings().update("control_indices", [0])
+        circuit = circuit_mapper.run(unitary_rep)
+        width = circuit.num_qubits
+        if width is None:
+            warnings.warn(
+                f"Controlled circuit mapper '{circuit_mapper.name()}' does not declare num_qubits. "
+                "Falling back to the unitary representation's width is deprecated; declare the full "
+                "callable width, including its control and working qubits.",
+                DeprecationWarning,
+                stacklevel=2,
+            )
+            width = unitary_rep.get_num_qubits() + 1
+        minimum_width = num_system_qubits + 1
+        if width < minimum_width:
+            raise ValueError(
+                f"The controlled circuit declares {width} qubits, but requires at least "
+                f"{minimum_width} including its control."
+            )
+        if circuit.metadata.num_phase_gradient_ancillas:
+            raise ValueError("This QPE builder does not initialize shared phase gradient ancillas.")
+        return circuit, width - minimum_width, num_system_qubits
+
+    def _controlled_circuit_and_widths(
+        self,
+        qubit_hamiltonian: HamiltonianDescription,
+        power: int,
+    ) -> tuple[Circuit, int, int]:
+        r"""Build controlled-:math:`U^{\\text{power}}` with the widths of its registers.
+
+        A :class:`~qdk_chemistry.data.QubitOperator` goes through :meth:`_create_controlled_circuit`,
+        so subclasses that override it keep working; other descriptions use :meth:`_build_controlled_unitary`.
+
+        Args:
+            qubit_hamiltonian: The Hamiltonian description the unitary builder takes.
+            power: The power to which the unitary should be raised.
+
+        Returns:
+            A tuple of (circuit, num_ancilla_qubits, num_system_qubits).
+
+        """
+        if isinstance(qubit_hamiltonian, QubitOperator):
+            circuit, num_ancilla_qubits = self._create_controlled_circuit(qubit_hamiltonian, power)
+            return circuit, num_ancilla_qubits, qubit_hamiltonian.num_qubits
+        return self._build_controlled_unitary(qubit_hamiltonian, power)
+
+    def _create_controlled_circuit(
+        self,
+        qubit_hamiltonian: HamiltonianDescription,
+        power: int,
+    ) -> tuple[Circuit, int]:
+        r"""Create the controlled circuit for the given Hamiltonian and power.
+
+        Args:
+            qubit_hamiltonian: The Hamiltonian description the unitary builder takes.
             power: The power to which the unitary should be raised.
 
         Returns:
@@ -114,14 +185,24 @@ class QpeCircuitBuilder(Algorithm):
             of ancilla qubits used by the unitary beyond the system qubits.
 
         """
-        unitary_builder = self._create_nested("unitary_builder")
-        unitary_builder.settings().update("power", power)
-        unitary_rep = unitary_builder.run(qubit_hamiltonian)
-        num_ancilla_qubits = unitary_rep.get_num_qubits() - qubit_hamiltonian.num_qubits
-        circuit_mapper = self._create_nested("controlled_circuit_mapper")
-        circuit_mapper.settings().update("control_indices", [0])
-        circuit = circuit_mapper.run(unitary_rep)
+        circuit, num_ancilla_qubits, _ = self._build_controlled_unitary(qubit_hamiltonian, power)
         return circuit, num_ancilla_qubits
+
+    @staticmethod
+    def _num_system_qubits(qubit_hamiltonian: HamiltonianDescription, unitary_rep: UnitaryRepresentation) -> int:
+        """Return the width of the system register the unitary acts on.
+
+        Args:
+            qubit_hamiltonian: The Hamiltonian description the unitary builder takes.
+            unitary_rep: The unitary built from ``qubit_hamiltonian``.
+
+        Returns:
+            The number of system qubits.
+
+        """
+        if isinstance(qubit_hamiltonian, QubitOperator):
+            return qubit_hamiltonian.num_qubits
+        return unitary_rep.get_num_system_qubits()
 
     @staticmethod
     def _validate_state_prep_width(state_preparation: Circuit, num_qubits_passed: int) -> None:
