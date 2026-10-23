@@ -826,6 +826,22 @@ class TestControlledSOSSAMapper:
         with pytest.raises(ValueError, match="does not support target_indices"):
             create("controlled_circuit_mapper", "sossa", target_indices=[0]).run(unitary)
 
+    def test_estimate_cache_name_identifies_the_walk_but_not_its_power(self):
+        """Distinct walks get distinct resource-estimation cache names; the powers of one walk share one."""
+        operator = self._operator()
+        other = create_random_factorized_hamiltonian(num_orbitals=2, num_ranks=1, num_bases=2, num_copies=1, seed=7)
+
+        def cache_name(power=1, other_operator=None, **settings):
+            unitary = SOSSABuilder(power=power).run(other_operator or operator)
+            walk = create("controlled_circuit_mapper", "sossa", **settings).run(unitary)
+            return walk._qsharp_factory.parameter["cacheName"]
+
+        reference = cache_name()
+        assert cache_name(power=4) == reference
+        assert cache_name(rotation_bit_precision=6) != reference
+        assert cache_name(select_algorithm="direct") != reference
+        assert cache_name(other_operator=factorized_hamiltonian_to_sossa_operator(other)) != reference
+
 
 @pytest.mark.parametrize(
     ("select_algorithm", "prepare_consumes_gradient"),

@@ -108,12 +108,16 @@ class ControlledSOSSAMapper(ControlledCircuitMapper):
             raise ValueError(f"The controlled SOSSA walk requires a positive power, got {container.power}.")
 
         ops, regs, register_layout = self._block_mapper().build_block_encoding_ops(container)
+        walk_data = {key: value for key, value in container.to_json().items() if key != "power"}
+        cache_name = f"ControlledSOSSAWalk_{self.hash(walk_data)}"
         return Circuit(
             qsharp_factory=QsharpFactoryData(
                 program=QSHARP_UTILS.SOSSAWalk.MakeControlledSOSSAWalkCircuit,
-                parameter={**ops, "layout": register_layout, "power": container.power},
+                parameter={**ops, "layout": register_layout, "cacheName": cache_name, "power": container.power},
             ),
-            qsharp_op=QSHARP_UTILS.SOSSAWalk.MakeControlledSOSSAWalkOp(*ops.values(), register_layout, container.power),
+            qsharp_op=QSHARP_UTILS.SOSSAWalk.MakeControlledSOSSAWalkOp(
+                *ops.values(), register_layout, cache_name, container.power
+            ),
             num_qubits=1 + regs["num_system_qubits"] + regs["num_ancilla_qubits"],
             metadata=CircuitMetadata(num_phase_gradient_ancillas=regs["num_phase_gradient_qubits"]),
         )
