@@ -146,11 +146,10 @@ std::shared_ptr<BasisSet> make_atom_basis_set(size_t index,
       mol, shells, ecp_shells, std::vector<int>{atom_ecp_electrons},
       BasisMode::RAW, basis_set.pure, false));
 
-  // Update atomic charges, total nuclear charge, and n_electrons based on ECPs
+  // Keep n_electrons unchanged; SCFImpl subtracts the ECP core electrons.
   if (atom_ecp_electrons > 0) {
     mol->atomic_charges[0] = atomic_number - atom_ecp_electrons;
     mol->total_nuclear_charge = mol->atomic_charges[0];
-    mol->n_electrons = mol->total_nuclear_charge - mol->charge;
   }
 
   return atom_basis;

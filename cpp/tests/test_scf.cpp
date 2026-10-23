@@ -4,6 +4,7 @@
 
 #include <gtest/gtest.h>
 #include <qdk/chemistry/scf/scf/scf_solver.h>
+#include <qdk/chemistry/scf/util/int1e.h>
 #include <spdlog/sinks/ostream_sink.h>
 
 #include <algorithm>
@@ -23,6 +24,7 @@
 
 #include "../src/qdk/chemistry/algorithms/microsoft/utils.hpp"
 #include "qdk/chemistry/algorithms/microsoft/scf.hpp"
+#include "qdk/chemistry/algorithms/microsoft/scf/src/scf_algorithm/asahf.h"
 #include "ut_common.hpp"
 
 using namespace qdk::chemistry::data;
@@ -968,6 +970,25 @@ TEST_F(ScfTest, OxygenTripletInitialGuessRestart) {
 
   // Should get the same energy (within tight tolerance)
   EXPECT_NEAR(energy_o2_first, energy_o2_second, testing::scf_energy_tolerance);
+}
+
+TEST_F(ScfTest, AgHDef2SvpAtomicGuessWithEcp) {
+  namespace qcs = qdk::chemistry::scf;
+  auto molecule = qdk::chemistry::utils::microsoft::convert_to_molecule(
+      *testing::create_agh_structure(), 0, 1);
+  auto basis = qcs::BasisSet::from_database_json(
+      molecule, "def2-svp", qcs::BasisMode::RAW, true, false);
+  const auto nao = basis->num_atomic_orbitals;
+  qcs::RowMajorMatrix density = qcs::RowMajorMatrix::Zero(nao, nao);
+  qcs::get_atom_guess(*basis, *molecule, density);
+
+  qcs::RowMajorMatrix overlap = qcs::RowMajorMatrix::Zero(nao, nao);
+  qcs::OneBodyIntegral integrals(basis.get(), molecule.get(),
+                               qcs::mpi_default_input());
+  integrals.overlap_integral(overlap.data());
+  EXPECT_TRUE(density.allFinite());
+  EXPECT_NEAR((density * overlap).trace(), 20.0,
+              testing::numerical_zero_tolerance);
 }
 
 TEST_F(ScfTest, AgHDef2SvpWithEcp) {
