@@ -392,21 +392,23 @@ TEST_F(ScfTest, X2COHROHFReference) {
 }
 
 namespace {
+struct LoggerGuard {
+  std::shared_ptr<spdlog::logger> logger;
+  std::vector<spdlog::sink_ptr> sinks;
+  qdk::chemistry::utils::LogLevel level;
+  ~LoggerGuard() {
+    logger->sinks() = std::move(sinks);
+    qdk::chemistry::utils::Logger::set_global_level(level);
+  }
+};
+
 void expect_x2c_gdm_matches_diis(std::shared_ptr<Structure> structure,
                                  int multiplicity) {
   using qdk::chemistry::utils::Logger;
   using qdk::chemistry::utils::LogLevel;
   std::ostringstream messages;
   auto logger = Logger::get();
-  struct LoggerGuard {
-    std::shared_ptr<spdlog::logger> logger;
-    std::vector<spdlog::sink_ptr> sinks;
-    LogLevel level;
-    ~LoggerGuard() {
-      logger->sinks() = std::move(sinks);
-      Logger::set_global_level(level);
-    }
-  } guard{logger, logger->sinks(), Logger::get_global_level()};
+  LoggerGuard guard{logger, logger->sinks(), Logger::get_global_level()};
   logger->sinks().push_back(
       std::make_shared<spdlog::sinks::ostream_sink_mt>(messages));
   Logger::set_global_level(LogLevel::info);
@@ -1621,6 +1623,15 @@ TEST_F(ScfTest, HydrogenIon_CCPVDZ_SCF) {
 }
 
 TEST_F(ScfTest, C4H_ROHF_LinearlyDependentAO) {
+  using qdk::chemistry::utils::Logger;
+  using qdk::chemistry::utils::LogLevel;
+  std::ostringstream messages;
+  auto logger = Logger::get();
+  LoggerGuard guard{logger, logger->sinks(), Logger::get_global_level()};
+  logger->sinks().push_back(
+      std::make_shared<spdlog::sinks::ostream_sink_mt>(messages));
+  Logger::set_global_level(LogLevel::info);
+
   std::vector<Eigen::Vector3d> coordinates = {{0.0, 0.0, -1.06},
                                               {0.0, 0.0, 0.0},
                                               {0.0, 0.0, 1.30},
@@ -1635,10 +1646,15 @@ TEST_F(ScfTest, C4H_ROHF_LinearlyDependentAO) {
   scf_solver->settings().set("method", "hf");
   scf_solver->settings().set("scf_type", "restricted");
   scf_solver->settings().set("nthreads", 1);
+  scf_solver->settings().set("enable_gdm", true);
+  scf_solver->settings().set("gdm_max_diis_iteration", 5);
   auto [energy, wavefunction] =
       scf_solver->run(structure, 0, 2, "d-aug-cc-pvdz");
   const auto orbitals = wavefunction->get_orbitals();
 
+  EXPECT_NE(messages.str().find("Switching from DIIS to GDM"),
+            std::string::npos)
+      << "The linearly dependent ROHF regression must exercise GDM.";
   EXPECT_TRUE(orbitals->is_restricted());
   EXPECT_EQ(orbitals->get_num_atomic_orbitals(), 141);
   EXPECT_EQ(orbitals->get_num_molecular_orbitals(), 139);
