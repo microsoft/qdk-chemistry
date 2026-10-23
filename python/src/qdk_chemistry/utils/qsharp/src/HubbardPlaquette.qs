@@ -384,26 +384,19 @@ namespace QDKChemistry.Utils.HubbardPlaquette {
     /// The whole evolution: the repeated body inside its one-time hopping boundary.
     ///
     /// # Description
-    /// Each step is the symmetric product `pink(s/2) I(s/2) gold(s) I(s/2) pink(s/2)`, so
-    /// the adjacent half-angle pink layers of neighbouring steps merge into one full-angle
-    /// layer. Only a single half-angle pink boundary is emitted at each end. This is the
-    /// "PIG" ordering of Eqs. (16a)-(16b) in
-    /// :cite:`Apel2026`, which merges the more expensive hopping layers; it deviates from
-    /// Eq. (D2) of :cite:`Campbell2022`, which puts the interaction outermost instead.
+    /// Each step is `pink(s/2) I(s/2) gold(s) I(s/2) pink(s/2)`, so the half-angle pink layers of
+    /// neighbouring steps merge, leaving one half-angle pink boundary at each end. This is the "PIG"
+    /// ordering of Eqs. (16a)-(16b) in :cite:`Apel2026`, which merges the more expensive hopping
+    /// layers, not Eq. (D2) of :cite:`Campbell2022`, which puts the interaction outermost.
     ///
-    /// The modes are routed into pink order once at the start and back once at the end, so
-    /// pink plaquettes are always local and only the gold layers route, from pink order. Both
-    /// orders keep the spin-up modes ahead of their spin-down partners, so the on-site pairs
-    /// stay one register half apart.
+    /// The modes are routed into pink order at the start and back at the end, so only the gold
+    /// layers route. Both orders keep the spin-up modes ahead of their spin-down partners, so the
+    /// on-site pairs stay one register half apart.
     ///
-    /// With a catalyst, every Hamming weight is phased by one addition into a generalized phase
-    /// gradient (see `HammingWeightPhase`). Such a catalyst holds a single angle, so the evolution
-    /// prepares one for the interaction layers and one for the hopping layers, and returns both to
-    /// |0⟩ at the end. The full-angle hopping layers run at twice the angle of the half-angle pink
-    /// boundaries, and dropping the first qubit of a catalyst doubles its angle, so one register
-    /// serves both. The catalyzed towers leave out their constant phases, which are classical
-    /// and sum to one rotation, applied once at the end; under control it is a phase on the
-    /// control qubit, which phase estimation would otherwise read as energy.
+    /// With a catalyst, one is prepared for the interaction layers and one for the hopping layers.
+    /// Dropping the hopping catalyst's first qubit doubles its angle for the full-angle layers. The
+    /// towers' constant phases are applied as one rotation at the end, since under control they
+    /// would shift the energy.
     ///
     /// # Input
     /// ## params
@@ -421,11 +414,14 @@ namespace QDKChemistry.Utils.HubbardPlaquette {
             let cap = params.maxBatchSize;
             let catalyzed = params.useHammingWeightPhasing and params.useCatalyst;
             // Each catalyst holds a qubit per place value of its largest weight; the hopping one
-            // holds one more, the qubit dropped to double its angle.
+            // holds one more if a full-angle layer runs, the qubit dropped to double its angle.
             let interactionPlaces = catalyzed and params.interactionAngle != 0.0
                 ? BitSizeI(HammingWeightBatchSize(sites, cap)) | 0;
+            let fullAngleHopping = Length(gold) > 0 or params.repetitions > 1;
             let hoppingPlaces = catalyzed and params.hoppingAngle != 0.0
-                ? BitSizeI(HammingWeightBatchSize(2 * MaxInt([Length(pink), Length(gold)]), cap)) + 1 | 0;
+                ? BitSizeI(HammingWeightBatchSize(2 * MaxInt([Length(pink), Length(gold)]), cap))
+                + (fullAngleHopping ? 1 | 0)
+                | 0;
             use interaction = Qubit[interactionPlaces];
             use hopping = Qubit[hoppingPlaces];
             let doubled = hoppingPlaces > 0 ? hopping[1...] | [];
@@ -472,8 +468,9 @@ namespace QDKChemistry.Utils.HubbardPlaquette {
                 );
             }
             if catalyzed {
-                // Every interaction tower left out e^{-i·(U/2)·sites} and every hopping tower
-                // e^{i·kappa·plaquettes}, which sum to these per step; `R(PauliI, g)` is e^{-ig/2}.
+                // Every interaction tower left out e^{-i·(interactionAngle/2)·sites} and every
+                // hopping tower e^{i·kappa·plaquettes}, which sum to these per step; `R(PauliI, g)`
+                // is e^{-ig/2}.
                 let perStep = params.interactionAngle * IntAsDouble(sites)
                     - params.hoppingAngle * IntAsDouble(Length(pink) + Length(gold));
                 if perStep != 0.0 {
