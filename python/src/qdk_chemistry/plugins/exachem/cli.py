@@ -13,7 +13,6 @@ management.
 from __future__ import annotations
 
 import json
-import logging
 import os
 import shutil
 import subprocess
@@ -21,7 +20,7 @@ import tempfile
 from dataclasses import dataclass, field
 from pathlib import Path
 
-logger = logging.getLogger(__name__)
+from qdk_chemistry.utils import Logger
 
 __all__ = [
     "CcsdInputConfig",
@@ -52,6 +51,7 @@ def find_exachem_binary() -> Path:
         ExachemNotFoundError: If the binary cannot be found.
 
     """
+    Logger.trace_entering()
     which = shutil.which("ExaChem")
     if which:
         return Path(which)
@@ -69,6 +69,7 @@ def find_mpi_launcher() -> list[str]:
         ExachemNotFoundError: If no MPI launcher is available.
 
     """
+    Logger.trace_entering()
     for launcher in ("mpirun", "srun"):
         if shutil.which(launcher):
             return [launcher]
@@ -143,6 +144,7 @@ class CcsdInputConfig:
 
     def to_json(self) -> dict:
         """Convert to ExaChem JSON input format."""
+        Logger.trace_entering()
         cc_block: dict = {
             "threshold": self.ccsd_threshold,
             "ccsd_maxiter": self.ccsd_maxiter,
@@ -224,12 +226,13 @@ def _binding_args(launcher: str, bind_to: str) -> list[str]:
         The arguments to append to the launcher invocation, empty when deferring.
 
     """
+    Logger.trace_entering()
     if not bind_to:
         return []
     if launcher.endswith("srun"):
         policy = _SRUN_BIND_POLICIES.get(bind_to)
         if policy is None:
-            logger.warning("No srun equivalent for bind-to policy %r; using the srun default.", bind_to)
+            Logger.warn(f"No srun equivalent for bind-to policy {bind_to!r}; using the srun default.")
             return []
         return [f"--cpu-bind={policy}"]
     return ["--bind-to", bind_to]
@@ -266,6 +269,7 @@ def run_exachem(
         ExachemRunError: If ExaChem exits with non-zero status or does not finish within ``timeout`` seconds.
 
     """
+    Logger.trace_entering()
     exachem_binary = find_exachem_binary()
 
     # A caller-supplied work_dir belongs to the caller; a directory we create here is
@@ -296,7 +300,7 @@ def run_exachem(
             cmd.extend(mpi_extra_args)
         cmd.extend([str(exachem_binary), str(input_path)])
 
-        logger.info("Running ExaChem: %s", " ".join(cmd))
+        Logger.info(f"Running ExaChem: {' '.join(cmd)}")
 
         # A copy of the parent environment: assigning into it never mutates os.environ,
         # so the calling process keeps its own OMP_NUM_THREADS. One OpenMP thread per
@@ -304,7 +308,7 @@ def run_exachem(
         run_env = {**os.environ, "OMP_NUM_THREADS": "1"}
         if libint_data_path is not None:
             run_env["LIBINT_DATA_PATH"] = str(libint_data_path)
-            logger.info("Using LIBINT_DATA_PATH=%s for ExaChem basis", libint_data_path)
+            Logger.info(f"Using LIBINT_DATA_PATH={libint_data_path} for ExaChem basis")
 
         process = subprocess.Popen(
             cmd, cwd=str(work_dir), stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True, env=run_env
@@ -329,9 +333,7 @@ def run_exachem(
         )
 
         if result.returncode != 0:
-            logger.error(
-                "ExaChem failed (rc=%d):\nstdout: %s\nstderr: %s", result.returncode, result.stdout, result.stderr
-            )
+            Logger.error(f"ExaChem failed (rc={result.returncode}):\nstdout: {result.stdout}\nstderr: {result.stderr}")
             output_tail = "\n".join(f"{result.stdout}\n{result.stderr}".strip().splitlines()[-5:])
             raise ExachemRunError(f"ExaChem exited with code {result.returncode}. Output ends with:\n{output_tail}")
 
@@ -339,7 +341,7 @@ def run_exachem(
     except BaseException:
         if owns_work_dir:
             shutil.rmtree(work_dir, ignore_errors=True)
-            logger.debug("Removed temporary work directory %s after a failed run", work_dir)
+            Logger.debug(f"Removed temporary work directory {work_dir} after a failed run")
         raise
 
 
@@ -354,6 +356,7 @@ def _setup_noscf_directory(work_dir: Path, config: CcsdInputConfig, scf_files_pr
     This function creates that directory structure and copies the
     pre-computed SCF files into it.
     """
+    Logger.trace_entering()
     prefix_name = f"{config.input_prefix}.{config.basis}"
     scf_dir = work_dir / f"{prefix_name}_files" / config.scf_type / "scf"
     scf_dir.mkdir(parents=True, exist_ok=True)
@@ -368,4 +371,4 @@ def _setup_noscf_directory(work_dir: Path, config: CcsdInputConfig, scf_files_pr
             dst = Path(str(target_prefix) + ext)
             if src.resolve() != dst.resolve():
                 shutil.copy2(str(src), str(dst))
-                logger.debug("Copied SCF file %s -> %s", src, dst)
+                Logger.debug(f"Copied SCF file {src} -> {dst}")

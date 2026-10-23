@@ -16,8 +16,8 @@ Cholesky decomposition tolerance, and by the two codes' coupled-cluster
 convergence thresholds. Both restricted (RHF) and unrestricted (UHF) references
 are exercised, and an effective-core-potential case is checked against native PySCF.
 
-Each test runs ExaChem via MPI, so they are marked ``slow``. The calculator finds
-``ExaChem`` on ``PATH``; the tests are skipped when it or an MPI runtime is missing.
+Each ExaChem run goes through MPI, so those tests are marked ``slow`` and are skipped when ``ExaChem`` (found on
+``PATH``), an MPI runtime, or PySCF is missing. The basis-export checks need none of them.
 """
 
 # --------------------------------------------------------------------------------------------
@@ -27,7 +27,6 @@ Each test runs ExaChem via MPI, so they are marked ``slow``. The calculator find
 
 from __future__ import annotations
 
-import os
 import shutil
 
 import numpy as np
@@ -47,6 +46,7 @@ exachem_plugin.load()
 # ---------------------------------------------------------------------------
 
 _EXACHEM_BINARY = shutil.which("ExaChem") or ""
+_MPI_LAUNCHER = shutil.which("mpirun") or shutil.which("srun") or ""
 
 try:
     from pyscf import cc, gto, scf
@@ -59,22 +59,10 @@ try:
 except ImportError:
     PYSCF_AVAILABLE = False
 
-pytestmark = [
-    pytest.mark.slow,
-    pytest.mark.skipif(
-        not (_EXACHEM_BINARY and exachem_plugin.QDK_CHEMISTRY_HAS_MPI and PYSCF_AVAILABLE),
-        reason="Requires ExaChem on PATH, an MPI runtime, and PySCF",
-    ),
-]
-
-
-@pytest.fixture(autouse=True)
-def _allow_openmpi_as_root(monkeypatch):
-    # The CI wheel-test container runs as root; OpenMPI's mpirun refuses root unless both are set.
-    if hasattr(os, "geteuid") and os.geteuid() == 0:
-        monkeypatch.setenv("OMPI_ALLOW_RUN_AS_ROOT", "1")
-        monkeypatch.setenv("OMPI_ALLOW_RUN_AS_ROOT_CONFIRM", "1")
-
+_requires_exachem = pytest.mark.skipif(
+    not (_EXACHEM_BINARY and _MPI_LAUNCHER and PYSCF_AVAILABLE),
+    reason="Requires ExaChem on PATH, an MPI runtime, and PySCF",
+)
 
 # With run_coupled_cluster's thresholds the codes agree to ~1e-9 Eh and ~1e-8 in amplitudes (ExaChem 45c192e8).
 _energy_tolerance = 100 * mp2_energy_tolerance
@@ -204,6 +192,8 @@ def assert_exachem_matches_pyscf(
 # ---------------------------------------------------------------------------
 
 
+@pytest.mark.slow
+@_requires_exachem
 class TestCcsdRestricted:
     """Compare the ExaChem and PySCF CCSD plugins for RHF references."""
 
@@ -222,6 +212,8 @@ class TestCcsdRestricted:
         assert_exachem_matches_pyscf(xyz, basis)
 
 
+@pytest.mark.slow
+@_requires_exachem
 class TestCcsdUnrestricted:
     """Compare the ExaChem and PySCF CCSD plugins for UHF references.
 
@@ -239,6 +231,8 @@ class TestCcsdUnrestricted:
         assert_exachem_matches_pyscf(xyz, basis, multiplicity=2, scf_type="unrestricted")
 
 
+@pytest.mark.slow
+@_requires_exachem
 class TestCcsdEffectiveCorePotential:
     """Compare ExaChem with native PySCF for basis sets that carry ECPs.
 
@@ -256,6 +250,8 @@ class TestCcsdEffectiveCorePotential:
         assert wavefunction.get_container().has_t2_amplitudes()
 
 
+@pytest.mark.slow
+@_requires_exachem
 class TestActiveSpace:
     """Check that ExaChem correlates only the Ansatz's active orbitals."""
 

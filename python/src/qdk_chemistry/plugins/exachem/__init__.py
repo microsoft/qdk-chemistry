@@ -18,25 +18,16 @@ Prerequisites:
 """
 
 _loaded = False
-QDK_CHEMISTRY_HAS_MPI = False
 
 
 def load():
     """Register ExaChem algorithm implementations with the QDK/Chemistry registry."""
     global _loaded  # noqa: PLW0603
-    global QDK_CHEMISTRY_HAS_MPI  # noqa: PLW0603
     if _loaded:
         return
     _loaded = True
 
     from qdk_chemistry.algorithms import register  # noqa: PLC0415
     from qdk_chemistry.plugins.exachem.ccsd_calculator import ExachemCcsdCalculator  # noqa: PLC0415
-    from qdk_chemistry.plugins.exachem.cli import ExachemNotFoundError, find_mpi_launcher  # noqa: PLC0415
-
-    try:
-        find_mpi_launcher()
-        QDK_CHEMISTRY_HAS_MPI = True
-    except ExachemNotFoundError:
-        QDK_CHEMISTRY_HAS_MPI = False
 
     register(lambda: ExachemCcsdCalculator())

@@ -22,6 +22,8 @@ from typing import TYPE_CHECKING
 
 import numpy as np
 
+from qdk_chemistry.utils import Logger
+
 __all__ = [
     "CcsdtEnergies",
     "parse_ccsd_amplitudes_restricted",
@@ -78,6 +80,7 @@ def parse_ccsdt_energy(stdout: str) -> CcsdtEnergies:
         Parsed :class:`CcsdtEnergies`. Fields that could not be found are ``None``.
 
     """
+    Logger.trace_entering()
     num = r"(-?\d+\.\d+)"
     patterns = {
         "scf_total": rf"\bTotal SCF energy\s*=\s*{num}",
@@ -103,6 +106,7 @@ def _read_amplitude_file(path: str | Path, shape: tuple[int, ...]) -> np.ndarray
     zeros (TAMM only writes amplitudes whose magnitude exceeds the print
     threshold).  The returned array has the given ``shape``.
     """
+    Logger.trace_entering()
     arr = np.zeros(shape, dtype=float)
     with open(path) as f:
         for line in f:
@@ -134,6 +138,7 @@ def parse_ccsd_amplitudes_restricted(
         ``(t1, t2)`` dense arrays in qdk-chemistry layout.
 
     """
+    Logger.trace_entering()
     t1_vo = _read_amplitude_file(t1_path, (nvir, nocc))
     t2_vvoo = _read_amplitude_file(t2_path, (nvir, nvir, nocc, nocc))
     t1 = np.ascontiguousarray(t1_vo.transpose(1, 0))
@@ -171,6 +176,7 @@ def parse_ccsd_amplitudes_unrestricted(
         ``(t1_aa, t1_bb, t2_aaaa, t2_abab, t2_bbbb)`` dense arrays.
 
     """
+    Logger.trace_entering()
     no, nv = noa + nob, nva + nvb
     t1 = _read_amplitude_file(t1_path, (nv, no))  # (vir_mso, occ_mso)
     t2 = _read_amplitude_file(t2_path, (nv, nv, no, no))  # (v1, v2, o1, o2)

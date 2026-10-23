@@ -10,12 +10,10 @@ interface to run ExaChem's CCSD method (Coupled Cluster Singles and Doubles) as
 an external MPI process, then reads the converged T1/T2 cluster amplitudes back
 into a qdk-chemistry :class:`~qdk_chemistry.data.AmplitudeContainer`.
 
-Unlike the CCSD(T) calculator (which only returns a total energy), ExaChem's
-plain CCSD writes its converged amplitudes to disk. This calculator enables
-ExaChem's ``CC.PRINT.tamplitudes`` option so the T1/T2 tensors are written as
-text files (``<prefix>.print_t1amp.txt`` / ``<prefix>.print_t2amp.txt``), parses
-them, and returns a wavefunction carrying the amplitudes -- mirroring the PySCF
-coupled-cluster calculator's contract.
+The calculator enables ExaChem's ``CC.PRINT.tamplitudes`` option so the T1/T2
+tensors are written as text files (``<prefix>.print_t1amp.txt`` /
+``<prefix>.print_t2amp.txt``), parses them, and returns a wavefunction carrying
+the amplitudes -- mirroring the PySCF coupled-cluster calculator's contract.
 
 Both restricted (RHF) and unrestricted (UHF) references are supported. ExaChem
 requires an unrestricted reference whenever the multiplicity exceeds one.
@@ -28,10 +26,10 @@ References:
 from __future__ import annotations
 
 import glob
-import logging
 import shutil
 import tempfile
 from pathlib import Path
+from typing import TYPE_CHECKING
 
 import numpy as np
 
@@ -46,14 +44,17 @@ from qdk_chemistry.plugins.exachem.conversion import (
     parse_ccsdt_energy,
 )
 from qdk_chemistry.plugins.exachem.scf_export import basis_name_to_exachem, ecp_name_to_exachem, export_scf_files
+from qdk_chemistry.utils import Logger
 
-logger = logging.getLogger(__name__)
+if TYPE_CHECKING:
+    from qdk_chemistry.data import Ansatz, Orbitals
 
 __all__ = ["ExachemCcsdCalculator", "ExachemCcsdSettings"]
 
 
-def _exachem_orbital_order(orbitals) -> tuple[list[int], int, int]:
+def _exachem_orbital_order(orbitals: Orbitals) -> tuple[list[int], int, int]:
     """Return the MO order inactive, active, remaining virtual, with the inactive and remaining virtual counts."""
+    Logger.trace_entering()
     nmo = orbitals.get_num_molecular_orbitals()
     if not orbitals.has_active_space():
         return list(range(nmo)), 0, 0
@@ -80,6 +81,7 @@ class ExachemCcsdSettings(Settings):
 
     def __init__(self):
         """Initialize the settings with default values."""
+        Logger.trace_entering()
         super().__init__()
         self._set_default(
             "mpi_ranks", "int", 2, "Number of MPI processes; ExaChem's default GA runtime needs at least 2"
@@ -117,18 +119,21 @@ class ExachemCcsdCalculator(DynamicalCorrelationCalculator):
 
     def __init__(self):
         """Initialize the calculator with default settings."""
+        Logger.trace_entering()
         super().__init__()
         self._settings = ExachemCcsdSettings()
 
     def name(self) -> str:
         """Return the name of this calculator implementation."""
+        Logger.trace_entering()
         return "exachem_ccsd"
 
     def aliases(self) -> list[str]:
         """Return algorithm aliases."""
+        Logger.trace_entering()
         return ["exachem_ccsd", "exachem_coupled_cluster"]
 
-    def _run_impl(self, ansatz):
+    def _run_impl(self, ansatz: Ansatz) -> tuple[float, Wavefunction, Wavefunction | None]:
         """Run ExaChem CCSD on the Ansatz's molecular reference.
 
         Args:
@@ -146,6 +151,7 @@ class ExachemCcsdCalculator(DynamicalCorrelationCalculator):
             RuntimeError: If ExaChem's SCF energy differs from the Ansatz reference or its CCSD outputs are missing.
 
         """
+        Logger.trace_entering()
         s = self._settings
         wavefunction = ansatz.get_wavefunction()
         orbitals = wavefunction.get_orbitals()
@@ -232,7 +238,7 @@ class ExachemCcsdCalculator(DynamicalCorrelationCalculator):
                     ao_tilesize=30,
                     runcontext_prefix=runcontext_prefix,
                 )
-            logger.info("Exported SCF data for noscf CCSD (%s) to %s", scf_type, scf_dir)
+            Logger.info(f"Exported SCF data for noscf CCSD ({scf_type}) to {scf_dir}")
 
             store_amplitudes = bool(s.get("store_amplitudes"))
 
@@ -298,11 +304,12 @@ class ExachemCcsdCalculator(DynamicalCorrelationCalculator):
             return total_energy, updated_wavefunction, None
         finally:
             shutil.rmtree(work_path, ignore_errors=True)
-            logger.debug("Cleaned up work directory %s", work_path)
+            Logger.debug(f"Cleaned up work directory {work_path}")
 
     @staticmethod
     def _find_amplitude_files(work_dir: Path) -> tuple[Path, Path]:
         """Locate ExaChem's T1/T2 amplitude text files under ``work_dir``."""
+        Logger.trace_entering()
         t1 = glob.glob(str(Path(work_dir) / "**" / "*print_t1amp.txt"), recursive=True)
         t2 = glob.glob(str(Path(work_dir) / "**" / "*print_t2amp.txt"), recursive=True)
         if not t1 or not t2:
@@ -315,18 +322,19 @@ class ExachemCcsdCalculator(DynamicalCorrelationCalculator):
 
     def _build_amplitude_container(
         self,
-        work_dir,
-        orbitals,
-        wavefunction,
-        n_alpha,
-        n_beta,
-        nmo,
-        is_unrestricted,
-        freeze_core,
-        freeze_virtual,
-        store_amplitudes,
-    ):
+        work_dir: Path,
+        orbitals: Orbitals,
+        wavefunction: Wavefunction,
+        n_alpha: int,
+        n_beta: int,
+        nmo: int,
+        is_unrestricted: bool,
+        freeze_core: int,
+        freeze_virtual: int,
+        store_amplitudes: bool,
+    ) -> AmplitudeContainer:
         """Parse the T amplitudes and build the qdk-chemistry AmplitudeContainer."""
+        Logger.trace_entering()
         if not store_amplitudes:
             return AmplitudeContainer(orbitals, wavefunction, AmplitudeType.CoupledCluster, sector="electrons")
 

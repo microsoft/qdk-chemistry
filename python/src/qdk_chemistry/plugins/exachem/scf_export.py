@@ -41,12 +41,13 @@ d/f/g corrupts the imported reference).
 from __future__ import annotations
 
 import json
-import logging
 from pathlib import Path
+from typing import TYPE_CHECKING
 
+import h5py
 import numpy as np
 
-logger = logging.getLogger(__name__)
+from qdk_chemistry.utils import Logger
 
 __all__ = [
     "basis_name_to_exachem",
@@ -56,18 +57,8 @@ __all__ = [
     "write_qdk_basis_g94",
 ]
 
-try:
-    import h5py
-
-    _HAS_H5PY = True
-except ImportError:
-    _HAS_H5PY = False
-
-
-def _require_h5py() -> None:
-    if not _HAS_H5PY:
-        raise ImportError("h5py is required for ExaChem SCF export. Install with: pip install h5py")
-
+if TYPE_CHECKING:
+    from qdk_chemistry.data import BasisSet
 
 _L_SYMBOL = {0: "S", 1: "P", 2: "D", 3: "F", 4: "G", 5: "H", 6: "I"}
 
@@ -90,6 +81,7 @@ def basis_name_to_exachem(name: str) -> str:
         'ec-aug-cc-pvdz'
 
     """
+    Logger.trace_entering()
     exachem_name = name.lower().replace(" ", "_")
     return f"ec-{exachem_name}" if exachem_name.startswith("aug") else exachem_name
 
@@ -111,6 +103,7 @@ def ecp_name_to_exachem(name: str) -> str:
         'def2-ecp'
 
     """
+    Logger.trace_entering()
     exachem_name = basis_name_to_exachem(name)
     if exachem_name.startswith("def2-"):
         return "def2-ecp"
@@ -119,7 +112,7 @@ def ecp_name_to_exachem(name: str) -> str:
     return exachem_name
 
 
-def _within_shell_m_reorder(basis_set) -> np.ndarray:
+def _within_shell_m_reorder(basis_set: BasisSet) -> np.ndarray:
     """AO permutation correcting the within-shell m-component ordering.
 
     This assumes ExaChem reads qdk-chemistry's own basis (identical inter-shell
@@ -134,6 +127,7 @@ def _within_shell_m_reorder(basis_set) -> np.ndarray:
     metadata (``get_atomic_orbital_info`` returns ``(shell_index, m)``) and
     satisfies ``C_exachem = C_qdk[perm, :]``.
     """
+    Logger.trace_entering()
     nao = basis_set.get_num_atomic_orbitals()
     perm = np.arange(nao)
     # Group AO indices by shell, recording the m quantum number (qdk order).
@@ -162,7 +156,7 @@ def _within_shell_m_reorder(basis_set) -> np.ndarray:
     return perm
 
 
-def write_qdk_basis_g94(basis_set, elements: list, basis_data_dir: str | Path, basis_name: str) -> Path:
+def write_qdk_basis_g94(basis_set: BasisSet, elements: list, basis_data_dir: str | Path, basis_name: str) -> Path:
     """Write qdk-chemistry's basis as a Gaussian-94 file in qdk's shell order.
 
     ExaChem/Libint2 reads a basis from ``<LIBINT_DATA_PATH>/basis/<name>.g94``.
@@ -186,6 +180,7 @@ def write_qdk_basis_g94(basis_set, elements: list, basis_data_dir: str | Path, b
         ValueError: If the basis name is not a safe file name or atoms of one element carry different shells.
 
     """
+    Logger.trace_entering()
     # basis_name becomes a file name, so reject anything that could escape the basis dir.
     if not basis_name or "/" in basis_name or "\\" in basis_name or ".." in basis_name:
         raise ValueError(f"Invalid basis name for a Gaussian-94 file name: {basis_name!r}")
@@ -230,7 +225,7 @@ def write_qdk_basis_g94(basis_set, elements: list, basis_data_dir: str | Path, b
         + "\n****\n"
     )
     g94_path.write_text(content)
-    logger.info("Wrote qdk-chemistry basis for ExaChem: %s", g94_path)
+    Logger.info(f"Wrote qdk-chemistry basis for ExaChem: {g94_path}")
     return Path(basis_data_dir)
 
 
@@ -242,10 +237,10 @@ def write_exachem_matrix(filepath: str | Path, matrix: np.ndarray) -> None:
         matrix: 2-D numpy array to write. Stored as a flat row-major 1-D dataset.
 
     Raises:
-        ImportError: If h5py is not installed.
+        ValueError: If ``matrix`` is not two-dimensional.
 
     """
-    _require_h5py()
+    Logger.trace_entering()
     filepath = Path(filepath)
     # Dataset name = last extension without the dot (e.g. ".alpha.movecs" → "movecs")
     dataset_name = filepath.suffix.lstrip(".")
@@ -263,14 +258,14 @@ def write_exachem_matrix(filepath: str | Path, matrix: np.ndarray) -> None:
         f.create_dataset(dataset_name, data=matrix_c.ravel())
         f.create_dataset("rdims", data=np.array(matrix_c.shape, dtype=np.int64))
 
-    logger.debug("Wrote %s: shape=%s, dataset=%r", filepath, matrix.shape, dataset_name)
+    Logger.debug(f"Wrote {filepath}: shape={matrix.shape}, dataset={dataset_name!r}")
 
 
 def export_scf_files(
     files_prefix: str | Path,
     mo_coeff_alpha: np.ndarray,
     density_alpha: np.ndarray,
-    basis_set,
+    basis_set: BasisSet,
     basis_name: str,
     elements: list,
     basis_data_dir: str | Path,
@@ -315,10 +310,10 @@ def export_scf_files(
         List of paths to the created files.
 
     Raises:
-        ImportError: If h5py is not installed.
+        ValueError: If the basis cannot be written for ExaChem (see :func:`write_qdk_basis_g94`).
 
     """
-    _require_h5py()
+    Logger.trace_entering()
     files_prefix = Path(files_prefix)
     files_prefix.parent.mkdir(parents=True, exist_ok=True)
 
@@ -364,5 +359,5 @@ def export_scf_files(
     runcontext_path.write_text(json.dumps(run_context, indent=2))
     created.append(runcontext_path)
 
-    logger.info("Exported %d SCF restart files with prefix %s", len(created), files_prefix)
+    Logger.info(f"Exported {len(created)} SCF restart files with prefix {files_prefix}")
     return created
