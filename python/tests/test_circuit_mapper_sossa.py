@@ -879,6 +879,12 @@ class TestMaxGivensRotationBatchesSetting:
         with pytest.raises(ValueError, match="max_givens_rotation_batches must be at most"):
             mapper.run(_build_sossa_unitary(num_orbitals=2))
 
+    def test_direct_select_ignores_it(self):
+        """Direct SELECT loads no angle table, so the same over-large limit must not reject it."""
+        mapper = _make_sossa_mapper(select_algorithm="direct")
+        mapper.settings().set("max_givens_rotation_batches", 2)
+        assert isinstance(mapper.run(_build_sossa_unitary(num_orbitals=2)), Circuit)
+
 
 class TestMaxSwapAddressBitsSetting:
     """The ``max_swap_address_bits`` setting's contract, without paying for an estimate."""

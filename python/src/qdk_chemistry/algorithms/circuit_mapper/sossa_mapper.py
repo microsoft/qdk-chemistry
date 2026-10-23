@@ -225,7 +225,7 @@ class SOSSAMapper(CircuitMapper):
 
         num_angles = max(meta.num_spatial_orbitals - 1, 0)
         max_givens_rotation_batches = int(self._settings.get("max_givens_rotation_batches"))
-        if 0 < num_angles < max_givens_rotation_batches:
+        if algorithm == "qrom_phase_gradient" and 0 < num_angles < max_givens_rotation_batches:
             raise ValueError(
                 f"max_givens_rotation_batches must be at most the {num_angles} rotation angles of a "
                 f"{meta.num_spatial_orbitals}-orbital system, got {max_givens_rotation_batches}"
