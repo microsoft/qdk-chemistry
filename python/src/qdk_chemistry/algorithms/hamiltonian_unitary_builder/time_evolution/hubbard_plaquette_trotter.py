@@ -85,7 +85,7 @@ def _plaquette_product_formula(
 ) -> PauliProductFormulaContainer:
     """Spell ``RepPlaquetteExp`` of HubbardPlaquette.qs out as Pauli exponentials in disjoint layers.
 
-    The TEMPORARY legacy resource costs are not reproduced. The steps with a full-angle pink layer are repeated.
+    The steps with a full-angle pink layer are repeated.
 
     Args:
         width: Number of lattice columns.

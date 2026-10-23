@@ -269,7 +269,7 @@ Hubbard plaquette mapper
 .. rubric:: Factory name: ``"hubbard_plaquette"``
 
 :class:`~qdk_chemistry.algorithms.controlled_circuit_mapper.ControlledHubbardPlaquetteMapper` maps the ``HubbardPlaquetteContainer`` from the ``"hubbard_plaquette"`` :doc:`HamiltonianUnitaryBuilder <hamiltonian_unitary_builder>` to a singly-controlled Q# circuit.
-Each layer of the plaquette step is a tower of same-angle :math:`R_z` rotations, which the mapper synthesizes with Hamming-weight phasing :cite:`Kan2025`: an adder tree writes the tower's Hamming weight into a scratch register, and a few place-value rotations on that register replace the per-term rotations.
+Each layer of the plaquette step is a tower of same-angle :math:`R_z` rotations, which the mapper synthesizes with Hamming-weight phasing :cite:`Kan2025`: an adder tree writes the tower's Hamming weight into a scratch register, which by default is added into a catalyst, a generalized phase gradient, so that one rotation replaces the per-term rotations. The alternative :math:`R_z` ladder applies one rotation per place value of the weight instead.
 
 .. rubric:: Settings
 
@@ -285,7 +285,10 @@ Each layer of the plaquette step is a tower of same-angle :math:`R_z` rotations,
      - Whether to phase each tower of same-angle rotations through a Hamming-weight register. When False, every term is its own rotation. Default is True.
    * - ``max_hamming_weight_phasing_batch_size``
      - int
-     - Largest tower of same-angle rotations phased through one Hamming-weight register. A smaller cap needs fewer scratch qubits but more rotations. Every batch is phased as given, so use a cap of at least 8: shorter batches save too few rotations to be worth the extra Toffolis and scratch qubits. Ignored when ``use_hamming_weight_phasing`` is False. When set to -1 (default), there is no cap.
+     - Largest tower of same-angle rotations phased through one Hamming-weight register. A smaller cap needs fewer scratch qubits but more rotations, and with the catalyst more Toffolis too, as each batch takes its own addition. Every batch is phased as given, so on the :math:`R_z` ladder (``hamming_weight_phasing_method`` ``"rz_ladder"``) use a cap of at least 8, as shorter batches save too few rotations to be worth the extra Toffolis and scratch qubits. Ignored when ``use_hamming_weight_phasing`` is False. When set to -1 (default), there is no cap.
+   * - ``hamming_weight_phasing_method``
+     - str
+     - How each Hamming weight is phased: ``"catalyst"`` (default) adds it into a catalyst, a generalized phase gradient prepared once for the interaction layers and once for the hopping layers, and ``"rz_ladder"`` synthesizes each place value as its own :math:`R_z`. Ignored when ``use_hamming_weight_phasing`` is False.
 
 Related classes
 ---------------
