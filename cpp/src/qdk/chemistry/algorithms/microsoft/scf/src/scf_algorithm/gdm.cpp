@@ -22,8 +22,9 @@
 #include "qdk/chemistry/scf/core/types.h"
 #include "util/matrix_exp.h"
 #ifdef QDK_CHEMISTRY_ENABLE_GPU
-#include "util/gpu/cuda_helper.h"
-#include "util/gpu/matrix_operations.h"
+#include <qdk/chemistry/scf/util/gpu/cuda_helper.h>
+
+#include "util/gpu/matrix_op.h"
 #endif
 
 namespace qdk::chemistry::scf {

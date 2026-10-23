@@ -5,6 +5,7 @@
 #pragma once
 
 #include <Eigen/Dense>
+#include <limits>
 #include <qdk/chemistry/algorithms/scf.hpp>
 
 namespace qdk::chemistry::algorithms::microsoft {
@@ -67,14 +68,32 @@ class ScfSettings
                 "Overlap-based shell pair pre-screening threshold. Shell "
                 "pairs with overlap norm below this value are excluded.");
     set_default(
-        "eri_method", std::string("direct"),
+        "eri_method", std::string("auto"),
         "ERI evaluation method: 'direct' computes integrals on-the-fly, "
-        "'incore' stores all integrals in memory",
+        "'incore' stores all integrals in memory, 'auto' stores them in device "
+        "memory when the SCF runs on a GPU and the O(N^4) tensor fits, and is "
+        "'direct' otherwise. In-core on the host is never chosen automatically "
+        "because it costs N^4 memory without the contraction speedup.",
         data::ListConstraint<std::string>{
-            {std::vector<std::string>{"direct", "incore"}}});
+            {std::vector<std::string>{"auto", "direct", "incore"}}});
     set_default("nthreads", static_cast<int64_t>(-1),
                 "Number of OpenMP threads to use for SCF calculation. "
                 "Set to -1 to use all available threads.");
+    set_default(
+        "gpu_incore_max_basis_functions", static_cast<int64_t>(160),
+        "Maximum AO basis size for automatic GPU in-core ERIs. "
+        "Zero disables automatic in-core selection; free GPU memory is "
+        "checked independently. Applies only to eri_method='auto'.",
+        data::BoundConstraint<int64_t>{0, std::numeric_limits<int64_t>::max()});
+    set_default(
+        "device", std::string("auto"),
+        "Execution device for the SCF linear algebra: 'cpu', 'gpu', or 'auto'. "
+        "'auto' selects the CPU, because the GPU only pays for its transfers "
+        "on "
+        "large systems. Requesting 'gpu' without GPU support compiled in, or "
+        "without a usable device, is an error rather than a silent fallback.",
+        data::ListConstraint<std::string>{
+            {std::vector<std::string>{"auto", "cpu", "gpu"}}});
   }
 };
 

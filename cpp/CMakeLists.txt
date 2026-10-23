@@ -313,6 +313,10 @@ install(FILES
     "${CMAKE_CURRENT_BINARY_DIR}/qdkConfigVersion.cmake"
     DESTINATION lib/cmake/qdk
 )
+if(QDK_CHEMISTRY_ENABLE_GPU)
+    install(FILES "${PROJECT_SOURCE_DIR}/cmake/modules/FindcuTENSOR.cmake"
+        DESTINATION lib/cmake/qdk)
+endif()
 
 # Export targets for build tree
 export(EXPORT chemistryTargets

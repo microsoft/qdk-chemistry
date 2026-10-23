@@ -33,6 +33,7 @@ endif()
 
 if(QDK_CHEMISTRY_ENABLE_GPU)
   find_dependency(CUDAToolkit REQUIRED)
+  find_dependency(cuTENSOR REQUIRED)
 endif()
 if(QDK_CHEMISTRY_ENABLE_HGP)
   find_dependency(HGP REQUIRED)

@@ -56,6 +56,10 @@ class ERI {
   /// Ending shell index (exclusive) for local MPI rank storage
   size_t loc_i_en_;
 
+  /// Whether the integrals live on the device. Fixed at construction, because
+  /// that is when the storage is committed to one side or the other.
+  bool on_device_ = false;
+
   // GPU-accelerated tensor contraction infrastructure
 #ifdef QDK_CHEMISTRY_ENABLE_GPU
   /// Device pointer to ERI tensor on GPU (N⁴ doubles)
@@ -84,6 +88,12 @@ class ERI {
   /// Pre-planned cuTENSOR contraction for exchange matrix: K[μν] = Σ_λσ (μλ|νσ)
   /// P[λσ]
   std::unique_ptr<cutensor::ContractionData> exxContraction_;
+
+  /// Density and result buffers, kept across iterations. An SCF calls build_JK
+  /// once per cycle, and for a small molecule the allocation cost otherwise
+  /// rivals the contraction itself.
+  std::shared_ptr<cuda::Memory<double>> d_P_buf_, d_J_buf_, d_K_buf_;
+  size_t d_buf_size_ = 0;
 #endif
 
   /**
@@ -105,6 +115,9 @@ class ERI {
    * @note Extremely memory intensive: O(N⁴) storage requirement
    */
   void generate_eri_();
+
+  /// Whether the in-core tensor (and its scratch) fits in free device memory.
+  bool fits_on_device_() const;
 
  public:
   /**

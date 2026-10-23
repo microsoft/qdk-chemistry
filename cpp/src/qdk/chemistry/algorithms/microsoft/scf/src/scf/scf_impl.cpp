@@ -41,6 +41,7 @@
 #endif
 
 #include <qdk/chemistry/scf/eri/eri_multiplexer.h>
+#include <qdk/chemistry/scf/util/device.h>
 
 #include "scf/guess.h"
 
@@ -429,30 +430,33 @@ void SCFImpl::compute_orthogonalization_matrix_(const RowMajorMatrix& S_,
   RowMajorMatrix U_t(num_atomic_orbitals_, num_atomic_orbitals_);
   RowMajorMatrix s(num_atomic_orbitals_, 1);
 #ifdef QDK_CHEMISTRY_ENABLE_GPU
-  auto U_d = cuda::alloc<double>(num_atomic_orbitals_ * num_atomic_orbitals_);
-  CUDA_CHECK(
-      cudaMemcpy(U_d->data(), S_.data(),
-                 sizeof(double) * num_atomic_orbitals_ * num_atomic_orbitals_,
-                 cudaMemcpyHostToDevice));
-  auto s_d = cuda::alloc<double>(num_atomic_orbitals_ * num_atomic_orbitals_);
-  cusolver::ManagedcuSolverHandle handle;
-  cusolver::syevd(handle, CUSOLVER_EIG_MODE_VECTOR, CUBLAS_FILL_MODE_LOWER,
-                  num_atomic_orbitals_, U_d->data(), num_atomic_orbitals_,
-                  s_d->data());
+  if (device::use_gpu_for_dense(num_atomic_orbitals_)) {
+    auto U_d = cuda::alloc<double>(num_atomic_orbitals_ * num_atomic_orbitals_);
+    CUDA_CHECK(
+        cudaMemcpy(U_d->data(), S_.data(),
+                   sizeof(double) * num_atomic_orbitals_ * num_atomic_orbitals_,
+                   cudaMemcpyHostToDevice));
+    auto s_d = cuda::alloc<double>(num_atomic_orbitals_ * num_atomic_orbitals_);
+    cusolver::ManagedcuSolverHandle handle;
+    cusolver::syevd(handle, CUSOLVER_EIG_MODE_VECTOR, CUBLAS_FILL_MODE_LOWER,
+                    num_atomic_orbitals_, U_d->data(), num_atomic_orbitals_,
+                    s_d->data());
 
-  CUDA_CHECK(
-      cudaMemcpy(U_t.data(), U_d->data(),
-                 sizeof(double) * num_atomic_orbitals_ * num_atomic_orbitals_,
-                 cudaMemcpyDeviceToHost));
-  CUDA_CHECK(cudaMemcpy(s.data(), s_d->data(),
-                        sizeof(double) * num_atomic_orbitals_,
-                        cudaMemcpyDeviceToHost));
-#else
-  std::memcpy(U_t.data(), S_.data(),
-              num_atomic_orbitals_ * num_atomic_orbitals_ * sizeof(double));
-  lapack::syev(lapack::Job::Vec, lapack::Uplo::Lower, num_atomic_orbitals_,
-               U_t.data(), num_atomic_orbitals_, s.data());
+    CUDA_CHECK(
+        cudaMemcpy(U_t.data(), U_d->data(),
+                   sizeof(double) * num_atomic_orbitals_ * num_atomic_orbitals_,
+                   cudaMemcpyDeviceToHost));
+    CUDA_CHECK(cudaMemcpy(s.data(), s_d->data(),
+                          sizeof(double) * num_atomic_orbitals_,
+                          cudaMemcpyDeviceToHost));
+  } else
 #endif
+  {
+    std::memcpy(U_t.data(), S_.data(),
+                num_atomic_orbitals_ * num_atomic_orbitals_ * sizeof(double));
+    lapack::syev(lapack::Job::Vec, lapack::Uplo::Lower, num_atomic_orbitals_,
+                 U_t.data(), num_atomic_orbitals_, s.data());
+  }
 
   RowMajorMatrix U = U_t.transpose();
 

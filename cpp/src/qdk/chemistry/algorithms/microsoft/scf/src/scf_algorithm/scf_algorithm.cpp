@@ -22,6 +22,8 @@
 #include "util/gpu/matrix_op.h"
 #endif
 
+#include <qdk/chemistry/scf/util/device.h>
+
 #include <lapack.hh>
 
 #include "asahf.h"
@@ -103,67 +105,75 @@ void SCFAlgorithm::solve_fock_eigenproblem(
   nvtx3::scoped_range r{nvtx3::rgb{0, 0, 255}, "solve_eigen"};
 #endif
 #ifdef QDK_CHEMISTRY_ENABLE_GPU
-  // solve F_ C_ = e S_ C_ by (conditioned) transformation to F_' C_' = e C_',
-  // where F_' = X_.transpose() . F_ . X_; the original C_ is obtained as C_ =
-  // X_ . C_'
-  auto X_d = cuda::alloc<double>(num_atomic_orbitals * num_molecular_orbitals);
-  CUDA_CHECK(cudaMemcpy(X_d->data(), X.data(), sizeof(double) * X.size(),
-                        cudaMemcpyHostToDevice));
-  auto F_d = cuda::alloc<double>(num_atomic_orbitals * num_atomic_orbitals);
-  CUDA_CHECK(cudaMemcpy(
-      F_d->data(),
-      F.data() + idx_spin * num_atomic_orbitals * num_atomic_orbitals,
-      sizeof(double) * num_atomic_orbitals * num_atomic_orbitals,
-      cudaMemcpyHostToDevice));
+  if (device::use_gpu_for_dense(num_atomic_orbitals)) {
+    // solve F_ C_ = e S_ C_ by (conditioned) transformation to F_' C_' = e C_',
+    // where F_' = X_.transpose() . F_ . X_; the original C_ is obtained as C_ =
+    // X_ . C_'
+    auto X_d =
+        cuda::alloc<double>(num_atomic_orbitals * num_molecular_orbitals);
+    CUDA_CHECK(cudaMemcpy(X_d->data(), X.data(), sizeof(double) * X.size(),
+                          cudaMemcpyHostToDevice));
+    auto F_d = cuda::alloc<double>(num_atomic_orbitals * num_atomic_orbitals);
+    CUDA_CHECK(cudaMemcpy(
+        F_d->data(),
+        F.data() + idx_spin * num_atomic_orbitals * num_atomic_orbitals,
+        sizeof(double) * num_atomic_orbitals * num_atomic_orbitals,
+        cudaMemcpyHostToDevice));
 
-  auto tmp = cuda::alloc<double>(num_molecular_orbitals * num_atomic_orbitals);
-  matrix_op::bmm(
-      X_d->data(), {1, num_atomic_orbitals, num_molecular_orbitals, true},
-      F_d->data(), {num_atomic_orbitals, num_atomic_orbitals}, tmp->data());
+    auto tmp =
+        cuda::alloc<double>(num_molecular_orbitals * num_atomic_orbitals);
+    matrix_op::bmm(
+        X_d->data(), {1, num_atomic_orbitals, num_molecular_orbitals, true},
+        F_d->data(), {num_atomic_orbitals, num_atomic_orbitals}, tmp->data());
 
-  auto V = cuda::alloc<double>(num_molecular_orbitals * num_molecular_orbitals);
-  matrix_op::bmm(tmp->data(), {num_molecular_orbitals, num_atomic_orbitals},
-                 X_d->data(), {num_atomic_orbitals, num_molecular_orbitals},
-                 V->data());
+    auto V =
+        cuda::alloc<double>(num_molecular_orbitals * num_molecular_orbitals);
+    matrix_op::bmm(tmp->data(), {num_molecular_orbitals, num_atomic_orbitals},
+                   X_d->data(), {num_atomic_orbitals, num_molecular_orbitals},
+                   V->data());
 
-  auto W = cuda::alloc<double>(num_molecular_orbitals);
-  cusolver::ManagedcuSolverHandle handle;
-  cusolver::syevd(handle, CUSOLVER_EIG_MODE_VECTOR, CUBLAS_FILL_MODE_LOWER,
-                  num_molecular_orbitals, V->data(), num_molecular_orbitals,
-                  W->data());
+    auto W = cuda::alloc<double>(num_molecular_orbitals);
+    cusolver::ManagedcuSolverHandle handle;
+    cusolver::syevd(handle, CUSOLVER_EIG_MODE_VECTOR, CUBLAS_FILL_MODE_LOWER,
+                    num_molecular_orbitals, V->data(), num_molecular_orbitals,
+                    W->data());
 
-  auto C_d = cuda::alloc<double>(num_atomic_orbitals * num_molecular_orbitals);
-  matrix_op::bmm(
-      X_d->data(), {num_atomic_orbitals, num_molecular_orbitals}, V->data(),
-      {1, num_molecular_orbitals, num_molecular_orbitals, true}, C_d->data());
+    auto C_d =
+        cuda::alloc<double>(num_atomic_orbitals * num_molecular_orbitals);
+    matrix_op::bmm(
+        X_d->data(), {num_atomic_orbitals, num_molecular_orbitals}, V->data(),
+        {1, num_molecular_orbitals, num_molecular_orbitals, true}, C_d->data());
 
-  auto C_t = tmp;
-  matrix_op::transpose(
-      C_d->data(), {num_atomic_orbitals, num_molecular_orbitals}, C_t->data());
+    auto C_t = tmp;
+    matrix_op::transpose(C_d->data(),
+                         {num_atomic_orbitals, num_molecular_orbitals},
+                         C_t->data());
 
-  CUDA_CHECK(cudaMemcpy(
-      C.data() + idx_spin * num_atomic_orbitals * num_molecular_orbitals,
-      C_d->data(),
-      sizeof(double) * num_atomic_orbitals * num_molecular_orbitals,
-      cudaMemcpyDeviceToHost));
-  CUDA_CHECK(cudaMemcpy(eigenvalues.data() + idx_spin * num_molecular_orbitals,
-                        W->data(), sizeof(double) * num_molecular_orbitals,
-                        cudaMemcpyDeviceToHost));
-#else
-  Eigen::Map<const RowMajorMatrix> F_dm(
-      F.data() + idx_spin * num_atomic_orbitals * num_atomic_orbitals,
-      num_atomic_orbitals, num_atomic_orbitals);
-  Eigen::Map<RowMajorMatrix> C_dm(
-      C.data() + idx_spin * num_atomic_orbitals * num_molecular_orbitals,
-      num_atomic_orbitals, num_molecular_orbitals);
-  RowMajorMatrix tmp1 = X.transpose() * F_dm;
-  RowMajorMatrix tmp2 = tmp1 * X;
-  lapack::syev(lapack::Job::Vec, lapack::Uplo::Lower, num_molecular_orbitals,
-               tmp2.data(), num_molecular_orbitals,
-               eigenvalues.data() + idx_spin * num_molecular_orbitals);
-  tmp2.transposeInPlace();  // Row major
-  C_dm.noalias() = X * tmp2;
+    CUDA_CHECK(cudaMemcpy(
+        C.data() + idx_spin * num_atomic_orbitals * num_molecular_orbitals,
+        C_d->data(),
+        sizeof(double) * num_atomic_orbitals * num_molecular_orbitals,
+        cudaMemcpyDeviceToHost));
+    CUDA_CHECK(cudaMemcpy(
+        eigenvalues.data() + idx_spin * num_molecular_orbitals, W->data(),
+        sizeof(double) * num_molecular_orbitals, cudaMemcpyDeviceToHost));
+  } else
 #endif
+  {
+    Eigen::Map<const RowMajorMatrix> F_dm(
+        F.data() + idx_spin * num_atomic_orbitals * num_atomic_orbitals,
+        num_atomic_orbitals, num_atomic_orbitals);
+    Eigen::Map<RowMajorMatrix> C_dm(
+        C.data() + idx_spin * num_atomic_orbitals * num_molecular_orbitals,
+        num_atomic_orbitals, num_molecular_orbitals);
+    RowMajorMatrix tmp1 = X.transpose() * F_dm;
+    RowMajorMatrix tmp2 = tmp1 * X;
+    lapack::syev(lapack::Job::Vec, lapack::Uplo::Lower, num_molecular_orbitals,
+                 tmp2.data(), num_molecular_orbitals,
+                 eigenvalues.data() + idx_spin * num_molecular_orbitals);
+    tmp2.transposeInPlace();  // Row major
+    C_dm.noalias() = X * tmp2;
+  }
 }
 
 void SCFAlgorithm::update_density_matrix(RowMajorMatrix& P,

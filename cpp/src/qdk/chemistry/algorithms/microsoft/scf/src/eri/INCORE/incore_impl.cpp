@@ -12,17 +12,14 @@
 #include <cuda_runtime.h>
 #include <qdk/chemistry/scf/util/gpu/cuda_helper.h>
 #endif
+#include <qdk/chemistry/scf/util/device.h>
 #include <qdk/chemistry/scf/util/libint2_util.h>
 
 #include <blas.hh>
 
 #define INCORE_ERI_GEN_DEBUG 0xF00
 #define INCORE_ERI_CON_HOST 0x0F0
-#ifdef QDK_CHEMISTRY_ENABLE_GPU
-#define QDK_CHEMISTRY_INCORE_ERI_STRATEGY 0
-#else
 #define QDK_CHEMISTRY_INCORE_ERI_STRATEGY INCORE_ERI_CON_HOST
-#endif
 
 namespace qdk::chemistry::scf::incore {
 
@@ -43,8 +40,26 @@ ERI::ERI(size_t spin_density_factor, const BasisSet& basis, ParallelConfig mpi,
                   ? obs_.nbf()
                   : loc_i_st_ + ni_per_rank;
 
+  on_device_ = device::use_gpu() && fits_on_device_();
+
   // Generate the ERIs INCORE
   generate_eri_();
+}
+
+bool ERI::fits_on_device_() const {
+  const size_t nbf = obs_.nbf();
+  const size_t local = loc_i_en_ - loc_i_st_;
+  const bool is_rsx = std::abs(omega_) > 1e-12;
+  // The tensor itself, plus the erf copy when range separated, plus headroom
+  // for the J/K scratch and cuTENSOR's workspace.
+  size_t needed = nbf * nbf * nbf * local * sizeof(double) * (is_rsx ? 2 : 1);
+  needed += needed / 8 + 64ul * 1024 * 1024;
+  if (device::device_can_hold(needed)) return true;
+  QDK_LOGGER().debug(
+      "In-core ERIs need {:.2f} GiB on the device, which is not available; "
+      "keeping them in host memory.",
+      needed / 1073741824.0);
+  return false;
 }
 
 void ERI::generate_eri_() {
@@ -77,54 +92,61 @@ void ERI::generate_eri_() {
 
 #if (QDK_CHEMISTRY_INCORE_ERI_STRATEGY & INCORE_ERI_CON_HOST) > 0 || \
     (QDK_CHEMISTRY_INCORE_ERI_STRATEGY & INCORE_ERI_CON_HOST) > 0
-  if (!mpi_.world_rank) QDK_LOGGER().debug("Saving ERIs on Host Memory");
-#else
-  // Allocate ERIs on the device and ship data
-  if (!mpi_.world_rank) {
-    QDK_LOGGER().debug("Saving ERIs in Device Memory");
-    QDK_LOGGER().debug("Using cuTensor for GPU ERI Contraction");
-  }
-  CUDA_CHECK(cudaMallocAsync(&d_eri_, eri_sz * sizeof(double), 0));
-  CUDA_CHECK(cudaStreamSynchronize(0));
-  CUDA_CHECK(cudaMemcpy(d_eri_, h_eri_.get(), sizeof(double) * eri_sz,
-                        cudaMemcpyHostToDevice));
-  h_eri_ = nullptr;  // Clear host memory
-  if (is_rsx) {
-    CUDA_CHECK(cudaMallocAsync(&d_eri_erf_, eri_sz * sizeof(double), 0));
+  if (!on_device_ && !mpi_.world_rank)
+    QDK_LOGGER().debug("Saving ERIs on Host Memory");
+#endif
+#ifdef QDK_CHEMISTRY_ENABLE_GPU
+  if (on_device_) {
+    // Allocate ERIs on the device and ship data
+    if (!mpi_.world_rank) {
+      QDK_LOGGER().debug("Saving ERIs in Device Memory");
+      QDK_LOGGER().debug("Using cuTensor for GPU ERI Contraction");
+    }
+    CUDA_CHECK(cudaMallocAsync(&d_eri_, eri_sz * sizeof(double), 0));
     CUDA_CHECK(cudaStreamSynchronize(0));
-    CUDA_CHECK(cudaMemcpy(d_eri_erf_, h_eri_erf_.get(), sizeof(double) * eri_sz,
+    CUDA_CHECK(cudaMemcpy(d_eri_, h_eri_.get(), sizeof(double) * eri_sz,
                           cudaMemcpyHostToDevice));
-    h_eri_erf_ = nullptr;  // Clear host memory
+    h_eri_ = nullptr;  // Clear host memory
+    if (is_rsx) {
+      CUDA_CHECK(cudaMallocAsync(&d_eri_erf_, eri_sz * sizeof(double), 0));
+      CUDA_CHECK(cudaStreamSynchronize(0));
+      CUDA_CHECK(cudaMemcpy(d_eri_erf_, h_eri_erf_.get(),
+                            sizeof(double) * eri_sz, cudaMemcpyHostToDevice));
+      h_eri_erf_ = nullptr;  // Clear host memory
+    }
   }
 #endif
 
 #ifdef QDK_CHEMISTRY_ENABLE_GPU
-  // Setup cuTensor
-  handle_ = std::make_shared<cutensor::TensorHandle>();
+  if (on_device_) {
+    // Setup cuTensor
+    handle_ = std::make_shared<cutensor::TensorHandle>();
 
-  std::vector<int64_t> extents4 = {loc_i_en_ - loc_i_st_, num_atomic_orbitals,
-                                   num_atomic_orbitals, num_atomic_orbitals};
-  std::vector<int64_t> extents2_P = {static_cast<int64_t>(spin_density_factor_),
+    std::vector<int64_t> extents4 = {loc_i_en_ - loc_i_st_, num_atomic_orbitals,
                                      num_atomic_orbitals, num_atomic_orbitals};
-  std::vector<int64_t> extents2_R = {static_cast<int64_t>(spin_density_factor_),
-                                     loc_i_en_ - loc_i_st_,
-                                     num_atomic_orbitals};
-  std::vector<int64_t> strides2 = {num_atomic_orbitals * num_atomic_orbitals,
-                                   num_atomic_orbitals,
-                                   1};  // Output is full space
-  descERI_ = std::make_shared<cutensor::TensorDesc>(
-      *handle_, 4, extents4.data(), CUTENSOR_R_64F);
-  descR_ = std::make_shared<cutensor::TensorDesc>(
-      *handle_, 3, extents2_R.data(), strides2.data(), CUTENSOR_R_64F);
-  descP_ = std::make_shared<cutensor::TensorDesc>(
-      *handle_, 3, extents2_P.data(), strides2.data(), CUTENSOR_R_64F);
+    std::vector<int64_t> extents2_P = {
+        static_cast<int64_t>(spin_density_factor_), num_atomic_orbitals,
+        num_atomic_orbitals};
+    std::vector<int64_t> extents2_R = {
+        static_cast<int64_t>(spin_density_factor_), loc_i_en_ - loc_i_st_,
+        num_atomic_orbitals};
+    std::vector<int64_t> strides2 = {num_atomic_orbitals * num_atomic_orbitals,
+                                     num_atomic_orbitals,
+                                     1};  // Output is full space
+    descERI_ = std::make_shared<cutensor::TensorDesc>(
+        *handle_, 4, extents4.data(), CUTENSOR_R_64F);
+    descR_ = std::make_shared<cutensor::TensorDesc>(
+        *handle_, 3, extents2_R.data(), strides2.data(), CUTENSOR_R_64F);
+    descP_ = std::make_shared<cutensor::TensorDesc>(
+        *handle_, 3, extents2_P.data(), strides2.data(), CUTENSOR_R_64F);
 
-  std::vector<int> j_ind = {'i', 'j', 'k', 'l'}, k_ind = {'i', 'k', 'j', 'l'},
-                   p_ind = {'m', 'k', 'l'}, r_ind = {'m', 'i', 'j'};
-  couContraction_ = std::make_unique<cutensor::ContractionData>(
-      handle_, descERI_, j_ind, descP_, p_ind, descR_, r_ind);
-  exxContraction_ = std::make_unique<cutensor::ContractionData>(
-      handle_, descERI_, k_ind, descP_, p_ind, descR_, r_ind);
+    std::vector<int> j_ind = {'i', 'j', 'k', 'l'}, k_ind = {'i', 'k', 'j', 'l'},
+                     p_ind = {'m', 'k', 'l'}, r_ind = {'m', 'i', 'j'};
+    couContraction_ = std::make_unique<cutensor::ContractionData>(
+        handle_, descERI_, j_ind, descP_, p_ind, descR_, r_ind);
+    exxContraction_ = std::make_unique<cutensor::ContractionData>(
+        handle_, descERI_, k_ind, descP_, p_ind, descR_, r_ind);
+  }
 #endif
 }
 
@@ -145,14 +167,62 @@ void ERI::build_JK(const double* P, double* J, double* K, double alpha,
   const size_t mat_size = spin_density_factor_ * num_atomic_orbitals2;
 
   // Clear out data
-  if (J) std::fill_n(J, mat_size, 0.0);
-  if (K) std::fill_n(K, mat_size, 0.0);
+  if (!on_device_) {
+    if (J) std::fill_n(J, mat_size, 0.0);
+    if (K) std::fill_n(K, mat_size, 0.0);
+  }
 
-#if (QDK_CHEMISTRY_INCORE_ERI_STRATEGY & INCORE_ERI_CON_HOST) > 0
+#ifdef QDK_CHEMISTRY_ENABLE_GPU
+  if (on_device_) {
+    if (!d_P_buf_ || d_buf_size_ < mat_size) {
+      d_P_buf_ = cuda::alloc<double>(mat_size);
+      d_J_buf_ = cuda::alloc<double>(mat_size);
+      d_K_buf_ = cuda::alloc<double>(mat_size);
+      d_buf_size_ = mat_size;
+    }
+    auto* dP = d_P_buf_->data();
+    auto* dJ = d_J_buf_->data();
+    auto* dK = d_K_buf_->data();
+
+    // The contraction writes rows [loc_i_st_, loc_i_en_) with beta=0, so it
+    // overwrites its own output; zeroing is only needed for the rows this rank
+    // does not own.
+    const bool owns_all =
+        loc_i_st_ == 0 && loc_i_en_ == static_cast<size_t>(num_atomic_orbitals);
+
+    CUDA_CHECK(
+        cudaMemcpy(dP, P, mat_size * sizeof(double), cudaMemcpyHostToDevice));
+    if (!owns_all) {
+      if (J) CUDA_CHECK(cudaMemset(dJ, 0, mat_size * sizeof(double)));
+      if (K) CUDA_CHECK(cudaMemset(dK, 0, mat_size * sizeof(double)));
+    }
+
+    // Perform Contractions
+    if (J)
+      couContraction_->contract(1.0, d_eri_, dP, 0.0,
+                                dJ + loc_i_st_ * num_atomic_orbitals);
+    if (K) {
+      exxContraction_->contract(alpha + beta, d_eri_, dP, 0.0,
+                                dK + loc_i_st_ * num_atomic_orbitals);
+      if (is_rsx) {
+        exxContraction_->contract(-beta, d_eri_erf_, dP, 1.0,
+                                  dK + loc_i_st_ * num_atomic_orbitals);
+      }
+    }
+
+    // Retrieve J/K
+    if (J)
+      CUDA_CHECK(
+          cudaMemcpy(J, dJ, mat_size * sizeof(double), cudaMemcpyDeviceToHost));
+    if (K)
+      CUDA_CHECK(
+          cudaMemcpy(K, dK, mat_size * sizeof(double), cudaMemcpyDeviceToHost));
+    return;
+  }
+#endif
+
   const size_t num_atomic_orbitals3 =
       num_atomic_orbitals2 * num_atomic_orbitals;
-  const size_t num_atomic_orbitals4 =
-      num_atomic_orbitals2 * num_atomic_orbitals2;
   const auto* h_eri_ptr = h_eri_.get();
   const auto* h_eri_erf_ptr = h_eri_erf_.get();
 
@@ -195,41 +265,6 @@ void ERI::build_JK(const double* P, double* J, double* K, double alpha,
             }
           }
       }
-
-#else  // Use GPU-accelerated contraction
-
-  // Allocate data for P/J/K on the device and send P
-  auto dP = cuda::alloc<double>(mat_size);
-  auto dJ = cuda::alloc<double>(mat_size);
-  auto dK = cuda::alloc<double>(mat_size);
-
-  CUDA_CHECK(cudaMemcpy(dP->data(), P, mat_size * sizeof(double),
-                        cudaMemcpyHostToDevice));
-  if (J) CUDA_CHECK(cudaMemset(dJ->data(), 0, mat_size * sizeof(double)));
-  if (K) CUDA_CHECK(cudaMemset(dK->data(), 0, mat_size * sizeof(double)));
-
-  // Perform Contractions
-  if (J)
-    couContraction_->contract(1.0, d_eri_, dP->data(), 0.0,
-                              dJ->data() + loc_i_st_ * num_atomic_orbitals);
-  if (K) {
-    exxContraction_->contract(alpha + beta, d_eri_, dP->data(), 0.0,
-                              dK->data() + loc_i_st_ * num_atomic_orbitals);
-    if (is_rsx) {
-      exxContraction_->contract(-beta, d_eri_erf_, dP->data(), 1.0,
-                                dK->data() + loc_i_st_ * num_atomic_orbitals);
-    }
-  }
-
-  // Retrieve J/K
-  if (J)
-    CUDA_CHECK(cudaMemcpy(J, dJ->data(), mat_size * sizeof(double),
-                          cudaMemcpyDeviceToHost));
-  if (K)
-    CUDA_CHECK(cudaMemcpy(K, dK->data(), mat_size * sizeof(double),
-                          cudaMemcpyDeviceToHost));
-
-#endif
 }
 
 void ERI::get_gradients(const double* P, double* dJ, double* dK, double alpha,
@@ -249,39 +284,40 @@ void ERI::quarter_trans(size_t nt, const double* C, double* out) {
       num_atomic_orbitals2 * num_atomic_orbitals2;
 
 #ifdef QDK_CHEMISTRY_ENABLE_GPU
+  if (on_device_) {
+    // Setup
+    std::vector<int64_t> extents_out = {
+        num_atomic_orbitals, num_atomic_orbitals, num_atomic_orbitals, nt};
+    std::vector<int64_t> extents_mat = {num_atomic_orbitals, nt};
 
-  // Setup
-  std::vector<int64_t> extents_out = {num_atomic_orbitals, num_atomic_orbitals,
-                                      num_atomic_orbitals, nt};
-  std::vector<int64_t> extents_mat = {num_atomic_orbitals, nt};
+    auto descOut = std::make_shared<cutensor::TensorDesc>(
+        *handle_, 4, extents_out.data(), CUTENSOR_R_64F);
+    auto descMat = std::make_shared<cutensor::TensorDesc>(
+        *handle_, 2, extents_mat.data(), CUTENSOR_R_64F);
 
-  auto descOut = std::make_shared<cutensor::TensorDesc>(
-      *handle_, 4, extents_out.data(), CUTENSOR_R_64F);
-  auto descMat = std::make_shared<cutensor::TensorDesc>(
-      *handle_, 2, extents_mat.data(), CUTENSOR_R_64F);
+    std::vector<int> eri_ind = {'i', 'j', 'k', 'l'},
+                     out_ind = {'i', 'j', 'k', 'p'}, mat_ind = {'l', 'p'};
 
-  std::vector<int> eri_ind = {'i', 'j', 'k', 'l'},
-                   out_ind = {'i', 'j', 'k', 'p'}, mat_ind = {'l', 'p'};
+    auto quarterTrans = std::make_shared<cutensor::ContractionData>(
+        handle_, descERI_, eri_ind, descMat, mat_ind, descOut, out_ind);
 
-  auto quarterTrans = std::make_shared<cutensor::ContractionData>(
-      handle_, descERI_, eri_ind, descMat, mat_ind, descOut, out_ind);
+    // Allocation
+    auto dC = cuda::alloc<double>(num_atomic_orbitals * nt);
+    auto dOut = cuda::alloc<double>(num_atomic_orbitals3 * nt);
 
-  // Allocation
-  auto dC = cuda::alloc<double>(num_atomic_orbitals * nt);
-  auto dOut = cuda::alloc<double>(num_atomic_orbitals3 * nt);
+    CUDA_CHECK(cudaMemcpy(dC->data(), C,
+                          num_atomic_orbitals * nt * sizeof(double),
+                          cudaMemcpyHostToDevice));
 
-  CUDA_CHECK(cudaMemcpy(dC->data(), C,
-                        num_atomic_orbitals * nt * sizeof(double),
-                        cudaMemcpyHostToDevice));
+    // 1st Quarter Contraction
+    quarterTrans->contract(1.0, d_eri_, dC->data(), 0.0, dOut->data());
 
-  // 1st Quarter Contraction
-  quarterTrans->contract(1.0, d_eri_, dC->data(), 0.0, dOut->data());
-
-  CUDA_CHECK(cudaMemcpy(out, dOut->data(),
-                        num_atomic_orbitals3 * nt * sizeof(double),
-                        cudaMemcpyDeviceToHost));
-
-#else
+    CUDA_CHECK(cudaMemcpy(out, dOut->data(),
+                          num_atomic_orbitals3 * nt * sizeof(double),
+                          cudaMemcpyDeviceToHost));
+    return;
+  }
+#endif
 
   if (omega_ > 1e-12) {
     blas::gemm(blas::Layout::ColMajor, blas::Op::NoTrans, blas::Op::NoTrans, nt,
@@ -292,8 +328,6 @@ void ERI::quarter_trans(size_t nt, const double* C, double* out) {
                num_atomic_orbitals3, num_atomic_orbitals, 1.0, C, nt,
                h_eri_.get(), num_atomic_orbitals, 0.0, out, nt);
   }
-
-#endif  // QDK_CHEMISTRY_ENABLE_GPU
 }
 
 ERI::~ERI() noexcept {

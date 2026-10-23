@@ -7,6 +7,7 @@
 #include <qdk/chemistry/scf/core/exc.h>
 #include <qdk/chemistry/scf/core/molecule.h>
 #include <qdk/chemistry/scf/eri/eri_multiplexer.h>
+#include <qdk/chemistry/scf/util/device.h>
 #include <qdk/chemistry/scf/util/gauxc_registry.h>
 
 #include <macis/solvers/davidson.hpp>
@@ -72,8 +73,11 @@ void compute_trial_fock(const std::shared_ptr<qcs::ERI> eri,
         RowMajorMatrix::Zero(ground_density.rows(), num_atomic_orbitals);
     RowMajorMatrix K_scratch =
         RowMajorMatrix::Zero(ground_density.rows(), num_atomic_orbitals);
-    eri->build_JK(trial_density.data(), J_scratch.data(), K_scratch.data(),
-                  alpha, beta, omega);
+    // The RHF external branch below uses only K, so asking for J would contract
+    // the whole integral tensor for a result that is discarded.
+    const bool need_j = !(rhf_external && !unrestricted);
+    eri->build_JK(trial_density.data(), need_j ? J_scratch.data() : nullptr,
+                  K_scratch.data(), alpha, beta, omega);
 
     // Compute Fock matrix: F = J - K for RHF, or appropriate combination for
     // UHF
@@ -467,7 +471,21 @@ StabilityChecker::_run_impl(
   scf_config->scf_orbital_type = unrestricted
                                      ? qcs::SCFOrbitalType::Unrestricted
                                      : qcs::SCFOrbitalType::Restricted;
-  scf_config->eri.method = qcs::ERIMethod::Libint2Direct;
+  const auto max_basis_functions = static_cast<size_t>(
+      _settings->get<int64_t>("gpu_incore_max_basis_functions"));
+  const size_t nbf_stab = basis_set_internal->num_atomic_orbitals;
+  const bool stability_on_device = scf::device::use_gpu() &&
+                                   nbf_stab <= max_basis_functions &&
+                                   scf::device::incore_eri_can_fit(nbf_stab);
+  scf_config->eri.method = stability_on_device ? qcs::ERIMethod::Incore
+                                               : qcs::ERIMethod::Libint2Direct;
+  // The multiplexer takes J from `eri` and K from `k_eri`, and builds a
+  // separate engine for each when they differ. Leaving k_eri at its default
+  // would put exchange -- the expensive half -- on a second, direct engine.
+  scf_config->k_eri = scf_config->eri;
+  QDK_LOGGER().debug("Stability analysis using {} ERIs on the {}.",
+                     stability_on_device ? "in-core" : "direct",
+                     stability_on_device ? "GPU" : "CPU");
 
   // Create ERI instance
   std::shared_ptr<qcs::ERI> eri;

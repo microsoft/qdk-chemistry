@@ -12,6 +12,48 @@ QDK/Chemistry can be installed in three ways:
 
 Most users should start with the PyPI install.
 
+### Experimental GPU SCF and stability branch
+
+The `ler/feat/gpu` branch is based on `v2.2.1`
+(`1eb14a9d73685d4e57ee7ee7ca6f4d2ef845a6dd`). It includes GPU SCF/stability
+contractions and CPU-only startup support derived from Marco's AFQMC-forces
+implementation, with configurable in-core cutoffs and installed-package
+cuTENSOR discovery. These changes are maintained as source, not build-time patches.
+
+Build with `QDK_CHEMISTRY_ENABLE_GPU=ON` and an explicit
+`CMAKE_CUDA_ARCHITECTURES` (`80` for A100 or `90` for H100). The build requires
+a compatible CUDA-enabled GauXC and cuTENSOR; CUDA 13 builds can use cuTENSOR
+2.3.1.0's CUDA-13 archive. Set `CUTENSOR_ROOT` to its installation prefix.
+`QDK_ALLOW_DEPENDENCY_FETCH=OFF` reuses installed managed dependencies; it does
+not disable independent FetchContent calls.
+
+GPU execution is opt-in:
+
+```python
+from qdk_chemistry.algorithms import create
+
+solver = create("scf_solver", "qdk")
+solver.settings().set("device", "gpu")
+solver.settings().set("eri_method", "auto")
+solver.settings().set("gpu_incore_max_basis_functions", 300)  # Default: 160
+
+checker = create("stability_checker", "qdk")
+checker.settings().set("gpu_incore_max_basis_functions", 300)  # Default: 250
+```
+
+Run the SCF solver on the same thread before the checker: the GPU selection is
+thread-local. `device="auto"` selects CPU. A GPU request without a usable
+device raises. Each cutoff accepts nonnegative integers; zero disables its
+automatic in-core choice. The SCF cutoff only applies to `eri_method="auto"`.
+The stabilized SCF backend forwards its cutoff to its nested SCF solver; set
+the stability cutoff independently through its `stability_checker` AlgorithmRef.
+
+Full ERIs require O(N^4) storage. Increasing either cutoff retains the
+free-device-memory checks and does not guarantee sufficient scratch space or
+a speedup. Stability accelerates repeated J/K contractions, not Davidson's
+CPU subspace solver. Dense SCF eigensolves retain a separate dimension
+threshold of 1000.
+
 ---
 
 ## Install from PyPI

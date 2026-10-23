@@ -7,6 +7,7 @@
 #include <qdk/chemistry/scf/core/molecule.h>
 #include <qdk/chemistry/scf/core/scf.h>
 #include <qdk/chemistry/scf/scf/scf_solver.h>
+#include <qdk/chemistry/scf/util/device.h>
 #include <qdk/chemistry/scf/util/gauxc_registry.h>
 #include <qdk/chemistry/scf/util/libint2_util.h>
 
@@ -203,7 +204,29 @@ ScfCalculationResult ScfSolver::_run_with_options(
           : qcs::DensityInitializationMethod::Atom;
 
   // Configure ERI method from settings
+  const std::string requested_device = _settings->get<std::string>("device");
+  const bool on_gpu = scf::device::set_use_gpu(requested_device == "gpu");
+  if (requested_device == "gpu" && !on_gpu) {
+    throw std::runtime_error(
+        "device='gpu' was requested but no GPU is usable. Either this build "
+        "has "
+        "QDK_CHEMISTRY_ENABLE_GPU=OFF, or no CUDA device is visible.");
+  }
+  QDK_LOGGER().debug("SCF linear algebra running on the {}.",
+                     on_gpu ? "GPU" : "CPU");
+
   std::string eri_method = _settings->get<std::string>("eri_method");
+  if (eri_method == "auto") {
+    const auto max_basis_functions = static_cast<size_t>(
+        _settings->get<int64_t>("gpu_incore_max_basis_functions"));
+    const size_t nbf = qdk_raw_basis_set->get_num_atomic_orbitals();
+    const bool incore_wins = on_gpu && nbf <= max_basis_functions &&
+                             scf::device::incore_eri_can_fit(nbf);
+    eri_method = incore_wins ? "incore" : "direct";
+    QDK_LOGGER().debug(
+        "eri_method='auto' resolved to '{}' ({} basis functions).", eri_method,
+        nbf);
+  }
   if (eri_method == "direct") {
     ms_scf_config->eri.method = qcs::ERIMethod::Libint2Direct;
   } else {  // Must be "incore" due to ListConstraint validation

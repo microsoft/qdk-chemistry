@@ -61,6 +61,19 @@ StabilizedScfSettings::StabilizedScfSettings()
               "unrestricted SCF, 'rotate_only' only rotates orbitals.",
               data::ListConstraint<std::string>{
                   {std::vector<std::string>{"unrestricted", "rotate_only"}}});
+  // Declared here as well as on the nested solver so that
+  // copy_common_scf_settings forwards it; the nested solver is what actually
+  // acts on it.
+  set_default("device", std::string("auto"),
+              "Execution device for the SCF linear algebra: 'cpu', 'gpu', or "
+              "'auto'. Forwarded to the nested SCF solver.",
+              data::ListConstraint<std::string>{
+                  {std::vector<std::string>{"auto", "cpu", "gpu"}}});
+  set_default(
+      "gpu_incore_max_basis_functions", static_cast<int64_t>(160),
+      "Maximum AO basis size for automatic GPU in-core ERIs in the nested "
+      "SCF solver. Configure the stability cutoff on stability_checker.",
+      data::BoundConstraint<int64_t>{0, std::numeric_limits<int64_t>::max()});
 }
 
 StabilizedScfSolver::StabilizedScfSolver() {

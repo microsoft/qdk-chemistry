@@ -11,4 +11,4 @@ foreach(cuda_dep cublas cublasLt cusolver)
   endif()
 endforeach()
 
-include(${CMAKE_CURRENT_LIST_DIR}/cutensor.cmake)
+find_package(cuTENSOR REQUIRED)

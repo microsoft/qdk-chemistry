@@ -43,6 +43,7 @@ target_sources(chemistry PRIVATE
 
 target_sources(chemistry PRIVATE
   util/blas_threads.cpp
+  util/device.cpp
   util/gauxc_util.cpp
   util/int1e.cpp
   util/libint2_util.cpp

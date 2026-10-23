@@ -4,6 +4,7 @@
 
 #pragma once
 
+#include <limits>
 #include <qdk/chemistry/algorithms/stability.hpp>
 
 namespace qdk::chemistry::algorithms::microsoft {
@@ -46,6 +47,11 @@ class StabilityCheckerSettings : public qdk::chemistry::data::Settings {
     set_default("max_subspace", 80);
     set_default("davidson_tolerance", 1e-8);
     set_default("stability_tolerance", -1e-4);
+    set_default(
+        "gpu_incore_max_basis_functions", static_cast<int64_t>(250),
+        "Maximum AO basis size for GPU in-core stability ERIs. "
+        "Zero selects direct ERIs; free GPU memory is checked independently.",
+        data::BoundConstraint<int64_t>{0, std::numeric_limits<int64_t>::max()});
     set_default(
         "method", "hf",
         "SCF method: 'hf' for Hartree-Fock, or a DFT functional name. "

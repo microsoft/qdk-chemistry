@@ -9,6 +9,7 @@
 #include <mpi.h>
 #endif
 #ifdef QDK_CHEMISTRY_ENABLE_GPU
+#include <qdk/chemistry/scf/util/device.h>
 #include <qdk/chemistry/scf/util/gpu/cuda_helper.h>
 #endif
 
@@ -113,8 +114,10 @@ void initialize_backend() {
   }
 
 #ifdef QDK_CHEMISTRY_ENABLE_GPU
-  CUDA_CHECK(cudaSetDevice(0));
-  qdk::chemistry::scf::cuda::init_memory_pool(0);
+  if (qcs::device::gpu_available()) {
+    CUDA_CHECK(cudaSetDevice(0));
+    qdk::chemistry::scf::cuda::init_memory_pool(0);
+  }
 #endif /* QDK_CHEMISTRY_ENABLE_GPU */
 
   _backed_initialized = true;
