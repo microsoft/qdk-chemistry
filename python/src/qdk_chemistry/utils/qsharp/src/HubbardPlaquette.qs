@@ -111,16 +111,6 @@ namespace QDKChemistry.Utils.HubbardPlaquette {
     }
 
     /// The on-site layer, phased through a Hamming-weight register.
-    internal operation InteractionLayer(
-        angle : Double,
-        sites : Int,
-        systems : Qubit[],
-        useHammingWeightPhasing : Bool,
-        maxBatchSize : Int
-    ) : Unit is Adj + Ctl {
-        InteractionLayerWithLegacyCosts(angle, sites, systems, useHammingWeightPhasing, maxBatchSize, false);
-    }
-
     internal operation InteractionLayerWithLegacyCosts(
         angle : Double,
         sites : Int,
@@ -341,24 +331,6 @@ namespace QDKChemistry.Utils.HubbardPlaquette {
     /// equal-angle Z rotations, which with Hamming-weight phasing saves a place-value rotation
     /// over separate XX and YY towers. Without Hamming-weight phasing each pair takes its own
     /// two rotations, so the basis change is skipped rather than paid for nothing.
-    internal operation HoppingPhases(
-        angle : Double,
-        pairs : Qubit[][],
-        useHammingWeightPhasing : Bool,
-        maxBatchSize : Int
-    ) : Unit is Adj + Ctl {
-        HoppingPhasesWithLegacyCosts(angle, pairs, useHammingWeightPhasing, maxBatchSize, false);
-    }
-
-    internal operation HoppingPhasesWithForcedLegacyCostsForTest(
-        angle : Double,
-        pairs : Qubit[][],
-        useHammingWeightPhasing : Bool,
-        maxBatchSize : Int
-    ) : Unit is Adj + Ctl {
-        HoppingPhasesWithLegacyCosts(angle, pairs, useHammingWeightPhasing, maxBatchSize, true);
-    }
-
     internal operation HoppingPhasesWithLegacyCosts(
         angle : Double,
         pairs : Qubit[][],
@@ -411,15 +383,6 @@ namespace QDKChemistry.Utils.HubbardPlaquette {
     }
 
     /// One PIG body, I^(1/2) G I^(1/2), followed by the given pink layer, on modes in `order`.
-    internal operation PlaquetteStepWithPinkAngle(
-        params : HubbardPlaquetteParams,
-        pinkAngle : Double,
-        order : Int[],
-        systems : Qubit[]
-    ) : Unit is Adj + Ctl {
-        PlaquetteStepWithPinkAngleAndLegacyCosts(params, pinkAngle, order, systems, false);
-    }
-
     internal operation PlaquetteStepWithPinkAngleAndLegacyCosts(
         params : HubbardPlaquetteParams,
         pinkAngle : Double,
@@ -471,24 +434,11 @@ namespace QDKChemistry.Utils.HubbardPlaquette {
         );
     }
 
-    /// One interior second-order Trotter body, I^(1/2) G I^(1/2) P, on modes in `order`.
-    internal operation PlaquetteStep(
-        params : HubbardPlaquetteParams,
-        order : Int[],
-        systems : Qubit[]
-    ) : Unit is Adj + Ctl {
-        PlaquetteStepWithPinkAngle(params, params.hoppingAngle, order, systems);
-    }
-
     /// TEMPORARY (legacy parity): resource estimates count the legacy circuit's conventional-model
     /// terms. These differ from the simulated symmetric model by a particle-number-dependent phase,
     /// which is global only inside a fixed-particle-number sector. They also count the legacy
     /// routing, which moves the modes from row-major order on every hopping layer instead of
     /// keeping them in pink order. Remove this function and every branch on it to revert.
-    internal function UsesLegacyCosts() : Bool {
-        return UsesLegacyCostsWithOverride(false);
-    }
-
     internal function UsesLegacyCostsWithOverride(forceLegacyCosts : Bool) : Bool {
         return forceLegacyCosts or IsResourceEstimating();
     }
@@ -520,13 +470,6 @@ namespace QDKChemistry.Utils.HubbardPlaquette {
         systems : Qubit[]
     ) : Unit is Adj + Ctl {
         RepPlaquetteExpWithLegacyCosts(params, systems, false);
-    }
-
-    internal operation RepPlaquetteExpWithForcedLegacyCostsForTest(
-        params : HubbardPlaquetteParams,
-        systems : Qubit[]
-    ) : Unit is Adj + Ctl {
-        RepPlaquetteExpWithLegacyCosts(params, systems, true);
     }
 
     internal operation RepPlaquetteExpWithLegacyCosts(

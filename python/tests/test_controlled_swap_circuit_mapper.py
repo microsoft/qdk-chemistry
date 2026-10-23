@@ -456,6 +456,11 @@ class TestVacuumPreservingBlocks:
         """Diagonal terms leave the vacuum in place and contribute -sum(angles) of phase."""
         assert _vacuum_eigenphase([(Z0, 0.3), (IDENTITY, 0.2)], 1e-9) == pytest.approx(-0.5)
 
+    def test_identity_factors_do_not_split_a_block(self):
+        """An explicit identity factor commutes with every Pauli on its qubit."""
+        terms = [({0: "X", 1: "X", 2: "I"}, 0.5), ({2: "Z"}, 0.1), ({0: "Y", 1: "Y", 2: "I"}, 0.5)]
+        assert _vacuum_eigenphase(terms, 1e-9) == pytest.approx(-0.1)
+
     def test_tolerance_controls_amplitude_cancellation(self):
         """Residual amplitude below ``atol`` counts as cancelled."""
         terms = [(XX, 0.5), (YY, 0.5 + 1e-7)]
@@ -689,49 +694,40 @@ class TestHammingWeightPhasing:
     """Equal-angle terms of a declared layer are phased through Hamming-weight registers on the vacuum."""
 
     @pytest.mark.parametrize(
-        ("xy", "field", "phasing", "cap"),
+        ("field", "phasing", "cap"),
         [
-            (0.0, 0.0, True, -1),
-            (0.0, 0.4, True, -1),
-            (0.0, 0.4, True, 12),
-            (0.0, 0.4, True, 1),
-            (0.0, 0.4, False, -1),
-            (1.0, 0.4, True, -1),
-            (1.0, 0.4, False, -1),
+            (0.0, True, -1),
+            (0.4, True, -1),
+            (0.4, True, 12),
+            (0.4, True, 1),
+            (0.4, False, -1),
         ],
     )
-    def test_spin_chain_matches_the_controlled_trotter_product(
-        self, xy: float, field: float, phasing: bool, cap: int
-    ) -> None:
+    def test_spin_chain_matches_the_controlled_trotter_product(self, field: float, phasing: bool, cap: int) -> None:
         """Phased, split and unphased layers all give the controlled Trotter product up to a global phase.
 
         Each bond color of the 16-site XXZ ring is a layer of 8 equal-angle terms per axis, and a nonzero ``field``
-        adds a layer of 16 Z terms. The control is in |+>, so a wrong vacuum phase fails the comparison.
+        adds a layer of 16 Z terms. The vacuum grouper keeps each XX/YY cancellation block in one commuting
+        group while retaining disjoint layers; no test-only reordering is needed. The control is in |+>,
+        so a wrong vacuum phase fails the comparison.
         """
         hamiltonian = create_heisenberg_hamiltonian(
-            LatticeGraph.chain(16, periodic=True), jx=xy, jy=xy, jz=1.0, hx=0.0, hy=0.0, hz=field
+            LatticeGraph.chain(16, periodic=True), jx=1.0, jy=1.0, jz=1.0, hx=0.0, hy=0.0, hz=field
         )
+        grouped = registry.create("term_grouper", "vacuum_annihilating").run(hamiltonian)
         trotter = registry.create("hamiltonian_unitary_builder", "trotter")
         trotter.settings().update({"order": 1, "num_divisions": 2, "time": 0.6})
-        container = trotter.run(hamiltonian).get_container()
-        layers = [container.step_terms[a:b] for a, b in pairwise(container.layer_offsets)]
-        if xy:
-            # The builder applies both XX colors before either YY color, which leaks the vacuum.
-            # Each color's XX and YY layers together annihilate it, so pair them.
-            layers[1], layers[2] = layers[2], layers[1]
-        container = PauliProductFormulaContainer(
-            [term for layer in layers for term in layer],
-            step_reps=container.step_reps,
-            num_qubits=container.num_qubits,
-            layer_offsets=container.layer_offsets,
-        )
+        unitary = trotter.run(grouped)
+        container = unitary.get_container()
+        assert container.layer_offsets is not None
+        assert any(stop - start >= 8 for start, stop in pairwise(container.layer_offsets))
         circuit = registry.create(
             "controlled_circuit_mapper",
             "cswap_pauli_sequence",
             use_hamming_weight_phasing=phasing,
             max_hamming_weight_phasing_batch_size=cap,
-        ).run(UnitaryRepresentation(container=container))
-        system = random_state(container.num_qubits, seed=cap + 2, support=2 if xy else 16)
+        ).run(unitary)
+        system = random_state(container.num_qubits, seed=cap + 2, support=2)
         state = np.kron(np.ones(2) / np.sqrt(2), system)
         actual = apply_operation(circuit._qsharp_op, state, split_control=True)
         assert_states_match_up_to_global_phase(actual, controlled_product_formula_state(container, state), 1e-10)

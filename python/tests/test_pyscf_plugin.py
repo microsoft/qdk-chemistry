@@ -32,12 +32,14 @@ try:
     import pyscf.mcscf
     import pyscf.scf
 
+    import qdk_chemistry.plugins.pyscf.stability as pyscf_stability
+
     PYSCF_AVAILABLE = True
 except ImportError:
     PYSCF_AVAILABLE = False
 
 if PYSCF_AVAILABLE:
-    from qdk_chemistry.constants import ANGSTROM_TO_BOHR
+    from qdk_chemistry.constants import ANGSTROM_TO_BOHR, FINE_STRUCTURE_CONSTANT
     from qdk_chemistry.data import AOType, BasisSet, OrbitalType, Shell
     from qdk_chemistry.plugins.pyscf import population_analysis as pyscf_population_analysis
     from qdk_chemistry.plugins.pyscf.conversion import (
@@ -466,6 +468,10 @@ class TestPyscfPlugin:
 
         settings.set("stability_tolerance", 1e-6)
         assert settings.get("stability_tolerance") == 1e-6
+
+        assert settings.get("relativity") == ""
+        settings.set("relativity", "sf-x2c")
+        assert settings.get("relativity") == "sf-x2c"
 
     def test_pyscf_water_scf_def2svp(self):
         """Test PySCF SCF solver on water molecule with def2-svp basis."""
@@ -2095,6 +2101,53 @@ class TestPyscfPlugin:
             atol=mcscf_energy_tolerance,
         )
 
+    @pytest.mark.parametrize("relativity", ["sf-x2c", "sf-x2c-contracted"])
+    def test_orbitals_only_relativistic_consumers_use_requested_hcore(self, relativity, monkeypatch):
+        """Apply the requested X2C one-body operator to orbitals-only PySCF consumers."""
+        solver = algorithms.create("scf_solver", "qdk")
+        solver.settings().set("relativity", relativity)
+        _, wavefunction = solver.run(create_helium_structure(), 0, 1, "6-31g")
+        orbitals = wavefunction.get_orbitals()
+        occ_a, occ_b = wavefunction.get_total_orbital_occupations()
+        mf = orbitals_to_scf(orbitals, occ_a, occ_b)
+
+        reference = pyscf.scf.RHF(mf.mol).sfx2c1e()
+        reference.with_x2c.xuncontract = relativity == "sf-x2c"
+        with pyscf.lib.temporary_env(pyscf.lib.param, LIGHT_SPEED=1.0 / FINE_STRUCTURE_CONSTANT):
+            expected_hcore = reference.get_hcore()
+
+        # Independently configured reference, including the supplied MO payload.
+        reference.get_hcore = lambda *_: expected_hcore
+        reference.mo_coeff, reference.mo_energy, reference.mo_occ = mf.mo_coeff, mf.mo_energy, mf.mo_occ
+        expected_spectrum, _ = pyscf_stability._rhf_internal(reference, nroots=1, verbose=0)
+        reference_cas = pyscf.mcscf.CASSCF(reference, 2, 2)
+        expected_h1, expected_core = reference_cas.get_h1eff(mf.mo_coeff)
+        expected_energy = reference_cas.kernel(mf.mo_coeff)[0]
+        captured = {}
+        make_casscf = pyscf.mcscf.CASSCF
+
+        def capture_casscf(casscf_mf, ncas, nelec):
+            result = make_casscf(casscf_mf, ncas, nelec)
+            captured["h1"], captured["core"] = result.get_h1eff(casscf_mf.mo_coeff)
+            return result
+
+        monkeypatch.setattr(pyscf.mcscf, "CASSCF", capture_casscf)
+
+        stability_checker = algorithms.create("stability_checker", "pyscf")
+        stability_checker.settings().set("external", False)
+        stability_checker.settings().set("nroots", 1)
+        stability_checker.settings().set("relativity", relativity)
+        _, stability = stability_checker.run(wavefunction)
+
+        pyscf_mcscf = algorithms.create("multi_configuration_scf", "pyscf")
+        pyscf_mcscf.settings().set("relativity", relativity)
+        energy, _ = pyscf_mcscf.run(orbitals, 1, 1)
+
+        np.testing.assert_allclose(stability.get_internal_eigenvalues(), np.asarray(expected_spectrum) * 0.25)
+        np.testing.assert_allclose(captured["h1"], expected_h1, atol=1e-10)
+        assert np.isclose(captured["core"], expected_core, atol=1e-10)
+        assert np.isclose(energy, expected_energy, atol=mcscf_energy_tolerance)
+
     def test_pyscf_mcscf_triplet(self):
         """Test PySCF MCSCF for o2 triplet with cc-pvdz basis and CAS(6,6)."""
         # Create O2 structure
@@ -2391,6 +2444,20 @@ class TestPyscfPlugin:
         solver = algorithms.create("scf_solver", "qdk", enable_gdm=False)
         _, wavefunction = solver.run(create_water_structure(), 0, 1, "sto-3g")
         hamiltonian = algorithms.create("hamiltonian_constructor", constructor, relativity=relativity).run(
+            wavefunction.get_orbitals()
+        )
+        occ_a, occ_b = wavefunction.get_total_orbital_occupations()
+        mf = hamiltonian_to_scf(hamiltonian, occ_a, occ_b)
+        coeff = spin_channel_matrix(wavefunction.get_orbitals().coefficients(), axes.alpha())
+        h1, _ = hamiltonian.get_one_body_integrals()
+        np.testing.assert_allclose(coeff.T @ mf.get_hcore() @ coeff, h1, rtol=0.0, atol=scf_energy_tolerance)
+        assert mf.energy_nuc() == hamiltonian.get_core_energy()
+
+    def test_hamiltonian_to_scf_preserves_scf_optimized_x2c_hamiltonian(self) -> None:
+        """Preserve the X2C one-body operator and scalar core from X2C-optimized SCF orbitals."""
+        solver = algorithms.create("scf_solver", "qdk", relativity="sf-x2c", enable_gdm=False)
+        _, wavefunction = solver.run(create_water_structure(), 0, 1, "sto-3g")
+        hamiltonian = algorithms.create("hamiltonian_constructor", "qdk", relativity="sf-x2c").run(
             wavefunction.get_orbitals()
         )
         occ_a, occ_b = wavefunction.get_total_orbital_occupations()

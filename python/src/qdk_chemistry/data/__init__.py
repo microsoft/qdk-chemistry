@@ -18,11 +18,11 @@ Exposed classes are:
 - :class:`Configuration`: Electronic configuration state information.
 - :class:`ConfigurationSet`: Collection of electronic configurations with associated orbital information.
 - :class:`DataClass`: Base data class.
+- :class:`DFTHCHamiltonianContainer`: Container for double-factorized tensor hypercontraction Hamiltonians.
 - :class:`EdgeLabel`: Geometric shell and optional semantic flavor of a lattice graph edge.
 - :class:`ElectronicStructureSettings`: Specialized settings for electronic structure calculations.
 - :class:`Element`: Represents a chemical element with its properties.
 - :class:`EnergyExpectationResult`: Result for Hamiltonian energy expectation value and variance.
-- :class:`FactorizedHamiltonianContainer`: Container for factorized hamiltonians.
 - :class:`FermiHubbardModelHamiltonianDescription`: Fermi-Hubbard model on a lattice.
 - :class:`Hamiltonian`: Quantum mechanical Hamiltonian operator representation.
 - :class:`HamiltonianContainer`: Abstract base class for different Hamiltonian storage formats.
@@ -86,10 +86,10 @@ from qdk_chemistry._core.data import (
     CholeskyHamiltonianContainer,
     Configuration,
     ConfigurationSet,
+    DFTHCHamiltonianContainer,
     EdgeLabel,
     ElectronicStructureSettings,
     Element,
-    FactorizedHamiltonianContainer,
     Hamiltonian,
     HamiltonianContainer,
     HamiltonianType,
@@ -164,6 +164,7 @@ __all__ = [
     "CircuitExecutorData",
     "Configuration",
     "ConfigurationSet",
+    "DFTHCHamiltonianContainer",
     "DataClass",
     "DrivenContainer",
     "DrivenQubitHamiltonian",
@@ -171,7 +172,6 @@ __all__ = [
     "ElectronicStructureSettings",
     "Element",
     "EnergyExpectationResult",
-    "FactorizedHamiltonianContainer",
     "FermiHubbardModelHamiltonianDescription",
     "FermionModeOrder",
     "FlatPartition",

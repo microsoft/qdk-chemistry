@@ -39,8 +39,7 @@ dependencies = [
   "matplotlib>=3.10.0",
   "argcomplete>=3.0.0",
   "ruamel-yaml>=0.18.10",
-  # qdk temporarily pinned to avoid https://github.com/microsoft/qdk-chemistry/issues/761
-  "qdk[jupyter]==1.32.3",
+  "qdk[jupyter]>=1.33.1",
   "pybind11-stubgen>=2.5.1",
   "h5py>=3.0.0",
 ]
@@ -87,7 +86,8 @@ docs = [
   "sphinx-rtd-theme",
   "myst-parser",
   "breathe==4.36.0",
-  "sphinx-autodoc-typehints",
+  # sphinx-autodoc-typehints temporarily capped to avoid https://github.com/microsoft/qdk-chemistry/issues/779
+  "sphinx-autodoc-typehints<3.14",
   "sphinx-inline-tabs",
   "sphinxcontrib-napoleon",
   "sphinxcontrib-bibtex",
@@ -96,8 +96,7 @@ docs = [
 jupyter = [
   "ipykernel>=6.0",
   "pandas>=2.0.0",
-  # qdk temporarily pinned to avoid https://github.com/microsoft/qdk-chemistry/issues/761
-  "qdk[jupyter]==1.32.3",
+  "qdk[jupyter]>=1.33.1",
 ]
 mcp = [
   "mcp>=2,<3"
@@ -114,7 +113,7 @@ plugins = [
 ]
 qiskit-extras = [
   # The qiskit stack and pennylane both require rustworkx, which publishes no win-arm64 wheels
-  "qiskit[qasm3-import]>=2.2.0; sys_platform != 'win32' or platform_machine != 'ARM64'",
+  "qiskit[qasm3-import]==2.5.0; sys_platform != 'win32' or platform_machine != 'ARM64'",
   # cp314 manylinux aarch64 wheel not available
   "qiskit-aer; (python_version < '3.14' or platform_machine != 'aarch64' or sys_platform != 'linux') and (sys_platform != 'win32' or platform_machine != 'ARM64')",
   "qiskit-ibm-runtime>=0.46.1; sys_platform != 'win32' or platform_machine != 'ARM64'",
@@ -124,8 +123,7 @@ qiskit-extras = [
   "requests>=2.33.0"
 ]
 qre = [
-  # qdk temporarily pinned to avoid https://github.com/microsoft/qdk-chemistry/issues/761
-  "qdk[qre,jupyter]==1.32.3"
+  "qdk[qre,jupyter]>=1.33.1"
 ]
 test = [
   "qdk-chemistry[azure-quantum,coverage,discovery,jupyter,networkx-extras,openfermion-extras,plugins,qiskit-extras,qre]",
@@ -145,7 +143,7 @@ test = [
 azure-quantum = [
   # azure-quantum requires azure-identity and azure-storage-blob, which both pull in cryptography; no win-arm64 wheel
   "azure-identity>=1.19.0,<2; sys_platform != 'win32' or platform_machine != 'ARM64'",
-  "azure-quantum>=2.1.0; sys_platform != 'win32' or platform_machine != 'ARM64'"
+  "azure-quantum==3.12.0; sys_platform != 'win32' or platform_machine != 'ARM64'"
 ]
 
 [project.urls]

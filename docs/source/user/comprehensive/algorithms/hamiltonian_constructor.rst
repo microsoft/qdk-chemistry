@@ -141,10 +141,6 @@ Relativistic treatment
 
 .. rubric:: Setting: ``relativity="sf-x2c"`` or ``relativity="sf-x2c-contracted"``
 
-.. note::
-
-   Spin-free X2C is not currently available during the :term:`SCF` calculation itself. It is applied only when constructing a :class:`~qdk_chemistry.data.Hamiltonian` from existing :class:`~qdk_chemistry.data.Orbitals`.
-
 The ``relativity`` setting selects the relativistic treatment of the Hamiltonian, with the empty string (``""``) retaining the nonrelativistic default.
 The ``"sf-x2c"`` and ``"sf-x2c-contracted"`` options apply spin-free exact-two-component (X2C) scalar-relativistic corrections using the exact-decoupling formulation :cite:`Kutzelnigg2005,Liu2009X2C`.
 The spin-free X2C treatment constructs the modified Dirac Hamiltonian from the :term:`AO` overlap, kinetic, nuclear-attraction, and spin-free :math:`\boldsymbol{p}V\boldsymbol{p}` integrals, selects its electronic states, and projects their energies back into the original AO metric.
