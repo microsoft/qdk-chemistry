@@ -295,6 +295,7 @@ jobs:
           -DCMAKE_BUILD_TYPE=RelWithDebInfo \
           -DCMAKE_INSTALL_PREFIX="$CMAKE_INSTALL_PREFIX" \
           -DQDK_UARCH="$QDK_UARCH" \
+          -DQDK_ALLOW_DEPENDENCY_FETCH=OFF \
           -DQDK_ENABLE_OPENMP=${{ runner.os == 'Linux' && 'ON' || 'OFF' }} \
           -DQDK_CHEMISTRY_ENABLE_COVERAGE=${{ matrix.enable-coverage && 'ON' || 'OFF' }} \
           -DBUILD_TESTING=ON \
@@ -350,9 +351,9 @@ jobs:
         # Install Python dependencies and build package
         # Use persistent build directory for coverage analysis
         if [ "${{ matrix.build-documentation }}" = "true" ]; then
-          python -m pip install --prefix=${{ github.workspace }}/install -C build-dir="build/{wheel_tag}" -v .[test,docs]
+          python -m pip install --prefix=${{ github.workspace }}/install -C build-dir="build/{wheel_tag}" -C cmake.define.QDK_ALLOW_DEPENDENCY_FETCH=OFF -v .[test,docs]
         else
-          python -m pip install --prefix=${{ github.workspace }}/install -C build-dir="build/{wheel_tag}" -v .[test]
+          python -m pip install --prefix=${{ github.workspace }}/install -C build-dir="build/{wheel_tag}" -C cmake.define.QDK_ALLOW_DEPENDENCY_FETCH=OFF -v .[test]
         fi
 
         # Print installed packages for debugging
