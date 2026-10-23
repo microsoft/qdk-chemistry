@@ -47,11 +47,14 @@ An :term:`IQPE` calculation requires four kinds of information:
 :ref:`Numerical and sampling controls <tutorial-iqpe-numerical-controls>`
    An evolution time, number of phase bits, shots per bit, and number of complete runs.
 
-The previous chapters supplied the qubit Hamiltonian and trial state for the selected molecular problem.
-They also recorded the core energy needed to reconstruct the molecular total and the classical :term:`CASCI` reference used to validate the final estimate; those two quantities are bookkeeping and validation data rather than inputs to the phase-estimation circuit.
+Previous chapters supplied the qubit Hamiltonian and trial state for the selected molecular problem.
+Those chapters also recorded two classical quantities with distinct roles: the core energy and the selected-space :term:`CASCI` reference.
+When the IQPE problem is prepared, the active-space component of the known CASCI reference configures the evolution time.
+After phase estimation, adding the core energy reconstructs the selected-space total energy.
+The selected-space CASCI reference then validates that reconstructed total.
 
-The compute register stores the encoded active-space wavefunction.
-This chapter adds one readout ancilla, a qubit used to extract phase information without representing another spin orbital.
+During IQPE, the compute register stores the encoded active-space wavefunction.
+One additional readout ancilla extracts phase information without representing another spin orbital.
 The `quantum phase estimation overview <https://en.wikipedia.org/wiki/Quantum_phase_estimation_algorithm>`_ provides an optional refresher on the basic controlled-unitary circuit model.
 
 .. _tutorial-energy-to-phase-encoding:
@@ -426,7 +429,7 @@ Negating that angle and dividing by the evolution time maps the measured phase t
 
    E_{\mathrm{active}}^{\mathrm{IQPE}}=\frac{-\alpha}{t}.
 
-This estimates an eigenvalue of the qubit Hamiltonian, not yet the selected-space molecular total.
+This estimates an eigenvalue of the qubit Hamiltonian, not yet the selected-space total energy.
 Finite phase resolution, sampling, and product-formula time evolution all contribute error.
 As :doc:`Mapping the problem to qubits <04_putting_the_problem_on_qubits>` explains, the mapper does not include the core energy in the qubit Hamiltonian.
 The core energy contains the nuclear repulsion and the constant contribution from frozen inactive orbitals.
