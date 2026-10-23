@@ -984,7 +984,7 @@ TEST_F(ScfTest, AgHDef2SvpAtomicGuessWithEcp) {
 
   qcs::RowMajorMatrix overlap = qcs::RowMajorMatrix::Zero(nao, nao);
   qcs::OneBodyIntegral integrals(basis.get(), molecule.get(),
-                               qcs::mpi_default_input());
+                                 qcs::mpi_default_input());
   integrals.overlap_integral(overlap.data());
   EXPECT_TRUE(density.allFinite());
   EXPECT_NEAR((density * overlap).trace(), 20.0,
