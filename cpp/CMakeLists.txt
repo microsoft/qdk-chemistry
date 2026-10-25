@@ -102,6 +102,13 @@ list( APPEND CMAKE_MODULE_PATH ${linalg-cmake-modules_SOURCE_DIR} )
 # Microarchitecture handling
 include(cmake/qdk-uarch.cmake)
 
+# Enable CUDA at top level before dependency discovery: CUDA-enabled GauXC
+# enables the language from within a function scope otherwise, leaving the
+# CUDA compile rules undefined for QDK's own targets.
+if(QDK_CHEMISTRY_ENABLE_GPU)
+    enable_language(CUDA)
+endif()
+
 # Handle TPL dependencies
 include(cmake/third_party.cmake)
 
@@ -137,11 +144,6 @@ else()
         message(STATUS "QDK_UARCH  = ${QDK_UARCH_USED}")
         message(FATAL_ERROR "Inconsistent microarchitecture settings between QDK and MACIS")
     endif()
-endif()
-
-# Enable CUDA for GPU bindings in QDK Chemistry
-if(QDK_CHEMISTRY_ENABLE_GPU)
-    enable_language(CUDA)
 endif()
 
 # Create library
