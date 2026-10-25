@@ -120,7 +120,8 @@
           "name": "NVIDIA cuTENSOR (CUDA 13, x86_64)",
           "version": "2.3.1.0",
           "downloadUrl": "https://developer.download.nvidia.com/compute/cutensor/redist/libcutensor/linux-x86_64/libcutensor-linux-x86_64-2.3.1.0_cuda13-archive.tar.xz",
-          "hash": "9cb1125f7de01ca319b5c72edeb7169b679b72beacc90354fb18a14056e24372"
+          "hash": "sha1:a3c773ba442fc7f1627193723e90db4910d589a8",
+          "sha256": "9cb1125f7de01ca319b5c72edeb7169b679b72beacc90354fb18a14056e24372"
         }
       },
       "developmentDependency": false
