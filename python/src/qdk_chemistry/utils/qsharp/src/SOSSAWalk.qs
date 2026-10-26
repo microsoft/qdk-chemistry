@@ -499,6 +499,8 @@ namespace QDKChemistry.Utils.SOSSAWalk {
     /// Register layout: [systemReg | outerReg | innerReg | spinReg | phaseGradientReg].
     /// `cacheName` keys the resource-estimation cache of one walk step. It must identify the walk,
     /// so that distinct walks in one program are estimated separately and the powers of one walk share it.
+    /// W and W† cost the same, so both directions share the entry. The adjoint is written out because
+    /// a generated one would run `EndEstimateCaching` before the step and cache an empty estimate.
     operation ControlledSOSSAWalkOnRegister(
         outerPrepareOp : (Qubit[]) => Unit is Adj + Ctl,
         freeRiderOp : (Qubit[], Qubit[]) => Unit is Adj + Ctl,
@@ -510,34 +512,56 @@ namespace QDKChemistry.Utils.SOSSAWalk {
         control : Qubit,
         allQubits : Qubit[],
     ) : Unit is Adj {
-        let regs = SOSSAWalkRegistersOf(layout, allQubits);
-        let walkAncillas = regs.outerReg + regs.innerReg + regs.spinReg;
-        for _ in 1..power {
-            if BeginEstimateCaching(cacheName, SingleVariant()) {
-                {
-                    // The block encoding returns the inner scratch to |0⟩, so release it before Ref_a.
-                    use innerScratch = Qubit[layout.numInnerQubits - layout.numReflectInner];
-                    ApplySOSSABlockEncoding(
-                        [control],
-                        outerPrepareOp,
-                        freeRiderOp,
-                        innerPrepareOp,
-                        selectOp,
-                        layout.numReflectInner,
-                        layout.numOuterIndexQubits,
-                        layout.numOuterPrepareGradientQubits,
-                        layout.numFreeRiderQubits,
-                        regs.outerReg,
-                        regs.innerReg + innerScratch,
-                        regs.spinReg,
-                        regs.systemReg,
-                        regs.phaseGradientReg,
-                    );
+        body ... {
+            for _ in 1..power {
+                if BeginEstimateCaching(cacheName, SingleVariant()) {
+                    ControlledSOSSAWalkStep(outerPrepareOp, freeRiderOp, innerPrepareOp, selectOp, layout, control, allQubits);
+                    EndEstimateCaching();
                 }
-                Controlled Reflect([control], walkAncillas);
-                EndEstimateCaching();
             }
         }
+        adjoint ... {
+            for _ in 1..power {
+                if BeginEstimateCaching(cacheName, SingleVariant()) {
+                    Adjoint ControlledSOSSAWalkStep(outerPrepareOp, freeRiderOp, innerPrepareOp, selectOp, layout, control, allQubits);
+                    EndEstimateCaching();
+                }
+            }
+        }
+    }
+
+    /// Apply one step of controlled-W, see `ControlledSOSSAWalkOnRegister`.
+    operation ControlledSOSSAWalkStep(
+        outerPrepareOp : (Qubit[]) => Unit is Adj + Ctl,
+        freeRiderOp : (Qubit[], Qubit[]) => Unit is Adj + Ctl,
+        innerPrepareOp : (Qubit[], Qubit[]) => Unit is Adj,
+        selectOp : (Qubit[], Qubit[], Qubit[], Qubit[], Qubit[]) => Unit is Adj + Ctl,
+        layout : SOSSAWalkLayout,
+        control : Qubit,
+        allQubits : Qubit[],
+    ) : Unit is Adj {
+        let regs = SOSSAWalkRegistersOf(layout, allQubits);
+        {
+            // The block encoding returns the inner scratch to |0⟩, so release it before Ref_a.
+            use innerScratch = Qubit[layout.numInnerQubits - layout.numReflectInner];
+            ApplySOSSABlockEncoding(
+                [control],
+                outerPrepareOp,
+                freeRiderOp,
+                innerPrepareOp,
+                selectOp,
+                layout.numReflectInner,
+                layout.numOuterIndexQubits,
+                layout.numOuterPrepareGradientQubits,
+                layout.numFreeRiderQubits,
+                regs.outerReg,
+                regs.innerReg + innerScratch,
+                regs.spinReg,
+                regs.systemReg,
+                regs.phaseGradientReg,
+            );
+        }
+        Controlled Reflect([control], regs.outerReg + regs.innerReg + regs.spinReg);
     }
 
     /// Select spin qubit and SWAP up/down registers (arXiv:2502.15882v1, Step 4).

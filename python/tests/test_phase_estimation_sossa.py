@@ -842,6 +842,33 @@ class TestControlledSOSSAMapper:
         assert cache_name(select_algorithm="direct") != reference
         assert cache_name(other_operator=factorized_hamiltonian_to_sossa_operator(other)) != reference
 
+    def test_estimate_counts_every_walk_step_in_either_direction(self):
+        """The cached estimate counts power steps of W or W†, whichever direction runs first."""
+        # Define the test operation before building the walk: evaluating new Q# invalidates earlier closures.
+        context = get_qsharp_context()
+        context.eval(
+            "operation SOSSAWalkTestEstimate(walk : (Qubit, Qubit[]) => Unit is Adj, numQubits : Int, "
+            "adjointFirst : Bool, thenForward : Bool) : Unit {"
+            " use control = Qubit(); use targets = Qubit[numQubits];"
+            " if adjointFirst { Adjoint walk(control, targets); } else { walk(control, targets); }"
+            " if thenForward { walk(control, targets); }"
+            " ResetAll([control] + targets); }"
+        )
+        operator = self._operator()
+
+        def counts(power, adjoint_first=False, then_forward=False):
+            walk = create("controlled_circuit_mapper", "sossa").run(SOSSABuilder(power=power).run(operator))
+            logical = context.logical_counts(
+                context.code.SOSSAWalkTestEstimate, walk._qsharp_op, walk.num_qubits - 1, adjoint_first, then_forward
+            )
+            return np.array([logical[key] for key in ("rotationCount", "cczCount", "measurementCount")])
+
+        step = counts(1)
+        assert step.all(), f"one walk step should use every counted resource: {step}"
+        np.testing.assert_array_equal(counts(3), 3 * step)
+        np.testing.assert_array_equal(counts(3, adjoint_first=True), 3 * step)
+        np.testing.assert_array_equal(counts(1, adjoint_first=True, then_forward=True), 2 * step)
+
 
 @pytest.mark.parametrize(
     ("select_algorithm", "prepare_consumes_gradient"),
