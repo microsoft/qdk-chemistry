@@ -58,6 +58,11 @@ The full constructor signature is:
 
 The ``encoding`` parameter records the fermion-to-qubit mapping assumed by the circuit (e.g., ``"jordan-wigner"``).
 
+Directly supplied QIR and QIR restored from JSON or HDF5 require an explicit
+``allow_external_qir`` opt-in in the QDK full-state executor. This execution
+policy does not prevent storing or inspecting circuits. Only enable it for
+trusted producers; see :doc:`../algorithms/circuit_executor`.
+
 
 .. _qsharp-factory-harness:
 
