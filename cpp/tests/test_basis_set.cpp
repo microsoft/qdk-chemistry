@@ -20,6 +20,16 @@
 
 #include "ut_common.hpp"
 
+#ifdef _WIN32
+#ifndef NOMINMAX
+#define NOMINMAX
+#endif
+// clang-format off
+#include <windows.h>
+#include <aclapi.h>
+// clang-format on
+#endif
+
 #define EXPECT_STRING_CONTAINS(str, query)                            \
   do {                                                                \
     std::string full_str(str);                                        \
@@ -1901,8 +1911,41 @@ TEST_F(BasisSetTest, BasisArchiveDirectoriesArePrivateAndScoped) {
     EXPECT_TRUE(std::filesystem::is_regular_file(second_file));
     EXPECT_TRUE(first.guess(true).has_value());
     EXPECT_TRUE(first.guess(false).has_value());
-#ifndef _WIN32
     const auto root = first_file.parent_path().parent_path().parent_path();
+#ifdef _WIN32
+    // Windows has no mode bits: the directory's protected DACL grants access
+    // only to its owner, and the extracted files inherit that DACL.
+    for (const auto& path : {root, first_file}) {
+      PSID owner = nullptr;
+      PACL dacl = nullptr;
+      PSECURITY_DESCRIPTOR descriptor = nullptr;
+      ASSERT_EQ(GetNamedSecurityInfoW(
+                    path.c_str(), SE_FILE_OBJECT,
+                    OWNER_SECURITY_INFORMATION | DACL_SECURITY_INFORMATION,
+                    &owner, nullptr, &dacl, nullptr, &descriptor),
+                static_cast<DWORD>(ERROR_SUCCESS));
+      const std::unique_ptr<void, decltype(&LocalFree)> security(descriptor,
+                                                                 &LocalFree);
+      if (path == root) {
+        SECURITY_DESCRIPTOR_CONTROL control = 0;
+        DWORD revision = 0;
+        ASSERT_TRUE(
+            GetSecurityDescriptorControl(descriptor, &control, &revision));
+        EXPECT_TRUE((control & SE_DACL_PROTECTED) != 0);
+      }
+      ASSERT_NE(dacl, nullptr) << path;
+      for (WORD i = 0; i < dacl->AceCount; ++i) {
+        void* ace = nullptr;
+        ASSERT_TRUE(GetAce(dacl, i, &ace));
+        const auto* allowed = static_cast<const ACCESS_ALLOWED_ACE*>(ace);
+        EXPECT_EQ(allowed->Header.AceType, ACCESS_ALLOWED_ACE_TYPE) << path;
+        PSID sid = const_cast<DWORD*>(&allowed->SidStart);
+        EXPECT_TRUE(IsWellKnownSid(sid, WinCreatorOwnerRightsSid) ||
+                    EqualSid(sid, owner))
+            << path;
+      }
+    }
+#else
     const auto permissions = std::filesystem::status(root).permissions();
     EXPECT_EQ(permissions & (std::filesystem::perms::group_all |
                              std::filesystem::perms::others_all),
