@@ -57,7 +57,7 @@ The :term:`QDK` also supports quantum programs built with Python frameworks such
 The :term:`QDK` extension provides Q# language support, while the required tutorial's Python scripts use QDK/Chemistry to generate the Q# circuit representations examined in later chapters.
 Create a folder for your downloaded tutorial files, then use **File > Open Folder** in Visual Studio Code to open it as your tutorial working folder.
 
-Use Python 3.10 or later on a platform supported by :term:`QDK`/Chemistry.
+Use Python 3.11 or later on a platform supported by :term:`QDK`/Chemistry.
 Released packages support Linux on x86-64 and Arm64, macOS on Apple silicon, and native Windows on x86-64 and Arm64.
 Windows users on either x86-64 or Arm64 can also use the `Windows Subsystem for Linux (WSL) <https://learn.microsoft.com/windows/wsl/install>`_, which uses the corresponding Linux wheels and Linux commands.
 The `installation instructions <https://github.com/microsoft/qdk-chemistry/blob/main/INSTALL.md>`_ contain the current support matrix.
@@ -75,7 +75,7 @@ Check the version before creating the environment:
 
       python --version
 
-Continue if the command reports Python 3.10 or later; otherwise, install a newer version of Python.
+Continue if the command reports Python 3.11 or later; otherwise, install a newer version of Python.
 
 Python environment setup
 =============================

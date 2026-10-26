@@ -1,7 +1,7 @@
 [build-system]
 build-backend = "scikit_build_core.build"
 requires = [
-  "scikit-build-core>=0.10.0",
+  "scikit-build-core>=1.0",
   "pybind11>=2.13.6",
   "numpy>=2.0.0,<2.4.0",
 ]
@@ -16,7 +16,6 @@ classifiers = [
   "Intended Audience :: Science/Research",
   "License :: OSI Approved :: MIT License",
   "Programming Language :: Python :: 3",
-  "Programming Language :: Python :: 3.10",
   "Programming Language :: Python :: 3.11",
   "Programming Language :: Python :: 3.12",
   "Programming Language :: Python :: 3.13",
@@ -48,7 +47,7 @@ license = { file = "LICENSE.txt" }
 dynamic = ["version"]
 name = "qdk-chemistry"
 readme = "README.md"
-requires-python = ">=3.10"
+requires-python = ">=3.11"
 
 [project.scripts]
 qc = "qdk_chemistry.ui.cli:main"
@@ -293,17 +292,17 @@ select = [
 
 # Scikit-build-core configuration
 [tool.scikit-build]
-experimental = true
+minimum-version = "build-system.requires"
 cmake.version = ">=3.15"
-cmake.build-type = "Release"
 # Build in current directory (python/)
 cmake.source-dir = "."
 # Enable verbose output for debugging
 build.verbose = true
 install.components = ["_core", "qdk_chemistry_resources"]
-metadata.version.provider = "_dev_version"
-metadata.version.provider-path = "."
-metadata.version.input = "../VERSION"
+
+# Applied only when not already set in the environment
+[tool.scikit-build.env]
+CMAKE_BUILD_PARALLEL_LEVEL = "4"
 
 [tool.scikit-build.wheel]
 packages = ["src/qdk_chemistry"]
@@ -315,20 +314,10 @@ BUILD_SHARED_LIBS = "OFF"
 QDK_CHEMISTRY_ENABLE_COVERAGE = {env="QDK_CHEMISTRY_ENABLE_COVERAGE", default="OFF"}
 QDK_UARCH = {env="QDK_UARCH", default="native"}
 QDK_ENABLE_OPENMP = {env="QDK_ENABLE_OPENMP"}
-CMAKE_BUILD_PARALLEL_LEVEL = {env="CMAKE_BUILD_PARALLEL_LEVEL", default="4"}
 
-[[tool.scikit-build.overrides]]
-if.env.CMAKE_BUILD_TYPE = "Debug"
-cmake.build-type = "Debug"
-
-[[tool.scikit-build.overrides]]
-if.env.CMAKE_BUILD_TYPE = "RelWithDebInfo"
-cmake.build-type = "RelWithDebInfo"
-
-[[tool.scikit-build.overrides]]
-if.from-sdist = true
-inherit.metadata.version = "append"
-metadata.version.input = "VERSION"
+[[tool.dynamic-metadata]]
+provider = {path = ".", module = "_dev_version"}
+input = "../VERSION"
 
 [[tool.scikit-build.generate]]
 path = "VERSION"

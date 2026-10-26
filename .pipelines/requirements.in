@@ -11,4 +11,4 @@ urllib3>=2.8.0
 # inside `python -m build`'s ephemeral isolated env, which CG never inspects).
 numpy>=2.0.0,<2.4.0
 pybind11>=2.13.6
-scikit-build-core>=0.10.0
+scikit-build-core>=1.0

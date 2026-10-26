@@ -4,6 +4,11 @@ Changelog
 
 For detailed release notes with code examples and feature walkthroughs, see the :doc:`release-notes/index` section.
 
+Unreleased
+==========
+
+- Raised the minimum supported Python version to 3.11 and removed Python 3.10 wheel builds
+
 Version 2.3.0
 =============
 
