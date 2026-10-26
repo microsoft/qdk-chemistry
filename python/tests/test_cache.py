@@ -563,6 +563,52 @@ class TestFolderCacheData:
         assert folder_cache.delete_data("list_hash")
         assert outside.read_bytes() == b"preserve"
 
+    @pytest.mark.parametrize("invalid_first", [False, True])
+    @pytest.mark.parametrize("manifest_kind", ["legacy", "dataclass", "ndarray"])
+    def test_delete_skips_invalid_references_in_any_order(self, folder_cache, cache_dir, manifest_kind, invalid_first):
+        """Invalid references are skipped wherever they appear, so valid ones still protect and delete blobs."""
+        cache_dir.mkdir()
+        shared = cache_dir / ("shared.ndarray.npy" if manifest_kind == "ndarray" else "shared.orbitals.h5")
+        shared.write_bytes(b"shared")
+
+        def write_manifest(name: str, keys: list[Any]) -> None:
+            manifest: dict[str, Any]
+            if manifest_kind == "legacy":
+                manifest = {"type": "orbitals", "items": keys}
+                path = cache_dir / f"{name}.list[orbitals].json"
+            else:
+                # A non-string key stands in for an entry that is not a reference at all.
+                items = [{"kind": manifest_kind, "hash": key} if isinstance(key, str) else key for key in keys]
+                manifest = {"kind": "sequence", "sequence_type": "list", "items": items}
+                path = cache_dir / f"{name}.list.json"
+            path.write_text(json.dumps(manifest))
+
+        invalid = ["../outside", 5]
+        write_manifest("first", ["shared"])
+        write_manifest("second", [*invalid, "shared"] if invalid_first else ["shared", *invalid])
+
+        assert folder_cache.delete_data("first")
+        assert shared.exists()
+        assert folder_cache.delete_data("second")
+        assert not shared.exists()
+
+    @pytest.mark.parametrize(
+        ("name", "manifest"),
+        [
+            ("list_hash.list.json", [1]),
+            ("list_hash.list.json", {"kind": "sequence", "sequence_type": "list", "items": [1]}),
+            ("list_hash.list[orbitals].json", "text"),
+            ("list_hash.list[orbitals].json", {"type": "orbitals", "items": 7}),
+        ],
+    )
+    def test_delete_malformed_manifest_is_removed(self, folder_cache, cache_dir, name, manifest):
+        """A manifest of the wrong shape is logged and removed instead of aborting deletion."""
+        cache_dir.mkdir()
+        (cache_dir / name).write_text(json.dumps(manifest))
+
+        assert folder_cache.delete_data("list_hash")
+        assert not (cache_dir / name).exists()
+
     def test_data_symlink_outside_root_is_miss(self, folder_cache, cache_dir, tmp_path, caplog):
         """A cache blob symlink that leaves the cache is a logged miss, and the next tier serves the data."""
         cache_dir.mkdir()

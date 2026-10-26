@@ -365,11 +365,11 @@ class FolderCache(CacheBackend):
         if generic_manifest.exists():
             try:
                 manifest = json.loads(self._checked_path(generic_manifest).read_text())
-                self._collect_data_nodes(manifest, child_nodes)
-            except (json.JSONDecodeError, OSError, KeyError, TypeError, ValueError) as exc:
-                # Best-effort cleanup: retain any collected child nodes and
-                # continue deleting even when the manifest is corrupt or unreadable.
-                logger.warning("Ignoring invalid cached sequence references in %s: %s", generic_manifest, exc)
+            except (json.JSONDecodeError, OSError, ValueError) as exc:
+                # Best-effort cleanup: continue deleting even when the manifest is corrupt or unreadable.
+                logger.warning("Ignoring invalid cached sequence manifest %s: %s", generic_manifest, exc)
+            else:
+                self._collect_data_nodes(manifest, child_nodes, generic_manifest)
             try:
                 generic_manifest.unlink()
                 deleted = True
@@ -382,20 +382,8 @@ class FolderCache(CacheBackend):
                 manifest = json.loads(self._checked_path(manifest_path).read_text())
             except (json.JSONDecodeError, OSError, ValueError) as exc:
                 logger.warning("Ignoring invalid cached list manifest %s: %s", manifest_path, exc)
-                try:
-                    manifest_path.unlink()
-                    deleted = True
-                except OSError:
-                    pass
-                continue
-
-            for item_hash in manifest.get("items", []):
-                try:
-                    self._validate_key(item_hash, "content_hash")
-                except ValueError as exc:
-                    logger.warning("Ignoring invalid cached list reference in %s: %s", manifest_path, exc)
-                    continue
-                child_nodes.add(("dataclass", item_hash))
+            else:
+                self._collect_list_items(manifest, child_nodes, manifest_path)
             try:
                 manifest_path.unlink()
                 deleted = True
@@ -432,20 +420,32 @@ class FolderCache(CacheBackend):
             return False
 
     @staticmethod
-    def _collect_data_nodes(node: dict[str, Any], nodes: set[tuple[str, str]]) -> None:
-        """Collect data blobs referenced by a generic manifest node."""
-        kind = node.get("kind")
-        if kind == "dataclass":
-            FolderCache._validate_key(node["hash"], "content_hash")
-            nodes.add((kind, node["hash"]))
+    def _collect_data_nodes(node: Any, nodes: set[tuple[str, str]], manifest_path: pathlib.Path) -> None:
+        """Collect the blob references in a generic manifest node, skipping invalid entries."""
+        kind = node.get("kind") if isinstance(node, dict) else None
+        if kind == "sequence" and isinstance(node.get("items"), list):
+            for item in node["items"]:
+                FolderCache._collect_data_nodes(item, nodes, manifest_path)
+        elif kind in ("dataclass", "ndarray"):
+            try:
+                FolderCache._validate_key(node.get("hash"), "content_hash")
+            except ValueError as exc:
+                logger.warning("Ignoring invalid cached reference in %s: %s", manifest_path, exc)
+            else:
+                nodes.add((kind, node["hash"]))
+        elif kind != "primitive":
+            logger.warning("Ignoring invalid cached sequence entry in %s", manifest_path)
+
+    @staticmethod
+    def _collect_list_items(manifest: Any, nodes: set[tuple[str, str]], manifest_path: pathlib.Path) -> None:
+        """Collect the item references in a homogeneous list manifest, skipping invalid items."""
+        items = manifest.get("items") if isinstance(manifest, dict) else None
+        if not isinstance(items, list):
+            logger.warning("Ignoring invalid cached list manifest %s", manifest_path)
             return
-        if kind == "ndarray":
-            FolderCache._validate_key(node["hash"], "content_hash")
-            nodes.add((kind, node["hash"]))
-            return
-        if kind == "sequence":
-            for item in node.get("items", []):
-                FolderCache._collect_data_nodes(item, nodes)
+        for item_hash in items:
+            # Each item of a homogeneous list is a DataClass reference.
+            FolderCache._collect_data_nodes({"kind": "dataclass", "hash": item_hash}, nodes, manifest_path)
 
     def _referenced_data_nodes(self) -> set[tuple[str, str]]:
         """Return data blobs referenced by sequence manifests in the cache."""
@@ -453,19 +453,17 @@ class FolderCache(CacheBackend):
         for manifest_path in self._root.glob("*.list.json"):
             try:
                 manifest = json.loads(self._checked_path(manifest_path).read_text())
-                self._collect_data_nodes(manifest, nodes)
-            except (json.JSONDecodeError, OSError, KeyError, TypeError, ValueError) as exc:
-                logger.warning("Ignoring invalid cached sequence references in %s: %s", manifest_path, exc)
-                continue
+            except (json.JSONDecodeError, OSError, ValueError) as exc:
+                logger.warning("Ignoring invalid cached sequence manifest %s: %s", manifest_path, exc)
+            else:
+                self._collect_data_nodes(manifest, nodes, manifest_path)
         for manifest_path in self._root.glob("*.list[[]*].json"):
             try:
                 manifest = json.loads(self._checked_path(manifest_path).read_text())
-                for item_hash in manifest["items"]:
-                    self._validate_key(item_hash, "content_hash")
-                    nodes.add(("dataclass", item_hash))
-            except (json.JSONDecodeError, OSError, KeyError, TypeError, ValueError) as exc:
-                logger.warning("Ignoring invalid cached list references in %s: %s", manifest_path, exc)
-                continue
+            except (json.JSONDecodeError, OSError, ValueError) as exc:
+                logger.warning("Ignoring invalid cached list manifest %s: %s", manifest_path, exc)
+            else:
+                self._collect_list_items(manifest, nodes, manifest_path)
         return nodes
 
     def clear(self) -> None:
