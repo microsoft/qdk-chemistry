@@ -45,8 +45,10 @@ steps:
 - ${{ if eq(parameters.arch, 'arm64') }}:
   - pwsh: >-
       $(System.DefaultWorkingDirectory)\.pipelines\install-scripts\ensure-python-windows.ps1
-      -Arch arm64 -Version ${{ parameters.pythonVersion }} -IncludePip
+      -Arch arm64 -Version "$env:QDK_PYTHON_VERSION" -IncludePip
     displayName: Use Python ${{ parameters.pythonVersion }} (arm64)
+    env:
+      QDK_PYTHON_VERSION: ${{ parameters.pythonVersion }}
 
 - pwsh: |
     python "$(System.DefaultWorkingDirectory)\.pipelines\pip-scripts\versioning.py" `
@@ -88,7 +90,7 @@ steps:
 - pwsh: |
     $fp = & "$(System.DefaultWorkingDirectory)\.pipelines\install-scripts\install-cpp-deps-windows.ps1" `
         -SrcDir    "$(System.DefaultWorkingDirectory)" `
-        -BuildType "${{ parameters.buildType }}" `
+        -BuildType "$env:QDK_BUILD_TYPE" `
         -Triplet   "$(VCPKG_TRIPLET)" `
         -ClPath    "$(CL_PATH)" `
         -EmitFingerprint | Select-Object -Last 1
@@ -96,6 +98,8 @@ steps:
     Write-Host "deps build plan fingerprint: $fp"
     Write-Host "##vso[task.setvariable variable=DEPS_FINGERPRINT]$fp"
   displayName: Compute dependency build plan fingerprint
+  env:
+    QDK_BUILD_TYPE: ${{ parameters.buildType }}
 
 - task: Cache@2
   displayName: Restore/save C++ deps install cache

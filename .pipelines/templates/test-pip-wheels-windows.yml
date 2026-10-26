@@ -23,8 +23,10 @@ steps:
 - ${{ if eq(parameters.arch, 'arm64') }}:
   - pwsh: >-
       $(System.DefaultWorkingDirectory)\.pipelines\install-scripts\ensure-python-windows.ps1
-      -Arch arm64 -Version ${{ parameters.pythonVersion }} -IncludePip
+      -Arch arm64 -Version "$env:QDK_PYTHON_VERSION" -IncludePip
     displayName: Use Python ${{ parameters.pythonVersion }} (arm64)
+    env:
+      QDK_PYTHON_VERSION: ${{ parameters.pythonVersion }}
 
 - pwsh: |
     $ErrorActionPreference = 'Stop'
@@ -32,11 +34,13 @@ steps:
     $pythonEnv = if ('${{ parameters.arch }}' -eq 'arm64') { 'venv' } else { 'conda' }
     & "$(System.DefaultWorkingDirectory)\.pipelines\pip-scripts\test-pip-wheels-windows.ps1" `
       -SrcDir "$(System.DefaultWorkingDirectory)" `
-      -PythonVersion '${{ parameters.pythonVersion }}' `
+      -PythonVersion "$env:QDK_PYTHON_VERSION" `
       -PythonEnv $pythonEnv `
       -Triplet '$(VCPKG_TRIPLET)' `
-      -RunSlowTests '${{ parameters.runSlowTests }}'
+      -RunSlowTests "$env:QDK_RUN_SLOW_TESTS"
   displayName: Audit and test wheel (Windows, Python ${{ parameters.pythonVersion }})
   condition: ${{ parameters.condition }}
   env:
+    QDK_PYTHON_VERSION: ${{ parameters.pythonVersion }}
+    QDK_RUN_SLOW_TESTS: ${{ parameters.runSlowTests }}
     SYSTEM_ACCESSTOKEN: $(System.AccessToken)
