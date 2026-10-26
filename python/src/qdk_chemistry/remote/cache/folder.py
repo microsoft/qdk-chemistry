@@ -86,7 +86,11 @@ class FolderCache(CacheBackend):
 
     def _within_root(self, path: pathlib.Path) -> bool:
         """Return whether *path* resolves inside the configured root."""
-        return path.resolve().is_relative_to(self._root.resolve())
+        try:
+            return path.resolve().is_relative_to(self._root.resolve())
+        except (OSError, RuntimeError):
+            # Before Python 3.13, resolving a symlink loop raises RuntimeError.
+            return False
 
     def _checked_path(self, path: pathlib.Path) -> pathlib.Path:
         """Reject cache paths that resolve outside the configured root."""
@@ -193,7 +197,11 @@ class FolderCache(CacheBackend):
         """Reconstruct a nested list or tuple result from a generic manifest."""
         try:
             manifest = json.loads(manifest_path.read_text())
-            if manifest.get("kind") != "sequence" or manifest.get("sequence_type") not in {"list", "tuple"}:
+            if (
+                not isinstance(manifest, dict)
+                or manifest.get("kind") != "sequence"
+                or manifest.get("sequence_type") not in {"list", "tuple"}
+            ):
                 raise ValueError("Invalid cached sequence manifest")
             data = self._node_to_data(manifest)
         except (json.JSONDecodeError, KeyError, OSError, TypeError, ValueError) as exc:

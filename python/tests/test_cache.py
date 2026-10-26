@@ -435,6 +435,13 @@ class TestFolderCacheData:
 
         assert folder_cache.get_data("list_hash") is None
 
+    def test_get_data_non_object_sequence_manifest_is_miss(self, folder_cache, cache_dir):
+        """Sequence manifests that are not JSON objects behave like cache misses."""
+        cache_dir.mkdir()
+        (cache_dir / "list_hash.list.json").write_text(json.dumps([1]))
+
+        assert folder_cache.get_data("list_hash") is None
+
     def test_put_and_get_nested_list_tuple_result(self, folder_cache):
         """Nested list/tuple results with mixed DataClass items round-trip."""
         energy = EnergyExpectationResult(
@@ -621,6 +628,19 @@ class TestFolderCacheData:
         shared.put_data("array_hash", np.array([2.0]))
         np.testing.assert_array_equal(TieredCache([folder_cache, shared]).get_data("array_hash"), [2.0])
         np.testing.assert_array_equal(np.load(outside), [1.0])
+
+    def test_symlink_loop_is_miss(self, folder_cache, cache_dir):
+        """A cache entry that is a symlink loop is a miss, and deleting it removes the link."""
+        cache_dir.mkdir()
+        loop = cache_dir / "list_hash.list[orbitals].json"
+        try:
+            loop.symlink_to(loop)
+        except OSError as exc:
+            pytest.skip(f"Symlink creation is not supported: {exc}")
+
+        assert folder_cache.get_data("list_hash") is None
+        assert folder_cache.delete_data("list_hash")
+        assert not loop.is_symlink()
 
 
 # ── FolderCache: clear ───────────────────────────────────────────────────────
