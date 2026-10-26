@@ -116,7 +116,7 @@ CholeskyHamiltonianContainer::get_two_body_integrals() const {
 
   // Lazily build and cache the four-center integrals on first access
   if (!std::get<0>(_cached_four_center_integrals)) {
-    _build_four_center_cache();
+    prepare_two_body_integrals();
   }
 
   return std::make_tuple(
@@ -125,7 +125,30 @@ CholeskyHamiltonianContainer::get_two_body_integrals() const {
       std::cref(*std::get<2>(_cached_four_center_integrals)));
 }
 
-void CholeskyHamiltonianContainer::_build_four_center_cache() const {
+void CholeskyHamiltonianContainer::prepare_two_body_integrals(
+    bool use_symmetry) const {
+  QDK_LOG_TRACE_ENTERING();
+  if (!has_two_body_integrals()) {
+    throw std::runtime_error("Three-center integrals are not set");
+  }
+  if (use_symmetry && !is_hermitian()) {
+    throw std::invalid_argument(
+        "Symmetry-based materialization requires a Hermitian Hamiltonian");
+  }
+  if (std::get<0>(_cached_four_center_integrals)) {
+    if (_four_center_cache_uses_symmetry != use_symmetry) {
+      throw std::invalid_argument(
+          "Four-center integrals were already cached with a different "
+          "materialization policy");
+    }
+    return;
+  }
+  _build_four_center_cache(use_symmetry);
+  _four_center_cache_uses_symmetry = use_symmetry;
+}
+
+void CholeskyHamiltonianContainer::_build_four_center_cache(
+    bool use_symmetry) const {
   QDK_LOG_TRACE_ENTERING();
 
   size_t norb =
@@ -142,9 +165,55 @@ void CholeskyHamiltonianContainer::_build_four_center_cache() const {
       -> std::shared_ptr<Eigen::VectorXd> {
     auto four_center = std::make_shared<Eigen::VectorXd>(norb4);
     size_t naux = three_left.cols();
-    blas::gemm(blas::Layout::ColMajor, blas::Op::NoTrans, blas::Op::Trans,
-               norb2, norb2, naux, 1.0, three_right.data(), norb2,
-               three_left.data(), norb2, 0.0, four_center->data(), norb2);
+    if (!use_symmetry) {
+      blas::gemm(blas::Layout::ColMajor, blas::Op::NoTrans, blas::Op::Trans,
+                 norb2, norb2, naux, 1.0, three_right.data(), norb2,
+                 three_left.data(), norb2, 0.0, four_center->data(), norb2);
+      return four_center;
+    }
+
+    // Hermitian integrals are symmetric under i <-> j and k <-> l (and
+    // ij <-> kl within a spin channel). Each unique integral is evaluated
+    // once over the orbital pairs i >= j, from the symmetric part of the
+    // three-center integrals, so that these symmetries hold exactly.
+    size_t npair = norb * (norb + 1) / 2;
+    std::vector<size_t> pair(norb2);
+    for (size_t i = 0, ij = 0; i < norb; ++i) {
+      for (size_t j = 0; j <= i; ++j, ++ij) {
+        pair[i * norb + j] = pair[j * norb + i] = ij;
+      }
+    }
+    auto symmetric_part = [&](const Eigen::MatrixXd& three) {
+      Eigen::MatrixXd packed(npair, naux);
+      for (size_t Q = 0; Q < naux; ++Q) {
+        for (size_t i = 0; i < norb; ++i) {
+          for (size_t j = 0; j <= i; ++j) {
+            packed(pair[i * norb + j], Q) =
+                0.5 * (three(i * norb + j, Q) + three(j * norb + i, Q));
+          }
+        }
+      }
+      return packed;
+    };
+    const Eigen::MatrixXd left = symmetric_part(three_left);
+    Eigen::MatrixXd unique(npair, npair);
+    if (&three_left == &three_right) {
+      blas::syrk(blas::Layout::ColMajor, blas::Uplo::Lower, blas::Op::NoTrans,
+                 npair, naux, 1.0, left.data(), npair, 0.0, unique.data(),
+                 npair);
+      unique.triangularView<Eigen::StrictlyUpper>() = unique.transpose();
+    } else {
+      const Eigen::MatrixXd right = symmetric_part(three_right);
+      blas::gemm(blas::Layout::ColMajor, blas::Op::NoTrans, blas::Op::Trans,
+                 npair, npair, naux, 1.0, right.data(), npair, left.data(),
+                 npair, 0.0, unique.data(), npair);
+    }
+    for (size_t ij = 0; ij < norb2; ++ij) {
+      double* row = four_center->data() + ij * norb2;
+      for (size_t kl = 0; kl < norb2; ++kl) {
+        row[kl] = unique(pair[kl], pair[ij]);
+      }
+    }
     return four_center;
   };
 
@@ -205,7 +274,7 @@ double CholeskyHamiltonianContainer::get_two_body_element(
   }
 
   if (!std::get<0>(_cached_four_center_integrals)) {
-    _build_four_center_cache();
+    prepare_two_body_integrals();
   }
 
   size_t ij = i * norb + j;

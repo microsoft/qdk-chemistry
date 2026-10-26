@@ -1030,6 +1030,17 @@ TEST_F(HamiltonianConstructorTest, CholeskyRestrictedO2) {
         hamiltonian->get_container<CholeskyHamiltonianContainer>();
     EXPECT_EQ(container.get_container_type(), "cholesky");
   });
+
+  // The MO Cholesky vectors are exactly symmetric in their orbital pair
+  const auto norb = std::get<0>(hamiltonian->get_one_body_integrals()).rows();
+  const Eigen::MatrixXd& L =
+      hamiltonian->get_container<CholeskyHamiltonianContainer>()
+          .get_three_center_integrals()
+          .first;
+  for (Eigen::Index k = 0; k < L.cols(); ++k) {
+    const Eigen::Map<const Eigen::MatrixXd> L_k(L.col(k).data(), norb, norb);
+    EXPECT_EQ((L_k - L_k.transpose()).cwiseAbs().maxCoeff(), 0.0);
+  }
 }
 
 TEST_F(HamiltonianConstructorTest, CholeskyUnrestrictedO2) {
@@ -1224,6 +1235,97 @@ TEST_F(HamiltonianTest, CholeskyContainerClone) {
   auto [h1_one_alpha, h1_one_beta] = h1.get_one_body_integrals();
   auto [h2_one_alpha, h2_one_beta] = h2.get_one_body_integrals();
   EXPECT_TRUE(h1_one_alpha.isApprox(h2_one_alpha));
+}
+
+TEST_F(HamiltonianTest, CholeskyContainerTwoBodySymmetry) {
+  // Hermitian four-center integrals come from the symmetric part of the
+  // three-center integrals and have exact permutational symmetry; the
+  // non-Hermitian ones are the plain product.
+  constexpr Eigen::Index norb = 3;
+  constexpr Eigen::Index naux = 4;
+  const Eigen::MatrixXd L_a = Eigen::MatrixXd::Random(norb * norb, naux);
+  const Eigen::MatrixXd L_b = Eigen::MatrixXd::Random(norb * norb, naux);
+  auto symmetric_part = [&](const Eigen::MatrixXd& L) {
+    Eigen::MatrixXd S(norb * norb, naux);
+    for (Eigen::Index i = 0; i < norb; ++i) {
+      for (Eigen::Index j = 0; j < norb; ++j) {
+        S.row(i * norb + j) = 0.5 * (L.row(i * norb + j) + L.row(j * norb + i));
+      }
+    }
+    return S;
+  };
+  const Eigen::MatrixXd S_a = symmetric_part(L_a);
+  const Eigen::MatrixXd S_b = symmetric_part(L_b);
+  const Eigen::MatrixXd one_body = Eigen::MatrixXd::Identity(norb, norb);
+  const Eigen::MatrixXd fock = Eigen::MatrixXd::Zero(0, 0);
+
+  Hamiltonian hermitian(std::make_unique<CholeskyHamiltonianContainer>(
+      one_body, one_body, L_a, L_b,
+      std::make_shared<ModelOrbitals>(norb, model_spin_symmetry(false)), 0.0,
+      fock, fock));
+  Hamiltonian default_hermitian(hermitian);
+  Hamiltonian non_hermitian(std::make_unique<CholeskyHamiltonianContainer>(
+      one_body, L_a,
+      std::make_shared<ModelOrbitals>(norb, model_spin_symmetry(true)), 0.0,
+      fock, std::nullopt, HamiltonianType::NonHermitian));
+  const auto& optimized =
+      hermitian.get_container<CholeskyHamiltonianContainer>();
+  optimized.prepare_two_body_integrals(true);
+  EXPECT_NO_THROW(optimized.prepare_two_body_integrals(true));
+  EXPECT_THROW(optimized.prepare_two_body_integrals(false),
+               std::invalid_argument);
+  const auto& [aaaa, aabb, bbbb] = hermitian.get_two_body_integrals();
+  const auto& [default_aaaa, default_aabb, default_bbbb] =
+      default_hermitian.get_two_body_integrals();
+  EXPECT_NO_THROW(
+      default_hermitian.get_container<CholeskyHamiltonianContainer>()
+          .prepare_two_body_integrals());
+  EXPECT_THROW(default_hermitian.get_container<CholeskyHamiltonianContainer>()
+                   .prepare_two_body_integrals(true),
+               std::invalid_argument);
+  EXPECT_THROW(non_hermitian.get_container<CholeskyHamiltonianContainer>()
+                   .prepare_two_body_integrals(true),
+               std::invalid_argument);
+  const Eigen::VectorXd& plain =
+      std::get<0>(non_hermitian.get_two_body_integrals());
+
+  auto at = [&](const Eigen::VectorXd& v, Eigen::Index i, Eigen::Index j,
+                Eigen::Index k, Eigen::Index l) {
+    return v(((i * norb + j) * norb + k) * norb + l);
+  };
+  for (Eigen::Index i = 0; i < norb; ++i) {
+    for (Eigen::Index j = 0; j < norb; ++j) {
+      for (Eigen::Index k = 0; k < norb; ++k) {
+        for (Eigen::Index l = 0; l < norb; ++l) {
+          const Eigen::Index ij = i * norb + j;
+          const Eigen::Index kl = k * norb + l;
+          EXPECT_NEAR(at(aaaa, i, j, k, l), S_a.row(ij).dot(S_a.row(kl)),
+                      testing::numerical_zero_tolerance);
+          EXPECT_NEAR(at(aabb, i, j, k, l), S_a.row(ij).dot(S_b.row(kl)),
+                      testing::numerical_zero_tolerance);
+          EXPECT_NEAR(at(bbbb, i, j, k, l), S_b.row(ij).dot(S_b.row(kl)),
+                      testing::numerical_zero_tolerance);
+          EXPECT_NEAR(at(default_aaaa, i, j, k, l),
+                      L_a.row(ij).dot(L_a.row(kl)),
+                      testing::numerical_zero_tolerance);
+          EXPECT_NEAR(at(default_aabb, i, j, k, l),
+                      L_a.row(ij).dot(L_b.row(kl)),
+                      testing::numerical_zero_tolerance);
+          EXPECT_NEAR(at(default_bbbb, i, j, k, l),
+                      L_b.row(ij).dot(L_b.row(kl)),
+                      testing::numerical_zero_tolerance);
+          EXPECT_NEAR(at(plain, i, j, k, l), L_a.row(ij).dot(L_a.row(kl)),
+                      testing::numerical_zero_tolerance);
+          for (const Eigen::VectorXd* v : {&aaaa, &aabb, &bbbb}) {
+            EXPECT_EQ(at(*v, j, i, k, l), at(*v, i, j, k, l));
+            EXPECT_EQ(at(*v, i, j, l, k), at(*v, i, j, k, l));
+          }
+          EXPECT_EQ(at(aaaa, k, l, i, j), at(aaaa, i, j, k, l));
+          EXPECT_EQ(at(bbbb, k, l, i, j), at(bbbb, i, j, k, l));
+        }
+      }
+    }
+  }
 }
 
 TEST_F(HamiltonianTest, SparseContainerConstructionWithTwoBody) {
