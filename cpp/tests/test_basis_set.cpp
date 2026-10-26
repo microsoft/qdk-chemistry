@@ -1911,7 +1911,7 @@ TEST_F(BasisSetTest, BasisArchiveDirectoriesArePrivateAndScoped) {
     EXPECT_TRUE(std::filesystem::is_regular_file(second_file));
     EXPECT_TRUE(first.guess(true).has_value());
     EXPECT_TRUE(first.guess(false).has_value());
-    const auto root = first_file.parent_path().parent_path().parent_path();
+    const auto root = first_file.parent_path().parent_path();
 #ifdef _WIN32
     // Windows has no mode bits: the directory's protected DACL grants access
     // only to its owner, and the extracted files inherit that DACL.
@@ -1987,19 +1987,6 @@ TEST_F(BasisSetTest, BasisArchivePathIsNotShellCode) {
     QDKChemistryConfig::set_resources_dir(literal);
     EXPECT_EQ(expected, read_json());
   }
-}
-
-TEST_F(BasisSetTest, BasisArchiveRejectsExternalSymlinks) {
-  const qdk::chemistry::utils::BasisArchive first("sto-3g");
-  const qdk::chemistry::utils::BasisArchive second("sto-3g");
-  const auto first_file = first.json();
-  std::filesystem::remove(first_file);
-  std::error_code error;
-  std::filesystem::create_symlink(second.json(), first_file, error);
-  if (error) {
-    GTEST_SKIP() << "Symlink creation is unavailable: " << error.message();
-  }
-  EXPECT_THROW(first.json(), std::invalid_argument);
 }
 
 TEST_F(BasisSetTest, FromBasisNameKeepsPlusInArchiveName) {

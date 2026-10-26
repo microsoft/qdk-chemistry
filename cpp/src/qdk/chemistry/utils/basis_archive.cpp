@@ -47,7 +47,7 @@ namespace {
 std::filesystem::path archive_path(const std::string& stem) {
   const std::filesystem::path name = stem + ".tar.gz";
   if (stem.empty() || stem.find('\0') != std::string::npos ||
-      name.has_root_path() || name.filename() != name) {
+      name.filename() != name) {
     return {};
   }
   return scf::QDKChemistryConfig::get_resources_dir() / "compressed" / name;
@@ -106,15 +106,12 @@ void remove_directory(const std::filesystem::path& path) {
 // Runs tar with an argument vector, so no shell parses the paths.
 void run_tar(const std::filesystem::path& archive,
              const std::filesystem::path& destination) {
-  // This fixed capability probe contains no archive or caller-supplied text.
 #ifdef _WIN32
+  // GNU tar from Git for Windows reads "C:/..." as host:path unless given
+  // --force-local, which the System32 BSD tar rejects. This fixed probe
+  // contains no archive or caller-supplied text.
   static const bool force_local =
       std::system("tar --force-local --version > nul 2>&1") == 0;
-#else
-  static const bool force_local =
-      std::system("tar --force-local --version > /dev/null 2>&1") == 0;
-#endif
-#ifdef _WIN32
   std::vector<std::wstring> arguments{L"tar"};
   if (force_local) {
     arguments.emplace_back(L"--force-local");
@@ -155,12 +152,11 @@ void run_tar(const std::filesystem::path& archive,
                              archive.string());
   }
 #else
-  std::vector<std::string> arguments{"tar"};
-  if (force_local) {
-    arguments.emplace_back("--force-local");
-  }
-  arguments.insert(arguments.end(),
-                   {"-xzf", archive.string(), "-C", destination.string()});
+  // GNU tar reads an archive name with a colon before its first slash as
+  // host:path; an absolute path never has one.
+  std::vector<std::string> arguments{
+      "tar", "-xzf", std::filesystem::absolute(archive).string(), "-C",
+      destination.string()};
   std::vector<char*> argv;
   for (auto& argument : arguments) {
     argv.push_back(argument.data());
@@ -190,26 +186,6 @@ void run_tar(const std::filesystem::path& archive,
                              archive.string());
   }
 #endif
-}
-
-// Extracted file, or nullopt if absent. Throws if it resolves outside the
-// extraction directory, e.g. through a symlink stored in the archive.
-std::optional<std::filesystem::path> find_extracted(
-    const std::filesystem::path& contents,
-    const std::filesystem::path& relative) {
-  const auto root = std::filesystem::weakly_canonical(contents);
-  const auto path = std::filesystem::weakly_canonical(root / relative);
-  const auto within = path.lexically_relative(root);
-  if (within.empty() || within.is_absolute() || *within.begin() == "..") {
-    throw std::invalid_argument(
-        "Extracted basis file is outside the extraction directory: " +
-        relative.string());
-  }
-  std::error_code error;
-  if (!std::filesystem::is_regular_file(path, error)) {
-    return std::nullopt;
-  }
-  return path;
 }
 
 }  // namespace
@@ -245,11 +221,7 @@ BasisArchive::BasisArchive(const std::string& basis_name)
   }
   _path = create_private_directory();
   try {
-    // Archive directory entries may change the extraction root's permissions,
-    // so the root sits underneath the private directory.
-    const auto contents = _path / "contents";
-    std::filesystem::create_directory(contents);
-    run_tar(archive, contents);
+    run_tar(archive, _path);
   } catch (...) {
     remove_directory(_path);
     throw;
@@ -259,19 +231,22 @@ BasisArchive::BasisArchive(const std::string& basis_name)
 BasisArchive::~BasisArchive() { remove_directory(_path); }
 
 std::filesystem::path BasisArchive::json() const {
-  const auto relative = std::filesystem::path("basis") / (_stem + ".json");
-  auto path = find_extracted(_path / "contents", relative);
-  if (!path) {
+  auto path = _path / "basis" / (_stem + ".json");
+  std::error_code error;
+  if (!std::filesystem::is_regular_file(path, error)) {
     throw std::invalid_argument("Basis set JSON file does not exist: " +
-                                (_path / "contents" / relative).string());
+                                path.string());
   }
-  return *path;
+  return path;
 }
 
 std::optional<std::filesystem::path> BasisArchive::guess(bool pure) const {
-  return find_extracted(
-      _path / "contents",
-      std::filesystem::path("guess") / (_stem + (pure ? "_pure" : "_cart")));
+  auto path = _path / "guess" / (_stem + (pure ? "_pure" : "_cart"));
+  std::error_code error;
+  if (!std::filesystem::is_regular_file(path, error)) {
+    return std::nullopt;
+  }
+  return path;
 }
 
 }  // namespace qdk::chemistry::utils

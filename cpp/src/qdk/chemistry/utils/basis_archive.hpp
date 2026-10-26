@@ -24,27 +24,20 @@ namespace qdk::chemistry::utils {
 class BasisArchive {
  public:
   /**
-   * @brief Map a basis-set name to the stem of its archive.
+   * @brief Map a basis-set name to the stem of its archive, e.g. "6-31g*" to
+   * "6-31g_st_".
    *
    * '*' becomes "_st_" and '/' becomes "_sl_"; every other character,
    * including '+', is kept, as in the shipped archive names. A stem maps to
    * itself.
-   *
-   * @param basis_name Basis-set name, e.g. "6-31g*"
-   * @return Archive stem, e.g. "6-31g_st_"
    */
   static std::string stem(const std::string& basis_name);
 
-  /**
-   * @brief Check whether an archive is shipped for a basis set.
-   * @param basis_name Basis-set name or archive stem
-   * @return True if the archive for the name's stem exists
-   */
+  /// Whether an archive is shipped for the stem of a basis-set name.
   static bool exists(const std::string& basis_name);
 
   /**
-   * @brief Extract the archive for a basis set.
-   * @param basis_name Basis-set name or archive stem
+   * @brief Extract the archive for a basis-set name or stem.
    * @throws std::invalid_argument if no archive is shipped for the name
    * @throws std::system_error if the directory cannot be created or tar
    *         cannot be launched
@@ -52,44 +45,26 @@ class BasisArchive {
    */
   explicit BasisArchive(const std::string& basis_name);
 
-  /**
-   * @brief Remove the extraction directory and its contents.
-   */
   ~BasisArchive();
 
-  /**
-   * @brief Deleted: each object owns its extraction directory.
-   */
   BasisArchive(const BasisArchive&) = delete;
-
-  /**
-   * @brief Deleted: each object owns its extraction directory.
-   */
   BasisArchive& operator=(const BasisArchive&) = delete;
 
   /**
    * @brief Path of the extracted basis-set JSON file.
-   * @return Path that is valid while this object is alive
-   * @throws std::invalid_argument if the archive has no basis JSON file or it
-   *         resolves outside the extraction directory
+   * @throws std::invalid_argument if the archive has no basis JSON file
    */
   std::filesystem::path json() const;
 
   /**
-   * @brief Path of the extracted precomputed atomic guess, if shipped.
+   * @brief Path of the extracted precomputed atomic guess, or std::nullopt if
+   * the archive ships none.
    * @param pure True for spherical (pure) functions, false for Cartesian
-   * @return Path that is valid while this object is alive, or std::nullopt if
-   *         the archive ships no such guess
-   * @throws std::invalid_argument if the guess file resolves outside the
-   *         extraction directory
    */
   std::optional<std::filesystem::path> guess(bool pure) const;
 
  private:
-  /// Archive stem of the extracted basis set.
   std::string _stem;
-
-  /// Private extraction directory; the archive contents are in `contents/`.
   std::filesystem::path _path;
 };
 
