@@ -36,24 +36,6 @@ static SparseMapBlock<4, double> to_sparse_block(
 }
 
 namespace detail {
-static void validate_sparse_orbital_count(std::size_t n) {
-  const auto max_elements = std::vector<double>().max_size();
-  if (n > static_cast<std::size_t>(std::numeric_limits<int>::max()) ||
-      (n != 0 && n > max_elements / n)) {
-    throw std::invalid_argument("Invalid sparse Hamiltonian orbital count");
-  }
-}
-
-static Eigen::MatrixXd dense_sparse_one_body(
-    const Eigen::SparseMatrix<double>& integrals) {
-  validate_sparse_orbital_count(static_cast<std::size_t>(integrals.rows()));
-  if (integrals.rows() != integrals.cols()) {
-    throw std::invalid_argument(
-        "Sparse one-body integrals must be a square matrix");
-  }
-  return Eigen::MatrixXd(integrals);
-}
-
 /**
  * @brief Pack two 32-bit unsigned indices into a single double via bitwise
  *        reinterpretation.
@@ -129,9 +111,8 @@ SparseHamiltonianContainer::SparseHamiltonianContainer(
     std::shared_ptr<const SymmetryBlockedSparseMap<4>> two_body,
     double core_energy, HamiltonianType type)
     : HamiltonianContainer(
-          make_spin_diagonal_rank2_sbt(
-              detail::dense_sparse_one_body(one_body_integrals),
-              Eigen::MatrixXd{}, /*restricted=*/true),
+          make_spin_diagonal_rank2_sbt(Eigen::MatrixXd(one_body_integrals),
+                                       Eigen::MatrixXd{}, /*restricted=*/true),
           _make_orbitals(static_cast<int>(one_body_integrals.rows())),
           core_energy,
           make_spin_diagonal_rank2_sbt(
@@ -269,7 +250,10 @@ SparseHamiltonianContainer::from_json(const nlohmann::json& j) {
     // Load one-body integrals (sparse triplets)
     const auto num_orbitals = detail::json_integer<std::size_t>(
         j.value("num_orbitals", nlohmann::json(0)));
-    detail::validate_sparse_orbital_count(num_orbitals);
+    if (num_orbitals >
+        static_cast<std::size_t>(std::numeric_limits<int>::max())) {
+      throw std::invalid_argument("Invalid sparse Hamiltonian orbital count");
+    }
     const auto n = static_cast<int>(num_orbitals);
     Eigen::SparseMatrix<double> one_body_sparse(n, n);
     if (j.value("has_one_body_integrals", false)) {
@@ -477,10 +461,9 @@ SparseHamiltonianContainer::from_hdf5(H5::Group& group) {
       }
       long long count = 0;
       norb_attr.read(H5::PredType::NATIVE_LLONG, &count);
-      if (count < 0) {
+      if (count < 0 || count > std::numeric_limits<int>::max()) {
         throw std::invalid_argument("Invalid sparse Hamiltonian orbital count");
       }
-      detail::validate_sparse_orbital_count(static_cast<std::size_t>(count));
       n_orb = static_cast<int>(count);
     }
 
