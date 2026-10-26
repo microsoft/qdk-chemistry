@@ -77,6 +77,12 @@ class QdkFullStateSimulatorSettings(Settings):
             "type", "string", "cpu", "Type of simulator to use: 'cpu', 'gpu', or 'clifford'", ["cpu", "gpu", "clifford"]
         )
         self._set_default("seed", "int", 42, "Random seed for simulation reproducibility")
+        self._set_default(
+            "allow_external_qir",
+            "bool",
+            False,
+            "Allow directly supplied or deserialized QIR from trusted producers",
+        )
 
 
 class QdkFullStateSimulator(CircuitExecutor):
@@ -117,6 +123,11 @@ class QdkFullStateSimulator(CircuitExecutor):
 
         """
         Logger.trace_entering()
+        if circuit.has_external_qir and not self._settings.get("allow_external_qir"):
+            raise ValueError(
+                "Executing directly supplied or deserialized QIR requires "
+                "allow_external_qir=True. Enable it only for trusted producers."
+            )
         qir = circuit.get_qir()
         Logger.debug("QIR compiled")
         noise_config = noise.to_qdk_noise_config() if noise is not None else None

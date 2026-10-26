@@ -53,3 +53,11 @@ Saved jobs retain backend configuration as metadata, but reconnect using trusted
 runtime configuration. Attach an explicitly configured backend when restoring
 a custom connection. This does not authenticate the saved job's remaining
 metadata or payloads.
+
+### Executable Circuits
+
+QIR is executable program input, not a sandboxed interchange format. The QDK
+full-state executor requires `allow_external_qir=True` for directly supplied
+QIR and QIR restored from serialized circuits. Enable it only for trusted
+producers. This opt-in neither authenticates inputs nor isolates their execution.
+OpenQASM and Q# factory circuits compiled internally do not require the opt-in.
