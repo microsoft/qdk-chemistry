@@ -61,3 +61,10 @@ full-state executor requires `allow_external_qir=True` for directly supplied
 QIR and QIR restored from serialized circuits. Enable it only for trusted
 producers. This opt-in neither authenticates inputs nor isolates their execution.
 OpenQASM and Q# factory circuits compiled internally do not require the opt-in.
+
+### Stub Generation
+
+The optional import-time stub generator is resolved before the target package
+directory is added to module lookup, and runs from a private temporary directory.
+Installed dependencies and package code must still be writable only by trusted
+principals.
