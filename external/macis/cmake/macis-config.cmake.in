@@ -15,7 +15,6 @@ set( MACIS_ENABLE_BOOST  @MACIS_ENABLE_BOOST@  CACHE BOOL "Enable Boost bindings
 set( MACIS_ENABLE_MPI    @MACIS_ENABLE_MPI@    CACHE BOOL "Enable MPI bindings in MACIS" FORCE)
 set( MACIS_ENABLE_OPENMP @MACIS_ENABLE_OPENMP@ CACHE BOOL "Enable OpenMP bindings in MAICS" FORCE)
 set( MACIS_UARCH         @MACIS_UARCH_USED@    CACHE STRING "User-defined microarchitecture for optimization" FORCE)
-include("${macis_CMAKE_DIR}/macis-uarch.cmake")
 
 include( CMakeFindDependencyMacro )
 if( MACIS_ENABLE_MPI )

@@ -1,24 +1,10 @@
+# MACIS_UARCH names the target microarchitecture. MACIS_UARCH_USED records the
+# validated name (NONE when disabled or unsupported); the installed package
+# exports it. MACIS_UARCH_FLAGS holds the derived option for MACIS's own
+# targets as a directory-scope variable, never as a cache entry.
 unset(MACIS_UARCH_FLAGS CACHE)
-unset(MACIS_UARCH_FLAGS)
+set(MACIS_UARCH_FLAGS "")
 set(MACIS_UARCH_USED "NONE" CACHE STRING "Validated target microarchitecture" FORCE)
-
-function(macis_target_uarch target)
-  if(MACIS_UARCH_USED STREQUAL "NONE")
-    return()
-  endif()
-  if(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang|AppleClang")
-    set(_uarch_option "-march=${MACIS_UARCH_USED}")
-  elseif(MSVC)
-    set(_uarch_option "/arch:${MACIS_UARCH_USED}")
-  endif()
-  if(CMAKE_CUDA_COMPILER_ID STREQUAL "NVIDIA")
-    target_compile_options(${target} PRIVATE
-      "$<$<COMPILE_LANGUAGE:CUDA>:-Xcompiler=${_uarch_option}>"
-      "$<$<NOT:$<COMPILE_LANGUAGE:CUDA>>:${_uarch_option}>")
-  else()
-    target_compile_options(${target} PRIVATE "${_uarch_option}")
-  endif()
-endfunction()
 
 if(NOT DEFINED MACIS_UARCH)
   message(WARNING "MACIS_UARCH not defined. This may degrade performance")
@@ -30,7 +16,6 @@ if(MACIS_UARCH STREQUAL "" OR MACIS_UARCH STREQUAL "NONE")
 endif()
 message(STATUS "Using user-defined uarch: ${MACIS_UARCH}")
 
-# Derive and validate options with the consuming compiler; cache only the ISA.
 if(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang|AppleClang")
   set(_macis_uarch_flag "-march=${MACIS_UARCH}")
 elseif(MSVC)
@@ -47,6 +32,7 @@ unset(COMPILER_SUPPORTS_MACIS_UARCH CACHE)
 check_cxx_compiler_flag("${_macis_uarch_flag}" COMPILER_SUPPORTS_MACIS_UARCH)
 if(COMPILER_SUPPORTS_MACIS_UARCH)
   set(MACIS_UARCH_USED "${MACIS_UARCH}" CACHE STRING "Validated target microarchitecture" FORCE)
+  set(MACIS_UARCH_FLAGS "${_macis_uarch_flag}")
 else()
   message(WARNING "Compiler ${CMAKE_CXX_COMPILER_ID} does not support MACIS_UARCH=${MACIS_UARCH}. Microarchitecture optimization disabled.")
 endif()

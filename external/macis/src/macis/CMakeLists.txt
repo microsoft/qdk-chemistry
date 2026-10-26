@@ -28,7 +28,9 @@ target_include_directories( macis PUBLIC
 )
 target_compile_features(macis PUBLIC cxx_std_20)
 set_property(TARGET macis PROPERTY POSITION_INDEPENDENT_CODE ON)
-macis_target_uarch(macis)
+if(DEFINED MACIS_UARCH_FLAGS)
+  target_compile_options(macis PRIVATE ${MACIS_UARCH_FLAGS})
+endif()
 
 configure_file(
   ${PROJECT_SOURCE_DIR}/include/macis/macis_config.hpp.in
@@ -140,11 +142,6 @@ write_basic_package_version_file(
 
 
 # Setup macis-config.cmake
-configure_file(
-  ${PROJECT_SOURCE_DIR}/cmake/macis-uarch.cmake
-  ${CMAKE_CURRENT_BINARY_DIR}/macis-uarch.cmake
-  COPYONLY
-)
 configure_package_config_file(
   ${PROJECT_SOURCE_DIR}/cmake/macis-config.cmake.in
   ${CMAKE_CURRENT_BINARY_DIR}/macis-config.cmake
@@ -155,7 +152,6 @@ configure_package_config_file(
 install( FILES
   ${CMAKE_CURRENT_BINARY_DIR}/macis-config.cmake
   ${CMAKE_CURRENT_BINARY_DIR}/macis-config-version.cmake
-  ${CMAKE_CURRENT_BINARY_DIR}/macis-uarch.cmake
   DESTINATION ${INSTALL_CONFIGDIR}
 )
 
