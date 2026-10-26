@@ -116,7 +116,13 @@ class ControlledSOSSAMapper(ControlledCircuitMapper):
                 parameter={**ops, "layout": register_layout, "cacheName": cache_name, "power": container.power},
             ),
             qsharp_op=QSHARP_UTILS.SOSSAWalk.MakeControlledSOSSAWalkOp(
-                *ops.values(), register_layout, cache_name, container.power
+                ops["outerPrepareOp"],
+                ops["freeRiderOp"],
+                ops["innerPrepareOp"],
+                ops["selectOp"],
+                register_layout,
+                cache_name,
+                container.power,
             ),
             num_qubits=1 + regs["num_system_qubits"] + regs["num_ancilla_qubits"],
             metadata=CircuitMetadata(num_phase_gradient_ancillas=regs["num_phase_gradient_qubits"]),

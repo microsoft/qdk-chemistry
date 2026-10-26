@@ -421,7 +421,9 @@ class SOSSAMapper(CircuitMapper):
             program=QSHARP_UTILS.SOSSAWalk.MakeSOSSABlockEncodingCircuit,
             parameter={**ops, "layout": register_layout},
         )
-        qsharp_op = QSHARP_UTILS.SOSSAWalk.MakeSOSSABlockEncodingOp(*ops.values(), register_layout)
+        qsharp_op = QSHARP_UTILS.SOSSAWalk.MakeSOSSABlockEncodingOp(
+            ops["outerPrepareOp"], ops["freeRiderOp"], ops["innerPrepareOp"], ops["selectOp"], register_layout
+        )
 
         return Circuit(
             qsharp_factory=qsharp_factory,
