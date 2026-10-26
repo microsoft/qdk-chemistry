@@ -193,6 +193,26 @@ class TestGetQsharpCircuit:
         assert len(qsc_info["qubits"]) == 4
         assert len(qsc_pruned_info["qubits"]) == 2
 
+    @pytest.mark.parametrize("generation_method", [None, "simulate"])
+    def test_get_qsharp_circuit_forwards_generation_method(self, generation_method):
+        """Test that get_qsharp_circuit passes the generation method through to the Q# context."""
+        if generation_method == "simulate":
+            generation_method = circuit_module.qsharp.CircuitGenerationMethod.Simulate
+        calls = []
+
+        class _RecordingContext:
+            def circuit(self, program, *args, **kwargs):
+                calls.append((program, args, kwargs))
+                return "circuit"
+
+        class _Program:
+            _qdk_context = _RecordingContext()
+
+        program = _Program()
+        circuit = Circuit(qsharp_factory=QsharpFactoryData(program=program, parameter={"n": 1}))
+        assert circuit.get_qsharp_circuit(generation_method=generation_method) == "circuit"
+        assert calls == [(program, (1,), {"generation_method": generation_method, "prune_classical_qubits": False})]
+
 
 @pytest.mark.skipif(not QDK_CHEMISTRY_HAS_QISKIT, reason="Qiskit not available")
 class TestGetQiskitConversion:
