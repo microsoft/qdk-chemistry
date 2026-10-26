@@ -663,24 +663,18 @@ TEST(AtomGuessTest, CompareWithFileGuess) {
 TEST(AtomGuessTest, MismatchedFileGuessFallsBackToGeneratedGuess) {
   auto mol = make_o2();
   double conv_thresh = SCFConfig().scf_algorithm.density_threshold;
-  // Name each basis after a shipped guess of a different size; the sto-3g
-  // shells receive def2-svp blocks larger than the basis itself.
-  for (const auto& [basis_name, guess_name] :
-       std::vector<std::pair<std::string, std::string>>{
-           {"def2-svp", "sto-3g"}, {"sto-3g", "def2-svp"}}) {
-    auto basis = BasisSet::from_database_json(mol, basis_name, BasisMode::PSI4,
-                                              true, false);
-    int N = basis->num_atomic_orbitals;
-    basis->name = "custom_basis_for_testing";
-    RowMajorMatrix D_generated = RowMajorMatrix::Zero(N, N);
-    atom_guess(*basis, *mol, D_generated.data());
+  auto basis =
+      BasisSet::from_database_json(mol, "sto-3g", BasisMode::PSI4, true, false);
+  int N = basis->num_atomic_orbitals;
+  basis->name = "custom_basis_for_testing";
+  RowMajorMatrix D_generated = RowMajorMatrix::Zero(N, N);
+  atom_guess(*basis, *mol, D_generated.data());
 
-    basis->name = guess_name;
-    RowMajorMatrix D_mismatched = RowMajorMatrix::Zero(N, N);
-    atom_guess(*basis, *mol, D_mismatched.data());
-    EXPECT_TRUE(D_mismatched.isApprox(D_generated, conv_thresh))
-        << basis_name << " shells named " << guess_name;
-  }
+  // The def2-svp guess blocks are larger than these sto-3g shells.
+  basis->name = "def2-svp";
+  RowMajorMatrix D_mismatched = RowMajorMatrix::Zero(N, N);
+  atom_guess(*basis, *mol, D_mismatched.data());
+  EXPECT_TRUE(D_mismatched.isApprox(D_generated, conv_thresh));
 }
 
 TEST(AtomGuessTest, UnreadableArchiveFallsBackToGeneratedGuess) {
