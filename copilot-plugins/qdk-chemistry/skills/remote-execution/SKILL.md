@@ -17,6 +17,12 @@ A `Job` supports `check()`, `wait()`, `fetch()`, `cancel()`, `save()`, and
 `load()`. Pass `job_dir` to `submit` to save the job record automatically;
 without it, the SDK returns an in-memory job that can be saved explicitly.
 
+Loaded jobs reconnect using the backend's current runtime defaults, not the
+connection parameters recorded in the saved file. For custom connections,
+create a backend from trusted configuration with `create_remote(...)` and
+attach it with `job.attach_backend(backend)` before checking, fetching or
+canceling the job.
+
 MCP `run_*` tools accept `remote`, `remote_config`, and `remote_timeout` when
 the selected algorithm supports remote execution. A submitted call returns a
 job identifier. `check_remote_job`, `retrieve_remote_results`,
