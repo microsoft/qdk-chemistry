@@ -1,6 +1,6 @@
 ---
 name: qdk-chemistry-mcp
-version: 'v2.2.1'
+version: 'v2.3.0'
 description: 'Describes the QDK Chemistry MCP tool interface, return envelope, and tool categories.'
 ---
 

@@ -237,7 +237,8 @@ class QdkIterativeQpeCircuitBuilder(IterativeQpeCircuitBuilder):
             qsharp_factory=QsharpFactoryData(
                 program=QSHARP_UTILS.IterativePhaseEstimation.MakeIQPECircuit,
                 parameter=iterative_parameters,
-            )
+            ),
+            num_qubits=1 + num_system_qubits + num_ancilla_qubits,
         )
 
     def _create_full_circuit(
@@ -327,7 +328,8 @@ class QdkIterativeQpeCircuitBuilder(IterativeQpeCircuitBuilder):
             qsharp_factory=QsharpFactoryData(
                 program=QSHARP_UTILS.CombinedIterationPhaseEstimation.RunFullIQPE,
                 parameter=iterative_parameters,
-            )
+            ),
+            num_qubits=1 + num_system_qubits + num_ancilla_qubits,
         )
 
     def name(self) -> str:
