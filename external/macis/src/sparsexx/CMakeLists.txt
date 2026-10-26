@@ -104,8 +104,8 @@ target_include_directories( sparsexx PUBLIC
     $<BUILD_INTERFACE:${PROJECT_BINARY_DIR}/include>
     $<INSTALL_INTERFACE:include>
 )
-if(DEFINED MACIS_UARCH_FLAGS)
-  target_compile_options(sparsexx PRIVATE ${MACIS_UARCH_FLAGS})
+if(COMMAND macis_target_uarch)
+  macis_target_uarch(sparsexx)
 endif()
 
 configure_file(

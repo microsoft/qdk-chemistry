@@ -226,10 +226,19 @@ set_target_properties(chemistry PROPERTIES POSITION_INDEPENDENT_CODE ON)
 # Determine export variables
 set(QDK_DEP_EXPORTS "" CACHE STRING "QDK Chemistry Exported Dependencies" FORCE)
 
+# The adapter has one fixed include path in CPU-only and addon builds.
+set_property(TARGET chemistry PROPERTY QDK_ASCI_EXECUTION_ADAPTER
+  "${PROJECT_SOURCE_DIR}/src/qdk/chemistry/algorithms/microsoft/macis_asci_execution.hpp")
+
 # Include Addons
 if(QDK_ADDONS_DIR)
   add_subdirectory(${QDK_ADDONS_DIR} addons)
 endif()
+
+get_target_property(_asci_execution_adapter chemistry QDK_ASCI_EXECUTION_ADAPTER)
+configure_file("${_asci_execution_adapter}"
+  "${PROJECT_BINARY_DIR}/asci_execution/qdk_asci_execution.hpp" COPYONLY)
+target_include_directories(chemistry PRIVATE "${PROJECT_BINARY_DIR}/asci_execution")
 
 get_target_property(_imported nlohmann_json::nlohmann_json IMPORTED)
 get_target_property(_aliased nlohmann_json::nlohmann_json ALIASED_TARGET)

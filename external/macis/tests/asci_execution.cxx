@@ -18,8 +18,15 @@
 
 #include "ut_common.hpp"
 
-namespace {
+namespace macis::test_support {
 
+/**
+ * @brief CPU reference executor for result parity and executor-lifetime tests.
+ * @tparam N Determinant bit width.
+ * @note Borrows the Hamiltonian and determinant iterators until finish or
+ * drain. A pending asynchronous task and injected phase failures exercise
+ * unwinding; the numerical search and diagonalization use the CPU routines.
+ */
 template <size_t N>
 class CpuExecution final : public macis::ASCIExecutionContext<N> {
  public:
@@ -89,6 +96,13 @@ class CpuExecution final : public macis::ASCIExecutionContext<N> {
   std::future<void> _build;
 };
 
+/**
+ * @brief Synthetic executor that forces ASCI refinement into union
+ * stabilization.
+ * @note Alternates overlapping two-determinant spaces and nonconverging
+ * energies, then accepts the three-determinant union. Records requested
+ * targets, build sizes and the union warm start; it is not a numerical solver.
+ */
 class AlternatingExecution final : public macis::ASCIExecutionContext<64> {
  public:
   std::vector<macis::wfn_t<64>> space;
@@ -121,7 +135,10 @@ class AlternatingExecution final : public macis::ASCIExecutionContext<64> {
   void drain() noexcept override {}
 };
 
-}  // namespace
+}  // namespace macis::test_support
+
+using macis::test_support::AlternatingExecution;
+using macis::test_support::CpuExecution;
 
 TEMPLATE_TEST_CASE("ASCI execution boundary", "[asci_execution]",
                    macis::wfn_t<64>, macis::wfn_t<512>) {
