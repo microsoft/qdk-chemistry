@@ -51,7 +51,8 @@ class FolderCache(CacheBackend):
 
     Cache paths, including nested references, must remain within the cache root.
     These checks do not authenticate manifests or make serialized objects safe
-    to load from an untrusted writer.
+    to load from an untrusted writer. Every writer must be trusted to supply
+    both serialized objects and results, including inline manifest values.
 
     Args:
         path: Directory to use as the cache root.  Created on first write.

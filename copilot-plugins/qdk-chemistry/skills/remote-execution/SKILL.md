@@ -51,6 +51,13 @@ separate files referenced by that manifest. The backend transfers the manifest
 and inputs, invokes the algorithm remotely, and transfers output files back.
 Nested algorithm-reference settings remain nested in the manifest.
 
+Cache and job files must be produced by trusted writers. A shared cache means
+storage is reachable from multiple machines, not that it isolates mutually
+untrusted users. Restrict write access to trusted submitters and workers;
+separate storage and permissions for different trust groups. Content hashes
+and manifest type tags do not authenticate files or make native deserialization
+safe for attacker-written payloads.
+
 ## Backends
 
 The package ships one backend: `local`. It runs the serialization and job

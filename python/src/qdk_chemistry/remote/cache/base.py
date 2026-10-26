@@ -62,7 +62,8 @@ class CacheBackend(ABC):
     Args:
         is_shared: Set to ``True`` when the backing store is reachable
             from multiple machines (e.g. a network-mounted folder).
-            Defaults to ``False``.
+            Defaults to ``False``. All writers must belong to the same
+            trust group; this flag does not provide tenant isolation.
 
     """
 
