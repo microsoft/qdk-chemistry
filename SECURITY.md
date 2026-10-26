@@ -48,3 +48,8 @@ Do not use a common writable cache as a security boundary between tenants.
 Deployments that require less-trusted writers need authentication before
 deserialization, including protected verification keys provisioned separately
 from the writable data.
+
+Saved jobs retain backend configuration as metadata, but reconnect using trusted
+runtime configuration. Attach an explicitly configured backend when restoring
+a custom connection. This does not authenticate the saved job's remaining
+metadata or payloads.
