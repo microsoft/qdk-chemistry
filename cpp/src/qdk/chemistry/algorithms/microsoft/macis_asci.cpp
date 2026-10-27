@@ -16,21 +16,12 @@
 #include <qdk/chemistry/data/symmetry/spin_channel_indices.hpp>
 #include <qdk/chemistry/data/wavefunction_containers/state_vector.hpp>
 #include <qdk/chemistry/utils/logger.hpp>
-#include <qdk_asci_execution.hpp>
 
 // Local implementation details
+#include "macis_asci_execution.hpp"
 #include "utils.hpp"
 
 namespace qdk::chemistry::algorithms::microsoft {
-
-void MacisAsciSettings::_configure_execution_settings() {
-  asci_extension::configure_settings(
-      [this](const std::string& key, const data::SettingValue& value,
-             const std::string& description,
-             std::optional<data::Constraint> constraint = std::nullopt) {
-        set_default(key, value, description, constraint);
-      });
-}
 
 /**
  * @brief Helper struct for CASCI calculation dispatch
@@ -172,7 +163,7 @@ struct asci_helper {
       E_casci = ham_gen.matrix_element(dets[0], dets[0]);
       C_casci = {1.0};
 
-      auto execution = asci_extension::make_context<N>(ham_gen, settings_);
+      auto execution = make_asci_execution<N>(ham_gen, settings_);
 
       // Growth phase
       QDK_LOGGER().debug("Starting MACIS ASCI growth phase.");

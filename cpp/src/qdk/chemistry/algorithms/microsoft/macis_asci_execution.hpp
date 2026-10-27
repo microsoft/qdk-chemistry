@@ -8,19 +8,23 @@
 #include <memory>
 #include <qdk/chemistry/data/settings.hpp>
 
-namespace qdk::chemistry::algorithms::microsoft::asci_extension {
+namespace qdk::chemistry::algorithms::microsoft {
 
-/** @brief The default adapter adds no execution-specific settings. */
-template <typename DefineSetting>
-void configure_settings(DefineSetting&&) {}
-
-/** @brief Select the built-in CPU implementation when no addon is configured.
+/**
+ * @brief Create the numerical executor for one ASCI solve.
+ *
+ * The library compiles one definition, from QDK_ASCI_EXECUTION_SOURCE. That
+ * source also defines MacisAsciSettings::_configure_execution_settings() and
+ * instantiates this function for every dispatch_by_norb width.
+ *
+ * @tparam N Determinant width in bits
+ * @param ham_gen Hamiltonian generator of the solve
+ * @param settings Settings of the solve
+ * @return The executor, or nullptr to use MACIS's CPU implementation
  */
 template <size_t N>
-std::unique_ptr<macis::ASCIExecutionContext<N>> make_context(
-    const macis::HamiltonianGenerator<macis::wfn_t<N>>&,
-    const data::Settings&) {
-  return nullptr;
-}
+std::unique_ptr<macis::ASCIExecutionContext<N>> make_asci_execution(
+    const macis::HamiltonianGenerator<macis::wfn_t<N>>& ham_gen,
+    const data::Settings& settings);
 
-}  // namespace qdk::chemistry::algorithms::microsoft::asci_extension
+}  // namespace qdk::chemistry::algorithms::microsoft

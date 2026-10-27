@@ -189,6 +189,7 @@ class MacisAsciSettings : public MacisSettings {
   virtual ~MacisAsciSettings() = default;
 
  private:
+  /// Adds the settings of the ASCI executor compiled into the library.
   void _configure_execution_settings();
 };
 
