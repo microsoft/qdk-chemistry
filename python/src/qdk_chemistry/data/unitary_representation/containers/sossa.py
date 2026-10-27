@@ -15,6 +15,7 @@ from __future__ import annotations
 
 import json
 from dataclasses import asdict, dataclass
+from math import isfinite
 from typing import TYPE_CHECKING, Any
 
 import numpy as np
@@ -133,9 +134,12 @@ class SOSSASelect:
     @classmethod
     def from_json(cls, data: dict[str, Any]) -> SOSSASelect:
         """Load from a JSON dictionary."""
+        one_body_angles = np.array(data["one_body_rotation_angles"], dtype=float)
         return cls(
-            one_body_rotation_angles=np.array(data["one_body_rotation_angles"], dtype=float),
-            two_body_rotation_angles=np.array(data["two_body_rotation_angles"], dtype=float),
+            one_body_rotation_angles=one_body_angles,
+            two_body_rotation_angles=np.array(data["two_body_rotation_angles"], dtype=float).reshape(
+                len(data["two_body_rotation_angles"]), one_body_angles.shape[1]
+            ),
         )
 
     def to_hdf5(self, group: h5py.Group) -> None:
@@ -195,7 +199,7 @@ class SOSSABlockEncodingContainer(BlockEncodingContainer):
         select: SOSSASelect,
         metadata: SumOfSquaresMetadata,
         layout: SOSSARegisterLayout,
-        normalization: float = 0.0,
+        normalization: float,
         power: int = 1,
         lambda_eff: float | None = None,
     ) -> None:
@@ -214,10 +218,13 @@ class SOSSABlockEncodingContainer(BlockEncodingContainer):
                 builder was given no reference energy to derive it from. See :attr:`lambda_eff`.
 
         Raises:
+            ValueError: If normalization is not positive and finite.
             ValueError: If the layout reserves free-rider bits that ``inner_prepare`` does not
                 supply a matching table for.
 
         """
+        if not isfinite(normalization) or normalization <= 0.0:
+            raise ValueError(f"SOSSA block encoding requires a positive finite normalization, got {normalization}.")
         num_free_rider_bits = layout.num_free_rider_bits
         free_rider_data = inner_prepare.free_rider_data
         if num_free_rider_bits > 0:

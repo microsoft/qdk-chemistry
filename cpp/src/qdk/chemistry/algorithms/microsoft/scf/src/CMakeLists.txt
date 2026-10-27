@@ -47,6 +47,7 @@ target_sources(chemistry PRIVATE
   util/int1e.cpp
   util/libint2_util.cpp
   util/matrix_exp.cpp
+  util/one_body.cpp
   util/similarity_transform.cpp
 )
 if(QDK_CHEMISTRY_ENABLE_MPI)

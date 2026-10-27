@@ -5,6 +5,7 @@
 # Licensed under the MIT License. See LICENSE.txt in the project root for license information.
 # --------------------------------------------------------------------------------------------
 
+import warnings
 from abc import abstractmethod
 
 from qdk_chemistry.algorithms.base import Algorithm, AlgorithmFactory
@@ -111,10 +112,10 @@ class QpeCircuitBuilder(Algorithm):
             power: The power to which the unitary should be raised.
 
         Returns:
-            A tuple of (circuit, num_ancilla_qubits, num_system_qubits) where circuit implements
-            controlled-:math:`U^{\\text{power}}`, num_ancilla_qubits is the number of ancilla
-            qubits used by the unitary beyond the system qubits, and num_system_qubits is the
-            width of the system register.
+            The controlled circuit, work width, and system width; work excludes the system and control.
+
+        Raises:
+            ValueError: If callable width is too small or shared ancillas are unsupported.
 
         """
         unitary_builder = self._create_nested("unitary_builder")
@@ -124,7 +125,25 @@ class QpeCircuitBuilder(Algorithm):
         circuit_mapper = self._create_nested("controlled_circuit_mapper")
         circuit_mapper.settings().update("control_indices", [0])
         circuit = circuit_mapper.run(unitary_rep)
-        return circuit, unitary_rep.get_num_qubits() - num_system_qubits, num_system_qubits
+        width = circuit.num_qubits
+        if width is None:
+            warnings.warn(
+                f"Controlled circuit mapper '{circuit_mapper.name()}' does not declare num_qubits. "
+                "Falling back to the unitary representation's width is deprecated; declare the full "
+                "callable width, including its control and working qubits.",
+                DeprecationWarning,
+                stacklevel=2,
+            )
+            width = unitary_rep.get_num_qubits() + 1
+        minimum_width = num_system_qubits + 1
+        if width < minimum_width:
+            raise ValueError(
+                f"The controlled circuit declares {width} qubits, but requires at least "
+                f"{minimum_width} including its control."
+            )
+        if circuit.metadata.num_phase_gradient_ancillas:
+            raise ValueError("This QPE builder does not initialize shared phase gradient ancillas.")
+        return circuit, width - minimum_width, num_system_qubits
 
     def _controlled_circuit_and_widths(
         self,

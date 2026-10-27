@@ -348,6 +348,11 @@ const std::vector<std::pair<int, int>>& BasisSet::get_shell_pairs() {
   return shell_pairs_;
 }
 
+void BasisSet::refresh_shell_pairs() {
+  QDK_LOG_TRACE_ENTERING();
+  shell_pairs_ = OneBodyIntegral::compute_shell_pairs(shells);
+}
+
 void norm_psi4_mode(std::vector<Shell>& shells) {
   QDK_LOG_TRACE_ENTERING();
 

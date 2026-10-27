@@ -174,3 +174,20 @@ def test_estimation_spin_models(notebook_name: str) -> None:
     (result,) = (output for output in results_cell.outputs if output.output_type == "execute_result")
     assert "text/html" in result.data, "Expected a rendered QRE results table."
     assert "Empty DataFrame" not in result.data["text/plain"], "No accepted QRE estimates were produced."
+
+
+@_requires_notebook_deps
+@pytest.mark.slow
+@pytest.mark.skipif(
+    not _HAS_JUPYTER_KERNEL,
+    reason="Jupyter kernel 'python3' not available. Install ipykernel and register the kernel.",
+)
+@pytest.mark.skipif(
+    not _HAS_QRE,
+    reason="qdk.qre not available",
+)
+def test_sossa_qre():
+    """Test the sequential SOSSA notebook workflow executes without errors."""
+    notebook_path = EXAMPLES_DIR / "sossa_qre.ipynb"
+    assert notebook_path.exists(), f"Notebook not found: {notebook_path}"
+    _execute_notebook_skip_visualizations(notebook_path)

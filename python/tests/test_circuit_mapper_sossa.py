@@ -6,6 +6,7 @@
 # --------------------------------------------------------------------------------------------
 
 import math
+from typing import Any
 
 import numpy as np
 import pytest
@@ -13,11 +14,11 @@ from qdk.test_utils import dump_operation_on_state
 
 from qdk_chemistry.algorithms.circuit_mapper import SOSSAMapper
 from qdk_chemistry.algorithms.hamiltonian_unitary_builder.block_encoding.sossa import SOSSABuilder
-from qdk_chemistry.data import AlgorithmRef, Circuit, FactorizedHamiltonianContainer
+from qdk_chemistry.data import AlgorithmRef, Circuit, DFTHCHamiltonianContainer
 from qdk_chemistry.data.circuit import CircuitMetadata
 from qdk_chemistry.data.unitary_representation.base import UnitaryRepresentation
 from qdk_chemistry.data.unitary_representation.containers.sossa import SOSSABlockEncodingContainer
-from qdk_chemistry.utils.qsharp import QSHARP_UTILS, create_qsharp_context, get_qsharp_context
+from qdk_chemistry.utils.qsharp import QSHARP_UTILS, get_qsharp_context, use_qsharp_context
 
 from .helpers import (
     create_random_factorized_hamiltonian,
@@ -29,6 +30,9 @@ from .test_phase_estimation_sossa import (
     _python_to_qsharp_permutation,
     _python_to_qsharp_sign,
 )
+
+# Measurement erasure exposes a bad row only on some outcomes, so repeat to avoid passing by luck.
+_ROUND_TRIP_TRIALS = 8
 
 
 def _build_sossa_unitary(
@@ -105,7 +109,7 @@ def _assert_full_block_matches_hgap(h1, u_matrices, w_matrices, wb_matrix, *, se
     num_system_qubits = 2 * num_orbitals
     dimension = 2**num_system_qubits
 
-    container = FactorizedHamiltonianContainer(
+    container = DFTHCHamiltonianContainer(
         one_body_integrals=h1,
         u_matrices=u_matrices.reshape(-1),
         w_matrices=w_matrices.reshape(-1),
@@ -235,19 +239,24 @@ class TestInnerPrep:
     """Tests for SOSSAMapper._build_inner_prep."""
 
     @pytest.mark.parametrize("algorithm", ["controlled_alias_sampling", "direct"])
-    def test_build_inner_prep_fidelity(self, algorithm):
+    def test_build_inner_prep_fidelity(self, qsharp_test_context, qsharp_test_utils, algorithm):
         # Use num_bases=2 for a non-trivial inner dimension (B+1=3)
         sossa_unitary = _build_sossa_unitary(num_orbitals=2, num_ranks=2, num_bases=2, num_copies=1)
         container = sossa_unitary.get_container()
 
         # Build outer prep (exact, dense_pure)
         outer_mapper = _make_sossa_mapper(outer_algorithm="dense_pure_state")
-        outer_op = outer_mapper._build_outer_prepare_circuit(container)._qsharp_op
+        with use_qsharp_context(qsharp_test_context):
+            outer_op = outer_mapper._build_outer_prepare_circuit(container)._qsharp_op
 
         # Build inner prep
         bit_precision = 6
         inner_mapper = _make_sossa_mapper(inner_algorithm=algorithm, coefficient_bit_precision=bit_precision)
-        inner_op, _ = inner_mapper._build_inner_oracles(container)
+        # Calling the builder directly skips _run_impl, which is what normally resolves these.
+        inner_mapper._max_swap_address_bits = inner_mapper.settings().get("max_swap_address_bits")
+        inner_mapper._borrow_dirty = False
+        with use_qsharp_context(qsharp_test_context):
+            inner_op, _ = inner_mapper._build_inner_oracles(container)
 
         # Compute register sizes
         outer_coeffs = np.asarray(container.outer_prepare.get_coefficients())
@@ -269,9 +278,9 @@ class TestInnerPrep:
         # Apply outer + inner prep
         full_sv = np.array(
             dump_operation_on_state(
-                QSHARP_UTILS.SOSSAWalk.MakeOuterInnerPrepOp(outer_op, inner_op, num_outer_qubits),
+                qsharp_test_utils.SOSSAWalkTests.TestMakeOuterInnerPrepOp(outer_op, inner_op, num_outer_qubits),
                 num_outer_qubits + num_inner_qubits,
-                context=get_qsharp_context(),
+                context=qsharp_test_context,
             )
         )
 
@@ -374,7 +383,7 @@ class TestSOSSAMapper:
         assert circuit._qsharp_op is not None
         assert circuit._qsharp_factory is not None
 
-    def test_free_rider_placement_costs_inner_prepare_pairs_consistently(self):
+    def test_free_rider_placement_costs_inner_prepare_pairs_consistently(self, qsharp_test_utils):
         """One block applies two inner PREPARE pairs against a single free-rider pair."""
         coefficients = [[1.0, 1.0, 1.0, 1.0] for _ in range(6)]
         free_rider_data = [[False, True] for _ in range(6)]
@@ -383,43 +392,105 @@ class TestSOSSAMapper:
         # 2:1 pair ratio splitting costs 2*25 + 5 = 55 against 2*27 = 54, so the word stays
         # inline; at 4:1 it was 4*25 + 5 = 105 against 4*27 = 108 and was split out. Both
         # clear by a margin, so the case does not rest on a tie-break.
-        load_separately = QSHARP_UTILS.SOSSAWalk.TestShouldLoadFreeRiderSeparately(
+        load_separately = qsharp_test_utils.SOSSAWalkTests.TestShouldLoadFreeRiderSeparately(
             coefficients,
             free_rider_data,
             1,
+            -1,
+            0,
         )
 
         assert load_separately is False
 
     @pytest.mark.parametrize(
-        ("sf_rows", "sf_address_qubits", "dq_rows", "dq_address_qubits"),
+        ("max_swap_bits", "available_dirty", "expected"),
+        [(-1, 0, True), (0, 0, False), (-1, 1, False)],
+        ids=["clean_network", "capped_to_select", "lender_too_small"],
+    )
+    def test_free_rider_placement_is_costed_at_the_width_actually_built(
+        self, qsharp_test_utils, max_swap_bits, available_dirty, expected
+    ):
+        """Splitting the free-rider word only pays where a swap network will be built.
+
+        Clean swaps make the inline word costly; width-0 or too-small borrowers leave a plain ``Select``.
+        """
+        coefficients = [[1.0] * 8 for _ in range(8)]
+        free_rider_data = [[bool((row >> bit) & 1) for bit in range(4)] for row in range(8)]
+
+        load_separately = qsharp_test_utils.SOSSAWalkTests.TestShouldLoadFreeRiderSeparately(
+            coefficients, free_rider_data, 2, max_swap_bits, available_dirty
+        )
+
+        assert load_separately is expected
+
+    def test_free_rider_placement_prices_the_best_width_under_the_cap(self, qsharp_test_utils):
+        """A cap below the selector's choice is priced at the best width it allows, not the clamped one.
+
+        Uncapped, the lent network takes width 2 for both layouts. Width 1 loses to plain ``Select``
+        (605 and 581 Toffolis against 547), so a cap of 1 selects width 0, where the inline word costs
+        2*547 = 1094 against 1094 + 35 = 1129 split. Clamping to width 1 had split it: 1210 against 2*581 + 35 = 1197.
+        """
+        coefficients = [[1.0] * 16 for _ in range(32)]
+        free_rider_data = [[bool((row >> bit) & 1) for bit in range(6)] for row in range(32)]
+
+        load_separately = qsharp_test_utils.SOSSAWalkTests.TestShouldLoadFreeRiderSeparately(
+            coefficients, free_rider_data, 3, 1, 4096
+        )
+
+        assert load_separately is False
+
+    @pytest.mark.parametrize(
+        "table_shape",
         [
             (4, 2, 4, 2),
             (3, 2, 3, 2),
             (5, 3, 3, 2),
             (2, 1, 7, 3),
         ],
+        ids=["sf4dq4", "sf3dq3", "sf5dq3", "sf2dq7"],
     )
+    @pytest.mark.parametrize("swap_bits", [(0, 0), (1, 0), (0, 1), (1, 1)])
+    @pytest.mark.parametrize("lookup_method", ["select_swap", "dirty_select_swap"])
     def test_branched_angle_word_erasure_restores_the_address_register(
         self,
-        sf_rows: int,
-        sf_address_qubits: int,
-        dq_rows: int,
-        dq_address_qubits: int,
+        qsharp_test_utils,
+        table_shape: tuple[int, int, int, int],
+        lookup_method: str,
+        swap_bits: tuple[int, int],
     ) -> None:
-        """The measurement-based erasure must phase exactly what the forward load wrote."""
+        """The measurement-based erasure must phase exactly what the forward load wrote.
+
+        Ragged tables alias surplus addresses through ``Select``, and dirty networks must return the lender.
+        """
         width = 3
+        sf_rows, sf_address_qubits, dq_rows, dq_address_qubits = table_shape
         sf_data = [[(i + j) % 3 == 0 for j in range(width)] for i in range(sf_rows)]
         dq_data = [[bool((i >> j) & 1) for j in range(width - 1)] for i in range(dq_rows)]
+        sf_swap_bits, dq_swap_bits = swap_bits
 
-        # The erasure measures, so a mismatched row only shows up for the outcomes whose
-        # parity it changes; repeat to keep the check from passing by luck.
-        for _ in range(8):
-            assert QSHARP_UTILS.SOSSAWalk.TestBranchedRotationWordRoundTrip(
+        for _ in range(_ROUND_TRIP_TRIALS):
+            assert qsharp_test_utils.SOSSAWalkTests.TestBranchedRotationWordRoundTrip(
                 sf_data,
                 dq_data,
                 sf_address_qubits,
                 dq_address_qubits,
+                lookup_method == "dirty_select_swap",
+                sf_swap_bits,
+                dq_swap_bits,
+            )
+
+    @pytest.mark.parametrize("dq_swap_bits", [2, 3])
+    def test_a_wider_borrowed_network_survives_the_erasure(self, qsharp_test_utils, dq_swap_bits: int) -> None:
+        """A deeper dirty butterfly must still return the angle word expected by erasure.
+
+        The DQ word stays one bit so the borrowed statevector remains cheap to simulate.
+        """
+        sf_data = [[(i + j) % 3 == 0 for j in range(1)] for i in range(4)]
+        dq_data = [[bool((i >> j) & 1) for j in range(1)] for i in range(8)]
+
+        for _ in range(_ROUND_TRIP_TRIALS):
+            assert qsharp_test_utils.SOSSAWalkTests.TestBranchedRotationWordRoundTrip(
+                sf_data, dq_data, 2, 3, True, 1, dq_swap_bits
             )
 
     def test_signed_two_term_block_encoding_matches_hand_calculation(self):
@@ -535,9 +606,13 @@ class TestSelectFullFidelity:
     def _select_data(
         N: int,  # noqa: N803
         rotation_bit_precision: int,
+        *,
         num_ranks: int = 1,
         num_bases: int = 1,
         num_copies: int = 1,
+        rotation_batch_size: int = 0,
+        lookup_method: str = "select",
+        max_swap_address_bits: int = -1,
     ) -> dict:
         rng = np.random.default_rng(42 + N)
 
@@ -553,31 +628,46 @@ class TestSelectFullFidelity:
             "numCopies": num_copies,
             "numPositiveOneBody": N,
             "OneBodyRotationAngles": [unit_angles() for _ in range(N)],
-            # Indexed b * R + r, matching both BuildSFBulkRotationData and the direct path.
+            # Indexed b * R + r, matching both BuildSFRotationBatch and the direct path.
             "TwoBodyRotationAngles": [unit_angles() for _ in range(num_ranks * (num_bases + 1))],
             "rotationBitPrecision": rotation_bit_precision,
+            "rotationBatchSize": rotation_batch_size,
+            # Mirrors SOSSAMapper._run_impl: "select" is a swap network capped at width 0.
+            "borrowDirty": lookup_method == "dirty_select_swap",
+            "maxSwapBits": 0 if lookup_method == "select" else max_swap_address_bits,
             "numFreeRiderBits": 2 + rank_bits,
             "signQubitIndex": -1,
         }
 
     @staticmethod
     def _run_select(
-        select_data: dict, xo_value: int = 0, b_value: int = 0, use_phase_gradient: bool = False
+        context, select_data: dict, xo_value: int = 0, b_value: int = 0, use_phase_gradient: bool = False
     ) -> np.ndarray:
-        ctx = create_qsharp_context()
-        ctx.code.QDKChemistry.Utils.SOSSAWalk.TestSelectDQ(select_data, xo_value, b_value, use_phase_gradient)
-        return np.array(ctx.dump_machine().as_dense_state())
+        result = context.run(
+            context.code.QDKChemistry.TestUtils.SOSSAWalkTests.TestSelectDQ,
+            1,
+            select_data,
+            xo_value,
+            b_value,
+            use_phase_gradient,
+            save_events=True,
+        )[0]
+        dump = result["events"][-1].state_dump()
+        state = np.zeros(1 << dump.qubit_count, dtype=complex)
+        for index, amplitude in dump.get_dict().items():
+            state[index] = amplitude
+        return state
 
     @pytest.mark.parametrize("num_free_rider_bits", [0, 1])
-    def test_select_rejects_missing_generator_bits(self, num_free_rider_bits):
+    def test_select_rejects_missing_generator_bits(self, qsharp_test_context, num_free_rider_bits):
         select_data = self._select_data(2, rotation_bit_precision=10)
         select_data["numFreeRiderBits"] = num_free_rider_bits
 
         with pytest.raises(Exception, match="SelectImpl requires at least two free-rider bits"):
-            self._run_select(select_data)
+            self._run_select(qsharp_test_context, select_data)
 
     @pytest.mark.parametrize("N", [2, 3])
-    def test_select_dq_applies_the_analytic_rotated_majorana(self, N):  # noqa: N803
+    def test_select_dq_applies_the_analytic_rotated_majorana(self, qsharp_test_context, N):  # noqa: N803
         rng = np.random.default_rng(2024)
         u = rng.standard_normal(N)
         u /= np.linalg.norm(u)
@@ -593,10 +683,13 @@ class TestSelectFullFidelity:
             "OneBodyRotationAngles": [_vector_to_givens_angles(u)] + [_vector_to_givens_angles(other)] * (N - 1),
             "TwoBodyRotationAngles": [_vector_to_givens_angles(other)] * 2,
             "rotationBitPrecision": 14,
+            "rotationBatchSize": 0,
+            "borrowDirty": False,
+            "maxSwapBits": -1,
             "numFreeRiderBits": 2,
             "signQubitIndex": -1,
         }
-        sv = self._run_select(select_data, xo_value=0, b_value=0)
+        sv = self._run_select(qsharp_test_context, select_data, xo_value=0, b_value=0)
         assert np.linalg.norm(sv) == pytest.approx(1.0, abs=1e-10)
 
         total = round(math.log2(len(sv)))
@@ -629,6 +722,7 @@ class TestSelectFullFidelity:
     )
     def test_phase_gradient_backend_matches_direct(
         self,
+        qsharp_test_context,
         dims: tuple[int, int, int, int],
         xo_value: int,
         b_value: int,
@@ -644,10 +738,12 @@ class TestSelectFullFidelity:
             num_copies=num_copies,
         )
 
-        direct = self._run_select(select_data, xo_value=xo_value, b_value=b_value, use_phase_gradient=False)
-        qrom = self._run_select(select_data, xo_value=xo_value, b_value=b_value, use_phase_gradient=True)[
-            :: 1 << bit_precision
-        ]
+        direct = self._run_select(
+            qsharp_test_context, select_data, xo_value=xo_value, b_value=b_value, use_phase_gradient=False
+        )
+        qrom = self._run_select(
+            qsharp_test_context, select_data, xo_value=xo_value, b_value=b_value, use_phase_gradient=True
+        )[:: 1 << bit_precision]
 
         # The gradient is conjugated back to |0...0>, so restricting to it keeps the full norm.
         assert len(qrom) == len(direct)
@@ -657,6 +753,65 @@ class TestSelectFullFidelity:
         assert fidelity == pytest.approx(1.0, abs=3e-3), (
             f"phase-gradient and direct SELECT backends disagree: fidelity={fidelity}"
         )
+
+    @pytest.mark.parametrize(
+        ("dims", "bit_precision"),
+        [
+            ((3, 1, 1, 1), 4),
+            ((4, 1, 2, 1), 4),
+        ],
+        ids=["N3R1B1", "N4R1B2"],
+    )
+    @pytest.mark.parametrize("lookup_method", ["select", "select_swap", "dirty_select_swap"])
+    def test_streamed_rotation_angles_match_the_resident_register(
+        self,
+        qsharp_test_context,
+        dims: tuple[int, int, int, int],
+        bit_precision: int,
+        lookup_method: str,
+    ):
+        """Streaming Givens angles must preserve SELECT while only changing cost.
+
+        This covers both angle-table branches and batch orders for all three loaders.
+        """
+        num_orbitals, num_ranks, num_bases, num_copies = dims
+        # Annotated so mypy does not widen this to dict[str, int] against _select_data's str keyword.
+        kwargs: dict[str, Any] = {
+            "rotation_bit_precision": bit_precision,
+            "num_ranks": num_ranks,
+            "num_bases": num_bases,
+            "num_copies": num_copies,
+        }
+        num_rot_angles = num_orbitals - 1
+
+        for xo_value in (0, num_orbitals):
+            for b_value in (0, num_bases):
+                reference = self._run_select(
+                    qsharp_test_context,
+                    self._select_data(num_orbitals, **kwargs),
+                    xo_value=xo_value,
+                    b_value=b_value,
+                    use_phase_gradient=True,
+                )
+                for batch in range(1, num_rot_angles):
+                    streamed = self._run_select(
+                        qsharp_test_context,
+                        self._select_data(
+                            num_orbitals,
+                            rotation_batch_size=batch,
+                            lookup_method=lookup_method,
+                            **kwargs,
+                        ),
+                        xo_value=xo_value,
+                        b_value=b_value,
+                        use_phase_gradient=True,
+                    )
+                    # Erasure leaves an outcome-dependent global phase, so compare overlap magnitude.
+                    fidelity = abs(np.vdot(reference, streamed))
+                    assert fidelity == pytest.approx(1.0, abs=1e-9), (
+                        f"lambda={batch} lookup={lookup_method} xo={xo_value} b={b_value} "
+                        f"disagrees with the resident register: fidelity={fidelity}"
+                    )
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -712,3 +867,34 @@ class TestSOSSAWalkLogicalCounts:
         assert actual_qubits <= min_qubits + select_ancilla + max_overhead, (
             f"N={N},R={R},B={B},C={C}: qubits={actual_qubits} > max={min_qubits + select_ancilla + max_overhead}"
         )
+
+
+class TestMaxGivensRotationBatchesSetting:
+    """The ``max_givens_rotation_batches`` setting's one bound the settings range cannot see."""
+
+    def test_it_rejects_more_passes_than_there_are_angles(self):
+        """Two passes over N = 2's single angle would otherwise clamp silently to one."""
+        mapper = _make_sossa_mapper()
+        mapper.settings().set("max_givens_rotation_batches", 2)
+        with pytest.raises(ValueError, match="max_givens_rotation_batches must be at most"):
+            mapper.run(_build_sossa_unitary(num_orbitals=2))
+
+    def test_direct_select_ignores_it(self):
+        """Direct SELECT loads no angle table, so the same over-large limit must not reject it."""
+        mapper = _make_sossa_mapper(select_algorithm="direct")
+        mapper.settings().set("max_givens_rotation_batches", 2)
+        assert isinstance(mapper.run(_build_sossa_unitary(num_orbitals=2)), Circuit)
+
+
+class TestMaxSwapAddressBitsSetting:
+    """The ``max_swap_address_bits`` setting's contract, without paying for an estimate."""
+
+    def test_it_defaults_to_the_sentinel_and_accepts_only_the_declared_range(self):
+        """``-1`` (uncapped) is the default, ``0`` is plain select, and widths outside ``[-1, 30]`` are rejected."""
+        assert SOSSAMapper().settings().get("max_swap_address_bits") == -1
+        for swap_bits in (-1, 0, 1, 2, 3, 30):
+            ref = AlgorithmRef("circuit_mapper", "sossa", max_swap_address_bits=swap_bits)
+            assert ref.settings.get("max_swap_address_bits") == swap_bits
+        for swap_bits in (-2, 31):
+            with pytest.raises(ValueError, match="out of allowed range"):
+                AlgorithmRef("circuit_mapper", "sossa", max_swap_address_bits=swap_bits)

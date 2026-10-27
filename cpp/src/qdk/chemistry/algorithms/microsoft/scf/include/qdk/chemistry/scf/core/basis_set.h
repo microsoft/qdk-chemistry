@@ -163,6 +163,9 @@ class BasisSet {
    */
   const std::vector<std::pair<int, int>>& get_shell_pairs();
 
+  /** @brief Rebuild screening data after changing shell coefficients. */
+  void refresh_shell_pairs();
+
   /**
    * @brief Get the maximum angular momentum in the basis set
    * @return Maximum angular momentum quantum number
