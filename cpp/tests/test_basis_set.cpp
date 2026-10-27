@@ -74,6 +74,38 @@ TEST_F(BasisSetTest, ShellConstructors) {
   EXPECT_EQ(coefficients.size(), shell_with_data.coefficients.size());
 }
 
+TEST_F(BasisSetTest, ShellSortingPreservesEqualExponentPrimitiveOrder) {
+  std::vector<Shell> shells;
+  shells.emplace_back(0, OrbitalType::S, std::vector{2.0, 1.0, 2.0},
+                      std::vector{10.0, 20.0, 30.0}, std::vector{0, 1, 2});
+
+  for (int pass = 0; pass < 2; ++pass) {
+    sort_shells_inplace(shells);
+    const auto& shell = shells.front();
+    EXPECT_DOUBLE_EQ(2.0, shell.exponents[0]);
+    EXPECT_DOUBLE_EQ(2.0, shell.exponents[1]);
+    EXPECT_DOUBLE_EQ(1.0, shell.exponents[2]);
+    EXPECT_DOUBLE_EQ(10.0, shell.coefficients[0]);
+    EXPECT_DOUBLE_EQ(30.0, shell.coefficients[1]);
+    EXPECT_DOUBLE_EQ(20.0, shell.coefficients[2]);
+    EXPECT_EQ(0, shell.rpowers[0]);
+    EXPECT_EQ(2, shell.rpowers[1]);
+    EXPECT_EQ(1, shell.rpowers[2]);
+  }
+}
+
+TEST_F(BasisSetTest, LocalEcpShellContributesNoAtomicOrbitals) {
+  Shell local(0, OrbitalType::UL, std::vector{1.0}, std::vector{2.0},
+              std::vector{2});
+  Shell gaussian(0, OrbitalType::D, std::vector{1.0}, std::vector{1.0});
+  ShellsPerAtom shells{{local, gaussian}};
+
+  EXPECT_EQ(0u, local.get_num_atomic_orbitals());
+  EXPECT_EQ(0u, local.get_num_atomic_orbitals(AOType::Cartesian));
+  EXPECT_EQ(5u, count_orbitals(shells, AOType::Spherical));
+  EXPECT_EQ(6u, count_orbitals(shells, AOType::Cartesian));
+}
+
 TEST_F(BasisSetTest, Constructors) {
   // Create a simple structure for testing
   std::vector<Eigen::Vector3d> coords = {{0.0, 0.0, 0.0}};

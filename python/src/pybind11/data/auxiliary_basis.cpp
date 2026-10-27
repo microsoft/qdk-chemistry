@@ -106,6 +106,8 @@ Create a custom auxiliary basis from shells and a molecular structure.
 
 The basis is named ``custom_aux``. Shells are stored in ascending atom order,
 and within each atom by angular momentum and decreasing exponent.
+Equal-exponent primitives retain their relative order. Individual atoms may
+intentionally have no shells.
 
 Args:
     shells (Iterable[Shell]): Auxiliary shells. Must not carry radial powers
@@ -115,7 +117,8 @@ Args:
 
 Raises:
     ValueError: If shells are empty, reference an atom outside the structure, carry radial
-        powers, or use the ECP local-potential orbital type
+        powers, use the ECP local-potential orbital type, or have angular momentum
+        outside the supported range from 0 through 6
 
 Examples:
     >>> aux = AuxiliaryBasis([Shell(0, OrbitalType.S, [5.0], [2.0])], structure)
@@ -140,7 +143,8 @@ Args:
         Default is Spherical
 
 Raises:
-    ValueError: If the name is empty, shells are empty, or shells are invalid for the structure
+    ValueError: If the name is empty, shells are empty, shells are invalid for the structure,
+        or a shell has angular momentum outside the supported range from 0 through 6
 
 Examples:
     >>> aux = AuxiliaryBasis("my-aux-fit", aux_shells, structure)
@@ -251,7 +255,8 @@ Returns:
     AuxiliaryBasis: New auxiliary basis instance
 
 Raises:
-    ValueError: If the auxiliary basis name is not recognized or the structure is invalid
+    ValueError: If the auxiliary basis name is not recognized, a requested element has no
+        definition, the structure is invalid, or a shell has angular momentum outside 0 through 6
 
 Examples:
     >>> aux = AuxiliaryBasis.from_basis_name("def2-universal-jfit", structure)
@@ -272,7 +277,8 @@ Returns:
     AuxiliaryBasis: New auxiliary basis instance named ``custom_aux``
 
 Raises:
-    ValueError: If an element in the structure is missing from the map or a name is invalid
+    ValueError: If an element in the structure is missing from the map, a selected basis is
+        invalid or unavailable for an element, or a shell has angular momentum outside 0 through 6
 
 Examples:
     >>> aux_map = {"H": "def2-universal-jfit", "O": "def2-universal-jfit"}
@@ -294,7 +300,8 @@ Returns:
     AuxiliaryBasis: New auxiliary basis instance named ``custom_aux``
 
 Raises:
-    ValueError: If an atom index is missing from the map or a name is invalid
+    ValueError: If an atom index is missing from the map, a selected basis is invalid or
+        unavailable for an element, or a shell has angular momentum outside 0 through 6
 
 Examples:
     >>> aux_map = {0: "def2-universal-jfit", 1: "def2-universal-jfit"}

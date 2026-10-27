@@ -17,10 +17,22 @@ namespace qdk::chemistry::data {
 
 namespace {
 
-void clear_legacy_radial_powers(std::vector<Shell>& shells) {
+std::vector<Shell> load_auxiliary_shells(const double nuclear_charge,
+                                         const std::string& basis_name,
+                                         const size_t atom_index) {
+  auto [shells, ignored_ecp_shells, ignored_ecp_electrons] =
+      detail::get_basis_for_nuclear_charge(nuclear_charge, basis_name,
+                                           atom_index);
+  if (shells.empty()) {
+    throw std::invalid_argument(
+        "Auxiliary basis '" + basis_name + "' is unavailable for atom " +
+        std::to_string(atom_index) + " (nuclear charge " +
+        std::to_string(nuclear_charge) + ")");
+  }
   for (auto& shell : shells) {
     shell.rpowers.resize(0);
   }
+  return shells;
 }
 
 }  // namespace
@@ -85,6 +97,7 @@ AuxiliaryBasis::AuxiliaryBasis(std::string name, std::vector<Shell> shells,
       throw std::invalid_argument(
           "Auxiliary shells cannot use the ECP local-potential orbital type");
     }
+    l_to_orbital_type(shell.get_angular_momentum());
     if (shell.exponents.size() == 0 || shell.coefficients.size() == 0 ||
         shell.exponents.size() != shell.coefficients.size()) {
       throw std::invalid_argument("AuxiliaryBasis contains an invalid shell");
@@ -156,10 +169,8 @@ std::shared_ptr<AuxiliaryBasis> AuxiliaryBasis::from_basis_name(
   const auto nuclear_charges = structure->get_nuclear_charges();
   for (size_t atom_index = 0; atom_index < nuclear_charges.size();
        ++atom_index) {
-    auto [atom_shells, ignored_ecp_shells, ignored_ecp_electrons] =
-        detail::get_basis_for_nuclear_charge(nuclear_charges[atom_index],
+    auto atom_shells = load_auxiliary_shells(nuclear_charges[atom_index],
                                              basis_name, atom_index);
-    clear_legacy_radial_powers(atom_shells);
     shells.insert(shells.end(), atom_shells.begin(), atom_shells.end());
   }
   return std::make_shared<AuxiliaryBasis>(
@@ -203,10 +214,8 @@ std::shared_ptr<AuxiliaryBasis> AuxiliaryBasis::from_index_map(
           std::to_string(atom_index));
     }
     std::string basis_name = detail::lowercase_basis_name(basis->second);
-    auto [atom_shells, ignored_ecp_shells, ignored_ecp_electrons] =
-        detail::get_basis_for_nuclear_charge(nuclear_charges[atom_index],
+    auto atom_shells = load_auxiliary_shells(nuclear_charges[atom_index],
                                              basis_name, atom_index);
-    clear_legacy_radial_powers(atom_shells);
     shells.insert(shells.end(), atom_shells.begin(), atom_shells.end());
   }
 

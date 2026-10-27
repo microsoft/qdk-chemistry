@@ -11,9 +11,15 @@
 #include <qdk/chemistry/data/basis_set.hpp>
 #include <stdexcept>
 #include <string>
+#include <type_traits>
+#include <utility>
 #include <vector>
 
 using namespace qdk::chemistry::data;
+
+static_assert(std::is_copy_constructible_v<AuxiliaryBasis>);
+static_assert(!std::is_copy_assignable_v<AuxiliaryBasis>);
+static_assert(!std::is_move_assignable_v<AuxiliaryBasis>);
 
 class AuxiliaryBasisTest : public ::testing::Test {
  protected:
@@ -53,6 +59,20 @@ class AuxiliaryBasisTest : public ::testing::Test {
     shells.emplace_back(0, OrbitalType::S, std::vector{0.5, 4.0},
                         std::vector{0.4, 0.6});
     return shells;
+  }
+
+  template <typename Factory>
+  static void expect_invalid_argument(Factory factory,
+                                      const std::string& expected_message) {
+    try {
+      factory();
+      FAIL() << "Expected std::invalid_argument containing: "
+             << expected_message;
+    } catch (const std::invalid_argument& error) {
+      EXPECT_NE(std::string::npos,
+                std::string(error.what()).find(expected_message))
+          << error.what();
+    }
   }
 };
 
@@ -173,6 +193,72 @@ TEST_F(AuxiliaryBasisTest, FactoryValidationRejectsBadMaps) {
                std::invalid_argument);
 }
 
+TEST_F(AuxiliaryBasisTest, FactoriesRejectUnavailableElementDefinitions) {
+  auto structure = make_structure({"C", "Ca"});
+  const std::string basis_name = "cc-pvdz-rifit";
+  const std::string expected_message =
+      "Auxiliary basis 'cc-pvdz-rifit' is unavailable for atom 1";
+
+  expect_invalid_argument(
+      [&] { AuxiliaryBasis::from_basis_name(basis_name, structure); },
+      expected_message);
+  expect_invalid_argument(
+      [&] {
+        AuxiliaryBasis::from_element_map(
+            {{"C", basis_name}, {"Ca", basis_name}}, structure);
+      },
+      expected_message);
+  expect_invalid_argument(
+      [&] {
+        AuxiliaryBasis::from_index_map({{0, basis_name}, {1, basis_name}},
+                                       structure);
+      },
+      expected_message);
+}
+
+TEST_F(AuxiliaryBasisTest, FactoriesRejectUnsupportedAngularMomentum) {
+  auto structure = make_structure({"C"});
+  const std::string basis_name = "cc-pv6z-rifit";
+  const std::string expected_message = "Unsupported angular momentum l: 7";
+
+  expect_invalid_argument(
+      [&] { AuxiliaryBasis::from_basis_name(basis_name, structure); },
+      expected_message);
+  expect_invalid_argument(
+      [&] { AuxiliaryBasis::from_element_map({{"C", basis_name}}, structure); },
+      expected_message);
+  expect_invalid_argument(
+      [&] { AuxiliaryBasis::from_index_map({{0, basis_name}}, structure); },
+      expected_message);
+}
+
+TEST_F(AuxiliaryBasisTest, CustomBasesRejectUnsupportedAngularMomentum) {
+  auto structure = make_structure({"H"});
+  for (const int angular_momentum : {-2, 7}) {
+    std::vector<Shell> shells;
+    shells.emplace_back(0, static_cast<OrbitalType>(angular_momentum),
+                        std::vector{1.0}, std::vector{1.0});
+    expect_invalid_argument(
+        [&] { AuxiliaryBasis basis(shells, structure); },
+        "Unsupported angular momentum l: " + std::to_string(angular_momentum));
+  }
+}
+
+TEST_F(AuxiliaryBasisTest, HighestSupportedAngularMomentumRoundTrips) {
+  std::vector<Shell> shells;
+  shells.emplace_back(0, OrbitalType::I, std::vector{1.0}, std::vector{1.0});
+  AuxiliaryBasis basis(shells, make_structure({"H"}));
+
+  EXPECT_EQ(13u, basis.get_num_auxiliary_orbitals());
+  EXPECT_EQ("i", basis.to_json()["atoms"][0]["shells"][0]["orbital_type"]);
+  auto from_json = AuxiliaryBasis::from_json(basis.to_json());
+  EXPECT_EQ(basis.content_hash(), from_json->content_hash());
+
+  basis.to_hdf5_file(hdf5_filename);
+  auto from_hdf5 = AuxiliaryBasis::from_hdf5_file(hdf5_filename);
+  EXPECT_EQ(basis.content_hash(), from_hdf5->content_hash());
+}
+
 TEST_F(AuxiliaryBasisTest, ContentHashTracksNameShellsAndAOType) {
   auto structure = make_structure();
   auto shells = make_shells();
@@ -212,6 +298,46 @@ TEST_F(AuxiliaryBasisTest, JSONRoundTripsInMemoryAndFile) {
   auto from_file = AuxiliaryBasis::from_json_file(json_filename);
   EXPECT_EQ(basis.content_hash(), from_file->content_hash());
   EXPECT_EQ(3u, from_file->get_num_atoms());
+}
+
+TEST_F(AuxiliaryBasisTest, EqualExponentPrimitivesRetainRoundTripIdentity) {
+  std::vector<double> exponents;
+  std::vector<double> coefficients;
+  for (int primitive = 0; primitive < 17; ++primitive) {
+    exponents.push_back(17.0 - primitive);
+    coefficients.push_back(primitive + 1.0);
+  }
+  exponents.back() = exponents.front();
+  std::vector<Shell> shells;
+  shells.emplace_back(0, OrbitalType::S, exponents, coefficients);
+  AuxiliaryBasis basis("equal-exponents", shells, make_structure({"H"}));
+
+  EXPECT_DOUBLE_EQ(17.0, basis.get_shell(0).exponents[0]);
+  EXPECT_DOUBLE_EQ(17.0, basis.get_shell(0).exponents[1]);
+  EXPECT_DOUBLE_EQ(1.0, basis.get_shell(0).coefficients[0]);
+  EXPECT_DOUBLE_EQ(17.0, basis.get_shell(0).coefficients[1]);
+
+  const auto json = basis.to_json();
+  const auto hash = basis.content_hash();
+  auto loaded = AuxiliaryBasis::from_json(json);
+  for (int pass = 0; pass < 3; ++pass) {
+    EXPECT_EQ(json, loaded->to_json());
+    EXPECT_EQ(hash, loaded->content_hash());
+    loaded = AuxiliaryBasis::from_json(
+        nlohmann::json::parse(loaded->to_json().dump()));
+  }
+  EXPECT_EQ(json, loaded->to_json());
+  EXPECT_EQ(hash, loaded->content_hash());
+
+  basis.to_json_file(json_filename);
+  auto from_file = AuxiliaryBasis::from_json_file(json_filename);
+  EXPECT_EQ(json, from_file->to_json());
+  EXPECT_EQ(hash, from_file->content_hash());
+
+  basis.to_hdf5_file(hdf5_filename);
+  auto from_hdf5 = AuxiliaryBasis::from_hdf5_file(hdf5_filename);
+  EXPECT_EQ(json, from_hdf5->to_json());
+  EXPECT_EQ(hash, from_hdf5->content_hash());
 }
 
 TEST_F(AuxiliaryBasisTest, HDF5FileRoundTrip) {
@@ -281,6 +407,26 @@ TEST_F(AuxiliaryBasisTest, ImmutableCollectionLookupAndRoundTrips) {
   EXPECT_EQ(
       "jfit-basis",
       from_hdf5->get_auxiliary_basis(AuxiliaryBasisRole::JFit)->get_name());
+}
+
+TEST_F(AuxiliaryBasisTest, ConstructionFromSharedValuesPreservesCollection) {
+  auto structure = make_structure();
+  auto shared =
+      std::make_shared<AuxiliaryBasis>("shared", make_shells(), structure);
+  auto other =
+      std::make_shared<AuxiliaryBasis>("other", make_shells(), structure);
+  AuxiliaryBasisCollection collection(
+      {{AuxiliaryBasisRole::JFit, shared}, {AuxiliaryBasisRole::RIFit, other}});
+  const auto hash = collection.content_hash();
+
+  AuxiliaryBasis copied(*shared);
+  AuxiliaryBasis from_rvalue(std::move(*shared));
+
+  EXPECT_EQ(shared->content_hash(), copied.content_hash());
+  EXPECT_EQ(shared->content_hash(), from_rvalue.content_hash());
+  EXPECT_EQ(hash, collection.content_hash());
+  EXPECT_EQ(hash, AuxiliaryBasisCollection::from_json(collection.to_json())
+                      ->content_hash());
 }
 
 TEST_F(AuxiliaryBasisTest, CollectionRejectsInvalidEntries) {

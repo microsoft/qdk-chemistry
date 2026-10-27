@@ -53,6 +53,12 @@ AuxiliaryBasisRole auxiliary_basis_role_from_string(std::string role);
  * representation and molecular structure. Density fitting is the most common
  * consumer, but the class holds no algorithm-specific role, so a calculation
  * may use several auxiliary bases for different purposes.
+ *
+ * Values are immutable after construction: copying is supported, but in-place
+ * assignment is prohibited so shared collection entries cannot be replaced
+ * through retained aliases. Custom bases may omit shells on individual atoms.
+ * Shell angular momenta must be between 0 and
+ * @ref MAX_ORBITAL_ANGULAR_MOMENTUM.
  */
 class AuxiliaryBasis : public DataClass,
                        public std::enable_shared_from_this<AuxiliaryBasis> {
@@ -84,6 +90,10 @@ class AuxiliaryBasis : public DataClass,
   AuxiliaryBasis(std::string name, std::vector<Shell> shells,
                  std::shared_ptr<Structure> structure,
                  AOType atomic_orbital_type = AOType::Spherical);
+
+  AuxiliaryBasis(const AuxiliaryBasis&) = default;
+  AuxiliaryBasis& operator=(const AuxiliaryBasis&) = delete;
+  AuxiliaryBasis& operator=(AuxiliaryBasis&&) = delete;
 
   /** @brief Get the auxiliary-basis name. @return Basis name. */
   const std::string& get_name() const;
@@ -131,8 +141,9 @@ class AuxiliaryBasis : public DataClass,
    * @param structure Molecular structure
    * @param atomic_orbital_type Spherical or Cartesian representation
    * @return Loaded auxiliary basis
-   * @throws std::invalid_argument if the structure is null or the basis is not
-   *         available for an element in the structure
+   * @throws std::invalid_argument if the structure is null, the basis is not
+   *         available for an element in the structure, or a shell has
+   *         unsupported angular momentum
    */
   static std::shared_ptr<AuxiliaryBasis> from_basis_name(
       std::string basis_name, std::shared_ptr<Structure> structure,
@@ -145,7 +156,8 @@ class AuxiliaryBasis : public DataClass,
    * @param atomic_orbital_type Spherical or Cartesian representation
    * @return Custom auxiliary basis assembled from the selected definitions
    * @throws std::invalid_argument if the structure is null, an element is
-   *         missing, or a selected basis is unavailable
+   *         missing, a selected basis is unavailable, or a shell has
+   *         unsupported angular momentum
    */
   static std::shared_ptr<AuxiliaryBasis> from_element_map(
       const std::map<std::string, std::string>& element_to_basis_map,
@@ -159,7 +171,8 @@ class AuxiliaryBasis : public DataClass,
    * @param atomic_orbital_type Spherical or Cartesian representation
    * @return Custom auxiliary basis assembled from the selected definitions
    * @throws std::invalid_argument if the structure is null, an atom index is
-   *         missing, or a selected basis is unavailable
+   *         missing, a selected basis is unavailable, or a shell has
+   *         unsupported angular momentum
    */
   static std::shared_ptr<AuxiliaryBasis> from_index_map(
       const std::map<size_t, std::string>& index_to_basis_map,

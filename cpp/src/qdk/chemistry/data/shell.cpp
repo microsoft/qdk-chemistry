@@ -97,9 +97,10 @@ void sort_shells_inplace(std::vector<Shell>& shells) {
   auto sort_shell_primitives = [](Shell& shell) {
     std::vector<size_t> indices(shell.get_num_primitives());
     std::iota(indices.begin(), indices.end(), 0);
-    std::sort(indices.begin(), indices.end(), [&shell](size_t lhs, size_t rhs) {
-      return shell.exponents(lhs) > shell.exponents(rhs);
-    });
+    std::stable_sort(indices.begin(), indices.end(),
+                     [&shell](size_t lhs, size_t rhs) {
+                       return shell.exponents(lhs) > shell.exponents(rhs);
+                     });
 
     Eigen::VectorXd sorted_exponents(shell.get_num_primitives());
     Eigen::VectorXd sorted_coefficients(shell.get_num_primitives());

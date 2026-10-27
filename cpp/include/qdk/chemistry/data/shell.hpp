@@ -160,10 +160,14 @@ struct Shell {
    * @brief Get number of atomic orbitals in this shell
    * @param atomic_orbital_type Whether to use spherical or cartesian atomic
    *        orbitals
-   * @return Number of basis functions contributed by the shell
+   * @return Number of basis functions contributed by the shell, or zero for
+   *         the ECP local potential
    */
   size_t get_num_atomic_orbitals(
       AOType atomic_orbital_type = AOType::Spherical) const {
+    if (orbital_type == OrbitalType::UL) {
+      return 0;
+    }
     int l = static_cast<int>(orbital_type);
     if (atomic_orbital_type == AOType::Spherical) {
       return 2 * l + 1;
@@ -241,6 +245,7 @@ using ShellsPerAtom = std::vector<std::vector<Shell>>;
  * Shells are ordered by angular momentum and then by decreasing largest
  * exponent. Within each shell the primitives are ordered by decreasing
  * exponent, keeping exponents, coefficients and radial powers aligned.
+ * Primitives with equal exponents retain their relative order.
  * @param shells Shells to sort
  */
 void sort_shells_inplace(std::vector<Shell>& shells);
