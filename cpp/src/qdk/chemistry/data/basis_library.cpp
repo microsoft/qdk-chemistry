@@ -155,6 +155,15 @@ get_basis_for_nuclear_charge(const double nuclear_charge,
                               static_cast<OrbitalType>(angular_momentum[0]),
                               exponents, coefficients, radial_powers);
     }
+    // The basis library stores the local term at the highest angular momentum.
+    const auto local_term =
+        std::max_element(ecp_shells.begin(), ecp_shells.end(),
+                         [](const Shell& lhs, const Shell& rhs) {
+                           return lhs.orbital_type < rhs.orbital_type;
+                         });
+    if (local_term != ecp_shells.end()) {
+      local_term->orbital_type = OrbitalType::UL;
+    }
   }
   return {shells, ecp_shells, num_ecp_electrons};
 }

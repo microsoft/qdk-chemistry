@@ -17,6 +17,12 @@ parameters:
 - name: devTag
   type: string
   default: 'None'
+- name: arch
+  type: string
+  default: x64
+  values:
+  - x64
+  - arm64
 
 steps:
 - checkout: self
@@ -24,6 +30,23 @@ steps:
   path: qdk-chemistry
   fetchDepth: 1
   retryCountOnTaskFailure: 3
+
+# Windows ARM64 is the only target that builds in a venv: conda publishes no
+# usable win-arm64 packages, so the wheel is built on the agent's own
+# interpreter. Everywhere else the policy-default conda path applies, and conda
+# brings its own Python. Switch to conda here once a win-arm64 conda exists.
+#
+# ARM64 also cannot use UsePythonVersion@0: that image's tool cache is empty, so
+# the task downloads Python and then tries to bootstrap pip from pypi.org, which
+# the CFSClean isolation policy blocks by design. It treats that as fatal and
+# unregisters the interpreter it just extracted. ensure-python-windows.ps1
+# installs the same official build without contacting any package feed, and
+# no-ops when the agent already has a usable interpreter on PATH.
+- ${{ if eq(parameters.arch, 'arm64') }}:
+  - pwsh: >-
+      $(System.DefaultWorkingDirectory)\.pipelines\install-scripts\ensure-python-windows.ps1
+      -Arch arm64 -Version ${{ parameters.pythonVersion }} -IncludePip
+    displayName: Use Python ${{ parameters.pythonVersion }} (arm64)
 
 - pwsh: |
     python "$(System.DefaultWorkingDirectory)\.pipelines\pip-scripts\versioning.py" `
@@ -33,11 +56,11 @@ steps:
   displayName: Validate/Set Development Version for Wheels
   condition: ne('${{ parameters.devTag }}', 'None')
 
-# Import the VS x64 developer environment (INCLUDE, LIB, PATH, etc.) so that
+# Import the VS developer environment (INCLUDE, LIB, PATH, etc.) so that
 # cl.exe and the MSVC linker are available to all subsequent steps.
-# Also resolves the MSVC toolset version for the dependency cache key.
-- pwsh: $(System.DefaultWorkingDirectory)\.pipelines\install-scripts\setup-msvc-env.ps1
-  displayName: Set up MSVC environment
+# Also resolves the MSVC toolset version and vcpkg triplet for the cache keys.
+- pwsh: $(System.DefaultWorkingDirectory)\.pipelines\install-scripts\setup-msvc-env.ps1 -Arch ${{ parameters.arch }}
+  displayName: Set up MSVC environment (${{ parameters.arch }})
 
 # Restore the dependency build dirs separately to avoid a known Windows issue
 # with Cache@2 multi-line `path`: the task passes both lines as a single tar
@@ -46,30 +69,50 @@ steps:
   displayName: Restore/save vcpkg dependency cache
   inputs:
     key: >-
-      "windows-vcpkg-x64-windows-static-md-v1" | "$(MSVC_TOOLSET)" |
+      "windows-vcpkg-${{ parameters.arch }}-windows-static-md-r1" | "$(MSVC_TOOLSET)" |
       vcpkg.json |
       vcpkg-configuration.json |
-      vcpkg-overlay/**/* |
-      .pipelines/install-scripts/install-cpp-deps-windows.ps1
+      vcpkg-overlay/**/*
     path: $(System.DefaultWorkingDirectory)/vcpkg_installed
     cacheHitVar: VCPKG_CACHE_RESTORED
+
+# This key must stay in step with build-pip-wheels-windows-deps.yml, which is
+# what populates the cache.
+#
+# No restore keys here. This job only consumes the tree, so falling back to an
+# older or partial cache would surface much later as a confusing "libint2 not
+# found" during configure. An exact-key miss is the clearer failure, and the
+# dependency job this one depends on will have banked the new key first.
+- pwsh: |
+    $fp = & "$(System.DefaultWorkingDirectory)\.pipelines\install-scripts\install-cpp-deps-windows.ps1" `
+        -SrcDir    "$(System.DefaultWorkingDirectory)" `
+        -BuildType "${{ parameters.buildType }}" `
+        -Triplet   "$(VCPKG_TRIPLET)" `
+        -ClPath    "$(CL_PATH)" `
+        -EmitFingerprint | Select-Object -Last 1
+    if (-not $fp) { throw "The build plan fingerprint came back empty." }
+    Write-Host "deps build plan fingerprint: $fp"
+    Write-Host "##vso[task.setvariable variable=DEPS_FINGERPRINT]$fp"
+  displayName: Compute dependency build plan fingerprint
 
 - task: Cache@2
   displayName: Restore/save C++ deps install cache
   inputs:
     key: >-
-      "windows-deps-install-msvc-x64-windows-static-md-v2" | "$(MSVC_TOOLSET)" |
+      "windows-deps-install-msvc-${{ parameters.arch }}-windows-static-md-r1" | "$(MSVC_TOOLSET)" |
       cpp/manifest/qdk-chemistry/cgmanifest.json |
       external/macis/manifest/cgmanifest.json |
       cpp/cmake/patches/**/* |
-      .pipelines/install-scripts/install-cpp-deps-windows.ps1 |
-      .pipelines/toolchains/windows.cmake
+      .pipelines/toolchains/windows.cmake |
+      "$(DEPS_FINGERPRINT)"
     path: $(System.DefaultWorkingDirectory)/deps-install-msvc
     cacheHitVar: DEPS_INSTALL_CACHE_RESTORED
 
-# Full qdk build, C++ tests, conda environment setup, and Python wheel build.
+# Full qdk build, C++ tests, Python environment setup, and Python wheel build.
 # SYSTEM_ACCESSTOKEN is required by bootstrap-conda for the Azure Artifacts feed.
 - pwsh: |
+    # Windows ARM64 is the only target without usable win-arm64 conda packages.
+    $pythonEnv = if ('${{ parameters.arch }}' -eq 'arm64') { 'venv' } else { 'conda' }
     & "$(System.DefaultWorkingDirectory)\.pipelines\pip-scripts\build-pip-wheels-windows.ps1" `
         -SrcDir         "$(System.DefaultWorkingDirectory)" `
         -March          "${{ parameters.march }}" `
@@ -77,6 +120,8 @@ steps:
         -BuildTesting   "${{ parameters.buildTesting }}" `
         -EnableCoverage "${{ parameters.enableCoverage }}" `
         -ClPath         "$(CL_PATH)" `
+        -Triplet        "$(VCPKG_TRIPLET)" `
+        -PythonEnv      $pythonEnv `
         -PythonVersion  "${{ parameters.pythonVersion }}" `
         -DevTag         "${{ parameters.devTag }}"
   displayName: Build C++ library, run tests, build Python wheel

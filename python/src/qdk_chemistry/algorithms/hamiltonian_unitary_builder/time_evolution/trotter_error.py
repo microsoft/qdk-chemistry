@@ -30,6 +30,7 @@ from __future__ import annotations
 import math
 from typing import TYPE_CHECKING
 
+from qdk_chemistry.data.qubit_operator.containers.pauli_decomposition import PauliDecompositionContainer
 from qdk_chemistry.utils.pauli_commutation import (
     commutator_bound_first_order,
     commutator_bound_higher_order,
@@ -87,8 +88,16 @@ def trotter_steps_naive(
             f"Trotter step estimation for order {order} is not yet implemented. "
             "Trotter orders must be positive and even for orders greater than 1"
         )
-    real_terms = hamiltonian.get_real_coefficients(tolerance=weight_threshold)
-    one_norm = sum(abs(coeff) for _, coeff in real_terms)
+    container_type = hamiltonian.get_container_type()
+    if not isinstance(hamiltonian.get_container(), PauliDecompositionContainer):
+        raise ValueError(
+            f"Trotter step estimation requires a Pauli decomposition qubit operator; "
+            f"got the {container_type!r} representation."
+        )
+
+    # Only magnitudes enter the bound, so skip building Pauli labels.
+    real_parts = (complex(coeff).real for coeff in hamiltonian.coefficients)
+    one_norm = sum(abs(real) for real in real_parts if abs(real) > weight_threshold)
 
     return max(
         1,

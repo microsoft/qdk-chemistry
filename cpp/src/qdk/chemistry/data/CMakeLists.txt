@@ -4,6 +4,7 @@ target_sources(chemistry PRIVATE
     basis_library.cpp
     basis_set.cpp
     configuration.cpp
+    lattice_geometry.cpp
     lattice_graph.cpp
     configuration_set.cpp
     element_data.cpp
@@ -12,6 +13,7 @@ target_sources(chemistry PRIVATE
     hamiltonian.cpp
     hamiltonian_containers/canonical_four_center.cpp
     hamiltonian_containers/cholesky.cpp
+    hamiltonian_containers/dfthc.cpp
     hamiltonian_containers/sparse.cpp
     majorana_map_engine.cpp
     majorana_mapping.cpp

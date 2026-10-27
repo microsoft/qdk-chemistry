@@ -146,6 +146,10 @@ Key features of the PySCF implementation:
      - int
      - ``50``
      - Maximum number of :term:`MCSCF` macro iterations (orbital optimization cycles)
+   * - ``relativity``
+     - string
+     - ``""``
+     - Nonrelativistic (``""``), spin-free X2C with decontraction (``"sf-x2c"``), or X2C in the supplied contracted basis (``"sf-x2c-contracted"``). X2C requires spherical all-electron AOs and uses QDK physical constants; the two-electron operator is unchanged.
 
 Related classes
 ---------------

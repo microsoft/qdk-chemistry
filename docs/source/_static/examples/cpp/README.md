@@ -32,12 +32,27 @@ cmake -B build -DCMAKE_PREFIX_PATH="/path/to/qdk/install"
 cmake --build build
 ```
 
+On Windows, run the same commands from a *Developer PowerShell for VS 2022* so the MSVC toolchain is
+on `PATH`:
+
+```powershell
+cmake -B build -DCMAKE_PREFIX_PATH="C:/path/to/qdk/install"
+cmake --build build
+```
+
 ### Using the Command Line
 
 Alternatively, compile directly with a C++20 compiler (though using CMake, as shown above, is recommended to pick up transitive dependencies):
 
 ```bash
+# Linux / macOS
 g++ -std=c++20 -I/path/to/qdk/include example.cpp -o example -L/path/to/qdk/lib -lqdk_chemistry
+```
+
+```powershell
+# Windows (MSVC, from a Developer PowerShell)
+cl /std:c++20 /EHsc /I C:\path\to\qdk\include example.cpp /Fe:example.exe `
+    /link /LIBPATH:C:\path\to\qdk\lib qdk_chemistry.lib
 ```
 
 ## Further Reading

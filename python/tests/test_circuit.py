@@ -27,7 +27,7 @@ except ImportError:
 from qdk_chemistry.algorithms.state_preparation._binary_encoding_utils import MatrixCompressionType
 from qdk_chemistry.data import Circuit
 from qdk_chemistry.data import circuit as circuit_module
-from qdk_chemistry.data.circuit import QsharpFactoryData
+from qdk_chemistry.data.circuit import CircuitMetadata, QsharpFactoryData
 from qdk_chemistry.plugins.qiskit import QDK_CHEMISTRY_HAS_QISKIT
 from qdk_chemistry.utils.qsharp import QSHARP_UTILS
 
@@ -102,6 +102,33 @@ class TestCircuitConstruction:
         assert Circuit(qasm="OPENQASM 3.0;", num_qubits=5).num_qubits == 5
         assert Circuit(qasm="OPENQASM 3.0;", num_qubits=0).num_qubits == 0
 
+    def test_phase_gradient_ancillas_are_recorded(self):
+        """A trailing phase gradient register is declared on the circuit."""
+        circuit = Circuit(qasm="OPENQASM 3.0;", num_qubits=5, metadata=CircuitMetadata(num_phase_gradient_ancillas=2))
+        assert circuit.metadata.num_phase_gradient_ancillas == 2
+
+    def test_phase_gradient_ancillas_survive_a_json_round_trip(self):
+        """The declaration is plain data, so it serializes with the rest of the circuit."""
+        circuit = Circuit(qasm="OPENQASM 3.0;", num_qubits=5, metadata=CircuitMetadata(num_phase_gradient_ancillas=2))
+        assert Circuit.from_json(circuit.to_json()).metadata.num_phase_gradient_ancillas == 2
+
+    @pytest.mark.parametrize(
+        ("num_qubits", "num_gradient", "match"),
+        [
+            (5, -1, "must be non-negative"),
+            (2, 3, "cannot exceed num_qubits"),
+            (None, 1, "num_qubits must be declared"),
+        ],
+    )
+    def test_inconsistent_phase_gradient_declarations_are_rejected(self, num_qubits, num_gradient, match):
+        """An unusable phase gradient declaration fails at construction, not inside Q#."""
+        with pytest.raises(ValueError, match=match):
+            Circuit(
+                qasm="OPENQASM 3.0;",
+                num_qubits=num_qubits,
+                metadata=CircuitMetadata(num_phase_gradient_ancillas=num_gradient),
+            )
+
 
 class TestGetQsharpCircuit:
     """Test cases for get_qsharp method."""
@@ -165,6 +192,26 @@ class TestGetQsharpCircuit:
         qsc_info = json.loads(qsc.json())
         assert len(qsc_info["qubits"]) == 4
         assert len(qsc_pruned_info["qubits"]) == 2
+
+    @pytest.mark.parametrize("generation_method", [None, "simulate"])
+    def test_get_qsharp_circuit_forwards_generation_method(self, generation_method):
+        """Test that get_qsharp_circuit passes the generation method through to the Q# context."""
+        if generation_method == "simulate":
+            generation_method = circuit_module.qsharp.CircuitGenerationMethod.Simulate
+        calls = []
+
+        class _RecordingContext:
+            def circuit(self, program, *args, **kwargs):
+                calls.append((program, args, kwargs))
+                return "circuit"
+
+        class _Program:
+            _qdk_context = _RecordingContext()
+
+        program = _Program()
+        circuit = Circuit(qsharp_factory=QsharpFactoryData(program=program, parameter={"n": 1}))
+        assert circuit.get_qsharp_circuit(generation_method=generation_method) == "circuit"
+        assert calls == [(program, (1,), {"generation_method": generation_method, "prune_classical_qubits": False})]
 
 
 @pytest.mark.skipif(not QDK_CHEMISTRY_HAS_QISKIT, reason="Qiskit not available")
@@ -495,18 +542,17 @@ class TestCircuitEstimate:
         assert result is not None
         assert hasattr(result, "logical_counts")
 
-    def test_estimate_warns_when_the_declared_width_disagrees(self, monkeypatch):
-        """A stale ``num_qubits`` is surfaced and replaced by the estimated width."""
-        warnings: list[str] = []
-        monkeypatch.setattr(circuit_module.Logger, "warn", warnings.append)
+    def test_estimate_reports_but_does_not_change_the_declared_width(self, monkeypatch):
+        """``num_qubits`` is the argument register, so internal scratch is reported, not written back."""
+        messages: list[str] = []
+        monkeypatch.setattr(circuit_module.Logger, "info", messages.append)
 
         circuit = Circuit(qasm=self._QASM_WITH_T, num_qubits=5)
         result = circuit.estimate()
 
         assert result.logical_counts["numQubits"] == 2
-        assert len(warnings) == 1
-        assert "declares 5 qubits" in warnings[0]
-        assert circuit.num_qubits == 2
+        assert circuit.num_qubits == 5
+        assert any("declares 5 qubits" in m for m in messages)
 
     def test_estimate_raises_with_qir_only(self):
         """Test that estimate raises when only QIR representation is available."""

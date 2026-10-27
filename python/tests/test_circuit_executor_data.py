@@ -151,6 +151,22 @@ class TestCircuitExecutorDataMethods:
 
         assert "Bitstring counts: 0" in summary
 
+    def test_content_hash_rejects_unsupported_metadata(self, sample_bitstring_counts):
+        """Test content_hash fails loudly for unsupported metadata types."""
+
+        class UnsupportedMetadata:
+            pass
+
+        data = CircuitExecutorData(
+            bitstring_counts=sample_bitstring_counts,
+            total_shots=1000,
+            executor="test_executor",
+            executor_metadata=UnsupportedMetadata(),
+        )
+
+        with pytest.raises(TypeError, match="Unsupported hash argument type"):
+            data.content_hash()
+
     def test_get_summary_with_loss(self, sample_executor_data_with_loss):
         """Test get_summary includes loss information."""
         summary = sample_executor_data_with_loss.get_summary()

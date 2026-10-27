@@ -114,6 +114,14 @@ Examples:
   ref_calc.def("name", &DynamicalCorrelationCalculator::name,
                "Get the algorithm name");
 
+  ref_calc.def("aliases", &DynamicalCorrelationCalculator::aliases,
+               R"(
+The algorithm's aliases.
+
+Returns:
+  list[str]: All registered names for the algorithm
+        )");
+
   ref_calc.def("type_name", &DynamicalCorrelationCalculator::type_name,
                R"(
 The algorithm's type name.

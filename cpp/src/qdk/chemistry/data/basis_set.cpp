@@ -7,9 +7,11 @@
 #include <algorithm>
 #include <filesystem>
 #include <fstream>
+#include <map>
 #include <qdk/chemistry/data/basis_set.hpp>
 #include <qdk/chemistry/data/structure.hpp>
 #include <qdk/chemistry/utils/logger.hpp>
+#include <set>
 #include <sstream>
 #include <stdexcept>
 
@@ -19,6 +21,43 @@
 #include "json_serialization.hpp"
 
 namespace qdk::chemistry::data {
+
+// Serialization version that stored each atom's local ECP term at its highest
+// angular momentum, retained so legacy files load with that term as UL.
+static constexpr const char* LEGACY_ECP_SERIALIZATION_VERSION = "0.1.0";
+
+namespace detail {
+
+// Labels each atom's highest ECP channel UL unless the atom already has one.
+void relabel_legacy_ecp_shells(std::vector<Shell>& ecp_shells) {
+  std::map<size_t, OrbitalType> highest;
+  std::set<size_t> has_local;
+  for (const auto& sh : ecp_shells) {
+    if (sh.orbital_type == OrbitalType::UL) {
+      has_local.insert(sh.atom_index);
+    }
+    auto it = highest.try_emplace(sh.atom_index, sh.orbital_type).first;
+    it->second = std::max(it->second, sh.orbital_type);
+  }
+  bool relabeled = false;
+  for (auto& sh : ecp_shells) {
+    if (!has_local.contains(sh.atom_index) &&
+        sh.orbital_type == highest[sh.atom_index]) {
+      sh.orbital_type = OrbitalType::UL;
+      relabeled = true;
+    }
+  }
+  if (relabeled) {
+    QDK_LOGGER().warn(
+        "BasisSet serialization version {} stored each atom's local ECP term "
+        "at its highest angular momentum; it was relabeled UL on load. To "
+        "update the file, migrate it with: python -m qdk_chemistry.migrate "
+        "<old_file> <new_file>.",
+        LEGACY_ECP_SERIALIZATION_VERSION);
+  }
+}
+
+}  // namespace detail
 
 BasisSet::BasisSet(const std::string& name, const std::vector<Shell>& shells,
                    AOType atomic_orbital_type)
@@ -1402,7 +1441,10 @@ std::shared_ptr<BasisSet> BasisSet::from_hdf5(H5::Group& group) {
     H5::Attribute version_attr = group.openAttribute("version");
     std::string version_str;
     version_attr.read(string_type, version_str);
-    validate_serialization_version(SERIALIZATION_VERSION, version_str);
+    const bool legacy_ecp = version_str == LEGACY_ECP_SERIALIZATION_VERSION;
+    validate_serialization_version(
+        legacy_ecp ? LEGACY_ECP_SERIALIZATION_VERSION : SERIALIZATION_VERSION,
+        version_str);
 
     // Load metadata
     H5::Group metadata_group = group.openGroup("metadata");
@@ -1594,6 +1636,10 @@ std::shared_ptr<BasisSet> BasisSet::from_hdf5(H5::Group& group) {
       }
     }
 
+    if (legacy_ecp) {
+      detail::relabel_legacy_ecp_shells(ecp_shells);
+    }
+
     // Load ECP name and electrons
     std::string ecp_name;
     std::vector<size_t> ecp_electrons;
@@ -1714,8 +1760,10 @@ std::shared_ptr<BasisSet> BasisSet::from_json(const nlohmann::json& j) {
     if (!j.contains("version")) {
       throw std::runtime_error("Invalid JSON: missing version field");
     }
-    const std::string version = j["version"];
-    validate_serialization_version(SERIALIZATION_VERSION, version);
+    const bool legacy_ecp = j["version"] == LEGACY_ECP_SERIALIZATION_VERSION;
+    validate_serialization_version(
+        legacy_ecp ? LEGACY_ECP_SERIALIZATION_VERSION : SERIALIZATION_VERSION,
+        j["version"]);
 
     std::string name = j.value("name", "");
 
@@ -1872,6 +1920,10 @@ std::shared_ptr<BasisSet> BasisSet::from_json(const nlohmann::json& j) {
                               shell_coefficients);
         }
       }
+    }
+
+    if (legacy_ecp) {
+      detail::relabel_legacy_ecp_shells(ecp_shells);
     }
 
     // Load ECP name and electrons if present

@@ -48,6 +48,7 @@ class QpeResult(DataClass):
         bits_msb_first: tuple[int, ...] | None = None,
         bitstring_msb_first: str | None = None,
         metadata: dict[str, object] | None = None,
+        bitstring_counts: dict[str, int] | None = None,
     ) -> None:
         """Initialize a QPE result.
 
@@ -58,13 +59,14 @@ class QpeResult(DataClass):
             canonical_phase_fraction: Alias-resolved phase fraction consistent with the selected energy branch.
                 Equals ``phase_fraction`` when the algorithm performs no alias resolution.
             canonical_phase_angle: Alias-resolved phase angle in radians.
-            raw_energy: Energy computed from ``canonical_phase_fraction``.
+            raw_energy: Energy computed from ``canonical_phase_fraction`` by scalar phase inversion.
             branching: Sorted tuple of all alias energy candidates considered, including ``raw_energy``.
             resolved_energy: Candidate from ``branching`` picked by the algorithm's alias-resolution rule,
                 or ``None`` when no resolution was performed.
             bits_msb_first: Tuple of measured bits ordered from MSB to LSB, when provided.
             bitstring_msb_first: Measured bitstring representation, when provided.
             metadata: Optional metadata dictionary.
+            bitstring_counts: Measured bitstring histogram, when provided.
 
         """
         Logger.trace_entering()
@@ -78,6 +80,7 @@ class QpeResult(DataClass):
         self.resolved_energy = resolved_energy
         self.bits_msb_first = bits_msb_first
         self.bitstring_msb_first = bitstring_msb_first
+        self.bitstring_counts = None if bitstring_counts is None else dict(bitstring_counts)
         self.metadata = metadata
         # Make instance immutable after construction (handled by base class)
         super().__init__()
@@ -104,6 +107,12 @@ class QpeResult(DataClass):
                 _hash_arg(h, x)
         _hash_optional(h, self.bitstring_msb_first, _hash_str)
         _hash_optional(h, self.metadata, _hash_arg)
+        # Hashed last, and contributing nothing when unset, so that a result carrying no
+        # histogram keeps the content_hash it had before this field existed. The hash names
+        # content-addressed cache artifacts, so an unconditional marker here would miss
+        # every entry written by an earlier version. Keep this the final field.
+        if self.bitstring_counts is not None:
+            _hash_arg(h, self.bitstring_counts)
 
     @classmethod
     def from_phase_fraction(
@@ -117,6 +126,7 @@ class QpeResult(DataClass):
         resolved_energy: float | None = None,
         bits_msb_first: Sequence[int] | None = None,
         bitstring_msb_first: str | None = None,
+        bitstring_counts: dict[str, int] | None = None,
         metadata: dict[str, object] | None = None,
     ) -> "QpeResult":
         r"""Construct a :class:`QpeResult` from a measured phase fraction.
@@ -124,20 +134,27 @@ class QpeResult(DataClass):
         This factory accepts a callable that maps a phase fraction to the
         corresponding Hamiltonian eigenvalue, as defined by the container's
         :meth:`~qdk_chemistry.data.unitary_representation.containers.base.UnitaryContainer.eigenvalue_from_phase`.
+        Ambiguous powered-walk phases must be resolved explicitly before constructing
+        a result; this factory does not select among candidate energies.
 
         Args:
             method: Phase estimation algorithm or workflow label.
             phase_fraction: Measured phase fraction in ``[0, 1)``.
-            eigenvalue_from_phase: A callable mapping phase fraction to the Hamiltonian eigenvalue.
+            eigenvalue_from_phase: A callable mapping phase fraction to one eigenvalue.
             canonical_phase_fraction: Alias-resolved phase the energy is computed from. Defaults to ``phase_fraction``.
-            branching: Alias energy candidates considered. Defaults to ``(raw_energy,)``.
+            branching: Alias energy candidates considered, sorted on the way in. Defaults to ``(raw_energy,)``.
             resolved_energy: Candidate picked by the algorithm's alias-resolution rule, if any.
             bits_msb_first: Optional measured bits ordered from MSB to LSB.
             bitstring_msb_first: Optional string representation of the measured bits.
+            bitstring_counts: Optional measured bitstring histogram.
             metadata: Optional dictionary copied into the result for caller-defined context.
 
         Returns:
             QpeResult: Populated :class:`QpeResult` instance reflecting the supplied data.
+
+        Raises:
+            ValueError: If ``branching`` omits the energy recovered from ``canonical_phase_fraction``
+                or the supplied ``resolved_energy``.
 
         """
         Logger.trace_entering()
@@ -148,7 +165,22 @@ class QpeResult(DataClass):
 
         canonical = normalized_phase if canonical_phase_fraction is None else float(canonical_phase_fraction % 1.0)
         canonical_angle = float(canonical * (2 * np.pi))
-        raw_energy = eigenvalue_from_phase(canonical)
+        raw_energy = float(eigenvalue_from_phase(canonical))
+        branches: tuple[float, ...] = (raw_energy,)
+
+        if branching is not None:
+            branches = tuple(sorted(float(energy) for energy in branching))
+            # Tolerances absorb recomputation round-off only, never a physically distinct energy.
+            if not np.isclose(branches, raw_energy, rtol=1e-12, atol=1e-12).any():
+                raise ValueError(
+                    f"branching {branches} does not contain raw_energy {raw_energy} recovered from phase {canonical}."
+                )
+
+        if (
+            resolved_energy is not None
+            and not np.isclose(branches, float(resolved_energy), rtol=1e-12, atol=1e-12).any()
+        ):
+            raise ValueError(f"resolved_energy {resolved_energy} is not contained in branching {branches}.")
 
         normalized_bits: tuple[int, ...] | None = None
         bitstring = bitstring_msb_first
@@ -166,10 +198,11 @@ class QpeResult(DataClass):
             canonical_phase_fraction=canonical,
             canonical_phase_angle=canonical_angle,
             raw_energy=raw_energy,
-            branching=(raw_energy,) if branching is None else tuple(branching),
+            branching=branches,
             resolved_energy=resolved_energy,
             bits_msb_first=normalized_bits,
             bitstring_msb_first=bitstring,
+            bitstring_counts=bitstring_counts,
             metadata=metadata_copy,
         )
 
@@ -219,6 +252,8 @@ class QpeResult(DataClass):
             data["bits_msb_first"] = list(self.bits_msb_first)
         if self.bitstring_msb_first is not None:
             data["bitstring_msb_first"] = self.bitstring_msb_first
+        if self.bitstring_counts is not None:
+            data["bitstring_counts"] = self.bitstring_counts
         if self.metadata is not None:
             data["metadata"] = self.metadata
 
@@ -247,6 +282,8 @@ class QpeResult(DataClass):
             group.create_dataset("bits_msb_first", data=np.array(self.bits_msb_first))
         if self.bitstring_msb_first is not None:
             group.attrs["bitstring_msb_first"] = self.bitstring_msb_first
+        if self.bitstring_counts is not None:
+            group.attrs["bitstring_counts"] = json.dumps(self.bitstring_counts)
         if self.metadata is not None:
             # Store metadata as JSON string since HDF5 doesn't handle nested dicts well
             group.attrs["metadata"] = json.dumps(self.metadata)
@@ -278,6 +315,7 @@ class QpeResult(DataClass):
             resolved_energy=json_data.get("resolved_energy"),
             bits_msb_first=tuple(json_data["bits_msb_first"]) if "bits_msb_first" in json_data else None,
             bitstring_msb_first=json_data.get("bitstring_msb_first"),
+            bitstring_counts=json_data.get("bitstring_counts"),
             metadata=json_data.get("metadata"),
         )
 
@@ -303,6 +341,10 @@ class QpeResult(DataClass):
         if "bits_msb_first" in group:
             bits_msb_first = tuple(group["bits_msb_first"][:])
 
+        bitstring_counts = None
+        if "bitstring_counts" in group.attrs:
+            bitstring_counts = json.loads(group.attrs["bitstring_counts"])
+
         metadata = None
         if "metadata" in group.attrs:
             metadata = json.loads(group.attrs["metadata"])
@@ -318,5 +360,6 @@ class QpeResult(DataClass):
             resolved_energy=group.attrs.get("resolved_energy"),
             bits_msb_first=bits_msb_first,
             bitstring_msb_first=group.attrs.get("bitstring_msb_first"),
+            bitstring_counts=bitstring_counts,
             metadata=metadata,
         )

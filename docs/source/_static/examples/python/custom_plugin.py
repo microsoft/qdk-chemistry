@@ -96,10 +96,19 @@ class CustomScfSolver(ScfSolver):
 
 ################################################################################
 # start-cell-registration
-from qdk_chemistry.algorithms.registry import register
+from qdk_chemistry.plugins import PluginRegistrar, QdkChemistryPlugin
 
-# Registration during module import
-register(lambda: CustomScfSolver())
+
+class CustomScfPlugin(QdkChemistryPlugin):
+    """Register the capabilities provided by the custom SCF package."""
+
+    def register(self, registrar: PluginRegistrar) -> None:
+        registrar.register_algorithm(lambda: CustomScfSolver())
+
+
+# Installed plugins are registered automatically through their entry point.
+# This call only makes the standalone documentation example executable.
+CustomScfPlugin().register(PluginRegistrar())
 # end-cell-registration
 ################################################################################
 
@@ -222,14 +231,20 @@ class MassDescriptor(MolecularDescriptorCalculator):
 
 ################################################################################
 # start-cell-descriptor-registration
-from qdk_chemistry import algorithms
+from qdk_chemistry.plugins import PluginRegistrar, QdkChemistryPlugin
 
-# Register the factory
-algorithms.registry.register_factory(MolecularDescriptorCalculatorFactory())
 
-# Register implementations
-algorithms.register(lambda: NuclearChargeDescriptor())
-algorithms.register(lambda: MassDescriptor())
+class MolecularDescriptorPlugin(QdkChemistryPlugin):
+    """Register a custom algorithm type and its implementations."""
+
+    def register(self, registrar: PluginRegistrar) -> None:
+        registrar.register_algorithm_factory(MolecularDescriptorCalculatorFactory())
+        registrar.register_algorithm(lambda: NuclearChargeDescriptor())
+        registrar.register_algorithm(lambda: MassDescriptor())
+
+
+# Installed plugins are registered automatically through their entry point.
+MolecularDescriptorPlugin().register(PluginRegistrar())
 # end-cell-descriptor-registration
 ################################################################################
 
