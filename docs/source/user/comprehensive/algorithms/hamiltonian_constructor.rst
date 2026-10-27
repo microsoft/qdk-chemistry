@@ -179,18 +179,11 @@ The decomposition represents the four-center ERIs as products of three-center in
 The output Hamiltonian stores the MO three-center integrals directly in a ``CholeskyHamiltonianContainer``, avoiding expansion to the full four-center representation.
 Additionally, the original AO Cholesky vectors are preserved in the container when ``store_ao_cholesky_vectors`` is enabled, and can be retrieved via ``get_ao_cholesky_vectors()``.
 Four-center integrals are lazily computed from the three-center integrals on demand.
-The generated MO three-center integrals are exactly symmetric in their orbital pair.
-By default, four-center reconstruction uses a full matrix product without allocating a packed pair-pair matrix.
-For a Hermitian :class:`~qdk_chemistry.data.CholeskyHamiltonianContainer`, calling ``prepare_two_body_integrals(use_symmetry=True)`` before the first integral access opts into reconstruction from symmetry-unique orbital pairs.
-This uses an additional ``npair * npair`` double-precision matrix and packed factors, where ``npair = norb * (norb + 1) / 2``, in addition to the dense four-center output.
-The optimized cache has exact within-pair permutation symmetry and pair-exchange symmetry within each same-spin channel.
-It uses the symmetric part of the input factors without modifying the stored factors.
-Once the cache is built, requesting a different materialization policy raises an error rather than replacing existing integral references.
-The opt-in also works for a :class:`~qdk_chemistry.data.Hamiltonian` loaded from a file:
-
-.. code-block:: python
-
-   hamiltonian.get_container().prepare_two_body_integrals(use_symmetry=True)
+The first access forms the product :math:`(ij|kl) = \sum_Q L_{ij,Q} L_{kl,Q}` of the stored three-center integrals, using the beta integrals for the second pair of the mixed-spin channel.
+It caches one dense array of ``norb**4`` double-precision values per distinct spin channel: one array for a restricted Hamiltonian, three for an unrestricted one.
+The products are written directly into the cached arrays, and the stored three-center integrals are not modified.
+For a Hermitian Hamiltonian, each same-spin channel comes from a symmetric rank-k update whose computed triangle is mirrored, so :math:`(ij|kl) = (kl|ij)` holds exactly within it.
+The generated MO three-center integrals are exactly symmetric in their orbital pair, so the resulting integrals also satisfy :math:`(ij|kl) = (ji|kl) = (ij|lk)` up to floating-point rounding.
 
 .. rubric:: Settings
 

@@ -116,7 +116,7 @@ CholeskyHamiltonianContainer::get_two_body_integrals() const {
 
   // Lazily build and cache the four-center integrals on first access
   if (!std::get<0>(_cached_four_center_integrals)) {
-    prepare_two_body_integrals();
+    _build_four_center_cache();
   }
 
   return std::make_tuple(
@@ -125,94 +125,54 @@ CholeskyHamiltonianContainer::get_two_body_integrals() const {
       std::cref(*std::get<2>(_cached_four_center_integrals)));
 }
 
-void CholeskyHamiltonianContainer::prepare_two_body_integrals(
-    bool use_symmetry) const {
-  QDK_LOG_TRACE_ENTERING();
-  if (!has_two_body_integrals()) {
-    throw std::runtime_error("Three-center integrals are not set");
-  }
-  if (use_symmetry && !is_hermitian()) {
-    throw std::invalid_argument(
-        "Symmetry-based materialization requires a Hermitian Hamiltonian");
-  }
-  if (std::get<0>(_cached_four_center_integrals)) {
-    if (_four_center_cache_uses_symmetry != use_symmetry) {
-      throw std::invalid_argument(
-          "Four-center integrals were already cached with a different "
-          "materialization policy");
+// Copy the strictly lower triangle of the column-major n x n matrix a into its
+// strictly upper triangle, one square tile at a time.
+static void copy_lower_to_upper(double* a, size_t n) {
+  constexpr size_t tile = 64;
+#ifdef _OPENMP
+#pragma omp parallel for schedule(dynamic)
+#endif
+  for (size_t c0 = 0; c0 < n; c0 += tile) {
+    const size_t c1 = std::min(c0 + tile, n);
+    for (size_t r0 = c0; r0 < n; r0 += tile) {
+      const size_t r1 = std::min(r0 + tile, n);
+      for (size_t c = c0; c < c1; ++c) {
+        for (size_t r = std::max(r0, c + 1); r < r1; ++r) {
+          a[c + r * n] = a[r + c * n];
+        }
+      }
     }
-    return;
   }
-  _build_four_center_cache(use_symmetry);
-  _four_center_cache_uses_symmetry = use_symmetry;
 }
 
-void CholeskyHamiltonianContainer::_build_four_center_cache(
-    bool use_symmetry) const {
+void CholeskyHamiltonianContainer::_build_four_center_cache() const {
   QDK_LOG_TRACE_ENTERING();
 
   size_t norb =
       spin_channel_indices(_orbitals->active_indices(), axes::alpha()).size();
   size_t norb2 = norb * norb;
   size_t norb4 = norb2 * norb2;
+  const bool hermitian = is_hermitian();
 
-  // 4-center build from 3-center: (ij|kl) = sum_Q L_ij,Q * R_Q,kl.
-  // The two reshaped dense matrices have shape [norb*norb, naux] in
-  // column-major order; the resulting 4-center has shape [norb2, norb2] in
-  // column-major (= row-major (ij|kl)).
+  // (ij|kl) = sum_Q L_ij,Q * R_kl,Q, written directly into the cached array.
+  // The three-center integrals are column-major [norb2, naux] matrices; the
+  // result is the column-major [norb2, norb2] matrix (kl, ij), i.e. the
+  // row-major (ij|kl) array.
   auto build_four_center = [&](const Eigen::MatrixXd& three_left,
                                const Eigen::MatrixXd& three_right)
       -> std::shared_ptr<Eigen::VectorXd> {
     auto four_center = std::make_shared<Eigen::VectorXd>(norb4);
+    double* out = four_center->data();
     size_t naux = three_left.cols();
-    if (!use_symmetry) {
+    if (hermitian && &three_left == &three_right) {
+      // One computed triangle, mirrored, makes (ij|kl) == (kl|ij) exact
+      blas::syrk(blas::Layout::ColMajor, blas::Uplo::Lower, blas::Op::NoTrans,
+                 norb2, naux, 1.0, three_left.data(), norb2, 0.0, out, norb2);
+      copy_lower_to_upper(out, norb2);
+    } else {
       blas::gemm(blas::Layout::ColMajor, blas::Op::NoTrans, blas::Op::Trans,
                  norb2, norb2, naux, 1.0, three_right.data(), norb2,
-                 three_left.data(), norb2, 0.0, four_center->data(), norb2);
-      return four_center;
-    }
-
-    // Hermitian integrals are symmetric under i <-> j and k <-> l (and
-    // ij <-> kl within a spin channel). Each unique integral is evaluated
-    // once over the orbital pairs i >= j, from the symmetric part of the
-    // three-center integrals, so that these symmetries hold exactly.
-    size_t npair = norb * (norb + 1) / 2;
-    std::vector<size_t> pair(norb2);
-    for (size_t i = 0, ij = 0; i < norb; ++i) {
-      for (size_t j = 0; j <= i; ++j, ++ij) {
-        pair[i * norb + j] = pair[j * norb + i] = ij;
-      }
-    }
-    auto symmetric_part = [&](const Eigen::MatrixXd& three) {
-      Eigen::MatrixXd packed(npair, naux);
-      for (size_t Q = 0; Q < naux; ++Q) {
-        for (size_t i = 0; i < norb; ++i) {
-          for (size_t j = 0; j <= i; ++j) {
-            packed(pair[i * norb + j], Q) =
-                0.5 * (three(i * norb + j, Q) + three(j * norb + i, Q));
-          }
-        }
-      }
-      return packed;
-    };
-    const Eigen::MatrixXd left = symmetric_part(three_left);
-    Eigen::MatrixXd unique(npair, npair);
-    if (&three_left == &three_right) {
-      blas::syrk(blas::Layout::ColMajor, blas::Uplo::Lower, blas::Op::NoTrans,
-                 npair, naux, 1.0, left.data(), npair, 0.0, unique.data(),
-                 npair);
-      unique.triangularView<Eigen::StrictlyUpper>() = unique.transpose();
-    } else {
-      const Eigen::MatrixXd right = symmetric_part(three_right);
-      blas::gemm(blas::Layout::ColMajor, blas::Op::NoTrans, blas::Op::Trans,
-                 npair, npair, naux, 1.0, right.data(), npair, left.data(),
-                 npair, 0.0, unique.data(), npair);
-    }
-    for (size_t ij = 0; ij < norb2; ++ij) {
-      double* row = four_center->data() + ij * norb2;
-      for (size_t kl = 0; kl < norb2; ++kl) {
-        row[kl] = unique(pair[kl], pair[ij]);
-      }
+                 three_left.data(), norb2, 0.0, out, norb2);
     }
     return four_center;
   };
@@ -274,7 +234,7 @@ double CholeskyHamiltonianContainer::get_two_body_element(
   }
 
   if (!std::get<0>(_cached_four_center_integrals)) {
-    prepare_two_body_integrals();
+    _build_four_center_cache();
   }
 
   size_t ij = i * norb + j;

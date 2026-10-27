@@ -460,31 +460,11 @@ Returns:
 Notes:
     Integrals are stored as flattened vectors in chemist notation <ij|kl>
     where indices are ordered as i + j*norb + k*norb^2 + l*norb^3.
-    Uses the original dense product unless prepare_two_body_integrals(True)
-    was called before the first access.
-)");
-
-  cholesky_container.def(
-      "prepare_two_body_integrals",
-      &CholeskyHamiltonianContainer::prepare_two_body_integrals,
-      py::arg("use_symmetry") = false, py::call_guard<py::gil_scoped_release>(),
-      R"(
-Prepare the four-center cache using an explicit memory policy.
-
-Args:
-    use_symmetry (bool): Use symmetric factors and packed orbital pairs for a Hermitian Hamiltonian; default False.
-
-Raises:
-    RuntimeError: If three-center integrals are not set.
-    ValueError: If symmetry is requested for a non-Hermitian Hamiltonian or another policy already built the cache.
-
-Notes:
-    Symmetry-based materialization requires an extra npair-by-npair matrix
-    and packed factors, where npair = norb*(norb+1)/2. It forms products from
-    (L_ij + L_ji) / 2 and gives exact within-pair permutation symmetry, plus
-    pair-exchange symmetry within a spin channel. The stored factors are
-    unchanged. Ordinary getters reuse the prepared cache; repeating the same
-    policy is a no-op. Choose the policy before the first integral access.
+    The first access computes (ij|kl) = sum_Q L_ij,Q L'_kl,Q from the stored
+    three-center integrals L, where L' is L for aaaa and bbbb and the beta
+    integrals for aabb, and caches one norb^4 array per distinct spin channel.
+    The stored three-center integrals are not modified. For a Hermitian
+    Hamiltonian, (ij|kl) == (kl|ij) holds exactly within aaaa and bbbb.
 )");
 
   cholesky_container.def("get_two_body_element",

@@ -97,8 +97,16 @@ class CholeskyHamiltonianContainer : public HamiltonianContainer {
   /**
    * @brief Get four-center two-electron integrals in MO basis for all spin
    * channels
-   * @note Uses the original dense product unless the cache was explicitly
-   * prepared with prepare_two_body_integrals(true).
+   *
+   * The first access computes (ij|kl) = sum_Q L_ij,Q L'_kl,Q from the stored
+   * three-center integrals L, where L' is L for aaaa and bbbb and the beta
+   * integrals for aabb, and caches the result as norb^4 doubles per distinct
+   * spin channel (one array if restricted, three otherwise). The products are
+   * written directly into the cached arrays; the stored three-center
+   * integrals are not modified. For a Hermitian Hamiltonian, aaaa and bbbb
+   * come from a symmetric rank-k update whose triangle is mirrored, so
+   * (ij|kl) == (kl|ij) holds exactly within them. Integrals that satisfy
+   * L_ij == L_ji give (ij|kl) == (ji|kl) == (ij|lk) up to rounding.
    * @return Tuple of references to (aaaa, aabb, bbbb) four-center two-electron
    * integrals vectors
    * @throws std::runtime_error if integrals are not set
@@ -106,20 +114,6 @@ class CholeskyHamiltonianContainer : public HamiltonianContainer {
   std::tuple<const Eigen::VectorXd&, const Eigen::VectorXd&,
              const Eigen::VectorXd&>
   get_two_body_integrals() const override;
-
-  /**
-   * @brief Prepare the four-center cache using an explicit memory policy.
-   * @param use_symmetry Use symmetric factors and packed orbital pairs for a
-   * Hermitian Hamiltonian; requires an additional npair-by-npair matrix and
-   * packed factors, where npair = norb*(norb+1)/2. Default: false.
-   * @note Ordinary getters reuse the prepared cache. With symmetry enabled,
-   * i <-> j and k <-> l are exact, as is ij <-> kl within a spin channel.
-   * The source factors are unchanged. Repeating the same policy is a no-op.
-   * @throws std::runtime_error if three-center integrals are not set.
-   * @throws std::invalid_argument if symmetry is requested for a
-   * non-Hermitian Hamiltonian or a different policy already built the cache.
-   */
-  void prepare_two_body_integrals(bool use_symmetry = false) const;
 
   /**
    * @brief Get three-center integrals in MO basis for all spin channels
@@ -226,10 +220,9 @@ class CholeskyHamiltonianContainer : public HamiltonianContainer {
                      std::shared_ptr<Eigen::VectorXd>,
                      std::shared_ptr<Eigen::VectorXd>>
       _cached_four_center_integrals;
-  mutable bool _four_center_cache_uses_symmetry = false;
 
   /** Build four-center integrals from three-center integrals and cache them */
-  void _build_four_center_cache(bool use_symmetry) const;
+  void _build_four_center_cache() const;
 
   /** Validation helper for integral dimensions */
   void validate_integral_dimensions() const override final;
