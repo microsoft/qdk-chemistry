@@ -1590,6 +1590,43 @@ TEST_F(BasisSetTest, SameBasisSetCheck) {
   EXPECT_NEAR(e_scf_custom, e_scf_manual, testing::scf_energy_tolerance);
 }
 
+TEST_F(BasisSetTest, LibraryShellRadialPowersAndJsonRoundTrip) {
+  const std::string basis_name = "def2-svp";
+  auto structure = testing::create_agh_structure();
+  std::map<size_t, std::string> index_map;
+  for (size_t atom = 0; atom < structure->get_num_atoms(); ++atom) {
+    index_map.emplace(atom, basis_name);
+  }
+  const std::vector<std::shared_ptr<BasisSet>> bases{
+      BasisSet::from_basis_name(basis_name, structure),
+      BasisSet::from_index_map(index_map, structure)};
+
+  for (const auto& basis : bases) {
+    SCOPED_TRACE(basis->get_name());
+    ASSERT_GT(basis->get_num_shells(), 0u);
+    for (const auto& shell : basis->get_shells()) {
+      EXPECT_FALSE(shell.has_radial_powers());
+      EXPECT_EQ(0, shell.rpowers.size());
+      EXPECT_FALSE(shell.to_json(true).contains("rpowers"));
+    }
+
+    ASSERT_GT(basis->get_num_ecp_shells(), 0u);
+    for (const auto& shell : basis->get_ecp_shells()) {
+      EXPECT_TRUE(shell.has_radial_powers());
+      EXPECT_EQ(shell.exponents.size(), shell.rpowers.size());
+      EXPECT_TRUE(shell.to_json(true).contains("rpowers"));
+    }
+
+    const auto json = basis->to_json();
+    auto loaded = BasisSet::from_json(nlohmann::json::parse(json.dump()));
+    EXPECT_EQ(json, loaded->to_json());
+    EXPECT_EQ(basis->content_hash(), loaded->content_hash());
+    for (const auto& shell : loaded->get_shells()) {
+      EXPECT_FALSE(shell.has_radial_powers());
+    }
+  }
+}
+
 TEST_F(BasisSetTest, SameBasisSetCheckWithEcp) {
   // Compare energies from standard basis set string vs custom BasisSet object
   const std::string basis_set = "def2-tzvp";

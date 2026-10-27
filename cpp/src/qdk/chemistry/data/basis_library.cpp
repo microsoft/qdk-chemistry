@@ -123,8 +123,7 @@ get_basis_for_nuclear_charge(const double nuclear_charge,
             shell["coefficients"][contraction][primitive].get<std::string>()));
       }
       shells.emplace_back(atom_index, static_cast<OrbitalType>(momentum),
-                          exponents, coefficients,
-                          std::vector<int>(exponents.size(), 0));
+                          exponents, coefficients);
     }
   }
 

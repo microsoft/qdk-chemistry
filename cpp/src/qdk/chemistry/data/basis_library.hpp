@@ -31,6 +31,9 @@ std::string lowercase_basis_name(std::string name);
  * @param basis_set_name Name of the basis set to read
  * @param atom_index Atom the returned shells are centered on
  * @return Primary shells, ECP shells, and the number of replaced electrons
+ *
+ * Primary shells have no radial powers; ECP shells retain the radial powers
+ * specified by the library definition.
  */
 std::tuple<std::vector<Shell>, std::vector<Shell>, size_t>
 get_basis_for_nuclear_charge(double nuclear_charge, std::string basis_set_name,

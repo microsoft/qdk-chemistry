@@ -29,9 +29,6 @@ std::vector<Shell> load_auxiliary_shells(const double nuclear_charge,
         std::to_string(atom_index) + " (nuclear charge " +
         std::to_string(nuclear_charge) + ")");
   }
-  for (auto& shell : shells) {
-    shell.rpowers.resize(0);
-  }
   return shells;
 }
 
