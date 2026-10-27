@@ -459,12 +459,7 @@ Returns:
 
 Notes:
     Integrals are stored as flattened vectors in chemist notation <ij|kl>
-    where indices are ordered as i + j*norb + k*norb^2 + l*norb^3.
-    The first access computes (ij|kl) = sum_Q L_ij,Q L'_kl,Q from the stored
-    three-center integrals L, where L' is L for aaaa and bbbb and the beta
-    integrals for aabb, and caches one norb^4 array per distinct spin channel.
-    The stored three-center integrals are not modified. For a Hermitian
-    Hamiltonian, (ij|kl) == (kl|ij) holds exactly within aaaa and bbbb.
+    where indices are ordered as i + j*norb + k*norb^2 + l*norb^3
 )");
 
   cholesky_container.def("get_two_body_element",

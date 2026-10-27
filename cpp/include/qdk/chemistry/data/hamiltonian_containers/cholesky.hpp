@@ -97,16 +97,6 @@ class CholeskyHamiltonianContainer : public HamiltonianContainer {
   /**
    * @brief Get four-center two-electron integrals in MO basis for all spin
    * channels
-   *
-   * The first access computes (ij|kl) = sum_Q L_ij,Q L'_kl,Q from the stored
-   * three-center integrals L, where L' is L for aaaa and bbbb and the beta
-   * integrals for aabb, and caches the result as norb^4 doubles per distinct
-   * spin channel (one array if restricted, three otherwise). The products are
-   * written directly into the cached arrays; the stored three-center
-   * integrals are not modified. For a Hermitian Hamiltonian, aaaa and bbbb
-   * come from a symmetric rank-k update whose triangle is mirrored, so
-   * (ij|kl) == (kl|ij) holds exactly within them. Integrals that satisfy
-   * L_ij == L_ji give (ij|kl) == (ji|kl) == (ij|lk) up to rounding.
    * @return Tuple of references to (aaaa, aabb, bbbb) four-center two-electron
    * integrals vectors
    * @throws std::runtime_error if integrals are not set
