@@ -25,7 +25,7 @@ namespace macis {
  *   - exact-size CSR construction (no compact/copy phase)
  *
  * Only used for diagonal (bra==ket) blocks; falls back to SortedDoubleLoop
- * for off-diagonal blocks.
+ * for off-diagonal blocks and spaces with fewer than two electrons.
  */
 template <typename WfnType>
 class ResidueArrayHamiltonianGenerator
@@ -43,7 +43,9 @@ class ResidueArrayHamiltonianGenerator
   ResidueArrayHamiltonianGenerator(Args&&... args)
       : base_type(std::forward<Args>(args)...) {}
 
-  bool csr_threshold_inclusive() const override { return true; }
+  bool csr_threshold_inclusive(size_t n_elec) const override {
+    return n_elec >= 2;
+  }
 
   // ---- Pair-based RDM override (spin-dependent only) ----
 

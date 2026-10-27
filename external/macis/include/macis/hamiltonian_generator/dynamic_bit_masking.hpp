@@ -57,7 +57,7 @@ class DynamicBitMaskHamiltonianGenerator
   }
   int num_masks() const { return n_masks_; }
 
-  bool csr_threshold_inclusive() const override { return true; }
+  bool csr_threshold_inclusive(size_t) const override { return true; }
 
   // form_rdms, form_rdms_spin_dep, form_entropies: NOT overridden.
   // DBM's pair enumeration (C(10,4)=210 combo passes) is too expensive to

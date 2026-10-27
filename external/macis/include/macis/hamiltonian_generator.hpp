@@ -99,12 +99,13 @@ class HamiltonianGenerator : public HamiltonianGeneratorBase<double> {
   /**
    *  @brief Thresholding convention of the diagonal-block CSR build
    *
+   *  @param[in] n_elec Number of electrons in each determinant of the block
    *  @returns true if the diagonal is always kept and off-diagonal elements
    *  with |H_ij| >= H_thresh are stored; false if every element with
    *  |H_ij| > H_thresh is stored. Alternative builders use this property to
    *  reproduce the threshold convention of the generator.
    */
-  virtual bool csr_threshold_inclusive() const { return false; }
+  virtual bool csr_threshold_inclusive(size_t) const { return false; }
 
   /**
    *  @brief Compute matrix element for quadruple excitation
