@@ -12,7 +12,6 @@ import h5py
 import pytest
 
 import qdk_chemistry.algorithms.circuit_executor.qdk as executor_module
-from qdk_chemistry.algorithms.circuit_executor.qdk import QdkFullStateSimulator
 from qdk_chemistry.data.circuit import Circuit, QsharpFactoryData
 
 
@@ -38,7 +37,7 @@ def test_external_qir_is_rejected_before_execution(external_circuit, monkeypatch
     monkeypatch.setattr(executor_module, "run_qir", run_qir)
 
     with pytest.raises(ValueError, match="allow_external_qir=True"):
-        QdkFullStateSimulator().run(external_circuit, shots=1)
+        executor_module.QdkFullStateSimulator().run(external_circuit, shots=1)
 
     run_qir.assert_not_called()
 
@@ -47,7 +46,7 @@ def test_external_qir_accepts_explicit_opt_in(external_circuit, monkeypatch):
     """A trusted caller can explicitly authorize external QIR execution."""
     run_qir = Mock(return_value=[["Zero"]])
     monkeypatch.setattr(executor_module, "run_qir", run_qir)
-    executor = QdkFullStateSimulator()
+    executor = executor_module.QdkFullStateSimulator()
     executor.settings().set("allow_external_qir", True)
 
     result = executor.run(external_circuit, shots=1)
@@ -64,7 +63,7 @@ def test_cached_factory_compilation_does_not_require_opt_in(monkeypatch):
     circuit = Circuit(qsharp_factory=QsharpFactoryData(program=program, parameter={}))
     run_qir = Mock(return_value=[["Zero"]])
     monkeypatch.setattr(executor_module, "run_qir", run_qir)
-    executor = QdkFullStateSimulator()
+    executor = executor_module.QdkFullStateSimulator()
 
     assert executor.run(circuit, shots=1).bitstring_counts == {"0": 1}
     assert executor.run(circuit, shots=1).bitstring_counts == {"0": 1}
