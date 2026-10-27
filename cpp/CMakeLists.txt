@@ -226,17 +226,10 @@ set_target_properties(chemistry PROPERTIES POSITION_INDEPENDENT_CODE ON)
 # Determine export variables
 set(QDK_DEP_EXPORTS "" CACHE STRING "QDK Chemistry Exported Dependencies" FORCE)
 
-# QDK compiles exactly one ASCI executor source into chemistry. An addon in
-# QDK_ADDONS_DIR may set this variable to its own source.
-set(QDK_ASCI_EXECUTION_SOURCE
-  "${PROJECT_SOURCE_DIR}/src/qdk/chemistry/algorithms/microsoft/macis_asci_execution.cpp")
-
 # Include Addons
 if(QDK_ADDONS_DIR)
   add_subdirectory(${QDK_ADDONS_DIR} addons)
 endif()
-
-target_sources(chemistry PRIVATE "${QDK_ASCI_EXECUTION_SOURCE}")
 
 get_target_property(_imported nlohmann_json::nlohmann_json IMPORTED)
 get_target_property(_aliased nlohmann_json::nlohmann_json ALIASED_TARGET)

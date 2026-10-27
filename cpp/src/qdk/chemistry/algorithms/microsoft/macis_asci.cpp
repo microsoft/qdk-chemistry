@@ -18,13 +18,12 @@
 #include <qdk/chemistry/utils/logger.hpp>
 
 // Local implementation details
-#include "macis_asci_execution.hpp"
 #include "utils.hpp"
 
 namespace qdk::chemistry::algorithms::microsoft {
 
 /**
- * @brief Helper struct for CASCI calculation dispatch
+ * @brief Helper struct for CPU ASCI calculation dispatch
  */
 struct asci_helper {
   /// Maximum total electron count for which the residue arrays algorithm is
@@ -34,7 +33,7 @@ struct asci_helper {
   using return_type = std::pair<double, data::Wavefunction>;
 
   /**
-   * @brief Template implementation of CASCI calculation
+   * @brief Template implementation of CPU ASCI calculation
    * @tparam N Number of bits for wavefunction representation
    * @param hamiltonian Hamiltonian object containing molecular integrals
    * @param settings_ Settings object storing asci specific settings
@@ -163,15 +162,12 @@ struct asci_helper {
       E_casci = ham_gen.matrix_element(dets[0], dets[0]);
       C_casci = {1.0};
 
-      auto execution = make_asci_execution<N>(ham_gen, settings_);
-
       // Growth phase
       QDK_LOGGER().debug("Starting MACIS ASCI growth phase.");
       std::tie(E_casci, dets, C_casci) = macis::asci_grow<N, int64_t>(
           asci_settings, mcscf_settings, E_casci, std::move(dets),
           std::move(C_casci), ham_gen,
-          num_molecular_orbitals MACIS_MPI_CODE(, MPI_COMM_WORLD),
-          execution.get());
+          num_molecular_orbitals MACIS_MPI_CODE(, MPI_COMM_WORLD));
       QDK_LOGGER().debug(
           "Completed MACIS ASCI growth phase with {} determinants.",
           dets.size());
@@ -182,8 +178,7 @@ struct asci_helper {
         std::tie(E_casci, dets, C_casci) = macis::asci_refine<N, int64_t>(
             asci_settings, mcscf_settings, E_casci, std::move(dets),
             std::move(C_casci), ham_gen,
-            num_molecular_orbitals MACIS_MPI_CODE(, MPI_COMM_WORLD),
-            execution.get());
+            num_molecular_orbitals MACIS_MPI_CODE(, MPI_COMM_WORLD));
         QDK_LOGGER().debug(
             "Completed MACIS ASCI refinement phase with {} determinants.",
             dets.size());
