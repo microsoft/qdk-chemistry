@@ -3,6 +3,7 @@
 // license information.
 
 #include <Eigen/Core>
+#include <algorithm>
 #include <array>
 #include <bit>
 #include <cmath>
@@ -188,10 +189,13 @@ class PackedAccumulator {
 //
 //   spin_symmetric = true   (restricted orbitals)
 //     The caller guarantees that all spin channels share the same integrals
-//     (h_alpha == h_beta, eri_aaaa == eri_bbbb == eri_aabb).  Eightfold
-//     integrals use spin-summed E_pq = E^α_pq + E^β_pq, roughly halving the
-//     two-body work; fourfold integrals use spin-summed symmetric and
-//     antisymmetric excitation pairs E_pq ± E_qp.  The δ_{qr} two-body
+//     (h_alpha == h_beta, eri_aaaa == eri_bbbb == eri_aabb), which must be
+//     fourfold.  They use spin-summed symmetric and antisymmetric excitation
+//     pairs E_pq ± E_qp with E_pq = E^α_pq + E^β_pq, weighted by
+//     g^S = ((pq|rs) + (pq|sr)) / 2 and g^A = ((pq|rs) - (pq|sr)) / 2.
+//     integral_threshold screens g^S and g^A, so eightfold input, whose g^A
+//     is round-off, adds antisymmetric products only where that round-off
+//     exceeds it.  The δ_{qr} two-body
 //     contraction is folded into the one-body integrals.
 //
 //   spin_symmetric = false  (unrestricted orbitals)
@@ -342,15 +346,15 @@ struct CholeskyEriProvider {
 // share the same integrals (SparseHamiltonianContainer is always
 // restricted), so a single channel backs the aaaa/aabb/bbbb accessors.
 //
-// Ingestion reads the entries literally, after expanding deprecated single
-// eightfold representatives:
+// Ingestion reads the entries literally:
 //   * entries_ — exactly one canonical (p<=q, r<=s, (p,q)<=(r,s))
 //                position per eightfold class with a stored member, with
 //                its literal value and that of (p,q,s,r), sorted
 //                lexicographically so accumulation order is deterministic
-//                for any input ordering.
+//                for any input ordering.  The excitation-pair split, which
+//                sparse input always takes, reads only these.
 //   * map_     — every stored position with its literal value; used by
-//                scalar lookups and the general fallback.
+//                scalar lookups.
 struct SparseEriProvider {
   // Enables the dedicated non-zero-only two-body loop in majorana_map_impl.
   static constexpr bool kSparse = true;
@@ -364,7 +368,7 @@ struct SparseEriProvider {
   // Canonical class positions, sorted lexicographically.
   std::vector<Entry> entries_;
   std::size_t n_ = 0;
-  // Scratch row for the general fallback when screening breaks symmetry.
+  // Scratch row for the row accessors, which complete the provider interface.
   mutable std::vector<double> row_buf_{};
   const std::vector<Entry>& entries() const { return entries_; }
   std::uint64_t key(std::size_t p, std::size_t q, std::size_t r,
@@ -384,7 +388,7 @@ struct SparseEriProvider {
               std::size_t s) const {
     return aaaa(p, q, r, s);
   }
-  // Build the (pq|·) row from map_ for the general fallback.
+  // Build the (pq|·) row from map_.
   const double* build_row(std::size_t p, std::size_t q) const {
     row_buf_.assign(n_ * n_, 0.0);
     const std::uint64_t n2 = static_cast<std::uint64_t>(n_ * n_);
@@ -407,54 +411,6 @@ struct SparseEriProvider {
   }
 };
 
-template <class EriProvider>
-bool pair_screening_preserves_symmetry(const EriProvider& provider,
-                                       std::size_t extent, bool restricted,
-                                       double integral_threshold) {
-  if (integral_threshold <= 0.0) return true;
-  auto retained = [integral_threshold](double value) {
-    return std::abs(value) >= integral_threshold;
-  };
-  if constexpr (EriProvider::kSparse) {
-    for (const auto& entry : provider.entries()) {
-      const std::size_t left[2][2] = {{entry.p, entry.q}, {entry.q, entry.p}};
-      const std::size_t right[2][2] = {{entry.r, entry.s}, {entry.s, entry.r}};
-      for (const auto& first : left)
-        for (const auto& second : right) {
-          const auto value =
-              retained(provider.aaaa(first[0], first[1], second[0], second[1]));
-          if (value != retained(provider.aaaa(second[0], second[1], first[0],
-                                              first[1])) ||
-              value != retained(provider.aaaa(first[1], first[0], second[1],
-                                              second[0])))
-            return false;
-        }
-    }
-    return true;
-  }
-  auto check_channel = [&](auto row_accessor, auto scalar_accessor,
-                           bool exchange) {
-    for (std::size_t bra = 0; bra < extent; ++bra)
-      for (std::size_t ket = 0; ket < extent; ++ket) {
-        const double* row = (provider.*row_accessor)(bra, ket);
-        for (std::size_t other_bra = 0; other_bra < extent; ++other_bra)
-          for (std::size_t other_ket = 0; other_ket < extent; ++other_ket) {
-            const bool value = retained(row[other_bra * extent + other_ket]);
-            if (value != retained((provider.*scalar_accessor)(
-                             ket, bra, other_ket, other_bra)) ||
-                (exchange && value != retained((provider.*scalar_accessor)(
-                                          other_bra, other_ket, bra, ket))))
-              return false;
-          }
-      }
-    return true;
-  };
-  return check_channel(&EriProvider::row_aaaa, &EriProvider::aaaa, true) &&
-         (restricted ||
-          (check_channel(&EriProvider::row_bbbb, &EriProvider::bbbb, true) &&
-           check_channel(&EriProvider::row_aabb, &EriProvider::aabb, false)));
-}
-
 template <std::size_t NW, class EriProvider>
 MajoranaMapResult majorana_map_impl(const MajoranaMapping& mapping,
                                     double core_energy, const double* h1_alpha,
@@ -463,12 +419,6 @@ MajoranaMapResult majorana_map_impl(const MajoranaMapping& mapping,
                                     std::size_t n_spatial, bool spin_symmetric,
                                     bool pair_split, double threshold,
                                     double integral_threshold) {
-  if (pair_split &&
-      !pair_screening_preserves_symmetry(eri_provider, n_spatial,
-                                         spin_symmetric, integral_threshold)) {
-    pair_split = false;
-    spin_symmetric = false;
-  }
   const std::size_t n_modes = 2 * n_spatial;
 
   PackedAccumulator<NW> acc;
@@ -506,23 +456,12 @@ MajoranaMapResult majorana_map_impl(const MajoranaMapping& mapping,
 
   const std::size_t num_spin_species =
       (mapping.num_modes() < 2 * n_spatial) ? 1 : 2;
-  const bool use_spin_symmetric =
-      spin_symmetric && (num_spin_species == 2) && !pair_split;
 
   auto ppair_alpha = build_pair_cache(alpha_offset);
   std::vector<PackedPairProduct> ppair_beta;
   if (num_spin_species == 2) {
     ppair_beta = build_pair_cache(beta_offset);
   }
-
-  auto alpha_pair = [&](std::size_t i,
-                        std::size_t j) -> const PackedPairProduct& {
-    return ppair_alpha[i * maj_per_spin + j];
-  };
-  auto beta_pair = [&](std::size_t i,
-                       std::size_t j) -> const PackedPairProduct& {
-    return ppair_beta[i * maj_per_spin + j];
-  };
 
   auto mode_alpha = [](std::size_t p) -> std::size_t { return p; };
   auto mode_beta = [n_spatial](std::size_t p) -> std::size_t {
@@ -550,35 +489,54 @@ MajoranaMapResult majorana_map_impl(const MajoranaMapping& mapping,
     acc.accumulate(identity, std::complex<double>(core_energy, 0.0));
   }
 
-  // ─── One-body terms ──────────────────────────────────────────────
-  std::vector<double> h1_eff_alpha(n_spatial * n_spatial);
-  std::vector<double> h1_eff_beta(n_spatial * n_spatial);
-  for (std::size_t p = 0; p < n_spatial; ++p) {
-    for (std::size_t s = 0; s < n_spatial; ++s) {
-      double h_a = h1_alpha[p * n_spatial + s];
-      double h_b = use_spin_symmetric ? h_a : h1_beta[p * n_spatial + s];
-      if (use_spin_symmetric) {
-        double delta_corr = 0.0;
-        for (std::size_t q = 0; q < n_spatial; ++q) {
-          delta_corr += eri_provider.aaaa(p, q, q, s);
-        }
-        h_a -= 0.5 * delta_corr;
-        h_b = h_a;
-      }
-      h1_eff_alpha[p * n_spatial + s] = h_a;
-      h1_eff_beta[p * n_spatial + s] = h_b;
-    }
-  }
+  // ─── Screening ────────────────────────────────────────────────────
+  //
+  // The excitation-pair split weights pair products by the symmetric and
+  // antisymmetric combinations g^S, g^A = ((pq|rs) ± (pq|sr)) / 2 and screens
+  // those rather than individual integrals.  Symmetry partners are thus
+  // screened together, and eightfold input, whose g^A is round-off, adds
+  // antisymmetric products only where that round-off exceeds the threshold.
+  // The mapped operator is that of the tensor g' = screened(g^S) +
+  // screened(g^A).
+  auto screened = [integral_threshold](double value) {
+    return std::abs(value) < integral_threshold ? 0.0 : value;
+  };
+  auto split = [&screened](double direct, double ket_swapped) {
+    return std::pair{screened(0.5 * (direct + ket_swapped)),
+                     screened(0.5 * (direct - ket_swapped))};
+  };
 
+  // ─── One-body terms ──────────────────────────────────────────────
+  // The split adds the δ_{qr} contraction -1/2 sum_q g'_pqqs of its two-body
+  // operator here; the general loops add it per integral.
+  auto contraction = [&](bool beta, std::size_t p, std::size_t s) {
+    double sum = 0.0;
+    for (std::size_t q = 0; q < n_spatial; ++q) {
+      const auto [symmetric, antisymmetric] =
+          beta ? split(eri_provider.bbbb(p, q, q, s),
+                       eri_provider.bbbb(p, q, s, q))
+               : split(eri_provider.aaaa(p, q, q, s),
+                       eri_provider.aaaa(p, q, s, q));
+      sum += symmetric + antisymmetric;
+    }
+    return -0.5 * sum;
+  };
+  auto one_body = [integral_threshold](double value) {
+    return std::abs(value) > integral_threshold ? value : 0.0;
+  };
   for (std::size_t p = 0; p < n_spatial; ++p) {
     for (std::size_t q = 0; q < n_spatial; ++q) {
-      double h_pq_a = h1_eff_alpha[p * n_spatial + q];
-      if (std::abs(h_pq_a) > integral_threshold) {
+      const double h_pq_a = one_body(h1_alpha[p * n_spatial + q]) +
+                            (pair_split ? contraction(false, p, q) : 0.0);
+      if (h_pq_a != 0.0) {
         accumulate_epq(mode_alpha(p), mode_alpha(q), h_pq_a);
       }
       if (num_spin_species == 2) {
-        double h_pq_b = h1_eff_beta[p * n_spatial + q];
-        if (std::abs(h_pq_b) > integral_threshold) {
+        const double h_pq_b =
+            spin_symmetric ? h_pq_a
+                           : one_body(h1_beta[p * n_spatial + q]) +
+                                 (pair_split ? contraction(true, p, q) : 0.0);
+        if (h_pq_b != 0.0) {
           accumulate_epq(mode_beta(p), mode_beta(q), h_pq_b);
         }
       }
@@ -649,20 +607,16 @@ MajoranaMapResult majorana_map_impl(const MajoranaMapping& mapping,
         }
       }
     };
-    auto screened = [integral_threshold](double value) {
-      return std::abs(value) < integral_threshold ? 0.0 : value;
-    };
     auto same_spin = [&](const auto& pairs, bool beta) {
       auto process = [&](std::size_t left, std::size_t right, double direct,
                          double ket_swapped) {
         const auto& first = pairs[left];
         const auto& second = pairs[right];
-        direct = screened(direct);
-        ket_swapped = screened(ket_swapped);
-        product(first.symmetric, second.symmetric,
-                0.25 * (direct + ket_swapped), left != right);
-        product(first.antisymmetric, second.antisymmetric,
-                0.25 * (direct - ket_swapped), left != right);
+        const auto [symmetric, antisymmetric] = split(direct, ket_swapped);
+        product(first.symmetric, second.symmetric, 0.5 * symmetric,
+                left != right);
+        product(first.antisymmetric, second.antisymmetric, 0.5 * antisymmetric,
+                left != right);
       };
       if constexpr (EriProvider::kSparse) {
         std::vector<std::size_t> pair_indices(n_spatial * n_spatial);
@@ -685,22 +639,6 @@ MajoranaMapResult majorana_map_impl(const MajoranaMapping& mapping,
         }
       }
     };
-    for (std::size_t bra = 0; bra < n_spatial; ++bra) {
-      for (std::size_t ket = 0; ket < n_spatial; ++ket) {
-        for (std::size_t contracted = 0; contracted < n_spatial; ++contracted) {
-          const double alpha =
-              screened(eri_provider.aaaa(bra, contracted, contracted, ket));
-          if (alpha != 0.0)
-            accumulate_epq(mode_alpha(bra), mode_alpha(ket), -0.5 * alpha);
-          if (num_spin_species == 2) {
-            const double beta =
-                screened(eri_provider.bbbb(bra, contracted, contracted, ket));
-            if (beta != 0.0)
-              accumulate_epq(mode_beta(bra), mode_beta(ket), -0.5 * beta);
-          }
-        }
-      }
-    }
     if (spin_symmetric && num_spin_species == 2) {
       same_spin(make_pairs(true, 0), false);
     } else {
@@ -712,130 +650,16 @@ MajoranaMapResult majorana_map_impl(const MajoranaMapping& mapping,
         for (const auto& first : alpha) {
           const double* row = eri_provider.row_aabb(first.bra, first.ket);
           for (const auto& second : beta) {
-            const double direct =
-                screened(row[second.bra * n_spatial + second.ket]);
-            const double ket_swapped =
-                screened(row[second.ket * n_spatial + second.bra]);
-            product(first.symmetric, second.symmetric,
-                    0.5 * (direct + ket_swapped), false);
-            product(first.antisymmetric, second.antisymmetric,
-                    0.5 * (direct - ket_swapped), false);
+            const auto [symmetric, antisymmetric] =
+                split(row[second.bra * n_spatial + second.ket],
+                      row[second.ket * n_spatial + second.bra]);
+            product(first.symmetric, second.symmetric, symmetric, false);
+            product(first.antisymmetric, second.antisymmetric, antisymmetric,
+                    false);
           }
         }
       }
     }
-  } else if (use_spin_symmetric) {
-    struct SpinSummedE {
-      std::vector<std::pair<std::complex<double>, PackedPauliWord<NW>>> terms;
-    };
-    std::vector<SpinSummedE> ss_e(n_spatial * n_spatial);
-
-    for (std::size_t p = 0; p < n_spatial; ++p) {
-      for (std::size_t q = 0; q < n_spatial; ++q) {
-        auto& sse = ss_e[p * n_spatial + q];
-        for (int a = 0; a < 2; ++a) {
-          for (int b = 0; b < 2; ++b) {
-            const auto& [coeff_a, word_a] = alpha_pair(2 * p + a, 2 * q + b);
-            sse.terms.emplace_back(coeff_a * 0.25 * excitation_coeff[a][b],
-                                   word_a);
-            const auto& [coeff_b, word_b] = beta_pair(2 * p + a, 2 * q + b);
-            sse.terms.emplace_back(coeff_b * 0.25 * excitation_coeff[a][b],
-                                   word_b);
-          }
-        }
-      }
-    }
-
-    struct SymmetrizedE {
-      std::vector<std::pair<std::complex<double>, PackedPauliWord<NW>>> terms;
-    };
-    std::vector<SymmetrizedE> sym_e;
-    std::vector<std::size_t> sym_map(n_spatial * n_spatial);
-    {
-      std::size_t idx = 0;
-      sym_e.resize(n_spatial * (n_spatial + 1) / 2);
-      for (std::size_t p = 0; p < n_spatial; ++p) {
-        for (std::size_t q = p; q < n_spatial; ++q) {
-          sym_map[p * n_spatial + q] = idx;
-          if (p != q) sym_map[q * n_spatial + p] = idx;
-
-          std::unordered_map<PackedPauliWord<NW>, std::complex<double>,
-                             PackedPauliWordHash<NW>>
-              merged;
-          for (const auto& [c, w] : ss_e[p * n_spatial + q].terms) {
-            merged[w] += c;
-          }
-          if (p != q) {
-            for (const auto& [c, w] : ss_e[q * n_spatial + p].terms) {
-              merged[w] += c;
-            }
-          }
-          auto& se = sym_e[idx];
-          for (auto& [w, c] : merged) {
-            if (std::abs(c) > 1e-15) {
-              se.terms.emplace_back(c, std::move(w));
-            }
-          }
-          ++idx;
-        }
-      }
-    }
-
-    // Accumulate the contribution of one canonical (pq|rs) pair.  Both the
-    // dense quad loop and the sparse non-zero loop funnel through this lambda
-    // so the arithmetic, ordering, and thresholding are byte-for-byte
-    // identical between paths.  Pre-condition: pq_idx <= rs_idx.
-    auto process_pair = [&](std::size_t pq_idx, std::size_t rs_idx,
-                            double eri) {
-      if (std::abs(eri) < integral_threshold) return;
-      const auto& s_pq = sym_e[pq_idx];
-      const auto& s_rs = sym_e[rs_idx];
-      double half_eri = 0.5 * eri;
-      if (pq_idx == rs_idx) {
-        for (const auto& [c1, w1] : s_pq.terms) {
-          for (const auto& [c2, w2] : s_rs.terms) {
-            acc.accumulate_product(w1, w2, half_eri * c1 * c2);
-          }
-        }
-      } else {
-        for (const auto& [c1, w1] : s_pq.terms) {
-          for (const auto& [c2, w2] : s_rs.terms) {
-            acc.accumulate_product(w1, w2, half_eri * c1 * c2);
-            acc.accumulate_product(w2, w1, half_eri * c2 * c1);
-          }
-        }
-      }
-    };
-
-    if constexpr (EriProvider::kSparse) {
-      // Fast path: visit only the stored non-zero entries.  Entries are
-      // canonicalized (p<=q, r<=s, (p,q)<=(r,s)) at ingestion; enforce the
-      // same pq_idx <= rs_idx ordering the dense quad loop uses before
-      // calling process_pair.
-      for (const auto& e : eri_provider.entries()) {
-        std::size_t pq_idx = sym_map[e.p * n_spatial + e.q];
-        std::size_t rs_idx = sym_map[e.r * n_spatial + e.s];
-        if (pq_idx > rs_idx) std::swap(pq_idx, rs_idx);
-        process_pair(pq_idx, rs_idx, e.value);
-      }
-    } else {
-      for (std::size_t p = 0; p < n_spatial; ++p) {
-        for (std::size_t q = p; q < n_spatial; ++q) {
-          std::size_t pq_idx = sym_map[p * n_spatial + q];
-          // One (pq|·) row per outer pair: zero-copy for dense, a single
-          // vectorized aux contraction for Cholesky.
-          const double* row = eri_provider.row_aaaa(p, q);
-          for (std::size_t r = 0; r < n_spatial; ++r) {
-            for (std::size_t s = r; s < n_spatial; ++s) {
-              std::size_t rs_idx = sym_map[r * n_spatial + s];
-              if (pq_idx > rs_idx) continue;
-              process_pair(pq_idx, rs_idx, row[r * n_spatial + s]);
-            }
-          }
-        }
-      }
-    }
-
   } else {
     auto accumulate_two_body_product =
         [&](std::size_t mode_p, std::size_t mode_q, std::size_t mode_r,
@@ -1138,15 +962,16 @@ MajoranaMapResult majorana_map_hamiltonian(
     const double* eri_bbbb, std::size_t n_spatial, bool spin_symmetric,
     double threshold, double integral_threshold) {
   detail::DenseEriProvider provider{eri_aaaa, eri_aabb, eri_bbbb, n_spatial};
-  bool pair_split = false;
+  bool pair_split = true;
   if (spin_symmetric) {
-    pair_split = detail::require_fourfold_two_body(
-                     eri_aaaa, n_spatial, "majorana_map_hamiltonian") ==
-                     detail::TwoBodySymmetry::FourFold ||
-                 detail::classify_two_body_symmetry(
-                     eri_aaaa, n_spatial, detail::eightfold_path_tolerance) !=
-                     detail::TwoBodySymmetry::EightFold;
+    detail::require_fourfold_two_body(eri_aaaa, n_spatial,
+                                      "majorana_map_hamiltonian");
   } else {
+    for (const double* tensor : {eri_aaaa, eri_aabb, eri_bbbb}) {
+      detail::require_finite_two_body(
+          tensor, n_spatial * n_spatial * n_spatial * n_spatial,
+          "majorana_map_hamiltonian");
+    }
     auto supports_split = [n_spatial](const double* tensor) {
       const auto symmetry = detail::classify_two_body_symmetry(
           tensor, n_spatial, detail::two_body_symmetry_tolerance);
@@ -1167,29 +992,33 @@ MajoranaMapResult majorana_map_hamiltonian_cholesky(
     const double* h1_beta, const double* three_center_aa,
     const double* three_center_bb, std::size_t n_spatial, std::size_t naux,
     bool spin_symmetric, double threshold, double integral_threshold) {
-  // A 4-fold part enters the integrals quadratically in the factor asymmetry,
-  // which this check bounds by 1e-5, so no tighter 8-fold check is needed.
-  const auto alpha_symmetry = detail::cholesky_two_body_symmetry(
-      three_center_aa, n_spatial, naux, detail::two_body_symmetry_tolerance);
-  if (spin_symmetric &&
-      alpha_symmetry == detail::TwoBodySymmetry::NonHermitian) {
+  auto require_finite = [count = n_spatial * n_spatial *
+                                 naux](const double* factors) {
+    if (!std::all_of(factors, factors + count,
+                     [](double value) { return std::isfinite(value); })) {
+      throw std::invalid_argument(
+          "majorana_map_hamiltonian_cholesky: the three-center factors "
+          "contain a non-finite value.");
+    }
+  };
+  require_finite(three_center_aa);
+  if (!spin_symmetric) require_finite(three_center_bb);
+  auto reversal_symmetric = [&](const double* left, const double* right) {
+    return detail::cholesky_has_reversal_symmetry(
+        left, right, n_spatial, naux, detail::two_body_symmetry_tolerance);
+  };
+  const bool alpha_hermitian =
+      reversal_symmetric(three_center_aa, three_center_aa);
+  if (spin_symmetric && !alpha_hermitian) {
     throw std::invalid_argument(
-        "majorana_map_hamiltonian_cholesky: pair-symmetric and "
-        "pair-antisymmetric "
-        "factor components have a nonzero cross product, so the reconstructed "
-        "two-body integrals define a non-Hermitian operator.");
+        "majorana_map_hamiltonian_cholesky: the reconstructed two-body "
+        "integrals violate (pq|rs) = (qp|sr), so they define a non-Hermitian "
+        "operator, which is not supported.");
   }
   const bool pair_split =
-      spin_symmetric
-          ? alpha_symmetry == detail::TwoBodySymmetry::FourFold
-          : alpha_symmetry != detail::TwoBodySymmetry::NonHermitian &&
-                detail::cholesky_two_body_symmetry(
-                    three_center_bb, n_spatial, naux,
-                    detail::two_body_symmetry_tolerance) !=
-                    detail::TwoBodySymmetry::NonHermitian &&
-                detail::cholesky_mixed_spin_has_reversal_symmetry(
-                    three_center_aa, three_center_bb, n_spatial, naux,
-                    detail::two_body_symmetry_tolerance);
+      spin_symmetric || (alpha_hermitian &&
+                         reversal_symmetric(three_center_bb, three_center_bb) &&
+                         reversal_symmetric(three_center_aa, three_center_bb));
   detail::CholeskyEriProvider provider{three_center_aa, three_center_bb,
                                        n_spatial, naux};
   return detail::run_with_provider(mapping, core_energy, h1_alpha, h1_beta,
@@ -1276,11 +1105,7 @@ MajoranaMapResult majorana_map_hamiltonian_sparse(
         "operator unchanged, so store the bra-ket average ((pq|rs) + (rs|pq)) "
         "/ 2 at both positions.");
   }
-  const bool pair_split =
-      classification.symmetry == detail::TwoBodySymmetry::FourFold ||
-      detail::classify_sparse_two_body_symmetry(
-          tensor, detail::eightfold_path_tolerance)
-              .symmetry != detail::TwoBodySymmetry::EightFold;
+  constexpr bool pair_split = true;
 
   provider.map_.reserve(tensor.size());
   std::set<detail::TwoBodyKey> canonical_keys;

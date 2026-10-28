@@ -875,7 +875,7 @@ class TestFourFoldReference:
 
     @pytest.mark.parametrize("storage", ["dense", "sparse"])
     def test_fourfold_part_below_rejection_tolerance_is_mapped(self, storage: str) -> None:
-        """The 8-fold path is taken only at round-off level, so a small fourfold part is kept."""
+        """A fourfold part below the rejection tolerance is mapped, not dropped."""
         random = np.random.default_rng(706)
         fourfold = fourfold_average(random.normal(size=(3,) * 4))
         exchanged = fourfold.transpose(1, 0, 2, 3)
@@ -891,26 +891,35 @@ class TestFourFoldReference:
         np.testing.assert_allclose(operator.to_matrix(), reference, atol=1e-11, rtol=0)
 
     @pytest.mark.parametrize("storage", ["restricted", "unrestricted", "sparse"])
-    def test_roundoff_near_integral_screen_preserves_literal_operator(self, storage: str) -> None:
-        """A cutoff that separates near-equal partners screens each integral individually."""
+    def test_integral_screen_acts_on_pair_combinations(self, storage: str) -> None:
+        """The screen acts on ((pq|rs) ± (pq|sr)) / 2, so near-equal partners on either side of it agree."""
         tensor = np.zeros((2,) * 4)
         tensor[0, 0, 0, 0] = 1.0
         tensor[0, 1, 0, 1] = tensor[1, 0, 1, 0] = 0.2
-        tensor[0, 1, 1, 0] = 0.1 - 1e-10
-        tensor[1, 0, 0, 1] = 0.1 + 1e-10
+        tensor[0, 1, 1, 0] = tensor[1, 0, 0, 1] = 0.1
         one_body = np.zeros((2, 2))
-        if storage == "sparse":
-            entries = {tuple(indices): tensor[tuple(indices)] for indices in np.argwhere(tensor)}
-            hamiltonian = Hamiltonian(SparseHamiltonianContainer(one_body, entries, 0.0))
-        elif storage == "restricted":
-            hamiltonian = create_dense_test_hamiltonian(one_body, tensor)
-        else:
-            hamiltonian = create_dense_test_hamiltonian(one_body, tensor, one_body, tensor, tensor)
-        screened = np.where(np.abs(tensor) < 0.1, 0.0, tensor)
-        reference = fermionic_reference_matrix(one_body, one_body, screened, screened, screened)
         mapper = create("qubit_mapper", "qdk", integral_threshold=0.1)
-        operator = mapper.run(hamiltonian, MajoranaMapping.jordan_wigner(4))
-        np.testing.assert_allclose(operator.to_matrix(), reference, atol=1e-11, rtol=0)
+
+        def mapped(two_body):
+            if storage == "sparse":
+                entries = {tuple(indices): two_body[tuple(indices)] for indices in np.argwhere(two_body)}
+                hamiltonian = Hamiltonian(SparseHamiltonianContainer(one_body, entries, 0.0))
+            elif storage == "restricted":
+                hamiltonian = create_dense_test_hamiltonian(one_body, two_body)
+            else:
+                hamiltonian = create_dense_test_hamiltonian(one_body, two_body, one_body, two_body, two_body)
+            return mapper.run(hamiltonian, MajoranaMapping.jordan_wigner(4)).to_matrix()
+
+        swapped = tensor.transpose(0, 1, 3, 2)
+        screened = sum(
+            np.where(np.abs(part) < 0.1, 0.0, part) for part in ((tensor + swapped) / 2, (tensor - swapped) / 2)
+        )
+        reference = fermionic_reference_matrix(one_body, one_body, screened, screened, screened)
+        np.testing.assert_allclose(mapped(tensor), reference, atol=1e-11, rtol=0)
+        nudged = tensor.copy()
+        nudged[0, 1, 1, 0] -= 1e-10
+        nudged[1, 0, 0, 1] += 1e-10
+        np.testing.assert_allclose(mapped(nudged), reference, atol=1e-9, rtol=0)
 
 
 class TestQdkQubitMapperRealHamiltonians:

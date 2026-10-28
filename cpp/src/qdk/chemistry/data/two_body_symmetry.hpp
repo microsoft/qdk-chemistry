@@ -17,19 +17,9 @@
 
 namespace qdk::chemistry::data::detail {
 
-/// Relative to the largest integral in the tensor.  Rounding in a four-index
-/// transformation grows with the orbital coefficients: about 1e-13 for
-/// ordinary molecules, but up to 2e-6 measured in nearly linearly dependent
-/// bases (an H8 chain in cc-pVTZ).  Genuinely reduced symmetry, as in
-/// downfolded Hamiltonians, appears near 1e-3 and above.  Qiskit Nature uses
-/// the same relative tolerance when it infers this symmetry.
+/// Symmetry violations up to this fraction of the largest integral in the
+/// tensor are treated as round-off; larger ones as genuinely reduced symmetry.
 inline constexpr double two_body_symmetry_tolerance = 1e-5;
-
-/// Relative residual up to which restricted mapping takes the 8-fold path,
-/// which drops any part without 8-fold symmetry.  Ordinary round-off is at
-/// most 9e-12 (cc-pVQZ); the 4-fold path is exact for 8-fold input too, so
-/// anything above this takes it instead of being dropped.
-inline constexpr double eightfold_path_tolerance = 1e-10;
 
 using TwoBodyKey = std::array<std::size_t, 4>;
 
@@ -174,122 +164,150 @@ inline TwoBodySymmetry require_fourfold_two_body(const double* integrals,
   return symmetry;
 }
 
-/// Whether every three-center factor is symmetric in its orbital pair.
+/// Three-center factors split into their parts symmetric and antisymmetric in
+/// the orbital pair, one row per pair p <= q in row-major order.
 ///
 /// Factors are column-major `[n^2 x naux]` with the pair index in row-major
-/// order, so element (pq, Q) lives at `factors[p * n + q + Q * n^2]`.  The
-/// reconstruction sum_Q L^Q_pq L^Q_rs is bra-ket symmetric by construction but
-/// carries the full eightfold symmetry only when each L^Q is symmetric.
-inline bool cholesky_factors_are_pair_symmetric(const double* factors,
-                                                std::size_t n, std::size_t naux,
-                                                double relative_tolerance) {
-  const std::size_t n2 = n * n;
-  const double tolerance = relative_tolerance * max_abs(factors, n2 * naux);
-
-  for (std::size_t aux = 0; aux < naux; ++aux) {
-    const double* factor = factors + aux * n2;
-    for (std::size_t p = 0; p < n; ++p) {
-      for (std::size_t q = p + 1; q < n; ++q) {
-        if (std::abs(factor[p * n + q] - factor[q * n + p]) > tolerance) {
-          return false;
-        }
-      }
-    }
-  }
-  return true;
-}
-
-struct CholeskyFactorSymmetryQR {
+/// order, so element (pq, Q) lives at `factors[p * n + q + Q * n^2]`.  With
+/// u = {p, q}, L_pq = S_u + A_u and L_qp = S_u - A_u; A_u is zero for p = q.
+struct CholeskyPairParts {
   Eigen::MatrixXd symmetric;
   Eigen::MatrixXd antisymmetric;
 };
 
-inline CholeskyFactorSymmetryQR cholesky_factor_symmetry_qr(
-    const double* factors, std::size_t n, std::size_t naux) {
+inline CholeskyPairParts cholesky_pair_parts(const double* factors,
+                                             std::size_t n, std::size_t naux,
+                                             double scale) {
   const std::size_t n2 = n * n;
-  const Eigen::Index rows = static_cast<Eigen::Index>(n2);
-  const Eigen::Index columns = static_cast<Eigen::Index>(naux);
-  const double scale = max_abs(factors, n2 * naux);
-  if (scale == 0.0) {
-    return {Eigen::MatrixXd::Zero(std::min(rows, columns), columns),
-            Eigen::MatrixXd::Zero(std::min(rows, columns), columns)};
-  }
-
-  Eigen::MatrixXd symmetric(rows, columns);
-  Eigen::MatrixXd antisymmetric(rows, columns);
+  const auto pairs = static_cast<Eigen::Index>(n * (n + 1) / 2);
+  const auto columns = static_cast<Eigen::Index>(naux);
+  CholeskyPairParts parts{Eigen::MatrixXd(pairs, columns),
+                          Eigen::MatrixXd(pairs, columns)};
   for (std::size_t aux = 0; aux < naux; ++aux) {
+    const auto column = static_cast<Eigen::Index>(aux);
+    Eigen::Index row = 0;
     for (std::size_t p = 0; p < n; ++p) {
-      for (std::size_t q = 0; q < n; ++q) {
+      for (std::size_t q = p; q < n; ++q, ++row) {
         const double forward = factors[p * n + q + aux * n2] / scale;
         const double reverse = factors[q * n + p + aux * n2] / scale;
-        symmetric(p * n + q, aux) = 0.5 * (forward + reverse);
-        antisymmetric(p * n + q, aux) = 0.5 * (forward - reverse);
+        parts.symmetric(row, column) = 0.5 * (forward + reverse);
+        parts.antisymmetric(row, column) = 0.5 * (forward - reverse);
       }
     }
   }
-  auto reduced_qr = [](const Eigen::MatrixXd& matrix) -> Eigen::MatrixXd {
-    Eigen::HouseholderQR<Eigen::MatrixXd> qr(matrix);
-    const Eigen::Index reduced_rows = std::min(matrix.rows(), matrix.cols());
-    return qr.matrixQR().topRows(reduced_rows).triangularView<Eigen::Upper>();
+  return parts;
+}
+
+/// Whether (pq|rs) = sum_Q left^Q_pq right^Q_rs satisfies (pq|rs) = (qp|sr)
+/// element by element to within `relative_tolerance` times its largest
+/// element, as the dense checks require.  For a same-spin block (`left ==
+/// right`) the reconstruction is bra-ket symmetric, so this is its Hermiticity
+/// and its fourfold symmetry.
+///
+/// In the notation of `CholeskyPairParts`, (pq|rs) - (qp|sr) =
+/// 2(±S^l_u.A^r_v ± A^l_u.S^r_v), whose largest magnitude is
+/// 2 max_{u,v} (|S^l_u.A^r_v| + |A^l_u.S^r_v|).  Two sufficient bounds are
+/// tried before that exact maximum: a Cauchy-Schwarz bound in O(n^2 naux) and
+/// a Frobenius bound from thin QR factors in O(n^2 naux^2).  The exact
+/// maximum is formed in row blocks, O(n^4 naux), only when both fail.  The
+/// bounds compare against the largest diagonal element |(pq|pq)|: that is the
+/// largest element of a same-spin block, and a lower bound for a mixed one.
+inline bool cholesky_has_reversal_symmetry(const double* left,
+                                           const double* right, std::size_t n,
+                                           std::size_t naux,
+                                           double relative_tolerance) {
+  const bool same_spin = left == right;
+  const std::size_t count = n * n * naux;
+  const double left_scale = max_abs(left, count);
+  const double right_scale = same_spin ? left_scale : max_abs(right, count);
+  if (left_scale == 0.0 || right_scale == 0.0) return true;
+
+  const auto l = cholesky_pair_parts(left, n, naux, left_scale);
+  CholeskyPairParts right_parts;
+  if (!same_spin)
+    right_parts = cholesky_pair_parts(right, n, naux, right_scale);
+  const auto& r = same_spin ? l : right_parts;
+
+  auto diagonal = [&l, &r](double sign) {
+    return (l.symmetric + sign * l.antisymmetric)
+        .cwiseProduct(r.symmetric + sign * r.antisymmetric)
+        .rowwise()
+        .sum()
+        .cwiseAbs()
+        .maxCoeff();
   };
-  return {reduced_qr(symmetric), reduced_qr(antisymmetric)};
-}
+  const double diagonal_max = std::max(diagonal(1.0), diagonal(-1.0));
+  const double bound = relative_tolerance * diagonal_max;
 
-inline double cholesky_reduced_product_norm(const Eigen::MatrixXd& left,
-                                            const Eigen::MatrixXd& right) {
-  Eigen::MatrixXd product(left.rows(), right.rows());
-  product.noalias() = left * right.transpose();
-  return product.stableNorm();
-}
-
-inline TwoBodySymmetry cholesky_two_body_symmetry(const double* factors,
-                                                  std::size_t n,
-                                                  std::size_t naux,
-                                                  double relative_tolerance) {
-  if (n == 0 || naux == 0 ||
-      cholesky_factors_are_pair_symmetric(factors, n, naux,
-                                          relative_tolerance)) {
-    return TwoBodySymmetry::EightFold;
-  }
-  const auto reduced = cholesky_factor_symmetry_qr(factors, n, naux);
-  const double mixed_norm =
-      cholesky_reduced_product_norm(reduced.symmetric, reduced.antisymmetric);
-  const double scale = std::hypot(
-      cholesky_reduced_product_norm(reduced.symmetric, reduced.symmetric),
-      cholesky_reduced_product_norm(reduced.antisymmetric,
-                                    reduced.antisymmetric),
-      std::sqrt(2.0) * mixed_norm);
-  return mixed_norm <= relative_tolerance * scale
-             ? TwoBodySymmetry::FourFold
-             : TwoBodySymmetry::NonHermitian;
-}
-
-inline bool cholesky_mixed_spin_has_reversal_symmetry(
-    const double* alpha, const double* beta, std::size_t n, std::size_t naux,
-    double relative_tolerance) {
-  if (n == 0 || naux == 0 ||
-      (cholesky_factors_are_pair_symmetric(alpha, n, naux,
-                                           relative_tolerance) &&
-       cholesky_factors_are_pair_symmetric(beta, n, naux,
-                                           relative_tolerance))) {
+  auto max_row_norm = [](const Eigen::MatrixXd& matrix) {
+    return matrix.rowwise().norm().maxCoeff();
+  };
+  if (2.0 * (max_row_norm(l.symmetric) * max_row_norm(r.antisymmetric) +
+             max_row_norm(l.antisymmetric) * max_row_norm(r.symmetric)) <=
+      bound) {
     return true;
   }
-  const auto alpha_reduced = cholesky_factor_symmetry_qr(alpha, n, naux);
-  const auto beta_reduced = cholesky_factor_symmetry_qr(beta, n, naux);
-  const double symmetric_norm = cholesky_reduced_product_norm(
-      alpha_reduced.symmetric, beta_reduced.symmetric);
-  const double antisymmetric_norm = cholesky_reduced_product_norm(
-      alpha_reduced.antisymmetric, beta_reduced.antisymmetric);
-  const double symmetric_antisymmetric_norm = cholesky_reduced_product_norm(
-      alpha_reduced.symmetric, beta_reduced.antisymmetric);
-  const double antisymmetric_symmetric_norm = cholesky_reduced_product_norm(
-      alpha_reduced.antisymmetric, beta_reduced.symmetric);
-  const double scale = std::hypot(
-      std::hypot(symmetric_norm, antisymmetric_norm),
-      std::hypot(symmetric_antisymmetric_norm, antisymmetric_symmetric_norm));
-  const double tolerance = relative_tolerance * scale;
-  return symmetric_antisymmetric_norm <= tolerance &&
-         antisymmetric_symmetric_norm <= tolerance;
+
+  // ||X Y^T||_F = ||R_X R_Y^T||_F for thin QR factors X = Q_X R_X.
+  auto reduced_r = [](const Eigen::MatrixXd& matrix) -> Eigen::MatrixXd {
+    Eigen::HouseholderQR<Eigen::MatrixXd> qr(matrix);
+    const Eigen::Index rows = std::min(matrix.rows(), matrix.cols());
+    return qr.matrixQR().topRows(rows).triangularView<Eigen::Upper>();
+  };
+  auto product_norm = [](const Eigen::MatrixXd& first,
+                         const Eigen::MatrixXd& second) {
+    Eigen::MatrixXd product(first.rows(), second.rows());
+    product.noalias() = first * second.transpose();
+    return product.stableNorm();
+  };
+  const Eigen::MatrixXd left_symmetric = reduced_r(l.symmetric);
+  const Eigen::MatrixXd left_antisymmetric = reduced_r(l.antisymmetric);
+  const Eigen::MatrixXd right_symmetric =
+      same_spin ? left_symmetric : reduced_r(r.symmetric);
+  const Eigen::MatrixXd right_antisymmetric =
+      same_spin ? left_antisymmetric : reduced_r(r.antisymmetric);
+  if (2.0 * (product_norm(left_symmetric, right_antisymmetric) +
+             product_norm(left_antisymmetric, right_symmetric)) <=
+      bound) {
+    return true;
+  }
+
+  // Exact maxima.  Element (u, v) of the reconstruction is a ± b ± c ± d with
+  // a = S.S, b = S.A, c = A.S, d = A.A, signs set by the pair orientations.
+  const Eigen::Index pairs = l.symmetric.rows();
+  const Eigen::Index block =
+      std::clamp<Eigen::Index>((Eigen::Index{1} << 20) / pairs, 1, pairs);
+  double max_difference = 0.0;
+  double max_value = diagonal_max;
+  for (Eigen::Index start = 0; start < pairs; start += block) {
+    const Eigen::Index rows = std::min(block, pairs - start);
+    Eigen::MatrixXd symmetric_antisymmetric(rows, pairs);
+    symmetric_antisymmetric.noalias() =
+        l.symmetric.middleRows(start, rows) * r.antisymmetric.transpose();
+    Eigen::MatrixXd antisymmetric_symmetric(rows, pairs);
+    antisymmetric_symmetric.noalias() =
+        l.antisymmetric.middleRows(start, rows) * r.symmetric.transpose();
+    max_difference =
+        std::max(max_difference, (symmetric_antisymmetric.cwiseAbs() +
+                                  antisymmetric_symmetric.cwiseAbs())
+                                     .maxCoeff());
+    if (same_spin) continue;
+    Eigen::MatrixXd symmetric_symmetric(rows, pairs);
+    symmetric_symmetric.noalias() =
+        l.symmetric.middleRows(start, rows) * r.symmetric.transpose();
+    Eigen::MatrixXd antisymmetric_antisymmetric(rows, pairs);
+    antisymmetric_antisymmetric.noalias() =
+        l.antisymmetric.middleRows(start, rows) * r.antisymmetric.transpose();
+    max_value = std::max(
+        {max_value,
+         ((symmetric_symmetric + antisymmetric_antisymmetric).cwiseAbs() +
+          (symmetric_antisymmetric + antisymmetric_symmetric).cwiseAbs())
+             .maxCoeff(),
+         ((symmetric_symmetric - antisymmetric_antisymmetric).cwiseAbs() +
+          (symmetric_antisymmetric - antisymmetric_symmetric).cwiseAbs())
+             .maxCoeff()});
+  }
+  return 2.0 * max_difference <= relative_tolerance * max_value;
 }
 
 /// Representative shared by all eight permutations of (p,q,r,s); also the

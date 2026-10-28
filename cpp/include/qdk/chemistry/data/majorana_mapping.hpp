@@ -355,20 +355,23 @@ struct MajoranaMapResult {
  * @param n_spatial Number of spatial orbitals.
  * @param spin_symmetric True for restricted input: the caller guarantees
  *        h_alpha == h_beta and eri_aaaa == eri_bbbb == eri_aabb (not
- *        validated).  8-fold integrals use spin-summed excitations; 4-fold
- *        integrals, (pq|rs) = (qp|sr) = (rs|pq), use spin-summed symmetric
- *        and antisymmetric excitation pairs.  False for unrestricted input:
- *        the excitation-pair split is used when aa and bb are 4-fold and ab
- *        satisfies (pq|rs) = (qp|sr), and every spin channel is looped over
- *        in full otherwise.  Either split falls back to the full loop when
- *        integral screening would break the symmetry it needs.
+ *        validated).  The integrals must be 4-fold, (pq|rs) = (qp|sr) =
+ *        (rs|pq), and are mapped with spin-summed symmetric and antisymmetric
+ *        excitation pairs (the excitation-pair split).  False for
+ *        unrestricted input: the excitation-pair split is used when aa and bb
+ *        are 4-fold and ab satisfies (pq|rs) = (qp|sr), and every spin
+ *        channel is looped over in full otherwise.
  * @param threshold Pauli terms with |coeff| < threshold are dropped.
- * @param integral_threshold Integrals with |value| < this are skipped.
+ * @param integral_threshold The excitation-pair split skips the combinations
+ *        ((pq|rs) +/- (pq|sr)) / 2 with magnitude below this, so symmetry
+ *        partners are screened together; the full loop skips individual
+ *        integrals.  One-body integrals with |value| <= this are skipped.
  * @return MajoranaMapResult with Pauli words and coefficients.
- * @throws std::invalid_argument If spin_symmetric is true and the two-body
- *         integrals define a non-Hermitian operator, or are Hermitian but not
- *         stored with (pq|rs) = (rs|pq); in the latter case, map their
- *         bra-ket average instead.
+ * @throws std::invalid_argument If the two-body integrals contain a
+ *         non-finite value, or spin_symmetric is true and they define a
+ *         non-Hermitian operator, or are Hermitian but not stored with
+ *         (pq|rs) = (rs|pq); in the latter case, map their bra-ket average
+ *         instead.
  */
 MajoranaMapResult majorana_map_hamiltonian(
     const MajoranaMapping& mapping, double core_energy, const double* h1_alpha,
@@ -393,7 +396,8 @@ MajoranaMapResult majorana_map_hamiltonian(
  * @param spin_symmetric True for restricted Hamiltonians; see the
  *        buffer-based overload for how integral symmetry selects the path.
  * @param threshold Pauli terms with |coeff| < threshold are dropped.
- * @param integral_threshold Integrals with |value| < this are skipped.
+ * @param integral_threshold Screening cutoff, as for the buffer-based
+ *        overload.
  * @return MajoranaMapResult with Pauli words and coefficients.
  * @throws std::invalid_argument As documented for the container's entry
  *         point.
@@ -414,10 +418,12 @@ MajoranaMapResult majorana_map_hamiltonian(const MajoranaMapping& mapping,
  * matrix-vector product per orbital pair — so the dense four-center
  * tensor is never reconstructed.
  *
- * Factors symmetric in their orbital pair give 8-fold integrals.  Otherwise
- * their pair-symmetric and pair-antisymmetric parts S and A give 4-fold
- * integrals exactly when S A^T = 0, which is checked through thin QR
- * factors of S and A (scratch O(N^2 naux + naux^2) for naux <= N^2).
+ * The reconstructed integrals are checked for (pq|rs) = (qp|sr) element by
+ * element, with the dense tolerance.  With S and A the parts of the factors
+ * symmetric and antisymmetric in their orbital pair, the largest violation
+ * is 2 max_{u,v} (|S_u.A_v| + |A_u.S_v|).  It is bounded in O(N^2 naux), then
+ * through thin QR factors of S and A in O(N^2 naux^2), and formed exactly in
+ * row blocks, O(N^4 naux), only when both bounds are inconclusive.
  *
  * @param mapping The Majorana-to-Pauli encoding.
  * @param core_energy Core (nuclear repulsion + frozen core) energy.
@@ -433,10 +439,12 @@ MajoranaMapResult majorana_map_hamiltonian(const MajoranaMapping& mapping,
  * @param spin_symmetric As for ::majorana_map_hamiltonian, with the integral
  *        symmetry determined from the factors.
  * @param threshold Pauli terms with |coeff| < threshold are dropped.
- * @param integral_threshold Integrals with |value| < this are skipped.
+ * @param integral_threshold Screening cutoff, as for
+ *        ::majorana_map_hamiltonian.
  * @return MajoranaMapResult with Pauli words and coefficients.
- * @throws std::invalid_argument If spin_symmetric is true and S A^T != 0, so
- *         the reconstructed two-body integrals are non-Hermitian.
+ * @throws std::invalid_argument If a factor is not finite, or spin_symmetric
+ *         is true and the reconstructed two-body integrals violate
+ *         (pq|rs) = (qp|sr), so they define a non-Hermitian operator.
  */
 MajoranaMapResult majorana_map_hamiltonian_cholesky(
     const MajoranaMapping& mapping, double core_energy, const double* h1_alpha,
@@ -474,7 +482,8 @@ MajoranaMapResult majorana_map_hamiltonian_cholesky(
  *        (SparseHamiltonianContainer is restricted-only).  Unrestricted
  *        Hamiltonians must use ::majorana_map_hamiltonian.
  * @param threshold Pauli terms with |coeff| < threshold are dropped.
- * @param integral_threshold Integrals with |value| < this are skipped.
+ * @param integral_threshold Screening cutoff, as for
+ *        ::majorana_map_hamiltonian.
  * @return MajoranaMapResult with Pauli words and coefficients.
  * @throws std::invalid_argument If spin_symmetric is false, any two-body
  *         index is outside [0, n_spatial), a value is not finite, duplicate

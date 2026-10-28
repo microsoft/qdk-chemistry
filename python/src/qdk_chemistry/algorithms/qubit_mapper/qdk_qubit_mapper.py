@@ -37,7 +37,8 @@ class QdkQubitMapperSettings(QubitMapperSettings):
 
     Settings:
         threshold (double, default=1e-12): Threshold for pruning small Pauli coefficients.
-        integral_threshold (double, default=1e-12): Threshold for filtering small integrals.
+        integral_threshold (double, default=1e-12): Threshold for filtering small integrals. Fourfold
+            two-body integrals are screened in the combinations ``((pq|rs) ± (pq|sr)) / 2``.
 
     """
 
@@ -71,15 +72,18 @@ class QdkQubitMapper(QubitMapper):
     output :class:`~qdk_chemistry.data.QubitOperator`, not for dispatch.
 
     Both restricted (RHF) and unrestricted (UHF) Hamiltonians are supported.
-    Restricted two-body tensors with 8-fold permutation symmetry use
-    spin-summed excitations. Tensors with only the 4-fold symmetry
-    ``(pq|rs) == (qp|sr) == (rs|pq)``, as produced by downfolding, use
-    spin-summed symmetric and antisymmetric excitation pairs. A non-Hermitian
-    restricted tensor raises ``ValueError``, as does a Hermitian one not stored
-    with ``(pq|rs) == (rs|pq)``; map its bra-ket average instead. Unrestricted
-    inputs use the excitation-pair split when ``aa`` and ``bb`` are 4-fold and
-    ``ab`` satisfies ``(pq|rs) == (qp|sr)``, and loop over every spin channel in
-    full otherwise.
+    Restricted two-body tensors must have the 4-fold symmetry
+    ``(pq|rs) == (qp|sr) == (rs|pq)``, which includes ordinary 8-fold integrals
+    and those produced by downfolding; they use spin-summed symmetric and
+    antisymmetric excitation pairs, weighted by ``((pq|rs) ± (pq|sr)) / 2``. The
+    ``integral_threshold`` screens these combinations, so for 8-fold integrals
+    antisymmetric products are formed only where round-off exceeds it. A
+    non-Hermitian restricted tensor raises
+    ``ValueError``, as does a Hermitian one not stored with
+    ``(pq|rs) == (rs|pq)``; map its bra-ket average instead. Unrestricted inputs
+    use the excitation-pair split when ``aa`` and ``bb`` are 4-fold and ``ab``
+    satisfies ``(pq|rs) == (qp|sr)``, and loop over every spin channel in full,
+    screening individual integrals, otherwise.
 
     The two-body integrals are consumed in the native storage format of the
     Hamiltonian's container (the C++ engine dispatches on the container type):

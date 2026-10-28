@@ -7,7 +7,9 @@
 #include <Eigen/Dense>
 #include <algorithm>
 #include <array>
+#include <cmath>
 #include <complex>
+#include <limits>
 #include <qdk/chemistry/data/lattice_graph.hpp>
 #include <qdk/chemistry/data/majorana_mapping.hpp>
 #include <stdexcept>
@@ -366,11 +368,11 @@ TEST(MajoranaMapEngineTest, CholeskyFourFoldValidationIsScaleInvariant) {
     Eigen::MatrixXd factors(4, 2);
     factors << 0.8, -0.8, 0.7, 0.3, -0.3, -0.7, 0.3, -0.3;
     factors *= scale;
-    EXPECT_EQ(detail::cholesky_two_body_symmetry(factors.data(), 2, 2, 1e-8),
-              detail::TwoBodySymmetry::FourFold);
+    EXPECT_TRUE(detail::cholesky_has_reversal_symmetry(
+        factors.data(), factors.data(), 2, 2, 1e-8));
     factors(0, 1) += 0.2 * scale;
-    EXPECT_EQ(detail::cholesky_two_body_symmetry(factors.data(), 2, 2, 1e-8),
-              detail::TwoBodySymmetry::NonHermitian);
+    EXPECT_FALSE(detail::cholesky_has_reversal_symmetry(
+        factors.data(), factors.data(), 2, 2, 1e-8));
   }
 }
 
@@ -379,13 +381,171 @@ TEST(MajoranaMapEngineTest, CholeskyMixedSpinValidationChecksCrossParity) {
   Eigen::MatrixXd alpha(4, 2);
   alpha << 0.8, 0.0, 0.2, 0.5, 0.2, -0.5, 0.3, 0.0;
   Eigen::MatrixXd beta = alpha;
-  EXPECT_TRUE(detail::cholesky_mixed_spin_has_reversal_symmetry(
-      alpha.data(), beta.data(), 2, 2, 1e-8));
+  EXPECT_TRUE(detail::cholesky_has_reversal_symmetry(alpha.data(), beta.data(),
+                                                     2, 2, 1e-8));
   beta.col(0).swap(beta.col(1));
-  EXPECT_EQ(detail::cholesky_two_body_symmetry(beta.data(), 2, 2, 1e-8),
-            detail::TwoBodySymmetry::FourFold);
-  EXPECT_FALSE(detail::cholesky_mixed_spin_has_reversal_symmetry(
-      alpha.data(), beta.data(), 2, 2, 1e-8));
+  EXPECT_TRUE(detail::cholesky_has_reversal_symmetry(beta.data(), beta.data(),
+                                                     2, 2, 1e-8));
+  EXPECT_FALSE(detail::cholesky_has_reversal_symmetry(alpha.data(), beta.data(),
+                                                      2, 2, 1e-8));
+}
+
+namespace {
+
+// (pq|rs) = sum_Q L^Q_pq L^Q_rs for column-major [n^2 x naux] factors; the
+// [n^2 x n^2] result is symmetric, so its storage is also row-major.
+std::vector<double> reconstruct_dense(const Eigen::MatrixXd& factors) {
+  const Eigen::MatrixXd tensor = factors * factors.transpose();
+  return {tensor.data(), tensor.data() + tensor.size()};
+}
+
+std::vector<double> diagonal_one_body(std::size_t extent) {
+  std::vector<double> one_body(extent * extent, 0.0);
+  for (std::size_t p = 0; p < extent; ++p)
+    one_body[p * extent + p] = 0.1 * static_cast<double>(p);
+  return one_body;
+}
+
+}  // namespace
+
+TEST(MajoranaMapEngineTest, CholeskyRejectsNonFiniteFactors) {
+  const auto mapping = MajoranaMapping::jordan_wigner(4);
+  const auto one_body = diagonal_one_body(2);
+  for (double invalid : {std::numeric_limits<double>::quiet_NaN(),
+                         std::numeric_limits<double>::infinity()}) {
+    Eigen::MatrixXd factors(4, 1);
+    factors << 0.8, 0.2, 0.2, invalid;
+    for (bool restricted : {true, false}) {
+      EXPECT_THROW(
+          majorana_map_hamiltonian_cholesky(
+              mapping, 0.0, one_body.data(), one_body.data(), factors.data(),
+              factors.data(), 2, 1, restricted, 1e-12, 1e-12),
+          std::invalid_argument);
+    }
+  }
+}
+
+TEST(MajoranaMapEngineTest, CholeskyValidationIsElementwiseLikeDense) {
+  // A violation at one pair is not diluted by the size of the tensor.
+  {
+    constexpr std::size_t n = 10;
+    const auto mapping = MajoranaMapping::jordan_wigner(2 * n);
+    const auto one_body = diagonal_one_body(n);
+    Eigen::MatrixXd factors = Eigen::MatrixXd::Ones(n * n, 1);
+    factors(0 * n + 1, 0) = 1.0 + 3e-5;
+    factors(1 * n + 0, 0) = 1.0 - 3e-5;
+    const auto dense = reconstruct_dense(factors);
+    EXPECT_THROW(
+        majorana_map_hamiltonian(mapping, 0.0, one_body.data(), one_body.data(),
+                                 dense.data(), dense.data(), dense.data(), n,
+                                 true, 1e-12, 1e-12),
+        std::invalid_argument);
+    EXPECT_THROW(majorana_map_hamiltonian_cholesky(
+                     mapping, 0.0, one_body.data(), one_body.data(),
+                     factors.data(), factors.data(), n, 1, true, 1e-12, 1e-12),
+                 std::invalid_argument);
+  }
+  // A violation spread thinly over every element is accepted by both, even
+  // though its Frobenius norm exceeds the tolerance.
+  constexpr std::size_t n = 6;
+  const auto mapping = MajoranaMapping::jordan_wigner(2 * n);
+  const auto one_body = diagonal_one_body(n);
+  Eigen::MatrixXd factors = Eigen::MatrixXd::Zero(n * n, 2);
+  for (std::size_t p = 0; p < n; ++p)
+    for (std::size_t q = 0; q < n; ++q)
+      factors(p * n + q, 0) = 1.0 + (p < q ? 1e-6 : p > q ? -1e-6 : 0.0);
+  factors(0 * n + 1, 1) = 0.5;
+  factors(1 * n + 0, 1) = -0.5;
+  const auto dense = reconstruct_dense(factors);
+  const auto from_dense = majorana_map_hamiltonian(
+      mapping, 0.0, one_body.data(), one_body.data(), dense.data(),
+      dense.data(), dense.data(), n, true, 1e-12, 0.0);
+  const auto from_factors = majorana_map_hamiltonian_cholesky(
+      mapping, 0.0, one_body.data(), one_body.data(), factors.data(),
+      factors.data(), n, 2, true, 1e-12, 0.0);
+  expect_same_coefficients(from_factors, from_dense, mapping.num_qubits());
+}
+
+TEST(MajoranaMapEngineTest, CholeskyKeepsAccumulatedFourFoldPart) {
+  // Each antisymmetric column is small, but their contribution to the
+  // integrals accumulates over the auxiliary index and must be kept.
+  constexpr std::size_t n = 3;
+  constexpr std::size_t antisymmetric_columns = 100;
+  const auto mapping = MajoranaMapping::jordan_wigner(2 * n);
+  const auto one_body = diagonal_one_body(n);
+  Eigen::MatrixXd factors =
+      Eigen::MatrixXd::Zero(n * n, 1 + antisymmetric_columns);
+  for (std::size_t p = 0; p < n; ++p)
+    for (std::size_t q = p; q < n; ++q)
+      factors(p * n + q, 0) = factors(q * n + p, 0) =
+          std::cos(static_cast<double>(p * n + q));
+  for (std::size_t column = 1; column <= antisymmetric_columns; ++column)
+    for (std::size_t p = 0; p < n; ++p)
+      for (std::size_t q = p + 1; q < n; ++q) {
+        factors(p * n + q, column) = 4e-6;
+        factors(q * n + p, column) = -4e-6;
+      }
+  const auto dense = reconstruct_dense(factors);
+  const auto from_dense = majorana_map_hamiltonian(
+      mapping, 0.0, one_body.data(), one_body.data(), dense.data(),
+      dense.data(), dense.data(), n, true, 1e-14, 1e-12);
+  const auto from_factors = majorana_map_hamiltonian_cholesky(
+      mapping, 0.0, one_body.data(), one_body.data(), factors.data(),
+      factors.data(), n, static_cast<std::size_t>(factors.cols()), true, 1e-14,
+      1e-12);
+  expect_same_coefficients(from_factors, from_dense, mapping.num_qubits());
+
+  Eigen::MatrixXd symmetric_part = factors.leftCols(1);
+  const auto eightfold = reconstruct_dense(symmetric_part);
+  const auto without_part = majorana_map_hamiltonian(
+      mapping, 0.0, one_body.data(), one_body.data(), eightfold.data(),
+      eightfold.data(), eightfold.data(), n, true, 1e-14, 1e-12);
+  double largest_difference = 0.0;
+  auto difference = test_support::collect_terms(from_factors, 2 * n);
+  for (const auto& [label, coefficient] :
+       test_support::collect_terms(without_part, 2 * n))
+    difference[label] -= coefficient;
+  for (const auto& [label, coefficient] : difference)
+    largest_difference = std::max(largest_difference, std::abs(coefficient));
+  // Well above the 1e-11 tolerance of expect_same_coefficients.
+  EXPECT_GT(largest_difference, 5e-11);
+}
+
+TEST(MajoranaMapEngineTest, FourFoldPartBelowIntegralThresholdAddsNoTerms) {
+  // Round-off well above the old 1e-10 relative cutoff but below
+  // integral_threshold in g^A maps like the exactly eightfold tensor.
+  namespace detail = qdk::chemistry::data::detail;
+  constexpr std::size_t n = 3;
+  const auto mapping = MajoranaMapping::jordan_wigner(2 * n);
+  const auto one_body = diagonal_one_body(n);
+  const auto fourfold = fourfold_test_tensor(n);
+  std::vector<double> eightfold(fourfold.size());
+  std::vector<double> perturbed(fourfold.size());
+  for (std::size_t p = 0; p < n; ++p)
+    for (std::size_t q = 0; q < n; ++q)
+      for (std::size_t r = 0; r < n; ++r)
+        for (std::size_t s = 0; s < n; ++s) {
+          const auto canonical = detail::eightfold_canonical({p, q, r, s});
+          const std::size_t index = ((p * n + q) * n + r) * n + s;
+          eightfold[index] =
+              1e-3 * std::sin(1.0 + static_cast<double>(
+                                        ((canonical[0] * n + canonical[1]) * n +
+                                         canonical[2]) *
+                                            n +
+                                        canonical[3]));
+          perturbed[index] = eightfold[index] +
+                             5e-13 * (fourfold[index] -
+                                      fourfold[((p * n + q) * n + s) * n + r]);
+        }
+  const auto exact = majorana_map_hamiltonian(
+      mapping, 0.0, one_body.data(), one_body.data(), eightfold.data(),
+      eightfold.data(), eightfold.data(), n, true, 0.0, 1e-12);
+  const auto mapped = majorana_map_hamiltonian(
+      mapping, 0.0, one_body.data(), one_body.data(), perturbed.data(),
+      perturbed.data(), perturbed.data(), n, true, 0.0, 1e-12);
+  EXPECT_EQ(test_support::collect_terms(mapped, 2 * n).size(),
+            test_support::collect_terms(exact, 2 * n).size());
+  expect_same_coefficients(mapped, exact, mapping.num_qubits());
 }
 
 TEST(MajoranaMappingHashTest, EqualMappingsHaveStableHash) {

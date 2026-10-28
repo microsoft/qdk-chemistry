@@ -345,18 +345,20 @@ Returns:
 Map a fermionic Hamiltonian to qubit Pauli terms using Majorana loops.
 
 When ``spin_symmetric`` is true, the integrals must be identical across spin
-channels (restricted orbitals; not validated). 8-fold integrals use
-spin-summed excitations, and 4-fold integrals,
-``(pq|rs) == (qp|sr) == (rs|pq)``, use spin-summed symmetric and
-antisymmetric excitation pairs. A non-Hermitian tensor raises ``ValueError``,
-as does a Hermitian tensor not stored with ``(pq|rs) == (rs|pq)``; map its
-bra-ket average instead.
+channels (restricted orbitals; not validated) and 4-fold,
+``(pq|rs) == (qp|sr) == (rs|pq)``; they are mapped with spin-summed symmetric
+and antisymmetric excitation pairs (the excitation-pair split). A
+non-Hermitian tensor raises ``ValueError``, as does a Hermitian tensor not
+stored with ``(pq|rs) == (rs|pq)``; map its bra-ket average instead.
 
 When ``spin_symmetric`` is false (unrestricted orbitals), the excitation-pair
 split is used when ``aa`` and ``bb`` are 4-fold and ``ab`` satisfies
 ``(pq|rs) == (qp|sr)``; otherwise every spin channel is looped over in full.
-Either split falls back to the full loop when integral screening would break
-the symmetry it needs.
+
+``integral_threshold`` screens the combinations ``((pq|rs) ± (pq|sr)) / 2`` in
+the excitation-pair split, so symmetry partners are screened together, and
+individual integrals in the full loop. Non-finite integrals raise
+``ValueError``.
 
 Returns ``(words, coefficients)`` where ``words`` is a list of sparse
 Pauli words.
@@ -386,9 +388,10 @@ read directly without reconstructing the dense N^4 two-body tensor; any
 other container uses the dense path. Integral symmetry selects the
 evaluation path as in the buffer-based overload.
 
-Cholesky factors with pair-symmetric and pair-antisymmetric parts ``S`` and
-``A`` give 4-fold integrals exactly when ``S @ A.T == 0``; restricted factors
-that fail this check raise ``ValueError``.
+Cholesky factors are checked element by element for
+``(pq|rs) == (qp|sr)``, with the dense tolerance, without reconstructing the
+dense tensor unless cheaper bounds are inconclusive; restricted factors that
+fail this check, and non-finite factors, raise ``ValueError``.
 
 Sparse entries are read literally, with unstored positions equal to zero; a
 complete 4-fold suborbit needs no explicit zeros.
@@ -403,15 +406,16 @@ Args:
     spin_symmetric (bool): Whether the integrals are identical across spin
       channels (restricted orbitals; not validated).
     threshold (float): Drop Pauli terms with magnitude below this value.
-    integral_threshold (float): Skip integrals with magnitude below this value.
+    integral_threshold (float): Screening cutoff for the two-body integrals, as
+      for the buffer-based overload, and for the one-body integrals.
 
 Returns:
     tuple: ``(words, coefficients)`` where ``words`` is a list of sparse Pauli
     words and ``coefficients`` is a list of complex coefficients.
 
 Raises:
-    ValueError: If restricted two-body integrals define a non-Hermitian
-        operator or are Hermitian but not stored with ``(pq|rs) == (rs|pq)``,
-        or if restricted Cholesky factors fail the ``S @ A.T == 0`` check.
+    ValueError: If the two-body integrals or Cholesky factors are not finite,
+        or restricted two-body integrals define a non-Hermitian operator or
+        are Hermitian but not stored with ``(pq|rs) == (rs|pq)``.
 )");
 }

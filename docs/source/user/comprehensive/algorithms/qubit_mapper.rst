@@ -203,20 +203,26 @@ Custom encodings can be defined by constructing a :class:`~qdk_chemistry.data.Ma
 
 .. rubric:: Integral symmetry
 
-Restricted integrals with 8-fold permutation symmetry use spin-summed
-excitations. Integrals with only the 4-fold symmetry
-:math:`(pq|rs) = (qp|sr) = (rs|pq)`, as produced by downfolding, use
-spin-summed symmetric and antisymmetric excitation pairs. A restricted tensor
-that defines a non-Hermitian operator raises, as does a Hermitian one not
-stored with :math:`(pq|rs) = (rs|pq)`; since that exchange leaves the operator
-unchanged, map its bra-ket average instead.
+Restricted integrals must have the 4-fold symmetry
+:math:`(pq|rs) = (qp|sr) = (rs|pq)`, which ordinary 8-fold integrals and those
+produced by downfolding both satisfy. They use spin-summed symmetric and
+antisymmetric excitation pairs, weighted by
+:math:`g^{S,A}_{pq,rs} = \tfrac12\left[(pq|rs) \pm (pq|sr)\right]`.
+A restricted tensor that defines a non-Hermitian operator raises, as does a
+Hermitian one not stored with :math:`(pq|rs) = (rs|pq)`; since that exchange
+leaves the operator unchanged, map its bra-ket average instead.
 
 Unrestricted integrals use the same excitation-pair split when the ``aa`` and
 ``bb`` blocks are 4-fold and ``ab`` satisfies
 :math:`(pq|rs)_{ab} = (qp|sr)_{ab}`; ``ab`` need not satisfy
 :math:`(pq|rs)_{ab} = (rs|pq)_{ab}`. Other unrestricted integrals are mapped
-channel by channel, as are integrals whose screening would break the symmetry
-a split needs.
+channel by channel.
+
+The ``integral_threshold`` setting screens :math:`g^S` and :math:`g^A` in the
+excitation-pair split, so symmetry partners are always screened together, and
+individual integrals in the channel-by-channel loop. For 8-fold integrals,
+:math:`g^A` vanishes up to round-off, so antisymmetric products are formed
+only where that round-off exceeds the threshold.
 
 .. rubric:: Container-aware fast paths
 
@@ -242,11 +248,12 @@ compressed form:
   (Cholesky / density-fitted) factors are kept in their
   :math:`O(N^2 \cdot n_\text{aux})` form and the auxiliary index is contracted
   in integral space, one ``(pq|.)`` row at a time (a vectorized matrix-vector
-  product per orbital pair). Factors that are not symmetric in their orbital
-  pair are checked for 4-fold symmetry through thin QR factors of their
-  pair-symmetric and pair-antisymmetric parts, which needs
-  :math:`O(N^2 n_\text{aux} + n_\text{aux}^2)` scratch for
-  :math:`n_\text{aux} \le N^2`.
+  product per orbital pair). The reconstructed integrals are checked element
+  by element for :math:`(pq|rs) = (qp|sr)`, with the same tolerance as dense
+  integrals. Cheap bounds from the parts of the factors symmetric and
+  antisymmetric in their orbital pair usually settle the check in
+  :math:`O(N^2 n_\text{aux}^2)`; otherwise the largest violation is formed
+  exactly in row blocks, in :math:`O(N^4 n_\text{aux})`.
 
 In all cases the result is a :class:`~qdk_chemistry.data.QubitOperator` that
 is numerically equivalent, term by term, to the dense
@@ -271,7 +278,7 @@ to use the dense path.
      - Threshold for pruning small Pauli coefficients. Default: ``1e-12``
    * - ``integral_threshold``
      - double
-     - Threshold for filtering small integrals before transformation. Default: ``1e-12``
+     - Threshold for filtering small integrals before transformation; 4-fold two-body integrals are screened in the symmetric and antisymmetric combinations above. Default: ``1e-12``
 
 .. rubric:: Example
 
