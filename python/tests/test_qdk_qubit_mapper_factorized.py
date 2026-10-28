@@ -18,6 +18,7 @@ correctness bar from issue #474.
 
 from __future__ import annotations
 
+import warnings
 from typing import ClassVar
 
 import numpy as np
@@ -29,6 +30,7 @@ from qdk_chemistry.data import (
     CanonicalFourCenterHamiltonianContainer,
     CholeskyHamiltonianContainer,
     Hamiltonian,
+    HamiltonianType,
     LatticeGraph,
     MajoranaMapping,
     Orbitals,
@@ -511,6 +513,19 @@ class TestSparseLiteralEntries:
             stored, dense, reference = _sparse_pair({seed: 0.7}, tensor)
         np.testing.assert_array_equal(stored.get_two_body_integrals()[0], dense.get_two_body_integrals()[0])
         np.testing.assert_allclose(_native(stored).to_matrix(), reference, atol=1e-11, rtol=0)
+
+    def test_non_hermitian_map_is_not_expanded(self) -> None:
+        """The shorthand assumes 8-fold symmetry, so a non-Hermitian map stays literal, with no warning."""
+        with warnings.catch_warnings():
+            warnings.simplefilter("error", DeprecationWarning)
+            container = SparseHamiltonianContainer(
+                csc_matrix(np.eye(2)), {(0, 1, 0, 1): 0.7}, 0.0, HamiltonianType.NonHermitian
+            )
+        expected = np.zeros((2,) * 4)
+        expected[0, 1, 0, 1] = 0.7
+        np.testing.assert_array_equal(
+            np.reshape(Hamiltonian(container).get_two_body_integrals()[0], (2,) * 4), expected
+        )
 
     @pytest.mark.parametrize("seed", [(0, 1, 0, 1), (0, 1, 0, 2)], ids=["repeated-four", "eight"])
     @pytest.mark.parametrize("invalid", ["nonhermitian", "partial"])

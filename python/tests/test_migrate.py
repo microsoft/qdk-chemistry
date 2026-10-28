@@ -668,6 +668,32 @@ def test_sparse_inconsistent_eightfold_class_refused(tmp_path):
         migrate.convert_file(src, tmp_path / "e_new.hamiltonian.h5")
 
 
+def test_sparse_0_2_0_non_hermitian_entries_stay_literal(tmp_path):
+    """The 8-fold reading applied only to Hermitian integrals, so non-Hermitian entries migrate as stored."""
+    norb = 3
+    two_body = [[0, 1, 0, 1, 0.7], [1, 0, 1, 0, 0.6], [0, 1, 0, 2, 0.5]]
+    container = {
+        "version": "0.2.0",
+        "container_type": "sparse",
+        "core_energy": 2.5,
+        "type": "NonHermitian",
+        "is_restricted": True,
+        "num_orbitals": norb,
+        "has_one_body_integrals": True,
+        "one_body_integrals_alpha_sparse": [[0, 0, 1.0]],
+        "two_body_integrals": _sbt.sparse_rank4_dict(two_body, norb),
+    }
+    src = tmp_path / "e.hamiltonian.json"
+    src.write_text(json.dumps({"version": "0.1.0", "container": container}))
+    dst = tmp_path / "e_new.hamiltonian.json"
+    migrate.convert_file(src, dst)
+    expected = np.zeros((norb,) * 4)
+    for *indices, value in two_body:
+        expected[tuple(indices)] = value
+    actual = np.asarray(Hamiltonian.from_file(str(dst), "json").get_two_body_integrals()[0])
+    np.testing.assert_array_equal(actual.reshape(expected.shape), expected)
+
+
 @pytest.mark.parametrize("fmt", ["json", "hdf5"])
 def test_current_sparse_reports_its_serialization_version(tmp_path, fmt):
     """An already-current sparse file is refused with its own version, not the internal step key."""

@@ -6,7 +6,8 @@ only the qubit mapper (and readers of exported FCIDUMP files, which held entries
 stored) expanded each stored two-body entry over its 8-fold permutation class; the
 integral getters read entries literally. Version
 0.3.0 reads entries literally everywhere, and the migration adopts the qubit
-mapper's reading by storing every class member. The (restricted) one-body sparse
+mapper's reading by storing every class member of a Hermitian container;
+non-Hermitian containers keep their entries as stored. The (restricted) one-body sparse
 triplet list and the scalar metadata are schema-stable. Sparse model Hamiltonians
 carry no orbitals.
 """
@@ -161,7 +162,10 @@ def to_new_json(old: dict) -> dict:
     """Build the migrated sparse container JSON object from a normalized old-doc."""
     norb = old["num_orbitals"]
     one_body = old.get("one_body_sparse") or []
-    two_body = _fill_eightfold_classes(old.get("two_body_sparse") or [])
+    two_body = old.get("two_body_sparse") or []
+    # The 8-fold reading only ever applied to Hermitian integrals.
+    if old.get("type", "Hermitian") != "NonHermitian":
+        two_body = _fill_eightfold_classes(two_body)
     return {
         "version": CONTAINER_VERSION,
         "container_type": "sparse",

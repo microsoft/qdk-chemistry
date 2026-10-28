@@ -52,7 +52,8 @@ static detail::SparseTwoBodyTensor to_tensor(
 }
 
 // Expands the deprecated shorthand in which a nonzero entry that is the only
-// stored member of a larger 8-fold class stands for the whole class.
+// stored member of a larger 8-fold class stands for the whole class.  The
+// shorthand assumes 8-fold symmetry, so non-Hermitian maps are kept literal.
 static SparseHamiltonianContainer::TwoBodyMap expand_eightfold_shorthand(
     SparseHamiltonianContainer::TwoBodyMap map) {
   auto tensor = to_tensor(map);
@@ -109,8 +110,10 @@ SparseHamiltonianContainer::SparseHamiltonianContainer(
     : SparseHamiltonianContainer(
           Eigen::SparseMatrix<double>(one_body_integrals),
           make_spin_diagonal_rank4_sbsm<double>(
-              to_sparse_block(
-                  expand_eightfold_shorthand(std::move(two_body_integrals))),
+              to_sparse_block(type == HamiltonianType::Hermitian
+                                  ? expand_eightfold_shorthand(
+                                        std::move(two_body_integrals))
+                                  : std::move(two_body_integrals)),
               static_cast<std::size_t>(one_body_integrals.rows())),
           core_energy, type) {}
 

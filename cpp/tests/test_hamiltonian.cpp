@@ -1959,6 +1959,21 @@ TEST_F(HamiltonianTest, FCIDUMPRejectsNonFiniteTwoBodyIntegrals) {
   EXPECT_FALSE(std::filesystem::exists(filename));
 }
 
+TEST(SparseHamiltonianContainerTest, NonHermitianMapsStayLiteral) {
+  // The 8-fold shorthand assumes 8-fold symmetry, so a non-Hermitian map is
+  // never expanded.
+  const Eigen::SparseMatrix<double> one_body(2, 2);
+  const SparseHamiltonianContainer::TwoBodyMap lone{{{0, 1, 0, 1}, 0.5}};
+  EXPECT_EQ(SparseHamiltonianContainer(one_body, lone, 0.0,
+                                       HamiltonianType::NonHermitian)
+                .sparse_two_body_integrals(),
+            lone);
+  EXPECT_EQ(SparseHamiltonianContainer(one_body, lone)
+                .sparse_two_body_integrals()
+                .size(),
+            4u);
+}
+
 TEST(SparseHamiltonianContainerTest, ConstructorExpandsEightfoldShorthand) {
   using Map = SparseHamiltonianContainer::TwoBodyMap;
   const Eigen::SparseMatrix<double> one_body(3, 3);

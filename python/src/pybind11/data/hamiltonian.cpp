@@ -841,7 +841,8 @@ Examples:
       py::init([](Eigen::SparseMatrix<double> one_body_integrals,
                   SparseHamiltonianContainer::TwoBodyMap two_body_integrals,
                   double core_energy, HamiltonianType type) {
-        if (SparseHamiltonianContainer::uses_eightfold_shorthand(
+        if (type == HamiltonianType::Hermitian &&
+            SparseHamiltonianContainer::uses_eightfold_shorthand(
                 two_body_integrals) &&
             PyErr_WarnEx(
                 PyExc_DeprecationWarning,
@@ -869,10 +870,11 @@ Args:
     type (HamiltonianType, optional): Hamiltonian type. Defaults to Hermitian.
 
 Warns:
-    DeprecationWarning: If a nonzero entry is the only stored member of a larger
-        8-fold permutation class; such an entry is expanded over its class.
-        Classes with two or more stored members are read literally, without a
-        warning: ``{(0, 1, 0, 1): v, (1, 0, 1, 0): v}`` gives ``(01|10) == 0``,
+    DeprecationWarning: If, in a Hermitian Hamiltonian, a nonzero entry is the
+        only stored member of a larger 8-fold permutation class; such an entry
+        is expanded over its class. Classes with two or more stored members,
+        and every entry of a non-Hermitian Hamiltonian, are read literally,
+        without a warning: ``{(0, 1, 0, 1): v, (1, 0, 1, 0): v}`` gives ``(01|10) == 0``,
         where earlier versions mapped it with ``(01|10) == v``. Such a map is
         valid 4-fold input, so this cannot be detected; when porting code, store
         every class member or use :meth:`expand_symmetry_representatives`.
