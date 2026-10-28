@@ -5,6 +5,7 @@
 #include "qdk/chemistry/scf/core/scf_algorithm.h"
 
 #include <qdk/chemistry/scf/config.h>
+#include <qdk/chemistry/scf/util/qr_pseudoinverse.h>
 
 #include <cmath>
 #include <cstdint>

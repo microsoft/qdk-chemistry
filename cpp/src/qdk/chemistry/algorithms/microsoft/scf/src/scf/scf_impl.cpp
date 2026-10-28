@@ -23,6 +23,7 @@
 #include <fstream>
 #include <iostream>
 #include <lapack.hh>
+#include <limits>
 #include <nlohmann/json.hpp>
 #include <numeric>
 #ifdef _OPENMP
@@ -463,6 +464,16 @@ void SCFImpl::compute_orthogonalization_matrix_(const RowMajorMatrix& S_,
                U_t.data(), num_atomic_orbitals_, s.data());
 #endif
 
+  // Allow eigensolver roundoff in the nominally positive semidefinite overlap.
+  const double negative_tolerance = std::numeric_limits<double>::epsilon() *
+                                    num_atomic_orbitals_ *
+                                    s.cwiseAbs().maxCoeff();
+  if (!s.allFinite() || (s.array() < -negative_tolerance).any()) {
+    throw std::runtime_error(
+        "Overlap orthogonalization requires finite, nonnegative eigenvalues "
+        "within numerical tolerance.");
+  }
+
   RowMajorMatrix U = U_t.transpose();
 
   auto threshold = ctx_.cfg->lindep_threshold;
@@ -470,7 +481,7 @@ void SCFImpl::compute_orthogonalization_matrix_(const RowMajorMatrix& S_,
 
   num_molecular_orbitals_ = 0;
   for (int i = num_atomic_orbitals_ - 1; i >= 0; --i) {
-    if (s(i) >= threshold) num_molecular_orbitals_++;
+    if (s(i) > 0.0 && s(i) >= threshold) num_molecular_orbitals_++;
   }
 
   if (num_atomic_orbitals_ != num_molecular_orbitals_) {
@@ -482,11 +493,6 @@ void SCFImpl::compute_orthogonalization_matrix_(const RowMajorMatrix& S_,
   }
 
   auto sigma = s.bottomRows(num_molecular_orbitals_);
-  if (!sigma.allFinite() || (sigma.array() <= 0.0).any()) {
-    throw std::runtime_error(
-        "Overlap orthogonalization requires positive finite retained "
-        "eigenvalues.");
-  }
   auto sigma_invsqrt = sigma.array().sqrt().inverse().matrix().asDiagonal();
 
   auto U_cond = U.block(0, num_atomic_orbitals_ - num_molecular_orbitals_,

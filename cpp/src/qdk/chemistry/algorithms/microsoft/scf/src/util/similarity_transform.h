@@ -4,19 +4,11 @@
 
 #pragma once
 
-#include <qdk/chemistry/scf/core/types.h>
-
 #include <blas.hh>
 #include <cstdint>
 #include <vector>
 
 namespace qdk::chemistry::scf {
-
-/**
- * @brief Thin-QR pseudoinverse of a finite, tall full-column-rank matrix.
- * Uses a triangular solve and rejects numerical rank deficiency.
- */
-RowMajorMatrix qr_pseudoinverse(const RowMajorMatrix& coefficients);
 
 /**
  * @brief Compute C = ALPHA * A**H * B * A + BETA * C using BLAS GEMM

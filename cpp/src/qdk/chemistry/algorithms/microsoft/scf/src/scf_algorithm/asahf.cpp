@@ -413,18 +413,19 @@ void AtomicSphericallyAveragedHartreeFock::solve_fock_eigenproblem(
 
     // Get MO coefficients for this l-block
     const auto& C_tmp = mo_coeffs_by_l[l_idx++];
+    const size_t retained_shells = static_cast<size_t>(C_tmp.cols());
 
     for (size_t i = 0; i < n_shells; ++i) {
       for (size_t m = 0; m < degeneracy; ++m) {
         size_t ao_row = idx[i * degeneracy + m];
-        for (size_t j = 0; j < static_cast<size_t>(C_tmp.cols()); ++j) {
+        for (size_t j = 0; j < retained_shells; ++j) {
           size_t mo_col = mo_offset + j * degeneracy + m;
           C_dm(ao_row, mo_col) = C_tmp(i, j);
         }
       }
     }
 
-    mo_offset += C_tmp.cols() * degeneracy;
+    mo_offset += retained_shells * degeneracy;
   }
 
   // get fractional occupation

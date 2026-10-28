@@ -199,7 +199,7 @@ SCF Convergence Algorithms in QDK
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 Achieving stable :term:`SCF` convergence is a non-trivial problem in computational chemistry.
-The native QDK/Chemistry solver uses :term:`DIIS` alone or a hybrid strategy that switches from :term:`DIIS` to :term:`GDM`.
+QDK/Chemistry implements two complementary algorithms that can be used independently or in combination.
 
 .. rubric:: Linearly dependent basis functions
 

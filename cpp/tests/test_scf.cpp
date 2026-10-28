@@ -8,6 +8,7 @@
 #include <spdlog/sinks/ostream_sink.h>
 
 #include <algorithm>
+#include <array>
 #include <cmath>
 #include <filesystem>
 #include <memory>
@@ -24,6 +25,7 @@
 
 #include "../src/qdk/chemistry/algorithms/microsoft/utils.hpp"
 #include "qdk/chemistry/algorithms/microsoft/scf.hpp"
+#include "qdk/chemistry/algorithms/microsoft/scf/src/scf/scf_impl.h"
 #include "qdk/chemistry/algorithms/microsoft/scf/src/scf_algorithm/asahf.h"
 #include "ut_common.hpp"
 
@@ -73,6 +75,49 @@ class MissingCanonicalAliasSCF : public TestSCF {
 
   std::vector<std::string> aliases() const override { return {"other_name"}; }
 };
+
+class OrthogonalizationSCF : public qdk::chemistry::scf::SCFImpl {
+ public:
+  using SCFImpl::compute_orthogonalization_matrix_;
+  using SCFImpl::SCFImpl;
+};
+
+TEST_F(ScfTest, OverlapOrthogonalizationDiscardsRoundoffAndZeroEigenvalues) {
+  namespace qcs = qdk::chemistry::scf;
+  auto molecule = qdk::chemistry::utils::microsoft::convert_to_molecule(
+      *testing::create_water_structure(), 0, 1);
+  qcs::SCFConfig config{};
+  config.basis = "sto-3g";
+  for (double threshold : {-1.0, 0.0, 1e-6}) {
+    config.lindep_threshold = threshold;
+    OrthogonalizationSCF solver(molecule, config, true);
+    for (double smallest : {-1e-16, 0.0}) {
+      qcs::RowMajorMatrix overlap = qcs::RowMajorMatrix::Identity(7, 7);
+      overlap(0, 0) = smallest;
+      qcs::RowMajorMatrix transform;
+      ASSERT_NO_THROW(
+          solver.compute_orthogonalization_matrix_(overlap, &transform));
+      ASSERT_EQ(transform.cols(), 6);
+      EXPECT_TRUE(transform.allFinite());
+      EXPECT_TRUE((transform.transpose() * overlap * transform)
+                      .isApprox(qcs::RowMajorMatrix::Identity(6, 6), 1e-12));
+    }
+  }
+}
+
+TEST_F(ScfTest, OverlapOrthogonalizationRejectsIndefiniteOverlap) {
+  namespace qcs = qdk::chemistry::scf;
+  auto molecule = qdk::chemistry::utils::microsoft::convert_to_molecule(
+      *testing::create_water_structure(), 0, 1);
+  qcs::SCFConfig config{};
+  config.basis = "sto-3g";
+  OrthogonalizationSCF solver(molecule, config, true);
+  qcs::RowMajorMatrix overlap = qcs::RowMajorMatrix::Identity(7, 7);
+  overlap(0, 0) = -1e-4;
+  qcs::RowMajorMatrix transform;
+  EXPECT_THROW(solver.compute_orthogonalization_matrix_(overlap, &transform),
+               std::runtime_error);
+}
 
 TEST_F(ScfTest, Factory) {
   auto available_solvers = ScfSolverFactory::available();
@@ -438,6 +483,49 @@ void expect_x2c_gdm_matches_diis(std::shared_ptr<Structure> structure,
     }
   }
 }
+
+void expect_rohf_gdm_empty_subspace(std::shared_ptr<Structure> structure,
+                                    int multiplicity, const std::string& basis,
+                                    const std::array<size_t, 3>& orbital_counts,
+                                    double reference_energy) {
+  using qdk::chemistry::utils::Logger;
+  using qdk::chemistry::utils::LogLevel;
+  std::ostringstream messages;
+  auto logger = Logger::get();
+  LoggerGuard guard{logger, logger->sinks(), Logger::get_global_level()};
+  logger->sinks().push_back(
+      std::make_shared<spdlog::sinks::ostream_sink_mt>(messages));
+  Logger::set_global_level(LogLevel::info);
+
+  auto solver = ScfSolverFactory::create("qdk");
+  solver->settings().set("method", "hf");
+  solver->settings().set("scf_type", "restricted");
+  solver->settings().set("eri_method", "incore");
+  solver->settings().set("enable_gdm", true);
+  solver->settings().set("gdm_max_diis_iteration", 2);
+  solver->settings().set("convergence_threshold", 1e-9);
+  auto [energy, wavefunction] = solver->run(structure, 0, multiplicity, basis);
+  const auto orbitals = wavefunction->get_orbitals();
+  const auto [n_alpha, n_beta] = wavefunction->get_total_num_electrons();
+  const auto n_mo = orbitals->get_num_molecular_orbitals();
+
+  EXPECT_NE(messages.str().find("Switching from DIIS to GDM"),
+            std::string::npos);
+  EXPECT_TRUE(orbitals->is_restricted());
+  EXPECT_EQ(n_beta, orbital_counts[0]);
+  EXPECT_EQ(n_alpha - n_beta, orbital_counts[1]);
+  EXPECT_EQ(n_mo - n_alpha, orbital_counts[2]);
+  EXPECT_TRUE(std::isfinite(energy));
+  // Independent PySCF ROHF references at the same geometries and spin.
+  EXPECT_NEAR(energy, reference_energy, testing::scf_energy_tolerance);
+
+  const auto& coefficients =
+      orbitals->coefficients()->block({axes::alpha(), axes::alpha()});
+  EXPECT_TRUE(coefficients.allFinite());
+  EXPECT_TRUE(
+      (coefficients.transpose() * orbitals->get_overlap_matrix() * coefficients)
+          .isApprox(Eigen::MatrixXd::Identity(n_mo, n_mo), 1e-10));
+}
 }  // namespace
 
 TEST_F(ScfTest, X2COHROHFGdmMatchesDiis) {
@@ -446,6 +534,22 @@ TEST_F(ScfTest, X2COHROHFGdmMatchesDiis) {
 
 TEST_F(ScfTest, X2CWaterRHFGdmMatchesDiis) {
   expect_x2c_gdm_matches_diis(testing::create_water_structure(), 1);
+}
+
+TEST_F(ScfTest, H2TripletROHFGdmZeroClosed) {
+  auto structure = std::make_shared<Structure>(
+      std::vector<Eigen::Vector3d>{{0.0, 0.0, 0.0}, {0.0, 0.0, 1.4}},
+      std::vector<std::string>{"H", "H"});
+  expect_rohf_gdm_empty_subspace(structure, 3, "6-31g", {0, 2, 2},
+                                 -0.7559669868614357);
+}
+
+TEST_F(ScfTest, HeHDoubletROHFGdmZeroVirtual) {
+  auto structure = std::make_shared<Structure>(
+      std::vector<Eigen::Vector3d>{{0.0, 0.0, 0.0}, {0.0, 0.0, 1.5}},
+      std::vector<std::string>{"He", "H"});
+  expect_rohf_gdm_empty_subspace(structure, 2, "sto-3g", {1, 1, 0},
+                                 -3.0333242753488783);
 }
 
 TEST_F(ScfTest, X2CRejectsEcp) {

@@ -160,8 +160,6 @@ class SCFAlgorithm {
    *
    * Converts spin-blocked Fock/density matrices into the effective ROHF Fock
    * and total-density representation used for OG evaluation.
-   * Rectangular C is supported: the AO effective Fock is lifted using its QR
-   * pseudoinverse and reproduces only the retained MO operator.
    *
    * @param[in] F Spin-blocked Fock matrix in AO basis with alpha and beta
    * blocks stacked by row

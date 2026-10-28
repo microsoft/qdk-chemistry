@@ -4,38 +4,9 @@
 
 #include "similarity_transform.h"
 
-#include <limits>
 #include <stdexcept>
 
 namespace qdk::chemistry::scf {
-
-RowMajorMatrix qr_pseudoinverse(const RowMajorMatrix& coefficients) {
-  if (coefficients.cols() == 0 || coefficients.rows() < coefficients.cols() ||
-      !coefficients.allFinite()) {
-    throw std::invalid_argument(
-        "qr_pseudoinverse requires a finite, nonempty tall or square matrix.");
-  }
-
-  const auto num_columns = coefficients.cols();
-  Eigen::HouseholderQR<RowMajorMatrix> qr(coefficients);
-  const auto R = qr.matrixQR().topRows(num_columns);
-  const auto diagonal = R.diagonal().cwiseAbs().eval();
-  const double singular_tolerance = std::numeric_limits<double>::epsilon() *
-                                    coefficients.rows() * diagonal.maxCoeff();
-  if (!R.allFinite() || (diagonal.array() <= singular_tolerance).any()) {
-    throw std::runtime_error(
-        "qr_pseudoinverse requires numerically full column rank.");
-  }
-
-  RowMajorMatrix Q = qr.householderQ() *
-                     RowMajorMatrix::Identity(coefficients.rows(), num_columns);
-  RowMajorMatrix result = R.triangularView<Eigen::Upper>().solve(Q.transpose());
-  if (!result.allFinite()) {
-    throw std::runtime_error(
-        "qr_pseudoinverse produced nonfinite coefficients.");
-  }
-  return result;
-}
 
 void similarity_transform(blas::Layout layout, int64_t N, int64_t K,
                           double ALPHA, const double* A, int64_t LDA,

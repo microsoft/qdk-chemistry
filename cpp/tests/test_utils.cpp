@@ -4,6 +4,7 @@
 
 #include <gtest/gtest.h>
 #include <qdk/chemistry/scf/core/enums.h>
+#include <qdk/chemistry/scf/util/qr_pseudoinverse.h>
 
 #include <Eigen/Dense>
 #include <algorithm>
@@ -22,7 +23,6 @@
 #include <stdexcept>
 #include <vector>
 
-#include "../src/qdk/chemistry/algorithms/microsoft/scf/src/util/similarity_transform.h"
 #include "../src/qdk/chemistry/algorithms/microsoft/utils.hpp"
 #include "ut_common.hpp"
 
@@ -75,6 +75,17 @@ TEST(QrPseudoinverseTest, IllConditionedFullColumnRank) {
   EXPECT_TRUE(C_plus.allFinite());
   EXPECT_TRUE((C_plus * C).isApprox(RowMajorMatrix::Identity(3, 3), 1e-9));
   EXPECT_TRUE((C * C_plus).isApprox(Q * Q.transpose(), 1e-9));
+}
+
+TEST(QrPseudoinverseTest, PreservesOriginalColumnOrdering) {
+  RowMajorMatrix C(5, 3);
+  C << 1.0, 0.0, 0.0, 0.0, 4.0, 0.0, 0.0, 0.0, 2.0, 1.0, 0.0, 0.0, 0.0, 4.0,
+      0.0;
+  RowMajorMatrix expected(3, 5);
+  expected << 0.5, 0.0, 0.0, 0.5, 0.0, 0.0, 0.125, 0.0, 0.0, 0.125, 0.0, 0.0,
+      0.5, 0.0, 0.0;
+
+  EXPECT_TRUE(qr_pseudoinverse(C).isApprox(expected, 1e-12));
 }
 
 TEST(QrPseudoinverseTest, MatchesCanonicalOverlapDual) {
