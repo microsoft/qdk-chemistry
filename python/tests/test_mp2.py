@@ -162,3 +162,41 @@ def test_mp2_accepts_fourfold_two_body(h4_chain):
             denominator = energies[removed].sum() - energies[added].sum()
             expected += matrix[reference_state, state] * matrix[state, reference_state] / denominator
     assert total_energy - ansatz.calculate_energy() == pytest.approx(expected, abs=1e-10)
+
+
+def test_ump2_ignores_same_spin_content_of_vanishing_operators():
+    """Same-spin (ia|ia) multiplies a+_i a+_i a_a a_a = 0, so UMP2 accepts it and its energy is unchanged."""
+    scf_solver = create("scf_solver")
+    scf_solver.settings().set("method", "hf")
+    _, wavefunction = scf_solver.run(create_o2_molecule(), 0, 3, "sto-3g")
+    hamiltonian = create("hamiltonian_constructor").run(wavefunction.get_orbitals())
+    one_alpha, one_beta = (np.asarray(matrix) for matrix in hamiltonian.get_one_body_integrals())
+    n = one_alpha.shape[0]
+    two_aa, two_ab, two_bb = (np.array(tensor).reshape((n,) * 4) for tensor in hamiltonian.get_two_body_integrals())
+
+    def with_two_body(aa, bb):
+        container = CanonicalFourCenterHamiltonianContainer(
+            one_alpha,
+            one_beta,
+            aa.ravel(),
+            two_ab.ravel(),
+            bb.ravel(),
+            wavefunction.get_orbitals(),
+            hamiltonian.get_core_energy(),
+            np.empty((0, 0)),
+            np.empty((0, 0)),
+        )
+        return Ansatz(Hamiltonian(container), wavefunction)
+
+    calculator = create("dynamical_correlation_calculator", "qdk_mp2_calculator")
+    expected, _, _ = calculator.run(with_two_body(two_aa, two_bb))
+    gauge = two_aa.copy()
+    gauge[0, n - 1, 0, n - 1] += 1.0  # alpha occupies 0..8 of 10 orbitals
+    actual, _, _ = calculator.run(with_two_body(gauge, two_bb))
+    assert actual == pytest.approx(expected, abs=1e-12)
+
+    # Content that MP2 does read, (ia|jb) - (ib|ja) with i < j and a < b, must still be Hermitian.
+    non_hermitian = two_bb.copy()
+    non_hermitian[0, 7, 1, 8] += 0.1  # beta occupies 0..6
+    with pytest.raises(ValueError, match="non-Hermitian"):
+        calculator.run(with_two_body(two_aa, non_hermitian))
