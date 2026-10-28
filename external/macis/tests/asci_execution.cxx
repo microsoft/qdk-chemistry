@@ -41,6 +41,7 @@ class CpuExecution final : public macis::ASCIExecutionContext<N> {
   size_t searches = 0;
   size_t updates = 0;
   size_t drains = 0;
+  bool coefficients_alive_at_drain = false;
 
   bool pending() const { return _build.valid(); }
 
@@ -71,7 +72,11 @@ class CpuExecution final : public macis::ASCIExecutionContext<N> {
   }
 
   double finish_diagonalization(std::vector<double>& C) override {
-    if (failure == Failure::finish) throw std::runtime_error("finish failure");
+    if (failure == Failure::finish) {
+      C.assign(1, 0.25);
+      _pending_coefficients = C.data();
+      throw std::runtime_error("finish failure");
+    }
     _build.get();
     return macis::selected_ci_diag<int64_t>(
         _begin, _end, _ham_gen, _settings.ci_matel_tol,
@@ -87,6 +92,10 @@ class CpuExecution final : public macis::ASCIExecutionContext<N> {
   void drain() noexcept override {
     ++drains;
     _build = {};
+    if (_pending_coefficients) {
+      coefficients_alive_at_drain = *_pending_coefficients == 0.25;
+      _pending_coefficients = nullptr;
+    }
   }
 
  private:
@@ -94,6 +103,7 @@ class CpuExecution final : public macis::ASCIExecutionContext<N> {
   Iterator _begin, _end;
   macis::MCSCFSettings _settings;
   std::future<void> _build;
+  const double* _pending_coefficients = nullptr;
 };
 
 /**
@@ -193,6 +203,7 @@ TEMPLATE_TEST_CASE("ASCI execution boundary", "[asci_execution]",
       REQUIRE_FALSE(execution.pending());
     }
     REQUIRE(execution.drains == 2);
+    REQUIRE(execution.coefficients_alive_at_drain);
   }
 
   SECTION("Grow rotations refresh the executor and refine reuses it") {

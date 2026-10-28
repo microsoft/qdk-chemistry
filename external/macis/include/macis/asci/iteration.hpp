@@ -152,12 +152,15 @@ auto asci_iter(ASCISettings asci_settings, MCSCFSettings mcscf_settings,
                       cX, norb, ham_gen.T(), ham_gen.G_red(), ham_gen.V_red(),
                       ham_gen.V(), ham_gen MACIS_MPI_CODE(, comm));
   }
+  std::vector<wfn_t<N>>().swap(cdets);
+  std::vector<double>().swap(cX);
 
   if (!std::is_sorted(wfn.begin(), wfn.end(), wfn_comp{}))
     std::sort(wfn.begin(), wfn.end(), wfn_comp{});
 
-  // Keep borrowed determinants alive if warm-start preparation throws while
-  // the executor is building their Hamiltonian.
+  std::vector<double> X_local;
+  // Drain before destroying either borrowed buffer if preparation or the solve
+  // throws.
   ASCIExecutionGuard<N> execution_guard(execution);
   if (execution)
     execution->start_diagonalization(wfn.begin(), wfn.end(), ham_gen,
@@ -167,7 +170,6 @@ auto asci_iter(ASCISettings asci_settings, MCSCFSettings mcscf_settings,
   // Only warm-start when the determinant overlap is high; during aggressive
   // growth the old eigenvector can point toward the wrong eigenstate in the
   // much larger space, causing Davidson to stall.
-  std::vector<double> X_local;
   if (asci_settings.warm_start_davidson && !old_wfn.empty()) {
     // Look up every (unique) old determinant in the sorted, unique new
     // determinant list; the lookups are independent and run in parallel.
