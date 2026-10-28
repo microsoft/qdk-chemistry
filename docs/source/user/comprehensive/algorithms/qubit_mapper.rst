@@ -8,16 +8,18 @@ This transformation is essential for executing quantum chemistry algorithms on q
 Overview
 --------
 
-The :class:`~qdk_chemistry.algorithms.QubitMapper` algorithm converts fermionic Hamiltonians into qubit-operator representations composed of Pauli strings.
+The :class:`~qdk_chemistry.algorithms.QubitMapper` algorithm converts fermionic Hamiltonians into qubit-operator representations, including explicit Pauli decompositions and structured sums of squares.
 This transformation preserves the operator algebra, particle-number constraints, and antisymmetry required by fermionic statistics.
 The resulting qubit operator is mathematically equivalent to the original fermionic Hamiltonian but is now in a form that can be executed on quantum hardware or simulated by quantum algorithms.
 
 .. note::
 
-   **Core energy handling:** The core energy (nuclear repulsion + frozen orbital contributions)
-   from the input Hamiltonian is **not** included in the output QubitOperator. To compute
-   total energies, add ``hamiltonian.get_core_energy()`` to expectation values computed from
-   the QubitOperator.
+   **Core energy handling:** Pauli-decomposition mappers exclude the input
+   Hamiltonian's core energy (nuclear repulsion and frozen-orbital contributions).
+   Add ``hamiltonian.get_core_energy()`` to their electronic energies.
+   The :ref:`sum-of-squares mapper <sum-of-squares-qubit-mapper>` instead includes
+   core energy in its scalar shift; its SOSSA-decoded energies are already total
+   energies and must not receive that constant a second time.
 
 Supported encodings
 ~~~~~~~~~~~~~~~~~~~
@@ -65,7 +67,7 @@ Using the QubitMapper
 
 This section demonstrates how to create, configure, and run a qubit mapping.
 The ``run`` method requires a :class:`~qdk_chemistry.data.MajoranaMapping` as its second argument, which specifies the fermion-to-qubit encoding to use.
-It returns a :class:`~qdk_chemistry.data.QubitOperator` object containing the Pauli-string representation.
+It returns a :class:`~qdk_chemistry.data.QubitOperator` containing the representation produced by the selected implementation.
 
 Input requirements
 ~~~~~~~~~~~~~~~~~~
@@ -141,7 +143,7 @@ You can discover available implementations programmatically:
 Details for extending implementations
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
-Implementations fall into two groups.  They use the
+Pauli-decomposition implementations fall into two groups. They use the
 :class:`~qdk_chemistry.data.MajoranaMapping` argument differently:
 
 **Table-driven backends** (QDK native)
@@ -176,7 +178,7 @@ This distinction has practical consequences:
   a ``_taper_result()`` helper that applies tapering and qubit relabeling
   to an *already mapped* ``QubitOperator``.  Backends must first run
   the base transform (typically using ``mapping.without_tapering()``) and
-  then call ``_taper_result()`` on the output.  All shipped backends use
+  then call ``_taper_result()`` on the output. The shipped Pauli-decomposition backends use
   this helper, but third-party backends are free to handle tapering
   however they choose.
 
@@ -335,6 +337,42 @@ OpenFermion's operator ordering, so 4-fold integrals are mapped exactly.
 This implementation has no configurable settings. The encoding strategy is
 determined entirely by the :class:`~qdk_chemistry.data.MajoranaMapping` provided
 to ``run()``.
+
+
+.. _sum-of-squares-qubit-mapper:
+
+Sum of squares
+~~~~~~~~~~~~~~
+
+.. rubric:: Factory name: ``"sum_of_squares"``
+
+The sum-of-squares mapper :cite:`Low2025` consumes a
+:class:`~qdk_chemistry.data.DFTHCHamiltonianContainer`, including ordinary
+DF data produced by :doc:`HamiltonianFactorization <hamiltonian_factorization>`.
+It returns a :class:`~qdk_chemistry.data.QubitOperator` containing rotated
+particle, hole, and spin-free generators:
+
+.. math::
+
+   H_{\mathrm{total}} = E_{\mathrm{shift}} I + \sum_j O_j^\dagger O_j.
+
+The scalar shift includes core energy.
+The ``threshold`` setting screens adjusted one-body eigenvalues below its
+non-negative magnitude cutoff (default ``1e-12``).
+
+The supported circuit workflow uses
+:meth:`~qdk_chemistry.data.MajoranaMapping.jordan_wigner` over twice the
+number of active spatial orbitals, with blocked spin ordering and no tapering.
+Custom tables and reordered
+modes are not supported by the SOSSA circuit path.
+
+The output is numerical generator data, not an executable circuit.
+Use the :ref:`SOSSA unitary builder <sossa-builder>` and its circuit mapper
+to construct the block encoding.
+Pauli-specific consumers reject this representation explicitly.
+Dense and sparse matrix conversion of the SOS representation is not
+implemented; conventional Hamiltonian access remains available on the
+input DFTHC container.
 
 
 Related classes
