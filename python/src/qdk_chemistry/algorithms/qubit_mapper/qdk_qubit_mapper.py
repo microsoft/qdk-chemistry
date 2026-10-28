@@ -37,8 +37,7 @@ class QdkQubitMapperSettings(QubitMapperSettings):
 
     Settings:
         threshold (double, default=1e-12): Threshold for pruning small Pauli coefficients.
-        integral_threshold (double, default=1e-12): Threshold for filtering small integrals. Fourfold
-            two-body integrals are screened in the combinations ``((pq|rs) ± (pq|sr)) / 2``.
+        integral_threshold (double, default=1e-12): Threshold for filtering small integrals.
 
     """
 
