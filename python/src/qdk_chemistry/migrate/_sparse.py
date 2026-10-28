@@ -1,11 +1,14 @@
 """Migrate the ``sparse`` Hamiltonian container serialization to the current version.
 
 The legacy flat ``two_body_integrals_sparse`` list of ``[p, q, r, s, value]``
-entries became a ``SymmetryBlockedSparseMap`` in version 0.2.0. Both versions read
-each stored two-body entry as standing for its whole 8-fold permutation class,
-while version 0.3.0 reads entries literally, so the migration stores every class
-member. The (restricted) one-body sparse triplet list and the scalar metadata are
-schema-stable. Sparse model Hamiltonians carry no orbitals.
+entries became a ``SymmetryBlockedSparseMap`` in version 0.2.0. In both versions
+only the qubit mapper (and readers of exported FCIDUMP files, which held entries as
+stored) expanded each stored two-body entry over its 8-fold permutation class; the
+integral getters read entries literally. Version
+0.3.0 reads entries literally everywhere, and the migration adopts the qubit
+mapper's reading by storing every class member. The (restricted) one-body sparse
+triplet list and the scalar metadata are schema-stable. Sparse model Hamiltonians
+carry no orbitals.
 """
 
 # --------------------------------------------------------------------------------------------
@@ -38,7 +41,8 @@ def from_json_doc(container: dict) -> dict:
     if "two_body_integrals" in container:
         two_body = _sbt.sparse_rank4_entries(container["two_body_integrals"])
     return {
-        "_source_version": step_key(str(container.get("version"))),
+        "_source_version": str(container.get("version")),
+        "_step_key": step_key(str(container.get("version"))),
         "container_type": "sparse",
         "core_energy": container.get("core_energy", 0.0),
         "type": container.get("type", "Hermitian"),
@@ -106,7 +110,8 @@ def from_hdf5_group(container: h5py.Group) -> dict:
         ]
 
     return {
-        "_source_version": step_key(_io.read_attr(container, "version")),
+        "_source_version": _io.read_attr(container, "version"),
+        "_step_key": step_key(_io.read_attr(container, "version")),
         "container_type": "sparse",
         "core_energy": float(_io.read_attr(metadata, "core_energy", 0.0)),
         "type": _io.read_attr(metadata, "type", "Hermitian"),

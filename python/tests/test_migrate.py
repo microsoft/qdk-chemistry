@@ -668,6 +668,18 @@ def test_sparse_inconsistent_eightfold_class_refused(tmp_path):
         migrate.convert_file(src, tmp_path / "e_new.hamiltonian.h5")
 
 
+@pytest.mark.parametrize("fmt", ["json", "hdf5"])
+def test_current_sparse_reports_its_serialization_version(tmp_path, fmt):
+    """An already-current sparse file is refused with its own version, not the internal step key."""
+    suffix = "json" if fmt == "json" else "h5"
+    src = tmp_path / f"e.hamiltonian.{suffix}"
+    _write_v1_sparse_hdf5(tmp_path / "old.hamiltonian.h5", 2, [[0, 0, 1.0]], [[0, 0, 0, 0, 0.5]], version="0.2.0")
+    migrate.convert_file(tmp_path / "old.hamiltonian.h5", src)
+    with pytest.raises(migrate.MigrationError, match=r"version '0\.3\.0'") as error:
+        migrate.convert_file(src, tmp_path / f"e_new.hamiltonian.{suffix}")
+    assert "sparse 0.3.0" not in str(error.value)
+
+
 # --------------------------------------------------------------------------- #
 # Wavefunction containers: state_vector and amplitude variants
 # --------------------------------------------------------------------------- #

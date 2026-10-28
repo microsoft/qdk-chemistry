@@ -857,6 +857,11 @@ Args:
 Warns:
     DeprecationWarning: If a nonzero entry is the only stored member of a larger
         8-fold permutation class; such an entry is expanded over its class.
+        Classes with two or more stored members are read literally, without a
+        warning: ``{(0, 1, 0, 1): v, (1, 0, 1, 0): v}`` gives ``(01|10) == 0``,
+        where earlier versions mapped it with ``(01|10) == v``. Such a map is
+        valid 4-fold input, so this cannot be detected; when porting code, store
+        every class member or use :meth:`expand_symmetry_representatives`.
 )",
       py::arg("one_body_integrals"), py::arg("two_body_integrals"),
       py::arg("core_energy") = 0.0,

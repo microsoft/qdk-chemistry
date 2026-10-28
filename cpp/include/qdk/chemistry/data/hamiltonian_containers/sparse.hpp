@@ -60,7 +60,12 @@ class SparseHamiltonianContainer : public HamiltonianContainer {
    * @brief Construct from sparse one-body integrals and sparse two-body map.
    *
    * As a deprecated shorthand, a nonzero entry that is the only stored member
-   * of a larger 8-fold permutation class is expanded over that class.
+   * of a larger 8-fold permutation class is expanded over that class.  Classes
+   * with two or more stored members are read literally, without a warning:
+   * {(0,1,0,1): v, (1,0,1,0): v} gives (01|10) = 0, where earlier versions
+   * mapped it with (01|10) = v.  Such a map is valid 4-fold input, so this
+   * cannot be detected; when porting code, store every class member or use
+   * @ref expand_symmetry_representatives.
    *
    * @param one_body_integrals Sparse one-body integral matrix [n x n]
    * @param two_body_integrals Sparse two-body integral map
