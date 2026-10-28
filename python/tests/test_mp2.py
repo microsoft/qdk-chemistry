@@ -139,7 +139,7 @@ def test_mp2_rejects_non_fourfold_two_body(h4_chain, kind, message):
 
 
 def test_mp2_accepts_fourfold_two_body(h4_chain):
-    """A 4-fold, non-8-fold tensor gives the second-order energy of the literal operator."""
+    """A 4-fold, non-8-fold tensor gives the literal operator's doubles-only second-order sum over orbital energies."""
     wavefunction, hamiltonian = h4_chain
     one_body = np.asarray(hamiltonian.get_one_body_integrals()[0])
     n = one_body.shape[0]
