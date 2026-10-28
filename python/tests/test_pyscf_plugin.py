@@ -2579,6 +2579,29 @@ class TestPyscfPlugin:
                     with pytest.raises(ValueError, match="0 or 1"):
                         hamiltonian_to_scf(reference, alpha, beta)
 
+    @pytest.mark.parametrize("defect", ["fourfold", "non-finite"])
+    def test_hamiltonian_to_scf_rejects_model_two_body_without_eightfold_symmetry(self, defect: str) -> None:
+        """PySCF reads one member per 8-fold class, so other model tensors would give wrong energies."""
+        num_orbitals = 3
+        random = np.random.default_rng(706)
+        tensor = random.normal(size=(num_orbitals,) * 4)
+        tensor = (
+            tensor + tensor.transpose(2, 3, 0, 1) + tensor.transpose(1, 0, 3, 2) + tensor.transpose(3, 2, 1, 0)
+        ) / 4
+        if defect == "non-finite":
+            tensor = (tensor + tensor.transpose(1, 0, 2, 3)) / 2
+            tensor = (tensor + tensor.transpose(0, 1, 3, 2)) / 2
+            tensor[0, 0, 0, 0] = np.nan
+        orbitals = data.ModelOrbitals(num_orbitals, SymmetryProduct([axes.spin(1, True)]))
+        hamiltonian = data.Hamiltonian(
+            data.CanonicalFourCenterHamiltonianContainer(
+                np.diag([-1.0, -0.5, 0.5]), tensor.ravel(), orbitals, 0.0, np.eye(num_orbitals)
+            )
+        )
+        occupation = np.array([1.0, 0.0, 0.0])
+        with pytest.raises(ValueError, match="8-fold" if defect == "fourfold" else "non-finite"):
+            hamiltonian_to_scf(hamiltonian, occupation, occupation)
+
 
 class TestQDKChemistryPySCFBasisConversion:
     """Test suite for QDK/Chemistry-PySCF basis set conversion."""
