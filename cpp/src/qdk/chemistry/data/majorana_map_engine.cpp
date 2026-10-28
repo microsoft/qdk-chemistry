@@ -548,20 +548,22 @@ MajoranaMapResult majorana_map_impl(const MajoranaMapping& mapping,
   if (pair_split) {
     using Terms =
         std::vector<std::pair<std::complex<double>, PackedPauliWord<NW>>>;
+    // Excitation terms per spin channel; a spin-summed pair fills both.
     struct ExcitationPair {
       std::size_t bra, ket;
-      Terms symmetric, antisymmetric;
+      std::array<Terms, 2> symmetric, antisymmetric;
     };
     auto make_pairs = [&](bool spin_sum, std::size_t spin) {
       std::vector<ExcitationPair> pairs;
       pairs.reserve(n_spatial * (n_spatial + 1) / 2);
       for (std::size_t bra = 0; bra < n_spatial; ++bra) {
         for (std::size_t ket = bra; ket < n_spatial; ++ket) {
-          std::unordered_map<PackedPauliWord<NW>, std::complex<double>,
-                             PackedPauliWordHash<NW>>
-              symmetric, antisymmetric;
+          ExcitationPair pair{bra, ket, {}, {}};
           for (std::size_t channel = spin_sum ? 0 : spin;
                channel < (spin_sum ? num_spin_species : spin + 1); ++channel) {
+            std::unordered_map<PackedPauliWord<NW>, std::complex<double>,
+                               PackedPauliWordHash<NW>>
+                symmetric, antisymmetric;
             const auto& cache = channel == 0 ? ppair_alpha : ppair_beta;
             for (std::size_t first = 0; first < 2; ++first) {
               for (std::size_t second = 0; second < 2; ++second) {
@@ -578,15 +580,14 @@ MajoranaMapResult majorana_map_impl(const MajoranaMapping& mapping,
                 }
               }
             }
-          }
-          ExcitationPair pair{bra, ket, {}, {}};
-          for (const auto& [word, coefficient] : symmetric) {
-            if (std::abs(coefficient) > 1e-15)
-              pair.symmetric.emplace_back(coefficient, word);
-          }
-          for (const auto& [word, coefficient] : antisymmetric) {
-            if (std::abs(coefficient) > 1e-15)
-              pair.antisymmetric.emplace_back(coefficient, word);
+            for (const auto& [word, coefficient] : symmetric) {
+              if (std::abs(coefficient) > 1e-15)
+                pair.symmetric[channel].emplace_back(coefficient, word);
+            }
+            for (const auto& [word, coefficient] : antisymmetric) {
+              if (std::abs(coefficient) > 1e-15)
+                pair.antisymmetric[channel].emplace_back(coefficient, word);
+            }
           }
           pairs.push_back(std::move(pair));
         }
@@ -607,16 +608,29 @@ MajoranaMapResult majorana_map_impl(const MajoranaMapping& mapping,
         }
       }
     };
+    // Sum over spin channels of left·right, plus right·left if both_orders.
+    // Bilinears of different spins commute, so each cross-spin product is
+    // formed once with the weight of both orders.
+    auto channel_product = [&](const std::array<Terms, 2>& left,
+                               const std::array<Terms, 2>& right, double scale,
+                               bool both_orders) {
+      for (std::size_t channel = 0; channel < 2; ++channel)
+        product(left[channel], right[channel], scale, both_orders);
+      product(left[0], right[1], 2.0 * scale, false);
+      // Without both orders left and right are the same pair, whose two
+      // cross-spin products coincide.
+      if (both_orders) product(left[1], right[0], 2.0 * scale, false);
+    };
     auto same_spin = [&](const auto& pairs, bool beta) {
       auto process = [&](std::size_t left, std::size_t right, double direct,
                          double ket_swapped) {
         const auto& first = pairs[left];
         const auto& second = pairs[right];
         const auto [symmetric, antisymmetric] = split(direct, ket_swapped);
-        product(first.symmetric, second.symmetric, 0.5 * symmetric,
-                left != right);
-        product(first.antisymmetric, second.antisymmetric, 0.5 * antisymmetric,
-                left != right);
+        channel_product(first.symmetric, second.symmetric, 0.5 * symmetric,
+                        left != right);
+        channel_product(first.antisymmetric, second.antisymmetric,
+                        0.5 * antisymmetric, left != right);
       };
       if constexpr (EriProvider::kSparse) {
         std::vector<std::size_t> pair_indices(n_spatial * n_spatial);
@@ -653,9 +667,9 @@ MajoranaMapResult majorana_map_impl(const MajoranaMapping& mapping,
             const auto [symmetric, antisymmetric] =
                 split(row[second.bra * n_spatial + second.ket],
                       row[second.ket * n_spatial + second.bra]);
-            product(first.symmetric, second.symmetric, symmetric, false);
-            product(first.antisymmetric, second.antisymmetric, antisymmetric,
-                    false);
+            product(first.symmetric[0], second.symmetric[1], symmetric, false);
+            product(first.antisymmetric[0], second.antisymmetric[1],
+                    antisymmetric, false);
           }
         }
       }
@@ -948,6 +962,18 @@ MajoranaMapResult run_with_provider(const MajoranaMapping& mapping,
         " exceeds the maximum of " + std::to_string(max_nw * 64) + " qubits.");
   }
 
+  // Screening would silently drop a NaN (|NaN| > threshold is false).
+  auto require_finite_one_body = [n_spatial](const double* one_body) {
+    if (!std::all_of(one_body, one_body + n_spatial * n_spatial,
+                     [](double value) { return std::isfinite(value); })) {
+      throw std::invalid_argument(
+          "majorana_map_hamiltonian: the one-body integrals contain a "
+          "non-finite value.");
+    }
+  };
+  require_finite_one_body(h1_alpha);
+  if (!spin_symmetric) require_finite_one_body(h1_beta);
+
   return dispatch_by_words<EriProvider>(
       std::make_index_sequence<max_nw>{}, num_words, mapping, core_energy,
       h1_alpha, h1_beta, eri_provider, n_spatial, spin_symmetric, pair_split,
@@ -1050,7 +1076,7 @@ MajoranaMapResult majorana_map_hamiltonian_sparse(
   detail::SparseTwoBodyTensor tensor;
   for (std::size_t e = 0; e < num_entries; ++e) {
     // Validate before the int -> size_t cast: a negative index would wrap
-    // to a huge value and read out of bounds downstream (e.g. in sym_map).
+    // to a huge value and read out of bounds downstream.
     for (std::size_t component = 0; component < 4; ++component) {
       const int idx = two_body_indices[4 * e + component];
       if (idx < 0 || static_cast<std::size_t>(idx) >= n_spatial) {

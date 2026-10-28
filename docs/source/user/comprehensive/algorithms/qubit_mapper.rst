@@ -224,7 +224,11 @@ The ``integral_threshold`` setting screens :math:`g^S` and :math:`g^A` in the
 excitation-pair split, so symmetry partners are always screened together, and
 individual integrals in the channel-by-channel loop. For 8-fold integrals,
 :math:`g^A` vanishes up to round-off, so antisymmetric products are formed
-only where that round-off exceeds the threshold.
+only where that round-off exceeds the threshold. In ill-conditioned bases, such
+as augmented ones, round-off can exceed the default threshold of ``1e-12`` and
+add Pauli terms of that size (2–6% more terms for an H₄ chain in
+aug-cc-pVDZ); an ``integral_threshold`` of about ``1e-10`` removes most of them,
+at the cost of also screening genuine integrals below it.
 
 .. rubric:: Container-aware fast paths
 
@@ -250,12 +254,17 @@ compressed form:
   (Cholesky / density-fitted) factors are kept in their
   :math:`O(N^2 \cdot n_\text{aux})` form and the auxiliary index is contracted
   in integral space, one ``(pq|.)`` row at a time (a vectorized matrix-vector
-  product per orbital pair). The reconstructed integrals are checked element
-  by element for :math:`(pq|rs) = (qp|sr)`, with the same tolerance as dense
-  integrals. Cheap bounds from the parts of the factors symmetric and
-  antisymmetric in their orbital pair usually settle the check in
-  :math:`O(N^2 n_\text{aux}^2)`; otherwise the largest violation is formed
-  exactly in row blocks, in :math:`O(N^4 n_\text{aux})`.
+  product per orbital pair), so the mapping needs one additional
+  :math:`N^2`-length row and suits systems whose dense ERI tensor does not fit
+  in memory. The reconstructed integrals are checked element by element for
+  :math:`(pq|rs) = (qp|sr)`, with the same tolerance as dense integrals. For
+  factors that are symmetric in their orbital pair up to round-off, as
+  Cholesky factors of ordinary integrals are, one pass over the factors with
+  :math:`O(N^2)` memory settles the check. Otherwise the parts of the factors
+  symmetric and antisymmetric in their orbital pair are copied, which doubles
+  the factor memory, and a Frobenius bound in
+  :math:`O(N^2 n_\text{aux}^2)` or, failing that, the exact largest violation
+  in :math:`O(N^4 n_\text{aux})` decides it.
 
 In all cases the result is a :class:`~qdk_chemistry.data.QubitOperator` that
 is numerically equivalent, term by term, to the dense

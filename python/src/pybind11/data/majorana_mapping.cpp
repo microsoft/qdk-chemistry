@@ -414,7 +414,7 @@ Returns:
     words and ``coefficients`` is a list of complex coefficients.
 
 Raises:
-    ValueError: If the two-body integrals or Cholesky factors are not finite,
+    ValueError: If an integral or Cholesky factor is not finite,
         or restricted two-body integrals define a non-Hermitian operator or
         are Hermitian but not stored with ``(pq|rs) == (rs|pq)``.
 )");

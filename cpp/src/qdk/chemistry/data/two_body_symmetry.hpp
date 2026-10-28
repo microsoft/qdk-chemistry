@@ -207,8 +207,10 @@ inline CholeskyPairParts cholesky_pair_parts(const double* factors,
 /// In the notation of `CholeskyPairParts`, (pq|rs) - (qp|sr) =
 /// 2(±S^l_u.A^r_v ± A^l_u.S^r_v), whose largest magnitude is
 /// 2 max_{u,v} (|S^l_u.A^r_v| + |A^l_u.S^r_v|).  Two sufficient bounds are
-/// tried before that exact maximum: a Cauchy-Schwarz bound in O(n^2 naux) and
-/// a Frobenius bound from thin QR factors in O(n^2 naux^2).  The exact
+/// tried before that exact maximum: a Cauchy-Schwarz bound from one pass over
+/// the factors in O(n^2) memory, which settles factors that are
+/// pair-symmetric to round-off without copying them, and a Frobenius bound
+/// from thin QR factors of copied S and A in O(n^2 naux^2).  The exact
 /// maximum is formed in row blocks, O(n^4 naux), only when both fail.  The
 /// bounds compare against the largest diagonal element |(pq|pq)|: that is the
 /// largest element of a same-spin block, and a lower bound for a mixed one.
@@ -222,31 +224,71 @@ inline bool cholesky_has_reversal_symmetry(const double* left,
   const double right_scale = same_spin ? left_scale : max_abs(right, count);
   if (left_scale == 0.0 || right_scale == 0.0) return true;
 
+  // Squared norms of S_u and A_u over the auxiliary index, per side, and the
+  // diagonal elements (pq|pq) and (qp|qp), in units of the two scales.
+  const std::size_t n2 = n * n;
+  const std::size_t pair_count = n * (n + 1) / 2;
+  std::vector<double> left_symmetric_sq(pair_count),
+      left_antisymmetric_sq(pair_count);
+  std::vector<double> right_symmetric_sq(same_spin ? 0 : pair_count);
+  std::vector<double> right_antisymmetric_sq(same_spin ? 0 : pair_count);
+  std::vector<double> forward_diagonal(pair_count),
+      reverse_diagonal(pair_count);
+  for (std::size_t aux = 0; aux < naux; ++aux) {
+    std::size_t pair = 0;
+    for (std::size_t p = 0; p < n; ++p) {
+      for (std::size_t q = p; q < n; ++q, ++pair) {
+        const std::size_t forward = p * n + q + aux * n2;
+        const std::size_t reverse = q * n + p + aux * n2;
+        const double left_forward = left[forward] / left_scale;
+        const double left_reverse = left[reverse] / left_scale;
+        const double symmetric = 0.5 * (left_forward + left_reverse);
+        const double antisymmetric = 0.5 * (left_forward - left_reverse);
+        left_symmetric_sq[pair] += symmetric * symmetric;
+        left_antisymmetric_sq[pair] += antisymmetric * antisymmetric;
+        if (same_spin) {
+          forward_diagonal[pair] += left_forward * left_forward;
+          reverse_diagonal[pair] += left_reverse * left_reverse;
+          continue;
+        }
+        const double right_forward = right[forward] / right_scale;
+        const double right_reverse = right[reverse] / right_scale;
+        const double right_sym = 0.5 * (right_forward + right_reverse);
+        const double right_anti = 0.5 * (right_forward - right_reverse);
+        right_symmetric_sq[pair] += right_sym * right_sym;
+        right_antisymmetric_sq[pair] += right_anti * right_anti;
+        forward_diagonal[pair] += left_forward * right_forward;
+        reverse_diagonal[pair] += left_reverse * right_reverse;
+      }
+    }
+  }
+  auto max_norm = [](const std::vector<double>& squared_norms) {
+    return std::sqrt(
+        *std::max_element(squared_norms.begin(), squared_norms.end()));
+  };
+  auto max_abs_of = [](const std::vector<double>& values) {
+    return max_abs(values.data(), values.size());
+  };
+  const double diagonal_max =
+      std::max(max_abs_of(forward_diagonal), max_abs_of(reverse_diagonal));
+  const double bound = relative_tolerance * diagonal_max;
+  const auto& right_symmetric_sq_or_left =
+      same_spin ? left_symmetric_sq : right_symmetric_sq;
+  const auto& right_antisymmetric_sq_or_left =
+      same_spin ? left_antisymmetric_sq : right_antisymmetric_sq;
+  if (2.0 * (max_norm(left_symmetric_sq) *
+                 max_norm(right_antisymmetric_sq_or_left) +
+             max_norm(left_antisymmetric_sq) *
+                 max_norm(right_symmetric_sq_or_left)) <=
+      bound) {
+    return true;
+  }
+
   const auto l = cholesky_pair_parts(left, n, naux, left_scale);
   CholeskyPairParts right_parts;
   if (!same_spin)
     right_parts = cholesky_pair_parts(right, n, naux, right_scale);
   const auto& r = same_spin ? l : right_parts;
-
-  auto diagonal = [&l, &r](double sign) {
-    return (l.symmetric + sign * l.antisymmetric)
-        .cwiseProduct(r.symmetric + sign * r.antisymmetric)
-        .rowwise()
-        .sum()
-        .cwiseAbs()
-        .maxCoeff();
-  };
-  const double diagonal_max = std::max(diagonal(1.0), diagonal(-1.0));
-  const double bound = relative_tolerance * diagonal_max;
-
-  auto max_row_norm = [](const Eigen::MatrixXd& matrix) {
-    return matrix.rowwise().norm().maxCoeff();
-  };
-  if (2.0 * (max_row_norm(l.symmetric) * max_row_norm(r.antisymmetric) +
-             max_row_norm(l.antisymmetric) * max_row_norm(r.symmetric)) <=
-      bound) {
-    return true;
-  }
 
   // ||X Y^T||_F = ||R_X R_Y^T||_F for thin QR factors X = Q_X R_X.
   auto reduced_r = [](const Eigen::MatrixXd& matrix) -> Eigen::MatrixXd {

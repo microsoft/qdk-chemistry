@@ -76,7 +76,10 @@ class QdkQubitMapper(QubitMapper):
     and those produced by downfolding; they use spin-summed symmetric and
     antisymmetric excitation pairs, weighted by ``((pq|rs) ± (pq|sr)) / 2``. The
     ``integral_threshold`` screens these combinations, so for 8-fold integrals
-    antisymmetric products are formed only where round-off exceeds it. A
+    antisymmetric products are formed only where round-off exceeds it. In
+    ill-conditioned bases that round-off can exceed the default and add Pauli
+    terms of its size; an ``integral_threshold`` of about ``1e-10`` removes most
+    of them. A
     non-Hermitian restricted tensor raises
     ``ValueError``, as does a Hermitian one not stored with
     ``(pq|rs) == (rs|pq)``; map its bra-ket average instead. Unrestricted inputs
@@ -97,7 +100,9 @@ class QdkQubitMapper(QubitMapper):
     * :class:`~qdk_chemistry.data.CholeskyHamiltonianContainer`: the
       three-center factors are kept in their ``O(N**2 * naux)`` form and the
       auxiliary index is contracted one ``(pq|.)`` row at a time, so the dense
-      ``N**4`` tensor is never reconstructed.
+      ``N**4`` tensor is never reconstructed and the mapping needs one
+      additional ``N**2`` row. Validating factors that are not pair-symmetric
+      up to round-off copies them once.
     * All other containers use the dense engine path.
 
     In all cases the result is numerically equivalent to mapping the dense

@@ -367,8 +367,9 @@ struct MajoranaMapResult {
  *        partners are screened together; the full loop skips individual
  *        integrals.  One-body integrals with |value| <= this are skipped.
  * @return MajoranaMapResult with Pauli words and coefficients.
- * @throws std::invalid_argument If the two-body integrals contain a
- *         non-finite value, or spin_symmetric is true and they define a
+ * @throws std::invalid_argument If an integral is not finite (beta
+ *         one-body integrals are read only when spin_symmetric is false), or
+ *         spin_symmetric is true and the two-body integrals define a
  *         non-Hermitian operator, or are Hermitian but not stored with
  *         (pq|rs) = (rs|pq); in the latter case, map their bra-ket average
  *         instead.
@@ -421,9 +422,13 @@ MajoranaMapResult majorana_map_hamiltonian(const MajoranaMapping& mapping,
  * The reconstructed integrals are checked for (pq|rs) = (qp|sr) element by
  * element, with the dense tolerance.  With S and A the parts of the factors
  * symmetric and antisymmetric in their orbital pair, the largest violation
- * is 2 max_{u,v} (|S_u.A_v| + |A_u.S_v|).  It is bounded in O(N^2 naux), then
- * through thin QR factors of S and A in O(N^2 naux^2), and formed exactly in
- * row blocks, O(N^4 naux), only when both bounds are inconclusive.
+ * is 2 max_{u,v} (|S_u.A_v| + |A_u.S_v|).  It is bounded from one pass over
+ * the factors in O(N^2) memory, which settles factors that are pair-symmetric
+ * to round-off; otherwise S and A are copied (as much memory as the factors)
+ * and the violation is bounded through their thin QR factors in
+ * O(N^2 naux^2), and formed exactly in row blocks, O(N^4 naux), only when
+ * both bounds are inconclusive.  The mapping itself needs one additional
+ * N^2-length row.
  *
  * @param mapping The Majorana-to-Pauli encoding.
  * @param core_energy Core (nuclear repulsion + frozen core) energy.
@@ -442,7 +447,8 @@ MajoranaMapResult majorana_map_hamiltonian(const MajoranaMapping& mapping,
  * @param integral_threshold Screening cutoff, as for
  *        ::majorana_map_hamiltonian.
  * @return MajoranaMapResult with Pauli words and coefficients.
- * @throws std::invalid_argument If a factor is not finite, or spin_symmetric
+ * @throws std::invalid_argument If a factor or one-body integral is not
+ *         finite, or spin_symmetric
  *         is true and the reconstructed two-body integrals violate
  *         (pq|rs) = (qp|sr), so they define a non-Hermitian operator.
  */
@@ -486,7 +492,7 @@ MajoranaMapResult majorana_map_hamiltonian_cholesky(
  *        ::majorana_map_hamiltonian.
  * @return MajoranaMapResult with Pauli words and coefficients.
  * @throws std::invalid_argument If spin_symmetric is false, any two-body
- *         index is outside [0, n_spatial), a value is not finite, duplicate
+ *         index is outside [0, n_spatial), an integral is not finite, duplicate
  *         entries for the same position carry conflicting values, or the
  *         literal tensor defines a non-Hermitian operator or is not stored
  *         with (pq|rs) = (rs|pq).

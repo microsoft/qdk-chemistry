@@ -425,6 +425,29 @@ TEST(MajoranaMapEngineTest, CholeskyRejectsNonFiniteFactors) {
   }
 }
 
+TEST(MajoranaMapEngineTest, RejectsNonFiniteOneBodyIntegrals) {
+  // Screening alone would drop a NaN one-body integral silently.
+  const auto mapping = MajoranaMapping::jordan_wigner(4);
+  const auto finite = diagonal_one_body(2);
+  auto invalid = finite;
+  invalid[1] = invalid[2] = std::numeric_limits<double>::quiet_NaN();
+  const double eri[16] = {};
+  for (bool restricted : {true, false}) {
+    EXPECT_THROW(
+        majorana_map_hamiltonian(mapping, 0.0, invalid.data(), finite.data(),
+                                 eri, eri, eri, 2, restricted, 1e-12, 1e-12),
+        std::invalid_argument);
+  }
+  // The beta integrals are read, and so checked, only when unrestricted.
+  EXPECT_NO_THROW(majorana_map_hamiltonian(mapping, 0.0, finite.data(),
+                                           invalid.data(), eri, eri, eri, 2,
+                                           true, 1e-12, 1e-12));
+  EXPECT_THROW(
+      majorana_map_hamiltonian(mapping, 0.0, finite.data(), invalid.data(), eri,
+                               eri, eri, 2, false, 1e-12, 1e-12),
+      std::invalid_argument);
+}
+
 TEST(MajoranaMapEngineTest, CholeskyValidationIsElementwiseLikeDense) {
   // A violation at one pair is not diluted by the size of the tensor.
   {
