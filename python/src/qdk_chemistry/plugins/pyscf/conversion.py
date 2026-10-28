@@ -42,6 +42,7 @@ from pyscf import lib
 from qdk_chemistry.constants import FINE_STRUCTURE_CONSTANT
 from qdk_chemistry.data import AOType, BasisSet, Hamiltonian, Orbitals, Shell, Structure
 from qdk_chemistry.data._spin_channels import spin_channel_indices, spin_channel_matrix, spin_channel_vector
+from qdk_chemistry.data._two_body_symmetry import eightfold_average
 from qdk_chemistry.data.symmetry import axes
 from qdk_chemistry.utils import Logger
 from qdk_chemistry.utils.enum import CaseInsensitiveStrEnum
@@ -623,25 +624,6 @@ def orbitals_to_scf_from_n_electrons_and_multiplicity(
     return orbitals_to_scf(orbitals, alpha_occ, beta_occ, scf_type, method)
 
 
-def _require_eightfold_two_body(eri: np.ndarray) -> None:
-    """Reject two-body integrals that PySCF would read as a different operator.
-
-    PySCF packs ``(pq|rs)`` by its 8-fold permutation class and keeps one member of each, so a tensor
-    without that symmetry would silently give wrong results. The tolerance is relative to the largest
-    integral, as in the library's other two-body symmetry checks.
-    """
-    if not np.all(np.isfinite(eri)):
-        raise ValueError("The two-body integrals contain a non-finite value.")
-    tolerance = 1e-5 * np.max(np.abs(eri), initial=0.0)
-    for permutation in ((1, 0, 2, 3), (0, 1, 3, 2), (2, 3, 0, 1)):
-        if np.max(np.abs(eri - eri.transpose(permutation)), initial=0.0) > tolerance:
-            raise ValueError(
-                "PySCF requires two-body integrals with 8-fold permutation symmetry, "
-                "(pq|rs) = (qp|rs) = (pq|sr) = (rs|pq); reduced-symmetry integrals, "
-                "such as downfolded ones, are not supported."
-            )
-
-
 def hamiltonian_to_scf(hamiltonian: Hamiltonian, alpha_occ: np.ndarray, beta_occ: np.ndarray) -> pyscf.scf.hf.SCF:
     """Convert a QDK/Chemistry Hamiltonian object to a PySCF mean-field reference.
 
@@ -666,9 +648,11 @@ def hamiltonian_to_scf(hamiltonian: Hamiltonian, alpha_occ: np.ndarray, beta_occ
         from the molecular basis, requiring ordinary Coulomb interactions and supporting AO-direct CCSD.
 
         Restricted closed-shell model references use stored one- and two-body integrals with identity
-        coefficients and overlap. PySCF assumes the 8-fold permutation symmetry of ordinary
-        electron-repulsion integrals, so two-body integrals with only the 4-fold symmetry, such as
-        downfolded ones, are rejected. Unrestricted and open-shell model references are not supported.
+        coefficients and overlap. PySCF keeps one value per 8-fold permutation class, so two-body
+        integrals are passed as their 8-fold class averages: differences from that average up to 1e-5
+        of the largest integral are treated as round-off, and larger ones, as in downfolded integrals
+        with only the 4-fold symmetry, are rejected. Unrestricted and open-shell model references are
+        not supported.
 
         All represented MOs must be active, with no inactive orbitals. Overlap-rank reduction is allowed;
         active-space effective Hamiltonians with folded core contributions are not supported.
@@ -757,8 +741,8 @@ def hamiltonian_to_scf(hamiltonian: Hamiltonian, alpha_occ: np.ndarray, beta_occ
 
     # Store integrals in the SCF object
     (eri, _, _) = hamiltonian.get_two_body_integrals()
-    eri = np.reshape(eri, (norb, norb, norb, norb))
-    _require_eightfold_two_body(eri)
+    # PySCF keeps one member of each 8-fold class, so pass the class averages.
+    eri = eightfold_average(np.reshape(eri, (norb, norb, norb, norb)), "PySCF")
     (h1e, _) = hamiltonian.get_one_body_integrals()
     # Use _eri directly as it's the established way to access this in PySCF
     # even though it's technically a private member

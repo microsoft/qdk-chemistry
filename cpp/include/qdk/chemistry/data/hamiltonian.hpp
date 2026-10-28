@@ -44,14 +44,18 @@ enum class SpinChannel { aa, bb, aaaa, aabb, bbbb };
  * Note that this class does not store two-electron integrals; derived classes
  * are expected to implement storage and access for these integrals.
  *
- * Two-electron integrals are real, in chemist notation (pq|rs), and represent
+ * Two-electron integrals are real and in chemist notation (pq|rs). Restricted
+ * integrals g represent the spin-free operator
+ * ½ Σ_pqrs g_pqrs Σ_στ a†_pσ a†_rτ a_sτ a_qσ, which depends on g only through
+ * its bra-ket average ((pq|rs) + (rs|pq)) / 2. Unrestricted blocks represent
  * the operator literally, with the beta-alpha block given by
  * (pq|rs)_ba = (rs|pq)_ab. Restricted integrals and the same-spin blocks of a
  * Hermitian Hamiltonian are expected to have the 4-fold permutation symmetry
  * (pq|rs) = (rs|pq) = (qp|sr); the alpha-beta block need only satisfy
  * (pq|rs) = (qp|sr). The additional 8-fold symmetry of ordinary
- * electron-repulsion integrals is not assumed; consumers that need it check
- * for it and reject other input.
+ * electron-repulsion integrals is not assumed: consumers that need it reject
+ * integrals that differ from their 8-fold average by more than 1e-5 of the
+ * largest integral, and average smaller differences away.
  *
  * This class implies that all inactive orbitals are fully occupied when
  * constructing inactive-orbital contributions to the constant energy term and
@@ -304,9 +308,10 @@ class HamiltonianContainer {
    * @param nalpha Number of alpha electrons
    * @param nbeta Number of beta electrons
    * @throws std::runtime_error if I/O error occurs, the Hamiltonian is
-   * unrestricted, or its two-body integrals lack 8-fold permutation symmetry
+   * unrestricted, or its two-body integrals differ from their 8-fold average
+   * (which each record holds) by more than 1e-5 of the largest integral
    * @throws std::invalid_argument if the active space has differing alpha and
-   * beta sizes
+   * beta sizes, or a two-body integral is not finite
    */
   virtual void to_fcidump_file(const std::string& filename, size_t nalpha,
                                size_t nbeta) const;
@@ -644,9 +649,10 @@ class Hamiltonian : public DataClass,
    * @param nalpha Number of alpha electrons
    * @param nbeta Number of beta electrons
    * @throws std::runtime_error if I/O error occurs, the Hamiltonian is
-   * unrestricted, or its two-body integrals lack 8-fold permutation symmetry
+   * unrestricted, or its two-body integrals differ from their 8-fold average
+   * (which each record holds) by more than 1e-5 of the largest integral
    * @throws std::invalid_argument if the active space has differing alpha and
-   * beta sizes
+   * beta sizes, or a two-body integral is not finite
    */
   void to_fcidump_file(const std::string& filename, size_t nalpha,
                        size_t nbeta) const;

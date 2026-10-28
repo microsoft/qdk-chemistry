@@ -1897,6 +1897,68 @@ TEST_F(HamiltonianTest, SparseContainerFCIDUMPRequiresEightfoldClasses) {
   std::filesystem::remove(filename);
 }
 
+TEST_F(HamiltonianTest, FCIDUMPWritesEightfoldClassAverages) {
+  // A 4-fold part below the tolerance is round-off: each record holds the
+  // average over its 8-fold class, which readers copy to the whole class.
+  auto idx = [](size_t p, size_t q, size_t r, size_t s) {
+    return ((p * 2 + q) * 2 + r) * 2 + s;
+  };
+  // Exactly representable, so the average prints exactly; the relative
+  // difference is 5.1e-6.
+  const double high = 0.75 + std::ldexp(1.0, -18);
+  const double low = 0.75 - std::ldexp(1.0, -18);
+  Eigen::VectorXd dense = Eigen::VectorXd::Zero(16);
+  dense(idx(0, 1, 0, 1)) = dense(idx(1, 0, 1, 0)) = high;
+  dense(idx(0, 1, 1, 0)) = dense(idx(1, 0, 0, 1)) = low;
+  const SparseHamiltonianContainer::TwoBodyMap sparse{{{0, 1, 0, 1}, high},
+                                                      {{1, 0, 1, 0}, high},
+                                                      {{0, 1, 1, 0}, low},
+                                                      {{1, 0, 0, 1}, low}};
+  Eigen::SparseMatrix<double> sparse_one_body(2, 2);
+  sparse_one_body.insert(0, 0) = 1.0;
+  sparse_one_body.makeCompressed();
+
+  const std::string filename = "test.average.hamiltonian.fcidump";
+  for (const auto& h :
+       {Hamiltonian(std::make_unique<CanonicalFourCenterHamiltonianContainer>(
+            one_body, dense, orbitals, core_energy, inactive_fock)),
+        Hamiltonian(std::make_unique<SparseHamiltonianContainer>(
+            sparse_one_body, sparse, core_energy))}) {
+    h.to_fcidump_file(filename, 1, 1);
+    std::ifstream file(filename);
+    std::stringstream buffer;
+    buffer << file.rdbuf();
+    EXPECT_NE(buffer.str().find("7.5000000000000000e-01    1    2    1    2"),
+              std::string::npos)
+        << buffer.str();
+  }
+  std::filesystem::remove(filename);
+}
+
+TEST_F(HamiltonianTest, FCIDUMPRejectsNonFiniteTwoBodyIntegrals) {
+  const std::string filename = "test.nonfinite.hamiltonian.fcidump";
+  Eigen::VectorXd dense = two_body;
+  dense(0) = std::numeric_limits<double>::quiet_NaN();
+  EXPECT_THROW(
+      Hamiltonian(std::make_unique<CanonicalFourCenterHamiltonianContainer>(
+                      one_body, dense, orbitals, core_energy, inactive_fock))
+          .to_fcidump_file(filename, 1, 1),
+      std::invalid_argument);
+
+  Eigen::SparseMatrix<double> sparse_one_body(2, 2);
+  sparse_one_body.insert(0, 0) = 1.0;
+  sparse_one_body.makeCompressed();
+  EXPECT_THROW(Hamiltonian(std::make_unique<SparseHamiltonianContainer>(
+                               sparse_one_body,
+                               SparseHamiltonianContainer::TwoBodyMap{
+                                   {{0, 0, 0, 0},
+                                    std::numeric_limits<double>::infinity()}},
+                               core_energy))
+                   .to_fcidump_file(filename, 1, 1),
+               std::invalid_argument);
+  EXPECT_FALSE(std::filesystem::exists(filename));
+}
+
 TEST(SparseHamiltonianContainerTest, ConstructorExpandsEightfoldShorthand) {
   using Map = SparseHamiltonianContainer::TwoBodyMap;
   const Eigen::SparseMatrix<double> one_body(3, 3);

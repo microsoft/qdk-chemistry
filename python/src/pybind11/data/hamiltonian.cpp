@@ -127,13 +127,17 @@ for quantum chemistry calculations. It contains:
 Derived classes implement specific storage formats for two-electron integrals
 (e.g., canonical 4-center, density-fitted, etc.).
 
-Two-electron integrals are real, in chemist notation (pq|rs), and represent the
+Two-electron integrals are real and in chemist notation (pq|rs). Restricted
+integrals g represent the spin-free operator
+½ Σ_pqrs g_pqrs Σ_στ a†_pσ a†_rτ a_sτ a_qσ, which depends on g only through its
+bra-ket average ((pq|rs) + (rs|pq)) / 2. Unrestricted blocks represent the
 operator literally, with the beta-alpha block given by (pq|rs)_ba = (rs|pq)_ab.
 Restricted integrals and the same-spin blocks of a Hermitian Hamiltonian are
 expected to have the 4-fold permutation symmetry (pq|rs) = (rs|pq) = (qp|sr);
 the alpha-beta block need only satisfy (pq|rs) = (qp|sr). The additional 8-fold
-symmetry of ordinary electron-repulsion integrals is not assumed; consumers that
-need it check for it and reject other input.
+symmetry of ordinary electron-repulsion integrals is not assumed: consumers that
+need it reject integrals that differ from their 8-fold average by more than
+1e-5 of the largest integral, and average smaller differences away.
 
 Note:
     This class cannot be instantiated directly. Use a derived class like
@@ -558,11 +562,16 @@ Args:
     nalpha (int): Number of alpha electrons
     nbeta (int): Number of beta electrons
 
+Each two-electron record holds the average over its 8-fold permutation class,
+which FCIDUMP readers copy to the whole class. Differences from that average up
+to 1e-5 of the largest integral are treated as round-off and averaged away.
+
 Raises:
     RuntimeError: If I/O error occurs, the Hamiltonian is unrestricted, or its
-        two-body integrals lack the 8-fold permutation symmetry that FCIDUMP
-        readers reconstruct.
-    ValueError: If the active space has differing alpha and beta sizes.
+        two-body integrals differ from their 8-fold average by more than that
+        tolerance.
+    ValueError: If the active space has differing alpha and beta sizes, or a
+        two-body integral is not finite.
 )",
       py::arg("filename"), py::arg("nalpha"), py::arg("nbeta"));
 
@@ -787,11 +796,16 @@ Args:
     nalpha (int): Number of alpha electrons
     nbeta (int): Number of beta electrons
 
+Each two-electron record holds the average over its 8-fold permutation class,
+which FCIDUMP readers copy to the whole class. Differences from that average up
+to 1e-5 of the largest integral are treated as round-off and averaged away.
+
 Raises:
     RuntimeError: If I/O error occurs, the Hamiltonian is unrestricted, or its
-        two-body integrals lack the 8-fold permutation symmetry that FCIDUMP
-        readers reconstruct.
-    ValueError: If the active space has differing alpha and beta sizes.
+        two-body integrals differ from their 8-fold average by more than that
+        tolerance.
+    ValueError: If the active space has differing alpha and beta sizes, or a
+        two-body integral is not finite.
 )",
       py::arg("filename"), py::arg("nalpha"), py::arg("nbeta"));
 
@@ -1044,10 +1058,16 @@ Args:
     nalpha (int): Number of alpha electrons.
     nbeta (int): Number of beta electrons.
 
+Each two-electron record holds the average over its 8-fold permutation class
+(unstored entries are zero), which FCIDUMP readers copy to the whole class.
+Differences from that average up to 1e-5 of the largest integral are treated as
+round-off and averaged away.
+
 Raises:
     RuntimeError: If I/O error occurs, the Hamiltonian is unrestricted, or its
-        two-body integrals lack the 8-fold permutation symmetry that FCIDUMP
-        readers reconstruct (unstored entries are zero).
+        two-body integrals differ from their 8-fold average by more than that
+        tolerance.
+    ValueError: If a two-body integral is not finite.
 )",
       py::arg("filename"), py::arg("nalpha"), py::arg("nbeta"));
 

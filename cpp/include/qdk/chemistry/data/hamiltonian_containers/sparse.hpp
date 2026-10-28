@@ -224,15 +224,18 @@ class SparseHamiltonianContainer : public HamiltonianContainer {
   /**
    * @brief Save Hamiltonian to an FCIDUMP file
    *
-   * Writes one record per 8-fold permutation class.
+   * Writes one record per 8-fold permutation class, holding the average over
+   * the class (unstored entries are zero).  FCIDUMP readers copy each record
+   * to its whole class, so differences from that average up to 1e-5 of the
+   * largest integral are treated as round-off and averaged away.
    *
    * @param filename Path to FCIDUMP file to create/overwrite
    * @param nalpha Number of alpha electrons
    * @param nbeta Number of beta electrons
    * @throws std::runtime_error if the Hamiltonian is unrestricted, its
-   *         two-body integrals lack the 8-fold permutation symmetry that
-   *         FCIDUMP readers reconstruct (unstored entries are zero), or the
-   *         file cannot be opened.
+   *         two-body integrals differ from their 8-fold average by more than
+   *         that tolerance, or the file cannot be opened.
+   * @throws std::invalid_argument if a two-body integral is not finite.
    */
   void to_fcidump_file(const std::string& filename, size_t nalpha,
                        size_t nbeta) const override;

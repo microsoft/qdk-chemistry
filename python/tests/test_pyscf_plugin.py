@@ -2602,6 +2602,25 @@ class TestPyscfPlugin:
         with pytest.raises(ValueError, match="8-fold" if defect == "fourfold" else "non-finite"):
             hamiltonian_to_scf(hamiltonian, occupation, occupation)
 
+    def test_hamiltonian_to_scf_passes_model_two_body_class_averages(self) -> None:
+        """PySCF keeps one value per 8-fold class, so a 4-fold part below the tolerance is averaged away."""
+        num_orbitals = 3
+        tensor = np.random.default_rng(706).normal(size=(num_orbitals,) * 4)
+        fourfold = (
+            tensor + tensor.transpose(2, 3, 0, 1) + tensor.transpose(1, 0, 3, 2) + tensor.transpose(3, 2, 1, 0)
+        ) / 4
+        eightfold = (fourfold + fourfold.transpose(1, 0, 2, 3)) / 2
+        perturbed = eightfold + 1e-6 * (fourfold - eightfold)
+        orbitals = data.ModelOrbitals(num_orbitals, SymmetryProduct([axes.spin(1, True)]))
+        hamiltonian = data.Hamiltonian(
+            data.CanonicalFourCenterHamiltonianContainer(
+                np.diag([-1.0, -0.5, 0.5]), perturbed.ravel(), orbitals, 0.0, np.eye(num_orbitals)
+            )
+        )
+        occupation = np.array([1.0, 0.0, 0.0])
+        mean_field = hamiltonian_to_scf(hamiltonian, occupation, occupation)
+        np.testing.assert_allclose(mean_field._eri, eightfold, atol=1e-14, rtol=0)
+
 
 class TestQDKChemistryPySCFBasisConversion:
     """Test suite for QDK/Chemistry-PySCF basis set conversion."""

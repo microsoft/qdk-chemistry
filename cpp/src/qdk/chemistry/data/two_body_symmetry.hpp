@@ -31,21 +31,25 @@ inline double max_abs(const double* values, std::size_t count) {
   return scale;
 }
 
-/// Permutation symmetry of a restricted or same-spin two-body tensor, in
-/// increasing strength.
+/// Permutation symmetry of a two-body tensor, in increasing strength.
 ///
 /// The three generators have different standing.  a+_p a+_r a_s a_q is
 /// invariant under (p,q) <-> (r,s), so the operator depends only on the
 /// bra-ket average gbar_pqrs = (g_pqrs + g_rspq) / 2: bra-ket symmetry is a
-/// gauge choice, not a property of the physics.  Given that average,
-/// (pq|rs) = (qp|sr) is exactly Hermiticity of the operator, and the
-/// independent bra swap (pq|rs) = (qp|rs) additionally requires real orbitals.
+/// gauge choice, not a property of the physics.  For a restricted tensor,
+/// which represents the spin-summed operator, (pq|rs) = (qp|sr) of that
+/// average is then exactly Hermiticity, and the independent bra swap
+/// (pq|rs) = (qp|rs) additionally requires real orbitals.  In a single
+/// same-spin block of unrestricted integrals, a+_p a+_r a_s a_q is also
+/// antisymmetric under q <-> s, so content symmetric under that swap cancels:
+/// there the classes below are sufficient but not necessary, and consumers use
+/// them only to choose an evaluation path, never to reject.
 ///
 /// Genuine electron-repulsion integrals over real orbitals therefore always
 /// reach `EightFold`.  `FourFold` is the general Hermitian two-body operator,
 /// which is what downfolding and effective-Hamiltonian constructions produce.
 enum class TwoBodySymmetry {
-  NonHermitian,        ///< gbar_pqrs != gbar_qpsr: no Hermitian operator
+  NonHermitian,        ///< gbar_pqrs != gbar_qpsr: non-Hermitian if restricted
   NotBraKetSymmetric,  ///< g_pqrs != g_rspq: Hermitian, but g != gbar
   FourFold,            ///< (pq|rs) = (qp|sr) = (rs|pq) = (sr|qp)
   EightFold,           ///< additionally (pq|rs) = (qp|rs) = (pq|sr)
@@ -152,8 +156,8 @@ inline void throw_unless_fourfold(TwoBodySymmetry symmetry,
   }
 }
 
-/// Rejects a restricted or same-spin tensor outside the fourfold group, and
-/// returns its classification (`FourFold` or `EightFold`).
+/// Rejects a restricted tensor outside the fourfold group, and returns its
+/// classification (`FourFold` or `EightFold`).
 inline TwoBodySymmetry require_fourfold_two_body(const double* integrals,
                                                  std::size_t n,
                                                  const std::string& consumer) {
@@ -392,6 +396,40 @@ inline std::array<TwoBodyKey, 8> eightfold_orbit(const TwoBodyKey& k) {
   return orbit;
 }
 
+/// Average of `at` over the eightfold class of `key`, i.e. the element at
+/// `key` of the nearest eightfold-symmetric tensor.  Consumers that keep one
+/// value per eightfold class (FCIDUMP, PySCF) store this average.  Every
+/// distinct position occurs equally often in the orbit, so averaging the
+/// eight images averages the distinct positions.
+template <class At>
+double eightfold_average(const TwoBodyKey& key, const At& at) {
+  double sum = 0.0;
+  for (const auto& position : eightfold_orbit(key)) sum += at(position);
+  return sum / 8.0;
+}
+
+/// Whether a row-major (pq|rs) tensor differs from its eightfold average by
+/// at most `relative_tolerance` times its largest element.  That difference
+/// is exactly what a consumer keeping one value per eightfold class
+/// discards.
+inline bool is_eightfold_within(const double* integrals, std::size_t n,
+                                double relative_tolerance) {
+  const double tolerance =
+      relative_tolerance * max_abs(integrals, n * n * n * n);
+  auto at = [integrals, n](const TwoBodyKey& k) {
+    return integrals[((k[0] * n + k[1]) * n + k[2]) * n + k[3]];
+  };
+  for (std::size_t p = 0; p < n; ++p)
+    for (std::size_t q = 0; q < n; ++q)
+      for (std::size_t r = 0; r < n; ++r)
+        for (std::size_t s = 0; s < n; ++s) {
+          const TwoBodyKey key{p, q, r, s};
+          if (std::abs(at(key) - eightfold_average(key, at)) > tolerance)
+            return false;
+        }
+  return true;
+}
+
 /// Literal sparse two-body tensor: positions that are absent are zero.
 using SparseTwoBodyTensor = std::map<TwoBodyKey, double>;
 
@@ -431,6 +469,28 @@ inline SparseTwoBodySymmetry classify_sparse_two_body_symmetry(
     }
   }
   return result;
+}
+
+/// Sparse counterpart of @ref is_eightfold_within, reading absent positions
+/// as zero.  Only classes with a stored member can differ from their average.
+inline bool sparse_is_eightfold_within(const SparseTwoBodyTensor& tensor,
+                                       double relative_tolerance) {
+  double scale = 0.0;
+  for (const auto& [key, value] : tensor) {
+    scale = std::max(scale, std::abs(value));
+  }
+  const double tolerance = relative_tolerance * scale;
+  auto at = [&tensor](const TwoBodyKey& key) {
+    const auto it = tensor.find(key);
+    return it == tensor.end() ? 0.0 : it->second;
+  };
+  for (const auto& [key, value] : tensor) {
+    const double average = eightfold_average(key, at);
+    for (const auto& position : eightfold_orbit(key)) {
+      if (std::abs(at(position) - average) > tolerance) return false;
+    }
+  }
+  return true;
 }
 
 /// Nonzero entries that are the only stored member of a larger eightfold

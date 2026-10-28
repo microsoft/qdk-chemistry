@@ -11,6 +11,7 @@
 #include <numeric>
 #include <qdk/chemistry/data/hamiltonian_containers/sparse.hpp>
 #include <qdk/chemistry/utils/logger.hpp>
+#include <set>
 #include <sstream>
 #include <stdexcept>
 #include <utility>
@@ -560,20 +561,25 @@ void SparseHamiltonianContainer::to_fcidump_file(const std::string& filename,
   }
 
   // Ordinary FCIDUMP readers reconstruct the eight permutations of every
-  // two-electron record, so the stored tensor must have 8-fold symmetry.
+  // two-electron record, so each record holds the average over its class, as
+  // in the dense writer.
   detail::SparseTwoBodyTensor tensor;
   if (has_two_body_integrals()) {
     for (const auto& [idx, value] : _two_body_sparse->block(
              {axes::alpha(), axes::alpha(), axes::alpha(), axes::alpha()})) {
+      if (!std::isfinite(value)) {
+        throw std::invalid_argument(
+            "FCIDUMP export: the two-body integrals contain a non-finite "
+            "value.");
+      }
       tensor.emplace(detail::TwoBodyKey{static_cast<std::size_t>(idx[0]),
                                         static_cast<std::size_t>(idx[1]),
                                         static_cast<std::size_t>(idx[2]),
                                         static_cast<std::size_t>(idx[3])},
                      value);
     }
-    if (detail::classify_sparse_two_body_symmetry(
-            tensor, detail::two_body_symmetry_tolerance)
-            .symmetry != detail::TwoBodySymmetry::EightFold) {
+    if (!detail::sparse_is_eightfold_within(
+            tensor, detail::two_body_symmetry_tolerance)) {
       throw std::runtime_error(
           "FCIDUMP export requires 8-fold two-body permutation symmetry; "
           "reduced-symmetry tensors cannot be represented losslessly.");
@@ -617,8 +623,16 @@ void SparseHamiltonianContainer::to_fcidump_file(const std::string& filename,
   };
 
   // One record per 8-fold class, in the dense writer's canonical order.
-  for (const auto& [key, val] : tensor) {
-    if (key != detail::eightfold_canonical(key)) continue;
+  auto at = [&tensor](const detail::TwoBodyKey& key) {
+    const auto it = tensor.find(key);
+    return it == tensor.end() ? 0.0 : it->second;
+  };
+  std::set<detail::TwoBodyKey> canonical_keys;
+  for (const auto& [key, value] : tensor) {
+    canonical_keys.insert(detail::eightfold_canonical(key));
+  }
+  for (const auto& key : canonical_keys) {
+    const double val = detail::eightfold_average(key, at);
     if (std::abs(val) < print_thresh) continue;
     formatted_line(key[0] + 1, key[1] + 1, key[2] + 1, key[3] + 1, val);
   }

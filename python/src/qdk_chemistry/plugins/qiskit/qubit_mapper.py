@@ -23,6 +23,7 @@ from qiskit_nature.second_q.mappers import (
 from qdk_chemistry.algorithms.qubit_mapper import QubitMapper, QubitMapperSettings
 from qdk_chemistry.data import Hamiltonian, QubitOperator
 from qdk_chemistry.data._spin_channels import spin_channel_indices
+from qdk_chemistry.data._two_body_symmetry import TWO_BODY_SYMMETRY_TOLERANCE
 from qdk_chemistry.data.enums.fermion_mode_order import FermionModeOrder
 from qdk_chemistry.data.symmetry import axes
 from qdk_chemistry.utils import Logger
@@ -37,9 +38,6 @@ _SUPPORTED_ENCODINGS: dict[str, type] = {
     "bravyi-kitaev": BravyiKitaevMapper,
     "parity": ParityMapper,
 }
-
-# Relative to the largest integral, as in the native mapper's symmetry checks.
-_TWO_BODY_SYMMETRY_TOLERANCE = 1e-5
 
 
 class QiskitQubitMapperSettings(QubitMapperSettings):
@@ -154,7 +152,7 @@ class QiskitQubitMapper(QubitMapper):
             )
         else:
             h2_ab_4d = h2_ab.reshape(num_orbs, num_orbs, num_orbs, num_orbs)
-            tolerance = _TWO_BODY_SYMMETRY_TOLERANCE * np.max(np.abs(h2_ab_4d), initial=0.0)
+            tolerance = TWO_BODY_SYMMETRY_TOLERANCE * np.max(np.abs(h2_ab_4d), initial=0.0)
             if not np.allclose(h2_ab_4d, h2_ab_4d.transpose(1, 0, 3, 2), rtol=0.0, atol=tolerance):
                 raise ValueError(
                     "The alpha-beta two-body integrals violate (pq|rs) = (qp|sr), so they define a "
