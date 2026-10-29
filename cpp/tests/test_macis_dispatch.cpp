@@ -40,6 +40,11 @@ TEST(MacisDispatchTest, ThresholdTableSupportsUpTo2048Orbitals) {
   EXPECT_EQ(dispatch_by_norb<test_support::DispatchProbe>(32), 128u);
   EXPECT_EQ(dispatch_by_norb<test_support::DispatchProbe>(127), 256u);
   EXPECT_EQ(dispatch_by_norb<test_support::DispatchProbe>(255), 512u);
+  EXPECT_EQ(dispatch_by_norb<test_support::DispatchProbe>(256), 640u);
+  EXPECT_EQ(dispatch_by_norb<test_support::DispatchProbe>(319), 640u);
+  EXPECT_EQ(dispatch_by_norb<test_support::DispatchProbe>(320), 768u);
+  EXPECT_EQ(dispatch_by_norb<test_support::DispatchProbe>(383), 768u);
+  EXPECT_EQ(dispatch_by_norb<test_support::DispatchProbe>(384), 1024u);
   EXPECT_EQ(dispatch_by_norb<test_support::DispatchProbe>(511), 1024u);
   EXPECT_EQ(dispatch_by_norb<test_support::DispatchProbe>(1023), 2048u);
   EXPECT_EQ(dispatch_by_norb<test_support::DispatchProbe>(1024), 4096u);

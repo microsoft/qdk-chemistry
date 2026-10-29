@@ -117,6 +117,24 @@ class HamiltonianGeneratorBase {
   inline auto* V() const { return V_pqrs_.data_handle(); }
 
   /**
+   * @brief Get pointer to doubly reduced antisymmetrized integral data
+   * @return Pointer to the underlying data of G2_red_data_
+   */
+  inline auto* G2_red() const { return G2_red_data_.data(); }
+
+  /**
+   * @brief Get pointer to doubly reduced two-electron integral data
+   * @return Pointer to the underlying data of V2_red_data_
+   */
+  inline auto* V2_red() const { return V2_red_data_.data(); }
+
+  /**
+   * @brief Get the number of orbitals
+   * @return Number of orbitals of the stored integrals
+   */
+  inline size_t norb() const { return norb_; }
+
+  /**
    * @brief Generate integral intermediates using the stored two-electron
    * integrals
    */

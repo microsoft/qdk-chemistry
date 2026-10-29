@@ -134,14 +134,14 @@ export(EXPORT sparsexx-targets
 # Install staic headers
 install(
   DIRECTORY   ${PROJECT_SOURCE_DIR}/include
-  DESTINATION ${CMAKE_INSTALL_PREFIX}
+  DESTINATION .
   FILES_MATCHING PATTERN "*.hpp"
 )
 
 # Install generated headers
 install(
   FILES       ${PROJECT_BINARY_DIR}/include/sparsexx/sparsexx_config.hpp
-  DESTINATION ${CMAKE_INSTALL_PREFIX}/include/sparsexx
+  DESTINATION include/sparsexx
 )
 
 

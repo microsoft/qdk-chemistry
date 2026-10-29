@@ -34,6 +34,8 @@ namespace macis {
  * @param[in,out] ham_gen Hamiltonian generator containing integrals and methods
  * @param[in] norb Number of molecular orbitals
  * @param[in] comm MPI communicator for parallel execution (MPI builds only)
+ * @param[in,out] execution Optional borrowed numerical executor; null selects
+ * CPU
  *
  * @return Tuple containing:
  *   - Final converged energy
@@ -46,7 +48,8 @@ template <size_t N, typename index_t = int32_t>
 auto asci_grow(ASCISettings asci_settings, MCSCFSettings mcscf_settings,
                double E0, std::vector<wfn_t<N>> wfn, std::vector<double> X,
                HamiltonianGenerator<wfn_t<N>>& ham_gen,
-               size_t norb MACIS_MPI_CODE(, MPI_Comm comm)) {
+               size_t norb MACIS_MPI_CODE(, MPI_Comm comm),
+               ASCIExecutionContext<N>* execution = nullptr) {
 #ifdef MACIS_ENABLE_MPI
   auto world_rank = comm_rank(comm);
   auto world_size = comm_size(comm);
@@ -128,7 +131,7 @@ auto asci_grow(ASCISettings asci_settings, MCSCFSettings mcscf_settings,
     auto ai_st = hrt_t::now();
     std::tie(E, wfn, X) = asci_iter<N, index_t>(
         asci_settings, grow_mcscf, ndets_new, E0, std::move(wfn), std::move(X),
-        ham_gen, norb, &h_cache MACIS_MPI_CODE(, comm));
+        ham_gen, norb, &h_cache MACIS_MPI_CODE(, comm), execution);
     auto ai_en = hrt_t::now();
     dur_t ai_dur = ai_en - ai_st;
     logger->trace("  * ASCI_ITER_DUR = {:.2e} ms", ai_dur.count());
@@ -217,14 +220,22 @@ auto asci_grow(ASCISettings asci_settings, MCSCFSettings mcscf_settings,
 
       // Rotation invalidates cached H (integrals changed)
       h_cache.clear();
+      if (execution) execution->update_integrals(ham_gen);
 
       logger->trace("  * Rediagonalizing");
       auto rdg_st = hrt_t::now();
       std::vector<double> X_local;
-      selected_ci_diag<index_t>(
-          wfn.begin(), wfn.end(), ham_gen, mcscf_settings.ci_matel_tol,
-          mcscf_settings.ci_max_subspace, mcscf_settings.ci_res_tol,
-          X_local MACIS_MPI_CODE(, comm));
+      if (execution) {
+        ASCIExecutionGuard<N> execution_guard(execution);
+        execution->start_diagonalization(wfn.begin(), wfn.end(), ham_gen,
+                                         mcscf_settings);
+        execution->finish_diagonalization(X_local);
+      } else {
+        selected_ci_diag<index_t>(
+            wfn.begin(), wfn.end(), ham_gen, mcscf_settings.ci_matel_tol,
+            mcscf_settings.ci_max_subspace, mcscf_settings.ci_res_tol,
+            X_local MACIS_MPI_CODE(, comm));
+      }
 
       if (world_size > 1) {
 #ifdef MACIS_ENABLE_MPI
