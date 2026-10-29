@@ -25,11 +25,8 @@ class ControlledHubbardPlaquetteMapperSettings(ControlledCircuitMapperSettings):
             Defaults to ``True``.
         max_hamming_weight_phasing_batch_size: Largest tower of equal-angle rotations phased
             through one Hamming-weight register, or ``-1`` for no cap.
-            A smaller cap needs fewer scratch qubits but more rotations, and with the catalyst more
-            Toffolis too, as each batch takes its own addition.
-            Every batch is phased as given, so on the ``Rz`` ladder (``hamming_weight_phasing_method``
-            ``"rz_ladder"``) use a cap of at least 8, as shorter batches save too few rotations to be
-            worth the extra Toffolis and scratch qubits.
+            A smaller cap needs fewer scratch qubits, and a cap one below a power of two, such as 7 or
+            15, saves a place value per batch.
             Ignored when ``use_hamming_weight_phasing`` is ``False``.
             Defaults to ``-1``.
         hamming_weight_phasing_method: How each Hamming weight is phased: ``"catalyst"`` adds it into
@@ -56,11 +53,9 @@ class ControlledHubbardPlaquetteMapperSettings(ControlledCircuitMapperSettings):
             "int",
             -1,
             "Largest tower of equal-angle rotations phased through one Hamming-weight register. "
-            "A smaller cap needs fewer scratch qubits but more rotations, and with the catalyst more "
-            "Toffolis too, as each batch takes its own addition. Every batch is phased as given, so "
-            "on the Rz ladder (hamming_weight_phasing_method 'rz_ladder') use a cap of at least 8, "
-            "as shorter batches save too few rotations to be worth the extra Toffolis and scratch "
-            "qubits. Ignored when use_hamming_weight_phasing is False. Set to -1 for no cap.",
+            "A smaller cap needs fewer scratch qubits, and a cap one below a power of two, such as 7 "
+            "or 15, saves a place value per batch. Ignored when use_hamming_weight_phasing is False. "
+            "Set to -1 for no cap.",
         )
         self._set_default(
             "hamming_weight_phasing_method",
