@@ -8,6 +8,7 @@
 
 #include <Eigen/Dense>
 #include <algorithm>
+#include <cmath>
 #include <iostream>
 #include <limits>
 #include <memory>
@@ -23,6 +24,7 @@
 #include <stdexcept>
 #include <vector>
 
+#include "../src/qdk/chemistry/algorithms/microsoft/scf/src/scf_algorithm/line_search.h"
 #include "../src/qdk/chemistry/algorithms/microsoft/utils.hpp"
 #include "ut_common.hpp"
 
@@ -31,6 +33,97 @@ using namespace qdk::chemistry::algorithms;
 using namespace qdk::chemistry::utils;
 
 namespace qdk::chemistry::scf {
+
+namespace {
+struct LineSearchQuadratic {
+  using argument_type = Eigen::VectorXd;
+  using return_type = double;
+
+  double energy_offset = 0.0;
+  double trial_energy_error = 0.0;
+  argument_type initial_point = argument_type::Constant(1, 1e-8);
+  argument_type stiffness = argument_type::Ones(1);
+
+  double eval(const argument_type& x) const {
+    const double error =
+        (x.array() != initial_point.array()).any() ? trial_energy_error : 0.0;
+    return energy_offset + 0.5 * x.dot(stiffness.cwiseProduct(x)) + error;
+  }
+
+  argument_type grad(const argument_type& x) const {
+    return stiffness.cwiseProduct(x);
+  }
+
+  static double dot(const argument_type& x, const argument_type& y) {
+    return x.dot(y);
+  }
+
+  static void axpy(double alpha, const argument_type& x, argument_type& y) {
+    y += alpha * x;
+  }
+};
+}  // namespace
+
+TEST(LineSearchTest, AcceptsRoundoffLimitedStepInBracketingAndZoom) {
+  LineSearchQuadratic objective;
+  objective.energy_offset = -3.0;
+  const double ulp =
+      std::nextafter(-3.0, std::numeric_limits<double>::infinity()) + 3.0;
+  for (double energy_error : {0.0, ulp}) {
+    objective.trial_energy_error = energy_error;
+    for (double initial_step : {1.0, 3.0}) {
+      SCOPED_TRACE(energy_error);
+      SCOPED_TRACE(initial_step);
+      double step = initial_step;
+      double energy = objective.eval(objective.initial_point);
+      Eigen::VectorXd gradient = objective.grad(objective.initial_point);
+      const Eigen::VectorXd direction = -gradient;
+      Eigen::VectorXd point;
+      impl::nocedal_wright_line_search(objective, objective.initial_point,
+                                       direction, step, point, energy,
+                                       gradient);
+      EXPECT_LE(energy, objective.energy_offset + ulp);
+      EXPECT_LE(gradient.norm(),
+                0.9 * objective.grad(objective.initial_point).norm());
+      EXPECT_GT((point - objective.initial_point).norm(), 0.0);
+    }
+  }
+}
+
+TEST(LineSearchTest, RejectsInvalidTrialEnergies) {
+  LineSearchQuadratic objective;
+  objective.energy_offset = -3.0;
+  for (double error : {1e-6, std::numeric_limits<double>::quiet_NaN(),
+                       std::numeric_limits<double>::infinity()}) {
+    SCOPED_TRACE(error);
+    objective.trial_energy_error = error;
+    double step = 1.0;
+    double energy = objective.eval(objective.initial_point);
+    Eigen::VectorXd gradient = objective.grad(objective.initial_point);
+    const Eigen::VectorXd direction = -gradient;
+    Eigen::VectorXd point;
+    EXPECT_THROW(impl::nocedal_wright_line_search(
+                     objective, objective.initial_point, direction, step, point,
+                     energy, gradient),
+                 std::runtime_error);
+  }
+}
+
+TEST(LineSearchTest, RejectsRoundoffStepWithFullGradientGrowth) {
+  LineSearchQuadratic objective;
+  objective.energy_offset = -3.0;
+  objective.initial_point = Eigen::Vector2d(1e-8, 0.0);
+  objective.stiffness = Eigen::Vector2d(1.0, 100.0);
+  const Eigen::VectorXd direction = Eigen::Vector2d(-1e-8, 5e-10);
+  double step = 1.0;
+  double energy = objective.eval(objective.initial_point);
+  Eigen::VectorXd gradient = objective.grad(objective.initial_point);
+  Eigen::VectorXd point;
+  EXPECT_THROW(impl::nocedal_wright_line_search(
+                   objective, objective.initial_point, direction, step, point,
+                   energy, gradient),
+               std::runtime_error);
+}
 
 TEST(QrPseudoinverseTest, SquareAndRectangularFockRoundTrips) {
   RowMajorMatrix coefficients(5, 3);
