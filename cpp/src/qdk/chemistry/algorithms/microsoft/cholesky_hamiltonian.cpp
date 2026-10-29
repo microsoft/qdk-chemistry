@@ -509,6 +509,8 @@ Eigen::MatrixXd transform_cholesky_to_mo(
     // Write directly to output column
     Eigen::Map<Eigen::MatrixXd> V_mo_map(mo_vectors.col(k).data(), n_mo, n_mo);
     V_mo_map.noalias() = mo_coeffs.transpose() * V_ao * mo_coeffs;
+    // Symmetric in exact arithmetic; make the rounded result symmetric too
+    V_mo_map = (0.5 * (V_mo_map + V_mo_map.transpose())).eval();
   }
 
   return mo_vectors;

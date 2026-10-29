@@ -17,7 +17,8 @@ namespace detail {
  * @param ao_cholesky_vectors The AO Cholesky vectors (rows = N_ao*N_ao, cols =
  * N_vectors).
  * @param mo_coeffs The MO coefficient matrix (rows = N_ao, cols = N_mo).
- * @return The MO Cholesky vectors (rows = N_mo*N_mo, cols = N_vectors).
+ * @return The MO Cholesky vectors (rows = N_mo*N_mo, cols = N_vectors), with
+ * L_{ij}^k == L_{ji}^k exactly.
  */
 Eigen::MatrixXd transform_cholesky_to_mo(
     const Eigen::MatrixXd& ao_cholesky_vectors,
