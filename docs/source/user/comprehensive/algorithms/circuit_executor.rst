@@ -163,13 +163,16 @@ A full-state simulator that supports CPU, GPU, and Clifford simulation modes, wi
      - Random seed for reproducibility. Default is 42.
    * - ``allow_external_qir``
      - bool
-     - Permit directly supplied or deserialized QIR from trusted producers. Default is ``False``.
+     - Permit QIR from any external source without verifying provenance. Default is ``False``.
 
 QIR supplied through ``Circuit(qir=...)`` or restored from a file requires
 ``executor.settings().set("allow_external_qir", True)`` before full-state
-execution. Only enable this for trusted producers: native QIR execution is not
-a sandbox. QIR compiled internally from OpenQASM or a Q# factory does not
-require this opt-in. Serialization remains available without enabling execution.
+execution. Enabling it accepts QIR from any external source; the executor does
+not verify its provenance or safety. The caller is responsible for deciding
+whether to trust the producer. Execution is not sandboxed, so malicious QIR can
+compromise the executing process. QIR compiled internally from OpenQASM or a
+Q# factory does not require this opt-in. Serialization remains available without
+enabling execution.
 
 
 Qiskit Aer simulator

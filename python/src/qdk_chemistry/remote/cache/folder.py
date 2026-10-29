@@ -49,10 +49,10 @@ def _resolve_dataclass_type(type_name: str) -> type[DataClass] | None:
 class FolderCache(CacheBackend):
     """Content-addressed folder cache.
 
-    Cache paths, including nested references, must remain within the cache root.
-    These checks do not authenticate manifests or make serialized objects safe
-    to load from an untrusted writer. Every writer must be trusted to supply
-    both serialized objects and results, including inline manifest values.
+    Paths are checked for containment, not writer identity or payload provenance.
+    The caller is responsible for controlling write access and trusting writers:
+    they can forge results, including inline values, or replace serialized objects
+    passed to native loaders. These checks do not make attacker-written data safe.
 
     Args:
         path: Directory to use as the cache root.  Created on first write.

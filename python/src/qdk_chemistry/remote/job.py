@@ -210,9 +210,11 @@ class Job:
     def load(cls, path: str | pathlib.Path) -> Job:
         """Reconstruct a ``Job`` from a previously saved file.
 
-        Connections use trusted runtime configuration, not saved backend
-        parameters. Attach a configured backend with :meth:`attach_backend`
-        when a custom connection is required.
+        Connections use current runtime configuration, not saved backend
+        parameters. For custom connections, use :meth:`attach_backend`.
+        The caller is responsible for trusting that configuration or backend:
+        it selects authenticated request destinations, and its trustworthiness
+        is not verified.
 
         Args:
             path: Path to a ``*.job.json`` file.

@@ -30,41 +30,49 @@ methods (e.g., `to_json_file()` / `from_json_file()`, `to_hdf5_file()` /
 
 ### Shared Caches and Remote Jobs
 
-Load serialized objects and execute remote job manifests only from trusted
-producers. JSON and HDF5 files, cache filenames, content hashes, and job owner
-metadata do not authenticate their writers. A content-hash comparison after
-loading does not protect the native parser that reads the file.
+The caller and deployment operator are responsible for deciding which producers
+and writers to trust and for controlling write access. QDK/Chemistry does not
+authenticate writers or verify their trustworthiness. JSON and HDF5 files,
+cache filenames, content hashes, and job owner metadata do not establish that
+trust. A content-hash comparison after loading does not protect the native
+parser that reads the file.
 
-Every principal with write access to a cache or job directory must be trusted
-to supply results, serialized objects, and algorithm settings. This includes
-results stored inline in JSON manifests. `is_shared=True` means storage is
-reachable from client and worker machines; it does not isolate mutually
+A writer to a cache or job directory can forge results, including inline JSON
+values, replace serialized objects, or select algorithms and settings for a
+worker to execute. `is_shared=True` means storage is reachable from client and
+worker machines; it does not verify access permissions or isolate mutually
 untrusted tenants.
 
-Restrict write access to the submitting application and its trusted workers.
-Use separate storage and access permissions for different trust groups, and
-protect input and output directories throughout transfer and execution.
-Do not use a common writable cache as a security boundary between tenants.
-Deployments that require less-trusted writers need authentication before
-deserialization, including protected verification keys provisioned separately
-from the writable data.
+Operators are responsible for restricting write access to their chosen
+submitters and workers, separating different trust groups, and protecting
+input/output directories during transfer and execution. Applications accepting
+less-trusted writers are responsible for authenticating manifests and payloads
+before deserialization and protecting verification keys separately from the
+writable data. QDK/Chemistry does not provide that authentication protocol.
 
-Saved jobs retain backend configuration as metadata, but reconnect using trusted
-runtime configuration. Attach an explicitly configured backend when restoring
-a custom connection. This does not authenticate the saved job's remaining
-metadata or payloads.
+Saved jobs retain backend configuration as metadata, but reconnect using current
+runtime configuration. Callers choose that configuration or attach an explicitly
+configured backend for a custom connection. Its trustworthiness is not verified;
+it determines the destinations of authenticated requests. The saved job's
+remaining metadata and payloads are not authenticated either.
 
 ### Executable Circuits
 
 QIR is executable program input, not a sandboxed interchange format. The QDK
 full-state executor requires `allow_external_qir=True` for directly supplied
-QIR and QIR restored from serialized circuits. Enable it only for trusted
-producers. This opt-in neither authenticates inputs nor isolates their execution.
-OpenQASM and Q# factory circuits compiled internally do not require the opt-in.
+QIR and QIR restored from serialized circuits. Enabling it permits QIR from
+any external source without verifying provenance or safety. The caller is
+responsible for deciding whether to trust the producer; malicious QIR can
+compromise the executing process. This opt-in neither authenticates inputs nor
+isolates their execution. OpenQASM and Q# factory circuits compiled internally
+do not require the opt-in.
 
 ### Stub Generation
 
 The optional import-time stub generator is resolved before the target package
 directory is added to module lookup, and runs from a private temporary directory.
-Installed dependencies and package code must still be writable only by trusted
-principals.
+The caller and deployment operator are responsible for trusting installed
+dependencies, interpreter search paths, and package code, and for controlling
+who can modify them. The generator helper does not verify that trust or those
+permissions; modifications can execute code with the importing application's
+privileges.

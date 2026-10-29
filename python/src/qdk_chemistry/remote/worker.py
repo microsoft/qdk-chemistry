@@ -166,8 +166,9 @@ def _store_cached_result(
 def execute_job(input_dir: str | Path, output_dir: str | Path) -> Any:
     """Execute one serialized algorithm job and write its serialized result.
 
-    The input directory and referenced cache must be writable only by trusted
-    submitters and workers: the manifest selects executable algorithms and loaders.
+    The caller is responsible for trusting input/cache writers and controlling
+    write access; the worker does not verify either. Writers can substitute data
+    or select algorithms and settings executed by this process.
 
     Args:
         input_dir: Directory containing serialized algorithm inputs.
