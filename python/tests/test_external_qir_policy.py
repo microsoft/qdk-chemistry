@@ -43,7 +43,7 @@ def test_external_qir_is_rejected_before_execution(external_circuit, monkeypatch
 
 
 def test_external_qir_accepts_explicit_opt_in(external_circuit, monkeypatch):
-    """A trusted caller can explicitly authorize external QIR execution."""
+    """Enabling the setting permits QIR without authenticating its source."""
     run_qir = Mock(return_value=[["Zero"]])
     monkeypatch.setattr(executor_module, "run_qir", run_qir)
     executor = executor_module.QdkFullStateSimulator()

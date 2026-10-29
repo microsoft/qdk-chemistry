@@ -81,7 +81,7 @@ class QdkFullStateSimulatorSettings(Settings):
             "allow_external_qir",
             "bool",
             False,
-            "Allow directly supplied or deserialized QIR from trusted producers",
+            "Allow QIR from any external source; source trust is the caller's responsibility and is not verified",
         )
 
 
@@ -126,7 +126,8 @@ class QdkFullStateSimulator(CircuitExecutor):
         if circuit.has_external_qir and not self._settings.get("allow_external_qir"):
             raise ValueError(
                 "Executing directly supplied or deserialized QIR requires "
-                "allow_external_qir=True. Enable it only for trusted producers."
+                "allow_external_qir=True. Sources are not verified and execution is not "
+                "sandboxed; the caller is responsible for trusting the producer."
             )
         qir = circuit.get_qir()
         Logger.debug("QIR compiled")

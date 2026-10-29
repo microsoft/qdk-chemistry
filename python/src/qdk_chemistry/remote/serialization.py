@@ -215,9 +215,9 @@ class FileSerializer:
     serializable values. Nested algorithm references remain supported through
     their tagged settings representation.
 
-    Manifests and payload files must come from trusted producers. Type tags
-    select registered loaders; neither those tags nor content hashes authenticate
-    the files before native deserialization.
+    The caller is responsible for trusting manifest and payload producers.
+    This serializer does not authenticate them: altered manifests can substitute
+    values or select a registered loader, including native parsers, for modified files.
 
     Each data class is serialized to its own .{type_name}.h5 file, and each
     NumPy array to its own .ndarray.npy file. Primitives and simple types are
