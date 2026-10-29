@@ -140,7 +140,7 @@ without ``layer_offsets`` raises a :class:`ValueError`. Phasing is off by defaul
      - Whether to phase each layer's equal-angle rotations through Hamming-weight registers. Pays off only when layers hold many equal angles. Default is False.
    * - ``max_hamming_weight_phasing_batch_size``
      - int
-     - Largest batch phased through one register; -1 (default) means no cap. A smaller cap needs fewer scratch qubits but more rotations; use at least 8, as smaller batches save too few rotations. Ignored when phasing is off.
+     - Largest batch phased through one register; -1 (default) means no cap. A smaller cap needs fewer scratch qubits, and a cap one below a power of two, such as 7 or 15, saves a place value per batch. Ignored when phasing is off.
 
 .. _cswap-pauli-sequence-mapper:
 
@@ -218,7 +218,7 @@ uncontrolled, since the swap sandwich supplies the control.
      - Whether to phase each layer's equal-angle rotations through Hamming-weight registers. Pays off only when layers hold many equal angles. Default is False.
    * - ``max_hamming_weight_phasing_batch_size``
      - int
-     - Largest batch phased through one register; -1 (default) means no cap. A smaller cap needs fewer scratch qubits but more rotations; use at least 8, as smaller batches save too few rotations. Ignored when phasing is off.
+     - Largest batch phased through one register; -1 (default) means no cap. A smaller cap needs fewer scratch qubits, and a cap one below a power of two, such as 7 or 15, saves a place value per batch. Ignored when phasing is off.
    * - ``vacuum_preservation_tolerance``
      - float
      - Absolute tolerance on the total amplitude the full evolution may leak out of the vacuum (default ``1e-9``).
