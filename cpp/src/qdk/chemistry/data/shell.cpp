@@ -9,6 +9,8 @@
 #include <qdk/chemistry/data/shell.hpp>
 #include <qdk/chemistry/utils/logger.hpp>
 
+#include "basis_library.hpp"
+
 namespace qdk::chemistry::data {
 
 namespace {
@@ -93,7 +95,15 @@ Shell Shell::from_json(const nlohmann::json& json, const size_t atom_index,
   return Shell(atom_index, type, exponents, coefficients);
 }
 
+namespace detail {
+
 void sort_shells_inplace(std::vector<Shell>& shells) {
+  if (std::any_of(shells.begin(), shells.end(), [](const Shell& shell) {
+        return shell.get_num_primitives() == 0;
+      })) {
+    throw std::invalid_argument("Cannot sort a shell with no primitives");
+  }
+
   auto sort_shell_primitives = [](Shell& shell) {
     std::vector<size_t> indices(shell.get_num_primitives());
     std::iota(indices.begin(), indices.end(), 0);
@@ -173,6 +183,8 @@ size_t count_orbitals(const ShellsPerAtom& shells_per_atom,
   }
   return result;
 }
+
+}  // namespace detail
 
 std::string orbital_type_to_string(const OrbitalType orbital_type) {
   switch (orbital_type) {

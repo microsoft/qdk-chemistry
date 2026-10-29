@@ -375,9 +375,9 @@ std::shared_ptr<BasisSet> BasisSet::from_basis_name(
   }
 
   // sort basis shells
-  sort_shells_inplace(all_basis_shells);
+  detail::sort_shells_inplace(all_basis_shells);
   // sort ecp shells
-  sort_shells_inplace(all_ecp_shells);
+  detail::sort_shells_inplace(all_ecp_shells);
 
   return std::make_shared<BasisSet>(basis_name, all_basis_shells, basis_name,
                                     all_ecp_shells, all_ecp_electrons,
@@ -462,9 +462,9 @@ std::shared_ptr<BasisSet> BasisSet::from_index_map(
   }
 
   // sort basis shells
-  sort_shells_inplace(all_basis_shells);
+  detail::sort_shells_inplace(all_basis_shells);
   // sort ecp shells
-  sort_shells_inplace(all_ecp_shells);
+  detail::sort_shells_inplace(all_ecp_shells);
 
   return std::make_shared<BasisSet>(
       std::string(BasisSet::custom_name), all_basis_shells,
@@ -521,7 +521,7 @@ AOType BasisSet::get_atomic_orbital_type() const {
 
 std::vector<Shell> BasisSet::get_shells() const {
   QDK_LOG_TRACE_ENTERING();
-  return flatten_shells(_shells_per_atom);
+  return detail::flatten_shells(_shells_per_atom);
 }
 
 const std::vector<Shell>& BasisSet::get_shells_for_atom(
@@ -566,7 +566,7 @@ size_t BasisSet::get_num_atoms() const {
 
 std::vector<Shell> BasisSet::get_ecp_shells() const {
   QDK_LOG_TRACE_ENTERING();
-  return flatten_shells(_ecp_shells_per_atom);
+  return detail::flatten_shells(_ecp_shells_per_atom);
 }
 
 const std::vector<Shell>& BasisSet::get_ecp_shells_for_atom(
@@ -603,7 +603,7 @@ const Shell& BasisSet::get_ecp_shell(size_t shell_index) const {
 
 size_t BasisSet::get_num_ecp_shells() const {
   QDK_LOG_TRACE_ENTERING();
-  return count_shells(_ecp_shells_per_atom);
+  return detail::count_shells(_ecp_shells_per_atom);
 }
 
 bool BasisSet::has_ecp_shells() const {

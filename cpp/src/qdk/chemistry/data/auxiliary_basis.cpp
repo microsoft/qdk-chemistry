@@ -101,10 +101,10 @@ AuxiliaryBasis::AuxiliaryBasis(std::string name, std::vector<Shell> shells,
     }
   }
 
-  _shells_per_atom = group_shells_by_atom(shells, _structure->get_num_atoms(),
-                                          "Auxiliary shell");
+  _shells_per_atom = detail::group_shells_by_atom(
+      shells, _structure->get_num_atoms(), "Auxiliary shell");
   for (auto& atom_shells : _shells_per_atom) {
-    sort_shells_inplace(atom_shells);
+    detail::sort_shells_inplace(atom_shells);
   }
   _validate();
 }
@@ -120,7 +120,7 @@ std::shared_ptr<Structure> AuxiliaryBasis::get_structure() const {
 }
 
 std::vector<Shell> AuxiliaryBasis::get_shells() const {
-  return flatten_shells(_shells_per_atom);
+  return detail::flatten_shells(_shells_per_atom);
 }
 
 const std::vector<Shell>& AuxiliaryBasis::get_shells_for_atom(
@@ -145,13 +145,13 @@ const Shell& AuxiliaryBasis::get_shell(const size_t shell_index) const {
 }
 
 size_t AuxiliaryBasis::get_num_shells() const {
-  return count_shells(_shells_per_atom);
+  return detail::count_shells(_shells_per_atom);
 }
 
 size_t AuxiliaryBasis::get_num_atoms() const { return _shells_per_atom.size(); }
 
 size_t AuxiliaryBasis::get_num_auxiliary_orbitals() const {
-  return count_orbitals(_shells_per_atom, _atomic_orbital_type);
+  return detail::count_orbitals(_shells_per_atom, _atomic_orbital_type);
 }
 
 std::shared_ptr<AuxiliaryBasis> AuxiliaryBasis::from_basis_name(

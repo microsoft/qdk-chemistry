@@ -450,14 +450,13 @@ Args:
     atom_index (int): Index of the atom
 
 Returns:
-    list[Shell]: Vector of shells for the specified atom
+    list[Shell]: Copies of the shells for the specified atom. Modifying them does not change the basis set
 
 Examples:
     >>> atom_shells = basis_set.get_shells_for_atom(0)
     >>> print(f"Atom 0 has {len(atom_shells)} shells")
 )",
-                py::arg("atom_index"),
-                py::return_value_policy::reference_internal);
+                py::arg("atom_index"), py::return_value_policy::copy);
 
   basis_set.def("get_shell", &BasisSet::get_shell,
                 R"(
@@ -467,7 +466,7 @@ Args:
     shell_index (int): Global index of the shell
 
 Returns:
-    Shell: Reference to the specified shell
+    Shell: Copy of the specified shell. Modifying it does not change the basis set
 
 Raises:
     IndexError: If shell index is out of range
@@ -476,8 +475,7 @@ Examples:
     >>> shell = basis_set.get_shell(0)
     >>> print(f"First shell type: {shell.orbital_type}")
 )",
-                py::arg("shell_index"),
-                py::return_value_policy::reference_internal);
+                py::arg("shell_index"), py::return_value_policy::copy);
 
   basis_set.def("get_num_shells", &BasisSet::get_num_shells,
                 R"(
@@ -524,14 +522,13 @@ Args:
     atom_index (int): Index of the atom
 
 Returns:
-    list[Shell]: Vector of ECP shells for the specified atom
+    list[Shell]: Copies of the ECP shells for the specified atom. Modifying them does not change the basis set
 
 Examples:
     >>> ecp_atom_shells = basis_set.get_ecp_shells_for_atom(0)
     >>> print(f"Atom 0 has {len(ecp_atom_shells)} ECP shells")
 )",
-                py::arg("atom_index"),
-                py::return_value_policy::reference_internal);
+                py::arg("atom_index"), py::return_value_policy::copy);
 
   basis_set.def("get_ecp_shell", &BasisSet::get_ecp_shell,
                 R"(
@@ -541,7 +538,7 @@ Args:
     shell_index (int): Global index of the ECP shell
 
 Returns:
-    Shell: Reference to the specified ECP shell
+    Shell: Copy of the specified ECP shell. Modifying it does not change the basis set
 
 Raises:
     IndexError: If ECP shell index is out of range
@@ -550,8 +547,7 @@ Examples:
     >>> ecp_shell = basis_set.get_ecp_shell(0)
     >>> print(f"First ECP shell has {ecp_shell.get_num_primitives()} primitives")
 )",
-                py::arg("shell_index"),
-                py::return_value_policy::reference_internal);
+                py::arg("shell_index"), py::return_value_policy::copy);
 
   basis_set.def("get_num_ecp_shells", &BasisSet::get_num_ecp_shells,
                 R"(

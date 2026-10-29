@@ -21,6 +21,10 @@ static_assert(std::is_copy_constructible_v<AuxiliaryBasis>);
 static_assert(!std::is_copy_assignable_v<AuxiliaryBasis>);
 static_assert(!std::is_move_assignable_v<AuxiliaryBasis>);
 
+static_assert(std::is_copy_constructible_v<AuxiliaryBasisCollection>);
+static_assert(!std::is_copy_assignable_v<AuxiliaryBasisCollection>);
+static_assert(!std::is_move_assignable_v<AuxiliaryBasisCollection>);
+
 class AuxiliaryBasisTest : public ::testing::Test {
  protected:
   static constexpr const char* json_filename = "test.auxiliary_basis.json";
@@ -427,6 +431,27 @@ TEST_F(AuxiliaryBasisTest, ConstructionFromSharedValuesPreservesCollection) {
   EXPECT_EQ(hash, collection.content_hash());
   EXPECT_EQ(hash, AuxiliaryBasisCollection::from_json(collection.to_json())
                       ->content_hash());
+}
+
+TEST_F(AuxiliaryBasisTest, ConstructionFromSharedCollectionPreservesAliases) {
+  auto basis = std::make_shared<AuxiliaryBasis>("shared", make_shells(),
+                                                make_structure());
+  auto collection = std::make_shared<AuxiliaryBasisCollection>(
+      AuxiliaryBasisCollection::Map{{AuxiliaryBasisRole::JFit, basis}});
+  auto retained = collection;
+  const auto hash = collection->content_hash();
+  const auto json = collection->to_json();
+
+  AuxiliaryBasisCollection copied(*collection);
+  AuxiliaryBasisCollection from_rvalue(std::move(*collection));
+
+  for (const auto* value :
+       {collection.get(), retained.get(), &copied, &from_rvalue}) {
+    EXPECT_EQ(hash, value->content_hash());
+    EXPECT_EQ(json, value->to_json());
+    ASSERT_EQ(1u, value->get_auxiliary_bases().size());
+    EXPECT_EQ(basis, value->get_auxiliary_basis(AuxiliaryBasisRole::JFit));
+  }
 }
 
 TEST_F(AuxiliaryBasisTest, CollectionRejectsInvalidEntries) {

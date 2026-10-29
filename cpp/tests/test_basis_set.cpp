@@ -16,6 +16,7 @@
 #include <string>
 #include <vector>
 
+#include "qdk/chemistry/data/basis_library.hpp"
 #include "ut_common.hpp"
 
 #define EXPECT_STRING_CONTAINS(str, query)                            \
@@ -80,7 +81,7 @@ TEST_F(BasisSetTest, ShellSortingPreservesEqualExponentPrimitiveOrder) {
                       std::vector{10.0, 20.0, 30.0}, std::vector{0, 1, 2});
 
   for (int pass = 0; pass < 2; ++pass) {
-    sort_shells_inplace(shells);
+    detail::sort_shells_inplace(shells);
     const auto& shell = shells.front();
     EXPECT_DOUBLE_EQ(2.0, shell.exponents[0]);
     EXPECT_DOUBLE_EQ(2.0, shell.exponents[1]);
@@ -94,16 +95,38 @@ TEST_F(BasisSetTest, ShellSortingPreservesEqualExponentPrimitiveOrder) {
   }
 }
 
+TEST_F(BasisSetTest, ShellSortingRejectsShellsWithoutPrimitives) {
+  std::vector<Shell> shells;
+  EXPECT_NO_THROW(detail::sort_shells_inplace(shells));
+
+  const Shell empty(0, OrbitalType::S, std::vector<double>{},
+                    std::vector<double>{});
+  const Shell nonempty(0, OrbitalType::S, std::vector{1.0, 2.0},
+                       std::vector{10.0, 20.0});
+  shells = {empty};
+  EXPECT_THROW(detail::sort_shells_inplace(shells), std::invalid_argument);
+
+  shells = {empty, nonempty};
+  EXPECT_THROW(detail::sort_shells_inplace(shells), std::invalid_argument);
+  EXPECT_DOUBLE_EQ(1.0, shells[1].exponents[0]);
+  EXPECT_DOUBLE_EQ(10.0, shells[1].coefficients[0]);
+
+  shells = {nonempty, empty};
+  EXPECT_THROW(detail::sort_shells_inplace(shells), std::invalid_argument);
+  EXPECT_DOUBLE_EQ(1.0, shells[0].exponents[0]);
+  EXPECT_DOUBLE_EQ(10.0, shells[0].coefficients[0]);
+}
+
 TEST_F(BasisSetTest, LocalEcpShellContributesNoAtomicOrbitals) {
   Shell local(0, OrbitalType::UL, std::vector{1.0}, std::vector{2.0},
               std::vector{2});
   Shell gaussian(0, OrbitalType::D, std::vector{1.0}, std::vector{1.0});
-  ShellsPerAtom shells{{local, gaussian}};
+  detail::ShellsPerAtom shells{{local, gaussian}};
 
   EXPECT_EQ(0u, local.get_num_atomic_orbitals());
   EXPECT_EQ(0u, local.get_num_atomic_orbitals(AOType::Cartesian));
-  EXPECT_EQ(5u, count_orbitals(shells, AOType::Spherical));
-  EXPECT_EQ(6u, count_orbitals(shells, AOType::Cartesian));
+  EXPECT_EQ(5u, detail::count_orbitals(shells, AOType::Spherical));
+  EXPECT_EQ(6u, detail::count_orbitals(shells, AOType::Cartesian));
 }
 
 TEST_F(BasisSetTest, Constructors) {

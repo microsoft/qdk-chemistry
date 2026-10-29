@@ -260,6 +260,9 @@ class AuxiliaryBasis : public DataClass,
  * is intended for algorithms that explicitly accept auxiliary-basis inputs.
  * It does not itself enable density fitting or change algorithm behavior. All
  * entries must describe the same molecular structure.
+ *
+ * Copy construction, including from rvalues, preserves the source collection.
+ * In-place assignment is prohibited so retained aliases remain unchanged.
  */
 class AuxiliaryBasisCollection
     : public DataClass,
@@ -282,6 +285,10 @@ class AuxiliaryBasisCollection
    * @throws std::invalid_argument if an entry is null or structures differ
    */
   explicit AuxiliaryBasisCollection(Map auxiliary_bases);
+
+  AuxiliaryBasisCollection(const AuxiliaryBasisCollection&) = default;
+  AuxiliaryBasisCollection& operator=(const AuxiliaryBasisCollection&) = delete;
+  AuxiliaryBasisCollection& operator=(AuxiliaryBasisCollection&&) = delete;
 
   /**
    * @brief Check whether an exact role has an associated auxiliary basis.

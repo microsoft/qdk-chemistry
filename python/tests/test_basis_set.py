@@ -101,6 +101,76 @@ def test_shell_management():
     assert basis_extended.get_num_atoms() == 2  # Now we have atoms 0 and 1
 
 
+@pytest.mark.parametrize(
+    "getter_name",
+    [
+        "get_shell",
+        "get_shells_for_atom",
+        "get_shells",
+        "get_ecp_shell",
+        "get_ecp_shells_for_atom",
+        "get_ecp_shells",
+    ],
+)
+@pytest.mark.parametrize("mutation", ["sort", "assign"])
+def test_shell_access_returns_independent_editable_copies(getter_name, mutation):
+    """Editing a returned shell must not change stored Gaussian or ECP data."""
+    exponents = [3.0, 2.0, 1.0]
+    coefficients = [30.0, 20.0, 10.0]
+    rpowers = [2, 1, 0]
+    structure = Structure(["Ag"], np.array([[0.0, 0.0, 0.0]]))
+    basis = BasisSet(
+        "copy-test",
+        [Shell(0, OrbitalType.S, exponents, coefficients)],
+        [Shell(0, OrbitalType.UL, exponents, coefficients, rpowers)],
+        structure,
+    )
+    original_hash = basis.content_hash()
+    original_json = basis.to_json()
+
+    getter = getattr(basis, getter_name)
+    result = getter() if getter_name in ("get_shells", "get_ecp_shells") else getter(0)
+    shell = result if isinstance(result, Shell) else result[0]
+    arrays: dict[str, list[float] | list[int]] = {"exponents": exponents, "coefficients": coefficients}
+    if shell.has_radial_powers():
+        arrays["rpowers"] = rpowers
+
+    for name, values in arrays.items():
+        array = getattr(shell, name)
+        expected = np.array(sorted(values), dtype=array.dtype)
+        if mutation == "sort":
+            array.sort()
+        else:
+            setattr(shell, name, expected)
+        np.testing.assert_array_equal(getattr(shell, name), expected)
+    shell.atom_index = 1
+    shell.orbital_type = OrbitalType.P
+    if isinstance(result, list):
+        result.clear()
+
+    assert basis.content_hash() == original_hash
+    assert basis.to_json() == original_json
+    for stored in (basis.get_shell(0), basis.get_ecp_shell(0)):
+        assert stored.atom_index == 0
+        np.testing.assert_array_equal(stored.exponents, exponents)
+        np.testing.assert_array_equal(stored.coefficients, coefficients)
+    assert basis.get_shell(0).orbital_type == OrbitalType.S
+    assert basis.get_ecp_shell(0).orbital_type == OrbitalType.UL
+    np.testing.assert_array_equal(basis.get_ecp_shell(0).rpowers, rpowers)
+
+
+def test_standalone_shell_arrays_remain_editable():
+    """Standalone shells retain writable primitive arrays and array setters."""
+    shell = Shell(0, OrbitalType.UL, [3.0, 1.0], [30.0, 10.0], [2, 0])
+    for name in ("exponents", "coefficients", "rpowers"):
+        array = getattr(shell, name)
+        original = array.copy()
+        array.sort()
+        np.testing.assert_array_equal(getattr(shell, name), np.sort(original))
+        setattr(shell, name, original)
+        np.testing.assert_array_equal(getattr(shell, name), original)
+
+
 def test_atomic_orbital_type_management():
     """Test basis type management."""
     # Create a valid shell for testing
