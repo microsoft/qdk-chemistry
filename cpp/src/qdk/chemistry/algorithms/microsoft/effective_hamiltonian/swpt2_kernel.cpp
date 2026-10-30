@@ -9,7 +9,7 @@
 #include <SeQuant/core/eval/backends/btas/eval_expr.hpp>
 #include <SeQuant/core/eval/backends/btas/result.hpp>
 #include <SeQuant/core/eval/eval.hpp>
-#include <SeQuant/core/index_space_registry.hpp>
+#include <SeQuant/core/index_basis_registry.hpp>
 #include <SeQuant/core/io/shorthands.hpp>
 #include <SeQuant/core/optimize/optimize.hpp>
 #include <SeQuant/core/wick.hpp>
@@ -306,7 +306,7 @@ struct Term {
 };
 
 struct Equations {
-  std::shared_ptr<sq::IndexSpaceRegistry> spaces;
+  std::shared_ptr<sq::IndexBasisRegistry> spaces;
   std::vector<Term> terms;
   std::size_t projected_terms = 0;
 };
@@ -359,7 +359,7 @@ struct DensityPattern {
 
 std::vector<DensityPattern> density_patterns() {
   auto context = sq::set_scoped_default_context(
-      {.index_space_registry_shared_ptr =
+      {.index_basis_registry_shared_ptr =
            sq::mbpt::make_min_mr_spaces(sq::mbpt::SpinConvention::Legacy),
        .vacuum = sq::Vacuum::Physical});
   // Particle-hole reversal turns the three-body Gaussian fold into ordinary
@@ -597,7 +597,7 @@ Equations derive() {
   equations.spaces =
       sq::mbpt::make_min_mr_spaces(sq::mbpt::SpinConvention::Default);
   auto context = sq::set_scoped_default_context(
-      {.index_space_registry_shared_ptr = equations.spaces,
+      {.index_basis_registry_shared_ptr = equations.spaces,
        .vacuum = sq::Vacuum::SingleProduct});
   EquationSums sums;
   const std::array roles{off_diagonal_blocks(1), off_diagonal_blocks(2)};
@@ -625,7 +625,6 @@ Equations derive() {
                                                   : coupling * generator)};
             wick.full_contractions(false).use_topology(false);
             wick.set_nop_connections(std::vector<std::pair<int, int>>{{0, 1}});
-            wick.set_external_indices(std::vector<sq::Index>{});
             const auto expansion = wick.compute(false, true);
             for (const auto& term : summands(expansion)) {
               if (!term->is<sq::Product>()) continue;
@@ -664,7 +663,7 @@ const Equations& reusable_equations() {
 Plans build_plans(const Equations& equations,
                   const std::array<std::size_t, 3>& extents, bool spin_free) {
   auto context = sq::set_scoped_default_context(
-      {.index_space_registry_shared_ptr = equations.spaces,
+      {.index_basis_registry_shared_ptr = equations.spaces,
        .vacuum = sq::Vacuum::SingleProduct});
   const auto extent = [&extents](const sq::Index& index) -> std::size_t {
     const wchar_t role = index.space().base_key()[0];

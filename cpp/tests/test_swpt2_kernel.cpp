@@ -531,7 +531,7 @@ Eigen::MatrixXd fock_matrix(const sw::DownfoldResult& result) {
 
 TEST(Swpt2KernelTest, RestoresCallerContextAndReusesPlans) {
   auto caller_context = sequant::set_scoped_default_context(
-      {.index_space_registry_shared_ptr = sequant::mbpt::make_min_sr_spaces(
+      {.index_basis_registry_shared_ptr = sequant::mbpt::make_min_sr_spaces(
            sequant::mbpt::SpinConvention::None),
        .vacuum = sequant::Vacuum::Physical});
   const auto original_context = sequant::get_default_context();
@@ -551,7 +551,7 @@ TEST(Swpt2KernelTest, RestoresCallerContextAndReusesPlans) {
   EXPECT_NEAR(first.one_body[0](0, 0),
               -0.5 + 0.01 * sw::regularized_inverse(-2.5, regularizer), 1e-14);
   auto alternate_context = sequant::set_scoped_default_context(
-      {.index_space_registry_shared_ptr = sequant::mbpt::make_min_mr_spaces(
+      {.index_basis_registry_shared_ptr = sequant::mbpt::make_min_mr_spaces(
            sequant::mbpt::SpinConvention::Legacy),
        .vacuum = sequant::Vacuum::SingleProduct});
   const auto alternate = sequant::get_default_context();
