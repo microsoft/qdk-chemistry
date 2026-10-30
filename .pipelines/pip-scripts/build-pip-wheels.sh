@@ -63,11 +63,9 @@ if [ "$MAC_BUILD" == "OFF" ]; then # Build/install Linux dependencies
         ninja-build \
         nlohmann-json3-dev \
         patchelf \
-        pybind11-dev \
         python3 \
         python3-dev \
         python3-pip \
-        python3-pybind11 \
         python3-venv \
         tk-dev \
         unzip \
@@ -107,7 +105,6 @@ elif [ "$MAC_BUILD" == "ON" ]; then
         gcc \
         ncurses \
         ninja \
-        pybind11 \
         python \
         wget
     export CMAKE_PREFIX_PATH="/opt/homebrew"

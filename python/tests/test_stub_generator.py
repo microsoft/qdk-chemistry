@@ -18,18 +18,21 @@ def test_target_directory_cannot_shadow_generator(tmp_path, monkeypatch):
     target = tmp_path / "package with spaces"
     target.mkdir()
     marker = tmp_path / "shadowed"
-    (target / "pybind11_stubgen.py").write_text(
+    (target / "nanobind.py").write_text(
         f"from pathlib import Path\nPath({str(marker)!r}).write_text('shadowed')\n"
     )
     (target / "_core.py").write_text("value = 'extension target'\n")
     installed = tmp_path / "installed"
     installed.mkdir()
-    (installed / "pybind11_stubgen.py").write_text(
+    (installed / "nanobind").mkdir()
+    (installed / "nanobind" / "__init__.py").write_text("")
+    (installed / "nanobind" / "stubgen.py").write_text(
         "def main():\n"
         "    import sys\n"
         "    from pathlib import Path\n"
         "    import _core\n"
-        "    output = Path(sys.argv[sys.argv.index('-o') + 1])\n"
+        "    assert sys.argv[1:6] == ['-m', '_core', '-r', '-P', '-O']\n"
+        "    output = Path(sys.argv[6])\n"
         "    (output / 'generated.pyi').write_text(_core.value)\n"
         "    (output / 'working-directory.txt').write_text(str(Path.cwd()))\n"
     )
@@ -50,7 +53,9 @@ def test_generator_failure_is_reported(tmp_path, monkeypatch):
     target.mkdir()
     installed = tmp_path / "installed"
     installed.mkdir()
-    (installed / "pybind11_stubgen.py").write_text(
+    (installed / "nanobind").mkdir()
+    (installed / "nanobind" / "__init__.py").write_text("")
+    (installed / "nanobind" / "stubgen.py").write_text(
         "def main():\n    import sys\n    print('generation failed', file=sys.stderr)\n    sys.exit(7)\n"
     )
     monkeypatch.setenv("PYTHONPATH", str(installed))

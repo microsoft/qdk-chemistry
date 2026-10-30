@@ -315,19 +315,7 @@ class QubitOperator(HamiltonianDescription):
         return cls(container=container)
 
 
-class _DeprecatedQubitOperatorAliasMeta(type(QubitOperator)):  # type: ignore[misc]
-    """Metaclass that makes the deprecated alias behave like :class:`QubitOperator` for type checks."""
-
-    def __instancecheck__(cls, instance: object) -> bool:
-        """Report any :class:`QubitOperator` instance as an instance of the alias."""
-        return isinstance(instance, QubitOperator)
-
-    def __subclasscheck__(cls, subclass: type) -> bool:
-        """Report any :class:`QubitOperator` subclass as a subclass of the alias."""
-        return issubclass(subclass, QubitOperator)
-
-
-class QubitHamiltonian(QubitOperator, metaclass=_DeprecatedQubitOperatorAliasMeta):
+class _DeprecatedQubitHamiltonian(QubitOperator):
     """Deprecated alias for :class:`QubitOperator`."""
 
     def __init__(self, *args: Any, **kwargs: Any) -> None:
@@ -340,3 +328,35 @@ class QubitHamiltonian(QubitOperator, metaclass=_DeprecatedQubitOperatorAliasMet
             stacklevel=2,
         )
         super().__init__(*args, **kwargs)
+
+
+class _DeprecatedQubitOperatorAlias:
+    """Class-like alias without subclassing nanobind's immutable metaclass."""
+
+    __bases__ = (QubitOperator,)
+
+    def __call__(self, *args: Any, **kwargs: Any) -> QubitOperator:
+        """Construct an operator through the deprecated constructor."""
+        return _DeprecatedQubitHamiltonian(*args, **kwargs)
+
+    def __getattr__(self, name: str) -> Any:
+        """Forward class attributes and constructors to the deprecated class."""
+        return getattr(_DeprecatedQubitHamiltonian, name)
+
+    def __instancecheck__(self, instance: object) -> bool:
+        """Recognize operators constructed through either public name."""
+        return isinstance(instance, QubitOperator)
+
+    def __subclasscheck__(self, subclass: type) -> bool:
+        """Recognize subclasses of the current operator class."""
+        return issubclass(subclass, QubitOperator)
+
+    def __mro_entries__(self, _bases: tuple) -> tuple:
+        """Preserve inheritance through the deprecated name."""
+        return (_DeprecatedQubitHamiltonian,)
+
+
+if TYPE_CHECKING:
+    QubitHamiltonian = _DeprecatedQubitHamiltonian
+else:
+    QubitHamiltonian = _DeprecatedQubitOperatorAlias()
