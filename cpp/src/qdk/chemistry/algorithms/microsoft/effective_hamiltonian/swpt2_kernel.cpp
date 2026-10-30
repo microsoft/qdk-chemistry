@@ -17,6 +17,7 @@
 #include <SeQuant/domain/mbpt/spin.hpp>
 #include <algorithm>
 #include <cmath>
+#include <exception>
 #include <map>
 #include <memory>
 #include <mutex>
@@ -956,10 +957,9 @@ DownfoldResult downfold(const std::array<Eigen::MatrixXd, 2>& one_body,
     operand_cache.emplace(key, value);
     return value;
   };
-  // SeQuant's BTAS evaluation updates a process-wide label map, so plans run
-  // serially.
   const auto plans = reusable_plans(inactive.size(), active.size(),
                                     virtuals.size(), spin_free);
+  std::vector<const Plan*> selected;
   for (const auto& plan : plans->plans) {
     if (plan.folded && !fold) continue;
     bool empty = false;
@@ -969,7 +969,32 @@ DownfoldResult downfold(const std::array<Eigen::MatrixXd, 2>& one_body,
         empty = empty || roles.at(index.space().base_key()[0])->empty();
     });
     if (empty) continue;
-    const auto value = sq::evaluate(plan.tree, evaluate_leaf);
+    // Build every operand first, so the concurrent plans only read the cache.
+    plan.tree.visit([&](const auto& node) {
+      if (node.leaf()) evaluate_leaf(node);
+    });
+    selected.push_back(&plan);
+  }
+  // Concurrent evaluation relies on the SeQuant patch that keeps BTAS off the
+  // process-wide trace-label map. Values are added in plan order below, so the
+  // result does not depend on the thread count.
+  std::vector<sq::ResultPtr> plan_values(selected.size());
+  std::exception_ptr failure;
+  const auto plan_count = static_cast<std::ptrdiff_t>(selected.size());
+#pragma omp parallel for schedule(dynamic, 1) if (n4(norb) >= min_parallel_work)
+  for (std::ptrdiff_t ordinal = 0; ordinal < plan_count; ++ordinal) {
+    try {
+      plan_values[ordinal] =
+          sq::evaluate(selected[ordinal]->tree, evaluate_leaf);
+    } catch (...) {
+#pragma omp critical(swpt2_plan_failure)
+      if (!failure) failure = std::current_exception();
+    }
+  }
+  if (failure) std::rethrow_exception(failure);
+  for (std::ptrdiff_t ordinal = 0; ordinal < plan_count; ++ordinal) {
+    const Plan& plan = *selected[ordinal];
+    const auto value = std::move(plan_values[ordinal]);
     if (plan.rank == 0) {
       result.scalar += value->get<double>();
       continue;
