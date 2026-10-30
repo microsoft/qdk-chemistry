@@ -202,7 +202,7 @@
         "type": "git",
         "git": {
           "repositoryUrl": "https://github.com/ValeevGroup/SeQuant.git",
-          "commitHash": "5fcefaebcf405e05fec07541822e2c970398e876"
+          "commitHash": "be931075ebb4d15d252045ab4ba4b3065845355d"
         }
       },
       "developmentDependency": false
@@ -212,7 +212,7 @@
         "type": "git",
         "git": {
           "repositoryUrl": "https://github.com/BTAS/btas.git",
-          "commitHash": "52aadfe54ee48874f6926da5932482e0f5cef85c"
+          "commitHash": "5b435cfdd3cb423f5a40229572c38f6700ba0456"
         }
       },
       "developmentDependency": false

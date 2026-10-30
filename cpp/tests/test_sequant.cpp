@@ -48,7 +48,7 @@ TEST(SeQuantBtasTest, EvaluatesWickDerivedCcsdEnergy) {
   using namespace sequant;
 
   auto context = set_scoped_default_context(
-      {.index_space_registry_shared_ptr =
+      {.index_basis_registry_shared_ptr =
            mbpt::make_min_sr_spaces(mbpt::SpinConvention::None),
        .vacuum = Vacuum::SingleProduct});
   auto mbpt_context = mbpt::set_scoped_default_mbpt_context(
@@ -75,7 +75,7 @@ TEST(SeQuantBtasTest, EvaluatesWickDerivedCcsdEnergy) {
       antisymmetrize(random_tensor({nmo, nmo, nmo, nmo}, engine));
 
   auto const occupied =
-      get_default_context().index_space_registry()->retrieve(L"i");
+      get_default_context().index_basis_registry()->retrieve_space(L"i");
   auto const leaf = [&](EvalNodeBTAS const& node) -> ResultPtr {
     if (node->result_type() != ResultType::Tensor) {
       return eval_result<ResultScalar<double>>(

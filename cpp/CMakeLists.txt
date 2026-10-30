@@ -158,21 +158,26 @@ block()
     )
     FetchContent_Declare(BTAS
         GIT_REPOSITORY https://github.com/BTAS/btas.git
-        GIT_TAG        52aadfe54ee48874f6926da5932482e0f5cef85c
+        GIT_TAG        5b435cfdd3cb423f5a40229572c38f6700ba0456
         SYSTEM
     )
+    # Concurrent evaluation otherwise races on SeQuant's trace-label map, even with tracing off.
+    set(_sequant_patch PATCH_COMMAND "${CMAKE_COMMAND}"
+        "-DPATCH_FILE=${CMAKE_CURRENT_LIST_DIR}/cmake/patches/sequant-eval-trace-labels.patch"
+        -P "${CMAKE_CURRENT_LIST_DIR}/cmake/patches/apply-patch.cmake")
     # clang-cl ignores [[no_unique_address]] like MSVC, which fails a SeQuant size check.
-    set(_sequant_patch "")
     if(CMAKE_CXX_COMPILER_ID MATCHES "Clang" AND CMAKE_CXX_SIMULATE_ID STREQUAL "MSVC")
-        set(_sequant_patch PATCH_COMMAND "${CMAKE_COMMAND}" -P
+        list(APPEND _sequant_patch COMMAND "${CMAKE_COMMAND}" -P
             "${CMAKE_CURRENT_LIST_DIR}/cmake/patches/sequant-clang-cl-no-unique-address.cmake")
     endif()
     FetchContent_Declare(SeQuant
         GIT_REPOSITORY https://github.com/ValeevGroup/SeQuant.git
-        GIT_TAG        5fcefaebcf405e05fec07541822e2c970398e876
+        GIT_TAG        be931075ebb4d15d252045ab4ba4b3065845355d
         ${_sequant_patch}
     )
     set(SEQUANT_BTAS ON)
+    # SeQuant otherwise leaves a fetched backend out of its install and exported targets.
+    set(SEQUANT_INSTALL_FETCHED_BACKENDS BTAS)
     # libPerm would otherwise fetch googletest and build its tests as part of `all`.
     set(LIBPERM_TESTS OFF)
 
