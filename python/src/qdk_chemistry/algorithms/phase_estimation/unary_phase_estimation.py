@@ -170,9 +170,12 @@ class UnaryPhaseEstimation(PhaseEstimation):
             )
 
         # Resolve container before running the circuit. The builder drops any carried power,
-        # so inversion must use the base (power=1) unitary.
+        # so inversion must use the base (power=1) unitary. It also completes the walk around a
+        # plain block encoding, so decode through the walk that block encoding defines.
         unitary_builder = circuit_builder._create_nested("unitary_builder")  # noqa: SLF001
         unitary_builder.settings().update("power", 1)
+        if unitary_builder.settings().has("quantum_walk"):
+            unitary_builder.settings().update("quantum_walk", True)
         unitary_rep = unitary_builder.run(qubit_hamiltonian)
         container = unitary_rep.get_container()
 
