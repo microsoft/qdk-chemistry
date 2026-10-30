@@ -5,6 +5,8 @@
 # Licensed under the MIT License. See LICENSE.txt in the project root for license information.
 # --------------------------------------------------------------------------------------------
 
+import re
+
 import numpy as np
 import pytest
 from qdk.test_utils import dump_operation_on_state
@@ -277,6 +279,34 @@ class TestResourceEstimate:
         counts = circuit.estimate()["logicalCounts"]
         assert counts["numQubits"] > 3 + 6
         assert counts["cczCount"] > 0
+
+
+_QIR_QUBIT = re.compile(r"%Qubit\* (?:null|inttoptr \(i64 (\d+) to %Qubit\*\))")
+
+
+def _reset_qubits(qir: str) -> set[int]:
+    """Return the indices of the qubits that a QIR program resets or measures and resets."""
+    reset = set()
+    for line in qir.splitlines():
+        if "call" in line and ("__quantum__qis__reset__body" in line or "__quantum__qis__mresetz__body" in line):
+            match = _QIR_QUBIT.search(line)
+            assert match is not None, line
+            reset.add(int(match.group(1) or 0))
+    return reset
+
+
+class TestExportedCircuit:
+    """The exported circuit leaves the synthesized output on the target register."""
+
+    @pytest.mark.parametrize("method", ["dense", "block_sparse"])
+    def test_target_is_not_reset(self, method):
+        """Only scratch qubits are reset; the target keeps the output, as in main's wrappers."""
+        theta = 0.7
+        matrix = np.array([[np.cos(theta), -np.sin(theta)], [np.sin(theta), np.cos(theta)]])
+        circuit = create("circuit_mapper", "unitary_synthesis", method=method).run(_representation(matrix))
+        reset = _reset_qubits(str(circuit.get_qir()))
+        assert reset, "the lookup scratch should still be measured and reset"
+        assert 0 not in reset
 
 
 class TestErrors:
