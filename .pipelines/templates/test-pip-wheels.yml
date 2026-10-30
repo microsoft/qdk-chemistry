@@ -44,7 +44,7 @@ steps:
         "$QDK_TEST_IMAGE" \
         bash ../.pipelines/pip-scripts/test-pip-wheels.sh "$QDK_PYTHON_VERSION" \
                                                           "$QDK_MAC_BUILD"
-    displayName: Test wheel (Docker linux/amd64)
+    displayName: Test wheel on Python ${{ parameters.pythonVersion }} (Docker linux/amd64)
     condition: ${{ parameters.condition }}
     env:
       QDK_TEST_PLATFORM: ${{ parameters.imageTag }}
@@ -72,7 +72,7 @@ steps:
         "$QDK_TEST_IMAGE" \
         bash ../.pipelines/pip-scripts/test-pip-wheels.sh "$QDK_PYTHON_VERSION" \
                                                           "$QDK_MAC_BUILD"
-    displayName: Test wheel (Docker ${{ parameters.imageTag }})
+    displayName: Test wheel on Python ${{ parameters.pythonVersion }} (Docker ${{ parameters.imageTag }})
     condition: ${{ parameters.condition }}
     env:
       QDK_TEST_PLATFORM: ${{ parameters.imageTag }}
@@ -90,7 +90,7 @@ steps:
       cd "$QDK_AGENT_BUILD_DIRECTORY/qdk-chemistry/python"
       bash ../.pipelines/pip-scripts/test-pip-wheels.sh "$QDK_PYTHON_VERSION" \
                                                         "$QDK_MAC_BUILD"
-    displayName: Test wheel (native)
+    displayName: Test wheel on Python ${{ parameters.pythonVersion }} (native)
     condition: ${{ parameters.condition }}
     env:
       QDK_AGENT_BUILD_DIRECTORY: ${{ parameters.agentBuildDirectory }}
