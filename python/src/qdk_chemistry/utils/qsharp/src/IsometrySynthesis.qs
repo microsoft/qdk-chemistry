@@ -272,7 +272,10 @@ namespace QDKChemistry.Utils.IsometrySynthesis {
         )
     }
 
-    /// Circuit wrapper for resource estimation - allocates qubits internally.
+    /// Circuit entry point for a dense isometry (allocates qubits).
+    ///
+    /// The target register keeps the synthesized output, as in the other `Make*Circuit`
+    /// wrappers; only the phase gradient and angle registers are returned to |0⟩.
     operation MakeDenseIsometryCircuit(
         synthesis : DenseIsometrySynthesis,
         numInputQubits : Int,
@@ -281,7 +284,6 @@ namespace QDKChemistry.Utils.IsometrySynthesis {
     ) : Unit {
         use target = Qubit[numInputQubits + numAddedQubits];
         ApplyIsometryOnTarget(numInputQubits, numAddedQubits, rotationBitPrecision, ApplyDenseIsometry(synthesis, _, _, _, _), target);
-        ResetAll(target);
     }
 
     /// Returns `ApplySparseIsometry` as an operation on the target register that allocates
@@ -308,7 +310,8 @@ namespace QDKChemistry.Utils.IsometrySynthesis {
         )
     }
 
-    /// Circuit wrapper for resource estimation - allocates qubits internally.
+    /// Circuit entry point for a sparse isometry (allocates qubits); see
+    /// `MakeDenseIsometryCircuit`.
     operation MakeSparseIsometryCircuit(
         synthesis : SparseIsometrySynthesis,
         numQubits : Int,
@@ -316,6 +319,5 @@ namespace QDKChemistry.Utils.IsometrySynthesis {
     ) : Unit {
         use target = Qubit[numQubits];
         ApplyIsometryOnTarget(numQubits, 0, rotationBitPrecision, ApplySparseIsometry(synthesis, _, _, _, _), target);
-        ResetAll(target);
     }
 }
