@@ -6,6 +6,7 @@ namespace QDKChemistry.TestUtils.UnitarySynthesisTests {
     import Std.Arrays.IndexRange;
     import Std.Math.MaxI;
     import QDKChemistry.Utils.PhaseGradient.PreparePhaseGradientState;
+    import QDKChemistry.Utils.UnitarySynthesis.ApplyPhasePolynomial;
     import QDKChemistry.Utils.UnitarySynthesis.ApplyRealUnitaryViaGivens;
     import QDKChemistry.Utils.UnitarySynthesis.GivensDecomposition;
     import QDKChemistry.Utils.UnitarySynthesis.QuantizeGivensDecomposition;
@@ -74,5 +75,39 @@ namespace QDKChemistry.TestUtils.UnitarySynthesisTests {
             }
         }
         ResetAll(target);
+    }
+
+    /// Applies `phases` to `register` controlled on every qubit of `controls`, either through
+    /// `Controlled ApplyPhasePolynomial` or, when `padded`, as one uncontrolled polynomial on
+    /// `register + controls` whose table is zero unless every control is set.
+    operation TestApplyControlledPhasePolynomial(
+        phases : Bool[],
+        controls : Qubit[],
+        register : Qubit[],
+        padded : Bool,
+    ) : Unit {
+        if padded {
+            let inactive = Repeated(false, ((1 <<< Length(controls)) - 1) * Length(phases));
+            ApplyPhasePolynomial(inactive + phases, register + controls);
+        } else {
+            Controlled ApplyPhasePolynomial(controls, (phases, register));
+        }
+    }
+
+    /// Returns `TestApplyControlledPhasePolynomial` as an operation on [register | controls].
+    function TestMakeControlledPhasePolynomialOp(phases : Bool[], numRegister : Int, padded : Bool) : Qubit[] => Unit {
+        qs => TestApplyControlledPhasePolynomial(phases, qs[numRegister...], qs[...numRegister - 1], padded)
+    }
+
+    /// `TestApplyControlledPhasePolynomial` on freshly allocated qubits.
+    operation TestControlledPhasePolynomialCircuit(
+        phases : Bool[],
+        numRegister : Int,
+        numControls : Int,
+        padded : Bool,
+    ) : Unit {
+        use register = Qubit[numRegister];
+        use controls = Qubit[numControls];
+        TestApplyControlledPhasePolynomial(phases, controls, register, padded);
     }
 }

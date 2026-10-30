@@ -6,6 +6,7 @@
 # --------------------------------------------------------------------------------------------
 
 import re
+import time
 
 import numpy as np
 import pytest
@@ -400,6 +401,55 @@ class TestGivensNetwork:
         state = self._run(qsharp_test_context, qsharp_test_utils, givens, prep_angles, controls)
         initial = _ry_product_state(prep_angles)
         np.testing.assert_allclose(state, initial if controls == (False,) else -initial, atol=1e-10)
+
+    @pytest.mark.parametrize("last_control", [True, False], ids=["controls-on", "last-control-off"])
+    def test_sign_under_many_controls(self, qsharp_test_context, qsharp_test_utils, last_control):
+        """``D = -I`` under 20 controls is one multi-controlled Z, not a 2^21-entry sign table."""
+        givens = {"layerAngles": [], "layerShifted": [], "phases": [True, True]}
+        prep_angles = [0.8]
+        start = time.perf_counter()
+        state = self._run(qsharp_test_context, qsharp_test_utils, givens, prep_angles, (True,) * 19 + (last_control,))
+        elapsed = time.perf_counter() - start
+        initial = _ry_product_state(prep_angles)
+        np.testing.assert_allclose(state, -initial if last_control else initial, atol=1e-10)
+        # Transforming the padded table took tens of seconds; the factored one takes well under one.
+        assert elapsed < 5.0, f"20 controls took {elapsed:.1f} s"
+
+    @pytest.mark.parametrize(("num_register", "num_controls"), [(0, 1), (1, 0), (1, 2), (2, 1), (2, 3), (3, 2)])
+    def test_controlled_phase_polynomial_matches_padded_table(
+        self, qsharp_test_context, qsharp_test_utils, num_register, num_controls
+    ):
+        """Controlling ``ApplyPhasePolynomial`` emits the gates, counts and signs of the padded table.
+
+        The padded table over ``register + controls`` is zero unless every control is set, so its
+        polynomial is ``AND(controls) * f(x)``, which the controlled specialization applies directly.
+        """
+        tests = qsharp_test_utils.UnitarySynthesisTests
+        rng = np.random.default_rng(10 * num_register + num_controls)
+        phases = [True, *rng.integers(0, 2, (1 << num_register) - 1).astype(bool).tolist()]
+        num_qubits = num_register + num_controls
+        initial = rng.normal(size=1 << num_qubits)
+        initial /= np.linalg.norm(initial)
+
+        circuits, counts, states = [], [], []
+        for padded in (True, False):
+            args = (phases, num_register, num_controls, padded)
+            circuits.append(
+                qsharp_test_context.circuit(tests.TestControlledPhasePolynomialCircuit, *args, group_by_scope=False)
+            )
+            counts.append(dict(qsharp_test_context.logical_counts(tests.TestControlledPhasePolynomialCircuit, *args)))
+            op = tests.TestMakeControlledPhasePolynomialOp(phases, num_register, padded)
+            states.append(np.array(dump_operation_on_state(op, num_qubits, list(initial), context=qsharp_test_context)))
+        assert circuits[0].json() == circuits[1].json()
+        assert counts[0] == counts[1]
+        np.testing.assert_array_equal(states[0], states[1])
+
+        # Big-endian over [register | controls], with the register little-endian.
+        index = np.arange(1 << num_qubits)
+        register = sum(((index >> (num_qubits - 1 - q)) & 1) << q for q in range(num_register))
+        controls_set = (index & ((1 << num_controls) - 1)) == (1 << num_controls) - 1
+        flipped = controls_set & np.asarray(phases)[register]
+        np.testing.assert_allclose(states[1], np.where(flipped, -initial, initial), atol=1e-12)
 
     @pytest.mark.parametrize("control", [True, False], ids=["control-on", "control-off"])
     def test_shifted_layer_under_control(self, qsharp_test_context, qsharp_test_utils, control):

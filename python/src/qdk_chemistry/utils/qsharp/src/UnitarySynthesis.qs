@@ -14,7 +14,9 @@ namespace QDKChemistry.Utils.UnitarySynthesis {
     import Std.Arrays.IsEmpty;
     import Std.Arrays.Mapped;
     import Std.Arrays.MappedOverRange;
+    import Std.Arrays.Most;
     import Std.Arrays.Reversed;
+    import Std.Arrays.Tail;
     import Std.Diagnostics.Fact;
     import Std.Math.PI;
     import Std.ResourceEstimation.BeginEstimateCaching;
@@ -106,46 +108,58 @@ namespace QDKChemistry.Utils.UnitarySynthesis {
     /// The Möbius transform over GF(2) gives f(x) = ⊕_S c_S ∏_{i∈S} x_i, and each nonzero c_S
     /// becomes a Z, CZ, CCZ, … gate on the qubits in S. The constant c_∅ is the global sign
     /// -I = R(PauliI, 2π). D is its own inverse.
-    operation ApplyPhasePolynomial(phases : Bool[], register : Qubit[]) : Unit is Adj {
+    ///
+    /// Controlled on the qubits C, the phase is AND(C) · f(x) = ⊕_S c_S ∏_{i∈S∪C} x_i, so each
+    /// gate also acts on C and c_∅ becomes a Z, CZ, … on C alone. Only the 2^n table of the
+    /// register is transformed, so the classical cost does not grow with the number of controls.
+    operation ApplyPhasePolynomial(phases : Bool[], register : Qubit[]) : Unit is Adj + Ctl {
         body (...) {
-            let n = Length(register);
-            let dim = Length(phases);
+            ApplyPhasePolynomialWithControls([], phases, register);
+        }
+        adjoint self;
+        controlled (controls, ...) {
+            ApplyPhasePolynomialWithControls(controls, phases, register);
+        }
+        controlled adjoint self;
+    }
 
-            // In-place Möbius butterfly; bitmask s encodes the subset S.
-            mutable coeffs = phases;
-            mutable step = 1;
-            while step < dim {
-                for j in 0..dim - 1 {
-                    if (j / step) % 2 == 1 {
-                        set coeffs w/= j <- coeffs[j] != coeffs[j - step];
+    /// `ApplyPhasePolynomial` controlled on every qubit of `controls`.
+    internal operation ApplyPhasePolynomialWithControls(controls : Qubit[], phases : Bool[], register : Qubit[]) : Unit {
+        let n = Length(register);
+        let dim = Length(phases);
+        Fact(dim == 0 or dim == 1 <<< n, "Phase data needs one entry per basis state of the register.");
+
+        // In-place Möbius butterfly; bitmask s encodes the subset S.
+        mutable coeffs = phases;
+        mutable step = 1;
+        while step < dim {
+            for j in 0..dim - 1 {
+                if (j / step) % 2 == 1 {
+                    set coeffs w/= j <- coeffs[j] != coeffs[j - step];
+                }
+            }
+            set step = step * 2;
+        }
+
+        for s in 0..dim - 1 {
+            if coeffs[s] {
+                mutable qubits : Qubit[] = [];
+                for bit in 0..n - 1 {
+                    if (s >>> bit) &&& 1 == 1 {
+                        set qubits += [register[bit]];
                     }
                 }
-                set step = step * 2;
-            }
-
-            if dim > 0 and coeffs[0] {
-                Fact(n > 0, "A constant sign needs a nonempty register to carry it.");
-                R(PauliI, 2.0 * PI(), register[0]);
-            }
-            for s in 1..dim - 1 {
-                if coeffs[s] {
-                    mutable qubits : Qubit[] = [];
-                    for bit in 0..n - 1 {
-                        if (s >>> bit) &&& 1 == 1 {
-                            set qubits += [register[bit]];
-                        }
-                    }
-                    if Length(qubits) == 1 {
-                        Z(qubits[0]);
-                    } elif Length(qubits) == 2 {
-                        Controlled Z([qubits[0]], qubits[1]);
-                    } else {
-                        Controlled Z(qubits[0..Length(qubits) - 2], qubits[Length(qubits) - 1]);
-                    }
+                set qubits += controls;
+                if IsEmpty(qubits) {
+                    Fact(n > 0, "A constant sign needs a nonempty register to carry it.");
+                    R(PauliI, 2.0 * PI(), register[0]);
+                } elif Length(qubits) == 1 {
+                    Z(qubits[0]);
+                } else {
+                    Controlled Z(Most(qubits), Tail(qubits));
                 }
             }
         }
-        adjoint self;
     }
 
     /// Applies the real unitary U = D · L_{m-1} ⋯ L_0 of `givens` to `target`, controlled on
@@ -199,11 +213,8 @@ namespace QDKChemistry.Utils.UnitarySynthesis {
             }
         }
 
-        // The controls are the most significant qubits of the register D acts on, so only the
-        // all-ones control block flips.
         if Any(flip -> flip, phaseFlips) {
-            let uncontrolledFlips = Repeated(false, ((1 <<< Length(controls)) - 1) * Length(phaseFlips));
-            ApplyPhasePolynomial(uncontrolledFlips + phaseFlips, Reversed(target) + controls);
+            Controlled ApplyPhasePolynomial(controls, (phaseFlips, Reversed(target)));
         }
     }
 }
