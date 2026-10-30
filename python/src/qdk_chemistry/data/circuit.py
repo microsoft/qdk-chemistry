@@ -132,6 +132,7 @@ class Circuit(DataClass):
         Logger.trace_entering()
         self.qasm = qasm
         self.qir = qir
+        self._qir_requires_opt_in = qir is not None
         self.qsharp = qsharp
         self._qsharp_factory = qsharp_factory
         self._qsharp_op = qsharp_op
@@ -156,6 +157,11 @@ class Circuit(DataClass):
 
         # Make instance immutable after construction (handled by base class)
         super().__init__()
+
+    @property
+    def has_external_qir(self) -> bool:
+        """Whether QIR was supplied directly rather than compiled by this circuit."""
+        return self._qir_requires_opt_in
 
     def _has_qir(self) -> bool:
         """Check if the Circuit has a QIR representation.

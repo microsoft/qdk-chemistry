@@ -215,6 +215,10 @@ class FileSerializer:
     serializable values. Nested algorithm references remain supported through
     their tagged settings representation.
 
+    The caller is responsible for trusting manifest and payload producers.
+    This serializer does not authenticate them: altered manifests can substitute
+    values or select a registered loader, including native parsers, for modified files.
+
     Each data class is serialized to its own .{type_name}.h5 file, and each
     NumPy array to its own .ndarray.npy file. Primitives and simple types are
     stored in a JSON manifest file.

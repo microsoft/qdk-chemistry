@@ -26,25 +26,28 @@ numpy==2.2.6 ; python_full_version < '3.11'
     # via -r requirements.in
 numpy==2.3.5 ; python_full_version >= '3.11'
     # via -r requirements.in
-opentelemetry-api==1.42.1 ; sys_platform == 'linux'
+opentelemetry-api==1.45.1 ; sys_platform == 'linux'
     # via
     #   -r requirements.in
     #   opentelemetry-exporter-otlp-proto-grpc
     #   opentelemetry-sdk
     #   opentelemetry-semantic-conventions
-opentelemetry-exporter-otlp-proto-common==1.42.1 ; sys_platform == 'linux'
+opentelemetry-exporter-otlp-common==0.66b1 ; sys_platform == 'linux'
     # via opentelemetry-exporter-otlp-proto-grpc
-opentelemetry-exporter-otlp-proto-grpc==1.42.1 ; sys_platform == 'linux'
+opentelemetry-exporter-otlp-proto-common==1.45.1 ; sys_platform == 'linux'
+    # via opentelemetry-exporter-otlp-proto-grpc
+opentelemetry-exporter-otlp-proto-grpc==1.45.1 ; sys_platform == 'linux'
     # via -r requirements.in
-opentelemetry-proto==1.42.1 ; sys_platform == 'linux'
+opentelemetry-proto==1.45.1 ; sys_platform == 'linux'
     # via
     #   opentelemetry-exporter-otlp-proto-common
     #   opentelemetry-exporter-otlp-proto-grpc
-opentelemetry-sdk==1.42.1 ; sys_platform == 'linux'
+opentelemetry-sdk==1.45.1 ; sys_platform == 'linux'
     # via
     #   -r requirements.in
+    #   opentelemetry-exporter-otlp-common
     #   opentelemetry-exporter-otlp-proto-grpc
-opentelemetry-semantic-conventions==0.63b1 ; sys_platform == 'linux'
+opentelemetry-semantic-conventions==0.66b1 ; sys_platform == 'linux'
     # via opentelemetry-sdk
 packaging==26.2
     # via
@@ -64,7 +67,7 @@ pyelftools==0.32 ; sys_platform == 'linux'
     # via auditwheel
 pyproject-hooks==1.2.0
     # via build
-scikit-build-core==0.12.2
+scikit-build-core==1.1.1
     # via -r requirements.in
 tomli==2.4.1 ; python_full_version < '3.11'
     # via
