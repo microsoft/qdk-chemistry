@@ -59,6 +59,22 @@ class TestValidation:
         matrix[0, 0] = 5.0
         np.testing.assert_array_equal(container.to_dense(), np.eye(4))
 
+    def test_sparse_matrix_is_returned_by_copy(self):
+        """Mutating the returned sparse matrix leaves the container, its hash and its JSON unchanged."""
+        matrix = _block_sparse(4)
+        container = RealUnitaryContainer(matrix)
+        content_hash = container.content_hash()
+        serialized = container.to_json()
+
+        returned = container.matrix
+        returned.data[:] = 0.0
+        returned.indices[:] = 0
+
+        np.testing.assert_array_equal(container.matrix.toarray(), matrix.toarray())
+        np.testing.assert_array_equal(container.to_dense(), matrix.toarray())
+        assert container.content_hash() == content_hash
+        assert container.to_json() == serialized
+
     def test_sparse_validation_stays_sparse(self):
         """Validating a wide sparse matrix never forms a dense Gram matrix or identity."""
         dimension = 1 << 12

@@ -133,8 +133,12 @@ class RealUnitaryContainer(UnitaryContainer):
 
     @property
     def matrix(self) -> np.ndarray | sparse.csc_array:
-        """Return the stored matrix, a read-only NumPy array or a SciPy CSC array."""
-        return self._matrix
+        """Return the stored read-only NumPy array, or a copy of the stored SciPy CSC array.
+
+        SciPy sparse arrays cannot be made read-only, so sparse storage is copied to keep the
+        validated container immutable.
+        """
+        return self._matrix.copy() if self.is_sparse else self._matrix
 
     @property
     def is_sparse(self) -> bool:
