@@ -55,11 +55,9 @@ parameters:
 - name: pythonVersions
   type: stringList
   values:
-  - '3.10'
   - '3.11'
   - '3.12'
   default:
-  - '3.10'
   - '3.11'
   - '3.12'
   displayName: Python build versions (3.12 builds an ABI3 wheel for 3.12+)
@@ -221,10 +219,8 @@ extends:
           strategy:
             matrix:
               ${{ each py in parameters.pythonVersions }}:
-                # CPython ships win-arm64 builds only from 3.11 onwards.
-                ${{ if not(and(eq(target.name, 'windows_aarch64'), eq(py, '3.10'))) }}:
-                  Py${{ py }}:
-                    pythonVersion: ${{ py }}
+                Py${{ py }}:
+                  pythonVersion: ${{ py }}
             maxParallel: 5
           displayName: Build ${{ target.march }} ${{ target.os }} wheels
           variables:
@@ -424,10 +420,9 @@ extends:
           inputs:     # Declare all build artifacts to be consumed in the release job
           - ${{ each target in parameters.matrix }}:
             - ${{ each py in parameters.pythonVersions }}:
-              - ${{ if not(and(eq(target.name, 'windows_aarch64'), eq(py, '3.10'))) }}:
-                - input: pipelineArtifact
-                  artifactName: ${{ target.os }}-${{ target.arch }}-wheels-python${{ py }}
-                  targetPath: $(System.DefaultWorkingDirectory)/artifacts/${{ target.os }}-${{ target.arch }}-wheels-python${{ py }}
+              - input: pipelineArtifact
+                artifactName: ${{ target.os }}-${{ target.arch }}-wheels-python${{ py }}
+                targetPath: $(System.DefaultWorkingDirectory)/artifacts/${{ target.os }}-${{ target.arch }}-wheels-python${{ py }}
         steps:
         - script: |
             mkdir -p $(System.DefaultWorkingDirectory)/target/wheels

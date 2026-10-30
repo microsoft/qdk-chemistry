@@ -126,7 +126,7 @@ else()
 endif()
 
 # Find Python first (required for nanobind)
-find_package(Python 3.10 REQUIRED COMPONENTS Interpreter Development.Module
+find_package(Python 3.11 REQUIRED COMPONENTS Interpreter Development.Module
              OPTIONAL_COMPONENTS Development.SABIModule)
 
 # vcpkg's find_package wrapper may miss pip-installed nanobind.
