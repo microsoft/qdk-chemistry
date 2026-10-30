@@ -264,7 +264,7 @@
         "type": "git",
         "git": {
           "repositoryUrl": "https://github.com/ValeevGroup/kit-cmake.git",
-          "commitHash": "256d9462bb765787f5acb69be154b26d6efba8b6"
+          "commitHash": "e820ffd200aebf6b97f2cf223d7b14134755d82e"
         }
       },
       "developmentDependency": true
