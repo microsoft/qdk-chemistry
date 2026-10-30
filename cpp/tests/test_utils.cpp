@@ -4,10 +4,13 @@
 
 #include <gtest/gtest.h>
 #include <qdk/chemistry/scf/core/enums.h>
+#include <qdk/chemistry/scf/util/qr_pseudoinverse.h>
 
 #include <Eigen/Dense>
 #include <algorithm>
+#include <cmath>
 #include <iostream>
+#include <limits>
 #include <memory>
 #include <optional>
 #include <qdk/chemistry/algorithms/scf.hpp>
@@ -21,12 +24,196 @@
 #include <stdexcept>
 #include <vector>
 
+#include "../src/qdk/chemistry/algorithms/microsoft/scf/src/scf_algorithm/line_search.h"
 #include "../src/qdk/chemistry/algorithms/microsoft/utils.hpp"
 #include "ut_common.hpp"
 
 using namespace qdk::chemistry::data;
 using namespace qdk::chemistry::algorithms;
 using namespace qdk::chemistry::utils;
+
+namespace qdk::chemistry::scf {
+
+namespace {
+struct LineSearchQuadratic {
+  using argument_type = Eigen::VectorXd;
+  using return_type = double;
+
+  double energy_offset = 0.0;
+  double trial_energy_error = 0.0;
+  argument_type initial_point = argument_type::Constant(1, 1e-8);
+  argument_type stiffness = argument_type::Ones(1);
+
+  double eval(const argument_type& x) const {
+    const double error =
+        (x.array() != initial_point.array()).any() ? trial_energy_error : 0.0;
+    return energy_offset + 0.5 * x.dot(stiffness.cwiseProduct(x)) + error;
+  }
+
+  argument_type grad(const argument_type& x) const {
+    return stiffness.cwiseProduct(x);
+  }
+
+  static double dot(const argument_type& x, const argument_type& y) {
+    return x.dot(y);
+  }
+
+  static void axpy(double alpha, const argument_type& x, argument_type& y) {
+    y += alpha * x;
+  }
+};
+}  // namespace
+
+TEST(LineSearchTest, AcceptsRoundoffLimitedStepInBracketingAndZoom) {
+  LineSearchQuadratic objective;
+  objective.energy_offset = -3.0;
+  const double ulp =
+      std::nextafter(-3.0, std::numeric_limits<double>::infinity()) + 3.0;
+  for (double energy_error : {0.0, ulp}) {
+    objective.trial_energy_error = energy_error;
+    for (double initial_step : {1.0, 3.0}) {
+      SCOPED_TRACE(energy_error);
+      SCOPED_TRACE(initial_step);
+      double step = initial_step;
+      double energy = objective.eval(objective.initial_point);
+      Eigen::VectorXd gradient = objective.grad(objective.initial_point);
+      const Eigen::VectorXd direction = -gradient;
+      Eigen::VectorXd point;
+      impl::nocedal_wright_line_search(objective, objective.initial_point,
+                                       direction, step, point, energy,
+                                       gradient);
+      EXPECT_LE(energy, objective.energy_offset + ulp);
+      EXPECT_LE(gradient.norm(),
+                0.9 * objective.grad(objective.initial_point).norm());
+      EXPECT_GT((point - objective.initial_point).norm(), 0.0);
+    }
+  }
+}
+
+TEST(LineSearchTest, RejectsInvalidTrialEnergies) {
+  LineSearchQuadratic objective;
+  objective.energy_offset = -3.0;
+  for (double error : {1e-6, std::numeric_limits<double>::quiet_NaN(),
+                       std::numeric_limits<double>::infinity()}) {
+    SCOPED_TRACE(error);
+    objective.trial_energy_error = error;
+    double step = 1.0;
+    double energy = objective.eval(objective.initial_point);
+    Eigen::VectorXd gradient = objective.grad(objective.initial_point);
+    const Eigen::VectorXd direction = -gradient;
+    Eigen::VectorXd point;
+    EXPECT_THROW(impl::nocedal_wright_line_search(
+                     objective, objective.initial_point, direction, step, point,
+                     energy, gradient),
+                 std::runtime_error);
+  }
+}
+
+TEST(LineSearchTest, RejectsRoundoffStepWithFullGradientGrowth) {
+  LineSearchQuadratic objective;
+  objective.energy_offset = -3.0;
+  objective.initial_point = Eigen::Vector2d(1e-8, 0.0);
+  objective.stiffness = Eigen::Vector2d(1.0, 100.0);
+  const Eigen::VectorXd direction = Eigen::Vector2d(-1e-8, 5e-10);
+  double step = 1.0;
+  double energy = objective.eval(objective.initial_point);
+  Eigen::VectorXd gradient = objective.grad(objective.initial_point);
+  Eigen::VectorXd point;
+  EXPECT_THROW(impl::nocedal_wright_line_search(
+                   objective, objective.initial_point, direction, step, point,
+                   energy, gradient),
+               std::runtime_error);
+}
+
+TEST(QrPseudoinverseTest, SquareAndRectangularFockRoundTrips) {
+  RowMajorMatrix coefficients(5, 3);
+  coefficients << 1.0, 0.2, -0.3, 0.4, 1.5, 0.6, -0.2, 0.3, 1.1, 0.7, -0.4, 0.2,
+      -0.5, 0.1, 0.8;
+  RowMajorMatrix fock_mo(3, 3);
+  fock_mo << -1.0, 0.3, -0.2, 0.3, 0.5, 0.1, -0.2, 0.1, 1.2;
+
+  for (int num_ao : {3, 5}) {
+    const RowMajorMatrix C = coefficients.topRows(num_ao);
+    const RowMajorMatrix C_plus = qr_pseudoinverse(C);
+    EXPECT_EQ(C_plus.rows(), 3);
+    EXPECT_EQ(C_plus.cols(), num_ao);
+    EXPECT_TRUE((C_plus * C).isApprox(RowMajorMatrix::Identity(3, 3), 1e-12));
+    EXPECT_TRUE((C * C_plus * C).isApprox(C, 1e-12));
+    EXPECT_TRUE((C_plus * C * C_plus).isApprox(C_plus, 1e-12));
+    const RowMajorMatrix projector = C * C_plus;
+    EXPECT_TRUE(projector.isApprox(projector.transpose(), 1e-12));
+
+    const RowMajorMatrix fock_ao = C_plus.transpose() * fock_mo * C_plus;
+    EXPECT_TRUE(fock_ao.isApprox(fock_ao.transpose(), 1e-12));
+    EXPECT_TRUE((C.transpose() * fock_ao * C).isApprox(fock_mo, 1e-12));
+    if (num_ao == 3) {
+      const RowMajorMatrix inverse = C.inverse();
+      EXPECT_TRUE(C_plus.isApprox(inverse, 1e-12));
+      EXPECT_TRUE(
+          fock_ao.isApprox(inverse.transpose() * fock_mo * inverse, 1e-12));
+    }
+  }
+}
+
+TEST(QrPseudoinverseTest, IllConditionedFullColumnRank) {
+  RowMajorMatrix seed(5, 3);
+  seed << 1.0, 2.0, 3.0, 3.0, -1.0, 2.0, 2.0, 3.0, -1.0, -1.0, 2.0, 1.0, 2.0,
+      1.0, 3.0;
+  const RowMajorMatrix Q =
+      seed.householderQr().householderQ() * RowMajorMatrix::Identity(5, 3);
+  RowMajorMatrix C = Q;
+  C.col(1) *= 1e-3;
+  C.col(2) *= 1e-6;
+  const RowMajorMatrix C_plus = qr_pseudoinverse(C);
+  EXPECT_TRUE(C_plus.allFinite());
+  EXPECT_TRUE((C_plus * C).isApprox(RowMajorMatrix::Identity(3, 3), 1e-9));
+  EXPECT_TRUE((C * C_plus).isApprox(Q * Q.transpose(), 1e-9));
+}
+
+TEST(QrPseudoinverseTest, PreservesOriginalColumnOrdering) {
+  RowMajorMatrix C(5, 3);
+  C << 1.0, 0.0, 0.0, 0.0, 4.0, 0.0, 0.0, 0.0, 2.0, 1.0, 0.0, 0.0, 0.0, 4.0,
+      0.0;
+  RowMajorMatrix expected(3, 5);
+  expected << 0.5, 0.0, 0.0, 0.5, 0.0, 0.0, 0.125, 0.0, 0.0, 0.125, 0.0, 0.0,
+      0.5, 0.0, 0.0;
+
+  EXPECT_TRUE(qr_pseudoinverse(C).isApprox(expected, 1e-12));
+}
+
+TEST(QrPseudoinverseTest, MatchesCanonicalOverlapDual) {
+  RowMajorMatrix seed(4, 4);
+  seed << 1, 2, 3, 4, 2, -1, 1, 3, 3, 1, -2, 1, 4, 3, 1, -1;
+  const RowMajorMatrix U = seed.householderQr().householderQ();
+  Eigen::Vector4d overlap_eigenvalues(0.0, 0.25, 1.0, 2.0);
+  const RowMajorMatrix S = U * overlap_eigenvalues.asDiagonal() * U.transpose();
+  const RowMajorMatrix C = U.rightCols(3) * overlap_eigenvalues.tail(3)
+                                                .array()
+                                                .sqrt()
+                                                .inverse()
+                                                .matrix()
+                                                .asDiagonal();
+  EXPECT_TRUE(
+      (C.transpose() * S * C).isApprox(RowMajorMatrix::Identity(3, 3), 1e-12));
+  EXPECT_TRUE(qr_pseudoinverse(C).isApprox(C.transpose() * S, 1e-12));
+}
+
+TEST(QrPseudoinverseTest, RejectsInvalidInputs) {
+  EXPECT_THROW(qr_pseudoinverse(RowMajorMatrix(3, 0)), std::invalid_argument);
+  EXPECT_THROW(qr_pseudoinverse(RowMajorMatrix::Ones(2, 3)),
+               std::invalid_argument);
+  EXPECT_THROW(qr_pseudoinverse(RowMajorMatrix::Zero(4, 2)),
+               std::runtime_error);
+  EXPECT_THROW(qr_pseudoinverse(RowMajorMatrix::Ones(4, 2)),
+               std::runtime_error);
+  RowMajorMatrix C = RowMajorMatrix::Identity(3, 2);
+  C(0, 0) = std::numeric_limits<double>::quiet_NaN();
+  EXPECT_THROW(qr_pseudoinverse(C), std::invalid_argument);
+  C(0, 0) = std::numeric_limits<double>::infinity();
+  EXPECT_THROW(qr_pseudoinverse(C), std::invalid_argument);
+}
+
+}  // namespace qdk::chemistry::scf
 
 TEST(MicrosoftUtilsTest, ParsesRelativity) {
   using qdk::chemistry::scf::Relativity;
