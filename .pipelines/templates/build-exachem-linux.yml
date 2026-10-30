@@ -1,0 +1,53 @@
+parameters:
+- name: march
+  type: string
+  default: x86-64-v3
+- name: agentBuildDirectory
+  type: string
+  default: $(Agent.BuildDirectory)
+- name: dockerImage
+  type: string
+  default: mcr.microsoft.com/mirror/docker/library/ubuntu:24.04
+
+steps:
+- checkout: self
+  persistCredentials: true
+  path: qdk-chemistry
+  fetchDepth: 1
+  retryCountOnTaskFailure: 3
+
+# Cached across pipeline runs, keyed on everything that can change ExaChem's build output.
+- task: Cache@2
+  displayName: Restore/save ExaChem install cache
+  inputs:
+    key: >-
+      "linux-exachem-${{ parameters.march }}-v1" | "${{ parameters.dockerImage }}" |
+      cpp/manifest/qdk-chemistry/cgmanifest.json |
+      external/macis/manifest/cgmanifest.json |
+      .pipelines/install-scripts/common.sh |
+      .pipelines/install-scripts/build-exachem-linux.sh |
+      .pipelines/install-scripts/install-blis.sh |
+      .pipelines/install-scripts/install-libflame.sh |
+      .pipelines/install-scripts/install-cpp-deps.sh |
+      .pipelines/install-scripts/install-blaspp.sh |
+      .pipelines/install-scripts/install-lapackpp.sh |
+      .pipelines/install-scripts/exachem/**/*
+    path: $(System.DefaultWorkingDirectory)/exachem_install
+    cacheHitVar: EXACHEM_INSTALL_CACHE_RESTORED
+
+- script: |
+    echo "Building ExaChem (Linux ${{ parameters.march }}, BLIS+LibFLAME)..."
+    docker run --rm \
+      --platform linux/amd64 \
+      -v ${{ parameters.agentBuildDirectory }}:/workspace:rshared \
+      -w /workspace/qdk-chemistry \
+      ${{ parameters.dockerImage }} \
+    bash .pipelines/install-scripts/build-exachem-linux.sh ${{ parameters.march }}
+  displayName: Build ExaChem (Linux ${{ parameters.march }})
+  condition: ne(variables['EXACHEM_INSTALL_CACHE_RESTORED'], 'true')
+
+# The container runs as root, so exachem_install is root-owned afterward; only needed on a fresh build.
+- script: |
+    sudo chown -R $(id -u):$(id -g) $(System.DefaultWorkingDirectory)/exachem_install
+  displayName: Fix ExaChem install directory ownership
+  condition: and(succeeded(), ne(variables['EXACHEM_INSTALL_CACHE_RESTORED'], 'true'))

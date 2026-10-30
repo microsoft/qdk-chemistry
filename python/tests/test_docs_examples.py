@@ -16,6 +16,8 @@ from pathlib import Path
 from tempfile import TemporaryDirectory
 from typing import ClassVar
 
+import pytest
+
 from qdk_chemistry.plugins.qiskit import (
     QDK_CHEMISTRY_HAS_QISKIT,
     QDK_CHEMISTRY_HAS_QISKIT_AER,
@@ -29,6 +31,11 @@ PYTHON_EXAMPLES_DIR = EXAMPLES_DIR / "python"
 PYSCF_AVAILABLE = importlib.util.find_spec("pyscf") is not None
 OPENFERMION_AVAILABLE = importlib.util.find_spec("openfermion") is not None
 GEOMETRIC_AVAILABLE = importlib.util.find_spec("geometric") is not None
+AZURE_QUANTUM_AVAILABLE = (
+    importlib.util.find_spec("azure") is not None
+    and importlib.util.find_spec("azure.quantum") is not None
+    and importlib.util.find_spec("azure.identity") is not None
+)
 _RUN_SLOW_TESTS = os.getenv("QDK_CHEMISTRY_RUN_SLOW_TESTS", "").lower() in {"1", "true", "yes"}
 
 # Release-note example scripts are snapshots that only work with the matching
@@ -44,7 +51,7 @@ def _generic_python_examples() -> list[Path]:
     return sorted(path for path in PYTHON_EXAMPLES_DIR.glob("*.py") if not path.name.startswith("tutorial_"))
 
 
-def check_example_requirements(example_file: Path) -> tuple[bool, bool, bool, bool, bool, bool, bool, bool]:
+def check_example_requirements(example_file: Path) -> tuple[bool, bool, bool, bool, bool, bool, bool, bool, bool]:
     """Check optional dependencies and execution requirements for an example.
 
     Args:
@@ -52,7 +59,7 @@ def check_example_requirements(example_file: Path) -> tuple[bool, bool, bool, bo
 
     Returns:
         Tuple of (requires_pyscf, requires_qiskit, requires_qiskit_aer, requires_qiskit_nature,
-              requires_openfermion, requires_geometric, requires_external_service, is_slow)
+              requires_openfermion, requires_geometric, requires_azure_quantum, requires_external_service, is_slow)
 
     """
     content = example_file.read_text(encoding="utf-8")
@@ -63,6 +70,7 @@ def check_example_requirements(example_file: Path) -> tuple[bool, bool, bool, bo
     requires_qiskit_nature = False
     requires_openfermion = False
     requires_geometric = False
+    requires_azure_quantum = False
     requires_external_service = False
     is_slow = False
 
@@ -143,9 +151,17 @@ def check_example_requirements(example_file: Path) -> tuple[bool, bool, bool, bo
     ):
         requires_qiskit_aer = True
 
-    # Expectation estimator examples run circuit simulations and are slow
-    if 'create("expectation_estimator"' in content or "create('expectation_estimator'" in content:
-        is_slow = True
+    if any(
+        pattern in content
+        for pattern in [
+            'create("circuit_executor", "azure_quantum_backend"',
+            "create('circuit_executor', 'azure_quantum_backend'",
+            "azure_quantum_backend",
+            "AzureQuantumBackend",
+            "qdk_chemistry.plugins.azure_quantum",
+        ]
+    ):
+        requires_azure_quantum = True
 
     # Individual examples can declare intentionally long execution explicitly.
     if "# docs-example: slow" in content:
@@ -161,6 +177,7 @@ def check_example_requirements(example_file: Path) -> tuple[bool, bool, bool, bo
         requires_qiskit_nature,
         requires_openfermion,
         requires_geometric,
+        requires_azure_quantum,
         requires_external_service,
         is_slow,
     )
@@ -225,6 +242,7 @@ def _create_test_methods():
                 requires_qiskit_nature,
                 requires_openfermion,
                 requires_geometric,
+                requires_azure_quantum,
                 requires_external_service,
                 is_slow,
             ) = check_example_requirements(example_file)
@@ -238,8 +256,8 @@ def _create_test_methods():
                 needs_qiskit_nature,
                 needs_openfermion,
                 needs_geometric,
+                needs_azure_quantum,
                 needs_external_service,
-                slow,
             ):
                 """Create a test method for the given example file."""
 
@@ -267,31 +285,34 @@ def _create_test_methods():
                         self.skipTest("OpenFermion not available")
                     if needs_geometric and not GEOMETRIC_AVAILABLE:
                         self.skipTest("geomeTRIC not available")
+                    if needs_azure_quantum and not AZURE_QUANTUM_AVAILABLE:
+                        self.skipTest("Azure Quantum not available")
                     if needs_external_service:
                         self.skipTest("Example requires an external service")
-                    if slow and not _RUN_SLOW_TESTS:
-                        self.skipTest("Skipping slow test. Set QDK_CHEMISTRY_RUN_SLOW_TESTS=1 to enable.")
 
                     self._run_python_example(filepath)
 
                 return test_method
 
             # Add the test method to the TestExampleScripts class
-            setattr(
-                TestExampleScripts,
-                test_name,
-                make_test(
-                    example_file,
-                    requires_pyscf,
-                    requires_qiskit,
-                    requires_qiskit_aer,
-                    requires_qiskit_nature,
-                    requires_openfermion,
-                    requires_geometric,
-                    requires_external_service,
-                    is_slow,
-                ),
+            generated_test = make_test(
+                example_file,
+                requires_pyscf,
+                requires_qiskit,
+                requires_qiskit_aer,
+                requires_qiskit_nature,
+                requires_openfermion,
+                requires_geometric,
+                requires_azure_quantum,
+                requires_external_service,
             )
+            if is_slow:
+                generated_test = pytest.mark.slow(generated_test)
+                generated_test = unittest.skipUnless(
+                    _RUN_SLOW_TESTS, "Slow test. Set QDK_CHEMISTRY_RUN_SLOW_TESTS=1 to enable."
+                )(generated_test)
+
+            setattr(TestExampleScripts, test_name, generated_test)
 
 
 # Generate test methods when the module is loaded

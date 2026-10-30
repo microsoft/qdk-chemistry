@@ -34,6 +34,7 @@ from qdk_chemistry.data import (
     QubitOperator,
     UnitaryRepresentation,
 )
+from qdk_chemistry.data.qubit_operator.containers.pauli_decomposition import PauliDecompositionContainer
 from qdk_chemistry.data.unitary_representation.containers.pauli_product_formula import (
     ExponentiatedPauliTerm,
     PauliProductFormulaContainer,
@@ -148,8 +149,12 @@ class Zassenhaus(TimeEvolutionBuilder):
             UnitaryRepresentation: The unitary representation built by the Zassenhaus decomposition.
 
         """
+        if not isinstance(qubit_hamiltonian, QubitOperator):
+            raise TypeError(
+                f"The {self.name()!r} builder takes a QubitOperator, got {type(qubit_hamiltonian).__name__}."
+            )
         container_type = qubit_hamiltonian.get_container_type()
-        if container_type != "pauli_decomposition":
+        if not isinstance(qubit_hamiltonian.get_container(), PauliDecompositionContainer):
             raise ValueError(
                 f"Zassenhaus time evolution requires a Pauli decomposition qubit operator; "
                 f"got the {container_type!r} representation."
@@ -190,7 +195,7 @@ class Zassenhaus(TimeEvolutionBuilder):
             step_terms=terms,
             step_reps=num_divisions * power_repetitions,
             num_qubits=num_qubits,
-            scale=effective_time,
+            scale=effective_time * power_repetitions,
         )
 
         return UnitaryRepresentation(container=container)

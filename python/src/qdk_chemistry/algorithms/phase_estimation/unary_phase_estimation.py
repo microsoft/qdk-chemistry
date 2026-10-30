@@ -10,9 +10,9 @@ from collections.abc import Callable
 from qdk_chemistry.data import (
     AlgorithmRef,
     Circuit,
+    HamiltonianDescription,
     QpeResult,
     QuantumErrorProfile,
-    QubitOperator,
 )
 from qdk_chemistry.utils import Logger
 
@@ -56,7 +56,7 @@ def _post_process_phase_estimation(
         method: Phase estimation algorithm label recorded on the result.
         resolve_positive_branch: ``True`` selects the non-negative eigenvalue branch,
             ``False`` the non-positive one, as wanted for a ground state.
-        eigenvalue_from_phase: A callable mapping a walk phase fraction to a Hamiltonian eigenvalue.
+        eigenvalue_from_phase: A callable mapping a walk phase fraction to its Hamiltonian eigenvalue.
 
     Returns:
         A :class:`~qdk_chemistry.data.QpeResult` whose ``phase_fraction`` is the measured bin,
@@ -90,6 +90,7 @@ def _post_process_phase_estimation(
         resolved_energy=raw_energy,
         bits_msb_first=tuple(int(bit) for bit in bitstring_msb_first),
         bitstring_msb_first=bitstring_msb_first,
+        bitstring_counts=counts,
     )
 
 
@@ -135,7 +136,7 @@ class UnaryPhaseEstimation(PhaseEstimation):
     def _run_impl(
         self,
         state_preparation: Circuit,
-        qubit_hamiltonian: QubitOperator,
+        qubit_hamiltonian: HamiltonianDescription,
         *,
         noise: QuantumErrorProfile | None = None,
     ) -> QpeResult:
@@ -143,7 +144,7 @@ class UnaryPhaseEstimation(PhaseEstimation):
 
         Args:
             state_preparation: The circuit that prepares the initial state.
-            qubit_hamiltonian: The qubit Hamiltonian for which to estimate eigenvalues.
+            qubit_hamiltonian: The Hamiltonian description the unitary builder takes.
             noise: The quantum error profile to simulate noise, defaults to None.
 
         Returns:
@@ -168,8 +169,13 @@ class UnaryPhaseEstimation(PhaseEstimation):
                 f"but got {type(circuit_builder)} instead."
             )
 
-        # Resolve container before running the circuit
+        # Resolve container before running the circuit. The builder drops any carried power,
+        # so inversion must use the base (power=1) unitary. It also completes the walk around a
+        # plain block encoding, so decode through the walk that block encoding defines.
         unitary_builder = circuit_builder._create_nested("unitary_builder")  # noqa: SLF001
+        unitary_builder.settings().update("power", 1)
+        if unitary_builder.settings().has("quantum_walk"):
+            unitary_builder.settings().update("quantum_walk", True)
         unitary_rep = unitary_builder.run(qubit_hamiltonian)
         container = unitary_rep.get_container()
 

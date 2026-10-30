@@ -107,6 +107,9 @@ include(cmake/qdk-uarch.cmake)
 # Handle TPL dependencies
 include(cmake/third_party.cmake)
 
+# BLAS thread-control backend selection
+include(cmake/qdk-blas-threads.cmake)
+
 # Handle GPU dependencies
 if(QDK_CHEMISTRY_ENABLE_GPU)
   include(${CMAKE_CURRENT_LIST_DIR}/cmake/cuda.cmake)
@@ -161,6 +164,8 @@ block()
         GIT_TAG        5b435cfdd3cb423f5a40229572c38f6700ba0456
         SYSTEM
     )
+    # SeQuant would otherwise take an installed BTAS over this pinned in-tree build.
+    set(CMAKE_DISABLE_FIND_PACKAGE_BTAS ON)
     # Concurrent evaluation otherwise races on SeQuant's trace-label map, even with tracing off.
     set(_sequant_patch PATCH_COMMAND "${CMAKE_COMMAND}"
         "-DPATCH_FILE=${CMAKE_CURRENT_LIST_DIR}/cmake/patches/sequant-eval-trace-labels.patch"
@@ -376,6 +381,10 @@ install(EXPORT chemistryTargets
 
 # Create config files
 include(CMakePackageConfigHelpers)
+
+# Where kit-cmake (via BTAS) installed the blaspp_headers export, relative to qdkConfig.
+get_directory_property(QDK_BLASPP_HEADERS_DIR DIRECTORY "${BTAS_SOURCE_DIR}" DEFINITION blaspp_install_configdir)
+cmake_path(RELATIVE_PATH QDK_BLASPP_HEADERS_DIR BASE_DIRECTORY lib/cmake/qdk)
 
 configure_package_config_file(
     "${CMAKE_CURRENT_SOURCE_DIR}/cmake/qdkConfig.cmake.in"

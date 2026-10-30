@@ -13,6 +13,8 @@
 #include <iostream>
 #include <macis/csr_hamiltonian.hpp>
 #include <macis/hamiltonian_generator/double_loop.hpp>
+#include <macis/hamiltonian_generator/dynamic_bit_masking.hpp>
+#include <macis/hamiltonian_generator/residue_arrays.hpp>
 #include <macis/hamiltonian_generator/sorted_double_loop.hpp>
 #include <macis/util/fcidump.hpp>
 
@@ -105,6 +107,60 @@ TEMPLATE_TEST_CASE("CSR Hamiltonian", "[ham_gen]",
                                             testing::ascii_text_tolerance));
   }
 #endif
+}
+
+TEMPLATE_TEST_CASE("CSR threshold policy matches diagonal blocks",
+                   "[csr_threshold]",
+                   macis::DoubleLoopHamiltonianGenerator<wfn_type>,
+                   macis::SortedDoubleLoopHamiltonianGenerator<wfn_type>,
+                   macis::ResidueArrayHamiltonianGenerator<wfn_type>,
+                   macis::DynamicBitMaskHamiltonianGenerator<wfn_type>) {
+  ROOT_ONLY(MPI_COMM_WORLD);
+
+  constexpr size_t norb = 3;
+  std::vector<double> T = {0.25, -0.5, 0.0, -0.5, 0.75, 0.0, 0.0, 0.0, 0.0};
+  std::vector<double> V(norb * norb * norb * norb, 0.0);
+  TestType generator(
+      macis::matrix_span<double>(T.data(), norb, norb),
+      macis::rank4_span<double>(V.data(), norb, norb, norb, norb));
+  macis::HamiltonianGenerator<wfn_type>& ham_gen = generator;
+
+  for (size_t n_elec = 0; n_elec <= 2; ++n_elec) {
+    CAPTURE(n_elec);
+    std::vector<wfn_type> dets(1);
+    if (n_elec != 0) {
+      dets[0].set(0);
+      if (n_elec == 2)
+        dets[0].set(macis::wavefunction_traits<wfn_type>::size() / 2 + 2);
+      dets.push_back(dets[0]);
+      dets[1].flip(0).set(1);
+    }
+
+    const bool inclusive = ham_gen.csr_threshold_inclusive(n_elec);
+    for (double threshold : {0.25, 0.5, 0.75}) {
+      CAPTURE(threshold);
+      const auto H = macis::make_csr_hamiltonian_block<int64_t>(
+          dets.begin(), dets.end(), dets.begin(), dets.end(), ham_gen,
+          threshold);
+      std::vector<int64_t> rowptr{0}, colind;
+      std::vector<double> nzval;
+      for (size_t i = 0; i < dets.size(); ++i) {
+        for (size_t j = 0; j < dets.size(); ++j) {
+          const double value = ham_gen.matrix_element(dets[i], dets[j]);
+          const bool keep = inclusive ? i == j || std::abs(value) >= threshold
+                                      : std::abs(value) > threshold;
+          if (keep) {
+            colind.push_back(j);
+            nzval.push_back(value);
+          }
+        }
+        rowptr.push_back(nzval.size());
+      }
+      CHECK(H.rowptr() == rowptr);
+      CHECK(H.colind() == colind);
+      CHECK(H.nzval() == nzval);
+    }
+  }
 }
 
 #ifdef MACIS_ENABLE_MPI
