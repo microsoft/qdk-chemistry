@@ -173,13 +173,16 @@ class MatrixProductStatePreparation(StatePreparation):
         syntheses: list[dict[str, Any]] = []
         right_factor: np.ndarray | None = None
         for index in range(len(mps_sites) - 1, 0, -1):
-            isometry = self._site_isometry(mps_sites[index], ancilla_dim)
-            if right_factor is not None:
-                bond = right_factor.shape[0]
-                isometry[:, :bond] = np.einsum("bc,pca->pba", right_factor, isometry[:, :bond])
-            matrix = isometry.reshape(-1, isometry.shape[2])
+            if method == "block_sparse":
+                matrix: np.ndarray | sparse.csc_array = self._sparse_site_isometry(mps_sites[index], ancilla_dim)
+            else:
+                isometry = self._site_isometry(mps_sites[index], ancilla_dim)
+                if right_factor is not None:
+                    bond = right_factor.shape[0]
+                    isometry[:, :bond] = np.einsum("bc,pca->pba", right_factor, isometry[:, :bond])
+                matrix = isometry.reshape(-1, isometry.shape[2])
             try:
-                container = RealUnitaryContainer(sparse.csc_array(matrix) if method == "block_sparse" else matrix)
+                container = RealUnitaryContainer(matrix)
             except ValueError as error:
                 raise ValueError(f"{_DESCRIPTION} requires isometric sites; site {index} is not: {error}") from error
             unitary = UnitaryRepresentation(container)
@@ -300,6 +303,33 @@ class MatrixProductStatePreparation(StatePreparation):
         isometry = np.zeros((physical, ancilla_dim, left))
         isometry[:, :right] = tensor.transpose(1, 2, 0)
         return isometry
+
+    @staticmethod
+    def _sparse_site_isometry(site: MPSSite, ancilla_dim: int) -> sparse.csc_array:
+        """Return :meth:`_site_isometry` reshaped to ``(physical * ancilla_dim, left)`` as a sparse matrix.
+
+        The symmetry blocks of the site are scattered straight into the matrix, so neither the dense
+        site nor the padded isometry is formed.
+        """
+        tensor = site.tensor
+        extents = tensor.extents()
+        offsets = []
+        for order, slot_extents in zip(site.sector_orders, extents, strict=True):
+            starts = np.cumsum([0] + [slot_extents[label] for label in order[:-1]])
+            offsets.append(dict(zip(order, starts.tolist(), strict=True)))
+        rows, columns, values = [np.empty(0, dtype=int)], [np.empty(0, dtype=int)], [np.empty(0)]
+        for labels, block in tensor.blocks():
+            shape = tuple(extents[slot][label] for slot, label in enumerate(labels))
+            values_3d = np.asarray(block).reshape(shape)
+            left, physical, right = np.nonzero(values_3d)
+            left_label, physical_label, right_label = labels
+            rows.append((offsets[1][physical_label] + physical) * ancilla_dim + offsets[2][right_label] + right)
+            columns.append(offsets[0][left_label] + left)
+            values.append(values_3d[left, physical, right])
+        return sparse.csc_array(
+            (np.concatenate(values), (np.concatenate(rows), np.concatenate(columns))),
+            shape=(site.physical_dimension * ancilla_dim, site.left_bond_dimension),
+        )
 
     @staticmethod
     def _validate_physical_basis(sites: Sequence[MPSSite]) -> None:

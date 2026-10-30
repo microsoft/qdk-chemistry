@@ -1,8 +1,10 @@
 """Tests for matrix product state preparation with dense and block-sparse unitary synthesis.
 
-Covers settings and input validation, agreement of the dense and block-sparse Q# circuits,
-fermionic order signs on open-shell states, composition with Trotterized quantum phase estimation
-to recover classical eigenvalues, and resource-estimate regressions. The site isometries are
+Covers settings and input validation, agreement of the dense and block-sparse Q# circuits, a
+multi-site preparation with unequal bonds against an independent contraction, the block-sparse site
+matrix built from symmetry blocks, fermionic order signs on open-shell states, composition with
+Trotterized quantum phase estimation to recover classical eigenvalues, and resource-estimate
+regressions. The site isometries are
 synthesized by the ``unitary_synthesis`` circuit mapper, which has its own tests. Fixture data
 (``mps_h2``, ``mps_spin``) lives in ``test_data/mps_h2.mps.json``/``mps_spin.mps.json``, generated
 by ``test_data/make_mps_fixtures.py``.
@@ -13,17 +15,28 @@ by ``test_data/make_mps_fixtures.py``.
 # Licensed under the MIT License. See LICENSE.txt in the project root for license information.
 # --------------------------------------------------------------------------------------------
 
+import itertools
 import json
 from pathlib import Path
 
 import numpy as np
 import pytest
 from qdk.qsharp import QSharpError
+from scipy import sparse
 
 from qdk_chemistry.algorithms import create
 from qdk_chemistry.algorithms.phase_estimation.standard_phase_estimation import StandardPhaseEstimation
 from qdk_chemistry.algorithms.state_preparation.matrix_product_state import MatrixProductStatePreparation
-from qdk_chemistry.data import AlgorithmRef, MPSContainer, MPSSite, Orbitals, QubitOperator, Wavefunction
+from qdk_chemistry.data import (
+    AlgorithmRef,
+    MPSContainer,
+    MPSSite,
+    Orbitals,
+    QubitOperator,
+    RealUnitaryContainer,
+    UnitaryRepresentation,
+    Wavefunction,
+)
 from qdk_chemistry.data import symmetry as sym
 from qdk_chemistry.utils.qsharp import create_qsharp_context, get_qsharp_context, use_qsharp_context
 
@@ -404,6 +417,98 @@ def test_dense_and_block_sparse_prepare_same_state(fixture_name, reversed_order)
             )
             assert probability > 1 - _AGREEMENT_TOLERANCE, method
     assert np.abs(np.vdot(states["dense"], states["block_sparse"])) ** 2 > 1 - _AGREEMENT_TOLERANCE
+
+
+def test_sparse_site_isometry_scatters_symmetry_blocks():
+    """The block-sparse site matrix is built from the symmetry blocks and equals the padded dense isometry.
+
+    Every slot has two spin sectors whose sector order is not the label order, and only some sector
+    triples hold a block, so the sector offsets and the empty blocks are both exercised.
+    """
+    syms = sym.SymmetryProduct([sym.axes.spin(1, False)])
+    alpha, beta = sym.SymmetryLabel([sym.axes.alpha()]), sym.SymmetryLabel([sym.axes.beta()])
+    extents = [{alpha: 2, beta: 1}, {alpha: 3, beta: 1}, {alpha: 1, beta: 2}]
+    rng = np.random.default_rng(3)
+    blocks = []
+    for labels in [(alpha, alpha, beta), (beta, alpha, alpha), (alpha, beta, alpha), (beta, beta, beta)]:
+        left, physical, right = (extents[slot][label] for slot, label in enumerate(labels))
+        blocks.append((labels, rng.standard_normal((left * physical, right))))
+    site = MPSSite(
+        sym.SymmetryBlockedTensorRank3([syms] * 3, extents, blocks), [beta, alpha], [beta, alpha], [beta, alpha]
+    )
+    ancilla_dim = 4
+
+    matrix = MatrixProductStatePreparation._sparse_site_isometry(site, ancilla_dim)
+
+    expected = MatrixProductStatePreparation._site_isometry(site, ancilla_dim).reshape(-1, site.left_bond_dimension)
+    assert isinstance(matrix, sparse.csc_array)
+    assert matrix.nnz == np.count_nonzero(expected) == sum(block.size for _, block in blocks)
+    assert np.array_equal(matrix.toarray(), expected)
+
+
+def _random_right_canonical_tensors(bond_dims: list[int], physical: int, seed: int) -> list[np.ndarray]:
+    """Random real right-canonical MPS tensors with the given bond dimensions and a normalized site zero."""
+    rng = np.random.default_rng(seed)
+    tensors = [rng.standard_normal((left, physical, right)) for left, right in itertools.pairwise(bond_dims)]
+    for site in range(len(tensors) - 1, 0, -1):
+        left, _, right = tensors[site].shape
+        q_matrix, r_matrix = np.linalg.qr(tensors[site].reshape(left, -1).T)
+        tensors[site] = q_matrix.T.reshape(left, physical, right)
+        tensors[site - 1] = tensors[site - 1] @ r_matrix.T
+    tensors[0] /= np.linalg.norm(tensors[0])
+    return tensors
+
+
+def _target_state(mps: MPSContainer) -> np.ndarray:
+    """Contract the MPS into the blocked Jordan-Wigner qubit basis of the prepared register.
+
+    With one qubit per site the physical index is the ``('0', '1')`` basis of a spinless mode; with two
+    it is ``('0', 'u', 'd', '2')``, whose bits create the alpha and then the beta mode. The mode of
+    channel ``c`` on orbital ``o`` is qubit ``c * num_sites + o`` (qubit 0 most significant), and each
+    amplitude carries the sign of reordering the creation operators from chain order into qubit order.
+    """
+    qubits_per_site = 1 if mps.sites[0].physical_dimension == 2 else 2
+    num_sites, order = mps.num_sites, list(mps.site_to_orbital_order)
+    num_qubits = qubits_per_site * num_sites
+    chain = np.ones((1, 1))
+    for site in mps.sites:
+        tensor = np.asarray(site.to_dense()).reshape(site.shape)
+        chain = np.einsum("sa,apb->spb", chain, tensor).reshape(-1, tensor.shape[2])
+    chain = chain[:, 0] / np.linalg.norm(chain[:, 0])
+    target = np.zeros(1 << num_qubits)
+    for index in np.flatnonzero(chain):
+        created = []
+        for site, orbital in enumerate(order):
+            physical = (int(index) >> (qubits_per_site * (num_sites - 1 - site))) & ((1 << qubits_per_site) - 1)
+            created += [channel * num_sites + orbital for channel in range(qubits_per_site) if physical >> channel & 1]
+        inversions = sum(first > second for i, first in enumerate(created) for second in created[i + 1 :])
+        target[sum(1 << (num_qubits - 1 - qubit) for qubit in created)] = (-1) ** inversions * chain[index]
+    return target
+
+
+@_METHODS
+def test_multi_site_mps_matches_contraction(method):
+    """A four-site MPS with unequal bonds prepares its independently contracted state.
+
+    Bonds 1-4-3-2-1 leave every bond after the first below the two-qubit bond register, so the sites
+    are padded. The dense circuits absorb each site's right factor into the site before it: the last
+    site's factor, checked here to be nontrivial, goes into site two, and site two's into site one.
+    The permuted ``site_to_orbital_order`` also checks the fermionic signs across several sites.
+    """
+    mps = make_mps(_random_right_canonical_tensors([1, 4, 3, 2, 1], 4, seed=11), site_to_orbital_order=(2, 0, 3, 1))
+    if method == "dense":
+        last = MatrixProductStatePreparation._site_isometry(mps.sites[-1], ancilla_dim=4)
+        mapper = create("circuit_mapper", "unitary_synthesis", num_input_qubits=2)
+        right_factor = mapper.right_factor(UnitaryRepresentation(RealUnitaryContainer(last.reshape(-1, 2))))
+        assert not np.allclose(np.abs(right_factor), np.eye(2), atol=1e-3)
+    operation, site_struct = _QSHARP_OPERATIONS[method]
+    with use_qsharp_context(create_qsharp_context()):
+        data = preparation_data(mps, method)
+        params = data.to_qsharp_params(rotation_bit_precision=_AGREEMENT_PRECISION)
+        probability, state = simulate_mps_preparation(operation, site_struct, params, data.num_sites, data.ancilla_bits)
+    assert data.ancilla_bits == 2
+    assert probability > 1 - _AGREEMENT_TOLERANCE
+    assert np.abs(np.vdot(_target_state(mps), state)) ** 2 > 1 - _AGREEMENT_TOLERANCE
 
 
 def _two_site_tensors(amplitudes: dict[tuple[int, int], float]):
