@@ -16,6 +16,7 @@
 #include <string>
 #include <vector>
 
+#include "qdk/chemistry/data/basis_library.hpp"
 #include "ut_common.hpp"
 
 #define EXPECT_STRING_CONTAINS(str, query)                            \
@@ -72,6 +73,60 @@ TEST_F(BasisSetTest, ShellConstructors) {
   EXPECT_EQ(OrbitalType::D, shell_with_data.orbital_type);
   EXPECT_EQ(exponents.size(), shell_with_data.exponents.size());
   EXPECT_EQ(coefficients.size(), shell_with_data.coefficients.size());
+}
+
+TEST_F(BasisSetTest, ShellSortingPreservesEqualExponentPrimitiveOrder) {
+  std::vector<Shell> shells;
+  shells.emplace_back(0, OrbitalType::S, std::vector{2.0, 1.0, 2.0},
+                      std::vector{10.0, 20.0, 30.0}, std::vector{0, 1, 2});
+
+  for (int pass = 0; pass < 2; ++pass) {
+    detail::sort_shells_inplace(shells);
+    const auto& shell = shells.front();
+    EXPECT_DOUBLE_EQ(2.0, shell.exponents[0]);
+    EXPECT_DOUBLE_EQ(2.0, shell.exponents[1]);
+    EXPECT_DOUBLE_EQ(1.0, shell.exponents[2]);
+    EXPECT_DOUBLE_EQ(10.0, shell.coefficients[0]);
+    EXPECT_DOUBLE_EQ(30.0, shell.coefficients[1]);
+    EXPECT_DOUBLE_EQ(20.0, shell.coefficients[2]);
+    EXPECT_EQ(0, shell.rpowers[0]);
+    EXPECT_EQ(2, shell.rpowers[1]);
+    EXPECT_EQ(1, shell.rpowers[2]);
+  }
+}
+
+TEST_F(BasisSetTest, ShellSortingRejectsShellsWithoutPrimitives) {
+  std::vector<Shell> shells;
+  EXPECT_NO_THROW(detail::sort_shells_inplace(shells));
+
+  const Shell empty(0, OrbitalType::S, std::vector<double>{},
+                    std::vector<double>{});
+  const Shell nonempty(0, OrbitalType::S, std::vector{1.0, 2.0},
+                       std::vector{10.0, 20.0});
+  shells = {empty};
+  EXPECT_THROW(detail::sort_shells_inplace(shells), std::invalid_argument);
+
+  shells = {empty, nonempty};
+  EXPECT_THROW(detail::sort_shells_inplace(shells), std::invalid_argument);
+  EXPECT_DOUBLE_EQ(1.0, shells[1].exponents[0]);
+  EXPECT_DOUBLE_EQ(10.0, shells[1].coefficients[0]);
+
+  shells = {nonempty, empty};
+  EXPECT_THROW(detail::sort_shells_inplace(shells), std::invalid_argument);
+  EXPECT_DOUBLE_EQ(1.0, shells[0].exponents[0]);
+  EXPECT_DOUBLE_EQ(10.0, shells[0].coefficients[0]);
+}
+
+TEST_F(BasisSetTest, LocalEcpShellContributesNoAtomicOrbitals) {
+  Shell local(0, OrbitalType::UL, std::vector{1.0}, std::vector{2.0},
+              std::vector{2});
+  Shell gaussian(0, OrbitalType::D, std::vector{1.0}, std::vector{1.0});
+  detail::ShellsPerAtom shells{{local, gaussian}};
+
+  EXPECT_EQ(0u, local.get_num_atomic_orbitals());
+  EXPECT_EQ(0u, local.get_num_atomic_orbitals(AOType::Cartesian));
+  EXPECT_EQ(5u, detail::count_orbitals(shells, AOType::Spherical));
+  EXPECT_EQ(6u, detail::count_orbitals(shells, AOType::Cartesian));
 }
 
 TEST_F(BasisSetTest, Constructors) {
@@ -430,8 +485,8 @@ TEST_F(BasisSetTest, Summary) {
 
 TEST_F(BasisSetTest, JSONSerialization) {
   std::vector<Shell> shells;
-  shells.emplace_back(
-      Shell(0, OrbitalType::S, std::vector{1.0}, std::vector{2.0}));
+  shells.emplace_back(0, OrbitalType::S, std::vector{1.0}, std::vector{2.0},
+                      std::vector{0});
   shells.emplace_back(
       Shell(0, OrbitalType::P, std::vector{0.5}, std::vector{1.0}));
 
@@ -440,6 +495,7 @@ TEST_F(BasisSetTest, JSONSerialization) {
   // Test JSON conversion
   auto json_data = basis.to_json();
   EXPECT_FALSE(json_data.empty());
+  EXPECT_FALSE(json_data["atoms"][0]["shells"][0].contains("rpowers"));
 
   // Test round-trip
   auto basis2 = BasisSet::from_json(json_data);
@@ -1555,6 +1611,43 @@ TEST_F(BasisSetTest, SameBasisSetCheck) {
   EXPECT_NEAR(e_scf_custom, e_scf_default, testing::scf_energy_tolerance);
   EXPECT_NEAR(e_scf_manual, e_scf_default, testing::scf_energy_tolerance);
   EXPECT_NEAR(e_scf_custom, e_scf_manual, testing::scf_energy_tolerance);
+}
+
+TEST_F(BasisSetTest, LibraryShellRadialPowersAndJsonRoundTrip) {
+  const std::string basis_name = "def2-svp";
+  auto structure = testing::create_agh_structure();
+  std::map<size_t, std::string> index_map;
+  for (size_t atom = 0; atom < structure->get_num_atoms(); ++atom) {
+    index_map.emplace(atom, basis_name);
+  }
+  const std::vector<std::shared_ptr<BasisSet>> bases{
+      BasisSet::from_basis_name(basis_name, structure),
+      BasisSet::from_index_map(index_map, structure)};
+
+  for (const auto& basis : bases) {
+    SCOPED_TRACE(basis->get_name());
+    ASSERT_GT(basis->get_num_shells(), 0u);
+    for (const auto& shell : basis->get_shells()) {
+      EXPECT_FALSE(shell.has_radial_powers());
+      EXPECT_EQ(0, shell.rpowers.size());
+      EXPECT_FALSE(shell.to_json(true).contains("rpowers"));
+    }
+
+    ASSERT_GT(basis->get_num_ecp_shells(), 0u);
+    for (const auto& shell : basis->get_ecp_shells()) {
+      EXPECT_TRUE(shell.has_radial_powers());
+      EXPECT_EQ(shell.exponents.size(), shell.rpowers.size());
+      EXPECT_TRUE(shell.to_json(true).contains("rpowers"));
+    }
+
+    const auto json = basis->to_json();
+    auto loaded = BasisSet::from_json(nlohmann::json::parse(json.dump()));
+    EXPECT_EQ(json, loaded->to_json());
+    EXPECT_EQ(basis->content_hash(), loaded->content_hash());
+    for (const auto& shell : loaded->get_shells()) {
+      EXPECT_FALSE(shell.has_radial_powers());
+    }
+  }
 }
 
 TEST_F(BasisSetTest, SameBasisSetCheckWithEcp) {

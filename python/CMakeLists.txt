@@ -159,6 +159,7 @@ pybind11_add_module(_core
     src/pybind11/data/settings.cpp
     src/pybind11/data/structure.cpp
     src/pybind11/data/basis_set.cpp
+    src/pybind11/data/auxiliary_basis.cpp
     src/pybind11/data/configuration.cpp
     src/pybind11/data/configuration_set.cpp
     src/pybind11/data/ansatz.cpp
