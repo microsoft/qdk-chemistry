@@ -40,7 +40,7 @@ steps:
         ${{ parameters.dockerImage }} \
         bash ../.pipelines/pip-scripts/test-pip-wheels.sh ${{ parameters.pythonVersion }} \
                                                           ${{ parameters.macBuild }}
-    displayName: Test wheel (Docker linux/amd64)
+    displayName: Test wheel on Python ${{ parameters.pythonVersion }} (Docker linux/amd64)
     condition: ${{ parameters.condition }}
     env:
       SYSTEM_ACCESSTOKEN: $(System.AccessToken)
@@ -59,7 +59,7 @@ steps:
         ${{ parameters.dockerImage }} \
         bash ../.pipelines/pip-scripts/test-pip-wheels.sh ${{ parameters.pythonVersion }} \
                                                           ${{ parameters.macBuild }}
-    displayName: Test wheel (Docker ${{ parameters.imageTag }})
+    displayName: Test wheel on Python ${{ parameters.pythonVersion }} (Docker ${{ parameters.imageTag }})
     condition: ${{ parameters.condition }}
     env:
       SYSTEM_ACCESSTOKEN: $(System.AccessToken)
@@ -71,7 +71,7 @@ steps:
       export QDK_CHEMISTRY_RUN_SLOW_TESTS=${{ parameters.runSlowTests }}
       bash ../.pipelines/pip-scripts/test-pip-wheels.sh ${{ parameters.pythonVersion }} \
                                                         ${{ parameters.macBuild }}
-    displayName: Test wheel (native)
+    displayName: Test wheel on Python ${{ parameters.pythonVersion }} (native)
     condition: ${{ parameters.condition }}
     env:
       SYSTEM_ACCESSTOKEN: $(System.AccessToken)

@@ -71,7 +71,7 @@ if ($Triplet -ne 'arm64-windows-static-md') {
 # ─── 5. Component Governance PipReport (non-fatal) ───────────────────────────
 Write-Host "=== Generate Component Governance PipReport ==="
 try {
-    $manifestDir = "$pythonDir\build\test-manifest"
+    $manifestDir = "$pythonDir\build\test-manifest\python$PythonVersion"
     New-Item -ItemType Directory -Force -Path $manifestDir | Out-Null
     $reqs = & $runExe @runArgs -m pip list --format=freeze --exclude qdk_chemistry
     if ($LASTEXITCODE -ne 0) { throw "pip list failed ($LASTEXITCODE)" }

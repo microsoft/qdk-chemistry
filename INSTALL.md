@@ -42,6 +42,8 @@ simplest option when you need PySCF.
 > **NOTE:** Commands below are given for Linux/macOS (`bash`) and Windows (PowerShell). Where the
 > Linux/macOS commands use `python3`, use `python` on Windows.
 
+CPython 3.12 and newer share a `cp312-abi3` wheel per platform. Python 3.10 and 3.11 use version-specific wheels.
+
 ### Step 1: Create a virtual environment
 
 Use a virtual environment to avoid conflicts with other packages:
@@ -278,7 +280,7 @@ each library; they are all declared in [`vcpkg.json`](vcpkg.json), so a single
 | Dependency | Description | Requirements | Source Location | Ubuntu / Debian | Redhat | Windows |
 |------------|-------------|--------------------|-----------------|-----------------|---------|-----------------|
 | Python 3 | Python interpreter and package tools | Version 3.10+ | [source](https://www.python.org/) | `apt install python3 python3-pip python3-venv` | `dnf install python3 python3-pip` | `winget install --id Python.Python.3.12 -e -s winget` |
-| CMake | Build system manager | Version > 3.15 | [source](https://github.com/Kitware/CMake) | `apt install cmake` | `dnf install cmake` | VS Build Tools |
+| CMake | Build system manager | Version > 3.15 (3.26+ for Python bindings) | [source](https://github.com/Kitware/CMake) | `apt install cmake` | `dnf install cmake` | VS Build Tools |
 | Ninja | Build tool used for the Windows builds | N/A | [source](https://github.com/ninja-build/ninja) | `apt install ninja-build` | `dnf install ninja-build` | VS Build Tools |
 | Eigen | C++ linear algebra templates | Version > 3.4.0 | [source](https://libeigen.gitlab.io/) | `apt install libeigen3-dev` | `dnf install eigen3-devel` | `eigen3` |
 | LAPACK | C library for linear algebra. See [this note](#note-on-lapack-usage) for further information | N/A | e.g. [source](https://github.com/OpenMathLib/OpenBLAS) | e.g. `apt install libopenblas-dev` | e.g. `dnf install openblas-devel`| `openblas` |

@@ -25,6 +25,7 @@ steps:
       $(System.DefaultWorkingDirectory)\.pipelines\install-scripts\ensure-python-windows.ps1
       -Arch arm64 -Version ${{ parameters.pythonVersion }} -IncludePip
     displayName: Use Python ${{ parameters.pythonVersion }} (arm64)
+    condition: ${{ parameters.condition }}
 
 - pwsh: |
     $ErrorActionPreference = 'Stop'

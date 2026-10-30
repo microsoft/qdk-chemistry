@@ -294,7 +294,7 @@ select = [
 # Scikit-build-core configuration
 [tool.scikit-build]
 experimental = true
-cmake.version = ">=3.15"
+cmake.version = ">=3.26"
 cmake.build-type = "Release"
 # Build in current directory (python/)
 cmake.source-dir = "."
@@ -309,6 +309,8 @@ metadata.version.input = "../VERSION"
 packages = ["src/qdk_chemistry"]
 install-dir = "qdk_chemistry"
 exclude = ["**/.no-stubgen"]
+# Python 3.12+ shares one stable-ABI wheel; 3.10/3.11 retain native ABI tags.
+py-api = "cp312"
 
 [tool.scikit-build.cmake.define]
 BUILD_SHARED_LIBS = "OFF"

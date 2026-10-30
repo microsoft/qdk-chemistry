@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 3.15)
+cmake_minimum_required(VERSION 3.26)
 
 # Read version from VERSION file at repo root
 set(_VERSION_FILE "${CMAKE_CURRENT_SOURCE_DIR}/../VERSION")
@@ -126,7 +126,8 @@ else()
 endif()
 
 # Find Python first (required for nanobind)
-find_package(Python 3.10 REQUIRED COMPONENTS Interpreter Development.Module)
+find_package(Python 3.10 REQUIRED COMPONENTS Interpreter Development.Module
+             OPTIONAL_COMPONENTS Development.SABIModule)
 
 # vcpkg's find_package wrapper may miss pip-installed nanobind.
 if(NOT nanobind_DIR)
@@ -144,6 +145,7 @@ find_package(nanobind 3.1 CONFIG REQUIRED)
 
 # Create the Python extension module
 nanobind_add_module(_core
+    STABLE_ABI
     src/nanobind/data/data_class.cpp
     src/nanobind/data/symmetry/symmetry.cpp
     src/nanobind/data/symmetry/symmetry_blocked_scalar.cpp

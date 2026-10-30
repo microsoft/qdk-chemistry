@@ -55,18 +55,14 @@ parameters:
 - name: pythonVersions
   type: stringList
   values:
-  - 3.10
-  - 3.11
-  - 3.12
-  - 3.13
-  - 3.14
+  - '3.10'
+  - '3.11'
+  - '3.12'
   default:
-  - 3.10
-  - 3.11
-  - 3.12
-  - 3.13
-  - 3.14
-  displayName: Python versions
+  - '3.10'
+  - '3.11'
+  - '3.12'
+  displayName: Python build versions (3.12 builds an ABI3 wheel for 3.12+)
 - name: publishEsrp
   type: boolean
   default: false
@@ -345,6 +341,33 @@ extends:
                 ${{ if eq(target.name, 'windows_aarch64') }}:
                   arch: arm64
 
+          # Exercise the same 3.12 ABI3 wheel on newer CPython runtimes.
+          - ${{ each testPython in split('3.13,3.14', ',') }}:
+            - ${{ if eq(target.os, 'windows') }}:
+              - template: .pipelines/templates/test-pip-wheels-windows.yml@self
+                parameters:
+                  pythonVersion: ${{ testPython }}
+                  runSlowTests: ${{ parameters.runSlowTests }}
+                  condition: and(succeeded(), eq(variables['pythonVersion'], '3.12'))
+                  ${{ if eq(target.arch, 'aarch64') }}:
+                    arch: arm64
+            - ${{ else }}:
+              - template: .pipelines/templates/test-pip-wheels.yml@self
+                parameters:
+                  agentBuildDirectory: $(Agent.BuildDirectory)
+                  pythonVersion: ${{ testPython }}
+                  runSlowTests: ${{ parameters.runSlowTests }}
+                  condition: and(succeeded(), eq(variables['pythonVersion'], '3.12'))
+                  ${{ if eq(target.os, 'macOS') }}:
+                    macBuild: ON
+                  ${{ else }}:
+                    dockerImage: mcr.microsoft.com/mirror/docker/library/ubuntu:24.04
+                    ${{ if eq(target.arch, 'x86_64') }}:
+                      imageTag: linux/amd64
+                      exachemRequired: true
+                    ${{ else }}:
+                      imageTag: linux/arm64/v8
+
           # SBoM Manifest Generator Task requires we transfer ownership of the wheel directory
           # back to the original base image user (Linux/macOS only; not needed on Windows).
           - ${{ if or(eq(target.name, 'linux_x86_64'), eq(target.name, 'linux_aarch64'), eq(target.name, 'macos_arm64')) }}:
@@ -399,79 +422,12 @@ extends:
           type: releaseJob
           isProduction: true
           inputs:     # Declare all build artifacts to be consumed in the release job
-          - input: pipelineArtifact
-            artifactName: linux-x86_64-wheels-python3.10
-            targetPath: $(System.DefaultWorkingDirectory)/artifacts/linux-x86_64-wheels-python3.10
-          - input: pipelineArtifact
-            artifactName: linux-x86_64-wheels-python3.11
-            targetPath: $(System.DefaultWorkingDirectory)/artifacts/linux-x86_64-wheels-python3.11
-          - input: pipelineArtifact
-            artifactName: linux-x86_64-wheels-python3.12
-            targetPath: $(System.DefaultWorkingDirectory)/artifacts/linux-x86_64-wheels-python3.12
-          - input: pipelineArtifact
-            artifactName: linux-x86_64-wheels-python3.13
-            targetPath: $(System.DefaultWorkingDirectory)/artifacts/linux-x86_64-wheels-python3.13
-          - input: pipelineArtifact
-            artifactName: linux-x86_64-wheels-python3.14
-            targetPath: $(System.DefaultWorkingDirectory)/artifacts/linux-x86_64-wheels-python3.14
-          - input: pipelineArtifact
-            artifactName: linux-aarch64-wheels-python3.10
-            targetPath: $(System.DefaultWorkingDirectory)/artifacts/linux-aarch64-wheels-python3.10
-          - input: pipelineArtifact
-            artifactName: linux-aarch64-wheels-python3.11
-            targetPath: $(System.DefaultWorkingDirectory)/artifacts/linux-aarch64-wheels-python3.11
-          - input: pipelineArtifact
-            artifactName: linux-aarch64-wheels-python3.12
-            targetPath: $(System.DefaultWorkingDirectory)/artifacts/linux-aarch64-wheels-python3.12
-          - input: pipelineArtifact
-            artifactName: linux-aarch64-wheels-python3.13
-            targetPath: $(System.DefaultWorkingDirectory)/artifacts/linux-aarch64-wheels-python3.13
-          - input: pipelineArtifact
-            artifactName: linux-aarch64-wheels-python3.14
-            targetPath: $(System.DefaultWorkingDirectory)/artifacts/linux-aarch64-wheels-python3.14
-          - input: pipelineArtifact
-            artifactName: macos-aarch64-wheels-python3.10
-            targetPath: $(System.DefaultWorkingDirectory)/artifacts/macos-aarch64-wheels-python3.10
-          - input: pipelineArtifact
-            artifactName: macos-aarch64-wheels-python3.11
-            targetPath: $(System.DefaultWorkingDirectory)/artifacts/macos-aarch64-wheels-python3.11
-          - input: pipelineArtifact
-            artifactName: macos-aarch64-wheels-python3.12
-            targetPath: $(System.DefaultWorkingDirectory)/artifacts/macos-aarch64-wheels-python3.12
-          - input: pipelineArtifact
-            artifactName: macos-aarch64-wheels-python3.13
-            targetPath: $(System.DefaultWorkingDirectory)/artifacts/macos-aarch64-wheels-python3.13
-          - input: pipelineArtifact
-            artifactName: macos-aarch64-wheels-python3.14
-            targetPath: $(System.DefaultWorkingDirectory)/artifacts/macos-aarch64-wheels-python3.14
-          - input: pipelineArtifact
-            artifactName: windows-x86_64-wheels-python3.10
-            targetPath: $(System.DefaultWorkingDirectory)/artifacts/windows-x86_64-wheels-python3.10
-          - input: pipelineArtifact
-            artifactName: windows-x86_64-wheels-python3.11
-            targetPath: $(System.DefaultWorkingDirectory)/artifacts/windows-x86_64-wheels-python3.11
-          - input: pipelineArtifact
-            artifactName: windows-x86_64-wheels-python3.12
-            targetPath: $(System.DefaultWorkingDirectory)/artifacts/windows-x86_64-wheels-python3.12
-          - input: pipelineArtifact
-            artifactName: windows-x86_64-wheels-python3.13
-            targetPath: $(System.DefaultWorkingDirectory)/artifacts/windows-x86_64-wheels-python3.13
-          - input: pipelineArtifact
-            artifactName: windows-x86_64-wheels-python3.14
-            targetPath: $(System.DefaultWorkingDirectory)/artifacts/windows-x86_64-wheels-python3.14
-          # No 3.10 entry: CPython ships win-arm64 builds only from 3.11 onwards.
-          - input: pipelineArtifact
-            artifactName: windows-aarch64-wheels-python3.11
-            targetPath: $(System.DefaultWorkingDirectory)/artifacts/windows-aarch64-wheels-python3.11
-          - input: pipelineArtifact
-            artifactName: windows-aarch64-wheels-python3.12
-            targetPath: $(System.DefaultWorkingDirectory)/artifacts/windows-aarch64-wheels-python3.12
-          - input: pipelineArtifact
-            artifactName: windows-aarch64-wheels-python3.13
-            targetPath: $(System.DefaultWorkingDirectory)/artifacts/windows-aarch64-wheels-python3.13
-          - input: pipelineArtifact
-            artifactName: windows-aarch64-wheels-python3.14
-            targetPath: $(System.DefaultWorkingDirectory)/artifacts/windows-aarch64-wheels-python3.14
+          - ${{ each target in parameters.matrix }}:
+            - ${{ each py in parameters.pythonVersions }}:
+              - ${{ if not(and(eq(target.name, 'windows_aarch64'), eq(py, '3.10'))) }}:
+                - input: pipelineArtifact
+                  artifactName: ${{ target.os }}-${{ target.arch }}-wheels-python${{ py }}
+                  targetPath: $(System.DefaultWorkingDirectory)/artifacts/${{ target.os }}-${{ target.arch }}-wheels-python${{ py }}
         steps:
         - script: |
             mkdir -p $(System.DefaultWorkingDirectory)/target/wheels
