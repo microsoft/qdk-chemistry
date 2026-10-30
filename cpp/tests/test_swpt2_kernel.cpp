@@ -577,7 +577,8 @@ TEST(Swpt2KernelTest, ThreadCountDoesNotChangeResults) {
 #ifndef _OPENMP
   GTEST_SKIP() << "OpenMP is disabled";
 #else
-  // Large enough that the Fock, diagnostic and operand loops all run threaded.
+  // Large enough that the Fock, diagnostic, operand and plan loops all run
+  // threaded.
   std::vector<int> virtuals;
   for (int orbital = 8; orbital < 36; ++orbital) virtuals.push_back(orbital);
   auto inputs = make_case({4, 5, 6, 7}, {0, 1, 2, 3}, virtuals);
