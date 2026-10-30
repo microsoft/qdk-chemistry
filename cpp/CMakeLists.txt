@@ -377,6 +377,10 @@ install(EXPORT chemistryTargets
 # Create config files
 include(CMakePackageConfigHelpers)
 
+# Where kit-cmake (via BTAS) installed the blaspp_headers export, relative to qdkConfig.
+get_directory_property(QDK_BLASPP_HEADERS_DIR DIRECTORY "${BTAS_SOURCE_DIR}" DEFINITION blaspp_install_configdir)
+cmake_path(RELATIVE_PATH QDK_BLASPP_HEADERS_DIR BASE_DIRECTORY lib/cmake/qdk)
+
 configure_package_config_file(
     "${CMAKE_CURRENT_SOURCE_DIR}/cmake/qdkConfig.cmake.in"
     "${CMAKE_CURRENT_BINARY_DIR}/qdkConfig.cmake"
