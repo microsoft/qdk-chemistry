@@ -312,6 +312,33 @@ TEST_CASE("ASCI constraint work providers preserve the partition",
                     std::invalid_argument);
 }
 
+TEST_CASE("ASCI constraint generation conserves work", "[asci_execution]") {
+  using Wfn = macis::wfn_t<64>;
+  using Traits = macis::wavefunction_traits<Wfn>;
+  const size_t norb = 8, ns_beta = 15, nd_beta = 30;
+  // Refinement reaches constraints that fix every alpha electron
+  for (size_t nalpha : {3, 4}) {
+    CAPTURE(nalpha);
+    auto dets = macis::generate_hilbert_space<Wfn>(norb, nalpha, 3);
+    std::sort(dets.begin(), dets.end(), Traits::spin_comparator{});
+    const auto unique_alpha = macis::get_unique_alpha(dets.begin(), dets.end());
+    auto total_work = [&](int world_size, size_t nlevel_min, int64_t nrec_min) {
+      size_t work = 0;
+      for (const auto& [constraint, w] : macis::gen_constraints_general<Wfn>(
+               5, norb, ns_beta, nd_beta, unique_alpha, world_size, nlevel_min,
+               nrec_min))
+        work += w;
+      return work;
+    };
+    const size_t reference = total_work(1, 0, -1);
+    // Load balancing over many workers, base levels, and refinement of the
+    // largest constraints
+    REQUIRE(total_work(4096, 0, -1) == reference);
+    REQUIRE(total_work(1, 1, -1) == reference);
+    REQUIRE(total_work(1, 1, 5) == reference);
+  }
+}
+
 TEMPLATE_TEST_CASE("ASCI core selection preserves order and coefficients",
                    "[asci_execution][asci_core_selection]", macis::wfn_t<64>,
                    macis::wfn_t<512>) {
