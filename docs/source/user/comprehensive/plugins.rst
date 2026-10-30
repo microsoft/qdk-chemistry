@@ -82,8 +82,9 @@ In addition to the native implementations packaged within QDK/Chemistry, plugins
 - `OpenFermion <https://quantumai.google/openfermion>`_ — Quantum algorithm primitives
 - `geomeTRIC <https://github.com/leeping/geomeTRIC>`_ — Molecular geometry optimization
 - `Azure Quantum <https://azure.microsoft.com/products/quantum>`_ — Circuit execution on remote targets
+- `ExaChem <https://github.com/ExaChem/exachem>`_ — Coupled cluster calculations run as an external MPI program
 
-These plugins are enabled automatically when the corresponding package is installed.
+These plugins are enabled automatically when the corresponding package is installed, or for ExaChem, when the program is on ``PATH``.
 
 .. _pyscf-plugin-details:
 
@@ -200,6 +201,27 @@ This boolean variable is set at module load time and reflects the actual availab
 .. warning::
 
    If you attempt to use an algorithm that requires OpenFermion but the package is not installed,
+   the algorithm will not be available in the factory. Use the :ref:`listing-implementations` pattern
+   to see which implementations are currently available.
+
+.. _exachem-plugin-details:
+
+ExaChem plugin details
+^^^^^^^^^^^^^^^^^^^^^^
+The ExaChem plugin integrates QDK/Chemistry with `ExaChem <https://github.com/ExaChem/exachem>`_, which runs as a separate MPI program rather than as a Python package.
+
+**Loading behavior:**
+
+- **ExaChem**: :class:`~qdk_chemistry.plugins.exachem.ccsd_calculator.ExachemCcsdCalculator` (``exachem_ccsd``) is registered when the plugin is initialized and both ``ExaChem`` and an MPI launcher (``mpirun`` or ``srun``) are on ``PATH``.
+
+**Installing ExaChem:**
+
+ExaChem is not installed with QDK/Chemistry.
+Build it by following the `ExaChem documentation <https://exachem.readthedocs.io/en/latest/>`_, and add the directory containing the ``ExaChem`` executable to ``PATH`` before importing QDK/Chemistry.
+
+.. warning::
+
+   If ExaChem or an MPI launcher is not on ``PATH`` when QDK/Chemistry is imported,
    the algorithm will not be available in the factory. Use the :ref:`listing-implementations` pattern
    to see which implementations are currently available.
 
