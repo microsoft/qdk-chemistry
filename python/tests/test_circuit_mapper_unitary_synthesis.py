@@ -359,6 +359,17 @@ class TestGivensNetwork:
         expected = _reconstruct_givens(givens) @ initial if control else initial
         assert abs(np.vdot(expected, state)) ** 2 > 1 - 1e-3
 
+    def test_estimate_caching_distinguishes_precision(self, qsharp_test_context, qsharp_test_utils):
+        """Networks that differ only in rotation precision are costed separately in one estimate."""
+        givens = {"layerAngles": [[0.4], [0.9]], "layerShifted": [False, True], "phases": [True, False, True, False]}
+        probe = qsharp_test_utils.UnitarySynthesisTests.TestGivensAtTwoPrecisions
+        counts = {
+            bits: qsharp_test_context.logical_counts(probe, givens, 2, *bits) for bits in [(6, 6), (9, 9), (6, 9)]
+        }
+        for key in ("cczCount", "measurementCount"):
+            assert counts[(6, 6)][key] != counts[(9, 9)][key]
+            assert 2 * counts[(6, 9)][key] == counts[(6, 6)][key] + counts[(9, 9)][key], key
+
 
 class TestAddConstant:
     """``AddConstant`` adds a signed constant modulo the register size."""

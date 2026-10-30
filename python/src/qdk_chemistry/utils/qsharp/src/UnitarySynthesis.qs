@@ -169,12 +169,15 @@ namespace QDKChemistry.Utils.UnitarySynthesis {
         Fact(IsEmpty(phaseFlips) or Length(phaseFlips) == 1 <<< n, "Givens phase data needs one entry per basis state of the target register.");
         Fact(n > 0 or IsEmpty(layers), "Givens rotation layers need a nonempty target register.");
 
-        // Layers differ only in data, so cache the shifted and unshifted circuits.
+        // Layers differ only in data, so cache the shifted and unshifted circuits. The key holds
+        // every width that sets a layer's cost, so compositions at other precisions or table
+        // sizes are counted separately.
         for i in 0..Length(layers) - 1 {
             let activeQubit = target[n - 1];
             let address = Reversed(target[0..n - 2]);
             let variant = n * 2 + (if layerIsShifted[i] { 1 } else { 0 });
-            if BeginEstimateCaching($"GivensLayer{Length(controls)}", variant) {
+            let cacheName = $"GivensLayer_c{Length(controls)}_g{Length(phaseGradient)}_a{Length(angleReg)}_d{Length(layers[i])}";
+            if BeginEstimateCaching(cacheName, variant) {
                 if layerIsShifted[i] {
                     AddConstant(-1, Reversed(target));
                 }
