@@ -176,7 +176,7 @@ namespace QDKChemistry.Utils.MPSSequential {
         }
     }
 
-    /// Circuit wrapper for resource estimation - allocates qubits internally.
+    /// Circuit entry point for MPS state preparation (allocates qubits and leaves them prepared).
     operation PrepareMPSCircuit(
         numStateQubits : Int,
         numAncillaQubits : Int,
@@ -185,7 +185,6 @@ namespace QDKChemistry.Utils.MPSSequential {
     ) : Unit {
         use state = Qubit[numStateQubits];
         PrepareMPSOnState(numStateQubits, numAncillaQubits, rotationBitPrecision, prepare, state);
-        ResetAll(state);
     }
 
     /// Parameters of a composable MPS sequential state preparation with dense site isometries.

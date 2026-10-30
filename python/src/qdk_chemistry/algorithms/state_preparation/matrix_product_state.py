@@ -152,8 +152,8 @@ class MatrixProductStatePreparation(StatePreparation):
             Site zero is the initial state; every following site is synthesized.
 
         Raises:
-            TypeError: If the input is not an MPSContainer, or the ``unitary_synthesis`` setting
-                does not refer to a :class:`UnitarySynthesisMapper`.
+            TypeError: If the input is not an MPSContainer, or the ``unitary_synthesis`` setting does not
+                refer to a :class:`~qdk_chemistry.algorithms.circuit_mapper.UnitarySynthesisMapper`.
             ValueError: If the physical basis is unsupported, the MPS is complex,
                 the initial state has zero norm, or a synthesized site is not isometric.
 
@@ -219,12 +219,12 @@ class MatrixProductStatePreparation(StatePreparation):
             A Circuit object implementing the MPS state preparation.
 
         Raises:
-            TypeError: If wavefunction is not an MPSContainer instance, or the
-                ``unitary_synthesis`` setting does not refer to a :class:`UnitarySynthesisMapper`.
+            TypeError: If wavefunction is not an MPSContainer instance, or the ``unitary_synthesis``
+                setting does not refer to a
+                :class:`~qdk_chemistry.algorithms.circuit_mapper.UnitarySynthesisMapper`.
             ValueError: If the MPS is complex, not right-canonical with orthogonality
-                center zero, does not use one of the ``('0', '1')`` and ``('0', 'u', 'd', '2')``
-                physical bases on every site, or does not have exactly one site per molecular
-                orbital.
+                center zero, or does not use one of the ``('0', '1')`` and ``('0', 'u', 'd', '2')``
+                physical bases on every site.
 
         """
         rotation_bit_precision = self._settings.get("rotation_bit_precision")
@@ -234,8 +234,6 @@ class MatrixProductStatePreparation(StatePreparation):
             raise TypeError(f"MatrixProductStatePreparation requires an MPSContainer, got {type(container)}.")
         if container.orthogonality_center != 0:
             raise ValueError(f"{_DESCRIPTION} requires a right-canonical MPS with center zero.")
-        if container.num_sites != container.orbitals.get_num_molecular_orbitals():
-            raise ValueError(f"{_DESCRIPTION} requires exactly one MPS site per molecular orbital.")
 
         data = self.generate_matrix_product_state_preparation_data(container)
         params = data.to_qsharp_params(rotation_bit_precision)
@@ -274,7 +272,7 @@ class MatrixProductStatePreparation(StatePreparation):
 
         Raises:
             TypeError: If the ``unitary_synthesis`` setting does not refer to a
-                :class:`UnitarySynthesisMapper`.
+                :class:`~qdk_chemistry.algorithms.circuit_mapper.UnitarySynthesisMapper`.
 
         """
         mapper = self._create_nested("unitary_synthesis")
@@ -369,7 +367,7 @@ class MatrixProductStatePreparationData:
     """Orbital that holds each chain site, from the MPS container."""
 
     method: str = "dense"
-    """Synthesis method of the sites: ``"dense"`` or ``"block_sparse"``."""
+    """Site synthesis method, either ``"dense"`` or ``"block_sparse"``."""
 
     sites: list[dict[str, Any]] = field(default_factory=list)
     """Per-site Q# synthesis data (one entry per site 1..num_sites-1)."""
