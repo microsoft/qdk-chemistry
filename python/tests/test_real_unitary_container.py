@@ -6,6 +6,7 @@
 # --------------------------------------------------------------------------------------------
 
 import json
+import tracemalloc
 
 import h5py
 import numpy as np
@@ -58,6 +59,25 @@ class TestValidation:
         matrix[0, 0] = 5.0
         np.testing.assert_array_equal(container.to_dense(), np.eye(4))
 
+    def test_sparse_validation_stays_sparse(self):
+        """Validating a wide sparse matrix never forms a dense Gram matrix or identity."""
+        dimension = 1 << 12
+        permutation = np.random.default_rng(0).permutation(dimension)
+        matrix = sparse.csc_array(
+            (np.where(permutation % 2 == 0, 1.0, -1.0), permutation, np.arange(dimension + 1)),
+            shape=(dimension, dimension),
+        )
+        tracemalloc.start()
+        try:
+            container = RealUnitaryContainer(matrix)
+            _, peak = tracemalloc.get_traced_memory()
+        finally:
+            tracemalloc.stop()
+
+        assert container.num_qubits == 12
+        # A dense 4096 x 4096 float64 array alone takes 128 MiB.
+        assert peak < 8 * 1024 * 1024, f"validation peaked at {peak / 2**20:.1f} MiB"
+
     @pytest.mark.parametrize("kind", ["csc_array", "csr_matrix", "coo_array"])
     def test_sparse_is_canonical_csc(self, kind):
         """Any SciPy sparse input is stored as a canonical CSC array without explicit zeros."""
@@ -98,6 +118,7 @@ class TestValidation:
             (np.array([[1.0, 1.0], [0.0, 1.0]]), "orthonormal"),
             (2.0 * np.eye(2), "orthonormal"),
             (sparse.csc_array(np.array([[1.0, 0.0], [0.0, 0.5]])), "orthonormal"),
+            (sparse.csc_array(np.array([[1.0, 1.0], [0.0, 1.0]]) / np.array([1.0, np.sqrt(2.0)])), "orthonormal"),
         ],
         ids=[
             "1d",
@@ -109,6 +130,7 @@ class TestValidation:
             "non-orthogonal",
             "not-normalized",
             "sparse-not-normalized",
+            "sparse-non-orthogonal",
         ],
     )
     def test_rejects_invalid(self, matrix, match):

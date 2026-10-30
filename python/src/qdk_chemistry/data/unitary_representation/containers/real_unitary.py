@@ -112,9 +112,14 @@ class RealUnitaryContainer(UnitaryContainer):
         values = matrix.data if sparse.issparse(matrix) else matrix
         if not np.all(np.isfinite(values)):
             raise ValueError("RealUnitaryContainer requires a finite matrix.")
-        gram = matrix.T @ matrix
-        gram = gram.toarray() if sparse.issparse(gram) else np.asarray(gram)
-        residual = float(np.linalg.norm(gram - np.eye(cols)))
+        if sparse.issparse(matrix):
+            # Keep the residual sparse: a dense m-by-m Gram matrix would dominate memory for wide isometries.
+            identity = sparse.csc_array(
+                (np.ones(cols), np.arange(cols), np.arange(cols + 1)), shape=(cols, cols), dtype=np.float64
+            )
+            residual = float(np.linalg.norm(sparse.csc_array(matrix.T @ matrix - identity).data))
+        else:
+            residual = float(np.linalg.norm(matrix.T @ matrix - np.eye(cols)))
         if not residual <= _ORTHOGONALITY_TOLERANCE * cols:
             raise ValueError(
                 "RealUnitaryContainer requires orthonormal columns; "
