@@ -16,7 +16,9 @@
 /// a with the added qubits in |0⟩.
 namespace QDKChemistry.Utils.IsometrySynthesis {
 
+    import Std.Arrays.Any;
     import Std.Arrays.IndexRange;
+    import Std.Arrays.IsEmpty;
     import Std.Arrays.Mapped;
     import Std.Arrays.Reversed;
     import Std.Convert.IntAsBoolArray;
@@ -24,6 +26,7 @@ namespace QDKChemistry.Utils.IsometrySynthesis {
     import Std.Diagnostics.Fact;
     import Std.Math.Ceiling;
     import Std.Math.Lg;
+    import Std.Math.PI;
     import Std.TableLookup.Select;
     import QDKChemistry.Utils.PhaseGradient.PreparePhaseGradientState;
     import QDKChemistry.Utils.PhaseGradient.QuantizeRyAngles;
@@ -153,7 +156,14 @@ namespace QDKChemistry.Utils.IsometrySynthesis {
         // The rotation tables are addressed by the little-endian input register; the Givens
         // operations take most-significant-first registers, hence `Reversed(input)`.
         for givens in rightFactorGivens {
-            ApplyRealUnitaryViaGivens(givens, [], Reversed(input), phaseGradient, angleReg);
+            if IsEmpty(input) {
+                // V is the 1 × 1 sign ±1, a global sign with no input qubit to carry it.
+                if Any(flip -> flip, givens.phases) {
+                    R(PauliI, 2.0 * PI(), added[0]);
+                }
+            } else {
+                ApplyRealUnitaryViaGivens(givens, [], Reversed(input), phaseGradient, angleReg);
+            }
         }
         if numAdded > 0 {
             ApplyMultiplexedRy(rotations[0], input, added[0], phaseGradient, angleReg);

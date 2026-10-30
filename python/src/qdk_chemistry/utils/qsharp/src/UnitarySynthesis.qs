@@ -16,6 +16,7 @@ namespace QDKChemistry.Utils.UnitarySynthesis {
     import Std.Arrays.MappedOverRange;
     import Std.Arrays.Reversed;
     import Std.Diagnostics.Fact;
+    import Std.Math.PI;
     import Std.ResourceEstimation.BeginEstimateCaching;
     import Std.ResourceEstimation.EndEstimateCaching;
     import QDKChemistry.Utils.Arithmetic.AddConstant;
@@ -103,7 +104,8 @@ namespace QDKChemistry.Utils.UnitarySynthesis {
     /// Applies D = diag((-1)^{f(x)}) on a little-endian register, with `phases[x]` = f(x).
     ///
     /// The Möbius transform over GF(2) gives f(x) = ⊕_S c_S ∏_{i∈S} x_i, and each nonzero c_S
-    /// becomes a Z, CZ, CCZ, … gate on the qubits in S. D is its own inverse.
+    /// becomes a Z, CZ, CCZ, … gate on the qubits in S. The constant c_∅ is the global sign
+    /// -I = R(PauliI, 2π). D is its own inverse.
     operation ApplyPhasePolynomial(phases : Bool[], register : Qubit[]) : Unit is Adj {
         body (...) {
             let n = Length(register);
@@ -121,6 +123,10 @@ namespace QDKChemistry.Utils.UnitarySynthesis {
                 set step = step * 2;
             }
 
+            if dim > 0 and coeffs[0] {
+                Fact(n > 0, "A constant sign needs a nonempty register to carry it.");
+                R(PauliI, 2.0 * PI(), register[0]);
+            }
             for s in 1..dim - 1 {
                 if coeffs[s] {
                     mutable qubits : Qubit[] = [];

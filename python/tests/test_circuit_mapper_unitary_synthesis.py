@@ -82,7 +82,9 @@ def _run_on_columns(circuit, num_qubits: int, coefficients: np.ndarray) -> np.nd
 def _assert_realizes(circuit, matrix: np.ndarray, seed: int, preimage=None) -> None:
     """Assert that ``circuit`` maps a random combination of the leading columns through ``matrix``.
 
-    ``preimage`` maps the coefficients to the circuit input; it defaults to the identity.
+    The comparison ignores the global phase: the measurement-based unlookups of the angle and
+    permutation tables leave a random global sign on each run. ``preimage`` maps the
+    coefficients to the circuit input; it defaults to the identity.
     """
     num_qubits = matrix.shape[0].bit_length() - 1
     coefficients = np.random.default_rng(seed).normal(size=matrix.shape[1])
@@ -134,6 +136,14 @@ class TestDense:
         assert circuit._qsharp_factory.parameter["numInputQubits"] == num_input_qubits
         assert circuit._qsharp_factory.parameter["numAddedQubits"] == 3 - num_input_qubits
         _assert_realizes(circuit, matrix, seed=num_input_qubits)
+
+    @pytest.mark.parametrize("column", [[-0.6, 0.8], [-0.5, 0.5, 0.5, 0.5]], ids=["one-added", "two-added"])
+    def test_negative_scalar_right_factor(self, column):
+        """Without input qubits ``V`` is a 1 x 1 sign, applied as a global sign when it is -1."""
+        matrix = np.array(column)[:, None]
+        mapper = create("circuit_mapper", "unitary_synthesis")
+        np.testing.assert_array_equal(mapper.right_factor(_representation(matrix)), [[-1.0]])
+        _assert_realizes(mapper.run(_representation(matrix)), matrix, seed=0)
 
     def test_sparse_storage(self):
         """A sparse container is densified for the dense method."""
@@ -348,6 +358,18 @@ class TestGivensNetwork:
         state = self._run(qsharp_test_context, qsharp_test_utils, givens, prep_angles, ())
         expected = _reconstruct_givens(givens) @ _ry_product_state(prep_angles)
         assert abs(np.vdot(expected, state)) ** 2 > 1 - 1e-3
+
+    @pytest.mark.parametrize("controls", [(), (True,), (False,)], ids=["uncontrolled", "control-on", "control-off"])
+    @pytest.mark.parametrize("prep_angles", [[0.8], [0.8, 1.3]], ids=["one-qubit", "two-qubit"])
+    def test_global_sign(self, qsharp_test_context, qsharp_test_utils, controls, prep_angles):
+        """``D = -I`` negates every amplitude whenever the network applies.
+
+        Without layers there is no measurement-based unlookup, so the global phase is exact.
+        """
+        givens = {"layerAngles": [], "layerShifted": [], "phases": [True] * (1 << len(prep_angles))}
+        state = self._run(qsharp_test_context, qsharp_test_utils, givens, prep_angles, controls)
+        initial = _ry_product_state(prep_angles)
+        np.testing.assert_allclose(state, initial if controls == (False,) else -initial, atol=1e-10)
 
     @pytest.mark.parametrize("control", [True, False], ids=["control-on", "control-off"])
     def test_shifted_layer_under_control(self, qsharp_test_context, qsharp_test_utils, control):
