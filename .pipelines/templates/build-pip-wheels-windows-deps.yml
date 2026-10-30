@@ -55,7 +55,7 @@ steps:
 - pwsh: |
     $fp = & "$(System.DefaultWorkingDirectory)\.pipelines\install-scripts\install-cpp-deps-windows.ps1" `
         -SrcDir    "$(System.DefaultWorkingDirectory)" `
-        -BuildType "${{ parameters.buildType }}" `
+        -BuildType "$env:QDK_BUILD_TYPE" `
         -Triplet   "$(VCPKG_TRIPLET)" `
         -ClPath    "$(CL_PATH)" `
         -EmitFingerprint | Select-Object -Last 1
@@ -63,6 +63,8 @@ steps:
     Write-Host "deps build plan fingerprint: $fp"
     Write-Host "##vso[task.setvariable variable=DEPS_FINGERPRINT]$fp"
   displayName: Compute dependency build plan fingerprint
+  env:
+    QDK_BUILD_TYPE: ${{ parameters.buildType }}
 
 - task: Cache@2
   displayName: Restore/save vcpkg dependency cache
@@ -104,8 +106,10 @@ steps:
 - pwsh: |
     & "$(System.DefaultWorkingDirectory)\.pipelines\install-scripts\install-cpp-deps-windows.ps1" `
         -SrcDir    "$(System.DefaultWorkingDirectory)" `
-        -BuildType "${{ parameters.buildType }}" `
+        -BuildType "$env:QDK_BUILD_TYPE" `
         -Triplet   "$(VCPKG_TRIPLET)" `
         -ClPath    "$(CL_PATH)"
   displayName: Build and install C++ dependencies
   condition: or(ne(variables['DEPS_INSTALL_CACHE_RESTORED'], 'true'), ne(variables['VCPKG_CACHE_RESTORED'], 'true'))
+  env:
+    QDK_BUILD_TYPE: ${{ parameters.buildType }}
