@@ -23,6 +23,7 @@
 #include "hdf5_error_handling.hpp"
 #include "hdf5_serialization.hpp"
 #include "json_serialization.hpp"
+#include "two_body_symmetry.hpp"
 
 namespace qdk::chemistry::data {
 
@@ -318,11 +319,6 @@ void HamiltonianContainer::to_fcidump_file(const std::string& filename,
         "FCIDUMP format is not supported for unrestricted Hamiltonians.");
   }
 
-  std::ofstream file(filename);
-  if (!file.is_open()) {
-    throw std::runtime_error("Cannot open file for writing: " + filename);
-  }
-
   size_t num_molecular_orbitals;
   if (has_orbitals()) {
     if (_orbitals->has_active_space()) {
@@ -352,6 +348,26 @@ void HamiltonianContainer::to_fcidump_file(const std::string& filename,
       num_molecular_orbitals2 * num_molecular_orbitals;
   const double print_thresh = std::numeric_limits<double>::epsilon();
 
+  // Ordinary FCIDUMP readers reconstruct the eight permutations of every
+  // two-electron record, so each record holds the average over its class.
+  // Differences from that average up to the symmetry tolerance are treated as
+  // round-off; larger ones mean the tensor cannot be represented.
+  auto [eri_aaaa, eri_aabb, eri_bbbb] = get_two_body_integrals();
+  detail::require_finite_two_body(
+      eri_aaaa.data(), num_molecular_orbitals3 * num_molecular_orbitals,
+      "FCIDUMP export");
+  if (!detail::is_eightfold_within(eri_aaaa.data(), num_molecular_orbitals,
+                                   detail::two_body_symmetry_tolerance)) {
+    throw std::runtime_error(
+        "FCIDUMP export requires 8-fold two-body permutation symmetry; "
+        "reduced-symmetry tensors cannot be represented losslessly.");
+  }
+
+  std::ofstream file(filename);
+  if (!file.is_open()) {
+    throw std::runtime_error("Cannot open file for writing: " + filename);
+  }
+
   // C1 symmetry
   std::string orb_string;
   for (size_t i = 0; i < num_molecular_orbitals - 1; ++i) {
@@ -380,13 +396,13 @@ void HamiltonianContainer::to_fcidump_file(const std::string& filename,
     file << std::setw(4) << l;
   };
 
-  // Get the two-electron integrals via the virtual accessor
-  auto [eri_aaaa, eri_aabb, eri_bbbb] = get_two_body_integrals();
-
+  auto eri_at = [&](const detail::TwoBodyKey& key) {
+    return eri_aaaa(key[0] * num_molecular_orbitals3 +
+                    key[1] * num_molecular_orbitals2 +
+                    key[2] * num_molecular_orbitals + key[3]);
+  };
   auto write_eri = [&](size_t i, size_t j, size_t k, size_t l) {
-    auto eri =
-        eri_aaaa(i * num_molecular_orbitals3 + j * num_molecular_orbitals2 +
-                 k * num_molecular_orbitals + l);
+    const double eri = detail::eightfold_average({i, j, k, l}, eri_at);
 
     formatted_line(i + 1, j + 1, k + 1, l + 1, eri);
     file << "\n";

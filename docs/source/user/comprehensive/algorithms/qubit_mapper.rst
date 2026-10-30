@@ -203,38 +203,75 @@ Both restricted (RHF) and unrestricted (UHF) Hamiltonians are supported.
 
 Custom encodings can be defined by constructing a :class:`~qdk_chemistry.data.MajoranaMapping` from a Pauli-string table.
 
+.. rubric:: Integral symmetry
+
+Restricted integrals must have the 4-fold symmetry
+:math:`(pq|rs) = (qp|sr) = (rs|pq)`, which ordinary 8-fold integrals and those
+produced by downfolding both satisfy. They use spin-summed symmetric and
+antisymmetric excitation pairs, weighted by
+:math:`g^{S,A}_{pq,rs} = \tfrac12\left[(pq|rs) \pm (pq|sr)\right]`.
+A restricted tensor that defines a non-Hermitian operator raises, as does a
+Hermitian one not stored with :math:`(pq|rs) = (rs|pq)`; since that exchange
+leaves the operator unchanged, map its bra-ket average instead.
+
+Unrestricted integrals use the same excitation-pair split when the ``aa`` and
+``bb`` blocks are 4-fold and ``ab`` satisfies
+:math:`(pq|rs)_{ab} = (qp|sr)_{ab}`; ``ab`` need not satisfy
+:math:`(pq|rs)_{ab} = (rs|pq)_{ab}`. Other unrestricted integrals are mapped
+channel by channel.
+
+The ``integral_threshold`` setting screens :math:`g^S` and :math:`g^A` in the
+excitation-pair split, so symmetry partners are always screened together, and
+individual integrals in the channel-by-channel loop. For 8-fold integrals,
+:math:`g^A` vanishes up to round-off, so antisymmetric products are formed
+only where that round-off exceeds the threshold. In ill-conditioned bases, such
+as augmented ones, round-off can exceed the default threshold of ``1e-12`` and
+add Pauli terms of that size (a few percent more terms for an H₄ chain
+in aug-cc-pVDZ); an ``integral_threshold`` of about ``1e-10`` removes most of them,
+at the cost of also screening genuine integrals below it.
+
 .. rubric:: Container-aware fast paths
 
 The ``"qdk"`` backend consumes two-body integrals directly from the underlying
-:doc:`HamiltonianContainer <../data/hamiltonian>` without ever materializing a
+:doc:`HamiltonianContainer <../data/hamiltonian>` without reconstructing a
 dense :math:`N^4` two-body tensor when the container stores its integrals in a
 compressed form:
 
 - :class:`~qdk_chemistry.data.SparseHamiltonianContainer` — the mapping loop
-  iterates over **only the stored non-zero** ``(p, q, r, s)`` integrals rather
-  than the full :math:`O(N^4)` index space, skipping the zeros that dominate
-  lattice/model Hamiltonians (e.g. those produced by
+  iterates over the stored ``(p, q, r, s)`` integrals rather than the full
+  :math:`O(N^4)` index space, skipping the zeros that dominate lattice/model
+  Hamiltonians (e.g. those produced by
   :func:`~qdk_chemistry.utils.model_hamiltonians.create_hubbard_hamiltonian`
   and :func:`~qdk_chemistry.utils.model_hamiltonians.create_ppp_hamiltonian`).
-  This improves **both memory and runtime**, since neither the dense tensor nor
-  the zero entries are ever touched. Stored entries are canonicalized under the
-  8-fold integral symmetry before mapping, so the result does not depend on
-  which symmetry-related permutations of an integral the container stores, nor
-  on their order.
+  Stored entries are read **literally**: positions that are not stored are
+  zero, exactly as in the dense view of the container, so a complete 4-fold
+  suborbit needs no explicit zeros for the rest of its 8-fold orbit. To build
+  entries from symmetry representatives, use
+  :meth:`~qdk_chemistry.data.SparseHamiltonianContainer.expand_symmetry_representatives`
+  with :class:`~qdk_chemistry.data.TwoBodyPermutationGroup`. Entry order does
+  not affect the result.
 - :class:`~qdk_chemistry.data.CholeskyHamiltonianContainer` — the three-center
   (Cholesky / density-fitted) factors are kept in their
   :math:`O(N^2 \cdot n_\text{aux})` form and the auxiliary index is contracted
   in integral space, one ``(pq|.)`` row at a time (a vectorized matrix-vector
-  product per orbital pair). The dense four-center tensor is never built and
-  peak additional memory is a single :math:`N^2`-length row, making this path
-  suitable for systems whose dense ERI tensor does not fit in memory.
+  product per orbital pair), so the mapping needs one additional
+  :math:`N^2`-length row and suits systems whose dense ERI tensor does not fit
+  in memory. The reconstructed integrals are checked element by element for
+  :math:`(pq|rs) = (qp|sr)`, with the same tolerance as dense integrals. For
+  factors that are symmetric in their orbital pair up to round-off, as
+  Cholesky factors of ordinary integrals are, one pass over the factors with
+  :math:`O(N^2)` memory settles the check. Otherwise the parts of the factors
+  symmetric and antisymmetric in their orbital pair are copied, which doubles
+  the factor memory, and a Frobenius bound in
+  :math:`O(N^2 n_\text{aux}^2)` or, failing that, the exact largest violation
+  in :math:`O(N^4 n_\text{aux})` decides it.
 
 In all cases the result is a :class:`~qdk_chemistry.data.QubitOperator` that
-is numerically equivalent — term-by-term, to within ``1e-12`` — to the dense
+is numerically equivalent, term by term, to the dense
 :class:`~qdk_chemistry.data.CanonicalFourCenterHamiltonianContainer` path for
-the same integrals. The behaviour of ``run()`` and the shape of the returned
-operator are unchanged, and the selection is fully automatic based on the
-container type. The
+the same integrals. The behaviour of
+``run()`` and the shape of the returned operator are unchanged, and the
+selection is fully automatic based on the container type. The
 :class:`~qdk_chemistry.data.CanonicalFourCenterHamiltonianContainer` continues
 to use the dense path.
 
@@ -252,7 +289,7 @@ to use the dense path.
      - Threshold for pruning small Pauli coefficients. Default: ``1e-12``
    * - ``integral_threshold``
      - double
-     - Threshold for filtering small integrals before transformation. Default: ``1e-12``
+     - Threshold for filtering small integrals before transformation; 4-fold two-body integrals are screened in the symmetric and antisymmetric combinations above. Default: ``1e-12``
 
 .. rubric:: Example
 
@@ -277,6 +314,12 @@ Supported base encodings: :ref:`Jordan-Wigner <encoding-jordan-wigner>`, :ref:`B
 
 Both restricted (RHF) and unrestricted (UHF) Hamiltonians are supported.
 
+The plugin permutes the two-body tensor axes from QDK's chemist ordering to
+Qiskit Nature's operator ordering, so 4-fold integrals are mapped exactly. An
+unrestricted ``ab`` block that violates :math:`(pq|rs) = (qp|sr)` defines a
+non-Hermitian operator, which Qiskit Nature cannot represent, so ``run()``
+raises ``ValueError``.
+
 .. rubric:: Settings
 
 This implementation has no configurable settings.
@@ -294,6 +337,9 @@ This is a **third-party** backend: it reads ``mapping.base_encoding`` to select 
 Supported base encodings: :ref:`Jordan-Wigner <encoding-jordan-wigner>`, :ref:`Bravyi-Kitaev <encoding-bravyi-kitaev>`, :ref:`Bravyi-Kitaev tree <encoding-bk-tree>`
 
 Both restricted (RHF) and unrestricted (UHF) Hamiltonians are supported.
+
+The plugin permutes the two-body tensor axes from QDK's chemist ordering to
+OpenFermion's operator ordering, so 4-fold integrals are mapped exactly.
 
 .. rubric:: Settings
 

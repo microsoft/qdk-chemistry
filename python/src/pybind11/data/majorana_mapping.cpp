@@ -344,9 +344,21 @@ Returns:
       R"(
 Map a fermionic Hamiltonian to qubit Pauli terms using Majorana loops.
 
-When ``spin_symmetric`` is true, uses a spin-summed fast path that assumes
-identical integrals across spin channels (restricted orbitals). When false,
-handles each spin channel independently (unrestricted orbitals).
+When ``spin_symmetric`` is true, the integrals must be identical across spin
+channels (restricted orbitals; not validated) and 4-fold,
+``(pq|rs) == (qp|sr) == (rs|pq)``; they are mapped with spin-summed symmetric
+and antisymmetric excitation pairs (the excitation-pair split). A
+non-Hermitian tensor raises ``ValueError``, as does a Hermitian tensor not
+stored with ``(pq|rs) == (rs|pq)``; map its bra-ket average instead.
+
+When ``spin_symmetric`` is false (unrestricted orbitals), the excitation-pair
+split is used when ``aa`` and ``bb`` are 4-fold and ``ab`` satisfies
+``(pq|rs) == (qp|sr)``; otherwise every spin channel is looped over in full.
+
+``integral_threshold`` screens the combinations ``((pq|rs) ± (pq|sr)) / 2`` in
+the excitation-pair split, so symmetry partners are screened together, and
+individual integrals in the full loop. A non-finite core energy or integral
+raises ``ValueError``.
 
 Returns ``(words, coefficients)`` where ``words`` is a list of sparse
 Pauli words.
@@ -372,32 +384,38 @@ Map a fermionic Hamiltonian to qubit Pauli terms.
 
 The two-body integrals are consumed in the native storage format of the
 Hamiltonian's container: Cholesky (three-center) and sparse containers are
-read directly without materializing the dense N^4 two-body tensor; any
-other container uses the dense path.
+read directly without reconstructing the dense N^4 two-body tensor; any
+other container uses the dense path. Integral symmetry selects the
+evaluation path as in the buffer-based overload.
 
-For Cholesky and dense containers, the returned ``(words, coefficients)``
-match the dense path for the same underlying integrals.  For sparse
-containers, stored entries are canonicalized and symmetry-expanded before
-mapping, so results agree with the dense path when integrals are stored
-canonically or symmetry-complete (as for in-repo model builders); the
-sparse fast path is more robust when only non-canonical symmetry
-representatives are stored.
+Cholesky factors are checked element by element for
+``(pq|rs) == (qp|sr)``, with the dense tolerance, without reconstructing the
+dense tensor unless cheaper bounds are inconclusive; restricted factors that
+fail this check, and non-finite factors, raise ``ValueError``.
+
+Sparse entries are read literally, with unstored positions equal to zero; a
+complete 4-fold suborbit needs no explicit zeros.
 
 The Hamiltonian's constant energy shift (nuclear repulsion / frozen core)
-is intentionally **not** included in the mapped operator, matching the
-buffer-based overload as invoked by ``QdkQubitMapper`` (which always
-passes ``core_energy=0.0``); callers that need the constant term must add
-it separately.
+is intentionally **not** included in the mapped operator; callers that need
+the constant term must add it separately.
 
 Args:
     mapping (MajoranaMapping): The Majorana-to-Pauli encoding (no tapering).
     hamiltonian (Hamiltonian): The fermionic Hamiltonian.
-    spin_symmetric (bool): Use the spin-summed restricted fast path.
+    spin_symmetric (bool): Whether the integrals are identical across spin
+      channels (restricted orbitals; not validated).
     threshold (float): Drop Pauli terms with magnitude below this value.
-    integral_threshold (float): Skip integrals with magnitude below this value.
+    integral_threshold (float): Screening cutoff for the two-body integrals, as
+      for the buffer-based overload, and for the one-body integrals.
 
 Returns:
     tuple: ``(words, coefficients)`` where ``words`` is a list of sparse Pauli
     words and ``coefficients`` is a list of complex coefficients.
+
+Raises:
+    ValueError: If an integral or Cholesky factor is not finite,
+        or restricted two-body integrals define a non-Hermitian operator or
+        are Hermitian but not stored with ``(pq|rs) == (rs|pq)``.
 )");
 }

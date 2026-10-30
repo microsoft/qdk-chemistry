@@ -5,10 +5,14 @@
 # --------------------------------------------------------------------------------------------
 
 import numpy as np
+import pytest
 
 from qdk_chemistry.algorithms import create
-from qdk_chemistry.data import Ansatz, Structure
+from qdk_chemistry.data import Ansatz, CanonicalFourCenterHamiltonianContainer, Hamiltonian, Structure
+from qdk_chemistry.data._spin_channels import spin_channel_vector
+from qdk_chemistry.data.symmetry import axes
 
+from .helpers import fermionic_reference_matrix, fourfold_average, non_fourfold_perturbation
 from .reference_tolerances import mp2_energy_tolerance
 
 
@@ -94,3 +98,105 @@ class TestMP2Validation:
             f"Ref={ref:.8f}, "
             f"diff={abs(qdk_ump2_corr_energy - ref):.2e}"
         )
+
+
+@pytest.fixture(scope="module")
+def h4_chain():
+    """RHF reference and Hamiltonian of an H4 chain, with more than one occupied-virtual pair."""
+    scf_solver = create("scf_solver")
+    scf_solver.settings().set("method", "hf")
+    structure = Structure(np.array([[0.0, 0.0, 1.6 * i] for i in range(4)]), [1] * 4)
+    _, wavefunction = scf_solver.run(structure, 0, 1, "sto-3g")
+    return wavefunction, create("hamiltonian_constructor").run(wavefunction.get_orbitals())
+
+
+def _mp2_ansatz(h4_chain, two_body):
+    """Ansatz for the H4 chain with its two-body integrals replaced."""
+    wavefunction, hamiltonian = h4_chain
+    container = CanonicalFourCenterHamiltonianContainer(
+        hamiltonian.get_one_body_integrals()[0],
+        two_body.ravel(),
+        wavefunction.get_orbitals(),
+        hamiltonian.get_core_energy(),
+        np.empty((0, 0)),
+    )
+    return Ansatz(Hamiltonian(container), wavefunction)
+
+
+@pytest.mark.parametrize(
+    ("kind", "message"),
+    [("exchange", "bra-ket average"), ("hermiticity", "non-Hermitian")],
+    ids=["exchange", "hermiticity"],
+)
+def test_mp2_rejects_non_fourfold_two_body(h4_chain, kind, message):
+    """MP2 reads (ia|jb) directly, so tensors outside the fourfold group would give wrong energies."""
+    two_body = np.asarray(h4_chain[1].get_two_body_integrals()[0])
+    n = round(len(two_body) ** 0.25)
+    perturbation = non_fourfold_perturbation(np.random.default_rng(706).normal(size=(n,) * 4), kind)
+    mp2_calculator = create("dynamical_correlation_calculator", "qdk_mp2_calculator")
+    with pytest.raises(ValueError, match=message):
+        mp2_calculator.run(_mp2_ansatz(h4_chain, two_body.reshape((n,) * 4) + 0.05 * perturbation))
+
+
+def test_mp2_accepts_fourfold_two_body(h4_chain):
+    """A 4-fold, non-8-fold tensor gives the literal operator's doubles-only second-order sum over orbital energies."""
+    wavefunction, hamiltonian = h4_chain
+    one_body = np.asarray(hamiltonian.get_one_body_integrals()[0])
+    n = one_body.shape[0]
+    two_body = np.asarray(hamiltonian.get_two_body_integrals()[0]).reshape((n,) * 4)
+    two_body = two_body + 0.05 * fourfold_average(np.random.default_rng(706).normal(size=(n,) * 4))
+    assert not np.allclose(two_body, two_body.swapaxes(0, 1))
+    ansatz = _mp2_ansatz(h4_chain, two_body)
+    total_energy, _, _ = create("dynamical_correlation_calculator", "qdk_mp2_calculator").run(ansatz)
+
+    # Sum over doubly excited determinants of the literal operator, blocked alpha then beta modes.
+    matrix = fermionic_reference_matrix(one_body, one_body, two_body, two_body, two_body).real
+    energies = np.tile(spin_channel_vector(wavefunction.get_orbitals().energies(), axes.alpha()), 2)
+    occupied = [0, 1, n, n + 1]
+    reference_state = sum(1 << mode for mode in occupied)
+    expected = 0.0
+    for state in range(len(matrix)):
+        removed = [mode for mode in occupied if not state >> mode & 1]
+        added = [mode for mode in range(2 * n) if state >> mode & 1 and mode not in occupied]
+        if len(removed) == len(added) == 2:
+            denominator = energies[removed].sum() - energies[added].sum()
+            expected += matrix[reference_state, state] * matrix[state, reference_state] / denominator
+    assert total_energy - ansatz.calculate_energy() == pytest.approx(expected, abs=1e-10)
+
+
+def test_ump2_ignores_same_spin_content_of_vanishing_operators():
+    """Same-spin (ia|ia) multiplies a+_i a+_i a_a a_a = 0, so UMP2 accepts it and its energy is unchanged."""
+    scf_solver = create("scf_solver")
+    scf_solver.settings().set("method", "hf")
+    _, wavefunction = scf_solver.run(create_o2_molecule(), 0, 3, "sto-3g")
+    hamiltonian = create("hamiltonian_constructor").run(wavefunction.get_orbitals())
+    one_alpha, one_beta = (np.asarray(matrix) for matrix in hamiltonian.get_one_body_integrals())
+    n = one_alpha.shape[0]
+    two_aa, two_ab, two_bb = (np.array(tensor).reshape((n,) * 4) for tensor in hamiltonian.get_two_body_integrals())
+
+    def with_two_body(aa, bb):
+        container = CanonicalFourCenterHamiltonianContainer(
+            one_alpha,
+            one_beta,
+            aa.ravel(),
+            two_ab.ravel(),
+            bb.ravel(),
+            wavefunction.get_orbitals(),
+            hamiltonian.get_core_energy(),
+            np.empty((0, 0)),
+            np.empty((0, 0)),
+        )
+        return Ansatz(Hamiltonian(container), wavefunction)
+
+    calculator = create("dynamical_correlation_calculator", "qdk_mp2_calculator")
+    expected, _, _ = calculator.run(with_two_body(two_aa, two_bb))
+    gauge = two_aa.copy()
+    gauge[0, n - 1, 0, n - 1] += 1.0  # alpha occupies 0..8 of 10 orbitals
+    actual, _, _ = calculator.run(with_two_body(gauge, two_bb))
+    assert actual == pytest.approx(expected, abs=1e-12)
+
+    # Content that MP2 does read, (ia|jb) - (ib|ja) with i < j and a < b, must still be Hermitian.
+    non_hermitian = two_bb.copy()
+    non_hermitian[0, 7, 1, 8] += 0.1  # beta occupies 0..6
+    with pytest.raises(ValueError, match="non-Hermitian"):
+        calculator.run(with_two_body(two_aa, non_hermitian))

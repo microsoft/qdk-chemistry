@@ -73,6 +73,23 @@ registered make the following changes:
   sets and the AO overlap are carried across unchanged.
 - :class:`~qdk_chemistry.data.Hamiltonian` — the four-center, Cholesky, and
   sparse containers all upgrade their integral storage to symmetry-blocked form.
+  Earlier versions, including sparse ``0.2.0``, expanded each two-body entry
+  over its 8-fold permutation class only in the qubit mapper (and in readers
+  of the FCIDUMP files they exported, which wrote entries as stored); the
+  integral getters, and so MACIS, MP2, and the plugins, read entries
+  literally. For Hermitian containers, migration adopts the qubit mapper's
+  reading: the migrated container stores every class member, and a class whose
+  stored values differ is refused. Dense consumers can therefore give different
+  results for files that stored only some class members. Non-Hermitian
+  containers keep their entries as stored.
+  Sparse two-body maps built in code are not migrated. In a Hermitian
+  container, a lone entry is still expanded over its class, with a
+  ``DeprecationWarning``, but classes with two or more stored members are read
+  literally:
+  ``{(0, 1, 0, 1): v, (1, 0, 1, 0): v}`` now gives :math:`(01|10) = 0`, where
+  earlier qubit mappings used ``v``. Such a map is valid 4-fold input, so this
+  cannot be detected; store every class member or use
+  :meth:`~qdk_chemistry.data.SparseHamiltonianContainer.expand_symmetry_representatives`.
 - :class:`~qdk_chemistry.data.Wavefunction` — the single-determinant,
   complete-active-space, and selected-CI containers upgrade to the
   state-vector container; the MP2 and coupled-cluster containers upgrade to the

@@ -7,6 +7,8 @@
 #include "mp2.hpp"
 
 #include <Eigen/Dense>
+#include <algorithm>
+#include <cmath>
 #include <cstddef>
 #include <optional>
 #include <qdk/chemistry/data/hamiltonian.hpp>
@@ -17,7 +19,92 @@
 #include <stdexcept>
 #include <tuple>
 
+#include "../../data/two_body_symmetry.hpp"
+
 namespace qdk::chemistry::algorithms::microsoft {
+
+namespace {
+
+// MP2 reads only (ia|jb) and (ib|ja), with i, j occupied and a, b virtual.
+// The alpha-beta block must satisfy (ia|jb) = (ai|bj).  A restricted tensor
+// also serves the alpha-beta channel, so it must be fourfold at these
+// positions.  An unrestricted same-spin block enters only through
+// (ia|jb) - (ib|ja) with i < j and a < b, which must equal its bra-ket
+// partner (jb|ia) - (ja|ib) and its Hermitian conjugate (ai|bj) - (aj|bi);
+// other same-spin content, such as (ia|ia), multiplies vanishing operators.
+void validate_two_body_symmetry(const data::Hamiltonian& hamiltonian,
+                                std::size_t n_alpha, std::size_t n_beta,
+                                bool unrestricted) {
+  if (!hamiltonian.has_two_body_integrals()) return;
+  const auto n = static_cast<std::size_t>(
+      std::get<0>(hamiltonian.get_one_body_integrals()).rows());
+  const auto& [aaaa, aabb, bbbb] = hamiltonian.get_two_body_integrals();
+  if (static_cast<std::size_t>(aaaa.size()) != n * n * n * n) return;
+  enum class Block { Restricted, SameSpin, AlphaBeta };
+  auto check_block = [n](const Eigen::VectorXd& tensor, std::size_t n_occ_i,
+                         std::size_t n_occ_j, Block block) {
+    data::detail::require_finite_two_body(
+        tensor.data(), static_cast<std::size_t>(tensor.size()), "MP2");
+    const double tolerance = data::detail::two_body_symmetry_tolerance *
+                             tensor.cwiseAbs().maxCoeff();
+    auto at = [&tensor, n](const data::detail::TwoBodyKey& k) {
+      return tensor[((k[0] * n + k[1]) * n + k[2]) * n + k[3]];
+    };
+    // (pq|rs) - (ps|rq), the antisymmetrized same-spin integral.
+    auto antisymmetrized = [&at](std::size_t p, std::size_t q, std::size_t r,
+                                 std::size_t s) {
+      return at({p, q, r, s}) - at({p, s, r, q});
+    };
+    auto symmetry = data::detail::TwoBodySymmetry::EightFold;
+    for (std::size_t i = 0; i < std::min(n_occ_i, n); ++i) {
+      for (std::size_t a = n_occ_i; a < n; ++a) {
+        for (std::size_t j = 0; j < std::min(n_occ_j, n); ++j) {
+          for (std::size_t b = n_occ_j; b < n; ++b) {
+            const data::detail::TwoBodyKey key{i, a, j, b};
+            if (block == Block::Restricted) {
+              symmetry = std::min(symmetry, data::detail::two_body_symmetry_at(
+                                                key, at(key), at, tolerance));
+            } else if (block == Block::AlphaBeta) {
+              if (std::abs(at(key) - at({a, i, b, j})) > tolerance) {
+                throw std::invalid_argument(
+                    "MP2: the alpha-beta two-body integrals violate (pq|rs) = "
+                    "(qp|sr), so they define a non-Hermitian operator, which "
+                    "is not supported.");
+              }
+            } else if (i < j && a < b) {
+              const double direct = antisymmetrized(i, a, j, b);
+              const double swapped = antisymmetrized(j, b, i, a);
+              const double conjugate = 0.5 * (antisymmetrized(a, i, b, j) +
+                                              antisymmetrized(b, j, a, i));
+              if (std::abs(0.5 * (direct + swapped) - conjugate) > tolerance) {
+                throw std::invalid_argument(
+                    "MP2: the same-spin two-body integrals give (ia|jb) - "
+                    "(ib|ja) != (ai|bj) - (aj|bi), so they define a "
+                    "non-Hermitian operator, which is not supported.");
+              }
+              if (std::abs(direct - swapped) > tolerance) {
+                throw std::invalid_argument(
+                    "MP2: the same-spin two-body integrals give (ia|jb) - "
+                    "(ib|ja) != (jb|ia) - (ja|ib), which this method assumes. "
+                    "That swap leaves the operator unchanged, so replace the "
+                    "tensor by its bra-ket average ((pq|rs) + (rs|pq)) / 2.");
+              }
+            }
+          }
+        }
+      }
+    }
+    data::detail::throw_unless_fourfold(symmetry, "MP2");
+  };
+  const auto same_spin =
+      hamiltonian.is_unrestricted() ? Block::SameSpin : Block::Restricted;
+  check_block(aaaa, n_alpha, n_alpha, same_spin);
+  if (!unrestricted) return;
+  check_block(bbbb, n_beta, n_beta, same_spin);
+  check_block(aabb, n_alpha, n_beta, Block::AlphaBeta);
+}
+
+}  // namespace
 
 MP2Calculator::MP2Calculator() = default;
 
@@ -42,6 +129,7 @@ DynamicalCorrelationResult MP2Calculator::_run_impl(
 
   // Determine whether to use restricted or unrestricted MP2
   bool use_unrestricted = hamiltonian->is_unrestricted() || (n_alpha != n_beta);
+  validate_two_body_symmetry(*hamiltonian, n_alpha, n_beta, use_unrestricted);
 
   if (use_unrestricted) {
     E_corr = calculate_unrestricted_mp2_energy(hamiltonian, orbitals, n_alpha,

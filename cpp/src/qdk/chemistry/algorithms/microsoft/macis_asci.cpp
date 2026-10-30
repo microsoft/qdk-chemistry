@@ -212,6 +212,7 @@ std::pair<double, std::shared_ptr<data::Wavefunction>> MacisAsci::_run_impl(
         "MacisAsci does not support unrestricted orbitals. "
         "Only restricted orbitals are supported.");
   }
+  validate_macis_two_body_symmetry(*hamiltonian, "MacisAsci");
   const auto active_ai = orbitals->active_indices();
   const auto active_indices =
       data::spin_channel_indices(active_ai, data::axes::alpha());
