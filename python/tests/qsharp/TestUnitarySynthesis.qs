@@ -47,4 +47,32 @@ namespace QDKChemistry.TestUtils.UnitarySynthesisTests {
             }
         }
     }
+
+    /// Applies `givens` to a fresh register twice in one program, first with `firstBits` and
+    /// then with `secondBits` rotation bits, each with its own phase gradient.
+    operation TestGivensAtTwoPrecisions(
+        givens : GivensDecomposition,
+        numTarget : Int,
+        firstBits : Int,
+        secondBits : Int,
+    ) : Unit {
+        use target = Qubit[numTarget];
+        let numAddresses = MaxI(1, 1 <<< (numTarget - 1));
+        for bits in [firstBits, secondBits] {
+            use phaseGradient = Qubit[bits];
+            use angleReg = Qubit[bits];
+            within {
+                PreparePhaseGradientState(phaseGradient);
+            } apply {
+                ApplyRealUnitaryViaGivens(
+                    QuantizeGivensDecomposition(givens, numAddresses, bits),
+                    [],
+                    target,
+                    phaseGradient,
+                    angleReg
+                );
+            }
+        }
+        ResetAll(target);
+    }
 }
