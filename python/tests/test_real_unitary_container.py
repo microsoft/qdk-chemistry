@@ -59,19 +59,29 @@ class TestValidation:
         matrix[0, 0] = 5.0
         np.testing.assert_array_equal(container.to_dense(), np.eye(4))
 
-    def test_sparse_matrix_is_returned_by_copy(self):
-        """Mutating the returned sparse matrix leaves the container, its hash and its JSON unchanged."""
+    @pytest.mark.parametrize("stored_sparse", [False, True], ids=["dense", "sparse"])
+    def test_matrix_is_returned_by_copy(self, stored_sparse):
+        """Mutating the returned matrix leaves the container, its hash and its JSON unchanged."""
         matrix = _block_sparse(4)
-        container = RealUnitaryContainer(matrix)
+        expected = matrix.toarray()
+        container = RealUnitaryContainer(matrix if stored_sparse else expected)
         content_hash = container.content_hash()
         serialized = container.to_json()
 
         returned = container.matrix
-        returned.data[:] = 0.0
-        returned.indices[:] = 0
+        if stored_sparse:
+            returned.data[:] = 0.0
+            returned.indices[:] = 0
+        else:
+            assert not returned.flags.writeable
+            returned.setflags(write=True)
+            returned[:] = 0.0
 
-        np.testing.assert_array_equal(container.matrix.toarray(), matrix.toarray())
-        np.testing.assert_array_equal(container.to_dense(), matrix.toarray())
+        np.testing.assert_array_equal(container.to_dense(), expected)
+        np.testing.assert_array_equal(
+            container.matrix.toarray() if stored_sparse else container.matrix,
+            expected,
+        )
         assert container.content_hash() == content_hash
         assert container.to_json() == serialized
 
