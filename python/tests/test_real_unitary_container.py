@@ -34,6 +34,16 @@ def _block_sparse(seed: int) -> sparse.csc_array:
     return sparse.csc_array(blocks[np.random.default_rng(seed).permutation(8)])
 
 
+def _signed_permutation(num_qubits: int, seed: int) -> sparse.csc_array:
+    """Return a random signed permutation matrix on ``num_qubits`` qubits."""
+    dimension = 1 << num_qubits
+    permutation = np.random.default_rng(seed).permutation(dimension)
+    return sparse.csc_array(
+        (np.where(permutation % 2 == 0, 1.0, -1.0), permutation, np.arange(dimension + 1)),
+        shape=(dimension, dimension),
+    )
+
+
 class TestValidation:
     """Construction accepts real isometries and rejects everything else with a clear error."""
 
@@ -87,12 +97,7 @@ class TestValidation:
 
     def test_sparse_validation_stays_sparse(self):
         """Validating a wide sparse matrix never forms a dense Gram matrix or identity."""
-        dimension = 1 << 12
-        permutation = np.random.default_rng(0).permutation(dimension)
-        matrix = sparse.csc_array(
-            (np.where(permutation % 2 == 0, 1.0, -1.0), permutation, np.arange(dimension + 1)),
-            shape=(dimension, dimension),
-        )
+        matrix = _signed_permutation(12, seed=0)
         tracemalloc.start()
         try:
             container = RealUnitaryContainer(matrix)
@@ -245,6 +250,33 @@ class TestOperations:
         combined = RealUnitaryContainer(first).combine(RealUnitaryContainer(second))
         assert combined.is_sparse
         np.testing.assert_allclose(combined.to_dense(), (second @ first).toarray(), atol=1e-14)
+
+    @pytest.mark.parametrize("sparse_first", [True, False], ids=["sparse-then-dense", "dense-then-sparse"])
+    def test_combine_mixed_storage(self, sparse_first):
+        """Combining dense and sparse containers gives the dense product in either order."""
+        sparse_matrix, dense_matrix = _block_sparse(3), _orthogonal(8, 4)
+        first, second = (sparse_matrix, dense_matrix) if sparse_first else (dense_matrix, sparse_matrix)
+        combined = RealUnitaryContainer(first).combine(RealUnitaryContainer(second))
+        assert not combined.is_sparse
+        expected = second @ first.toarray() if sparse_first else second.toarray() @ first
+        np.testing.assert_allclose(combined.to_dense(), expected, atol=1e-14)
+
+    def test_combine_mixed_storage_keeps_sparse_factor_sparse(self):
+        """Appending a wide sparse unitary to a dense column never densifies the sparse factor."""
+        permutation = _signed_permutation(12, seed=1)
+        column = np.random.default_rng(1).normal(size=(permutation.shape[0], 1))
+        column /= np.linalg.norm(column)
+        state, other = RealUnitaryContainer(column), RealUnitaryContainer(permutation)
+        tracemalloc.start()
+        try:
+            combined = state.combine(other)
+            _, peak = tracemalloc.get_traced_memory()
+        finally:
+            tracemalloc.stop()
+
+        np.testing.assert_array_equal(combined.to_dense(), permutation @ column)
+        # A dense 4096 x 4096 float64 array alone takes 128 MiB.
+        assert peak < 8 * 1024 * 1024, f"combine peaked at {peak / 2**20:.1f} MiB"
 
     def test_combine_rejects_mismatch(self):
         """Different widths, a non-square second factor or another container type are rejected."""

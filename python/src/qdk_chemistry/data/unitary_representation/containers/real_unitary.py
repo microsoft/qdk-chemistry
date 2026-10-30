@@ -198,7 +198,8 @@ class RealUnitaryContainer(UnitaryContainer):
 
         Returns:
             RealUnitaryContainer: The product ``other.matrix @ self.matrix``, stored sparse when
-            both inputs are sparse.
+            both inputs are sparse. Mixed storage multiplies the stored matrices directly, so the
+            sparse factor is never densified.
 
         Raises:
             TypeError: If ``other`` is not a :class:`~qdk_chemistry.data.RealUnitaryContainer`.
@@ -213,9 +214,7 @@ class RealUnitaryContainer(UnitaryContainer):
             )
         if not other.is_square:
             raise ValueError("Only a square RealUnitaryContainer can be appended after another.")
-        if self.is_sparse and other.is_sparse:
-            return RealUnitaryContainer(other.matrix @ self.matrix)
-        return RealUnitaryContainer(other.to_dense() @ self.to_dense())
+        return RealUnitaryContainer(other._matrix @ self._matrix)  # noqa: SLF001
 
     def _hash_update(self, h) -> None:
         """Feed identifying data into the hasher."""
