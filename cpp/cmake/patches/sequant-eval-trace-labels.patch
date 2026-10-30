@@ -1,0 +1,23 @@
+# Build the BTAS/TAPP evaluation trace labels only when tracing is compiled in.
+# ords_to_labels() runs eagerly as a log_btas()/log_tapp() argument, so with
+# tracing off it still inserts into annot_label()'s unsynchronized static map,
+# which races when several threads evaluate expressions at once.
+diff --git a/SeQuant/core/eval/result.hpp b/SeQuant/core/eval/result.hpp
+--- a/SeQuant/core/eval/result.hpp
++++ b/SeQuant/core/eval/result.hpp
+@@ -153,10 +153,14 @@ inline std::string annot_label(std::int64_t key) noexcept {
+ }
+ 
+ template <typename RngOfOrdinals>
+-std::string ords_to_labels(RngOfOrdinals const& ords) {
++std::string ords_to_labels([[maybe_unused]] RngOfOrdinals const& ords) {
++#ifdef SEQUANT_EVAL_TRACE
+   return join_strings<std::string>(ords, ",", [](auto x) {
+     return annot_label(static_cast<std::int64_t>(x));
+   });
++#else
++  return {};
++#endif
+ }
+ 
+ template <typename... Args>

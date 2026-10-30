@@ -323,8 +323,8 @@ These dependencies are automatically downloaded and built by the CMake build sys
 | Libecpint | A C++ library for molecular integrals involving [effective core potentials](https://en.wikipedia.org/wiki/Pseudopotential) | v1.0.7 | [source](https://github.com/robashaw/libecpint) | `apt install libecpint-dev` | N/A | N/A |
 | GauXC | A C++ library for molecular integrals on numerical grids | v1.0 | [source](https://github.com/wavefunction91/gauxc) | N/A | N/A | N/A |
 | MACIS | A C++ library for configuration interaction methods | N/A | [source](https://github.com/wavefunction91/macis) | N/A | N/A | N/A |
-| SeQuant | A C++ library for symbolic tensor algebra in many-body methods | 5fcefae | [source](https://github.com/ValeevGroup/SeQuant) | N/A | N/A | N/A |
-| BTAS | A C++ tensor library, used as SeQuant's numerical backend | 52aadfe | [source](https://github.com/BTAS/btas) | N/A | N/A | N/A |
+| SeQuant | A C++ library for symbolic tensor algebra in many-body methods | be93107 | [source](https://github.com/ValeevGroup/SeQuant) | N/A | N/A | N/A |
+| BTAS | A C++ tensor library, used as SeQuant's numerical backend | 5b435cf | [source](https://github.com/BTAS/btas) | N/A | N/A | N/A |
 
 **NOTE**: As Libint and GauXC exhibit very long build times, it is **strongly encouraged** that these dependencies are separately installed to avoid excessive build costs. See the [Libint2](https://github.com/evaleev/libint) and [GauXC](https://github.com/wavefunction91/gauxc) project documentation for build instructions.
 
