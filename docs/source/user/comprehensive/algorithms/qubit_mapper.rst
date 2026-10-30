@@ -226,8 +226,8 @@ individual integrals in the channel-by-channel loop. For 8-fold integrals,
 :math:`g^A` vanishes up to round-off, so antisymmetric products are formed
 only where that round-off exceeds the threshold. In ill-conditioned bases, such
 as augmented ones, round-off can exceed the default threshold of ``1e-12`` and
-add Pauli terms of that size (2–6% more terms for an H₄ chain in
-aug-cc-pVDZ); an ``integral_threshold`` of about ``1e-10`` removes most of them,
+add Pauli terms of that size (a few percent more terms for an H₄ chain
+in aug-cc-pVDZ); an ``integral_threshold`` of about ``1e-10`` removes most of them,
 at the cost of also screening genuine integrals below it.
 
 .. rubric:: Container-aware fast paths
