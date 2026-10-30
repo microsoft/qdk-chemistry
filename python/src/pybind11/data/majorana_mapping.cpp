@@ -357,8 +357,8 @@ split is used when ``aa`` and ``bb`` are 4-fold and ``ab`` satisfies
 
 ``integral_threshold`` screens the combinations ``((pq|rs) ± (pq|sr)) / 2`` in
 the excitation-pair split, so symmetry partners are screened together, and
-individual integrals in the full loop. Non-finite integrals raise
-``ValueError``.
+individual integrals in the full loop. A non-finite core energy or integral
+raises ``ValueError``.
 
 Returns ``(words, coefficients)`` where ``words`` is a list of sparse
 Pauli words.

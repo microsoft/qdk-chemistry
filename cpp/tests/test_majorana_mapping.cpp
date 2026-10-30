@@ -448,6 +448,31 @@ TEST(MajoranaMapEngineTest, RejectsNonFiniteOneBodyIntegrals) {
       std::invalid_argument);
 }
 
+TEST(MajoranaMapEngineTest, RejectsNonFiniteCoreEnergy) {
+  // Screening alone would drop a NaN core energy from the identity term.
+  const auto mapping = MajoranaMapping::jordan_wigner(4);
+  const auto one_body = diagonal_one_body(2);
+  const double eri[16] = {};
+  Eigen::MatrixXd factors = Eigen::MatrixXd::Zero(4, 1);
+  const int index[4] = {0, 0, 0, 0};
+  const double value[1] = {0.5};
+  for (double core_energy : {std::numeric_limits<double>::quiet_NaN(),
+                             std::numeric_limits<double>::infinity()}) {
+    EXPECT_THROW(majorana_map_hamiltonian(mapping, core_energy, one_body.data(),
+                                          one_body.data(), eri, eri, eri, 2,
+                                          true, 1e-12, 1e-12),
+                 std::invalid_argument);
+    EXPECT_THROW(majorana_map_hamiltonian_cholesky(
+                     mapping, core_energy, one_body.data(), one_body.data(),
+                     factors.data(), factors.data(), 2, 1, true, 1e-12, 1e-12),
+                 std::invalid_argument);
+    EXPECT_THROW(majorana_map_hamiltonian_sparse(
+                     mapping, core_energy, one_body.data(), one_body.data(),
+                     index, value, 1, 2, true, 1e-12, 1e-12),
+                 std::invalid_argument);
+  }
+}
+
 TEST(MajoranaMapEngineTest, CholeskyValidationIsElementwiseLikeDense) {
   // A violation at one pair is not diluted by the size of the tensor.
   {

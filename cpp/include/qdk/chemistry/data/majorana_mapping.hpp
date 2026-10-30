@@ -367,10 +367,10 @@ struct MajoranaMapResult {
  *        partners are screened together; the full loop skips individual
  *        integrals.  One-body integrals with |value| <= this are skipped.
  * @return MajoranaMapResult with Pauli words and coefficients.
- * @throws std::invalid_argument If an integral is not finite (beta
- *         one-body integrals are read only when spin_symmetric is false), or
- *         spin_symmetric is true and the two-body integrals define a
- *         non-Hermitian operator, or are Hermitian but not stored with
+ * @throws std::invalid_argument If core_energy or an integral is not finite
+ *         (beta one-body integrals are read only when spin_symmetric is
+ *         false), or spin_symmetric is true and the two-body integrals define
+ *         a non-Hermitian operator, or are Hermitian but not stored with
  *         (pq|rs) = (rs|pq); in the latter case, map their bra-ket average
  *         instead.
  */
@@ -447,10 +447,10 @@ MajoranaMapResult majorana_map_hamiltonian(const MajoranaMapping& mapping,
  * @param integral_threshold Screening cutoff, as for
  *        ::majorana_map_hamiltonian.
  * @return MajoranaMapResult with Pauli words and coefficients.
- * @throws std::invalid_argument If a factor or one-body integral is not
- *         finite, or spin_symmetric
- *         is true and the reconstructed two-body integrals violate
- *         (pq|rs) = (qp|sr), so they define a non-Hermitian operator.
+ * @throws std::invalid_argument If core_energy, a factor, or a one-body
+ *         integral is not finite, or spin_symmetric is true and the
+ *         reconstructed two-body integrals violate (pq|rs) = (qp|sr), so they
+ *         define a non-Hermitian operator.
  */
 MajoranaMapResult majorana_map_hamiltonian_cholesky(
     const MajoranaMapping& mapping, double core_energy, const double* h1_alpha,
@@ -492,10 +492,10 @@ MajoranaMapResult majorana_map_hamiltonian_cholesky(
  *        ::majorana_map_hamiltonian.
  * @return MajoranaMapResult with Pauli words and coefficients.
  * @throws std::invalid_argument If spin_symmetric is false, any two-body
- *         index is outside [0, n_spatial), an integral is not finite, duplicate
- *         entries for the same position carry conflicting values, or the
- *         literal tensor defines a non-Hermitian operator or is not stored
- *         with (pq|rs) = (rs|pq).
+ *         index is outside [0, n_spatial), core_energy or an integral is not
+ *         finite, duplicate entries for the same position carry conflicting
+ *         values, or the literal tensor defines a non-Hermitian operator or is
+ *         not stored with (pq|rs) = (rs|pq).
  */
 MajoranaMapResult majorana_map_hamiltonian_sparse(
     const MajoranaMapping& mapping, double core_energy, const double* h1_alpha,

@@ -963,6 +963,10 @@ MajoranaMapResult run_with_provider(const MajoranaMapping& mapping,
   }
 
   // Screening would silently drop a NaN (|NaN| > threshold is false).
+  if (!std::isfinite(core_energy)) {
+    throw std::invalid_argument(
+        "majorana_map_hamiltonian: the core energy is not finite.");
+  }
   auto require_finite_one_body = [n_spatial](const double* one_body) {
     if (!std::all_of(one_body, one_body + n_spatial * n_spatial,
                      [](double value) { return std::isfinite(value); })) {
