@@ -2,7 +2,7 @@
 build-backend = "scikit_build_core.build"
 requires = [
   "scikit-build-core>=0.10.0",
-  "pybind11>=2.13.6",
+  "nanobind>=3.1.0",
   "numpy>=2.0.0,<2.4.0",
 ]
 
@@ -40,7 +40,7 @@ dependencies = [
   "argcomplete>=3.0.0",
   "ruamel-yaml>=0.18.10",
   "qdk[jupyter]>=1.33.1",
-  "pybind11-stubgen>=2.5.1",
+  "nanobind>=3.1.0",
   "h5py>=3.0.0",
 ]
 description = "Quantum Development Kit - Chemistry Library"

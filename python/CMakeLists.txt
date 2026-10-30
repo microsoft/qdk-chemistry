@@ -125,83 +125,84 @@ else()
     message(STATUS "Building Python bindings without GPU support")
 endif()
 
-# Find Python first (required for pybind11)
+# Find Python first (required for nanobind)
 find_package(Python 3.10 REQUIRED COMPONENTS Interpreter Development.Module)
 
-# Find pybind11 - tell it to use the FindPython we already called
-set(PYBIND11_FINDPYTHON ON)
-# vcpkg's find_package wrapper may miss pip-installed pybind11; ask pybind11 for its cmakedir.
-if(NOT pybind11_DIR)
+# vcpkg's find_package wrapper may miss pip-installed nanobind.
+if(NOT nanobind_DIR)
   execute_process(
-    COMMAND "${Python_EXECUTABLE}" -m pybind11 --cmakedir
-    OUTPUT_VARIABLE _pybind11_cmakedir
+    COMMAND "${Python_EXECUTABLE}" -m nanobind --cmake_dir
+    OUTPUT_VARIABLE _nanobind_cmakedir
     OUTPUT_STRIP_TRAILING_WHITESPACE
     ERROR_QUIET
-    RESULT_VARIABLE _pybind11_result)
-  if(_pybind11_result EQUAL 0 AND _pybind11_cmakedir)
-    set(pybind11_DIR "${_pybind11_cmakedir}" CACHE PATH "" FORCE)
+    RESULT_VARIABLE _nanobind_result)
+  if(_nanobind_result EQUAL 0 AND _nanobind_cmakedir)
+    set(nanobind_DIR "${_nanobind_cmakedir}" CACHE PATH "" FORCE)
   endif()
 endif()
-find_package(pybind11 REQUIRED)
+find_package(nanobind 3.1 CONFIG REQUIRED)
 
 # Create the Python extension module
-pybind11_add_module(_core
-    src/pybind11/data/data_class.cpp
-    src/pybind11/data/symmetry/symmetry.cpp
-    src/pybind11/data/symmetry/symmetry_blocked_scalar.cpp
-    src/pybind11/data/symmetry/symmetry_blocked_tensor.cpp
-    src/pybind11/data/symmetry/symmetry_blocked_index_set.cpp
-    src/pybind11/data/symmetry/symmetry_blocked_sparse_map.cpp
-    src/pybind11/data/element_data.cpp
-    src/pybind11/data/orbitals.cpp
-    src/pybind11/data/wavefunction.cpp
-    src/pybind11/data/hamiltonian.cpp
-    src/pybind11/data/settings.cpp
-    src/pybind11/data/structure.cpp
-    src/pybind11/data/basis_set.cpp
-    src/pybind11/data/configuration.cpp
-    src/pybind11/data/configuration_set.cpp
-    src/pybind11/data/ansatz.cpp
-    src/pybind11/data/stability_result.cpp
-    src/pybind11/data/nuclear_gradients.cpp
-    src/pybind11/data/nuclear_hessian.cpp
-    src/pybind11/data/pauli_operator.cpp
-    src/pybind11/data/majorana_mapping.cpp
-    src/pybind11/data/serialization.cpp
-    src/pybind11/data/lattice_geometry.cpp
-    src/pybind11/data/lattice_graph.cpp
-    src/pybind11/algorithms/localizer.cpp
-    src/pybind11/algorithms/stability.cpp
-    src/pybind11/algorithms/mc.cpp
-    src/pybind11/algorithms/pmc.cpp
-    src/pybind11/algorithms/mcscf.cpp
-    src/pybind11/algorithms/hamiltonian.cpp
-    src/pybind11/algorithms/scf.cpp
-    src/pybind11/algorithms/nuclear_derivative.cpp
-    src/pybind11/algorithms/population_analysis.cpp
-    src/pybind11/algorithms/geometry_optimization.cpp
-    src/pybind11/algorithms/active_space.cpp
-    src/pybind11/algorithms/dynamical_correlation_calculator.cpp
-    src/pybind11/algorithms/effective_hamiltonian.cpp
-    src/pybind11/algorithms/hamiltonian_factorization.cpp
-    src/pybind11/algorithms/double_factorization.cpp
-    src/pybind11/algorithms/davidson_solver.cpp
-    src/pybind11/algorithms/syev_solver.cpp
-    src/pybind11/utils/logger.cpp
-    src/pybind11/utils/valence_space.cpp
-    src/pybind11/utils/orbital_rotation.cpp
-    src/pybind11/utils/model_hamiltonians.cpp
-    src/pybind11/utils/cube_generator.cpp
-    src/pybind11/constants.cpp
-    src/pybind11/qdk_scf_config.cpp
-    src/pybind11/module.cpp
+nanobind_add_module(_core
+    src/nanobind/data/data_class.cpp
+    src/nanobind/data/symmetry/symmetry.cpp
+    src/nanobind/data/symmetry/symmetry_blocked_scalar.cpp
+    src/nanobind/data/symmetry/symmetry_blocked_tensor.cpp
+    src/nanobind/data/symmetry/symmetry_blocked_index_set.cpp
+    src/nanobind/data/symmetry/symmetry_blocked_sparse_map.cpp
+    src/nanobind/data/element_data.cpp
+    src/nanobind/data/orbitals.cpp
+    src/nanobind/data/wavefunction.cpp
+    src/nanobind/data/hamiltonian.cpp
+    src/nanobind/data/settings.cpp
+    src/nanobind/data/structure.cpp
+    src/nanobind/data/basis_set.cpp
+    src/nanobind/data/configuration.cpp
+    src/nanobind/data/configuration_set.cpp
+    src/nanobind/data/ansatz.cpp
+    src/nanobind/data/stability_result.cpp
+    src/nanobind/data/nuclear_gradients.cpp
+    src/nanobind/data/nuclear_hessian.cpp
+    src/nanobind/data/pauli_operator.cpp
+    src/nanobind/data/majorana_mapping.cpp
+    src/nanobind/data/serialization.cpp
+    src/nanobind/data/lattice_geometry.cpp
+    src/nanobind/data/lattice_graph.cpp
+    src/nanobind/algorithms/localizer.cpp
+    src/nanobind/algorithms/stability.cpp
+    src/nanobind/algorithms/mc.cpp
+    src/nanobind/algorithms/pmc.cpp
+    src/nanobind/algorithms/mcscf.cpp
+    src/nanobind/algorithms/hamiltonian.cpp
+    src/nanobind/algorithms/scf.cpp
+    src/nanobind/algorithms/nuclear_derivative.cpp
+    src/nanobind/algorithms/population_analysis.cpp
+    src/nanobind/algorithms/geometry_optimization.cpp
+    src/nanobind/algorithms/active_space.cpp
+    src/nanobind/algorithms/dynamical_correlation_calculator.cpp
+    src/nanobind/algorithms/effective_hamiltonian.cpp
+    src/nanobind/algorithms/hamiltonian_factorization.cpp
+    src/nanobind/algorithms/double_factorization.cpp
+    src/nanobind/algorithms/davidson_solver.cpp
+    src/nanobind/algorithms/syev_solver.cpp
+    src/nanobind/utils/logger.cpp
+    src/nanobind/utils/valence_space.cpp
+    src/nanobind/utils/orbital_rotation.cpp
+    src/nanobind/utils/model_hamiltonians.cpp
+    src/nanobind/utils/cube_generator.cpp
+    src/nanobind/constants.cpp
+    src/nanobind/qdk_scf_config.cpp
+    src/nanobind/module.cpp
 )
 
 # Link against the qdk::chemistry library
 target_link_libraries(_core PRIVATE qdk::chemistry)
 
 # Add cpp/src to include path for accessing private implementation headers
-target_include_directories(_core PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/../cpp/src")
+target_include_directories(_core PRIVATE
+    "${CMAKE_CURRENT_SOURCE_DIR}/../cpp/src"
+    "${CMAKE_CURRENT_SOURCE_DIR}/src/nanobind"
+)
 
 # C++20
 target_compile_features(_core PUBLIC cxx_std_20)

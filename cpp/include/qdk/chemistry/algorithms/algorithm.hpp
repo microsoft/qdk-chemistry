@@ -155,7 +155,7 @@ class Algorithm {
    * @tparam FactoryType The AlgorithmFactory subclass (e.g.
    *         HamiltonianConstructorFactory)
    * @param key The settings key holding the AlgorithmRef
-   * @return A unique pointer to the created nested algorithm
+   * @return A shared pointer to the created nested algorithm
    * @throws SettingNotFound if key doesn't exist
    * @throws SettingTypeMismatch if the value is not an AlgorithmRef
    * @throws std::runtime_error if the factory cannot create the algorithm
@@ -188,8 +188,8 @@ class Algorithm {
   /**
    * @brief The algorithm's settings, to be replaced by derived classes
    */
-  std::unique_ptr<data::Settings> _settings =
-      std::make_unique<data::Settings>();
+  std::shared_ptr<data::Settings> _settings =
+      std::make_shared<data::Settings>();
 };
 
 namespace detail {
@@ -242,7 +242,7 @@ struct DeprecationAccess {
 template <typename BaseAlgorithmType, typename Derived>
 class AlgorithmFactory {
  public:
-  using return_type = std::unique_ptr<BaseAlgorithmType>;
+  using return_type = std::shared_ptr<BaseAlgorithmType>;
   using functor_type = std::function<return_type(void)>;
 
   /**
@@ -258,7 +258,7 @@ class AlgorithmFactory {
    *
    * @param name The name to identify the desired algorithm implementation.
    * @param suppress_warnings Whether to suppress creation-time warnings.
-   * @return A unique pointer to the created algorithm instance.
+   * @return A shared pointer to the created algorithm instance.
    * @throws std::runtime_error if the name is not found in the registry.
    */
   static return_type create(const std::string& name = "",

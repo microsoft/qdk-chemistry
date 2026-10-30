@@ -8,6 +8,12 @@
 from __future__ import annotations
 
 from qdk_chemistry.data import symmetry as sym
+from qdk_chemistry.data._spin_channels import spin_channel_indices
+
+
+def test_missing_spin_channel_indices():
+    """A missing index set represents an empty spin channel."""
+    assert spin_channel_indices(None, sym.axes.alpha()) == []
 
 
 class TestAxisName:

@@ -412,7 +412,7 @@ $env:CMAKE_BUILD_PARALLEL_LEVEL = 1
 python -m pip install ".[all]"
 ```
 
-> **For active developers:** The pip source build includes a full C++ compilation, which is slow. For faster iteration, [build and install the C++ library separately](#building-the-c-library) first, then [link the Python build to it](#linking-to-an-existing-c-installation). That way `pip install` only rebuilds the pybind11 bindings.
+> **For active developers:** The pip source build includes a full C++ compilation, which is slow. For faster iteration, [build and install the C++ library separately](#building-the-c-library) first, then [link the Python build to it](#linking-to-an-existing-c-installation). That way `pip install` only rebuilds the nanobind bindings.
 
 #### Building on Windows
 

@@ -125,7 +125,7 @@ autodoc_mock_imports = [  # Configure autodoc to handle C++ extension modules an
     "qdk_chemistry.libmacis",
     "qdk_chemistry.libchemistry",
     "qdk_chemistry.libsparsexx",
-    "pybind11_builtins",
+    "nanobind",
     "qiskit",
     "qiskit_nature",
     "qiskit_aer",
@@ -186,7 +186,7 @@ suppress_warnings = [
     "ref.ref",  # sphinx does not like bools for some reason
     "ref.identifier:*breathe_api_autogen*",  # Suppress warnings about duplicate object descriptions from imported classes
     "toc.not_included",  # Suppress warnings about toctree entries not included in the documentation
-    "*pybind11_detail*",  # Suppress warnings about pybind11 internal implementation details
+    "*nanobind*",  # Suppress warnings about nanobind internal implementation details
 ]
 nitpicky = True  # Enable nitpicky mode to catch all warnings/errors
 nitpick_ignore_regex = [
@@ -331,7 +331,7 @@ def normalize_autodoc_docstring(app, what, name, obj, options, lines):
     """Rewrite internal module references that appear inside docstrings."""
     for idx, line in enumerate(lines):
         rewritten = _rewrite_internal_module_path(line)
-        # Escape '*args' and '**kwargs' in pybind11 auto-generated signature
+        # Escape '*args' and '**kwargs' in nanobind auto-generated signature
         # lines so Sphinx/reST does not treat them as emphasis/bold markup.
         # Negative lookbehind avoids double-escaping already-escaped instances.
         rewritten = re.sub(r"(?<!\\)\*\*kwargs", r"\\**kwargs", rewritten)
@@ -341,11 +341,11 @@ def normalize_autodoc_docstring(app, what, name, obj, options, lines):
 
 
 def normalize_public_export_modules():
-    """Give pybind11 exports their public module names before Sphinx inspects them."""
+    """Give nanobind exports their public module names before Sphinx inspects them."""
     for internal_mod, public_mod in _MODULE_ALIAS_RULES:
         if internal_mod.endswith("."):
             continue  # prefix-only rewrite, nothing to alias
-        # Importing the public module loads the private pybind11 module whose
+        # Importing the public module loads the private nanobind module whose
         # exported objects need public names in the generated documentation.
         pub = importlib.import_module(public_mod)
         if internal_mod not in sys.modules:
@@ -563,7 +563,7 @@ def setup(app):
     import sys
     import typing
 
-    sys.modules["typing"] = typing  # Ensure typing module is available to pybind
+    sys.modules["typing"] = typing  # Ensure typing module is available to nanobind
     app.connect("autodoc-skip-member", autodoc_skip_imports)
     app.connect("autodoc-process-signature", normalize_autodoc_signature)
     app.connect("autodoc-process-docstring", normalize_autodoc_docstring)

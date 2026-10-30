@@ -357,6 +357,13 @@ class Hamiltonian : public DataClass,
   Hamiltonian(std::unique_ptr<HamiltonianContainer> container);
 
   /**
+   * @brief Share an immutable container with another owner (e.g. Python).
+   */
+  template <typename Container>
+  explicit Hamiltonian(std::shared_ptr<Container> container)
+      : _container(std::move(container)) {}
+
+  /**
    * @brief Copy constructor
    */
   Hamiltonian(const Hamiltonian& other);
@@ -641,7 +648,7 @@ class Hamiltonian : public DataClass,
   void hash_update(qdk::chemistry::utils::HashContext& ctx) const override;
 
   /// Container holding the Hamiltonian implementation
-  std::unique_ptr<const HamiltonianContainer> _container;
+  std::shared_ptr<const HamiltonianContainer> _container;
 
   /// Serialization version
   static constexpr const char* SERIALIZATION_VERSION = "0.1.0";

@@ -164,7 +164,7 @@ class DataClass(_CoreDataClass):
         if truncate_chars < 0:
             raise ValueError("truncate_chars must be non-negative")
 
-        # C++ classes have their own content_hash via pybind11.
+        # C++ classes have their own content_hash via nanobind.
         # For pure-Python subclasses, use _hash_update.
         h = hashlib.sha256()
         self._hash_update(h)

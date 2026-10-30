@@ -1,6 +1,6 @@
 """Pure-Python Pauli matrix utilities.
 
-Provides the same functionality as the C++ pybind11 ``pauli_matrix`` module
+Provides the same functionality as the C++ nanobind ``pauli_matrix`` module
 using only NumPy (and SciPy for sparse output), preserving the original
 bitmask algorithms to minimise memory cost and keep efficiency.
 

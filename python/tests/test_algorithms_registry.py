@@ -5,6 +5,8 @@
 # Licensed under the MIT License. See LICENSE.txt in the project root for license information.
 # --------------------------------------------------------------------------------------------
 
+import gc
+import weakref
 from unittest.mock import MagicMock
 
 import numpy as np
@@ -12,7 +14,7 @@ import pytest
 
 from qdk_chemistry._core._algorithms import ScfSolverFactory
 from qdk_chemistry.algorithms import ScfSolver, registry
-from qdk_chemistry.data import AlgorithmRef
+from qdk_chemistry.data import AlgorithmRef, Settings, Structure
 from qdk_chemistry.plugins import DuplicateRegistrationError
 from qdk_chemistry.plugins.qiskit import (
     QDK_CHEMISTRY_HAS_QISKIT,
@@ -145,6 +147,49 @@ def test_algorithm_wrapper_does_not_reserve_poll_interval():
     wrapped.run("input", poll_interval=0.25)
 
     algorithm.run.assert_called_once_with("input", poll_interval=0.25)
+
+
+def test_native_factory_preserves_python_algorithm_and_settings():
+    """C++ ownership must retain Python overrides and Settings subclasses."""
+
+    class CustomSettings(Settings):
+        marker = "python settings"
+
+        def __init__(self):
+            super().__init__()
+            self._set_default("energy", "double", 1.25)
+
+    class CustomSolver(ScfSolver):
+        def __init__(self):
+            super().__init__()
+            self._settings = CustomSettings()
+            self.marker = "python algorithm"
+
+        def name(self):
+            return "binding_lifetime_test"
+
+        def _run_impl(self, structure, charge, spin_multiplicity, basis_or_guess):  # noqa: ARG002
+            assert self.marker == "python algorithm"
+            assert self.settings().marker == "python settings"
+            return self.settings().get("energy"), None
+
+    ScfSolverFactory.register_instance(CustomSolver)
+    try:
+        solver = ScfSolverFactory.create("binding_lifetime_test")
+        settings_ref = weakref.ref(solver.settings())
+        gc.collect()
+        assert isinstance(solver, CustomSolver)
+        assert isinstance(settings_ref(), CustomSettings)
+        settings_ref().set("energy", 2.5)
+        structure = Structure(np.zeros((1, 3)), ["H"])
+        assert solver.run(structure, 0, 2, "sto-3g") == (2.5, None)
+
+        # This path creates and destroys the Python solver entirely from C++.
+        ref = AlgorithmRef("scf_solver", "binding_lifetime_test")
+        gc.collect()
+        assert ref.settings.get("energy") == 1.25
+    finally:
+        ScfSolverFactory.unregister_instance("binding_lifetime_test")
 
 
 class TestRegistryShowDefault:

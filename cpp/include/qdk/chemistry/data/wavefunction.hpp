@@ -909,6 +909,13 @@ class Wavefunction : public DataClass,
    */
   Wavefunction(std::unique_ptr<WavefunctionContainer> container);
 
+  /**
+   * @brief Share an immutable container with another owner (e.g. Python).
+   */
+  template <typename Container>
+  explicit Wavefunction(std::shared_ptr<Container> container)
+      : _container(std::move(container)) {}
+
   ~Wavefunction() = default;
 
   /**
@@ -1478,7 +1485,7 @@ class Wavefunction : public DataClass,
   void hash_update(qdk::chemistry::utils::HashContext& ctx) const override;
 
   /// Container holding the wavefunction implementation
-  std::unique_ptr<const WavefunctionContainer> _container;
+  std::shared_ptr<const WavefunctionContainer> _container;
 
   /// Serialization version
   static constexpr const char* SERIALIZATION_VERSION = "0.2.0";

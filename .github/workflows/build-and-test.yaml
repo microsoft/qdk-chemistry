@@ -460,7 +460,7 @@ jobs:
         echo "C++ Coverage Summary:"
         cat ${{ github.workspace }}/coverage-reports/cpp_coverage.txt
 
-    - name: Generate Pybind11 coverage report
+    - name: Generate Nanobind coverage report
       if: matrix.enable-coverage
       working-directory: python
       run: |
@@ -470,21 +470,21 @@ jobs:
         gcovr \
           --root ${{ github.workspace }}/python \
           --object-directory "${{ github.workspace }}/python/$CLEAN_BUILD_DIR" \
-          --filter '.*src/pybind11.*' \
+          --filter '.*src/nanobind.*' \
           --filter '.*src/cpp.*' \
           --exclude '.*test.*' \
           --exclude '.*external.*' \
           --gcov-ignore-errors=no_working_dir_found \
           --gcov-ignore-errors=source_not_found \
-          --cobertura "../coverage-reports/pybind11_coverage.cobertura.xml" \
-          --txt "../coverage-reports/pybind11_coverage.txt" \
-          --markdown "../coverage-reports/pybind11_coverage.md" \
+          --cobertura "../coverage-reports/nanobind_coverage.cobertura.xml" \
+          --txt "../coverage-reports/nanobind_coverage.txt" \
+          --markdown "../coverage-reports/nanobind_coverage.md" \
           --markdown-heading-level 5 \
-          --markdown-title 'Pybind11 Coverage Report' \
+          --markdown-title 'Nanobind Coverage Report' \
           2> >(grep -v 'Can not fix case of path' >&2 || true)
 
-        echo "Pybind11 Coverage Summary:"
-        cat ../coverage-reports/pybind11_coverage.txt
+        echo "Nanobind Coverage Summary:"
+        cat ../coverage-reports/nanobind_coverage.txt
 
     - name: Add coverage report to job summary
       if: matrix.enable-coverage
@@ -497,8 +497,8 @@ jobs:
         CPP_COVERAGE=${CPP_COVERAGE:-0}
         PYTHON_COVERAGE=$(extract_coverage coverage-reports/python_coverage.md)
         PYTHON_COVERAGE=${PYTHON_COVERAGE:-0}
-        PYBIND11_COVERAGE=$(extract_coverage coverage-reports/pybind11_coverage.txt)
-        PYBIND11_COVERAGE=${PYBIND11_COVERAGE:-0}
+        NANOBIND_COVERAGE=$(extract_coverage coverage-reports/nanobind_coverage.txt)
+        NANOBIND_COVERAGE=${NANOBIND_COVERAGE:-0}
 
         report=coverage-reports/coverage-report.md
         echo "## 📊 Coverage Summary" > "$report"
@@ -507,8 +507,8 @@ jobs:
         echo "|-----------|----------|" >> "$report"
         echo "| C++ Library | ${CPP_COVERAGE}% |" >> "$report"
         echo "| Python Package | ${PYTHON_COVERAGE}% |" >> "$report"
-        if [ "$PYBIND11_COVERAGE" != "0" ]; then
-          echo "| Pybind11 Bindings | ${PYBIND11_COVERAGE}% |" >> "$report"
+        if [ "$NANOBIND_COVERAGE" != "0" ]; then
+          echo "| Nanobind Bindings | ${NANOBIND_COVERAGE}% |" >> "$report"
         fi
         echo "" >> "$report"
 
@@ -527,9 +527,9 @@ jobs:
         echo "</details>" >> "$report"
         echo "" >> "$report"
 
-        echo "<details><summary>Pybind11 Coverage Details</summary>" >> "$report"
+        echo "<details><summary>Nanobind Coverage Details</summary>" >> "$report"
         echo "" >> "$report"
-        cat coverage-reports/pybind11_coverage.md >> "$report"
+        cat coverage-reports/nanobind_coverage.md >> "$report"
         echo "</details>" >> "$report"
 
         cat "$report" >> "$GITHUB_STEP_SUMMARY"
@@ -541,7 +541,7 @@ jobs:
         name: cobertura-xml-linux-py${{ matrix.python-version }}
         path: |
           coverage-reports/cpp_coverage.cobertura.xml
-          coverage-reports/pybind11_coverage.cobertura.xml
+          coverage-reports/nanobind_coverage.cobertura.xml
           coverage-reports/python_coverage.xml
         retention-days: 7
 
@@ -555,13 +555,13 @@ jobs:
         label: code-coverage/cpp
         fail-on-error: false
 
-    - name: Upload Pybind11 code coverage
+    - name: Upload Nanobind code coverage
       if: matrix.enable-coverage && (github.event_name == 'pull_request' || github.event_name == 'push')
       uses: actions/upload-code-coverage@2b21a77928be8d5168c2b9581a67f2adbebacc52 # v1.4.4
       with:
-        file: coverage-reports/pybind11_coverage.cobertura.xml
+        file: coverage-reports/nanobind_coverage.cobertura.xml
         language: C++
-        label: code-coverage/pybind11
+        label: code-coverage/nanobind
         fail-on-error: false
 
     - name: Upload Python code coverage

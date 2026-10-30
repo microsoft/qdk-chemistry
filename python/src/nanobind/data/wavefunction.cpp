@@ -1,0 +1,1546 @@
+// Copyright (c) Microsoft Corporation. All rights reserved.
+// Licensed under the MIT License. See LICENSE.txt in the project root for
+// license information.
+
+#include <nanobind/nanobind.h>
+#include <nanobind/ndarray.h>
+#include <nanobind/stl/complex.h>
+
+#include <algorithm>
+#include <nlohmann/json.hpp>
+#include <numeric>
+#include <qdk/chemistry.hpp>
+#include <qdk/chemistry/data/wavefunction.hpp>
+#include <qdk/chemistry/data/wavefunction_containers/amplitude_container.hpp>
+#include <qdk/chemistry/data/wavefunction_containers/state_vector.hpp>
+
+#include "eigen.hpp"
+#include "path_utils.hpp"
+#include "property_binding_helpers.hpp"
+#include "stl.hpp"
+
+namespace nb = nanobind;
+
+// Helper functions to convert variant types to Python objects
+nb::object variant_to_python(
+    const qdk::chemistry::data::ContainerTypes::ScalarVariant& var) {
+  return std::visit(
+      [](const auto& value) -> nb::object { return nb::cast(value); }, var);
+}
+nb::object variant_to_python(
+    const qdk::chemistry::data::ContainerTypes::MatrixVariant& var) {
+  return std::visit(
+      [](const auto& value) -> nb::object { return nb::cast(value); }, var);
+}
+
+nb::object variant_to_python(
+    const qdk::chemistry::data::ContainerTypes::VectorVariant& var) {
+  return std::visit(
+      [](const auto& value) -> nb::object { return nb::cast(value); }, var);
+}
+
+// SymmetryBlockedTensorVariant<Rank> -> Python: resolves to the bound
+// SymmetryBlockedTensorRank{N}{,Complex} class via nanobind's class caster.
+template <std::size_t Rank>
+nb::object variant_to_python(
+    const qdk::chemistry::data::SymmetryBlockedTensorVariant<Rank>& var) {
+  return std::visit([](const auto& sbt) -> nb::object { return nb::cast(sbt); },
+                    var);
+}
+
+// Wrapper functions for file I/O methods that accept both strings and pathlib
+// Path objects
+void wavefunction_to_file_wrapper(qdk::chemistry::data::Wavefunction& self,
+                                  const nb::object& filename,
+                                  const std::string& format_type) {
+  self.to_file(qdk::chemistry::python::utils::to_string_path(filename),
+               format_type);
+}
+
+std::shared_ptr<qdk::chemistry::data::Wavefunction>
+wavefunction_from_file_wrapper(const nb::object& filename,
+                               const std::string& format_type) {
+  return qdk::chemistry::data::Wavefunction::from_file(
+      qdk::chemistry::python::utils::to_string_path(filename), format_type);
+}
+
+void wavefunction_to_hdf5_file_wrapper(qdk::chemistry::data::Wavefunction& self,
+                                       const nb::object& filename) {
+  self.to_hdf5_file(qdk::chemistry::python::utils::to_string_path(filename));
+}
+
+std::shared_ptr<qdk::chemistry::data::Wavefunction>
+wavefunction_from_hdf5_file_wrapper(const nb::object& filename) {
+  return qdk::chemistry::data::Wavefunction::from_hdf5_file(
+      qdk::chemistry::python::utils::to_string_path(filename));
+}
+
+void wavefunction_to_json_file_wrapper(qdk::chemistry::data::Wavefunction& self,
+                                       const nb::object& filename) {
+  self.to_json_file(qdk::chemistry::python::utils::to_string_path(filename));
+}
+
+std::shared_ptr<qdk::chemistry::data::Wavefunction>
+wavefunction_from_json_file_wrapper(const nb::object& filename) {
+  return qdk::chemistry::data::Wavefunction::from_json_file(
+      qdk::chemistry::python::utils::to_string_path(filename));
+}
+
+/// Convert a Python dict to OrbitalEntropies.
+///
+/// Accepted keys (all optional):
+///   "single_orbital"     – 1-D array  (VectorXd)
+///   "two_orbital"        – 2-D array  (MatrixXd)
+///   "mutual_information" – 2-D array  (MatrixXd)
+///
+/// Passing ``nb::none()`` (the default) yields an empty struct.
+qdk::chemistry::data::OrbitalEntropies parse_entropies(const nb::object& obj) {
+  using qdk::chemistry::data::OrbitalEntropies;
+  if (obj.is_none()) return OrbitalEntropies{};
+  if (!nb::isinstance<nb::dict>(obj)) {
+    throw nb::type_error(
+        std::string(
+            "entropies must be a dict with keys from "
+            "{'single_orbital', 'two_orbital', 'mutual_information'}, or None")
+            .c_str());
+  }
+  auto d = nb::cast<nb::dict>(obj);
+  OrbitalEntropies e;
+  if (d.contains("single_orbital") && !d["single_orbital"].is_none()) {
+    e.single_orbital = nb::cast<Eigen::VectorXd>(d["single_orbital"]);
+  }
+  if (d.contains("two_orbital") && !d["two_orbital"].is_none()) {
+    e.two_orbital = nb::cast<Eigen::MatrixXd>(d["two_orbital"]);
+  }
+  if (d.contains("mutual_information") && !d["mutual_information"].is_none()) {
+    e.mutual_information = nb::cast<Eigen::MatrixXd>(d["mutual_information"]);
+  }
+  return e;
+}
+
+void bind_wavefunction(nb::module_& data) {
+  using namespace qdk::chemistry::algorithms;
+  using namespace qdk::chemistry::data;
+  using qdk::chemistry::python::utils::bind_getter_as_property;
+
+  // Bind WavefunctionType enum
+  nb::enum_<WavefunctionType>(data, "WavefunctionType",
+                              R"(
+Enum to distinguish between different wavefunction representations.
+
+This enum allows tagging wavefunctions based on their mathematical role:
+
+* SelfDual: Wavefunctions that can be used as both bra and ket
+* NotSelfDual: Wavefunctions that are strictly bra or ket
+)")
+      .value("SelfDual", WavefunctionType::SelfDual,
+             "Wavefunction that can be used as both bra and ket")
+      .value("NotSelfDual", WavefunctionType::NotSelfDual,
+             "Wavefunction that is strictly bra or ket")
+      .export_values();
+
+  // Bind abstract WavefunctionContainer base class
+  nb::class_<WavefunctionContainer>(data, "WavefunctionContainer",
+                                    R"(
+Abstract base class for wavefunction containers.
+
+This class provides the interface for different types of wavefunction representations (e.g., CI, MCSCF, coupled cluster).
+It uses variant types to support both real and complex arithmetic.
+    )")
+      .def("norm", &WavefunctionContainer::norm,
+           "Calculate norm of the wavefunction")
+      .def("get_orbitals", &WavefunctionContainer::get_orbitals,
+           "Get reference to orbital basis set")
+      .def("get_type", &WavefunctionContainer::get_type,
+           "Get the wavefunction type (Bra, Ket, or Both)")
+      .def("get_active_num_electrons",
+           &WavefunctionContainer::get_active_num_electrons,
+           "Get number of active alpha and beta electrons")
+      .def("get_total_num_electrons",
+           &WavefunctionContainer::get_total_num_electrons,
+           "Get total number of alpha and beta electrons")
+      .def("get_active_orbital_occupations",
+           &WavefunctionContainer::get_active_orbital_occupations,
+           "Get orbital occupations for active orbitals only")
+      .def("get_total_orbital_occupations",
+           &WavefunctionContainer::get_total_orbital_occupations,
+           "Get orbital occupations for all orbitals")
+      .def("has_one_rdm_spin_dependent",
+           &WavefunctionContainer::has_one_rdm_spin_dependent,
+           "Check if spin-dependent one-particle RDMs for active orbitals are "
+           "available")
+      .def("has_one_rdm_spin_traced",
+           &WavefunctionContainer::has_one_rdm_spin_traced,
+           "Check if spin-traced one-particle RDM for active orbitals is "
+           "available")
+      .def("has_two_rdm_spin_dependent",
+           &WavefunctionContainer::has_two_rdm_spin_dependent,
+           "Check if spin-dependent two-particle RDMs for active orbitals are "
+           "available")
+      .def("has_two_rdm_spin_traced",
+           &WavefunctionContainer::has_two_rdm_spin_traced,
+           "Check if spin-traced two-particle RDM for active orbitals is "
+           "available")
+      // SymmetryBlockedTensor-native RDM accessors
+      .def(
+          "active_one_rdm",
+          [](const WavefunctionContainer& self) {
+            return variant_to_python(self.active_one_rdm());
+          },
+          "Active-space 1-RDM as a rank-2 symmetry-blocked tensor. The block "
+          "structure follows the symmetries carried on the associated "
+          "Orbitals. Returns a real (`SymmetryBlockedTensorRank2`) or complex "
+          "(`SymmetryBlockedTensorRank2Complex`) instance depending on the "
+          "scalar type of the underlying RDM.")
+      .def(
+          "active_one_rdm_block",
+          [](const WavefunctionContainer& self, const SymmetryLabel& row,
+             const SymmetryLabel& col) {
+            return variant_to_python(self.active_one_rdm_block(row, col));
+          },
+          "Active-space 1-RDM block for given row/col symmetry labels. "
+          "Returns a real (`numpy.ndarray[float64]`) or complex "
+          "(`numpy.ndarray[complex128]`) matrix.",
+          nb::arg("row"), nb::arg("col"))
+      .def("has_active_one_rdm", &WavefunctionContainer::has_active_one_rdm,
+           "True if the active-space 1-RDM symmetry-blocked tensor is "
+           "available (real or complex).")
+      .def(
+          "active_two_rdm",
+          [](const WavefunctionContainer& self) {
+            return variant_to_python(self.active_two_rdm());
+          },
+          "Active-space 2-RDM as a rank-4 symmetry-blocked tensor. The block "
+          "structure follows the symmetries carried on the associated "
+          "Orbitals. Returns a real (`SymmetryBlockedTensorRank4`) or complex "
+          "(`SymmetryBlockedTensorRank4Complex`) instance depending on the "
+          "scalar type of the underlying RDM.")
+      .def(
+          "active_two_rdm_block",
+          [](const WavefunctionContainer& self, const SymmetryLabel& p,
+             const SymmetryLabel& q, const SymmetryLabel& r,
+             const SymmetryLabel& s) {
+            return variant_to_python(self.active_two_rdm_block(p, q, r, s));
+          },
+          "Active-space 2-RDM block for given symmetry labels. Returns a real "
+          "(`numpy.ndarray[float64]`) or complex (`numpy.ndarray[complex128]`) "
+          "flat vector.",
+          nb::arg("p"), nb::arg("q"), nb::arg("r"), nb::arg("s"))
+      .def("has_active_two_rdm", &WavefunctionContainer::has_active_two_rdm,
+           "True if the active-space 2-RDM symmetry-blocked tensor is "
+           "available (real or complex).")
+      // Symmetry-blocked count / occupation accessors
+      .def("active_num_particles", &WavefunctionContainer::active_num_particles,
+           "Number of active-space particles as a SymmetryBlockedScalarCount. "
+           "Carries an independent alpha/beta count when the basis has a spin "
+           "axis, otherwise a single trivial block with the aggregate count.")
+      .def("total_num_particles", &WavefunctionContainer::total_num_particles,
+           "Number of particles (active + inactive) as a "
+           "SymmetryBlockedScalarCount, blocked like active_num_particles.")
+      .def("active_orbital_occupations",
+           &WavefunctionContainer::active_orbital_occupations,
+           "Active orbital occupations as a rank-1 SymmetryBlockedTensor "
+           "(alpha/beta blocks when the basis has a spin axis).")
+      .def("total_orbital_occupations",
+           &WavefunctionContainer::total_orbital_occupations,
+           "Orbital occupations for all orbitals as a rank-1 "
+           "SymmetryBlockedTensor, blocked like active_orbital_occupations.")
+      .def("is_complex", &WavefunctionContainer::is_complex,
+           "Check if the wavefunction is complex-valued")
+      .def("has_single_orbital_entropies",
+           &WavefunctionContainer::has_single_orbital_entropies,
+           "Check if single orbital entropies are available")
+      .def("get_single_orbital_entropies",
+           &WavefunctionContainer::get_single_orbital_entropies,
+           "Get single orbital entropies for active orbitals")
+      .def("has_two_orbital_entropies",
+           &WavefunctionContainer::has_two_orbital_entropies,
+           "Check if two-orbital entropies are available")
+      .def("get_two_orbital_entropies",
+           &WavefunctionContainer::get_two_orbital_entropies,
+           "Get two-orbital entropy matrix for active orbitals")
+      .def("has_mutual_information",
+           &WavefunctionContainer::has_mutual_information,
+           "Check if mutual information is available")
+      .def("get_mutual_information",
+           &WavefunctionContainer::get_mutual_information,
+           "Get mutual information matrix for active orbitals")
+      .def("compute_s_squared", &WavefunctionContainer::compute_s_squared,
+           "Compute the expectation value of the total spin-squared operator "
+           "<S^2> from spin-dependent RDMs");
+
+  // Wavefunction class
+  nb::class_<Wavefunction, DataClass> wavefunction(data, "Wavefunction",
+                                                   R"(
+Represents a wavefunction with associated properties.
+
+This class encapsulates wavefunction data including:
+
+* Configuration interaction coefficients
+* Reduced density matrices (RDMs) in spin-dependent and spin-traced forms
+* Methods for computing properties
+    * Configuration interaction coefficients
+    * Coupled cluster amplitudes
+    * Reduced density matrices (RDMs) in spin-dependent and spin-traced forms
+    * Methods for computing properties
+
+Supports both restricted and unrestricted wavefunctions with real or complex coefficients.
+    Supports both restricted and unrestricted wavefunctions with real or
+    complex coefficients.
+    )");
+
+  // Constructor with container
+  wavefunction.def(nb::init<std::shared_ptr<WavefunctionContainer>>(),
+                   R"(
+Constructs a wavefunction with a container implementation.
+
+Args:
+    container (WavefunctionContainer): The container holding the wavefunction implementation
+
+Examples:
+    >>> container = qdk_chemistry.StateVectorContainer(coeffs, dets, orbitals)
+    >>> wf = qdk_chemistry.Wavefunction(container)
+)",
+                   nb::arg("container"));
+
+  // Orbital and container access
+  bind_getter_as_property(wavefunction, "get_orbitals",
+                          &Wavefunction::get_orbitals,
+                          R"(
+Get reference to orbital basis set.
+
+Returns:
+    Orbitals: Shared pointer to orbital basis set
+
+Examples:
+    >>> orbitals = wf.get_orbitals()
+)",
+                          nb::rv_policy::reference_internal);
+
+  wavefunction.def(
+      "get_container",
+      [](const Wavefunction& self) -> const WavefunctionContainer& {
+        if (!self.has_container_type<WavefunctionContainer>()) {
+          throw std::runtime_error(
+              "The wavefunction does not have a valid container.");
+        }
+        if (self.has_container_type<StateVectorContainer>()) {
+          return self.get_container<StateVectorContainer>();
+        } else if (self.has_container_type<AmplitudeContainer>()) {
+          return self.get_container<AmplitudeContainer>();
+        } else {
+          throw std::runtime_error("Unknown container type.");
+        }
+      },
+      R"(
+      Get the underlying wavefunction container.
+
+Returns:
+    WavefunctionContainer: The underlying wavefunction container
+
+Raises:
+    RuntimeError: If the container is not available
+
+Examples:
+    >>> container = wf.get_container()
+)",
+      nb::rv_policy::reference_internal);
+
+  // ---- Single-particle sectors --------------------------------------------
+
+  wavefunction.def("sectors", &Wavefunction::sectors,
+                   R"(
+Names of the single-particle sectors this wavefunction spans.
+
+A sector is a named single-particle basis (Orbitals); the sector inherits that
+basis's single-particle symmetries. Sectors are owned by the underlying
+container. The current single-species data model reports a single sector.
+
+Returns:
+    list[str]: The wavefunction's sector names
+
+Examples:
+    >>> wf.sectors()
+)");
+
+  wavefunction.def("has_sector", &Wavefunction::has_sector,
+                   R"(
+Check whether a sector with the given name is present.
+
+Args:
+    name (str): Sector name to look up
+
+Returns:
+    bool: True if the container binds a basis under ``name``
+)",
+                   nb::arg("name"));
+
+  wavefunction.def("sector_basis", &Wavefunction::sector_basis,
+                   R"(
+Single-particle basis associated with a sector.
+
+Args:
+    name (str): Sector name to resolve
+
+Returns:
+    Orbitals: The basis bound to ``name``
+
+Raises:
+    IndexError: If no sector named ``name`` is present
+
+Examples:
+    >>> basis = wf.sector_basis(wf.sectors()[0])
+)",
+                   nb::arg("name"));
+
+  wavefunction.def("sector_symmetries", &Wavefunction::sector_symmetries,
+                   R"(
+Single-particle symmetries inherited from a sector's basis.
+
+Args:
+    name (str): Sector name to resolve
+
+Returns:
+    SymmetryProduct: The symmetries of the sector's basis
+
+Raises:
+    IndexError: If no sector named ``name`` is present
+)",
+                   nb::arg("name"));
+
+  // Electron and occupation methods
+  wavefunction.def("get_active_num_electrons",
+                   &Wavefunction::get_active_num_electrons,
+                   R"(
+Get number of active alpha and beta electrons.
+
+Returns:
+    tuple: Pair of ``(n_alpha, n_beta)`` electrons
+
+Examples:
+    >>> n_alpha, n_beta = wf.get_active_num_electrons()
+)");
+
+  wavefunction.def("get_total_num_electrons",
+                   &Wavefunction::get_total_num_electrons,
+                   R"(
+Get total number of alpha and beta electrons.
+
+Returns:
+    tuple: Pair of ``(n_alpha, n_beta)`` electrons
+
+Examples:
+    >>> n_alpha, n_beta = wf.get_total_num_electrons()
+)");
+
+  wavefunction.def("get_total_orbital_occupations",
+                   &Wavefunction::get_total_orbital_occupations,
+                   R"(
+Get orbital occupations for all orbitals.
+
+Returns:
+    tuple: Pair of ``(alpha_occupations, beta_occupations)``
+
+Examples:
+    >>> alpha_occ, beta_occ = wf.get_total_orbital_occupations()
+)");
+
+  wavefunction.def("get_active_orbital_occupations",
+                   &Wavefunction::get_active_orbital_occupations,
+                   R"(
+Get orbital occupations for active orbitals only.
+
+Returns:
+    tuple: Pair of ``(alpha_active_occupations, beta_active_occupations)``
+
+Examples:
+    >>> alpha_active, beta_active = wf.get_active_orbital_occupations()
+)");
+
+  // Symmetry-blocked count / occupation accessors
+  wavefunction.def("active_num_particles", &Wavefunction::active_num_particles,
+                   R"(
+Number of active-space particles as a symmetry-blocked scalar.
+
+The block structure is induced by the single-particle basis: an alpha/beta
+count when the associated orbitals carry a spin axis, otherwise a single
+trivial block carrying the aggregate count.
+
+Returns:
+    SymmetryBlockedScalarCount: The symmetry-blocked active particle count.
+)");
+
+  wavefunction.def("total_num_particles", &Wavefunction::total_num_particles,
+                   R"(
+Number of particles (active + inactive) as a symmetry-blocked scalar.
+
+Blocked like :func:`active_num_particles`.
+
+Returns:
+    SymmetryBlockedScalarCount: The symmetry-blocked total particle count.
+)");
+
+  wavefunction.def("total_orbital_occupations",
+                   &Wavefunction::total_orbital_occupations,
+                   R"(
+Orbital occupations for all orbitals as a rank-1 symmetry-blocked tensor.
+
+Returns:
+    SymmetryBlockedTensorRank1: Alpha/beta occupation blocks when the basis
+    carries a spin axis, otherwise a single trivial block.
+)");
+
+  wavefunction.def("active_orbital_occupations",
+                   &Wavefunction::active_orbital_occupations,
+                   R"(
+Active orbital occupations as a rank-1 symmetry-blocked tensor.
+
+Blocked like :func:`total_orbital_occupations`.
+
+Returns:
+    SymmetryBlockedTensorRank1: The symmetry-blocked active orbital occupations.
+)");
+
+  // Coefficient access methods
+  wavefunction.def(
+      "get_coefficient",
+      [](const Wavefunction& self, const Configuration& det) {
+        return variant_to_python(self.get_coefficient(det));
+      },
+      R"(
+Get coefficient for a specific determinant.
+
+Args:
+    det (Configuration): The determinant configuration to look up
+
+Returns:
+    complex | float: The coefficient for the determinant if found, zero otherwise
+
+Examples:
+    >>> coeff = wf.get_coefficient(qdk_chemistry.Configuration.from_spin_half_string("33221100"))
+)",
+      nb::arg("det"));
+
+  wavefunction.def(
+      "get_coefficients",
+      [](const Wavefunction& self) {
+        return variant_to_python(self.get_coefficients());
+      },
+      R"(
+Get coefficients for all determinants as a vector, in which the sequence of coefficients is consistent with the vector from ``get_active_determinants()``
+
+Returns:
+    numpy.ndarray: Vector of all coefficients (real or complex)
+
+Examples:
+    >>> coeffs = wf.get_coefficients()
+    >>> print(f"Number of coefficients: {len(coeffs)}")
+)");
+
+  wavefunction.def("get_active_determinants",
+                   &Wavefunction::get_active_determinants,
+                   R"(
+Get all determinants in the wavefunction (active space only).
+
+Returns:
+    list[Configuration]: Vector of all configurations/determinants representing only the active space
+
+Notes:
+    The determinants only include the active space orbitals.
+    To get determinants with full orbital space (including inactive and virtual orbitals), use ``get_total_determinants()``.
+
+Examples:
+    >>> dets = wf.get_active_determinants()
+)",
+                   nb::rv_policy::reference_internal);
+
+  wavefunction.def(
+      "get_configuration_set",
+      [](const Wavefunction& self) -> const ConfigurationSet& {
+        if (self.has_container_type<StateVectorContainer>()) {
+          return self.get_container<StateVectorContainer>()
+              .get_configuration_set();
+        } else if (self.has_container_type<AmplitudeContainer>()) {
+          return self.get_container<AmplitudeContainer>()
+              .get_configuration_set();
+        }
+        throw std::runtime_error(
+            "Wavefunction container does not support get_configuration_set");
+      },
+      R"(
+Get the configuration set associated with this wavefunction.
+
+Returns:
+    ConfigurationSet: The configuration set containing all determinant metadata
+
+Examples:
+    >>> config_set = wf.get_configuration_set()
+    >>> n_modes = config_set.num_modes()
+)",
+      nb::rv_policy::reference_internal);
+
+  wavefunction.def("get_total_determinants",
+                   &Wavefunction::get_total_determinants,
+                   R"(
+Get all determinants in the wavefunction with full orbital space.
+
+Returns:
+    list[Configuration]: Vector of all configurations/determinants including inactive and virtual orbitals
+
+Notes:
+    Converts active-space-only determinants to full orbital space by prepending doubly occupied inactive orbitals and appending unoccupied virtual orbitals.
+
+Examples:
+    >>> total_dets = wf.get_total_determinants()
+    >>> # Each determinant now includes inactive (doubly occupied) and virtual (unoccupied) orbitals
+)");
+
+  wavefunction.def("get_active_determinant",
+                   &Wavefunction::get_active_determinant,
+                   R"(
+Extract active space determinant from a full orbital space determinant.
+
+Args:
+    total_determinant (Configuration): Configuration representing full orbital space
+
+Returns:
+    Configuration: Configuration representing only the active space portion
+
+Notes:
+    Removes inactive and virtual orbital information, keeping only the active space orbitals.
+
+Examples:
+    >>> total_det = qdk_chemistry.Configuration.from_spin_half_string("2222uudd0000")  # 4 inactive, 4 active, 4 virtual
+    >>> active_det = wf.get_active_determinant(total_det)
+    >>> # active_det now contains only "uudd" (the 4 active orbitals)
+)",
+                   nb::arg("total_determinant"));
+
+  wavefunction.def("get_total_determinant",
+                   &Wavefunction::get_total_determinant,
+                   R"(
+Convert active space determinant to full orbital space determinant.
+
+Args:
+    active_determinant (Configuration): Configuration representing only active space
+
+Returns:
+    Configuration: Configuration representing full orbital space
+
+Notes:
+    Expands active-space-only determinant to full orbital space by prepending doubly occupied inactive orbitals and appending unoccupied virtual orbitals.
+
+Examples:
+    >>> active_det = qdk_chemistry.Configuration.from_spin_half_string("uudd")  # 4 active orbitals
+    >>> total_det = wf.get_total_determinant(active_det)
+    >>> # If there are 4 inactive and 4 virtual orbitals, total_det will be "2222uudd0000"
+)",
+                   nb::arg("active_determinant"));
+
+  wavefunction.def("size", &Wavefunction::size,
+                   R"(
+Get number of determinants.
+
+Returns:
+    int: Number of determinants in the wavefunction
+
+Examples:
+    >>> dim = wf.size()
+    >>> print(f"Wavefunction dimension: {dim}")
+)");
+
+  wavefunction.def(
+      "get_top_determinants",
+      [](const Wavefunction& self, std::optional<size_t> max_determinants) {
+        auto [configs, coeffs] = self.get_top_determinants(max_determinants);
+        nb::dict py_result;
+        std::visit(
+            [&py_result, &configs](const auto& coeff_vec) {
+              for (Eigen::Index i = 0;
+                   i < static_cast<Eigen::Index>(configs.size()); ++i) {
+                py_result[nb::cast(configs[static_cast<size_t>(i)])] =
+                    nb::cast(coeff_vec[i]);
+              }
+            },
+            coeffs);
+        return py_result;
+      },
+      R"(
+Return determinants ranked by absolute CI coefficient.
+
+Args:
+    max_determinants (int | None): Number of top determinants to return. If None, return all.
+
+Returns:
+    dict[Configuration, complex | float]: A dictionary containing (Configuration, CI coefficient) pairs
+        consisting of the top determinants sorted by descending absolute coefficient value.
+
+Examples:
+    >>> top_dets = wf.get_top_determinants(max_determinants=2)
+    >>> for config, coeff in top_dets.items():
+    ...     print(f"{config}: {coeff}")
+)",
+      nb::arg("max_determinants") = nb::none());
+
+  wavefunction.def(
+      "truncate",
+      [](const Wavefunction& self, std::optional<size_t> max_determinants) {
+        return self.truncate(max_determinants);
+      },
+      R"(
+Create a truncated wavefunction with top N determinants.
+
+Creates a new wavefunction containing only the top N determinants
+ranked by absolute coefficient value, with coefficients renormalized.
+The resulting wavefunction uses a StateVectorContainer.
+
+Args:
+    max_determinants (int | None): Maximum number of determinants to keep.
+        If None, returns a copy with all determinants (renormalized).
+
+Returns:
+    Wavefunction: New wavefunction with truncated and renormalized coefficients
+
+Examples:
+    >>> # Get a truncated trial wavefunction with top 2 determinants
+    >>> trial_wfn = casci_wfn.truncate(max_determinants=2)
+    >>> print(f"Truncated to {trial_wfn.size()} determinants")
+    >>> print(f"Norm: {trial_wfn.norm()}")  # Should be 1.0
+)",
+      nb::arg("max_determinants") = nb::none());
+
+  wavefunction.def("norm", &Wavefunction::norm,
+                   R"(
+Calculate norm of the wavefunction.
+
+Returns:
+    float: Norm (always real)
+
+Examples:
+    >>> norm_value = wf.norm()
+    >>> print(f"Wavefunction norm: {norm_value}")
+)");
+
+  wavefunction.def(
+      "overlap",
+      [](const Wavefunction& self, const Wavefunction& other) {
+        return variant_to_python(self.overlap(other));
+      },
+      R"(
+Calculate overlap with another wavefunction.
+
+Args:
+    other (Wavefunction): Other wavefunction
+
+Returns:
+    complex | float: Overlap value (real or complex)
+
+Examples:
+    >>> wf1 = qdk_chemistry.Wavefunction(container1)
+    >>> wf2 = qdk_chemistry.Wavefunction(container2)
+    >>> overlap = wf1.overlap(wf2)
+    >>> print(f"Overlap: {overlap}")
+)",
+      nb::arg("other"));
+
+  // RDM methods
+  wavefunction.def(
+      "get_active_one_rdm_spin_dependent",
+      [](const Wavefunction& self) {
+        auto [aa, bb] = self.get_active_one_rdm_spin_dependent();
+        return nb::make_tuple(variant_to_python(aa), variant_to_python(bb));
+      },
+      R"(
+Get spin-dependent one-particle reduced density matrices (RDMs) for active orbitals only.
+
+Returns:
+    tuple: Tuple of (alpha-alpha, beta-beta) one-particle RDMs for active orbitals
+
+Raises:
+    RuntimeError: If the spin-dependent 1-RDM is not available
+
+Examples:
+    >>> rdm_aa, rdm_bb = wf.get_active_one_rdm_spin_dependent()
+)");
+
+  wavefunction.def(
+      "get_active_two_rdm_spin_dependent",
+      [](const Wavefunction& self) {
+        auto [aaaa, aabb, bbbb] = self.get_active_two_rdm_spin_dependent();
+        return nb::make_tuple(variant_to_python(aaaa), variant_to_python(aabb),
+                              variant_to_python(bbbb));
+      },
+      R"(
+Get spin-dependent two-particle reduced density matrices (RDMs) for active orbitals only.
+
+Returns:
+    tuple: Tuple of (aaaa, aabb, bbbb) two-particle RDMs for active orbitals
+
+Raises:
+    RuntimeError: If the spin-dependent 2-RDM is not available
+
+Examples:
+    >>> aaaa, aabb, bbbb = wf.get_active_two_rdm_spin_dependent()
+)");
+
+  wavefunction.def(
+      "get_active_one_rdm_spin_traced",
+      [](const Wavefunction& self) {
+        return variant_to_python(self.get_active_one_rdm_spin_traced());
+      },
+      R"(
+Get spin-traced one-particle reduced density matrix (RDM) for active orbitals only.
+
+Returns:
+    numpy.ndarray: Spin-traced one-particle RDM for active orbitals
+
+Raises:
+    RuntimeError: If the 1-RDM is not available
+
+Examples:
+    >>> rdm = wf.get_active_one_rdm_spin_traced()
+)");
+
+  wavefunction.def(
+      "get_active_two_rdm_spin_traced",
+      [](const Wavefunction& self) {
+        return variant_to_python(self.get_active_two_rdm_spin_traced());
+      },
+      R"(
+Get spin-traced two-particle reduced density matrix (RDM) for active orbitals only.
+
+Returns:
+    numpy.ndarray: Spin-traced two-particle RDM for active orbitals
+
+Raises:
+    RuntimeError: If the 2-RDM is not available
+
+Examples:
+    >>> two_rdm = wf.get_active_two_rdm_spin_traced()
+)");
+
+  wavefunction.def("has_single_orbital_entropies",
+                   &Wavefunction::has_single_orbital_entropies,
+                   R"(
+Check if single orbital entropies for active orbitals are available.
+
+Returns:
+    bool: True if single orbital entropies are available
+
+Examples:
+    >>> if wf.has_single_orbital_entropies():
+    ...     entropies = wf.get_single_orbital_entropies()
+)");
+
+  wavefunction.def("get_single_orbital_entropies",
+                   &Wavefunction::get_single_orbital_entropies,
+                   R"(
+Calculate single orbital entropies for active orbitals only.
+
+This function uses the method of Boguslawski & Tecmer (2015), doi:10.1002/qua.24832,
+:cite:`Boguslawski2015`.
+
+Returns:
+    numpy.ndarray: Vector of orbital entropies for active orbitals (always real)
+
+Raises:
+    RuntimeError: If the required reduced density matrices (RDMs) are not available
+
+Examples:
+    >>> entropies = wf.get_single_orbital_entropies()
+)");
+
+  wavefunction.def("has_mutual_information",
+                   &Wavefunction::has_mutual_information,
+                   R"(
+Check if mutual information for active orbitals is available.
+
+Returns:
+    bool: True if mutual information matrix is available
+
+Examples:
+    >>> if wf.has_mutual_information():
+    ...     mi = wf.get_mutual_information()
+)");
+
+  wavefunction.def("get_mutual_information",
+                   &Wavefunction::get_mutual_information,
+                   R"(
+Get the mutual information matrix for active orbitals.
+
+The mutual information is defined as:
+    I_{ij} = s_{1,i} + s_{1,j} - s_{2,ij}
+
+Returns:
+    numpy.ndarray: Matrix of mutual information values for active orbitals
+
+Raises:
+    RuntimeError: If mutual information is not available
+
+Examples:
+    >>> mi = wf.get_mutual_information()
+)");
+
+  wavefunction.def("has_two_orbital_entropies",
+                   &Wavefunction::has_two_orbital_entropies,
+                   R"(
+Check if two-orbital entropies for active orbitals are available.
+
+Returns:
+    bool: True if two-orbital entropies are available
+
+Examples:
+    >>> if wf.has_two_orbital_entropies():
+    ...     s2 = wf.get_two_orbital_entropies()
+)");
+
+  wavefunction.def("get_two_orbital_entropies",
+                   &Wavefunction::get_two_orbital_entropies,
+                   R"(
+Get the two-orbital entropy matrix for active orbitals.
+
+Returns:
+    numpy.ndarray: Matrix of two-orbital entropies for active orbitals
+
+Raises:
+    RuntimeError: If two-orbital entropies are not available
+
+Examples:
+    >>> s2 = wf.get_two_orbital_entropies()
+)");
+
+  wavefunction.def("compute_s_squared", &Wavefunction::compute_s_squared,
+                   R"(
+Compute the expectation value of the total spin-squared operator <S^2>.
+
+Uses the spin-dependent one- and two-particle reduced density matrices (RDMs):
+
+    <S^2> = 3/4 * Tr(gamma^a + gamma^b)
+            - sum_{ij} Gamma^{ab}(i,j,j,i)
+            - 1/4 * sum_{ij} Gamma^{aa}(i,j,j,i)
+            - 1/4 * sum_{ij} Gamma^{bb}(i,j,j,i)
+            - 1/2 * sum_{ij} Gamma^{ab}(i,i,j,j)
+
+For a pure spin eigenstate, <S^2> = S(S+1).
+The alpha and beta molecular orbitals must share a common spatial basis, as in
+restricted closed-shell and restricted open-shell calculations.
+
+Returns:
+    float: The expectation value <S^2> (real-valued wavefunctions only)
+
+Raises:
+    RuntimeError: If the orbitals are unrestricted, the required spin-resolved active-space RDMs are unavailable or inconsistent, or the RDMs are complex-valued
+
+Examples:
+    >>> s_squared = wf.compute_s_squared()
+)");
+
+  // RDM availability check methods
+  wavefunction.def("has_one_rdm_spin_dependent",
+                   &Wavefunction::has_one_rdm_spin_dependent,
+                   R"(
+Check if spin-dependent one-particle RDMs for active orbitals are available.
+
+Returns:
+    bool: True if available
+
+Examples:
+    >>> if wf.has_one_rdm_spin_dependent():
+    ...     rdm_aa, rdm_bb = wf.get_active_one_rdm_spin_dependent()
+)");
+
+  wavefunction.def("has_one_rdm_spin_traced",
+                   &Wavefunction::has_one_rdm_spin_traced,
+                   R"(
+Check if spin-traced one-particle RDM for active orbitals is available.
+
+Returns:
+    bool: True if available
+
+Examples:
+    >>> if wf.has_one_rdm_spin_traced():
+    ...     rdm = wf.get_active_one_rdm_spin_traced()
+)");
+
+  wavefunction.def("has_two_rdm_spin_dependent",
+                   &Wavefunction::has_two_rdm_spin_dependent,
+                   R"(
+Check if spin-dependent two-particle RDMs for active orbitals are available.
+
+Returns:
+    bool: True if available
+
+Examples:
+    >>> if wf.has_two_rdm_spin_dependent():
+    ...     aaaa, aabb, bbbb = wf.get_active_two_rdm_spin_dependent()
+)");
+
+  wavefunction.def("has_two_rdm_spin_traced",
+                   &Wavefunction::has_two_rdm_spin_traced,
+                   R"(
+Check if spin-traced two-particle RDM for active orbitals is available.
+
+Returns:
+    bool: True if available
+
+Examples:
+    >>> if wf.has_two_rdm_spin_traced():
+    ...     two_rdm = wf.get_active_two_rdm_spin_traced()
+)");
+
+  // Type checking methods
+  wavefunction.def("is_complex", &Wavefunction::is_complex,
+                   R"(
+Check if the wavefunction is complex-valued.
+
+Returns:
+    bool: True if the wavefunction uses complex coefficients, False if real
+
+Examples:
+    >>> is_complex = wf.is_complex()
+    >>> print(f"Wavefunction uses complex coefficients: {is_complex}")
+)");
+
+  // Type access methods
+  wavefunction.def("get_type", &Wavefunction::get_type,
+                   R"(
+Get the wavefunction type (Bra, Ket, or Both).
+
+Returns:
+    WavefunctionType: Enum value representing the wavefunction type
+
+Examples:
+    >>> wf_type = wf.get_type()
+)");
+
+  // Serialization methods
+  wavefunction.def(
+      "to_json",
+      [](const Wavefunction& self) -> std::string {
+        return self.to_json().dump();
+      },
+      R"(
+Convert wavefunction to JSON string format.
+
+Returns:
+    str: JSON string containing wavefunction data
+
+Examples:
+    >>> json_str = wf.to_json()
+)");
+
+  wavefunction.def_static(
+      "from_json",
+      [](const std::string& json_str) -> std::shared_ptr<Wavefunction> {
+        return Wavefunction::from_json(nlohmann::json::parse(json_str));
+      },
+      R"(
+Load wavefunction from JSON string format.
+
+Args:
+    json_str (str): JSON string containing wavefunction data
+
+Returns:
+    Wavefunction: Wavefunction object created from JSON string
+
+Examples:
+    >>> wf = qdk_chemistry.Wavefunction.from_json(json_str)
+)",
+      nb::arg("json_str"));
+
+  wavefunction.def("to_json_file", wavefunction_to_json_file_wrapper,
+                   R"(
+Save wavefunction to JSON file.
+
+Args:
+    filename (str | pathlib.Path): Path to JSON file to create/overwrite
+
+Examples:
+    >>> wf.to_json_file("wavefunction.json")
+    >>> wf.to_json_file(Path("wavefunction.json"))
+)",
+                   nb::arg("filename"));
+
+  wavefunction.def_static("from_json_file", wavefunction_from_json_file_wrapper,
+                          R"(
+Load wavefunction from JSON file.
+
+Args:
+    filename (str | pathlib.Path): Path to JSON file to read
+
+Returns:
+    Wavefunction: Wavefunction object created from JSON file
+
+Examples:
+    >>> wf = qdk_chemistry.Wavefunction.from_json_file("wavefunction.json")
+    >>> wf = qdk_chemistry.Wavefunction.from_json_file(Path("wavefunction.json"))
+)",
+                          nb::arg("filename"));
+
+  wavefunction.def("to_hdf5_file", wavefunction_to_hdf5_file_wrapper,
+                   R"(
+Save wavefunction to HDF5 file.
+
+Args:
+    filename (str | pathlib.Path): Path to HDF5 file to create/overwrite
+
+Examples:
+    >>> wf.to_hdf5_file("wavefunction.h5")
+    >>> wf.to_hdf5_file(Path("wavefunction.h5"))
+)",
+                   nb::arg("filename"));
+
+  wavefunction.def_static("from_hdf5_file", wavefunction_from_hdf5_file_wrapper,
+                          R"(
+Load wavefunction from HDF5 file.
+
+Args:
+    filename (str | pathlib.Path): Path to HDF5 file to read
+
+Returns:
+    Wavefunction: Wavefunction object created from HDF5 file
+
+Examples:
+    >>> wf = qdk_chemistry.Wavefunction.from_hdf5_file("wavefunction.h5")
+    >>> wf = qdk_chemistry.Wavefunction.from_hdf5_file(Path("wavefunction.h5"))
+)",
+                          nb::arg("filename"));
+
+  wavefunction.def("to_file", wavefunction_to_file_wrapper,
+                   R"(
+Save wavefunction to file in specified format.
+
+Args:
+    filename (str | pathlib.Path): Path to file to create/overwrite
+    format (str): Format type ("json" or "hdf5")
+
+Examples:
+    >>> wf.to_file("wavefunction.json", "json")
+    >>> wf.to_file(Path("wavefunction.h5"), "hdf5")
+)",
+                   nb::arg("filename"), nb::arg("format"));
+
+  wavefunction.def_static("from_file", wavefunction_from_file_wrapper,
+                          R"(
+Load wavefunction from file in specified format.
+
+Args:
+    filename (str | pathlib.Path): Path to file to read
+    format (str): Format type ("json" or "hdf5")
+
+Returns:
+    Wavefunction: Wavefunction object created from file
+
+Examples:
+    >>> wf = qdk_chemistry.Wavefunction.from_file("wavefunction.json", "json")
+    >>> wf = qdk_chemistry.Wavefunction.from_file(Path("wavefunction.h5"), "hdf5")
+)",
+                          nb::arg("filename"), nb::arg("format"));
+
+  wavefunction.def(
+      "__repr__",
+      [](const Wavefunction& w) {
+        return "<qdk_chemistry.Wavefunction size=" + std::to_string(w.size()) +
+               " norm=" + std::to_string(w.norm()) + ">";
+      },
+      R"(
+Returns a string representation of the Wavefunction object.
+
+The representation includes the size of the wavefunction and its norm.
+
+Returns:
+    str: String representation of the Wavefunction object
+)");
+
+  wavefunction.def("get_container_type", &Wavefunction::get_container_type,
+                   R"(
+Get the type of the underlying wavefunction container.
+
+Returns:
+      str: Type name of the underlying wavefunction container
+
+Examples:
+    >>> container_type = wf.get_container_type()
+    >>> print(f"Container type: {container_type}")
+)");
+
+  wavefunction.def("__str__", [](const Wavefunction& w) {
+    return "<qdk_chemistry.Wavefunction size=" + std::to_string(w.size()) +
+           " norm=" + std::to_string(w.norm()) + ">";
+  });
+
+  // Pickling support using JSON serialization
+  wavefunction
+      .def("__getstate__",
+           [](const Wavefunction& w) {
+             // __getstate__ - serialize to JSON string
+             return w.to_json().dump();
+           })
+      .def("__setstate__", [](Wavefunction* self, const std::string& json_str) {
+        // __setstate__ - deserialize from JSON string
+        nlohmann::json parsed_json = nlohmann::json::parse(json_str);
+        std::shared_ptr<Wavefunction> wf_ptr =
+            Wavefunction::from_json(parsed_json);
+        new (self) Wavefunction(*wf_ptr);
+      });
+
+  wavefunction.def_static("data_type_name", &Wavefunction::data_type_name, R"(
+Return the wire-format identifier for wavefunctions.
+
+Returns:
+        str: ``"wavefunction"``
+
+)");
+
+  // Bind StateVectorContainer
+  nb::class_<StateVectorContainer, WavefunctionContainer>(
+      data, "StateVectorContainer",
+      R"(
+State-vector wavefunction container implementation.
+
+This container represents a wavefunction as a linear combination of Slater
+determinants (a coefficient vector together with the corresponding
+determinants). It is the single container type for determinant-expansion
+wavefunctions, covering single Slater determinants (e.g. Hartree-Fock
+references), complete active space (CAS), and selected configuration
+interaction (SCI). A single Slater determinant is the special case of a
+one-determinant expansion with coefficient 1.0.
+)")
+      // Single Slater-determinant convenience constructor
+      .def(nb::init<const Configuration&, std::shared_ptr<Orbitals>,
+                    const std::string&, WavefunctionType>(),
+           R"(
+Constructs a single Slater-determinant state vector.
+
+Args:
+    det (Configuration): The single determinant configuration
+    orbitals (Orbitals): Shared pointer to orbital basis set
+    sector (str): Name of the single-particle sector the orbitals belong to
+    type (WavefunctionType | None): Type of wavefunction (default: SelfDual)
+
+Examples:
+    >>> det = qdk_chemistry.Configuration.from_spin_half_string("33221100")
+    >>> container = qdk_chemistry.StateVectorContainer(det, orbitals, "electrons")
+)",
+           nb::arg("det"), nb::arg("orbitals"),
+           nb::arg("sector") =
+               qdk::chemistry::data::Wavefunction::DEFAULT_SECTOR,
+           nb::arg("type") = WavefunctionType::SelfDual)
+      // Basic constructor: coeffs, dets, orbitals, sector, type
+      .def(nb::init<const ContainerTypes::VectorVariant&,
+                    const ContainerTypes::DeterminantVector&,
+                    std::shared_ptr<Orbitals>, const std::string&,
+                    WavefunctionType>(),
+           R"(
+Constructs a basic state-vector wavefunction container.
+
+Args:
+    coeffs (numpy.ndarray): The vector of CI coefficients (real or complex)
+    dets (list[Configuration]): The vector of determinants
+    orbitals (Orbitals): Shared pointer to orbital basis set
+    sector (str): Name of the single-particle sector the orbitals belong to
+    type (WavefunctionType | None): Type of wavefunction (default: SelfDual)
+
+Examples:
+    >>> import numpy as np
+    >>> coeffs = np.array([0.9, 0.1])
+    >>> dets = [qdk_chemistry.Configuration.from_spin_half_string("33221100"), qdk_chemistry.Configuration.from_spin_half_string("33221001")]
+    >>> container = qdk_chemistry.StateVectorContainer(coeffs, dets, orbitals, "electrons")
+)",
+           nb::arg("coeffs"), nb::arg("dets"), nb::arg("orbitals"),
+           nb::arg("sector") = std::string(Wavefunction::DEFAULT_SECTOR),
+           nb::arg("type") = WavefunctionType::SelfDual)
+      // Constructor with spin-traced RDMs and optional entropies dict
+      .def(
+          "__init__",
+          [](StateVectorContainer* self,
+             const ContainerTypes::VectorVariant& coeffs,
+             const ContainerTypes::DeterminantVector& dets,
+             std::shared_ptr<Orbitals> orbitals,
+             std::optional<ContainerTypes::MatrixVariant> one_rdm_spin_traced,
+             std::optional<ContainerTypes::VectorVariant> two_rdm_spin_traced,
+             const std::string& sector, nb::object entropies,
+             WavefunctionType type) {
+            new (self) StateVectorContainer(
+                coeffs, dets, std::move(orbitals), one_rdm_spin_traced,
+                two_rdm_spin_traced, sector, parse_entropies(entropies), type);
+          },
+          R"(
+Constructs a state-vector wavefunction container with spin-traced RDMs.
+
+Args:
+    coeffs (numpy.ndarray): The vector of CI coefficients (real or complex)
+    dets (list[Configuration]): The vector of determinants
+    orbitals (Orbitals): Shared pointer to orbital basis set
+    one_rdm_spin_traced (numpy.ndarray | None): Spin-traced one-particle reduced density matrix
+    two_rdm_spin_traced (numpy.ndarray | None): Spin-traced two-particle reduced density matrix
+    sector (str): Name of the single-particle sector the orbitals belong to (default: "__default__")
+    entropies (dict | None): Orbital entropies, with optional keys
+        ``"single_orbital"`` (1-D), ``"two_orbital"`` (2-D),
+        and ``"mutual_information"`` (2-D)
+    type (WavefunctionType | None): Type of wavefunction (default: SelfDual)
+
+Examples:
+    >>> import numpy as np
+    >>> coeffs = np.array([0.9, 0.1])
+    >>> dets = [qdk_chemistry.Configuration.from_spin_half_string("33221100"), qdk_chemistry.Configuration.from_spin_half_string("33221001")]
+    >>> one_rdm = np.eye(4)  # Example 1-RDM
+    >>> container = qdk_chemistry.StateVectorContainer(coeffs, dets, orbitals, one_rdm, None)
+    >>> # With entropies:
+    >>> container = qdk_chemistry.StateVectorContainer(coeffs, dets, orbitals,
+    ...     one_rdm, None, entropies={"single_orbital": s1_vec})
+)",
+          nb::arg("coeffs"), nb::arg("dets"), nb::arg("orbitals"),
+          nb::arg("one_rdm_spin_traced").none() = std::nullopt,
+          nb::arg("two_rdm_spin_traced").none() = std::nullopt,
+          nb::arg("sector") = std::string(Wavefunction::DEFAULT_SECTOR),
+          nb::arg("entropies") = nb::none(),
+          nb::arg("type") = WavefunctionType::SelfDual)
+      // Full constructor with all RDM components and optional entropies dict
+      .def(
+          "__init__",
+          [](StateVectorContainer* self,
+             const ContainerTypes::VectorVariant& coeffs,
+             const ContainerTypes::DeterminantVector& dets,
+             std::shared_ptr<Orbitals> orbitals,
+             std::optional<ContainerTypes::MatrixVariant> one_rdm_spin_traced,
+             std::optional<ContainerTypes::MatrixVariant> one_rdm_aa,
+             std::optional<ContainerTypes::MatrixVariant> one_rdm_bb,
+             std::optional<ContainerTypes::VectorVariant> two_rdm_spin_traced,
+             std::optional<ContainerTypes::VectorVariant> two_rdm_aaaa,
+             std::optional<ContainerTypes::VectorVariant> two_rdm_aabb,
+             std::optional<ContainerTypes::VectorVariant> two_rdm_bbbb,
+             const std::string& sector, nb::object entropies,
+             WavefunctionType type) {
+            new (self) StateVectorContainer(
+                coeffs, dets, std::move(orbitals), one_rdm_spin_traced,
+                one_rdm_aa, one_rdm_bb, two_rdm_spin_traced, two_rdm_aaaa,
+                two_rdm_aabb, two_rdm_bbbb, sector, parse_entropies(entropies),
+                type);
+          },
+          R"(
+Constructs a state-vector wavefunction container with full RDM data.
+
+Args:
+    coeffs (numpy.ndarray): The vector of CI coefficients (real or complex)
+    dets (list[Configuration]): The vector of determinants
+    orbitals (Orbitals): Shared pointer to orbital basis set
+    one_rdm_spin_traced (numpy.ndarray | None): Spin-traced one-particle reduced density matrix
+    one_rdm_aa (numpy.ndarray | None): Alpha-alpha block of one-particle RDM
+    one_rdm_bb (numpy.ndarray | None): Beta-beta block of one-particle RDM
+    two_rdm_spin_traced (numpy.ndarray | None): Spin-traced two-particle reduced density matrix
+    two_rdm_aaaa (numpy.ndarray | None): Alpha-alpha-alpha-alpha block of two-particle RDM
+    two_rdm_aabb (numpy.ndarray | None): Alpha-alpha-beta-beta block of two-particle RDM
+    two_rdm_bbbb (numpy.ndarray | None): Beta-beta-beta-beta block of two-particle RDM
+    sector (str): Name of the single-particle sector the orbitals belong to (default: "__default__")
+    entropies (dict | None): Orbital entropies, with optional keys
+        ``"single_orbital"`` (1-D), ``"two_orbital"`` (2-D),
+        and ``"mutual_information"`` (2-D)
+    type (WavefunctionType | None): Type of wavefunction (default: SelfDual)
+
+Examples:
+    >>> import numpy as np
+    >>> coeffs = np.array([0.9, 0.1])
+    >>> dets = [qdk_chemistry.Configuration.from_spin_half_string("33221100"), qdk_chemistry.Configuration.from_spin_half_string("33221001")]
+    >>> container = qdk_chemistry.StateVectorContainer(coeffs, dets, orbitals,
+    ...     one_rdm, one_rdm_aa, one_rdm_bb,
+    ...     two_rdm, two_rdm_aaaa, two_rdm_aabb, two_rdm_bbbb)
+)",
+          nb::arg("coeffs"), nb::arg("dets"), nb::arg("orbitals"),
+          nb::arg("one_rdm_spin_traced").none() = std::nullopt,
+          nb::arg("one_rdm_aa").none() = std::nullopt,
+          nb::arg("one_rdm_bb").none() = std::nullopt,
+          nb::arg("two_rdm_spin_traced").none() = std::nullopt,
+          nb::arg("two_rdm_aaaa").none() = std::nullopt,
+          nb::arg("two_rdm_aabb").none() = std::nullopt,
+          nb::arg("two_rdm_bbbb").none() = std::nullopt,
+          nb::arg("sector") = std::string(Wavefunction::DEFAULT_SECTOR),
+          nb::arg("entropies") = nb::none(),
+          nb::arg("type") = WavefunctionType::SelfDual)
+      .def("get_coefficients", &StateVectorContainer::get_coefficients,
+           "Get the coefficients of the wavefunction",
+           nb::rv_policy::reference_internal)
+      .def("get_coefficient", &StateVectorContainer::get_coefficient,
+           "Get coefficient for a specific determinant", nb::arg("det"))
+      .def("get_active_determinants",
+           &StateVectorContainer::get_active_determinants,
+           "Get all determinants in the wavefunction",
+           nb::rv_policy::reference_internal)
+      .def("size", &StateVectorContainer::size, "Get number of determinants")
+      .def("contains_determinant", &StateVectorContainer::contains_determinant,
+           "Check if a determinant is present in the expansion",
+           nb::arg("det"));
+
+  // Bind AmplitudeType enum
+  nb::enum_<AmplitudeType>(data, "AmplitudeType",
+                           R"(
+Correlated method that produced an amplitude wavefunction.
+
+Because all amplitude-based wavefunctions share a single container type, this
+tag lets downstream consumers know how to interpret the stored amplitudes.
+
+* MollerPlesset: Moller-Plesset perturbation theory
+* CoupledCluster: Coupled cluster theory
+* Unspecified: Producer did not record a type (e.g. legacy data)
+)")
+      .value("MollerPlesset", AmplitudeType::MollerPlesset,
+             "Moller-Plesset perturbation theory")
+      .value("CoupledCluster", AmplitudeType::CoupledCluster,
+             "Coupled cluster theory")
+      .value("Unspecified", AmplitudeType::Unspecified,
+             "Producer did not record a type (e.g. legacy data)")
+      .export_values();
+
+  // Bind AmplitudeContainer
+  nb::class_<AmplitudeContainer, WavefunctionContainer>(data,
+                                                        "AmplitudeContainer",
+                                                        R"(
+Amplitude-based correlated wavefunction container (e.g. coupled cluster or MP2).
+
+This container stores a reference wavefunction together with T1/T2 excitation
+amplitudes. It is pure storage: it does not expand the amplitudes into a
+determinant/coefficient representation and does not compute reduced density
+matrices, so determinant- and RDM-based accessors raise. It supports both
+restricted and unrestricted amplitudes (optionally spin-separated). The
+amplitude type (see :class:`AmplitudeType`) records which correlated method
+produced the amplitudes.
+    )")
+      .def(nb::init<std::shared_ptr<Orbitals>, std::shared_ptr<Wavefunction>,
+                    AmplitudeType,
+                    const std::optional<AmplitudeContainer::VectorVariant>&,
+                    const std::optional<AmplitudeContainer::VectorVariant>&,
+                    std::string>(),
+           R"(
+Constructs an amplitude wavefunction container with spatial (restricted) amplitudes.
+
+Args:
+    orbitals (Orbitals): Shared pointer to orbital basis set
+    wavefunction (Wavefunction): Shared pointer to the reference wavefunction
+    amplitude_type (AmplitudeType): Correlated method that produced the amplitudes
+    t1_amplitudes (numpy.ndarray, optional): T1 amplitudes (both alpha, beta spin)
+    t2_amplitudes (numpy.ndarray, optional): T2 amplitudes (both alpha, beta spin)
+    sector (str): Name of the single-particle sector the orbitals belong to
+
+Examples:
+    >>> t1 = np.array([...])
+    >>> t2 = np.array([...])
+    >>> container = qdk_chemistry.AmplitudeContainer(orbitals, wfn, AmplitudeType.CoupledCluster, t1, t2)
+        )",
+           nb::arg("orbitals"), nb::arg("wavefunction"),
+           nb::arg("amplitude_type"),
+           nb::arg("t1_amplitudes").none() = std::nullopt,
+           nb::arg("t2_amplitudes").none() = std::nullopt,
+           nb::arg("sector") =
+               qdk::chemistry::data::Wavefunction::DEFAULT_SECTOR)
+      .def(nb::init<std::shared_ptr<Orbitals>, std::shared_ptr<Wavefunction>,
+                    AmplitudeType,
+                    const std::optional<AmplitudeContainer::VectorVariant>&,
+                    const std::optional<AmplitudeContainer::VectorVariant>&,
+                    const std::optional<AmplitudeContainer::VectorVariant>&,
+                    const std::optional<AmplitudeContainer::VectorVariant>&,
+                    const std::optional<AmplitudeContainer::VectorVariant>&,
+                    std::string>(),
+           R"(
+Constructs an amplitude wavefunction container with spin-separated amplitudes.
+
+Args:
+    orbitals (Orbitals): Shared pointer to orbital basis set
+    wavefunction (Wavefunction): Shared pointer to the reference wavefunction
+    amplitude_type (AmplitudeType): Correlated method that produced the amplitudes
+    t1_amplitudes_aa (numpy.ndarray, optional): Alpha T1 amplitudes
+    t1_amplitudes_bb (numpy.ndarray, optional): Beta T1 amplitudes
+    t2_amplitudes_abab (numpy.ndarray, optional): Alpha-beta T2 amplitudes
+    t2_amplitudes_aaaa (numpy.ndarray, optional): Alpha-alpha T2 amplitudes
+    t2_amplitudes_bbbb (numpy.ndarray, optional): Beta-beta T2 amplitudes
+    sector (str): Name of the single-particle sector the orbitals belong to
+
+Examples:
+    >>> container = qdk_chemistry.AmplitudeContainer(
+    ...     orbitals, wfn, AmplitudeType.CoupledCluster, t1_aa, t1_bb, t2_abab, None, None)
+        )",
+           nb::arg("orbitals"), nb::arg("wavefunction"),
+           nb::arg("amplitude_type"),
+           nb::arg("t1_amplitudes_aa").none() = std::nullopt,
+           nb::arg("t1_amplitudes_bb").none() = std::nullopt,
+           nb::arg("t2_amplitudes_abab").none() = std::nullopt,
+           nb::arg("t2_amplitudes_aaaa").none() = std::nullopt,
+           nb::arg("t2_amplitudes_bbbb").none() = std::nullopt,
+           nb::arg("sector") =
+               qdk::chemistry::data::Wavefunction::DEFAULT_SECTOR)
+      .def("get_amplitude_type", &AmplitudeContainer::get_amplitude_type,
+           R"(
+Get the correlated method that produced these amplitudes.
+
+Returns:
+    AmplitudeType: The amplitude expansion type (MollerPlesset, CoupledCluster, or Unspecified)
+
+Examples:
+    >>> amplitude_type = container.get_amplitude_type()
+        )")
+      .def("get_wavefunction", &AmplitudeContainer::get_wavefunction,
+           R"(
+Get the reference wavefunction.
+
+Returns:
+    Wavefunction: Shared pointer to the reference wavefunction
+
+Examples:
+    >>> wfn = container.get_wavefunction()
+        )",
+           nb::rv_policy::reference_internal)
+      .def(
+          "get_t1_amplitudes",
+          [](const AmplitudeContainer& self) {
+            const auto& [t1_aa, t1_bb] = self.get_t1_amplitudes();
+            return nb::make_tuple(variant_to_python(t1_aa),
+                                  variant_to_python(t1_bb));
+          },
+          R"(
+Get T1 amplitudes. For restricted wavefunctions both blocks are identical.
+
+Returns:
+    tuple: Pair of (alpha, beta) T1 amplitudes
+
+Examples:
+    >>> t1_aa, t1_bb = container.get_t1_amplitudes()
+        )")
+      .def(
+          "get_t2_amplitudes",
+          [](const AmplitudeContainer& self) {
+            const auto& [t2_abab, t2_aaaa, t2_bbbb] = self.get_t2_amplitudes();
+            return nb::make_tuple(variant_to_python(t2_abab),
+                                  variant_to_python(t2_aaaa),
+                                  variant_to_python(t2_bbbb));
+          },
+          R"(
+Get T2 amplitudes.
+
+Returns:
+    tuple: Tuple of (alpha-beta, alpha-alpha, beta-beta) T2 amplitudes
+
+Examples:
+    >>> t2_abab, t2_aaaa, t2_bbbb = container.get_t2_amplitudes()
+        )")
+      .def("has_t1_amplitudes", &AmplitudeContainer::has_t1_amplitudes,
+           R"(
+Check if T1 amplitudes are available.
+
+Returns:
+    bool: True if T1 amplitudes are available
+
+Examples:
+    >>> if container.has_t1_amplitudes():
+    ...     t1_aa, t1_bb = container.get_t1_amplitudes()
+        )")
+      .def("has_t2_amplitudes", &AmplitudeContainer::has_t2_amplitudes,
+           R"(
+Check if T2 amplitudes are available.
+
+Returns:
+    bool: True if T2 amplitudes are available
+
+Examples:
+    >>> if container.has_t2_amplitudes():
+    ...     t2 = container.get_t2_amplitudes()
+        )");
+}
