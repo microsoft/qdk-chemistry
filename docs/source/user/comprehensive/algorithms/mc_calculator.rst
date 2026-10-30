@@ -156,6 +156,7 @@ The returned wavefunction likewise stores only the :term:`CI` coefficients, in a
 The number of determinants, and with it time and memory, still grows combinatorially with the size of the active space, so this solver suits small to moderately large active spaces; for larger ones, consider :ref:`MACIS ASCI <macis-asci>`.
 
 This implementation uses the common settings described above, plus the following MACIS-specific settings. For small determinant spaces (at or below ``iterative_solver_dimension_cutoff``), dense diagonalization is used; otherwise the iterative Davidson solver is employed.
+For larger spaces the Davidson solver applies the Hamiltonian in single precision wherever that cannot change the result, and accepts the final eigenpair only once its residual, computed in double precision, meets ``ci_residual_tolerance``, so the results match a double-precision calculation to that tolerance.
 
 With equal numbers of active alpha and beta electrons, the :term:`CI` coefficients of a state with total spin :math:`S` form a matrix over alpha and beta strings that is symmetric for even :math:`S` and antisymmetric for odd :math:`S`.
 The ``spin_flip_symmetry`` setting restricts the calculation to one of these two sectors, which roughly halves the cost of each iteration and can target, for example, the lowest triplet when the lowest state overall is a singlet.

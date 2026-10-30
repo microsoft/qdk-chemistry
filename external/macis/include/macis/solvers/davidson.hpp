@@ -18,6 +18,7 @@
 #include <fstream>
 #include <iomanip>
 #include <iostream>
+#include <limits>
 #include <lobpcgxx/lobpcg.hpp>
 #include <macis/util/mpi.hpp>
 #include <memory>
@@ -388,7 +389,8 @@ auto davidson(int64_t N, int64_t max_m, const Functor& op, const double* D,
 namespace detail {
 
 struct DavidsonFree {
-  void operator()(double* p) const {
+  template <typename T>
+  void operator()(T* p) const {
 #if defined(__linux__)
     std::free(p);
 #else
@@ -396,22 +398,30 @@ struct DavidsonFree {
 #endif
   }
 };
-using davidson_array = std::unique_ptr<double[], DavidsonFree>;
+template <typename T = double>
+using davidson_buffer = std::unique_ptr<T[], DavidsonFree>;
+using davidson_array = davidson_buffer<double>;
 
-/// Uninitialized array of n doubles for large work vectors; on Linux it is
-/// 2 MiB aligned and advised for transparent huge pages, which saves page
-/// faults and TLB misses in the strided accesses of the operator
-inline davidson_array davidson_alloc(size_t n) {
+/// Uninitialized array of n elements for large work vectors; on Linux, arrays
+/// of 1 MiB or more are rounded up to whole 2 MiB pages and advised for
+/// transparent huge pages, which saves page faults and TLB misses in the
+/// strided accesses of the operator
+template <typename T = double>
+inline davidson_buffer<T> davidson_alloc(size_t n) {
 #if defined(__linux__)
+  constexpr size_t huge_page = size_t(1) << 21;
+  size_t bytes = std::max<size_t>(n, 1) * sizeof(T);
+  const bool huge = bytes >= huge_page / 2;
+  if (huge) bytes = (bytes + huge_page - 1) & ~(huge_page - 1);
   void* p = nullptr;
-  const size_t bytes = std::max<size_t>(n, 1) * sizeof(double);
-  if (posix_memalign(&p, size_t(1) << 21, bytes) != 0) throw std::bad_alloc();
+  if (posix_memalign(&p, huge ? huge_page : 64, bytes) != 0)
+    throw std::bad_alloc();
 #ifdef MADV_HUGEPAGE
-  madvise(p, bytes, MADV_HUGEPAGE);
+  if (huge) madvise(p, bytes, MADV_HUGEPAGE);
 #endif
-  return davidson_array(static_cast<double*>(p));
+  return davidson_buffer<T>(static_cast<T*>(p));
 #else
-  return davidson_array(new double[n]);
+  return davidson_buffer<T>(new T[n]);
 #endif
 }
 
@@ -462,7 +472,43 @@ void davidson_reduce(int64_t n, int64_t len, double* result, Body&& body) {
     for (int64_t l = 0; l < len; ++l) result[l] += partial[t * stride + l];
 }
 
+/// Sum of term(i) over [i0, i1), accumulated in blocks of 512 terms. A single
+/// running sum over millions of terms of one sign rounds away those below
+/// half an ulp of it, always in the same direction: a Rayleigh quotient over
+/// 1.66e8 determinants came out 1e-10 too high.
+template <typename Term>
+double davidson_sum(int64_t i0, int64_t i1, Term&& term) {
+  constexpr int64_t block = 512;
+  double sum = 0.0;
+  for (int64_t b0 = i0; b0 < i1; b0 += block) {
+    const int64_t b1 = std::min(b0 + block, i1);
+    double s = 0.0;
+    for (int64_t i = b0; i < b1; ++i) s += term(i);
+    sum += s;
+  }
+  return sum;
+}
+
 }  // namespace detail
+
+/**
+ * @brief Exact block of the restarted_davidson preconditioner on a few
+ * coordinates, e.g. a P-space of important determinants.
+ *
+ * With the matrix restricted to the span of the columns of Z (index.size() x
+ * lambda.size(), orthonormal columns over the coordinates `index`) equal to
+ * Z diag(lambda) Z^T, the new direction on those coordinates is
+ * -Z (lambda - lam)^-1 Z^T r instead of the diagonal's -r / (D - lam).
+ * Components with |lambda_a - lam| < min_abs_denominator are dropped: a
+ * guess that is the block's own lowest eigenvector has lam = lambda_0 at the
+ * first iteration.
+ */
+struct DavidsonBlockPreconditioner {
+  std::vector<int64_t> index;
+  std::vector<double> Z;
+  std::vector<double> lambda;
+  double min_abs_denominator = 1e-3;
+};
 
 /**
  * @brief Davidson eigensolver with subspace restarts for the lowest eigenpair.
@@ -483,13 +529,35 @@ void davidson_reduce(int64_t n, int64_t len, double* result, Body&& body) {
  * @param[in,out] X  Input: initial guess vector, Output: converged eigenvector
  * @param[in] min_abs_denominator  Minimum absolute value for preconditioner
  * denominator to avoid division by zero
+ * @param[in] throw_on_failure  If false, running out of iterations is not an
+ * error: X then receives the current Ritz vector
+ * @param[out] residual_norm  If not null, the residual norm of the returned
+ * Ritz pair as computed from the operator applications
+ * @param[in] stagnation_window  If positive, also stop (unconverged) once the
+ * residual norm has not halved over this many iterations, e.g. at the
+ * resolution limit of an inexact operator
+ * @param[in] exact  Optional exact operator, for an inexact (e.g. reduced
+ * precision) op: once the residual falls below anchor_tol (or tol, or
+ * stagnates) the search space is collapsed onto the Ritz vector, whose image
+ * is recomputed with exact; later directions use op again. Their errors
+ * then enter the Ritz vector scaled by its (small) change since this
+ * anchor. Convergence is only accepted after anchoring.
+ * @param[in] anchor_tol  Residual norm at which to anchor
+ * @param[in] block  Optional exact block of the preconditioner
  * @return Pair containing (number of iterations, converged eigenvalue)
  * @throws std::runtime_error if not converged within max_iter iterations
+ * and throw_on_failure is true
  */
-template <typename Functor>
+template <typename Functor, typename ExactFunctor = Functor>
 auto restarted_davidson(int64_t N, int64_t max_m, int64_t max_iter,
                         const Functor& op, const double* D, double tol,
-                        double* X, double min_abs_denominator = 1e-12) {
+                        double* X, double min_abs_denominator = 1e-12,
+                        bool throw_on_failure = true,
+                        double* residual_norm = nullptr,
+                        int64_t stagnation_window = 0,
+                        const ExactFunctor* exact = nullptr,
+                        double anchor_tol = 0.0,
+                        const DavidsonBlockPreconditioner* block = nullptr) {
   if (!X) throw std::runtime_error("Davidson: No Guess Provided");
   if (max_m < 2)
     throw std::invalid_argument("restarted_davidson: max_m must be >= 2");
@@ -508,6 +576,7 @@ auto restarted_davidson(int64_t N, int64_t max_m, int64_t max_iter,
     X[0] = 1.0;
     double AX = 0.0;
     op.operator_action(1, 1., X, N, 0., &AX, N);
+    if (residual_norm) *residual_norm = 0.0;
     return std::make_pair(size_t(0), AX);
   }
 
@@ -518,14 +587,15 @@ auto restarted_davidson(int64_t N, int64_t max_m, int64_t max_iter,
 
   // Search space V (max_m columns plus one for the new direction) and AV,
   // addressed through column pointers so that the new direction can be
-  // renamed after a collapse; first touched with the partition of all passes
+  // renamed after a collapse. V is first written by the passes below, which
+  // all use the static partition (its first touch places it); AV is first
+  // written by the operator, so it is first touched here
   auto v_store = detail::davidson_alloc(N * (max_m + 1));
   auto av_store = detail::davidson_alloc(N * max_m);
   std::vector<double*> V(max_m + 1), AV(max_m);
   for (int64_t j = 0; j <= max_m; ++j) V[j] = v_store.get() + j * N;
   for (int64_t j = 0; j < max_m; ++j) AV[j] = av_store.get() + j * N;
   davidson_partition(N, [&](int64_t, int64_t i0, int64_t i1) {
-    for (auto* v : V) std::fill(v + i0, v + i1, 0.0);
     for (auto* v : AV) std::fill(v + i0, v + i1, 0.0);
   });
 
@@ -554,9 +624,8 @@ auto restarted_davidson(int64_t N, int64_t max_m, int64_t max_iter,
 
   // V[0] = X / |X|
   davidson_reduce(N, 1, sums.data(), [&](int64_t i0, int64_t i1, double* acc) {
-    double d = 0.0;
-    for (int64_t i = i0; i < i1; ++i) d += X[i] * X[i];
-    acc[0] += d;
+    acc[0] +=
+        detail::davidson_sum(i0, i1, [&](int64_t i) { return X[i] * X[i]; });
   });
   if (!(sums[0] > 0.0))
     throw std::runtime_error("restarted_davidson: zero initial guess");
@@ -568,15 +637,76 @@ auto restarted_davidson(int64_t N, int64_t max_m, int64_t max_iter,
   }
   op.operator_action(1, 1., V[0], N, 0., AV[0], N);
   davidson_reduce(N, 1, H.data(), [&](int64_t i0, int64_t i1, double* acc) {
-    double d = 0.0;
-    for (int64_t i = i0; i < i1; ++i) d += V[0][i] * AV[0][i];
-    acc[0] += d;
+    acc[0] += detail::davidson_sum(
+        i0, i1, [&](int64_t i) { return V[0][i] * AV[0][i]; });
   });
 
   int64_t k = 1;
   bool have_prev = false;
   bool converged = false;
+  bool anchored = exact == nullptr;
+  double last_res = std::numeric_limits<double>::infinity();
+  std::vector<double> res_history;
   size_t iter = 1;
+
+  // Collapse the search space onto U = [y, y_prev orthogonalized against y]
+  // (just y when max_m == 2 or without a previous Ritz vector, leaving room
+  // for the new direction): [V|AV][0:kk) <- [V|AV][0:k) U, H <- U^T H U and
+  // proj <- U^T proj; returns kk. Near convergence y_prev is almost parallel
+  // to y, so the projection is repeated to keep U orthonormal to working
+  // precision.
+  auto collapse_basis = [&](const double* y) -> int64_t {
+    std::copy_n(y, k, U.data());
+    int64_t kk = 1;
+    if (have_prev and max_m > 2) {
+      double* u1 = U.data() + k;
+      std::copy_n(y_prev.data(), k, u1);
+      for (int pass = 0; pass < 2; ++pass)
+        blas::axpy(k, -blas::dot(k, y, 1, u1, 1), y, 1, u1, 1);
+      const auto nrm = blas::nrm2(k, u1, 1);
+      if (nrm > 1e-12) {
+        blas::scal(k, 1. / nrm, u1, 1);
+        kk = 2;
+      }
+    }
+    return kk;
+  };
+  // H <- U^T H U and proj <- U^T proj
+  auto collapse_projections = [&](int64_t kk) {
+    blas::gemm(blas::Layout::ColMajor, blas::Op::NoTrans, blas::Op::NoTrans, k,
+               kk, k, 1., H.data(), max_m, U.data(), k, 0., HU.data(), k);
+    blas::gemm(blas::Layout::ColMajor, blas::Op::Trans, blas::Op::NoTrans, kk,
+               kk, k, 1., U.data(), k, HU.data(), k, 0., H.data(), max_m);
+    double new_proj[2];
+    for (int64_t c = 0; c < kk; ++c)
+      new_proj[c] = blas::dot(k, U.data() + c * k, 1, proj.data(), 1);
+    std::copy_n(new_proj, kk, proj.data());
+  };
+  auto collapse = [&](const double* y) -> int64_t {
+    const int64_t kk = collapse_basis(y);
+    // [V|AV][0:kk) <- [V|AV][0:k) U, in place block by block
+    davidson_partition(N, [&](int64_t, int64_t i0, int64_t i1) {
+      alignas(64) double nv[2][chunk];
+      for (int64_t c0 = i0; c0 < i1; c0 += chunk) {
+        const int64_t len = std::min(chunk, i1 - c0);
+        for (auto* B : {&V, &AV}) {
+          for (int64_t c = 0; c < kk; ++c) {
+            std::fill_n(nv[c], len, 0.0);
+            for (int64_t j = 0; j < k; ++j) {
+              const double u = U[j + c * k];
+              const double* b = (*B)[j] + c0;
+              for (int64_t i = 0; i < len; ++i) nv[c][i] += u * b[i];
+            }
+          }
+          for (int64_t c = 0; c < kk; ++c)
+            std::copy_n(nv[c], len, (*B)[c] + c0);
+        }
+      }
+    });
+    collapse_projections(kk);
+    return kk;
+  };
+
   for (;; ++iter) {
     // Rayleigh-Ritz on the k-dimensional search space
     for (int64_t j = 0; j < k; ++j)
@@ -586,12 +716,18 @@ auto restarted_davidson(int64_t N, int64_t max_m, int64_t max_iter,
     const double* y = Y.data();
     const double lam = LAM[0];
 
+    // A full search space is collapsed in the same pass (fused): onto the
+    // Ritz vector, whose image the residual needs anyway, and the previous
+    // one (see collapse), saving a pass over all of [V|AV]
+    const bool fuse = k == max_m;
+    const int64_t kk = fuse ? collapse_basis(y) : k;
+
     // Residual r = AV y - lam V y (not stored), new direction
     // t = -(D - lam)^-1 r in V[k] and V[0:k)^T t, in one pass:
-    // sums = [|r|^2, V^T t]
+    // sums = [|r|^2, V^T t, |t|^2]
     davidson_reduce(
-        N, k + 1, sums.data(), [&](int64_t i0, int64_t i1, double* acc) {
-          alignas(64) double xs[chunk], rs[chunk];
+        N, k + 2, sums.data(), [&](int64_t i0, int64_t i1, double* acc) {
+          alignas(64) double xs[chunk], rs[chunk], x1[chunk], ax1[chunk];
           for (int64_t c0 = i0; c0 < i1; c0 += chunk) {
             const int64_t len = std::min(chunk, i1 - c0);
             std::fill_n(xs, len, 0.0);
@@ -605,8 +741,21 @@ auto restarted_davidson(int64_t N, int64_t max_m, int64_t max_iter,
                 rs[i] += yj * av[i];
               }
             }
+            if (fuse and kk > 1) {
+              std::fill_n(x1, len, 0.0);
+              std::fill_n(ax1, len, 0.0);
+              for (int64_t j = 0; j < k; ++j) {
+                const double* v = V[j] + c0;
+                const double* av = AV[j] + c0;
+                const double uj = U[j + k];
+                for (int64_t i = 0; i < len; ++i) {
+                  x1[i] += uj * v[i];
+                  ax1[i] += uj * av[i];
+                }
+              }
+            }
             double* t = V[k] + c0;
-            double r2 = 0.0;
+            double r2 = 0.0, t2 = 0.0;
             for (int64_t i = 0; i < len; ++i) {
               const double r = rs[i] - lam * xs[i];
               r2 += r * r;
@@ -614,87 +763,135 @@ auto restarted_davidson(int64_t N, int64_t max_m, int64_t max_iter,
               if (std::abs(denom) < min_abs_denominator)
                 denom = denom >= 0 ? min_abs_denominator : -min_abs_denominator;
               t[i] = -r / denom;
+              t2 += t[i] * t[i];
             }
             acc[0] += r2;
+            acc[k + 1] += t2;
             for (int64_t j = 0; j < k; ++j) {
               const double* v = V[j] + c0;
               double d = 0.0;
               for (int64_t i = 0; i < len; ++i) d += v[i] * t[i];
               acc[1 + j] += d;
             }
+            if (fuse) {
+              std::copy_n(xs, len, V[0] + c0);
+              std::copy_n(rs, len, AV[0] + c0);
+              if (kk > 1) {
+                std::copy_n(x1, len, V[1] + c0);
+                std::copy_n(ax1, len, AV[1] + c0);
+              }
+            }
           }
         });
-    const double res_nrm = std::sqrt(sums[0]);
     std::copy_n(sums.data() + 1, k, proj.data());
+    double t_before2 = sums[k + 1];
+    if (fuse) {
+      // The basis is now [V|AV][0:kk) with the Ritz vector first, and t
+      // moves to V[kk]
+      collapse_projections(kk);
+      std::swap(V[k], V[kk]);
+      k = kk;
+      std::fill_n(Y.data(), k, 0.0);
+      Y[0] = 1.0;
+      y = Y.data();
+      std::fill(y_prev.begin(), y_prev.end(), 0.0);
+    }
+    if (block and not block->lambda.empty()) {
+      // Exact block: r and the diagonal's direction on the block coordinates,
+      // the block's direction there, and its effect on V^T t and |t|^2
+      const auto& idx = block->index;
+      const size_t nc = idx.size(), ne = block->lambda.size();
+      std::vector<double> r_b(nc), t_b(nc, 0.0), c(ne);
+      for (size_t i = 0; i < nc; ++i) {
+        double x = 0.0, ax = 0.0;
+        for (int64_t j = 0; j < k; ++j) {
+          x += y[j] * V[j][idx[i]];
+          ax += y[j] * AV[j][idx[i]];
+        }
+        r_b[i] = ax - lam * x;
+      }
+      for (size_t a = 0; a < ne; ++a) {
+        const double den = block->lambda[a] - lam;
+        c[a] =
+            std::abs(den) < block->min_abs_denominator
+                ? 0.0
+                : -blas::dot(nc, block->Z.data() + a * nc, 1, r_b.data(), 1) /
+                      den;
+      }
+      // t_b = Z c in the same order for every coordinate, so that rows of Z
+      // that are exact mirrors (spin-flip sector functions) give exact
+      // mirrors (BLAS gives no such guarantee)
+      for (size_t a = 0; a < ne; ++a) {
+        const double* z = block->Z.data() + a * nc;
+        for (size_t i = 0; i < nc; ++i) t_b[i] += z[i] * c[a];
+      }
+      for (size_t i = 0; i < nc; ++i) {
+        double& t = V[k][idx[i]];
+        for (int64_t j = 0; j < k; ++j) proj[j] += V[j][idx[i]] * (t_b[i] - t);
+        t_before2 += t_b[i] * t_b[i] - t * t;
+        t = t_b[i];
+      }
+    }
+    const double res_nrm = std::sqrt(sums[0]);
+    last_res = res_nrm;
 
     logger->info("iter = {:4}, LAM(0) = {:20.12e}, RNORM = {:20.12e}", iter,
                  lam, res_nrm);
 
-    if (res_nrm < tol) {
+    if (anchored and res_nrm < tol) {
       converged = true;
       break;
     }
     if (iter >= size_t(max_iter)) break;
+    res_history.push_back(res_nrm);
+    const bool stagnated =
+        stagnation_window > 0 and
+        int64_t(res_history.size()) > stagnation_window and
+        res_nrm >
+            0.5 *
+                res_history[res_history.size() - 1 - size_t(stagnation_window)];
 
-    if (k == max_m) {
-      // Collapse onto U = [y, y_prev orthogonalized against y] (just y when
-      // max_m == 2, to leave room for the new direction). Near convergence
-      // y_prev is almost parallel to y, so the projection is repeated to keep
-      // U orthonormal to working precision.
-      std::copy_n(y, k, U.data());
-      int64_t kk = 1;
-      if (have_prev and max_m > 2) {
-        double* u1 = U.data() + k;
-        std::copy_n(y_prev.data(), k, u1);
-        for (int pass = 0; pass < 2; ++pass)
-          blas::axpy(k, -blas::dot(k, y, 1, u1, 1), y, 1, u1, 1);
-        const auto nrm = blas::nrm2(k, u1, 1);
-        if (nrm > 1e-12) {
-          blas::scal(k, 1. / nrm, u1, 1);
-          kk = 2;
-        }
-      }
-      // [V|AV][0:kk) <- [V|AV][0:k) U, in place block by block
-      davidson_partition(N, [&](int64_t, int64_t i0, int64_t i1) {
-        alignas(64) double nv[2][chunk];
-        for (int64_t c0 = i0; c0 < i1; c0 += chunk) {
-          const int64_t len = std::min(chunk, i1 - c0);
-          for (auto* B : {&V, &AV}) {
-            for (int64_t c = 0; c < kk; ++c) {
-              std::fill_n(nv[c], len, 0.0);
-              for (int64_t j = 0; j < k; ++j) {
-                const double u = U[j + c * k];
-                const double* b = (*B)[j] + c0;
-                for (int64_t i = 0; i < len; ++i) nv[c][i] += u * b[i];
-              }
-            }
-            for (int64_t c = 0; c < kk; ++c)
-              std::copy_n(nv[c], len, (*B)[c] + c0);
-          }
-        }
+    if (not anchored and (res_nrm < std::max(tol, anchor_tol) or stagnated)) {
+      // Collapse onto the Ritz vector (and the previous one) and apply the
+      // exact operator to the Ritz vector; its coupling to the second basis
+      // vector (AV[0]^T V[1]) is then exact as well, while the image of that
+      // vector keeps the inexact operator's error at a small coefficient
+      anchored = true;
+      res_history.clear();
+      const int64_t ka = fuse ? k : collapse(y);
+      exact->operator_action(1, 1., V[0], N, 0., AV[0], N);
+      double h[2] = {0.0, 0.0};
+      davidson_reduce(N, ka, h, [&](int64_t i0, int64_t i1, double* acc) {
+        acc[0] += detail::davidson_sum(
+            i0, i1, [&](int64_t i) { return V[0][i] * AV[0][i]; });
+        if (ka > 1)
+          acc[1] += detail::davidson_sum(
+              i0, i1, [&](int64_t i) { return AV[0][i] * V[1][i]; });
       });
-      // H <- U**T * H * U, and V^T t in the new basis
-      blas::gemm(blas::Layout::ColMajor, blas::Op::NoTrans, blas::Op::NoTrans,
-                 k, kk, k, 1., H.data(), max_m, U.data(), k, 0., HU.data(), k);
-      blas::gemm(blas::Layout::ColMajor, blas::Op::Trans, blas::Op::NoTrans, kk,
-                 kk, k, 1., U.data(), k, HU.data(), k, 0., H.data(), max_m);
-      double new_proj[2];
-      for (int64_t c = 0; c < kk; ++c)
-        new_proj[c] = blas::dot(k, U.data() + c * k, 1, proj.data(), 1);
-      std::copy_n(new_proj, kk, proj.data());
-      std::swap(V[k], V[kk]);
-      k = kk;
-      // The current Ritz vector is the first new basis vector
+      H[0] = h[0];
+      if (ka > 1) H[1] = H[max_m] = h[1];
+      k = ka;
       std::fill(y_prev.begin(), y_prev.end(), 0.0);
       y_prev[0] = 1.0;
-    } else {
-      std::copy_n(y, k, y_prev.data());
+      have_prev = true;
+      logger->info("Davidson anchored");
+      continue;
     }
+    if (stagnated) {
+      logger->info("Davidson stagnated");
+      break;
+    }
+
+    // After a collapse the Ritz vector is the first basis vector (y = e_0)
+    std::copy_n(y, k, y_prev.data());
     have_prev = true;
 
-    // Classical Gram-Schmidt, twice: t -= V proj, sums = V^T t;
-    // t -= V sums, |t|^2. A direction inside the search space (possible only
-    // for tiny N) is replaced by unit vectors until one is not.
+    // Classical Gram-Schmidt: t -= V proj, sums = [V^T t, |t|^2], and a
+    // second pass t -= V sums only where the first removed more than about
+    // 30 % of |t| (the DGKS criterion |t'|^2 <= |t|^2 / 2), i.e. where
+    // cancellation can have spoilt orthogonality. A direction inside the
+    // search space (possible only for tiny N) is replaced by unit vectors
+    // until one is not.
     double t_nrm = 0.0;
     for (int64_t unit = -1; unit < N; ++unit) {
       if (unit >= 0) {
@@ -706,29 +903,42 @@ auto restarted_davidson(int64_t N, int64_t max_m, int64_t max_iter,
               for (int64_t j = 0; j < k; ++j)
                 acc[j] += unit >= i0 and unit < i1 ? V[j][unit] : 0.0;
             });
+        t_before2 = 1.0;
       }
-      davidson_reduce(
-          N, k, sums.data(), [&](int64_t i0, int64_t i1, double* acc) {
-            for (int64_t c0 = i0; c0 < i1; c0 += chunk)
-              project_out(k, proj.data(), c0, std::min(chunk, i1 - c0), acc);
-          });
-      double t2;
-      davidson_reduce(N, 1, &t2, [&](int64_t i0, int64_t i1, double* acc) {
-        for (int64_t c0 = i0; c0 < i1; c0 += chunk) {
-          const int64_t len = std::min(chunk, i1 - c0);
-          project_out(k, sums.data(), c0, len, nullptr);
-          const double* t = V[k] + c0;
-          double d = 0.0;
-          for (int64_t i = 0; i < len; ++i) d += t[i] * t[i];
-          acc[0] += d;
-        }
-      });
+      davidson_reduce(N, k + 1, sums.data(),
+                      [&](int64_t i0, int64_t i1, double* acc) {
+                        for (int64_t c0 = i0; c0 < i1; c0 += chunk) {
+                          const int64_t len = std::min(chunk, i1 - c0);
+                          project_out(k, proj.data(), c0, len, acc);
+                          const double* t = V[k] + c0;
+                          double d = 0.0;
+                          for (int64_t i = 0; i < len; ++i) d += t[i] * t[i];
+                          acc[k] += d;
+                        }
+                      });
+      double t2 = sums[k];
+      if (not(t2 > 0.5 * t_before2)) {
+        davidson_reduce(N, 1, &t2, [&](int64_t i0, int64_t i1, double* acc) {
+          for (int64_t c0 = i0; c0 < i1; c0 += chunk) {
+            const int64_t len = std::min(chunk, i1 - c0);
+            project_out(k, sums.data(), c0, len, nullptr);
+            const double* t = V[k] + c0;
+            double d = 0.0;
+            for (int64_t i = 0; i < len; ++i) d += t[i] * t[i];
+            acc[0] += d;
+          }
+        });
+      }
       t_nrm = std::sqrt(t2);
       if (t_nrm > 1e-12) break;
     }
 
     // AV[k] = H t / |t|; then t /= |t| together with the new row of the
-    // projected matrix, sums = V[0:k]^T AV[k]
+    // projected matrix, H(j, k) = AV[j]^T V[k] for j < k and V[k]^T AV[k].
+    // Taking the off-diagonal entries from the older images (equal in exact
+    // arithmetic) keeps them exact for an exact anchor image when op is
+    // inexact: V[j]^T AV[k] would carry the error of op(t) projected on the
+    // anchor, which bounds how far the residual can fall.
     op.operator_action(1, 1. / t_nrm, V[k], N, 0., AV[k], N);
     davidson_reduce(N, k + 1, sums.data(),
                     [&](int64_t i0, int64_t i1, double* acc) {
@@ -737,13 +947,16 @@ auto restarted_davidson(int64_t N, int64_t max_m, int64_t max_iter,
                         const int64_t len = std::min(chunk, i1 - c0);
                         double* t = V[k] + c0;
                         for (int64_t i = 0; i < len; ++i) t[i] *= f;
-                        const double* av = AV[k] + c0;
-                        for (int64_t j = 0; j <= k; ++j) {
-                          const double* v = V[j] + c0;
+                        for (int64_t j = 0; j < k; ++j) {
+                          const double* av = AV[j] + c0;
                           double d = 0.0;
-                          for (int64_t i = 0; i < len; ++i) d += v[i] * av[i];
+                          for (int64_t i = 0; i < len; ++i) d += av[i] * t[i];
                           acc[j] += d;
                         }
+                        const double* av = AV[k] + c0;
+                        double d = 0.0;
+                        for (int64_t i = 0; i < len; ++i) d += t[i] * av[i];
+                        acc[k] += d;
                       }
                     });
     for (int64_t j = 0; j <= k; ++j)
@@ -751,8 +964,13 @@ auto restarted_davidson(int64_t N, int64_t max_m, int64_t max_iter,
     ++k;
   }
 
-  if (!converged) throw std::runtime_error("Davidson Did Not Converge!");
-  logger->info("Davidson Converged!");
+  if (residual_norm) *residual_norm = last_res;
+  if (converged)
+    logger->info("Davidson Converged!");
+  else if (throw_on_failure)
+    throw std::runtime_error("Davidson Did Not Converge!");
+  else
+    logger->info("Davidson stopped after {} iterations", iter);
 
   // X = V y
   {

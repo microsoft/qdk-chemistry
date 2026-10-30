@@ -14,6 +14,16 @@
 
 namespace macis {
 
+/// Instruction-set levels of the hand-vectorized FCI kernels; all give the
+/// same results up to rounding
+enum class FCISimd { generic = 0, avx2 = 1, avx512 = 2 };
+
+/// Widest kernel level supported by this CPU and compiler
+FCISimd fci_simd_supported();
+
+/// Precision of the Hamiltonian applications in fci_ground_state
+enum class FCIPrecision { automatic, mixed, double_precision };
+
 /**
  * @brief Direct (string-driven) full CI Hamiltonian for real, spin-restricted
  * integrals.
@@ -47,6 +57,13 @@ class FCIHamiltonian {
   /// Number of determinants
   size_t size() const { return alpha_->size() * beta_->size(); }
 
+  /// Kernel level used by sigma, by default fci_simd_supported()
+  FCISimd simd() const { return simd_; }
+
+  /// Selects the kernel level (for testing and benchmarking)
+  /// @throws std::invalid_argument if this CPU or compiler does not support it
+  void set_simd(FCISimd level);
+
   /// Diagonal of H (size() entries)
   void diagonal(double* D) const;
 
@@ -65,6 +82,17 @@ class FCIHamiltonian {
    *                               non-zero for unequal electron counts
    */
   void sigma(const double* C, double* S, double alpha = 1.0, double beta = 0.0,
+             int spin_flip = 0) const;
+
+  /**
+   * @brief Single-precision S = alpha * H * C + beta * S, same contract as
+   * the double-precision overload (integrals rounded to float).
+   *
+   * Relative accuracy is that of float arithmetic (about 1e-6); the
+   * mixed-precision ground-state solver uses it for correction vectors and
+   * checks its result in double precision.
+   */
+  void sigma(const float* C, float* S, float alpha = 1.0f, float beta = 0.0f,
              int spin_flip = 0) const;
 
   /// Operator contract of macis::davidson: AV = alpha * H * V + beta * AV for
@@ -86,6 +114,7 @@ class FCIHamiltonian {
     size_t clique_size = 0;
     size_t pair_dim = 0;  ///< W is pair_dim x pair_dim
     std::vector<double> W;
+    std::vector<float> W_f;        ///< W rounded to float
     std::vector<uint32_t> string;  ///< num_cliques x clique_size addresses
     std::vector<uint32_t> pair;    ///< row of W per member, bit 31 = sign
     std::vector<double> diagonal;  ///< H^ss(I, I)
@@ -103,19 +132,39 @@ class FCIHamiltonian {
                                   const FCIStringSpace& space, size_t I,
                                   size_t J);
 
+  /// Per-thread work arrays of sigma, kept between calls: fresh ones cost up
+  /// to a quarter of a sigma in page faults and unmapping (7e/14o). A call
+  /// that finds them in use by a concurrent call allocates its own.
+  struct Workspace;
+  class Scratch;
+
+  /// sigma for double or float vectors
+  template <typename T>
+  void sigma_impl(const T* C, T* S, T alpha, T beta, int spin_flip) const;
+
   /// S += alpha * (H^ss applied to the strings of tiles of C): along columns
   /// of the alpha-major CI matrix for alpha, along rows for beta
-  void same_spin_pass(bool alpha_strings, const double* C, double* S,
-                      double alpha) const;
+  template <typename T>
+  void same_spin_pass(bool alpha_strings, const T* C, T* S, T alpha,
+                      Scratch& scratch) const;
 
   size_t norb_;
   size_t npair_;
   std::shared_ptr<const FCIStringSpace> alpha_;
   std::shared_ptr<const FCIStringSpace> beta_;
   std::vector<double> vpair_;    ///< npair x npair, (pq|rs) by packed pairs
+  std::vector<float> vpair_f_;   ///< vpair_ rounded to float
   std::vector<double> coulomb_;  ///< norb x norb, (pp|qq)
   std::shared_ptr<const SameSpinOperator> h_alpha_;
   std::shared_ptr<const SameSpinOperator> h_beta_;
+  /// Off-diagonal excitations of the beta strings for the alpha-beta pass:
+  /// target address, and fci_pair_index with the sign in bit 31
+  std::vector<uint32_t> beta_link_target_;
+  std::vector<uint32_t> beta_link_pair_;
+  /// fci_pair_index(q, q) of the occupied orbitals q of every beta string
+  std::vector<uint32_t> beta_diag_pair_;
+  FCISimd simd_ = fci_simd_supported();
+  std::shared_ptr<Workspace> workspace_;
 };
 
 /**
@@ -135,14 +184,50 @@ class FCIHamiltonian {
  *                         restriction, +1 (-1) for the lowest state of even
  *                         (odd) total spin
  * @param[in] max_subspace Davidson search-space dimension (>= 2); memory is
- *                         about (2*max_subspace + 3) CI vectors
+ *                         about (2*max_subspace + 3) CI vectors. The default
+ *                         3 (current and previous Ritz vector plus the new
+ *                         direction, as in LOBPCG) took as many iterations as
+ *                         4 to 16 in all measured cases; 2 converges far
+ *                         more slowly
+ * @param[in] precision    Precision of the Hamiltonian applications:
+ *                         FCIPrecision::mixed applies H in single precision
+ *                         where that cannot affect the result (a single-
+ *                         precision phase down to a residual of about 1e-4,
+ *                         then an in-place anchor: a double-precision sigma
+ *                         of the Ritz vector, while later correction vectors
+ *                         keep single precision, their sigma errors entering
+ *                         scaled by their small coefficients) and accepts the
+ *                         result only on its double-precision residual
+ *                         (res_tol), so the contract matches
+ *                         FCIPrecision::double_precision. The default
+ *                         FCIPrecision::automatic is mixed for spaces of at
+ *                         least 2^21 determinants, where it was measured
+ *                         faster, and double precision below.
  * @return Lowest eigenvalue
  * @throws std::invalid_argument for an invalid or empty spin-flip sector
  * @throws std::runtime_error if Davidson does not converge
  */
 double fci_ground_state(const FCIHamiltonian& H, size_t max_iter,
                         double res_tol, std::vector<double>& C,
-                        int spin_flip = 0, size_t max_subspace = 4);
+                        int spin_flip = 0, size_t max_subspace = 3,
+                        FCIPrecision precision = FCIPrecision::automatic);
+
+/**
+ * @brief fci_ground_state on caller-provided storage.
+ *
+ * Same as the std::vector overload, with the eigenvector written to the
+ * H.size() elements at C. Unless `guess` is true their initial contents are
+ * ignored, so C can be uninitialized memory: the solver writes every
+ * element with the threads that later process it, without the serial
+ * zero-fill of a std::vector (0.4 s for 1.7e8 determinants).
+ *
+ * @param[in] guess  Whether C holds the initial guess (then used as by the
+ *                   std::vector overload; a zero guess is ignored)
+ */
+double fci_ground_state(const FCIHamiltonian& H, size_t max_iter,
+                        double res_tol, double* C, bool guess,
+                        int spin_flip = 0, size_t max_subspace = 3,
+                        FCIPrecision precision = FCIPrecision::automatic);
 
 /**
  * @brief Lowest eigenpair of H within the span of a determinant subset, by

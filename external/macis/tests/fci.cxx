@@ -10,6 +10,7 @@
 #include <spdlog/sinks/null_sink.h>
 #include <spdlog/spdlog.h>
 
+#include <algorithm>
 #include <array>
 #include <blas.hh>
 #include <cmath>
@@ -24,11 +25,13 @@
 #include <macis/util/fcidump.hpp>
 #include <numeric>
 #include <random>
+#include <thread>
 #ifdef _OPENMP
 #include <omp.h>
 #endif
 #include <sparsexx/matrix_types/dense_conversions.hpp>
 #include <sparsexx/spblas/spmbv.hpp>
+#include <tuple>
 #include <vector>
 
 #include "ut_common.hpp"
@@ -63,6 +66,18 @@ void random_integrals(size_t norb, std::mt19937& gen, std::vector<double>& T,
           v(p, q, r, s) = v(q, p, r, s) = v(p, q, s, r) = v(q, p, s, r) = x;
           v(r, s, p, q) = v(s, r, p, q) = v(r, s, q, p) = v(s, r, q, p) = x;
         }
+}
+
+// || a - b || / max(|| b ||, 1) for a single-precision result a
+double relative_error(const std::vector<float>& a,
+                      const std::vector<double>& b) {
+  double err2 = 0.0, ref2 = 0.0;
+  for (size_t i = 0; i < b.size(); ++i) {
+    const double d = double(a[i]) - b[i];
+    err2 += d * d;
+    ref2 += b[i] * b[i];
+  }
+  return std::sqrt(err2 / std::max(ref2, 1.0));
 }
 
 }  // namespace
@@ -180,6 +195,23 @@ TEST_CASE("FCI Hamiltonian") {
       for (size_t i = 0; i < ndet; ++i)
         REQUIRE_THAT(sigma[i], Catch::Matchers::WithinAbs(sigma_ref[i], 1e-10));
 
+      // Every kernel level this CPU supports, in both precisions
+      REQUIRE(H.simd() == macis::fci_simd_supported());
+      for (int level = 0; level <= int(macis::fci_simd_supported()); ++level) {
+        H.set_simd(macis::FCISimd(level));
+        H.sigma(x.data(), sigma.data());
+        for (size_t i = 0; i < ndet; ++i)
+          REQUIRE_THAT(sigma[i],
+                       Catch::Matchers::WithinAbs(sigma_ref[i], 1e-10));
+        std::vector<float> xf(x.begin(), x.end()), sf(ndet);
+        H.sigma(xf.data(), sf.data());
+        REQUIRE(relative_error(sf, sigma_ref) < 1e-5);
+      }
+      H.set_simd(macis::fci_simd_supported());
+      if (macis::fci_simd_supported() != macis::FCISimd::avx512)
+        REQUIRE_THROWS_AS(H.set_simd(macis::FCISimd::avx512),
+                          std::invalid_argument);
+
       std::vector<double> D(ndet);
       H.diagonal(D.data());
       for (size_t i = 0; i < ndet; ++i)
@@ -193,6 +225,18 @@ TEST_CASE("FCI Hamiltonian") {
       for (size_t i = 0; i < ndet; ++i)
         REQUIRE_THAT(AV[i], Catch::Matchers::WithinAbs(
                                 2.0 * sigma_ref[i] - 0.5 * y[i], 1e-10));
+
+      // Single precision: the same contraction to float accuracy, for
+      // S = H C and S = alpha H C + beta S
+      std::vector<float> xf(x.begin(), x.end()), sf(ndet);
+      H.sigma(xf.data(), sf.data());
+      REQUIRE(relative_error(sf, sigma_ref) < 1e-5);
+      sf.assign(y.begin(), y.end());
+      H.sigma(xf.data(), sf.data(), 2.0f, -0.5f);
+      std::vector<double> scaled_ref(ndet);
+      for (size_t i = 0; i < ndet; ++i)
+        scaled_ref[i] = 2.0 * sigma_ref[i] - 0.5 * y[i];
+      REQUIRE(relative_error(sf, scaled_ref) < 1e-5);
 
       // Explicit matrix elements on an arbitrary determinant subset
       std::vector<size_t> subset;
@@ -239,14 +283,57 @@ TEST_CASE("FCI Hamiltonian") {
                                 sigma_ref.data(), ndet);
       for (int nthreads : {1, 2, 5}) {
         omp_set_num_threads(nthreads);
-        H.sigma(x.data(), sigma.data());
-        for (size_t i = 0; i < ndet; ++i)
-          REQUIRE_THAT(sigma[i],
-                       Catch::Matchers::WithinAbs(sigma_ref[i], 1e-10));
+        for (int level = 0; level <= int(macis::fci_simd_supported());
+             ++level) {
+          H.set_simd(macis::FCISimd(level));
+          H.sigma(x.data(), sigma.data());
+          for (size_t i = 0; i < ndet; ++i)
+            REQUIRE_THAT(sigma[i],
+                         Catch::Matchers::WithinAbs(sigma_ref[i], 1e-10));
+          std::vector<float> xf(x.begin(), x.end()), sf(ndet);
+          H.sigma(xf.data(), sf.data());
+          REQUIRE(relative_error(sf, sigma_ref) < 1e-5);
+        }
       }
     }
   }
 #endif
+
+  // Concurrent calls on one Hamiltonian: only one can use its cached work
+  // arrays, the others allocate their own
+  SECTION("Concurrent calls") {
+    const size_t norb = 8, na = 4, nb = 3;
+    std::vector<double> T, V;
+    random_integrals(norb, gen, T, V);
+    const macis::FCIHamiltonian H(norb, na, nb, T.data(), norb, V.data(), norb);
+    const size_t ndet = H.size();
+    constexpr int ncallers = 4;
+    std::vector<std::vector<double>> x(ncallers, std::vector<double>(ndet));
+    std::vector<std::vector<double>> ref(ncallers, std::vector<double>(ndet));
+    for (int c = 0; c < ncallers; ++c) {
+      for (auto& xi : x[c]) xi = dist(gen);
+      H.sigma(x[c].data(), ref[c].data());
+    }
+    std::vector<double> error(ncallers, 0.0), error_f(ncallers, 0.0);
+    std::vector<std::thread> callers;
+    for (int c = 0; c < ncallers; ++c)
+      callers.emplace_back([&, c] {
+        std::vector<double> s(ndet);
+        std::vector<float> xf(x[c].begin(), x[c].end()), sf(ndet);
+        for (int rep = 0; rep < 20; ++rep) {
+          H.sigma(x[c].data(), s.data());
+          H.sigma(xf.data(), sf.data());
+          for (size_t i = 0; i < ndet; ++i)
+            error[c] = std::max(error[c], std::abs(s[i] - ref[c][i]));
+          error_f[c] = std::max(error_f[c], relative_error(sf, ref[c]));
+        }
+      });
+    for (auto& t : callers) t.join();
+    for (int c = 0; c < ncallers; ++c) {
+      REQUIRE(error[c] < 1e-10);
+      REQUIRE(error_f[c] < 1e-5);
+    }
+  }
 }
 
 TEST_CASE("FCI Spin Flip") {
@@ -297,6 +384,14 @@ TEST_CASE("FCI Spin Flip") {
         for (size_t i = 0; i < ndet; ++i)
           REQUIRE_THAT(S[i], Catch::Matchers::WithinAbs(
                                  2.0 * ref[i] - 0.5 * S0[i], 1e-10));
+
+        // Single precision: float accuracy, still exactly in the sector
+        std::vector<float> Cf(C.begin(), C.end()), Sf(ndet);
+        H.sigma(Cf.data(), Sf.data(), 1.0f, 0.0f, eta);
+        REQUIRE(relative_error(Sf, ref) < 1e-5);
+        for (size_t i = 0; i < ns; ++i)
+          for (size_t j = 0; j < ns; ++j)
+            REQUIRE(Sf[i * ns + j] == float(eta) * Sf[j * ns + i]);
       }
     }
   }
@@ -373,6 +468,17 @@ TEST_CASE("FCI Ground State") {
       std::vector<double> C_warm = C;
       const double E_warm = macis::fci_ground_state(H, 1, 1e-8, C_warm);
       REQUIRE_THAT(E_warm, Catch::Matchers::WithinAbs(E, 1e-12));
+
+      // Caller storage: without a guess its contents (here NaN, as
+      // uninitialized memory may hold) are ignored; with one it is used
+      std::vector<double> C_raw(ndet, std::numeric_limits<double>::quiet_NaN());
+      REQUIRE_THAT(macis::fci_ground_state(H, 200, 1e-8, C_raw.data(), false),
+                   Catch::Matchers::WithinAbs(E, 1e-10));
+      REQUIRE_THAT(std::abs(blas::dot(ndet, C_raw.data(), 1, C.data(), 1)),
+                   Catch::Matchers::WithinAbs(1.0, 1e-10));
+      std::copy(C.begin(), C.end(), C_raw.begin());
+      REQUIRE_THAT(macis::fci_ground_state(H, 1, 1e-8, C_raw.data(), true),
+                   Catch::Matchers::WithinAbs(E, 1e-12));
 
       if (na != nb) {
         std::vector<double> C_flip;
@@ -492,6 +598,92 @@ TEST_CASE("FCI Ground State") {
     std::vector<double> C;
     REQUIRE_THROWS_AS(macis::fci_ground_state(H, 10, 1e-8, C, -1),
                       std::invalid_argument);
+  }
+
+  SECTION("P-space guess") {
+    // With at most 400 determinants the P-space of the guess is the whole
+    // space: the guess is the ground state and one iteration converges
+    for (int spin_flip : {0, 1, -1}) {
+      macis::FCIHamiltonian H(6, 3, 3, T.data(), norb, V.data(), norb);
+      REQUIRE(H.size() == 400);
+      std::vector<size_t> all(H.size());
+      std::iota(all.begin(), all.end(), size_t{0});
+      std::vector<double> C, C_dense;
+      REQUIRE_THAT(macis::fci_ground_state(H, 1, 1e-6, C, spin_flip),
+                   Catch::Matchers::WithinAbs(macis::fci_subspace_ground_state(
+                                                  H, all, C_dense, spin_flip),
+                                              1e-10));
+    }
+  }
+}
+
+TEST_CASE("FCI Mixed Precision") {
+  ROOT_ONLY(MPI_COMM_WORLD);
+  for (auto name : {"ci_solver", "davidson"})
+    if (!spdlog::get(name)) spdlog::null_logger_mt(name);
+
+  // Leading 11x11 orbital block of the water cc-pVDZ integrals (mixed
+  // precision forced: the automatic choice keeps spaces this small in double
+  // precision)
+  const size_t nfull = macis::read_fcidump_norb(water_ccpvdz_fcidump);
+  std::vector<double> T_full(nfull * nfull),
+      V_full(nfull * nfull * nfull * nfull);
+  macis::read_fcidump_1body(water_ccpvdz_fcidump, T_full.data(), nfull);
+  macis::read_fcidump_2body(water_ccpvdz_fcidump, V_full.data(), nfull);
+  const size_t norb = 11;
+  std::vector<double> T(norb * norb), V(norb * norb * norb * norb);
+  for (size_t p = 0; p < norb; ++p)
+    for (size_t q = 0; q < norb; ++q) {
+      T[p + q * norb] = T_full[p + q * nfull];
+      for (size_t r = 0; r < norb; ++r)
+        for (size_t s = 0; s < norb; ++s)
+          V[p + norb * (q + norb * (r + norb * s))] =
+              V_full[p + nfull * (q + nfull * (r + nfull * s))];
+    }
+
+  // (nalpha, nbeta, spin_flip, residual tolerance); the tight tolerance is
+  // below what one single-precision restart resolves
+  const std::vector<std::tuple<size_t, size_t, int, double>> cases = {
+      {4, 4, 0, 1e-6},
+      {4, 4, 0, 1e-10},
+      {5, 4, 0, 1e-6},
+      {4, 4, 1, 1e-6},
+      {4, 4, -1, 1e-6}};
+  for (auto [na, nb, spin_flip, tol] : cases) {
+    DYNAMIC_SECTION("nalpha = " << na << " nbeta = " << nb << " spin_flip = "
+                                << spin_flip << " tol = " << tol) {
+      macis::FCIHamiltonian H(norb, na, nb, T.data(), norb, V.data(), norb);
+      const size_t ndet = H.size();
+
+      std::vector<double> C_ref, C;
+      const double E_ref =
+          macis::fci_ground_state(H, 500, tol, C_ref, spin_flip, 3,
+                                  macis::FCIPrecision::double_precision);
+      // Caller storage holding NaN (ignored without a guess)
+      C.assign(ndet, std::numeric_limits<double>::quiet_NaN());
+      const double E =
+          macis::fci_ground_state(H, 500, tol, C.data(), false, spin_flip, 3,
+                                  macis::FCIPrecision::mixed);
+
+      // Both residuals are below tol, so the eigenvalues agree to ~tol^2
+      REQUIRE_THAT(E, Catch::Matchers::WithinAbs(
+                          E_ref, std::max(1e-11, 100.0 * tol * tol)));
+      REQUIRE_THAT(blas::nrm2(ndet, C.data(), 1),
+                   Catch::Matchers::WithinAbs(1.0, 1e-12));
+      std::vector<double> R(ndet);
+      H.sigma(C.data(), R.data());
+      REQUIRE_THAT(blas::dot(ndet, C.data(), 1, R.data(), 1),
+                   Catch::Matchers::WithinAbs(E, 1e-10));
+      blas::axpy(ndet, -E, C.data(), 1, R.data(), 1);
+      REQUIRE(blas::nrm2(ndet, R.data(), 1) < tol);
+
+      if (spin_flip != 0) {
+        const size_t ns = H.alpha_strings().size();
+        for (size_t i = 0; i < ns; ++i)
+          for (size_t j = 0; j < ns; ++j)
+            REQUIRE(C[i * ns + j] == spin_flip * C[j * ns + i]);
+      }
+    }
   }
 }
 

@@ -137,18 +137,20 @@ auto dispatch_by_norb(size_t norb, Args&&... args) {
  *  - `calculate_two_orbital_entropies`
  *  - `calculate_mutual_information`
  *
- * @tparam RdmFunc Callable taking (ordm_aa, ordm_bb, trdm_aaaa, trdm_bbbb,
- *   trdm_aabb) spans with the contract of
+ * @tparam RdmFunc Callable taking (coefficients as `double*`, ordm_aa,
+ *   ordm_bb, trdm_aaaa, trdm_bbbb, trdm_aabb) spans with the contract of
  *   `macis::HamiltonianGenerator::form_rdms_spin_dep`.
- * @tparam EntropyFunc Callable taking (single-orbital entropy vector,
- *   two-orbital entropy span, mutual information span) with the contract of
+ * @tparam EntropyFunc Callable taking (coefficients as `double*`,
+ *   single-orbital entropy vector, two-orbital entropy span, mutual
+ *   information span) with the contract of
  *   `macis::HamiltonianGenerator::form_entropies`.
  * @tparam ContainerFunc Callable taking (coefficients, one_rdm_aa,
  *   one_rdm_bb, two_rdm_aaaa, two_rdm_aabb, two_rdm_bbbb, entropies) and
  *   returning the `std::unique_ptr` to the wavefunction container.
  * @param settings Settings controlling RDM and entropy computation.
  * @param nmo Number of active orbitals.
- * @param coeffs CI coefficient array (real values assumed).
+ * @param coeffs CI coefficient array (real values assumed), moved into the
+ *   container.
  * @param form_rdms_spin_dep Evaluates the spin-dependent RDMs of `coeffs`.
  * @param form_entropies Evaluates the orbital entropies of `coeffs`.
  * @param make_container Builds the container holding `coeffs` and its
@@ -158,8 +160,7 @@ auto dispatch_by_norb(size_t norb, Args&&... args) {
  */
 template <typename RdmFunc, typename EntropyFunc, typename ContainerFunc>
 inline data::Wavefunction build_wavefunction(const data::Settings& settings,
-                                             size_t nmo,
-                                             const std::vector<double>& coeffs,
+                                             size_t nmo, Eigen::VectorXd coeffs,
                                              RdmFunc&& form_rdms_spin_dep,
                                              EntropyFunc&& form_entropies,
                                              ContainerFunc&& make_container) {
@@ -169,8 +170,6 @@ inline data::Wavefunction build_wavefunction(const data::Settings& settings,
   // All the new logging in this file should be debug, not info
   QDK_LOGGER().debug("Building wavefunction with {} determinants...",
                      coeffs.size());
-  Eigen::VectorXd C_vector(coeffs.size());
-  std::copy(coeffs.begin(), coeffs.end(), C_vector.data());
 
   const bool eval_one_rdm = settings.get<bool>("calculate_one_rdm");
   const bool eval_two_rdm = settings.get<bool>("calculate_two_rdm");
@@ -198,6 +197,7 @@ inline data::Wavefunction build_wavefunction(const data::Settings& settings,
         eval_two_rdm ? nmo * nmo * nmo * nmo : 0, 0.0);
 
     form_rdms_spin_dep(
+        coeffs.data(),
         macis::matrix_span<double>(
             eval_one_rdm ? active_one_aa.data() : nullptr, nmo, nmo),
         macis::matrix_span<double>(
@@ -245,7 +245,7 @@ inline data::Wavefunction build_wavefunction(const data::Settings& settings,
     std::vector<double> s2_data(eval_s2 ? nmo * nmo : 0, 0.0);
     std::vector<double> mi_data(eval_mutual_info ? nmo * nmo : 0, 0.0);
 
-    form_entropies(s1_vec,
+    form_entropies(coeffs.data(), s1_vec,
                    macis::matrix_span<double>(
                        eval_s2 ? s2_data.data() : nullptr, nmo, nmo),
                    macis::matrix_span<double>(
@@ -283,7 +283,7 @@ inline data::Wavefunction build_wavefunction(const data::Settings& settings,
   };
 
   return data::Wavefunction(make_container(
-      std::move(C_vector), to_mv(one_aa), to_mv(one_bb), to_vv(two_aaaa),
+      std::move(coeffs), to_mv(one_aa), to_mv(one_bb), to_vv(two_aaaa),
       to_vv(two_aabb), to_vv(two_bbbb), computed_entropies));
 }
 

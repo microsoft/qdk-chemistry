@@ -174,17 +174,23 @@ struct asci_helper {
     }
 
     // Build wavefunction with unified builder (supports spin-dependent RDMs
-    // when requested)
+    // when requested); a parallel copy, as the first touch of a large vector
+    // is otherwise one thread's page faults
+    Eigen::VectorXd coefficients(C_casci.size());
+    const auto ncoef = static_cast<std::ptrdiff_t>(C_casci.size());
+#pragma omp parallel for schedule(static)
+    for (std::ptrdiff_t i = 0; i < ncoef; ++i) coefficients[i] = C_casci[i];
+    std::vector<double>().swap(C_casci);
     data::Wavefunction wfn = build_wavefunction(
-        settings_, num_molecular_orbitals, C_casci,
-        [&](auto... rdms) {
+        settings_, num_molecular_orbitals, std::move(coefficients),
+        [&](double* C, auto... rdms) {
           ham_gen.form_rdms_spin_dep(dets.begin(), dets.end(), dets.begin(),
-                                     dets.end(), C_casci.data(), rdms...);
+                                     dets.end(), C, rdms...);
         },
-        [&](auto&&... entropies) {
+        [&](double* C, auto&&... entropies) {
           ham_gen.form_entropies(
-              dets.begin(), dets.end(), dets.begin(), dets.end(),
-              C_casci.data(), std::forward<decltype(entropies)>(entropies)...);
+              dets.begin(), dets.end(), dets.begin(), dets.end(), C,
+              std::forward<decltype(entropies)>(entropies)...);
         },
         [&](Eigen::VectorXd coeffs, const auto& one_aa, const auto& one_bb,
             const auto& two_aaaa, const auto& two_aabb, const auto& two_bbbb,

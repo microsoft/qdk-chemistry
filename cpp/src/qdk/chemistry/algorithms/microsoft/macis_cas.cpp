@@ -77,28 +77,33 @@ struct cas_helper {
                                   V_aaaa.data(), num_molecular_orbitals);
     const size_t ndets = fci_ham.size();
 
-    std::vector<double> C_casci;
+    // The solver writes the coefficients straight into the vector the
+    // wavefunction keeps (no serial zero-fill or copy of the CI vector)
+    Eigen::VectorXd C_casci(ndets);
     double E_casci = 0.0;
     if (ndets <= static_cast<size_t>(settings_.get<int64_t>(
                      "iterative_solver_dimension_cutoff"))) {
       std::vector<size_t> all_dets(ndets);
       std::iota(all_dets.begin(), all_dets.end(), size_t{0});
-      E_casci = macis::fci_subspace_ground_state(fci_ham, all_dets, C_casci,
+      std::vector<double> C_dense;
+      E_casci = macis::fci_subspace_ground_state(fci_ham, all_dets, C_dense,
                                                  spin_flip);
+      C_casci = Eigen::Map<const Eigen::VectorXd>(C_dense.data(), ndets);
     } else {
       E_casci = macis::fci_ground_state(
           fci_ham, settings_.get<int64_t>("max_solver_iterations"),
-          settings_.get<double>("ci_residual_tolerance"), C_casci, spin_flip);
+          settings_.get<double>("ci_residual_tolerance"), C_casci.data(),
+          /*guess=*/false, spin_flip);
     }
 
     data::Wavefunction wfn = build_wavefunction(
-        settings_, num_molecular_orbitals, C_casci,
-        [&](auto... rdms) {
+        settings_, num_molecular_orbitals, std::move(C_casci),
+        [&](double* C, auto... rdms) {
           macis::fci_rdms_spin_dep(fci_ham.alpha_strings(),
-                                   fci_ham.beta_strings(), C_casci.data(),
-                                   rdms..., spin_flip);
+                                   fci_ham.beta_strings(), C, rdms...,
+                                   spin_flip);
         },
-        [&](auto&&... entropies) {
+        [&](double* C, auto&&... entropies) {
           // Determinant-list entropies, determinants in CI-vector order
           auto dets = macis::generate_hilbert_space<wfn_type>(
               num_molecular_orbitals, nalpha, nbeta);
@@ -111,8 +116,8 @@ struct cas_helper {
                   num_molecular_orbitals, num_molecular_orbitals,
                   num_molecular_orbitals));
           ham_gen.form_entropies(
-              dets.begin(), dets.end(), dets.begin(), dets.end(),
-              C_casci.data(), std::forward<decltype(entropies)>(entropies)...);
+              dets.begin(), dets.end(), dets.begin(), dets.end(), C,
+              std::forward<decltype(entropies)>(entropies)...);
         },
         [&](Eigen::VectorXd coeffs, const auto& one_aa, const auto& one_bb,
             const auto& two_aaaa, const auto& two_aabb, const auto& two_bbbb,

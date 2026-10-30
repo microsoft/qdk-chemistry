@@ -23,6 +23,7 @@ add_library( macis
 
   fci/string_space.cxx
   fci/fci_hamiltonian.cxx
+  fci/fci_kernels.cxx
   fci/fci_rdms.cxx
 )
 
