@@ -164,6 +164,8 @@ block()
         GIT_TAG        5b435cfdd3cb423f5a40229572c38f6700ba0456
         SYSTEM
     )
+    # SeQuant would otherwise take an installed BTAS over this pinned in-tree build.
+    set(CMAKE_DISABLE_FIND_PACKAGE_BTAS ON)
     # Concurrent evaluation otherwise races on SeQuant's trace-label map, even with tracing off.
     set(_sequant_patch PATCH_COMMAND "${CMAKE_COMMAND}"
         "-DPATCH_FILE=${CMAKE_CURRENT_LIST_DIR}/cmake/patches/sequant-eval-trace-labels.patch"
