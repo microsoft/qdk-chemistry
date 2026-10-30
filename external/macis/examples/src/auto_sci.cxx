@@ -209,7 +209,7 @@ int main(int argc, char** argv) {
     // CASCI
     using generator_t = macis::SortedDoubleLoopHamiltonianGenerator<wfn_type>;
     std::vector<double> C_casci;
-    double E_casci = macis::CASRDMFunctor<generator_t>::rdms(
+    double E_casci = macis::CASRDMFunctor::rdms(
         mcscf_settings, NumOrbital(n_active), nalpha, nbeta, T_active.data(),
         V_active.data(), nullptr, nullptr,
         C_casci MACIS_MPI_CODE(, MPI_COMM_WORLD));

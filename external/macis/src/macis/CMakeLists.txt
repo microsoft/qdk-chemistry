@@ -11,6 +11,7 @@ add_library( macis
   moller_plesset.cxx
 
   mcscf/fock_matrices.cxx
+  mcscf/cas.cxx
   mcscf/casscf.cxx
   mcscf/orbital_gradient.cxx
   mcscf/orbital_energies.cxx
@@ -19,6 +20,10 @@ add_library( macis
   mcscf/orbital_steps.cxx
 
   hamiltonian_generator/base.cxx
+
+  fci/string_space.cxx
+  fci/fci_hamiltonian.cxx
+  fci/fci_rdms.cxx
 )
 
 target_include_directories( macis PUBLIC

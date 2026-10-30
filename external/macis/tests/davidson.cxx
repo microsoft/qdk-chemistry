@@ -71,7 +71,42 @@ TEST_CASE("Davidson") {
         blas::dot(X.size(), X.data(), 1, AX.data(), 1),
         Catch::Matchers::WithinAbs(E0, testing::numerical_zero_tolerance));
   }
-  spdlog::drop_all();
+
+  SECTION("Restarted") {
+    auto D = sparsexx::extract_diagonal_elements(H);
+    // Small search spaces force many restarts; with max_m == 2 a restart
+    // keeps only the current Ritz vector
+    for (int64_t max_m : {2, 3, 4}) {
+      DYNAMIC_SECTION("max_m = " << max_m) {
+        std::vector<double> X(H.n());
+        macis::diagonal_guess(H.n(), H, X.data());
+        auto [niter, E0] = macis::restarted_davidson(
+            H.n(), max_m, 500, macis::SparseMatrixOperator(H), D.data(), 1e-8,
+            X.data());
+
+        REQUIRE(niter > 4);
+        REQUIRE_THAT(E0 + E_core, Catch::Matchers::WithinAbs(
+                                      E0_ref, testing::davidson_tolerance));
+        REQUIRE_THAT(
+            blas::nrm2(X.size(), X.data(), 1),
+            Catch::Matchers::WithinAbs(1.0, testing::numerical_zero_tolerance));
+
+        std::vector<double> AX(X.size());
+        sparsexx::spblas::gespmbv(1, 1., H, X.data(), H.n(), 0., AX.data(),
+                                  H.n());
+        REQUIRE_THAT(
+            blas::dot(X.size(), X.data(), 1, AX.data(), 1),
+            Catch::Matchers::WithinAbs(E0, testing::numerical_zero_tolerance));
+      }
+    }
+
+    std::vector<double> X_guess(H.n());
+    macis::diagonal_guess(H.n(), H, X_guess.data());
+    REQUIRE_THROWS(macis::restarted_davidson(H.n(), 4, 3,
+                                             macis::SparseMatrixOperator(H),
+                                             D.data(), 1e-8, X_guess.data()));
+  }
+  testing::drop_test_loggers();
 }
 
 #ifdef MACIS_ENABLE_MPI
@@ -138,6 +173,6 @@ TEST_CASE("Parallel Davidson") {
   }
 
   MPI_Barrier(MPI_COMM_WORLD);
-  spdlog::drop_all();
+  testing::drop_test_loggers();
 }
 #endif

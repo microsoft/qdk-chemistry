@@ -150,9 +150,15 @@ MACIS CAS
 
 .. rubric:: Factory name: ``"macis_cas"`` (default)
 
-The :term:`MACIS` (Many-body Adaptive Configuration Interaction Solver) :term:`CAS` implementation provides a reference solver to compute the exact energy within the active space. This module is very memory and compute intensive, and is thus suitable only for small active spaces.
+The :term:`MACIS` (Many-body Adaptive Configuration Interaction Solver) :term:`CAS` implementation provides a reference solver to compute the exact energy within the active space.
+It uses a direct, string-driven full :term:`CI` algorithm :cite:`Knowles1984,Olsen1988,Harrison1989`: the Hamiltonian is applied to the :term:`CI` vector from the one- and two-electron integrals and is never stored, so memory is dominated by about a dozen vectors with one entry per determinant rather than by the Hamiltonian.
+The returned wavefunction likewise stores only the :term:`CI` coefficients, in a :class:`~qdk_chemistry.data.CasStateVectorContainer`, and generates its determinants when they are first requested.
+The number of determinants, and with it time and memory, still grows combinatorially with the size of the active space, so this solver suits small to moderately large active spaces; for larger ones, consider :ref:`MACIS ASCI <macis-asci>`.
 
-This implementation uses only the common settings described above, plus the following MACIS-specific setting. For small determinant spaces (at or below ``iterative_solver_dimension_cutoff``), dense diagonalization is used; otherwise the iterative Davidson solver is employed.
+This implementation uses the common settings described above, plus the following MACIS-specific settings. For small determinant spaces (at or below ``iterative_solver_dimension_cutoff``), dense diagonalization is used; otherwise the iterative Davidson solver is employed.
+
+With equal numbers of active alpha and beta electrons, the :term:`CI` coefficients of a state with total spin :math:`S` form a matrix over alpha and beta strings that is symmetric for even :math:`S` and antisymmetric for odd :math:`S`.
+The ``spin_flip_symmetry`` setting restricts the calculation to one of these two sectors, which roughly halves the cost of each iteration and can target, for example, the lowest triplet when the lowest state overall is a singlet.
 
 .. list-table::
    :header-rows: 1
@@ -165,7 +171,11 @@ This implementation uses only the common settings described above, plus the foll
    * - ``ci_matel_tol``
      - float
      - ``~2.2e-16`` (machine epsilon)
-     - Hamiltonian matrix element sparsification threshold for building the CI Hamiltonian
+     - Hamiltonian matrix element sparsification threshold shared by the MACIS calculators; ``macis_cas`` accepts it for compatibility but does not use it, because it never builds the :term:`CI` Hamiltonian
+   * - ``spin_flip_symmetry``
+     - string
+     - ``"none"``
+     - ``"even"`` restricts the solution to even total spin (singlet, quintet, ...), ``"odd"`` to odd total spin (triplet, septet, ...); requires equal numbers of active alpha and beta electrons. ``"none"`` finds the lowest state of any spin
 
 .. _macis-asci:
 

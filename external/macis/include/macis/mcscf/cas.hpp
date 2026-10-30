@@ -9,15 +9,20 @@
 
 #pragma once
 #include <macis/mcscf/mcscf.hpp>
-#include <macis/solvers/selected_ci_diag.hpp>
 #include <macis/types.hpp>
+#include <macis/util/mpi.hpp>
+#include <utility>
+#include <vector>
 
 namespace macis {
 
 /**
- *  @brief Compute the CAS-CI 1- and 2-RDMs
+ *  @brief Compute the CAS-CI ground state and its spin-traced 1- and 2-RDMs
  *
- *  @tparam HamGen Type of the Hamiltonian Generator
+ *  The active-space full CI problem is solved directly from the integrals
+ *  (FCIHamiltonian / fci_ground_state, default search space).
+ *  `settings.ci_max_subspace` bounds the number of Davidson iterations and
+ *  `settings.ci_res_tol` is the residual tolerance.
  *
  *  @param[in] settings Settings for the CI calculation
  *  @param[in] norb     Number of orbitals
@@ -25,55 +30,25 @@ namespace macis {
  *  @param[in] nbeta    Number of beta electrons
  *  @param[in] T        The one-body Hamiltonian
  *  @param[in] V        The two-body Hamiltonian
- *  @param[out] ORDM    The CAS-CI 1-RDM
+ *  @param[out] ORDM    The CAS-CI 1-RDM (written only if ORDM and TRDM are
+ *                      both non-null)
  *  @param[out] TRDM    The CAS-CI 2-RDM
- *  @param[out] C       The CAS-CI CI vector
- *  @param[in]  comm    MPI Communicator on which to solve the EVP.
+ *  @param[in,out] C    The CAS-CI CI vector, alpha-major in the determinant
+ *                      order of generate_hilbert_space; used as the initial
+ *                      guess when it is sized and non-zero
+ *  @param[in]  comm    MPI Communicator; every rank solves the problem and the
+ *                      results of rank 0 are broadcast
  */
-template <typename HamGen>
-double compute_casci_rdms(
-    MCSCFSettings settings, NumOrbital norb, size_t nalpha, size_t nbeta,
-    double* T, double* V, double* ORDM, double* TRDM,
-    std::vector<double>& C MACIS_MPI_CODE(, MPI_Comm comm)) {
-  using wfn_type = typename HamGen::full_det_t;
-#ifdef MACIS_ENABLE_MPI
-  int rank;
-  MPI_Comm_rank(comm, &rank);
-#else
-  [[maybe_unused]] int rank = 0;
-#endif /* MACIS_ENABLE_MPI */
-
-  // Hamiltonian Matrix Element Generator
-  size_t no = norb.get();
-  HamGen ham_gen(matrix_span<double>(T, no, no),
-                 rank4_span<double>(V, no, no, no, no));
-
-  // Compute Lowest Energy Eigenvalue (ED)
-  auto dets = generate_hilbert_space<wfn_type>(norb.get(), nalpha, nbeta);
-  double E0 = selected_ci_diag<int64_t>(
-      dets.begin(), dets.end(), ham_gen, settings.ci_matel_tol,
-      settings.ci_max_subspace, settings.ci_res_tol, C MACIS_MPI_CODE(, comm));
-
-  // Compute RDMs
-  if (ORDM and TRDM)
-    ham_gen.form_rdms(dets.begin(), dets.end(), dets.begin(), dets.end(),
-                      C.data(), matrix_span<double>(ORDM, no, no),
-                      rank4_span<double>(TRDM, no, no, no, no));
-
-  return E0;
-}
+double compute_casci_rdms(MCSCFSettings settings, NumOrbital norb,
+                          size_t nalpha, size_t nbeta, double* T, double* V,
+                          double* ORDM, double* TRDM,
+                          std::vector<double>& C MACIS_MPI_CODE(,
+                                                                MPI_Comm comm));
 
 /**
- * @brief Functor wrapper around compute_casci_rdms for use in MCSCF
- * implementations
- *
- * This functor provides a convenient interface to the compute_casci_rdms
- * function that can be used as a template parameter in MCSCF implementations.
- *
- * @tparam HamGen Type of the Hamiltonian Generator used for matrix element
- * computation
+ * @brief Functor wrapper around compute_casci_rdms for use as the RDM operator
+ * of MCSCF implementations
  */
-template <typename HamGen>
 struct CASRDMFunctor {
   /**
    * @brief Static function that forwards arguments to compute_casci_rdms
@@ -83,7 +58,7 @@ struct CASRDMFunctor {
    */
   template <typename... Args>
   static auto rdms(Args&&... args) {
-    return compute_casci_rdms<HamGen>(std::forward<Args>(args)...);
+    return compute_casci_rdms(std::forward<Args>(args)...);
   }
 };
 

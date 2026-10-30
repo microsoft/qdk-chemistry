@@ -128,56 +128,49 @@ auto dispatch_by_norb(size_t norb, Args&&... args) {
 
 /** @brief Unified wavefunction builder.
  *
- * Creates a `data::Wavefunction` wrapping a concrete Container instance with
- * optional spin-traced and spin-dependent reduced density matrices (RDMs)
- * determined by flags stored in `settings`:
+ * Creates a `data::Wavefunction` from CI coefficients, with the optional
+ * spin-dependent reduced density matrices (RDMs) and orbital entropies
+ * requested by flags stored in `settings`:
  *  - `calculate_one_rdm`
  *  - `calculate_two_rdm`
  *  - `calculate_single_orbital_entropies`
+ *  - `calculate_two_orbital_entropies`
  *  - `calculate_mutual_information`
  *
- * The container type must provide:
- *  - `MatrixVariant`, `VectorVariant` typedefs
- *  - Constructors accepting:
- *    (coeffs, dets, orbitals)
- *    (coeffs, dets, orbitals, one_rdm_spin_traced, two_rdm_spin_traced)
- *    (coeffs, dets, orbitals, one_rdm_spin_traced, one_rdm_aa, one_rdm_bb,
- *       two_rdm_spin_traced, two_rdm_aaaa, two_rdm_aabb, two_rdm_bbbb,
- *       single_orbital_entropies, mutual_information, type)
- *
- * @tparam Container Concrete wavefunction container class.
- * @tparam Generator Hamiltonian generator type.
- * @tparam WfnContainer Determinant storage container type.
- * @param settings Settings controlling RDM computation.
- * @param hamiltonian Hamiltonian providing orbitals.
- * @param ham_gen Prepared generator for the active space.
+ * @tparam RdmFunc Callable taking (ordm_aa, ordm_bb, trdm_aaaa, trdm_bbbb,
+ *   trdm_aabb) spans with the contract of
+ *   `macis::HamiltonianGenerator::form_rdms_spin_dep`.
+ * @tparam EntropyFunc Callable taking (single-orbital entropy vector,
+ *   two-orbital entropy span, mutual information span) with the contract of
+ *   `macis::HamiltonianGenerator::form_entropies`.
+ * @tparam ContainerFunc Callable taking (coefficients, one_rdm_aa,
+ *   one_rdm_bb, two_rdm_aaaa, two_rdm_aabb, two_rdm_bbbb, entropies) and
+ *   returning the `std::unique_ptr` to the wavefunction container.
+ * @param settings Settings controlling RDM and entropy computation.
  * @param nmo Number of active orbitals.
  * @param coeffs CI coefficient array (real values assumed).
- * @param dets Determinant collection.
+ * @param form_rdms_spin_dep Evaluates the spin-dependent RDMs of `coeffs`.
+ * @param form_entropies Evaluates the orbital entropies of `coeffs`.
+ * @param make_container Builds the container holding `coeffs` and its
+ *   determinants.
  * @return A fully constructed `data::Wavefunction`.
- * @note Skips all RDM work if no flags are set.
+ * @note Skips all RDM and entropy work if no flags are set.
  */
-template <typename Container, typename Generator, typename WfnContainer>
-inline data::Wavefunction build_wavefunction(
-    const data::Settings& settings, const data::Hamiltonian& hamiltonian,
-    Generator& ham_gen, size_t nmo, std::vector<double>& coeffs,
-    WfnContainer& dets) {
-  using MV = typename Container::MatrixVariant;
-  using VV = typename Container::VectorVariant;
+template <typename RdmFunc, typename EntropyFunc, typename ContainerFunc>
+inline data::Wavefunction build_wavefunction(const data::Settings& settings,
+                                             size_t nmo,
+                                             const std::vector<double>& coeffs,
+                                             RdmFunc&& form_rdms_spin_dep,
+                                             EntropyFunc&& form_entropies,
+                                             ContainerFunc&& make_container) {
+  using MV = data::ContainerTypes::MatrixVariant;
+  using VV = data::ContainerTypes::VectorVariant;
 
-  // General Wavefunction construction
   // All the new logging in this file should be debug, not info
-  QDK_LOGGER().debug(
-      "Building wavefunction: converting {} determinants to "
-      "configurations...",
-      dets.size());
+  QDK_LOGGER().debug("Building wavefunction with {} determinants...",
+                     coeffs.size());
   Eigen::VectorXd C_vector(coeffs.size());
   std::copy(coeffs.begin(), coeffs.end(), C_vector.data());
-  std::vector<data::Configuration> dets_configs;
-  dets_configs.reserve(dets.size());
-  for (auto det : dets)
-    dets_configs.emplace_back(
-        data::Configuration::from_spin_half_bitset(det, nmo));
 
   const bool eval_one_rdm = settings.get<bool>("calculate_one_rdm");
   const bool eval_two_rdm = settings.get<bool>("calculate_two_rdm");
@@ -193,7 +186,7 @@ inline data::Wavefunction build_wavefunction(
   if (eval_one_rdm || eval_two_rdm) {
     QDK_LOGGER().debug(
         "Computing spin-dependent RDMs ({} determinants, {} orbitals)...",
-        dets.size(), nmo);
+        coeffs.size(), nmo);
     auto rdm_st = std::chrono::high_resolution_clock::now();
     std::vector<double> active_one_aa(eval_one_rdm ? nmo * nmo : 0, 0.0);
     std::vector<double> active_one_bb(eval_one_rdm ? nmo * nmo : 0, 0.0);
@@ -204,8 +197,7 @@ inline data::Wavefunction build_wavefunction(
     std::vector<double> active_two_aabb(
         eval_two_rdm ? nmo * nmo * nmo * nmo : 0, 0.0);
 
-    ham_gen.form_rdms_spin_dep(
-        dets.begin(), dets.end(), dets.begin(), dets.end(), coeffs.data(),
+    form_rdms_spin_dep(
         macis::matrix_span<double>(
             eval_one_rdm ? active_one_aa.data() : nullptr, nmo, nmo),
         macis::matrix_span<double>(
@@ -247,19 +239,17 @@ inline data::Wavefunction build_wavefunction(
     QDK_LOGGER().debug(
         "Computing orbital entropies ({} determinants, {} "
         "orbitals)...",
-        dets.size(), nmo);
+        coeffs.size(), nmo);
     auto ent_st = std::chrono::high_resolution_clock::now();
     std::vector<double> s1_vec(nmo, 0.0);
     std::vector<double> s2_data(eval_s2 ? nmo * nmo : 0, 0.0);
     std::vector<double> mi_data(eval_mutual_info ? nmo * nmo : 0, 0.0);
 
-    ham_gen.form_entropies(
-        dets.begin(), dets.end(), dets.begin(), dets.end(), coeffs.data(),
-        s1_vec,
-        macis::matrix_span<double>(eval_s2 ? s2_data.data() : nullptr, nmo,
-                                   nmo),
-        macis::matrix_span<double>(eval_mutual_info ? mi_data.data() : nullptr,
-                                   nmo, nmo));
+    form_entropies(s1_vec,
+                   macis::matrix_span<double>(
+                       eval_s2 ? s2_data.data() : nullptr, nmo, nmo),
+                   macis::matrix_span<double>(
+                       eval_mutual_info ? mi_data.data() : nullptr, nmo, nmo));
     auto ent_en = std::chrono::high_resolution_clock::now();
     QDK_LOGGER().debug("Entropy computation complete ({:.1f}s).",
                        std::chrono::duration<double>(ent_en - ent_st).count());
@@ -292,21 +282,9 @@ inline data::Wavefunction build_wavefunction(
     return VV(*v);
   };
 
-  // build container with appropriate RDMs
-  std::unique_ptr<data::WavefunctionContainer> container;
-  if (one_aa || one_bb || two_aabb || two_aaaa || two_bbbb ||
-      computed_entropies.has_any()) {
-    container = std::make_unique<Container>(
-        C_vector, dets_configs, hamiltonian.get_orbitals(), std::nullopt,
-        to_mv(one_aa), to_mv(one_bb), std::nullopt, to_vv(two_aaaa),
-        to_vv(two_aabb), to_vv(two_bbbb), "electrons", computed_entropies,
-        data::WavefunctionType::SelfDual);
-  } else {
-    container = std::make_unique<Container>(
-        C_vector, dets_configs, hamiltonian.get_orbitals(), "electrons",
-        data::WavefunctionType::SelfDual);
-  }
-  return data::Wavefunction(std::move(container));
+  return data::Wavefunction(make_container(
+      std::move(C_vector), to_mv(one_aa), to_mv(one_bb), to_vv(two_aaaa),
+      to_vv(two_aabb), to_vv(two_bbbb), computed_entropies));
 }
 
 /**

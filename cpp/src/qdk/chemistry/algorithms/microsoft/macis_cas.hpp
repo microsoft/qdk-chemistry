@@ -16,11 +16,22 @@ namespace qdk::chemistry::algorithms::microsoft {
  * @class MacisCasSettings
  * @brief Settings class for MACIS CAS calculations.
  *
- * Inherits MCSCF defaults from MacisSettings.
+ * Inherits MCSCF defaults from MacisSettings and adds the spin-flip symmetry
+ * restriction of the CI vector.
  */
 class MacisCasSettings : public MacisSettings {
  public:
-  MacisCasSettings() = default;
+  MacisCasSettings() {
+    set_default<std::string>(
+        "spin_flip_symmetry", "none",
+        "Spin-flip symmetry of the CI vector with equal numbers of active "
+        "alpha and beta electrons: 'even' restricts the solution to even "
+        "total spin S (singlet, quintet, ...), 'odd' to odd S (triplet, "
+        "septet, ...), each at about half the cost per iteration; 'none' "
+        "finds the lowest state of any spin",
+        data::ListConstraint<std::string>{
+            {std::vector<std::string>{"none", "even", "odd"}}});
+  }
   ~MacisCasSettings() override = default;
 };
 

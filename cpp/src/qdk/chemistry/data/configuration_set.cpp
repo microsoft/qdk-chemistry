@@ -172,23 +172,20 @@ void ConfigurationSet::_validate_configurations() const {
         spin_channel_indices(_orbitals->active_indices(), axes::alpha()).size();
 
     if (active_space_size != 0) {
+      // Every capacity equals first_config_orbitals (checked above)
+      if (first_config_orbitals < active_space_size) {
+        throw std::invalid_argument(
+            "ConfigurationSet: configuration at index 0 has orbital "
+            "capacity " +
+            std::to_string(first_config_orbitals) +
+            " which is insufficient for active space (requires at least " +
+            std::to_string(active_space_size) + " orbitals).");
+      }
+
       for (size_t i = 0; i < _configurations.size(); ++i) {
-        const auto& config = _configurations[i];
-        const std::string config_str = config.to_string();
-
-        if (config.get_orbital_capacity() < active_space_size) {
-          throw std::invalid_argument(
-              "ConfigurationSet: configuration at index " + std::to_string(i) +
-              " has orbital capacity " +
-              std::to_string(config.get_orbital_capacity()) +
-              " which is insufficient for active space (requires at least " +
-              std::to_string(active_space_size) + " orbitals).");
-        }
-
         for (size_t orbital_idx = active_space_size;
-             orbital_idx < config.get_orbital_capacity(); ++orbital_idx) {
-          if (orbital_idx < config_str.length() &&
-              config_str[orbital_idx] != '0') {
+             orbital_idx < first_config_orbitals; ++orbital_idx) {
+          if (_configurations[i].get_mode_state(orbital_idx) != 0) {
             throw std::invalid_argument(
                 "ConfigurationSet: configuration at index " +
                 std::to_string(i) + " has occupied orbital at index " +

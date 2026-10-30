@@ -170,6 +170,22 @@ TEST_F(StateVectorContainerTest, EmptyDeterminantsThrows) {
   EXPECT_EQ(sv.size(), 0);
 }
 
+TEST_F(StateVectorContainerTest, SizeMismatchThrows) {
+  auto orbitals = testing::create_test_orbitals(4, 4, true);
+  std::vector<Configuration> dets = {
+      Configuration::from_spin_half_string("2200"),
+      Configuration::from_spin_half_string("2020"),
+      Configuration::from_spin_half_string("2002")};
+  Eigen::VectorXd coeffs(2);
+  coeffs << 1.0 / sqrt(2), 1.0 / sqrt(2);
+
+  EXPECT_THROW(StateVectorContainer(coeffs, dets, orbitals),
+               std::invalid_argument);
+  EXPECT_THROW(
+      StateVectorContainer(std::move(coeffs), std::move(dets), orbitals),
+      std::invalid_argument);
+}
+
 TEST_F(StateVectorContainerTest, ErrorMessagesAreDescriptive) {
   auto orbitals = testing::create_test_orbitals(4, 4, true);
   std::vector<Configuration> empty_dets;

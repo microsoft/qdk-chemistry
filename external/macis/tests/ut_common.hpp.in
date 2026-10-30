@@ -15,6 +15,7 @@
 #include <catch2/matchers/catch_matchers_string.hpp>
 #include <catch2/matchers/catch_matchers_vector.hpp>
 #include <macis/util/mpi.hpp>
+#include <spdlog/spdlog.h>
 #ifdef MACIS_ENABLE_MPI
 
 #define ROOT_ONLY(comm)           \
@@ -50,4 +51,12 @@ inline static constexpr double numerical_zero_tolerance = 1e-12;
 
 /// Tolerance for comparing results that are derived from ASCII text files.
 inline static constexpr double ascii_text_tolerance = 1e-6;
+
+/// Drop the loggers a test registered. Unlike spdlog::drop_all() alone, this
+/// keeps spdlog's default logger, which library code logs through.
+inline void drop_test_loggers() {
+  auto default_logger = spdlog::default_logger();
+  spdlog::drop_all();
+  spdlog::set_default_logger(default_logger);
+}
 }  // namespace testing

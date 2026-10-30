@@ -5,11 +5,13 @@
 #include <gtest/gtest.h>
 
 #include <filesystem>
+#include <macis/sd_operations.hpp>
 #include <qdk/chemistry/algorithms/active_space.hpp>
 #include <qdk/chemistry/algorithms/hamiltonian.hpp>
 #include <qdk/chemistry/algorithms/mc.hpp>
 #include <qdk/chemistry/algorithms/scf.hpp>
 #include <qdk/chemistry/data/symmetry/spin_channel_indices.hpp>
+#include <qdk/chemistry/data/wavefunction_containers/cas_state_vector.hpp>
 #include <qdk/chemistry/data/wavefunction_containers/state_vector.hpp>
 
 #include "ut_common.hpp"
@@ -432,6 +434,67 @@ TEST_F(MCTest, Water_STO3G_FCI_IterativeSolver) {
   EXPECT_NEAR(E_fci - ham->get_core_energy(), -8.301534669468e+01,
               testing::ci_energy_tolerance);
   EXPECT_EQ(wfn_fci->size(), 441);
+
+  // The determinants are generated on demand, in MACIS's CI-vector order
+  EXPECT_TRUE(wfn_fci->has_container_type<CasStateVectorContainer>());
+  const auto& dets = wfn_fci->get_active_determinants();
+  const auto macis_dets =
+      macis::generate_hilbert_space<macis::wfn_t<64>>(7, 5, 5);
+  ASSERT_EQ(dets.size(), macis_dets.size());
+  const auto& coeffs = std::get<Eigen::VectorXd>(wfn_fci->get_coefficients());
+  for (size_t i = 0; i < dets.size(); ++i) {
+    EXPECT_EQ(dets[i], Configuration::from_spin_half_bitset(macis_dets[i], 7));
+    EXPECT_EQ(std::get<double>(wfn_fci->get_coefficient(dets[i])), coeffs[i]);
+  }
+}
+
+/**
+ * @brief Alpha and beta agree between the determinants and the RDM spin blocks
+ * of an open-shell state; a swap anywhere breaks these identities, which
+ * singlets and <S^2> cannot detect.
+ */
+TEST_F(MCTest, Water_STO3G_CAS_OpenShellSpinBlocks) {
+  auto water = testing::create_water_structure();
+  auto [E_HF, wfn_HF] = ScfSolverFactory::create()->run(water, 0, 1, "sto-3g");
+  auto ham =
+      HamiltonianConstructorFactory::create()->run(wfn_HF->get_orbitals());
+  auto mc = MultiConfigurationCalculatorFactory::create("macis_cas");
+  mc->settings().set("calculate_one_rdm", true);
+  mc->settings().set("calculate_two_rdm", true);
+  const size_t n = 7, n_alpha = 5, n_beta = 4;
+  auto [E, wfn] = mc->run(ham, n_alpha, n_beta);
+
+  const auto [aa, bb] = wfn->get_active_one_rdm_spin_dependent();
+  const auto& gamma_alpha = std::get<Eigen::MatrixXd>(aa);
+  const auto& gamma_beta = std::get<Eigen::MatrixXd>(bb);
+  const auto& dets = wfn->get_active_determinants();
+  const auto& coeffs = std::get<Eigen::VectorXd>(wfn->get_coefficients());
+  Eigen::VectorXd occ_alpha = Eigen::VectorXd::Zero(n);
+  Eigen::VectorXd occ_beta = Eigen::VectorXd::Zero(n);
+  for (size_t i = 0; i < dets.size(); ++i) {
+    for (size_t p = 0; p < n; ++p) {
+      occ_alpha[p] += coeffs[i] * coeffs[i] * dets[i].has_alpha_electron(p);
+      occ_beta[p] += coeffs[i] * coeffs[i] * dets[i].has_beta_electron(p);
+    }
+  }
+  EXPECT_LT((occ_alpha - gamma_alpha.diagonal()).cwiseAbs().maxCoeff(), 1e-12);
+  EXPECT_LT((occ_beta - gamma_beta.diagonal()).cwiseAbs().maxCoeff(), 1e-12);
+
+  // Gamma(p,q,r,s) = <a+_p a+_r a_s a_q>, alpha on (p,q) and beta on (r,s)
+  const auto aabb = std::get<Eigen::VectorXd>(
+      std::get<1>(wfn->get_active_two_rdm_spin_dependent()));
+  Eigen::MatrixXd beta_trace = Eigen::MatrixXd::Zero(n, n);
+  Eigen::MatrixXd alpha_trace = Eigen::MatrixXd::Zero(n, n);
+  for (size_t p = 0; p < n; ++p) {
+    for (size_t q = 0; q < n; ++q) {
+      for (size_t r = 0; r < n; ++r) {
+        beta_trace(p, q) += aabb[((p * n + q) * n + r) * n + r];
+        alpha_trace(p, q) += aabb[((r * n + r) * n + p) * n + q];
+      }
+    }
+  }
+  EXPECT_LT((beta_trace - n_beta * gamma_alpha).cwiseAbs().maxCoeff(), 1e-12);
+  EXPECT_LT((alpha_trace - n_alpha * gamma_beta).cwiseAbs().maxCoeff(), 1e-12);
 }
 
 /**
@@ -454,4 +517,11 @@ TEST_F(MCTest, MCSettings_DefaultsAndConstraints) {
                    std::numeric_limits<double>::epsilon());
   settings.set("ci_matel_tol", 1e-12);
   EXPECT_DOUBLE_EQ(settings.get<double>("ci_matel_tol"), 1e-12);
+
+  // spin_flip_symmetry: default, override, constraint
+  EXPECT_EQ(settings.get<std::string>("spin_flip_symmetry"), "none");
+  settings.set("spin_flip_symmetry", std::string("odd"));
+  EXPECT_EQ(settings.get<std::string>("spin_flip_symmetry"), "odd");
+  EXPECT_THROW(settings.set("spin_flip_symmetry", std::string("singlet")),
+               std::invalid_argument);
 }
