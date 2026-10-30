@@ -47,6 +47,24 @@ class TestQubitHamiltonianDeprecation:
         op = QubitOperator(["ZZ"], np.array([1.0]))
         assert isinstance(op, QubitHamiltonian)
 
+    def test_qubit_hamiltonian_supports_inheritance(self):
+        """Subclassing the alias preserves operator behavior and deprecation warnings."""
+
+        class DerivedOperator(QubitHamiltonian):
+            pass
+
+        with pytest.warns(DeprecationWarning, match="QubitHamiltonian"):
+            operator = DerivedOperator(["ZZ"], np.array([1.0]))
+        assert isinstance(operator, QubitOperator)
+        assert issubclass(DerivedOperator, QubitHamiltonian)
+
+    def test_qubit_hamiltonian_classmethod_warns(self):
+        """Deserialization through the old name keeps its deprecated constructor."""
+        operator = QubitOperator(["ZZ"], np.array([1.0]))
+        with pytest.warns(DeprecationWarning, match="QubitHamiltonian"):
+            restored = QubitHamiltonian.from_json(operator.to_json())
+        assert restored.equiv(operator)
+
     def test_deprecated_qubit_hamiltonian_works_when_passed_to_an_algorithm(self):
         """A deprecated ``QubitHamiltonian`` can be passed straight into an algorithm.
 

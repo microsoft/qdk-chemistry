@@ -6,6 +6,7 @@
 # --------------------------------------------------------------------------------------------
 
 import contextlib
+import gc
 import pickle
 import re
 import tempfile
@@ -53,6 +54,24 @@ def test_orbitals_construction():
         alpha, alpha2, rtol=float_comparison_relative_tolerance, atol=float_comparison_absolute_tolerance
     )
     assert np.allclose(beta, beta2, rtol=float_comparison_relative_tolerance, atol=float_comparison_absolute_tolerance)
+
+
+def test_array_like_inputs_and_readonly_view_lifetime():
+    """Eigen conversions retain array-like inputs and immutable view ownership."""
+    coefficients = [[0.9, 0.1], [0.1, -0.9], [0.0, 0.0]]
+    energies = np.array([[-1.0], [0.5]])
+    orbitals = Orbitals(coefficients, energies, None, create_test_basis_set(3))
+    view = orbitals.get_coefficients_alpha()
+    assert not view.flags.writeable
+    assert np.allclose(orbitals.get_energies_alpha(), energies.ravel())
+    del orbitals
+    gc.collect()
+    assert np.allclose(view, coefficients)
+
+    restricted = Orbitals(coefficients, basis_set=create_test_basis_set(3))
+    unrestricted = Orbitals(coefficients, coefficients, basis_set=create_test_basis_set(3))
+    assert np.allclose(restricted.get_coefficients_alpha(), coefficients)
+    assert np.allclose(unrestricted.get_coefficients_beta(), coefficients)
 
 
 def test_coefficient_management():

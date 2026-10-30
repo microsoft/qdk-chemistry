@@ -81,3 +81,22 @@ def test_syev_solver_invalid_input():
 
     with pytest.raises(ValueError, match="Input matrix must be 2-dimensional"):
         syev_solver(np.array([1, 2, 3]))
+
+
+@pytest.mark.parametrize("layout", ["c", "fortran", "strided", "readonly"])
+def test_syev_solver_array_layouts(layout):
+    """Array conversion must preserve values, layout independence, and ownership."""
+    matrix = np.array([[2.0, -1.0], [-1.0, 3.0]])
+    if layout == "fortran":
+        matrix = np.asfortranarray(matrix)
+    elif layout == "strided":
+        storage = np.zeros((4, 4))
+        storage[::2, ::2] = matrix
+        matrix = storage[::2, ::2]
+    elif layout == "readonly":
+        matrix.setflags(write=False)
+
+    original = matrix.copy()
+    eigenvalues, eigenvectors = syev_solver(matrix)
+    np.testing.assert_array_equal(matrix, original)
+    np.testing.assert_allclose(eigenvectors @ np.diag(eigenvalues) @ eigenvectors.T, original)

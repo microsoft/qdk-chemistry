@@ -332,7 +332,7 @@ class SettingTypeMismatch : public std::runtime_error {
  * This class provides a flexible settings system that can:
  * - Store arbitrary typed values using a variant system
  * - Be easily extended by derived classes during construction only
- * - Map seamlessly to Python dictionaries via pybind11
+ * - Map seamlessly to Python dictionaries via nanobind
  * - Provide type-safe access to settings with default values
  * - Support nested settings structures
  * - Prevent extension of the settings map after class initialization
