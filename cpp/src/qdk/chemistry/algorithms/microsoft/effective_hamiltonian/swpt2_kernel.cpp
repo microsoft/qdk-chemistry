@@ -202,14 +202,26 @@ Eigen::VectorXd rotate_two_body(const Eigen::VectorXd& two_body,
   const Eigen::Index n = norb;
   const Eigen::Index n3 = n * n * n;
   // Each pass transforms the leading index and cycles it to the back, so four
-  // passes restore (p, q, r, s) order.
-  Eigen::VectorXd current = two_body;
+  // passes restore (p, q, r, s) order. The column-major (n, n^3) product
+  // already is the cycled tensor, so it is written in place, one column panel
+  // per task.
+  constexpr Eigen::Index panel = 1024;
+  const Eigen::Index panels = (n3 + panel - 1) / panel;
+  Eigen::VectorXd current(n4(norb));
   Eigen::VectorXd next(n4(norb));
   for (int pass = 0; pass < 4; ++pass) {
-    const auto& rotation = pass < 2 ? first_pair : second_pair;
-    const Eigen::Map<const RowMajorMatrix> in(current.data(), n, n3);
-    const Eigen::MatrixXd transformed = rotation.transpose() * in;
-    Eigen::Map<RowMajorMatrix>(next.data(), n3, n) = transformed.transpose();
+    const Eigen::MatrixXd transposed =
+        (pass < 2 ? first_pair : second_pair).transpose();
+    const Eigen::Map<const RowMajorMatrix> in(
+        pass == 0 ? two_body.data() : current.data(), n, n3);
+    Eigen::Map<Eigen::MatrixXd> out(next.data(), n, n3);
+#pragma omp parallel for schedule(static) if (n4(norb) >= min_parallel_work)
+    for (Eigen::Index index = 0; index < panels; ++index) {
+      const Eigen::Index begin = index * panel;
+      const Eigen::Index width = std::min(panel, n3 - begin);
+      out.middleCols(begin, width).noalias() =
+          transposed * in.middleCols(begin, width);
+    }
     current.swap(next);
   }
   return current;

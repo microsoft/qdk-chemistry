@@ -84,7 +84,9 @@ class SchriefferWolffPT2Settings : public qdk::chemistry::data::Settings {
  * must select the same orbital indices in both spins. Every singly occupied
  * orbital must lie in the reference active space.
  * Noncanonical orbitals are semicanonicalized independently within inactive,
- * active, and virtual blocks. Intruder diagnostics are logged, with an
+ * active, and virtual blocks; blocks whose off-diagonal generalized-Fock
+ * elements are at most 1e-6 Eh, such as those of a converged SCF, are left
+ * unrotated. Intruder diagnostics are logged, with an
  * additional warning for large raw amplitudes.
  *
  * The emitted two-body blocks are only 4-fold symmetric: hermiticity and
@@ -99,9 +101,6 @@ class SchriefferWolffPT2Settings : public qdk::chemistry::data::Settings {
  * occupied and the rest empty), never the partition: P comes from `p_indices`
  * alone and need not coincide with the reference active space. Occupations of
  * folded orbitals are rounded, bounded by `max_folded_occupation_deviation`.
- *
- * Concurrent calls within one process are unsupported by the pinned SeQuant
- * backend. Use sequential calls or separate worker processes.
  *
  * See `swpt2_kernel.hpp` for the operator and tensor conventions.
  */
