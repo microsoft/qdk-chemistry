@@ -133,6 +133,7 @@ This is the default (and currently only) propagator.  It computes the time-avera
    \bar{f} = \frac{1}{\delta t}\int_{t_1}^{t_2} f(t')\,\mathrm{d}t'
 
 where the drive integral is evaluated by numerical quadrature (``scipy.integrate.quad``).
+A static Hamiltonian built without a drive, ``DrivenQubitHamiltonian(h0)``, is returned as :math:`H_0` unchanged, including its term partition.
 
 This is the leading-order term of the Magnus expansion.  For sufficiently smooth :math:`H(t)`, it has :math:`O(\delta t^3)` local error and second-order global accuracy over a fixed evolution interval.
 

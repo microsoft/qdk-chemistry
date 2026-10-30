@@ -7,12 +7,13 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 
 import numpy as np
 import pytest
 
 from qdk_chemistry.algorithms.phase_estimation.standard_phase_estimation import StandardPhaseEstimation
+from qdk_chemistry.algorithms.state_preparation.qrom_state_prep import QROMStatePreparation
 from qdk_chemistry.data import (
     AlgorithmRef,
     Circuit,
@@ -23,6 +24,7 @@ from qdk_chemistry.data.circuit import QsharpFactoryData
 from qdk_chemistry.plugins.qiskit import QDK_CHEMISTRY_HAS_QISKIT
 from qdk_chemistry.utils.qsharp import QSHARP_UTILS
 
+from .helpers import create_dense_wavefunction
 from .reference_tolerances import (
     float_comparison_relative_tolerance,
     qpe_energy_tolerance,
@@ -201,6 +203,7 @@ def _run_standard(
     problem: PhaseEstimationProblem,
     builder_name: str = "qdk_standard",
     controlled_circuit_mapper_name: str = "pauli_sequence",
+    executor_name: str = "qdk_full_state_simulator",
 ) -> QpeResult:
     """Execute standard QPE and return structured results.
 
@@ -208,6 +211,7 @@ def _run_standard(
         problem: Benchmark description supplying Hamiltonian, state prep, and expectations.
         builder_name: The circuit builder to use ("qdk_standard" or "qiskit_standard").
         controlled_circuit_mapper_name: Name of the controlled circuit mapper to use.
+        executor_name: Name of the circuit executor to use.
 
     Returns:
         :class:`QpeResult` instance summarizing the standard run.
@@ -217,7 +221,7 @@ def _run_standard(
     qpe = StandardPhaseEstimation(shots=problem.shots)
     qpe.settings().set(
         "circuit_executor",
-        AlgorithmRef("circuit_executor", "qdk_full_state_simulator", seed=_SEED),
+        AlgorithmRef("circuit_executor", executor_name, seed=_SEED),
     )
     qpe.settings().set(
         "qpe_circuit_builder",
@@ -247,6 +251,22 @@ _controlled_mapper_params = [
 ]
 
 
+@pytest.mark.parametrize("packed", [False, True])
+def test_standard_phase_estimation_retains_identity_shift(two_qubit_phase_problem, packed: bool) -> None:
+    """An identity energy shift remains a measurable controlled-evolution phase."""
+    coefficients = np.array([0.25, 0.5, 0.25])
+    hamiltonian = (
+        QubitOperator.from_sparse_terms(2, [{0: "X", 1: "X"}, {0: "Z", 1: "Z"}, {}], coefficients)
+        if packed
+        else QubitOperator(["XX", "ZZ", "II"], coefficients)
+    )
+    problem = replace(two_qubit_phase_problem, hamiltonian=hamiltonian)
+    result = _run_standard(problem)
+    assert result.bitstring_msb_first == "1100"
+    assert result.phase_fraction == pytest.approx(0.75, abs=qpe_phase_fraction_tolerance)
+    assert result.raw_energy == pytest.approx(1.0, abs=qpe_energy_tolerance)
+
+
 @pytest.mark.parametrize("builder_name", _builder_params)
 def test_standard_phase_estimation_extracts_phase_and_energy(
     two_qubit_phase_problem: PhaseEstimationProblem,
@@ -256,12 +276,68 @@ def test_standard_phase_estimation_extracts_phase_and_energy(
     result = _run_standard(two_qubit_phase_problem, builder_name)
 
     assert result.bitstring_msb_first == two_qubit_phase_problem.expected_bitstring
+    assert result.bitstring_counts is not None
+    assert sum(result.bitstring_counts.values()) == two_qubit_phase_problem.shots
     assert np.isclose(
         result.phase_fraction,
         two_qubit_phase_problem.expected_phase,
         rtol=float_comparison_relative_tolerance,
         atol=qpe_phase_fraction_tolerance,
     )
+    assert np.isclose(
+        result.raw_energy,
+        two_qubit_phase_problem.expected_energy,
+        rtol=float_comparison_relative_tolerance,
+        atol=qpe_energy_tolerance,
+    )
+
+
+def test_standard_phase_estimation_shares_the_gradient_with_the_state_preparation(
+    two_qubit_phase_problem: PhaseEstimationProblem,
+) -> None:
+    """Standard QPE hands its gradient to a QROM state preparation."""
+    state_prep = QROMStatePreparation(rotation_bit_precision=8, allocate_phase_gradient=False).run(
+        create_dense_wavefunction([1.0 / np.sqrt(2.0), 0.0, 0.0, 1.0 / np.sqrt(2.0)])
+    )
+    # qdk 1.32.3 cannot lower this QROM to QIR, so use the sparse simulator.
+    result = _run_standard(
+        replace(two_qubit_phase_problem, state_prep=state_prep), executor_name="qdk_sparse_state_simulator"
+    )
+
+    assert result.bitstring_msb_first == two_qubit_phase_problem.expected_bitstring
+
+
+@pytest.mark.parametrize("power", [2, 4])
+def test_standard_phase_estimation_energy_is_independent_of_unitary_power(
+    two_qubit_phase_problem: PhaseEstimationProblem,
+    power: int,
+) -> None:
+    """The circuit builder overrides the unitary's power per bit, so it must not shift the energy."""
+    qpe_circuit_builder = AlgorithmRef(
+        "qpe_circuit_builder",
+        "qdk_standard",
+        num_bits=two_qubit_phase_problem.num_bits,
+        controlled_circuit_mapper=AlgorithmRef("controlled_circuit_mapper", "pauli_sequence"),
+        unitary_builder=AlgorithmRef(
+            "hamiltonian_unitary_builder",
+            "trotter",
+            time=two_qubit_phase_problem.evolution_time,
+            power=power,
+        ),
+    )
+    qpe = StandardPhaseEstimation(shots=two_qubit_phase_problem.shots)
+    qpe.settings().set(
+        "circuit_executor",
+        AlgorithmRef("circuit_executor", "qdk_full_state_simulator", seed=_SEED),
+    )
+    qpe.settings().set("qpe_circuit_builder", qpe_circuit_builder)
+
+    result = qpe.run(
+        qubit_hamiltonian=two_qubit_phase_problem.hamiltonian,
+        state_preparation=two_qubit_phase_problem.state_prep,
+    )
+
+    assert result.bitstring_msb_first == two_qubit_phase_problem.expected_bitstring
     assert np.isclose(
         result.raw_energy,
         two_qubit_phase_problem.expected_energy,

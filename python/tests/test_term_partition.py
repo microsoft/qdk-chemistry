@@ -7,12 +7,15 @@
 
 from __future__ import annotations
 
+import json
+
 import numpy as np
 import pytest
 
 from qdk_chemistry.algorithms import registry
 from qdk_chemistry.data import (
     FlatPartition,
+    LatticeGeometry,
     LatticeGraph,
     LayeredPartition,
     QubitOperator,
@@ -22,8 +25,10 @@ from qdk_chemistry.data import (
 from qdk_chemistry.plugins.networkx import QDK_CHEMISTRY_HAS_NETWORKX
 from qdk_chemistry.remote.serialization import deserialize_outputs, serialize_outputs
 from qdk_chemistry.utils.model_hamiltonians import (
+    KitaevBondFlavor,
     create_heisenberg_hamiltonian,
     create_ising_hamiltonian,
+    create_kitaev_hamiltonian,
 )
 from qdk_chemistry.utils.pauli_commutation import do_pauli_labels_commute, do_pauli_labels_qw_commute
 
@@ -33,6 +38,8 @@ from qdk_chemistry.utils.pauli_commutation import do_pauli_labels_commute, do_pa
 
 
 class TestFlatPartition:
+    """Check flat-group normalization, counts, and ordered index traversal."""
+
     def test_construction_normalises_to_tuples_of_ints(self):
         """Construction normalises to tuples of ints."""
         p = FlatPartition(strategy="commuting", groups=[[0, 1, 2], [3, 4]])
@@ -57,6 +64,8 @@ class TestFlatPartition:
 
 
 class TestLayeredPartition:
+    """Check nested tuple normalization and group, layer, and index access."""
+
     def test_construction(self):
         """Construction."""
         p = LayeredPartition(
@@ -105,6 +114,8 @@ def test_remote_round_trip_restores_partition_subtype(tmp_path, partition):
 
 
 class TestQubitHamiltonianTermPartition:
+    """Check optional partition attachment and invalidation after fermion-mode reordering."""
+
     def test_default_is_none(self):
         """Default is none."""
         qh = QubitOperator(["XX", "ZZ"], np.array([0.1, 0.2]))
@@ -140,6 +151,8 @@ class TestQubitHamiltonianTermPartition:
 
 
 class TestTermGrouperRegistry:
+    """Check registered grouping strategies, term coverage, commutation, and metadata preservation."""
+
     def test_available_strategies(self):
         """Available strategies."""
         names = registry.available("term_grouper")
@@ -157,7 +170,8 @@ class TestTermGrouperRegistry:
         grouper = registry.create("term_grouper", strategy)
         out = grouper.run(qh)
         assert out is not qh
-        assert isinstance(out.term_partition, FlatPartition)
+        expected_partition = LayeredPartition if strategy == "vacuum_annihilating" else FlatPartition
+        assert isinstance(out.term_partition, expected_partition)
         assert out.term_partition.strategy == strategy
 
     def test_partition_indices_cover_all_terms_exactly_once(self):
@@ -193,14 +207,20 @@ class TestTermGrouperRegistry:
         assert out.encoding == qh.encoding
         assert out.fermion_mode_order == qh.fermion_mode_order
 
-    def test_vacuum_annihilating_preserves_tapering(self):
+    @pytest.mark.parametrize("sparse", [False, True])
+    @pytest.mark.parametrize("strategy", ["commuting", "qubit_wise_commuting", "identity", "vacuum_annihilating"])
+    def test_grouping_preserves_tapering(self, strategy, sparse):
         """Grouping changes neither the qubits nor the mapped sector."""
-        qh = QubitOperator(
-            ["XX", "YY", "ZZ"],
-            np.array([1.0, 1.0, 3.0]),
-            tapering=TaperingSpecification(qubit_indices=(3, 1), eigenvalues=(1, -1)),
+        tapering = TaperingSpecification(qubit_indices=(3, 1), eigenvalues=(1, -1))
+        coefficients = np.array([1.0, 1.0, 3.0])
+        qh = (
+            QubitOperator.from_sparse_terms(
+                2, [{0: "X", 1: "X"}, {0: "Y", 1: "Y"}, {0: "Z", 1: "Z"}], coefficients, tapering=tapering
+            )
+            if sparse
+            else QubitOperator(["XX", "YY", "ZZ"], coefficients, tapering=tapering)
         )
-        out = registry.create("term_grouper", "vacuum_annihilating").run(qh)
+        out = registry.create("term_grouper", strategy).run(qh)
 
         assert out.tapering == qh.tapering
 
@@ -225,6 +245,12 @@ class TestTermGrouperRegistry:
 # ---------------------------------------------------------------------------
 
 
+def _vacuum_groups(operator: QubitOperator) -> list[tuple[int, ...]]:
+    """Read the outer evolution groups independently of their internal layer schedule."""
+    assert isinstance(operator.term_partition, LayeredPartition)
+    return [tuple(i for layer in group for i in layer) for group in operator.term_partition.groups]
+
+
 class TestVacuumAnnihilatingTermGrouper:
     """Tests for the ``vacuum_annihilating`` term grouper."""
 
@@ -234,22 +260,23 @@ class TestVacuumAnnihilatingTermGrouper:
         qh = QubitOperator(["XX", "YY", "II", "IZ"], np.array([0.5, 0.5, 0.5, -0.5]))
         out = registry.create("term_grouper", "vacuum_annihilating").run(qh)
 
-        groups = {frozenset(group) for group in out.term_partition.groups}
-        assert frozenset({0, 1}) in groups
+        groups = [set(group) for group in _vacuum_groups(out)]
+        assert any({0, 1} <= group for group in groups)
         # Pure I/Z strings are diagonal: they flip no qubits at all.
-        assert frozenset({2, 3}) in groups
+        assert any({2, 3} <= group for group in groups)
 
-    def test_terms_flipping_different_qubits_are_separated(self):
-        """Terms flipping different qubits cannot cancel each other on |0...0>."""
+    def test_disjoint_cancellation_blocks_share_layers(self):
+        """Disjoint XX/YY blocks can share a commuting group and parallel Pauli layers."""
         qh = QubitOperator(["XXII", "YYII", "IIXX", "IIYY"], np.array([1.0, 1.0, 1.0, 1.0]))
         out = registry.create("term_grouper", "vacuum_annihilating").run(qh)
-        assert out.term_partition.groups == ((0, 1), (2, 3))
+        assert len(_vacuum_groups(out)) == 1
+        assert [len(layer) for layer in out.term_partition.groups[0]] == [2, 2]
 
     def test_same_support_with_odd_y_parity_is_separated(self):
         """X and Y flip the same qubit but anticommute, so they cannot share a group."""
         qh = QubitOperator(["IX", "IX", "IY", "IY"], np.array([1.0, -1.0, 1.0, -1.0]))
         out = registry.create("term_grouper", "vacuum_annihilating").run(qh)
-        assert out.term_partition.groups == ((0, 1), (2, 3))
+        assert _vacuum_groups(out) == [(0, 1), (2, 3)]
 
     def test_each_group_annihilates_the_zero_state(self):
         """Every group of a |0...0>-annihilating operator annihilates it too."""
@@ -259,47 +286,55 @@ class TestVacuumAnnihilatingTermGrouper:
         )
         out = registry.create("term_grouper", "vacuum_annihilating").run(qh)
 
-        for group in out.term_partition.groups:
-            amplitude = 0j
-            for index in group:
-                # P|0...0> = i^{n_Y} |b_F>; within a group every term hits the same |b_F>.
-                phase = 1j ** out.pauli_strings[index].count("Y")
-                amplitude += complex(out.coefficients[index]) * phase
-            assert abs(amplitude) < 1e-12
+        for group in _vacuum_groups(out):
+            operator = QubitOperator([out.pauli_strings[i] for i in group], out.coefficients[list(group)])
+            np.testing.assert_allclose(operator.to_matrix()[1:, 0], 0.0, atol=1e-12)
 
     def test_group_members_pairwise_commute(self):
-        """Members of a group flip the same qubits with the same Y parity, hence commute."""
+        """Packed cancellation blocks still form fully commuting outer groups."""
         qh = QubitOperator(
             ["XXXX", "YYXX", "XXYY", "YYYY", "XYXY", "YXYX"],
             np.array([0.25, 0.25, 0.25, 0.25, 0.25, -0.25]),
         )
         out = registry.create("term_grouper", "vacuum_annihilating").run(qh)
 
-        for group in out.term_partition.groups:
+        for group in _vacuum_groups(out):
             for position, i in enumerate(group):
                 for j in group[position + 1 :]:
                     assert do_pauli_labels_commute(out.pauli_strings[i], out.pauli_strings[j])
 
-    def test_coefficients_split_a_flip_set_into_cancelling_groups(self):
-        """Two independent XX/YY pairs cancel separately instead of forming one group."""
+    def test_commuting_cancellation_blocks_may_recombine(self):
+        """Separate zero-sum cuts need not remain separate outer groups when all their words commute."""
         qh = QubitOperator(["XX", "YY", "XX", "YY"], np.array([0.5, 0.5, 0.25, 0.25]))
         out = registry.create("term_grouper", "vacuum_annihilating").run(qh)
 
-        assert out.term_partition.groups == ((0, 1), (2, 3))
+        assert _vacuum_groups(out) == [(0, 1, 2, 3)]
+        assert all(len(layer) == 1 for layer in out.term_partition.groups[0])
 
     def test_terms_that_cannot_cancel_raise(self):
         """Unbalanced coefficients leave a remainder that no grouping can annihilate."""
         qh = QubitOperator(["XX", "YY", "XX"], np.array([0.5, 0.5, 0.25]))
 
-        with pytest.raises(ValueError, match="uncancelled vacuum amplitude"):
+        with pytest.raises(ValueError, match=r"flip qubits \[0, 1\].*uncancelled vacuum amplitude"):
             registry.create("term_grouper", "vacuum_annihilating").run(qh)
+
+    def test_sparse_keys_hold_flipped_qubits_not_a_register_bitmask(self):
+        """The last qubit of a 2**32-qubit register groups like any other."""
+        last = 2**32 - 1
+        qh = QubitOperator.from_sparse_terms(
+            2**32, [{0: "X", last: "X"}, {0: "Y", last: "Y"}, {5: "Z"}], np.array([0.5, 0.5, 1.0])
+        )
+        out = registry.create("term_grouper", "vacuum_annihilating").run(qh)
+
+        assert sorted(out.term_partition.all_indices()) == [0, 1, 2]
+        assert any({0, 1} <= set(group) for group in _vacuum_groups(out))
 
     def test_diagonal_group_may_leave_a_vacuum_phase(self):
         """Diagonal terms only phase the vacuum, which a consumer can correct for."""
         qh = QubitOperator(["ZI", "IZ", "II"], np.array([0.5, 0.5, 3.0]))
         out = registry.create("term_grouper", "vacuum_annihilating").run(qh)
 
-        assert out.term_partition.groups == ((0, 1, 2),)
+        assert _vacuum_groups(out) == [(0, 1, 2)]
 
     @pytest.mark.parametrize("coefficients", [[0.5, 0.5j], [0.5, np.inf], [0.5, np.nan]])
     def test_non_real_or_non_finite_coefficients_raise(self, coefficients):
@@ -318,21 +353,21 @@ class TestVacuumAnnihilatingTermGrouper:
 
         # Certified as a whole, but no prefix cancels exactly, so the set stays in one group.
         tolerant = registry.create("term_grouper", "vacuum_annihilating", tolerance=1e-6)
-        assert tolerant.run(qh).term_partition.groups == ((0, 1, 2, 3),)
+        assert _vacuum_groups(tolerant.run(qh)) == [(0, 1, 2, 3)]
 
     def test_tiny_prefixes_do_not_strand_a_remainder(self):
         """The flip set cancels exactly, so splitting on a sub-tolerance prefix must not reject it."""
         qh = QubitOperator(["XX", "XX", "XX"], np.array([0.75e-9, 0.75e-9, -1.5e-9]))
         out = registry.create("term_grouper", "vacuum_annihilating").run(qh)
 
-        assert out.term_partition.groups == ((0, 1, 2),)
+        assert _vacuum_groups(out) == [(0, 1, 2)]
 
     def test_catastrophic_cancellation_is_accepted(self):
         """The set sums to zero exactly, which a running subtraction would lose."""
         qh = QubitOperator(["XX"] * 4, np.array([1e16, 1.0, -1e16, -1.0]))
         out = registry.create("term_grouper", "vacuum_annihilating").run(qh)
 
-        assert sorted(index for group in out.term_partition.groups for index in group) == [0, 1, 2, 3]
+        assert sorted(out.term_partition.all_indices()) == [0, 1, 2, 3]
 
     @pytest.mark.parametrize("tolerance", [-1e-9, np.inf, np.nan])
     def test_invalid_tolerance_raises(self, tolerance):
@@ -342,7 +377,7 @@ class TestVacuumAnnihilatingTermGrouper:
         with pytest.raises(ValueError, match="tolerance must be finite and non-negative"):
             registry.create("term_grouper", "vacuum_annihilating", tolerance=tolerance).run(qh)
 
-    def test_group_order_is_deterministic_with_the_diagonal_group_first(self):
+    def test_group_order_is_deterministic(self):
         """Group order drives the Trotter sequence, so it must not depend on dict ordering."""
         qh = QubitOperator(
             ["IIXI", "IZII", "XIII", "IIXI", "IIII", "XIII"],
@@ -350,8 +385,9 @@ class TestVacuumAnnihilatingTermGrouper:
         )
         out = registry.create("term_grouper", "vacuum_annihilating").run(qh)
 
-        # Diagonal (I/Z-only) terms first, then the remaining groups by first member index.
-        assert out.term_partition.groups == ((1, 4), (0, 3), (2, 5))
+        repeated = registry.create("term_grouper", "vacuum_annihilating").run(qh)
+        assert out.term_partition == repeated.term_partition
+        assert sorted(out.term_partition.all_indices()) == list(range(6))
 
     def test_input_operator_is_not_mutated(self):
         """The grouper returns a new operator and leaves the input untouched."""
@@ -468,6 +504,26 @@ class TestNxTermGroupers:
 
 
 class TestLatticeEdgeColoring:
+    """Check constructor-owned colors cover physical pairs independently of weights."""
+
+    @pytest.mark.parametrize("weight", [-2.0, 0.0])
+    def test_constructor_coloring_is_deterministic_and_disjoint(self, weight: float) -> None:
+        """Geometry graphs color all labelled pairs, including zero-weight ones."""
+        geometry = LatticeGeometry.square(3, 3)
+        graph = LatticeGraph.from_geometry(geometry, [1, 2], weight=weight)
+        coloring = graph.edge_coloring
+
+        assert coloring is not None
+        assert set(coloring) == set(graph.edge_labels)
+        assert coloring == LatticeGraph.from_geometry(geometry, [2, 1]).edge_coloring
+        sites_by_color: dict[int, set[int]] = {}
+        for edge, color in coloring.items():
+            sites = sites_by_color.setdefault(color, set())
+            assert sites.isdisjoint(edge)
+            sites.update(edge)
+        coloring.clear()
+        assert graph.edge_coloring
+
     def test_chain_two_colors(self):
         """Chain two colors."""
         lat = LatticeGraph.chain(4, periodic=True)
@@ -475,11 +531,12 @@ class TestLatticeEdgeColoring:
         assert coloring is not None
         assert len(set(coloring.values())) == 2
 
-    def test_returns_dict_or_none(self):
-        """Returns dict or none."""
-        lat = LatticeGraph.chain(3, periodic=False)
-        coloring = lat.edge_coloring
-        assert isinstance(coloring, dict)
+    def test_edgeless_graphs_have_empty_coloring(self) -> None:
+        """A geometry graph has a coloring even when it has no edges."""
+        assert LatticeGraph.from_geometry(LatticeGeometry.chain(3), []).edge_coloring == {}
+        assert LatticeGraph.from_dense_matrix(np.zeros((3, 3))).edge_coloring is None
+        with pytest.raises(ValueError, match="own periodic image"):
+            LatticeGraph.from_geometry(LatticeGeometry.chain(1, periodic=True), [1])
 
 
 # ---------------------------------------------------------------------------
@@ -487,7 +544,40 @@ class TestLatticeEdgeColoring:
 # ---------------------------------------------------------------------------
 
 
+def _assert_family_colorings(
+    hamiltonian: QubitOperator, graph: LatticeGraph, supports: dict[str, list[tuple[int, int]]]
+) -> None:
+    """Compare family layers with the stored coloring restricted to nonzero support."""
+    partition = hamiltonian.term_partition
+    assert isinstance(partition, LayeredPartition)
+    assert partition.strategy == "geometry_coloring"
+    assert sorted(partition.all_indices()) == list(range(len(hamiltonian.pauli_strings)))
+    assert len(partition.groups) == len(supports)
+    coloring = graph.edge_coloring
+    assert coloring is not None
+    for (family, pairs), group in zip(supports.items(), partition.groups, strict=True):
+        expected_by_color: dict[int, list[tuple[int, int]]] = {}
+        for pair in sorted(pairs):
+            expected_by_color.setdefault(coloring[pair], []).append(pair)
+        actual: list[list[tuple[int, int]]] = []
+        for layer in group:
+            layer_pairs: list[tuple[int, int]] = []
+            used: set[int] = set()
+            for index in layer:
+                label = hamiltonian.pauli_strings[index]
+                assert label.replace("I", "") == family
+                sites = [site for site, pauli in enumerate(reversed(label)) if pauli != "I"]
+                assert len(sites) == 2
+                assert used.isdisjoint(sites)
+                used.update(sites)
+                layer_pairs.append((sites[0], sites[1]))
+            actual.append(layer_pairs)
+        assert actual == [expected_by_color[color] for color in sorted(expected_by_color)]
+
+
 class TestModelHamiltonianTermPartition:
+    """Check model-generated partitions restrict stored colors to each nonzero Pauli family."""
+
     def test_heisenberg_populates_layered_partition(self):
         """Heisenberg populates layered partition."""
         lat = LatticeGraph.chain(4, periodic=True)
@@ -510,6 +600,44 @@ class TestModelHamiltonianTermPartition:
         ham = create_heisenberg_hamiltonian(lat, jx=1.0, jy=1.0, jz=1.0, include_term_groups=False)
         assert ham.term_partition is None
 
+    def test_heisenberg_restricts_stored_colors_to_nonzero_family_supports(self) -> None:
+        """Inactive shell-2 pairs retain their colors but do not emit Hamiltonian terms."""
+        graph = LatticeGraph.from_geometry(LatticeGeometry.chain(5), [1, 2])
+        xx_pairs = [(0, 1), (3, 4)]
+        yy_pairs = [(0, 1), (1, 2), (2, 3), (3, 4)]
+        jx = np.zeros((5, 5))
+        jy = np.zeros((5, 5))
+        for pair in xx_pairs:
+            jx[pair] = 2.0
+        for pair in yy_pairs:
+            jy[pair] = 3.0
+
+        hamiltonian = create_heisenberg_hamiltonian(graph, {1: jx}, {1: jy}, {2: np.zeros((5, 5))})
+
+        assert dict(hamiltonian.get_real_coefficients()) == {
+            "IIIXX": 2.0,
+            "XXIII": 2.0,
+            "IIIYY": 3.0,
+            "IIYYI": 3.0,
+            "IYYII": 3.0,
+            "YYIII": 3.0,
+        }
+        _assert_family_colorings(hamiltonian, graph, {"XX": xx_pairs, "YY": yy_pairs})
+
+    def test_kitaev_filters_stored_colors_after_exchange_cancellation(self) -> None:
+        """Canceled exchanges are omitted without recoloring the remaining family support."""
+        xx_pairs = [(0, 1), (3, 4)]
+        data = json.loads(LatticeGraph.from_geometry(LatticeGeometry.chain(5), [1]).to_json())
+        for label in data["edge_labels"]:
+            label[3] = int(KitaevBondFlavor.Z if tuple(label[:2]) in xx_pairs else KitaevBondFlavor.X)
+        graph = LatticeGraph.from_json(json.dumps(data))
+        all_pairs = [(0, 1), (1, 2), (2, 3), (3, 4)]
+
+        hamiltonian = create_kitaev_hamiltonian(graph, {1: -4.0}, {}, {}, j={1: 4.0})
+
+        np.testing.assert_array_equal(hamiltonian.coefficients, np.ones(10))
+        _assert_family_colorings(hamiltonian, graph, {"XX": xx_pairs, "YY": all_pairs, "ZZ": all_pairs})
+
 
 # ---------------------------------------------------------------------------
 # Trotter consumes term_partition
@@ -517,6 +645,8 @@ class TestModelHamiltonianTermPartition:
 
 
 class TestTrotterConsumesTermPartition:
+    """Check Trotter partition support and second-order step counts."""
+
     def test_trotter_runs_with_partitioned_hamiltonian(self):
         """Trotter runs with partitioned hamiltonian."""
         lat = LatticeGraph.chain(4, periodic=True)
@@ -577,6 +707,8 @@ class TestTrotterConsumesTermPartition:
 
 
 class TestTermPartitionSerialisation:
+    """Check JSON and HDF5 round trips preserve partition types, groups, and absence."""
+
     def test_flat_partition_to_json_round_trip(self):
         """Flat partition to json round trip."""
         partition = FlatPartition(strategy="commuting", groups=[[0, 2], [1]])

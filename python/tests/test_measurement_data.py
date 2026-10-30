@@ -70,6 +70,18 @@ def test_measurement_data_json_serialization():
     assert json_dict["0"]["bitstring"] == {"0": 60, "1": 40}
 
 
+def test_measurement_data_json_round_trip_for_sparse_operator():
+    """Sparse Pauli storage serializes to the same plain label list as dense storage."""
+    sparse = QubitOperator.from_sparse_terms(3, [{0: "Z"}, {1: "Z", 2: "Z"}], np.array([0.5, -0.25]))
+    data = MeasurementData(hamiltonians=[sparse], bitstring_counts=[{"000": 10}], shots_list=[10])
+
+    restored = MeasurementData.from_json(json.loads(json.dumps(data.to_json())))
+
+    assert list(restored.hamiltonians[0].pauli_strings) == list(sparse.pauli_strings)
+    assert np.array_equal(restored.hamiltonians[0].coefficients, sparse.coefficients)
+    assert restored.bitstring_counts == [{"000": 10}]
+
+
 def test_measurement_data_json_file_io():
     """Test MeasurementData JSON file I/O."""
     ham = QubitOperator(["ZZ", "IZ"], np.array([1.0, -0.5]))

@@ -55,6 +55,7 @@ from qdk_chemistry._core.constants import (
     ATOMIC_MASS_CONSTANT,
     AVOGADRO_CONSTANT,
     # Conversion factors
+    BOHR_MAGNETON,
     BOHR_TO_ANGSTROM,
     BOLTZMANN_CONSTANT,
     ELECTRON_MASS,
@@ -107,6 +108,7 @@ def list_constants(show_values: bool = True, show_units: bool = True) -> None:
             "fine_structure_constant",
             "speed_of_light",
             "elementary_charge",
+            "bohr_magneton",
             "planck_constant",
             "reduced_planck_constant",
         ],
@@ -207,6 +209,7 @@ __all__ = [
     "ANGSTROM_TO_BOHR",
     "ATOMIC_MASS_CONSTANT",
     "AVOGADRO_CONSTANT",
+    "BOHR_MAGNETON",
     "BOHR_TO_ANGSTROM",
     "BOLTZMANN_CONSTANT",
     "ELECTRON_MASS",

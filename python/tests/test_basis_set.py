@@ -6,17 +6,20 @@
 # --------------------------------------------------------------------------------------------
 
 import contextlib
+import json
 import pickle
 import re
 import tempfile
 from pathlib import Path
 
+import h5py
 import numpy as np
 import pytest
 
 import qdk_chemistry.algorithms as alg
 from qdk_chemistry.data import AOType, BasisSet, Element, OrbitalType, Shell, Structure
 from qdk_chemistry.data._type_name import class_data_type_name
+from qdk_chemistry.utils import Logger
 
 from .reference_tolerances import float_comparison_absolute_tolerance, float_comparison_relative_tolerance
 
@@ -1184,6 +1187,13 @@ def test_basis_set_ecp_functionality():
     assert list(basis_copy.get_ecp_electrons()) == ecp_electrons
 
 
+def test_basis_set_library_ecp_local_term_is_ul():
+    """Test that ECPs from the basis-set library store their local term as OrbitalType.UL."""
+    basis = BasisSet.from_basis_name("def2-svp", Structure(["Ag"], np.array([[0.0, 0.0, 0.0]])))
+
+    assert sorted(int(shell.orbital_type) for shell in basis.get_ecp_shells()) == [-1, 0, 1, 2]
+
+
 def test_basis_set_ecp_shells():
     """Test basis set ECP shells with radial powers."""
     # Create a structure with an atom that uses ECP
@@ -1280,6 +1290,87 @@ def test_basis_set_ecp_shells_serialization():
         loaded_shell = loaded_basis.get_ecp_shell(0)
         assert loaded_shell.has_radial_powers()
         assert np.array_equal(loaded_shell.rpowers, [0, 2])
+
+
+@pytest.fixture
+def warn_logger():
+    """Temporarily set logger to warn level, restoring on teardown."""
+    prev_level = Logger.get_global_level()
+    Logger.set_global_level("warn")
+    yield
+    Logger.set_global_level(prev_level)
+
+
+def _ecp_shell_data(basis):
+    return [
+        (int(shell.orbital_type), list(shell.exponents), list(shell.coefficients), list(shell.rpowers))
+        for shell in basis.get_ecp_shells()
+    ]
+
+
+def _write_legacy_ecp_file(basis, path, fmt):
+    """Write ``basis`` as version 0.1.0 did, with each local ECP term at the next angular momentum up."""
+    basis.to_file(str(path), fmt)
+    if fmt == "json":
+        doc = json.loads(path.read_text())
+        letters = "spdfghi"
+        for atom in doc["atoms"]:
+            shells = atom.get("ecp_shells", [])
+            semilocal = [letters.index(s["orbital_type"]) for s in shells if s["orbital_type"] != "ul"]
+            for shell in shells:
+                if shell["orbital_type"] == "ul":
+                    shell["orbital_type"] = letters[max(semilocal) + 1]
+        doc["version"] = "0.1.0"
+        path.write_text(json.dumps(doc))
+        return
+    with h5py.File(path, "r+") as handle:
+        group = handle["basis_set"]
+        atoms = group["ecp_shells/atom_indices"][()]
+        types = group["ecp_shells/orbital_types"][()]
+        for atom in np.unique(atoms):
+            on_atom = atoms == atom
+            types[on_atom & (types == -1)] = types[on_atom & (types != -1)].max() + 1
+        group["ecp_shells/orbital_types"][...] = types
+        group.attrs.modify("version", "0.1.0")
+
+
+@pytest.mark.usefixtures("warn_logger")
+@pytest.mark.parametrize("fmt", ["json", "hdf5"])
+def test_basis_set_legacy_ecp_file(tmp_path, capfd, fmt):
+    """Test that version 0.1.0 ECP files load with each atom's local term relabeled OrbitalType.UL."""
+    basis = BasisSet.from_basis_name("def2-svp", Structure(["Ag"], np.array([[0.0, 0.0, 0.0]])))
+    ext = "json" if fmt == "json" else "h5"
+    current = tmp_path / f"current.basis_set.{ext}"
+    basis.to_file(str(current), fmt)
+    legacy = tmp_path / f"legacy.basis_set.{ext}"
+    _write_legacy_ecp_file(basis, legacy, fmt)
+    capfd.readouterr()
+
+    loaded = BasisSet.from_file(str(legacy), fmt)
+    assert _ecp_shell_data(loaded) == _ecp_shell_data(BasisSet.from_file(str(current), fmt))
+    assert "relabeled UL on load" in capfd.readouterr().out
+
+
+@pytest.mark.usefixtures("warn_logger")
+@pytest.mark.parametrize(
+    ("basis_name", "symbols"), [("sto-3g", ["H", "H"]), ("def2-svp", ["Ag", "H"])], ids=["no_ecp", "already_ul"]
+)
+def test_basis_set_legacy_file_without_relabel(tmp_path, capfd, basis_name, symbols):
+    """Test that version 0.1.0 files whose local ECP terms need no relabel load unchanged and silently."""
+    basis = BasisSet.from_basis_name(basis_name, Structure(symbols, np.array([[0.0, 0.0, 0.0], [0.0, 0.0, 3.0]])))
+    path = tmp_path / "legacy.basis_set.json"
+    basis.to_json_file(str(path))
+    doc = json.loads(path.read_text())
+    doc["version"] = "0.1.0"
+    path.write_text(json.dumps(doc))
+    capfd.readouterr()
+
+    loaded = BasisSet.from_json_file(str(path))
+    assert loaded.get_num_shells() == basis.get_num_shells()
+    assert sorted(int(shell.orbital_type) for shell in loaded.get_ecp_shells()) == sorted(
+        int(shell.orbital_type) for shell in basis.get_ecp_shells()
+    )
+    assert "relabeled" not in capfd.readouterr().out
 
 
 def test_basis_set_ecp_shells_copy():

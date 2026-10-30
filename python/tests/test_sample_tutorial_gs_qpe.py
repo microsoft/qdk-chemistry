@@ -38,8 +38,6 @@ from .test_sample_workflow_utils import (
     _requires_notebook_deps,
 )
 
-# Environment variable to enable slow tests (including notebook e2e tests)
-_RUN_SLOW_TESTS = os.getenv("QDK_CHEMISTRY_RUN_SLOW_TESTS", "").lower() in {"1", "true", "yes"}
 _RUN_TUTORIAL_SNAPSHOTS = os.getenv("QDK_CHEMISTRY_RUN_TUTORIAL_SNAPSHOTS", "").lower() in {
     "1",
     "true",
@@ -492,10 +490,6 @@ def test_tutorial_run_iqpe_configuration(capsys):
 
 @pytest.mark.slow
 @pytest.mark.tutorial_baseline
-@pytest.mark.skipif(
-    not _RUN_SLOW_TESTS,
-    reason="Skipping slow test. Set QDK_CHEMISTRY_RUN_SLOW_TESTS=1 to enable.",
-)
 def test_tutorial_run_iqpe_simulation():
     """Check one seeded IQPE run against its configured phase-grid target."""
     _load_tutorial_module("tutorial_choose_active_space")

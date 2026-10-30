@@ -49,6 +49,14 @@ Settings
    ``control_indices`` (list of int): Which qubits serve as controls (default: ``[0]``).
    ``target_indices`` (list of int): Which qubits the unitary acts on (default: auto-filled).
 
+.. _compact-formula-mappers:
+
+.. rubric:: Compact product-formula support
+
+:ref:`Compact product-formula containers <compact-product-formulas>` are supported by :class:`~qdk_chemistry.algorithms.circuit_mapper.PauliSequenceMapper` and :class:`~qdk_chemistry.algorithms.controlled_circuit_mapper.ControlledPauliSequenceMapper`.
+They execute ``prefix_terms`` and ``suffix_terms`` once, preserving the body's symbolic ``step_reps``; declared layers do not cross these segment boundaries.
+The :ref:`CSWAP mapper <cswap-pauli-sequence-mapper>` also supports nonempty prefix and suffix terms, subject to independent section-wise vacuum validation.
+
 .. rubric:: Creating a mapper
 
 .. tab:: Python API
@@ -81,6 +89,8 @@ You can discover available implementations programmatically:
       :end-before: # end-cell-list-implementations
 
 
+.. _pauli-sequence-mapper:
+
 Pauli sequence mapper
 ~~~~~~~~~~~~~~~~~~~~~
 
@@ -95,6 +105,44 @@ Given a time-evolution unitary expressed as a :class:`~qdk_chemistry.data.PauliP
 
 .. note::
    The current implementation supports a single control qubit.
+
+When the :class:`~qdk_chemistry.data.PauliProductFormulaContainer` supplies ``layer_offsets``,
+the mapper interleaves controlled-rotation decompositions into two rotation rounds
+per declared disjoint layer. These boundaries originate in the unitary builder;
+the mapper does not infer layers from supports or merge neighboring layers.
+Term order, signed angles, and symbolic repetitions are preserved, and identity
+terms retain their phase on the control. Without layer metadata, each controlled
+exponential is completed separately.
+
+This can reduce logical rotation depth without extra ancillas or a different
+mapper selection. Shared-control CNOTs remain serial in a two-qubit-gate model,
+so the rotation-depth improvement is not a guarantee of constant total gate depth.
+
+.. rubric:: Hamming-weight phasing
+
+With ``use_hamming_weight_phasing``, terms of a declared layer with exactly equal nonzero angles,
+such as the uniform bonds of an Ising or Heisenberg lattice, are phased together with
+Hamming-weight phasing :cite:`Kan2025`: an adder tree writes their Hamming weight into scratch
+qubits, and a few controlled rotations on it replace the per-term rotations. Phasing a formula
+without ``layer_offsets`` raises a :class:`ValueError`. Phasing is off by default.
+
+.. rubric:: Settings
+
+.. list-table::
+   :header-rows: 1
+   :widths: 25 15 60
+
+   * - Setting
+     - Type
+     - Description
+   * - ``use_hamming_weight_phasing``
+     - bool
+     - Whether to phase each layer's equal-angle rotations through Hamming-weight registers. Pays off only when layers hold many equal angles. Default is False.
+   * - ``max_hamming_weight_phasing_batch_size``
+     - int
+     - Largest batch phased through one register; -1 (default) means no cap. A smaller cap needs fewer scratch qubits, and a cap one below a power of two, such as 7 or 15, saves a place value per batch. Ignored when phasing is off.
+
+.. _cswap-pauli-sequence-mapper:
 
 Controlled SWAP Pauli sequence mapper
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -136,16 +184,44 @@ fermionic term are exponentiated as one contiguous block:
    \approx \prod_i e^{-it P_i}|0\ldots0\rangle = |0\ldots0\rangle .
 
 The :ref:`vacuum-annihilating term grouper <algorithms-term-grouper>` (factory name
-``"vacuum_annihilating"``) produces that ordering. A Pauli factor *flips* a qubit when it
-exchanges :math:`|0\rangle` and :math:`|1\rangle`, which :math:`X` and :math:`Y` do and
-:math:`I` and :math:`Z` do not. Terms flipping the same qubits are the only ones that can
-cancel, so the grouper walks them in order and closes a group as soon as the accumulated
-amplitude :math:`\sum_j c_j i^{n_Y^{(j)}}` vanishes — each emitted group therefore annihilates
-the vacuum outright. Groups are restricted to one :math:`Y`-count parity so that their members
-commute and can be exponentiated term by term.
+``"vacuum_annihilating"``) supports :class:`~qdk_chemistry.data.LayeredPartition`: terms within
+each outer group commute and each group preserves the vacuum, with disjoint-support layers. It preserves
+compatible incoming groups and layers, repairing group boundaries when needed to keep cancellation
+partners together. For flat or unpartitioned inputs, it constructs disjoint layers from Pauli supports.
 
 The mapper validates its input product formula and raises a :class:`ValueError` when the
 ordering is not vacuum preserving, rather than returning a wrong result.
+
+.. important::
+
+   Compact formulas support nonempty ``prefix_terms`` and ``suffix_terms``; each executes once around the repeated body inside the same CSWAP sandwich.
+   The prefix, body, and suffix are independently validated for vacuum preservation, sharing one leakage tolerance across repetition counts ``1``, ``step_reps``, and ``1``.
+
+.. rubric:: Hamming-weight phasing
+
+With ``use_hamming_weight_phasing``, HWP is supported for formulas built from a
+:class:`~qdk_chemistry.data.LayeredPartition`, as in the
+:ref:`Pauli sequence mapper <pauli-sequence-mapper>`. The evolution on the vacuum register is
+uncontrolled, since the swap sandwich supplies the control.
+
+.. rubric:: Settings
+
+.. list-table::
+   :header-rows: 1
+   :widths: 25 15 60
+
+   * - Setting
+     - Type
+     - Description
+   * - ``use_hamming_weight_phasing``
+     - bool
+     - Whether to phase each layer's equal-angle rotations through Hamming-weight registers. Pays off only when layers hold many equal angles. Default is False.
+   * - ``max_hamming_weight_phasing_batch_size``
+     - int
+     - Largest batch phased through one register; -1 (default) means no cap. A smaller cap needs fewer scratch qubits, and a cap one below a power of two, such as 7 or 15, saves a place value per batch. Ignored when phasing is off.
+   * - ``vacuum_preservation_tolerance``
+     - float
+     - Absolute tolerance on the total amplitude the full evolution may leak out of the vacuum (default ``1e-9``).
 
 .. rubric:: Worked example
 
@@ -184,6 +260,35 @@ so half of the vacuum amplitude leaks. Keeping the partners together instead giv
       :language: python
       :start-after: # start-cell-cswap
       :end-before: # end-cell-cswap
+
+.. _hubbard-plaquette-mapper:
+
+Hubbard plaquette mapper
+~~~~~~~~~~~~~~~~~~~~~~~~
+
+.. rubric:: Factory name: ``"hubbard_plaquette"``
+
+:class:`~qdk_chemistry.algorithms.controlled_circuit_mapper.ControlledHubbardPlaquetteMapper` maps the ``HubbardPlaquetteContainer`` from the ``"hubbard_plaquette"`` :doc:`HamiltonianUnitaryBuilder <hamiltonian_unitary_builder>` to a singly-controlled Q# circuit.
+Each layer of the plaquette step is a tower of same-angle :math:`R_z` rotations, which the mapper synthesizes with Hamming-weight phasing :cite:`Kan2025`: an adder tree writes the tower's Hamming weight into a scratch register, which by default is added into a catalyst, a generalized phase gradient, so that one rotation replaces the per-term rotations. The alternative :math:`R_z` ladder applies one rotation per place value of the weight instead.
+
+.. rubric:: Settings
+
+.. list-table::
+   :header-rows: 1
+   :widths: 25 15 60
+
+   * - Setting
+     - Type
+     - Description
+   * - ``use_hamming_weight_phasing``
+     - bool
+     - Whether to phase each tower of same-angle rotations through a Hamming-weight register. When False, every term is its own rotation. Default is True.
+   * - ``max_hamming_weight_phasing_batch_size``
+     - int
+     - Largest tower of same-angle rotations phased through one Hamming-weight register. A smaller cap needs fewer scratch qubits, and a cap one below a power of two, such as 7 or 15, saves a place value per batch. Ignored when ``use_hamming_weight_phasing`` is False. When set to -1 (default), there is no cap.
+   * - ``hamming_weight_phasing_method``
+     - str
+     - How each Hamming weight is phased: ``"catalyst"`` (default) adds it into a catalyst, a generalized phase gradient prepared once for the interaction layers and once for the hopping layers, and ``"rz_ladder"`` synthesizes each place value as its own :math:`R_z`. Ignored when ``use_hamming_weight_phasing`` is False.
 
 Related classes
 ---------------
