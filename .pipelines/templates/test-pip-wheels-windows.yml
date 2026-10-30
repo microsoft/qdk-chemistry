@@ -27,6 +27,7 @@ steps:
     displayName: Use Python ${{ parameters.pythonVersion }} (arm64)
     env:
       QDK_PYTHON_VERSION: ${{ parameters.pythonVersion }}
+    condition: ${{ parameters.condition }}
 
 - pwsh: |
     $ErrorActionPreference = 'Stop'

@@ -42,6 +42,8 @@ simplest option when you need PySCF.
 > **NOTE:** Commands below are given for Linux/macOS (`bash`) and Windows (PowerShell). Where the
 > Linux/macOS commands use `python3`, use `python` on Windows.
 
+CPython 3.12 and newer share a `cp312-abi3` wheel per platform. Python 3.10 and 3.11 use version-specific wheels.
+
 ### Step 1: Create a virtual environment
 
 Use a virtual environment to avoid conflicts with other packages:
