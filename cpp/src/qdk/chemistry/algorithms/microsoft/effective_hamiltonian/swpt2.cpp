@@ -381,9 +381,11 @@ std::shared_ptr<data::Hamiltonian> SchriefferWolffPT2Constructor::_run_impl(
       Eigen::MatrixXd::Identity(norb, norb)};
   bool semicanonical_applied = false;
   if (_settings->get<bool>("semicanonicalize")) {
-    // Below this the block is already diagonal to working precision and the
-    // rotation would be a no-op.
-    constexpr double semicanonical_tolerance = 1e-10;
+    // A converged SCF leaves off-diagonal Fock elements near its orbital-
+    // gradient threshold. Neglecting them perturbs the result only at that
+    // level, while rotating costs an O(N^5) integral transform, so blocks
+    // below this tolerance are left as they are.
+    constexpr double semicanonical_tolerance = 1e-6;
     for (int spin = 0; spin < (unrestricted ? 2 : 1); ++spin)
       rotation[spin] = sw::semicanonical_rotation(
           fock[spin], {inactive_spatial, active_spatial, virtual_spatial},

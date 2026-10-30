@@ -156,8 +156,11 @@ reference's per-spin 1-RDMs, so the orbital energies can differ between spins.
 
 By default, ``semicanonicalize`` diagonalizes each :math:`F^\sigma` within the inactive,
 active, and virtual blocks. Integrals and density are rotated consistently,
-and the emitted integrals are rotated back. With this option disabled, the
-denominators use the diagonals of :math:`F^\sigma` in the supplied basis.
+and the emitted integrals are rotated back. A block whose off-diagonal elements
+are at most :math:`10^{-6}\,E_h` is left unrotated: such elements are SCF
+convergence noise, and neglecting them changes the result only at that level.
+With this option disabled, the denominators use the diagonals of
+:math:`F^\sigma` in the supplied basis.
 
 Near-degenerate channels give a small :math:`\Delta_T` and a large amplitude, which can make the
 perturbative expansion unreliable. ``regularizer_sigma2`` damps them by replacing the
