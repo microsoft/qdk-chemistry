@@ -164,3 +164,20 @@ lcu_circuit = psp_mapper.run(unitary)
 print(lcu_circuit.estimate()["logicalCounts"])
 # end-cell-lcu-prepare
 ################################################################################
+
+################################################################################
+# start-cell-lcu-select
+from qdk_chemistry.algorithms import create
+from qdk_chemistry.data import AlgorithmRef
+
+# Decode the SELECT index by unary iteration instead of multi-controlling every term
+unary_mapper = create(
+    "circuit_mapper",
+    "prepare_select_prepare",
+    select_method="unary_iteration",
+    prepare=AlgorithmRef("state_prep", "alias_sampling", bits_precision=6),
+)
+unary_counts = unary_mapper.run(unitary).estimate()["logicalCounts"]
+print(f"Toffolis: {lcu_circuit.estimate()['logicalCounts']['cczCount']} -> {unary_counts['cczCount']}")
+# end-cell-lcu-select
+################################################################################

@@ -5,7 +5,7 @@
 # Licensed under the MIT License. See LICENSE.txt in the project root for license information.
 # --------------------------------------------------------------------------------------------
 
-from qdk_chemistry.algorithms.circuit_mapper.psp_mapper import PSPMapper
+from qdk_chemistry.algorithms.circuit_mapper.psp_mapper import SELECT_METHODS, PSPMapper
 from qdk_chemistry.data import AlgorithmRef
 from qdk_chemistry.data.circuit import Circuit, QsharpFactoryData
 from qdk_chemistry.data.unitary_representation.base import UnitaryRepresentation
@@ -22,6 +22,9 @@ class ControlledPSPMapperSettings(ControlledCircuitMapperSettings):
     Attributes:
         prepare: Algorithm reference for the PREPARE oracle state preparation.
             Defaults to ``DensePureStatePreparation``.
+        select_method: How SELECT decodes the index register, as for
+            :class:`~qdk_chemistry.algorithms.circuit_mapper.psp_mapper.PSPMapper`.
+            Defaults to ``"multi_controlled"``.
 
     """
 
@@ -33,6 +36,15 @@ class ControlledPSPMapperSettings(ControlledCircuitMapperSettings):
             "algorithm_ref",
             AlgorithmRef("state_prep", "dense_pure_state"),
             "Algorithm for the PREPARE oracle state preparation. ",
+        )
+        self._set_default(
+            "select_method",
+            "string",
+            "multi_controlled",
+            "How SELECT decodes the index register. 'multi_controlled' controls every term on the "
+            "full index; 'unary_iteration' decodes it by unary iteration, about L - 1 Toffolis for "
+            "L terms.",
+            list(SELECT_METHODS),
         )
 
 
@@ -82,11 +94,12 @@ class ControlledPSPMapper(ControlledCircuitMapper):
         """Build the uncontrolled PSP mapper to delegate the block encoding to.
 
         Returns:
-            A :class:`PSPMapper` carrying this mapper's ``prepare`` setting.
+            A :class:`PSPMapper` carrying this mapper's ``prepare`` and ``select_method`` settings.
 
         """
         mapper = PSPMapper()
         mapper.settings().set("prepare", self._settings.get("prepare"))
+        mapper.settings().set("select_method", self._settings.get("select_method"))
         return mapper
 
     def _run_impl(self, unitary: UnitaryRepresentation) -> Circuit:

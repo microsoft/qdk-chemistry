@@ -480,6 +480,48 @@ To use alias sampling for the PREPARE oracle, pass an
       :start-after: # start-cell-lcu-prepare
       :end-before: # end-cell-lcu-prepare
 
+By default SELECT controls every Pauli term on the full index register, so each factor of each
+term becomes a multi-controlled gate. Setting ``select_method="unary_iteration"`` instead decodes
+the index by unary iteration :cite:`Babbush2018` (Sec. III A), which costs about :math:`L - 2`
+Toffolis for :math:`L` terms (one more under a control) plus at most
+:math:`\lceil \log_2 L \rceil - 1` scratch qubits that it allocates and releases internally.
+Under the Base target profile the scratch uncomputation falls back to Toffolis, since it
+cannot measure. Index states past the last term apply a
+term rather than the identity, but PREPARE gives them no amplitude, so the block encoding is
+unchanged. Combined with alias-sampling PREPARE, this is the standard LCU cost model of
+:cite:`Babbush2018`, useful for projecting resources at scales that cannot be simulated.
+
+.. list-table:: Logical counts for a 6-qubit, 20-term Hamiltonian (Adaptive profile)
+   :header-rows: 1
+
+   * - ``select_method``
+     - ``prepare``
+     - CCZ
+     - Qubits (estimate)
+   * - ``multi_controlled``
+     - ``dense_pure_state``
+     - 618
+     - 14
+   * - ``unary_iteration``
+     - ``dense_pure_state``
+     - 18
+     - 15
+   * - ``multi_controlled``
+     - ``alias_sampling``
+     - 683
+     - 47
+   * - ``unary_iteration``
+     - ``alias_sampling``
+     - 83
+     - 47
+
+.. tab:: Python API -- unary-iteration SELECT
+
+   .. literalinclude:: ../../../_static/examples/python/hamiltonian_unitary_builder.py
+      :language: python
+      :start-after: # start-cell-lcu-select
+      :end-before: # end-cell-lcu-select
+
 The resulting :class:`~qdk_chemistry.data.UnitaryRepresentation` wraps an ``LCUContainer`` containing the Prepare and Select oracles.
 
 .. _sossa-builder:

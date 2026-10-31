@@ -5,15 +5,20 @@
 # Licensed under the MIT License. See LICENSE.txt in the project root for license information.
 # --------------------------------------------------------------------------------------------
 
+import contextlib
+import functools
+
 import numpy as np
 import pytest
+from qdk import TargetProfile
 
+from qdk_chemistry.algorithms import registry
 from qdk_chemistry.algorithms.controlled_circuit_mapper import ControlledPSPMapper
 from qdk_chemistry.algorithms.hamiltonian_unitary_builder.block_encoding.lcu import LCUBuilder
 from qdk_chemistry.data import Circuit, QubitOperator
 from qdk_chemistry.data.unitary_representation.base import UnitaryRepresentation
 from qdk_chemistry.plugins.qiskit import QDK_CHEMISTRY_HAS_QISKIT
-from qdk_chemistry.utils.qsharp import create_qsharp_context
+from qdk_chemistry.utils.qsharp import create_qsharp_context, use_qsharp_context
 
 if QDK_CHEMISTRY_HAS_QISKIT:
     from qiskit.quantum_info import Operator
@@ -26,6 +31,22 @@ def _build_unitary_rep(pauli_strings, coefficients, *, quantum_walk=False):
     hamiltonian = QubitOperator(pauli_strings=pauli_strings, coefficients=coefficients)
     builder = LCUBuilder(quantum_walk=quantum_walk)
     return builder.run(hamiltonian)
+
+
+@functools.cache
+def _base_context():
+    """A Base-profile context, shared across tests because each one compiles the Q# sources."""
+    return create_qsharp_context(TargetProfile.Base)
+
+
+def _qiskit_compatible_context(select_method: str):
+    """The unary SELECT uncomputes its ANDs by measurement unless built under the Base profile.
+
+    Qiskit's ``Operator`` needs a measurement-free circuit, so that variant runs in a Base context.
+    """
+    if select_method == "unary_iteration":
+        return use_qsharp_context(_base_context())
+    return contextlib.nullcontext()
 
 
 def _extract_block_encoding_submatrix(full_unitary, num_target, num_ancilla):
@@ -126,20 +147,24 @@ class TestPrepareSelectMapper:
         ],
         ids=["1q_mixed_sign", "2q_molecular", "4q_ising"],
     )
-    def test_block_encoding_identity(self, pauli_strings, coefficients, description):
+    @pytest.mark.parametrize("select_method", ["multi_controlled", "unary_iteration"])
+    def test_block_encoding_identity(self, pauli_strings, coefficients, description, select_method):
         r"""Verify the block encoding identity <0|_anc B[H] |0>_anc = H/\lambda.
 
         Parametrized over several Hamiltonians of increasing complexity, from
-        textbook 1-qubit examples to a molecular-inspired 2-qubit benchmark.
+        textbook 1-qubit examples to a molecular-inspired 2-qubit benchmark, and over
+        both SELECT constructions.
         """
         coefficients = np.array(coefficients)
         hamiltonian = QubitOperator(pauli_strings=pauli_strings, coefficients=coefficients)
         num_target = hamiltonian.num_qubits
 
         unitary_rep = _build_unitary_rep(pauli_strings, coefficients)
-        mapper = ControlledPSPMapper()
-        circuit = mapper.run(unitary_rep)
-        qc = circuit.get_qiskit_circuit()
+        with _qiskit_compatible_context(select_method):
+            circuit = registry.create(
+                "controlled_circuit_mapper", "prepare_select_prepare", select_method=select_method
+            ).run(unitary_rep)
+            qc = circuit.get_qiskit_circuit()
         full_u = Operator(qc).data
 
         # num_ancilla = total circuit qubits - 1 (control) - num_target
@@ -154,7 +179,8 @@ class TestPrepareSelectMapper:
         ), f"Block encoding identity failed for: {description}"
 
     @pytest.mark.skipif(not QDK_CHEMISTRY_HAS_QISKIT, reason="Qiskit not available.")
-    def test_quantum_walk_eigenvalues(self):
+    @pytest.mark.parametrize("select_method", ["multi_controlled", "unary_iteration"])
+    def test_quantum_walk_eigenvalues(self, select_method):
         r"""Verify quantum walk operator eigenvalues satisfy the arccos relation.
 
         For H = \alpha_1*X + \alpha_2*Z on 1 qubit with \lambda = |\alpha_1| + |\alpha_2|,
@@ -167,13 +193,17 @@ class TestPrepareSelectMapper:
         coeffs = np.array([0.5, 0.3])
         unitary_rep = _build_unitary_rep(["X", "Z"], coeffs, quantum_walk=True)
 
-        mapper = ControlledPSPMapper()
-        circuit = mapper.run(unitary_rep)
-        full_u = Operator(circuit.get_qiskit_circuit()).data
+        with _qiskit_compatible_context(select_method):
+            circuit = registry.create(
+                "controlled_circuit_mapper", "prepare_select_prepare", select_method=select_method
+            ).run(unitary_rep)
+            qc = circuit.get_qiskit_circuit()
+        full_u = Operator(qc).data
 
-        # Extract the ctrl=1 block (the full walk operator W acting on system+ancilla)
+        # Extract the ctrl=1 block (the full walk operator W acting on system+ancilla). Qubits past
+        # the declared width are SELECT's internal scratch, which starts and ends in |0>.
         dim = full_u.shape[0]
-        ctrl1_indices = [i for i in range(dim) if i & 1]
+        ctrl1_indices = [i for i in range(dim) if i & 1 and i >> circuit.num_qubits == 0]
         walk_u = full_u[np.ix_(ctrl1_indices, ctrl1_indices)]
 
         eigenvalues = np.linalg.eigvals(walk_u)
