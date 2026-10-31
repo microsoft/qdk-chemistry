@@ -187,10 +187,11 @@ MACIS_AVX512 void same_spin_tile_avx512(size_t m, size_t pair_dim, const T* W,
                                         uint32_t* pid) {
   constexpr size_t RW = V * tile_width<T>;
   // Blocks of R output members: at least eight independent FMA chains (R V
-  // accumulators) while the R row pointers of W still fit in registers, R
-  // being 9 or 8 (6 or 5 for V = 4), whichever pads m less. The last block
-  // is padded with copies of a valid row rather than run short, as a short
-  // block is latency bound and costs as much as a full one.
+  // accumulators, for two FMA ports of 4-cycle latency as on Cascade Lake)
+  // while the R row pointers of W still fit in registers, R being 9 or 8 (6
+  // or 5 for V = 4), whichever pads m less. The last block is padded with
+  // copies of a valid row rather than run short, as a short block is latency
+  // bound and costs as much as a full one.
   constexpr size_t R1 = V == 4 ? 6 : 9;
   const size_t R =
       m % R1 == 0 or (m + R1 - 1) / R1 * R1 < (m + R1 - 2) / (R1 - 1) * (R1 - 1)
@@ -219,7 +220,9 @@ MACIS_AVX512 void same_spin_tile_avx512(size_t m, size_t pair_dim, const T* W,
 }
 
 // AVX2: a tile row is two registers; four output members (eight
-// accumulators) at a time
+// accumulators) at a time. Not tuned (Cascade Lake runs the AVX-512 kernels):
+// AVX2 machines (Zen 2/3, client Intel) may gain from wider tiles as AVX-512
+// did
 MACIS_AVX2 inline __m256d v256_load(const double* p) {
   return _mm256_load_pd(p);
 }
@@ -306,30 +309,64 @@ MACIS_AVX2 void same_spin_tile_avx2(size_t m, size_t pair_dim, const T* W,
 
 #endif  // MACIS_FCI_X86_SIMD
 
-// Alpha-beta scatter, compiler-vectorized: each link entry is read once for
-// all NR rows
-template <typename T, int NR>
-void beta_scatter_rows(size_t b0, size_t bl, size_t npair, size_t nexc,
-                       size_t nocc, const uint32_t* link_target,
-                       const uint32_t* link_pair, const uint32_t* diag_pair,
-                       const T* const* z, T* const* s) {
+// Alpha-beta scatter, all R rows of the group: each link entry is read once
+// for all of them, and their R interleaved sigma elements are one short
+// vector (R scalar loads of z, one vector add)
+template <typename T, size_t R>
+void beta_scatter_group(size_t b0, size_t bl, size_t npair, size_t nexc,
+                        size_t nocc, const uint32_t* link_target,
+                        const uint32_t* link_pair, const uint32_t* link_npos,
+                        const uint32_t* diag_pair, const T* const* z,
+                        T* __restrict si) {
   for (size_t b = 0; b < bl; ++b) {
     const size_t jb = b0 + b;
     const uint32_t* lt = link_target + jb * nexc;
     const uint32_t* lp = link_pair + jb * nexc;
-    const T* zb[NR];
-    for (int r = 0; r < NR; ++r) zb[r] = z[r] + b * npair;
-    for (size_t e = 0; e < nexc; ++e) {
-      const uint32_t t = lt[e], ps = lp[e];
-      const uint32_t p = ps & ~sign_bit;
-      const T sg = member_sign<T>(ps);
-      for (int r = 0; r < NR; ++r) s[r][t] += sg * zb[r][p];
+    const size_t npos = link_npos[jb];
+    const T* zb[R];
+    for (size_t r = 0; r < R; ++r) zb[r] = z[r] + b * npair;
+    for (size_t e = 0; e < npos; ++e) {
+      T* __restrict y = si + size_t(lt[e]) * R;
+      const uint32_t p = lp[e];
+      for (size_t r = 0; r < R; ++r) y[r] += zb[r][p];
+    }
+    for (size_t e = npos; e < nexc; ++e) {
+      T* __restrict y = si + size_t(lt[e]) * R;
+      const uint32_t p = lp[e];
+      for (size_t r = 0; r < R; ++r) y[r] -= zb[r][p];
     }
     const uint32_t* dp = diag_pair + jb * nocc;
-    for (int r = 0; r < NR; ++r) {
+    T* __restrict y = si + jb * R;
+    for (size_t r = 0; r < R; ++r) {
       T d = 0;
       for (size_t q = 0; q < nocc; ++q) d += zb[r][dp[q]];
-      s[r][jb] += d;
+      y[r] += d;
+    }
+  }
+}
+
+// Alpha-beta scatter for a subset of the rows (the last group, and rows
+// without entries in a block of a spin-flip sector)
+template <typename T, size_t R>
+void beta_scatter_lanes(size_t b0, size_t bl, size_t npair, size_t nexc,
+                        size_t nocc, const uint32_t* link_target,
+                        const uint32_t* link_pair, const uint32_t* link_npos,
+                        const uint32_t* diag_pair, int nrows, const int* lane,
+                        const T* const* z, T* si) {
+  for (size_t b = 0; b < bl; ++b) {
+    const size_t jb = b0 + b;
+    const uint32_t* lt = link_target + jb * nexc;
+    const uint32_t* lp = link_pair + jb * nexc;
+    const size_t npos = link_npos[jb];
+    for (int a = 0; a < nrows; ++a) {
+      const T* zb = z[a] + b * npair;
+      T* y = si + lane[a];
+      for (size_t e = 0; e < npos; ++e) y[size_t(lt[e]) * R] += zb[lp[e]];
+      for (size_t e = npos; e < nexc; ++e) y[size_t(lt[e]) * R] -= zb[lp[e]];
+      const uint32_t* dp = diag_pair + jb * nocc;
+      T d = 0;
+      for (size_t q = 0; q < nocc; ++q) d += zb[dp[q]];
+      y[jb * R] += d;
     }
   }
 }
@@ -337,29 +374,22 @@ void beta_scatter_rows(size_t b0, size_t bl, size_t npair, size_t nexc,
 template <typename T>
 void beta_scatter_generic(size_t b0, size_t bl, size_t npair, size_t nexc,
                           size_t nocc, const uint32_t* link_target,
-                          const uint32_t* link_pair, const uint32_t* diag_pair,
-                          int nrows, const T* const* z, T* const* s) {
-  switch (nrows) {
-    case 1:
-      beta_scatter_rows<T, 1>(b0, bl, npair, nexc, nocc, link_target, link_pair,
-                              diag_pair, z, s);
-      break;
-    case 2:
-      beta_scatter_rows<T, 2>(b0, bl, npair, nexc, nocc, link_target, link_pair,
-                              diag_pair, z, s);
-      break;
-    case 3:
-      beta_scatter_rows<T, 3>(b0, bl, npair, nexc, nocc, link_target, link_pair,
-                              diag_pair, z, s);
-      break;
-    default:
-      beta_scatter_rows<T, 4>(b0, bl, npair, nexc, nocc, link_target, link_pair,
-                              diag_pair, z, s);
-  }
+                          const uint32_t* link_pair, const uint32_t* link_npos,
+                          const uint32_t* diag_pair, int nrows, const int* lane,
+                          const T* const* z, T* si) {
+  constexpr size_t R = row_group;
+  if (size_t(nrows) == R)
+    beta_scatter_group<T, R>(b0, bl, npair, nexc, nocc, link_target, link_pair,
+                             link_npos, diag_pair, z, si);
+  else
+    beta_scatter_lanes<T, R>(b0, bl, npair, nexc, nocc, link_target, link_pair,
+                             link_npos, diag_pair, nrows, lane, z, si);
 }
 
 }  // namespace
 
+// Wide tile rows pay where a broadcast matrix element is the bottleneck,
+// measured for AVX-512 only
 size_t max_tile_lines(FCISimd simd) {
 #if MACIS_FCI_X86_SIMD
   if (simd == FCISimd::avx512) return 4;
@@ -387,9 +417,10 @@ template SameSpinTileKernel<float> same_spin_tile_kernel<float>(FCISimd,
 template SameSpinTileKernel<double> same_spin_tile_kernel<double>(FCISimd,
                                                                   size_t);
 
-// The scatter has no SIMD variants: AVX-512 gather/scatter over a string's
-// links (conflict free) measured 2.2x (float) / 2.7x (double) slower than
-// the scalar multi-row loop on Cascade Lake
+// The scatter has no instruction-set variants: its portable form vectorizes
+// over the rows of a group with any SSE2 or later. AVX-512 gather/scatter
+// over a string's links (conflict free) measured 2.2x (float) / 2.7x
+// (double) slower than scalar code on Cascade Lake.
 template <typename T>
 BetaScatterKernel<T> beta_scatter_kernel(FCISimd) {
   return &beta_scatter_generic<T>;

@@ -275,6 +275,26 @@ TEST_CASE("Restarted Davidson Long Tail") {
   testing::drop_test_loggers();
 }
 
+TEST_CASE("Davidson Work Arrays") {
+  // The vectorized FCI kernels load their tiles (carved from these arrays)
+  // with aligned loads; sizes span the small and the huge-page branch
+  auto aligned = [](const void* p) {
+    return reinterpret_cast<uintptr_t>(p) % macis::detail::davidson_alignment ==
+           0;
+  };
+  for (size_t n : {size_t(0), size_t(1), size_t(3), size_t(1000),
+                   size_t(1) << 17, (size_t(1) << 18) + 5}) {
+    for (int rep = 0; rep < 4; ++rep) {
+      auto c = macis::detail::davidson_alloc<char>(n);
+      auto f = macis::detail::davidson_alloc<float>(n);
+      auto d = macis::detail::davidson_alloc<double>(n);
+      REQUIRE(aligned(c.get()));
+      REQUIRE(aligned(f.get()));
+      REQUIRE(aligned(d.get()));
+    }
+  }
+}
+
 #ifdef MACIS_ENABLE_MPI
 TEST_CASE("Parallel Davidson") {
   if (!spdlog::get("davidson")) {

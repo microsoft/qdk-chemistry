@@ -151,7 +151,7 @@ MACIS CAS
 .. rubric:: Factory name: ``"macis_cas"`` (default)
 
 The :term:`MACIS` (Many-body Adaptive Configuration Interaction Solver) :term:`CAS` implementation provides a reference solver to compute the exact energy within the active space.
-It uses a direct, string-driven full :term:`CI` algorithm :cite:`Knowles1984,Olsen1988,Harrison1989`: the Hamiltonian is applied to the :term:`CI` vector from the one- and two-electron integrals and is never stored, so memory is dominated by about a dozen vectors with one entry per determinant rather than by the Hamiltonian.
+It uses a direct, string-driven full :term:`CI` algorithm :cite:`Knowles1984,Olsen1988,Harrison1989`: the Hamiltonian is applied to the :term:`CI` vector from the one- and two-electron integrals and is never stored, so memory is dominated by a small number of vectors with one entry per determinant rather than by the Hamiltonian.
 The returned wavefunction likewise stores only the :term:`CI` coefficients, in a :class:`~qdk_chemistry.data.CasStateVectorContainer`, and generates its determinants when they are first requested.
 The number of determinants, and with it time and memory, still grows combinatorially with the size of the active space, so this solver suits small to moderately large active spaces; for larger ones, consider :ref:`MACIS ASCI <macis-asci>`.
 

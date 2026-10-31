@@ -14,8 +14,9 @@
 
 namespace macis {
 
-/// Instruction-set levels of the hand-vectorized FCI kernels; all give the
-/// same results up to rounding
+/// Instruction-set levels of the hand-vectorized FCI kernels: portable C++
+/// (any architecture) and x86-64 AVX2 / AVX-512, selected at run time; all
+/// give the same results up to rounding
 enum class FCISimd { generic = 0, avx2 = 1, avx512 = 2 };
 
 /// Widest kernel level supported by this CPU and compiler
@@ -157,10 +158,12 @@ class FCIHamiltonian {
   std::vector<double> coulomb_;  ///< norb x norb, (pp|qq)
   std::shared_ptr<const SameSpinOperator> h_alpha_;
   std::shared_ptr<const SameSpinOperator> h_beta_;
-  /// Off-diagonal excitations of the beta strings for the alpha-beta pass:
-  /// target address, and fci_pair_index with the sign in bit 31
+  /// Off-diagonal excitations of the beta strings for the alpha-beta pass,
+  /// those of positive sign first (beta_link_npos_ of them): target address
+  /// and fci_pair_index
   std::vector<uint32_t> beta_link_target_;
   std::vector<uint32_t> beta_link_pair_;
+  std::vector<uint32_t> beta_link_npos_;
   /// fci_pair_index(q, q) of the occupied orbitals q of every beta string
   std::vector<uint32_t> beta_diag_pair_;
   FCISimd simd_ = fci_simd_supported();

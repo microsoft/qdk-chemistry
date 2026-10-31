@@ -39,9 +39,9 @@ namespace macis {
 
 namespace {
 // Beta strings per GEMM of the alpha-beta pass: as many as keep a task's
-// products (row_group x npair x block elements) within about 512 KiB, i.e.
-// L2 resident together with its sigma rows, capped at 256 (measured best
-// for 16 orbitals; 64 doubled the gather time)
+// products (row_group x npair x block elements) within 512 KiB, half the L2
+// of Cascade Lake, capped at 256 (measured best for 16 orbitals on Cascade
+// Lake; 64 doubled the gather time, a 256 KiB budget cost 4 %)
 template <typename T>
 size_t beta_block_size(size_t row_group, size_t npair) {
   const size_t fit = (size_t(1) << 19) / (row_group * npair * sizeof(T));
@@ -78,13 +78,14 @@ std::vector<size_t> tile_task_lines(size_t ntiles, size_t nt,
 }
 
 // Below this many determinants FCIPrecision::automatic stays in double
-// precision: measured slower mixed at 8.5e5 (H12), faster at 2.9e6 (H13)
+// precision: measured slower mixed at 8.5e5 (H12), faster at 2.9e6 (H13) on
+// Cascade Lake with 64 threads
 constexpr size_t mixed_precision_min_size = size_t(1) << 21;
 
 // From this many determinants the P-space is also an exact block of the
 // Davidson preconditioner: its eigendecomposition (about 25 ms) is then
 // cheaper than the iteration it saves (57 ms for 1.2e7 determinants, 18 ms
-// for 2.9e6)
+// for 2.9e6, on Cascade Lake with 64 threads)
 constexpr size_t block_preconditioner_min_size = size_t(1) << 23;
 
 #ifdef MACIS_FCI_PROFILE
@@ -108,7 +109,8 @@ inline double profile_clock() {
 /// takes a microcode assist; they arise in converged vectors, as products of
 /// vanishing (e.g. symmetry-forbidden) coefficients with integrals that are
 /// zero up to rounding, and were measured to slow the single-precision GEMM
-/// down fivefold.
+/// down fivefold on Cascade Lake. x86 only: other architectures keep their
+/// default floating-point mode (e.g. AArch64 FPCR.FZ is not set).
 template <typename T>
 struct FlushDenormals {
 #if defined(__SSE2__) || defined(_M_X64)
@@ -154,7 +156,8 @@ T* cache_line_aligned(T* p) {
 }
 
 /// Threads for a parallel region doing `flops` of work: one per 2e6 flops
-/// (about 0.1 ms), so that small spaces are not dominated by thread start-up
+/// (about 0.1 ms on Cascade Lake), so that small spaces are not dominated by
+/// thread start-up
 int threads_for(double flops) {
 #ifdef _OPENMP
   const double max_threads = omp_get_max_threads();
@@ -167,7 +170,7 @@ int threads_for(double flops) {
 /// While alive, OpenMP-threaded BLAS/LAPACK calls of the calling thread run
 /// serially: for the 400 x 400 P-space matrix, 64 MKL threads took 14 ms
 /// instead of 6 (syevr) and up to 170 ms instead of 23 (syevd of a spin-flip
-/// sector matrix); threading only pays from about 1000 x 1000
+/// sector matrix) on Cascade Lake; threading only pays from about 1000 x 1000
 struct SerialLapack {
 #ifdef _OPENMP
   int saved = omp_get_max_threads();
@@ -261,21 +264,30 @@ FCIHamiltonian::FCIHamiltonian(size_t norb, size_t nalpha, size_t nbeta,
                             : make_same_spin_operator(*beta_, T, LDT, V, LDV);
 
   // Compact beta links of the alpha-beta scatter (8 bytes per excitation
-  // instead of 16) and the diagonal pairs of every beta string
+  // instead of 16) and the diagonal pairs of every beta string. The links of
+  // a string are stored positive sign first, so the scatter adds and then
+  // subtracts without decoding signs; a string's targets are distinct, so
+  // their order does not change any sum.
   const size_t nbs = beta_->size();
   const size_t nexc = beta_->num_excitations();
   const size_t nocc = beta_->nelec();
   beta_link_target_.resize(nbs * nexc);
   beta_link_pair_.resize(nbs * nexc);
+  beta_link_npos_.resize(nbs);
   beta_diag_pair_.resize(nbs * nocc);
 #pragma omp parallel for schedule(static) num_threads(threads_for(nbs* nexc))
   for (size_t ib = 0; ib < nbs; ++ib) {
     const auto* ex = beta_->excitations(ib);
-    for (size_t e = 0; e < nexc; ++e) {
-      beta_link_target_[ib * nexc + e] = ex[e].target;
-      beta_link_pair_[ib * nexc + e] =
-          ex[e].pair | (ex[e].sign < 0 ? sign_bit : 0u);
-    }
+    size_t pos = ib * nexc;
+    for (int sign : {1, -1})
+      for (size_t e = 0; e < nexc; ++e) {
+        if (ex[e].sign != sign) continue;
+        beta_link_target_[pos] = ex[e].target;
+        beta_link_pair_[pos] = ex[e].pair;
+        ++pos;
+      }
+    beta_link_npos_[ib] = uint32_t(
+        std::count_if(ex, ex + nexc, [](const auto& x) { return x.sign > 0; }));
     const uint32_t* occ = beta_->occupied(ib);
     for (size_t q = 0; q < nocc; ++q)
       beta_diag_pair_[ib * nocc + q] = uint32_t(fci_pair_index(occ[q], occ[q]));
@@ -543,10 +555,7 @@ void FCIHamiltonian::sigma_impl(const T* C, T* S, T alpha, T beta,
   double prof_threads = 0, prof_gather = 0, prof_gemm = 0, prof_scatter = 0;
   MACIS_FCI_TIC(prof_t0);
 #endif
-  // Alpha strings per task: each beta link entry is read once for all of
-  // them, and their sigma rows, products and integral columns stay L2
-  // resident (about 0.6 MB)
-  constexpr size_t row_group = sizeof(T) == 4 ? 4 : 2;
+  constexpr size_t row_group = fci_detail::row_group;
   const size_t beta_block = beta_block_size<T>(row_group, npair_);
   const auto beta_scatter = fci_detail::beta_scatter_kernel<T>(simd_);
   const size_t ngroups = (na + row_group - 1) / row_group;
@@ -556,13 +565,15 @@ void FCIHamiltonian::sigma_impl(const T* C, T* S, T alpha, T beta,
   {
     [[maybe_unused]] FlushDenormals<T> flush;
     // Every element is written before it is read (gemm with beta = 0 does
-    // not read Z)
+    // not read Z); SI holds the sigma rows of a group interleaved
     const size_t w_size = mixed ? row_group * npair_ * K : 0;
     const size_t x_size = mixed ? beta_block * K : 0;
-    T* const W = scratch.get<T>(w_size + x_size +
-                                (mixed ? row_group * beta_block * npair_ : 0));
+    const size_t z_size = mixed ? row_group * beta_block * npair_ : 0;
+    T* const W =
+        scratch.get<T>(w_size + x_size + z_size + (mixed ? row_group * nb : 0));
     T* const X = W + w_size;
     T* const Z = X + x_size;
+    T* const SI = Z + z_size;
     // Per row of the group: column order of X and W and the row of C each
     // column gathers, on cache lines of their own
     std::vector<uint32_t> column_buffer(row_group * 2 * K + 32);
@@ -576,7 +587,9 @@ void FCIHamiltonian::sigma_impl(const T* C, T* S, T alpha, T beta,
     // excitations of ia, and W the matching signed integral columns; Z is
     // then scattered through the beta excitations into row ia. In a sector
     // the work of a row grows with the addresses of its excitations, hence
-    // the dynamic schedule (measured as fast as static without a sector)
+    // the dynamic schedule; without a sector it also beats a static one (on
+    // Cascade Lake, NUMA-local rows: concurrent consecutive groups share
+    // their source rows of C in cache instead)
 #pragma omp for schedule(dynamic, 1)
     for (size_t g = 0; g < ngroups; ++g) {
       const size_t ia0 = g * row_group;
@@ -586,10 +599,19 @@ void FCIHamiltonian::sigma_impl(const T* C, T* S, T alpha, T beta,
       for (size_t r = 0; r < nr; ++r) {
         const size_t ia = ia0 + r;
         s[r] = S + ia * nb;
-        if (beta == T(0))
+        if (mixed) {
+          // Interleaved (scaled) rows; lanes past nr stay unused
+          T* si = SI + r;
+          if (beta == T(0))
+            for (size_t ib = 0; ib < nb; ++ib) si[ib * row_group] = T(0);
+          else
+            for (size_t ib = 0; ib < nb; ++ib)
+              si[ib * row_group] = s_scale * s[r][ib];
+        } else if (beta == T(0)) {
           std::fill_n(s[r], nb, T(0));
-        else if (s_scale != T(1))
+        } else if (s_scale != T(1)) {
           for (size_t ib = 0; ib < nb; ++ib) s[r][ib] *= s_scale;
+        }
         if (not mixed) continue;
 
         // Column 0 is ia, column l + 1 its l-th excitation; in a sector the
@@ -631,7 +653,7 @@ void FCIHamiltonian::sigma_impl(const T* C, T* S, T alpha, T beta,
         const size_t bl = std::min(beta_block, nb - b0);
         // Rows of the group with entries in this block (in a sector a row
         // has none past its diagonal)
-        T* s_active[row_group];
+        int lane[row_group];
         const T* z_active[row_group];
         int nactive = 0;
         for (size_t r = 0; r < nr; ++r) {
@@ -662,7 +684,7 @@ void FCIHamiltonian::sigma_impl(const T* C, T* S, T alpha, T beta,
                      npair_, bl, kb[r], T(1), W + r * K * npair_, npair_, X, bl,
                      T(0), z, npair_);
           MACIS_FCI_TOC(t_gemm, tm);
-          s_active[nactive] = s[r];
+          lane[nactive] = int(r);
           z_active[nactive] = z;
           ++nactive;
         }
@@ -670,13 +692,15 @@ void FCIHamiltonian::sigma_impl(const T* C, T* S, T alpha, T beta,
         if (nactive == 0) break;
 
         MACIS_FCI_TIC(ts);
-        const uint32_t* lt = beta_link_target_.data();
-        const uint32_t* lp = beta_link_pair_.data();
-        const uint32_t* dp = beta_diag_pair_.data();
-        beta_scatter(b0, bl, npair_, nexc_b, nocc_b, lt, lp, dp, nactive,
-                     z_active, s_active);
+        beta_scatter(b0, bl, npair_, nexc_b, nocc_b, beta_link_target_.data(),
+                     beta_link_pair_.data(), beta_link_npos_.data(),
+                     beta_diag_pair_.data(), nactive, lane, z_active, SI);
         MACIS_FCI_TOC(t_scatter, ts);
       }
+      MACIS_FCI_TIC(ts);
+      for (size_t r = 0; r < nr; ++r)
+        for (size_t ib = 0; ib < nb; ++ib) s[r][ib] = SI[ib * row_group + r];
+      MACIS_FCI_TOC(t_scatter, ts);
     }
 #ifdef MACIS_FCI_PROFILE
 #pragma omp critical
@@ -1220,8 +1244,8 @@ double fci_ground_state(const FCIHamiltonian& H, size_t max_iter,
   // spatial-symmetry sector. In large spaces it is also an exact block of
   // the preconditioner, which saved one iteration (two for a stretched
   // H12) in every measured case for the cost of its eigendecomposition
-  // (about 25 ms); larger P-spaces, or the largest components of the
-  // converged vector, converged no faster or slower.
+  // (about 25 ms on Cascade Lake); larger P-spaces, or the largest
+  // components of the converged vector, converged no faster or slower.
   const bool need_guess = not guess or blas::nrm2(N, C, 1) == 0.0;
   const bool use_block = N >= block_preconditioner_min_size;
   DavidsonBlockPreconditioner block;
@@ -1328,52 +1352,18 @@ double fci_ground_state(const FCIHamiltonian& H, size_t max_iter,
   // as the change of the Ritz vector since the start vector v_0. So after a
   // single-precision phase, the solve restarts from its vector with that
   // start vector in double precision and keeps the corrections in single
-  // precision, and the final Ritz pair is accepted on its double-precision
-  // residual.
-  auto xf = detail::davidson_alloc<float>(N);
-  auto sf = detail::davidson_alloc<float>(N);
-  detail::davidson_partition(int64_t(N), [&](int64_t, int64_t i0, int64_t i1) {
-    std::fill(xf.get() + i0, xf.get() + i1, 0.0f);
-    std::fill(sf.get() + i0, sf.get() + i1, 0.0f);
-  });
+  // precision (stored so: their images carry no more digits), and the final
+  // Ritz pair is accepted on its double-precision residual.
   struct SingleOperator {
     const FCIHamiltonian& H;
     int spin_flip;
-    float* x;
-    float* s;
-    int64_t N;
-    void operator_action(size_t m, double alpha, const double* V, size_t LDV,
-                         double beta, double* AV, size_t LDAV) const {
-      for (size_t i = 0; i < m; ++i) {
-        const double* v = V + i * LDV;
-        double* av = AV + i * LDAV;
-        // Values below the float range would become denormals (see
-        // FlushDenormals)
-        detail::davidson_partition(N, [&](int64_t, int64_t i0, int64_t i1) {
-          constexpr double tiny = std::numeric_limits<float>::min();
-          for (int64_t j = i0; j < i1; ++j)
-            x[j] = std::abs(v[j]) < tiny ? 0.0f : float(v[j]);
-        });
-        H.sigma(x, s, 1.0f, 0.0f, spin_flip);
-        detail::davidson_partition(N, [&](int64_t, int64_t i0, int64_t i1) {
-          for (int64_t j = i0; j < i1; ++j)
-            av[j] = alpha * double(s[j]) + (beta == 0.0 ? 0.0 : beta * av[j]);
-        });
-      }
+    void operator_action(size_t m, double alpha, const float* V, size_t LDV,
+                         double beta, float* AV, size_t LDAV) const {
+      for (size_t i = 0; i < m; ++i)
+        H.sigma(V + i * LDV, AV + i * LDAV, float(alpha), float(beta),
+                spin_flip);
     }
-  } single{H, spin_flip, xf.get(), sf.get(), int64_t(N)};
-  // Double precision for the first (start) vector, single for the rest
-  struct AnchoredOperator {
-    const SectorOperator& dp;
-    const SingleOperator& sp;
-    mutable bool anchored = false;
-    void operator_action(size_t m, double alpha, const double* V, size_t LDV,
-                         double beta, double* AV, size_t LDAV) const {
-      if (anchored) return sp.operator_action(m, alpha, V, LDV, beta, AV, LDAV);
-      anchored = true;
-      dp.operator_action(m, alpha, V, LDV, beta, AV, LDAV);
-    }
-  };
+  } single{H, spin_flip};
 
   // Single-precision sigma resolves residuals down to about 1e-7 |E| (H c ~
   // E c involves no cancellation); the switch keeps a wide margin above
@@ -1390,7 +1380,7 @@ double fci_ground_state(const FCIHamiltonian& H, size_t max_iter,
   // re-anchored below
   constexpr int64_t stagnation_window = 6;
   double res = 0.0;
-  auto [niter, E] = restarted_davidson(
+  auto [niter, E] = restarted_davidson<float>(
       N, max_subspace, max_iter, single, D.get(), res_tol, C, 1e-12, false,
       &res, stagnation_window, &op, switch_tol, block_ptr);
   logger->info("  * mixed precision: {} iterations, |r| = {:.3e}", niter, res);
@@ -1399,23 +1389,27 @@ double fci_ground_state(const FCIHamiltonian& H, size_t max_iter,
   constexpr int max_rounds = 4;
   for (int round = 0; round < max_rounds; ++round) {
     if (round > 0) {
+      // Restart anchored at the current vector
       if (niter >= max_iter) break;
-      AnchoredOperator anchored{op, single};
-      auto [it, E2] = restarted_davidson(
-          N, max_subspace, max_iter - niter, anchored, D.get(), res_tol, C,
-          1e-12, false, &res, stagnation_window,
-          static_cast<const AnchoredOperator*>(nullptr), 0.0, block_ptr);
+      auto [it, E2] = restarted_davidson<float>(
+          N, max_subspace, max_iter - niter, single, D.get(), res_tol, C, 1e-12,
+          false, &res, stagnation_window, &op,
+          std::numeric_limits<double>::infinity(), block_ptr);
       niter += it;
       logger->info("  * anchored: {} iterations, |r| = {:.3e}", it, res);
     }
-    // Ritz pair (C is normalized) and its residual in double precision
+    // Rayleigh quotient of C and its residual in double precision (C is
+    // normalized to the precision of the single-precision corrections)
     op.operator_action(1, 1.0, C, N, 0.0, S.get(), N);
-    double e = 0.0, r2 = 0.0;
+    double sums[2] = {0.0, 0.0}, r2 = 0.0;
     detail::davidson_reduce(
-        int64_t(N), 1, &e, [&](int64_t i0, int64_t i1, double* acc) {
+        int64_t(N), 2, sums, [&](int64_t i0, int64_t i1, double* acc) {
           acc[0] += detail::davidson_sum(
+              i0, i1, [&](int64_t i) { return C[i] * C[i]; });
+          acc[1] += detail::davidson_sum(
               i0, i1, [&](int64_t i) { return C[i] * S[i]; });
         });
+    const double e = sums[1] / sums[0];
     detail::davidson_reduce(
         int64_t(N), 1, &r2, [&](int64_t i0, int64_t i1, double* acc) {
           acc[0] += detail::davidson_sum(i0, i1, [&](int64_t i) {
@@ -1423,8 +1417,16 @@ double fci_ground_state(const FCIHamiltonian& H, size_t max_iter,
             return r * r;
           });
         });
-    logger->info("  * double-precision residual {:.3e}", std::sqrt(r2));
-    if (std::sqrt(r2) < res_tol) return finish(niter, e);
+    const double res64 = std::sqrt(r2 / sums[0]);
+    logger->info("  * double-precision residual {:.3e}", res64);
+    if (res64 < res_tol) {
+      const double f = 1.0 / std::sqrt(sums[0]);
+      detail::davidson_partition(int64_t(N),
+                                 [&](int64_t, int64_t i0, int64_t i1) {
+                                   for (int64_t i = i0; i < i1; ++i) C[i] *= f;
+                                 });
+      return finish(niter, e);
+    }
   }
 
   logger->info("  * continuing in double precision");

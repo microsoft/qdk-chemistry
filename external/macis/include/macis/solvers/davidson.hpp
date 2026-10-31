@@ -22,7 +22,9 @@
 #include <lobpcgxx/lobpcg.hpp>
 #include <macis/util/mpi.hpp>
 #include <memory>
+#include <new>
 #include <sparsexx/matrix_types/csr_matrix.hpp>
+#include <type_traits>
 
 #ifdef MACIS_ENABLE_MPI
 #include <sparsexx/spblas/pspmbv.hpp>
@@ -388,13 +390,18 @@ auto davidson(int64_t N, int64_t max_m, const Functor& op, const double* D,
 
 namespace detail {
 
+/// Alignment of davidson_alloc arrays (a cache line); vectorized kernels may
+/// rely on it for aligned loads
+inline constexpr size_t davidson_alignment = 64;
+
 struct DavidsonFree {
   template <typename T>
   void operator()(T* p) const {
 #if defined(__linux__)
     std::free(p);
 #else
-    delete[] p;
+    ::operator delete(static_cast<void*>(p),
+                      std::align_val_t{davidson_alignment});
 #endif
   }
 };
@@ -402,27 +409,29 @@ template <typename T = double>
 using davidson_buffer = std::unique_ptr<T[], DavidsonFree>;
 using davidson_array = davidson_buffer<double>;
 
-/// Uninitialized array of n elements for large work vectors; on Linux, arrays
-/// of 1 MiB or more are rounded up to whole 2 MiB pages and advised for
-/// transparent huge pages, which saves page faults and TLB misses in the
-/// strided accesses of the operator
+/// Uninitialized array of n elements for large work vectors, aligned to
+/// davidson_alignment. On Linux, arrays of 1 MiB or more are rounded up to
+/// whole 2 MiB pages and advised for transparent huge pages, which saves page
+/// faults and TLB misses in the strided accesses of the operator (2 MiB is
+/// the huge page size of x86-64 and of 4 KiB-page ARM64 kernels; elsewhere
+/// the advice is merely ineffective)
 template <typename T = double>
 inline davidson_buffer<T> davidson_alloc(size_t n) {
+  size_t bytes = std::max<size_t>(n, 1) * sizeof(T);
 #if defined(__linux__)
   constexpr size_t huge_page = size_t(1) << 21;
-  size_t bytes = std::max<size_t>(n, 1) * sizeof(T);
   const bool huge = bytes >= huge_page / 2;
   if (huge) bytes = (bytes + huge_page - 1) & ~(huge_page - 1);
   void* p = nullptr;
-  if (posix_memalign(&p, huge ? huge_page : 64, bytes) != 0)
+  if (posix_memalign(&p, huge ? huge_page : davidson_alignment, bytes) != 0)
     throw std::bad_alloc();
 #ifdef MADV_HUGEPAGE
   if (huge) madvise(p, bytes, MADV_HUGEPAGE);
 #endif
-  return davidson_buffer<T>(static_cast<T*>(p));
 #else
-  return davidson_buffer<T>(new T[n]);
+  void* p = ::operator new(bytes, std::align_val_t{davidson_alignment});
 #endif
+  return davidson_buffer<T>(static_cast<T*>(p));
 }
 
 inline int64_t davidson_max_threads() {
@@ -489,6 +498,19 @@ double davidson_sum(int64_t i0, int64_t i1, Term&& term) {
   return sum;
 }
 
+/// Sum of term(i) over [0, len) in eight interleaved partial sums: unlike a
+/// single running sum (a chain of dependent additions, which compilers do
+/// not reorder), it vectorizes
+template <typename Term>
+inline double davidson_lane_sum(int64_t len, Term&& term) {
+  double s[8] = {0, 0, 0, 0, 0, 0, 0, 0};
+  int64_t i = 0;
+  for (; i + 8 <= len; i += 8)
+    for (int l = 0; l < 8; ++l) s[l] += term(i + l);
+  for (int l = 0; i < len; ++i, ++l) s[l] += term(i);
+  return ((s[0] + s[4]) + (s[1] + s[5])) + ((s[2] + s[6]) + (s[3] + s[7]));
+}
+
 }  // namespace detail
 
 /**
@@ -519,7 +541,13 @@ struct DavidsonBlockPreconditioner {
  * the iteration count. Length-N work is threaded over a static partition that
  * also places the work arrays on the NUMA domains of their threads.
  *
- * @tparam Functor Type of the matrix-vector operation functor
+ * @tparam TC Storage type of the search space and its images except their
+ * first vectors (the Ritz vector after a collapse, i.e. the anchor of an
+ * inexact op), which are double: float halves the memory traffic and
+ * footprint for a single-precision op, whose images carry no more digits
+ * @tparam Functor Type of the matrix-vector operation functor (on vectors of
+ * TC)
+ * @tparam ExactFunctor Type of the exact operator (on vectors of double)
  * @param[in] N        Size of the matrix
  * @param[in] max_m    Maximum dimension of the search space (>= 2)
  * @param[in] max_iter Maximum number of iterations (operator applications)
@@ -542,13 +570,15 @@ struct DavidsonBlockPreconditioner {
  * is recomputed with exact; later directions use op again. Their errors
  * then enter the Ritz vector scaled by its (small) change since this
  * anchor. Convergence is only accepted after anchoring.
- * @param[in] anchor_tol  Residual norm at which to anchor
+ * @param[in] anchor_tol  Residual norm at which to anchor; infinity anchors
+ * the start vector
  * @param[in] block  Optional exact block of the preconditioner
  * @return Pair containing (number of iterations, converged eigenvalue)
  * @throws std::runtime_error if not converged within max_iter iterations
  * and throw_on_failure is true
  */
-template <typename Functor, typename ExactFunctor = Functor>
+template <typename TC = double, typename Functor,
+          typename ExactFunctor = Functor>
 auto restarted_davidson(int64_t N, int64_t max_m, int64_t max_iter,
                         const Functor& op, const double* D, double tol,
                         double* X, double min_abs_denominator = 1e-12,
@@ -558,6 +588,8 @@ auto restarted_davidson(int64_t N, int64_t max_m, int64_t max_iter,
                         const ExactFunctor* exact = nullptr,
                         double anchor_tol = 0.0,
                         const DavidsonBlockPreconditioner* block = nullptr) {
+  static_assert(std::is_same_v<TC, double> or std::is_same_v<TC, float>,
+                "restarted_davidson: TC must be double or float");
   if (!X) throw std::runtime_error("Davidson: No Guess Provided");
   if (max_m < 2)
     throw std::invalid_argument("restarted_davidson: max_m must be >= 2");
@@ -574,52 +606,89 @@ auto restarted_davidson(int64_t N, int64_t max_m, int64_t max_iter,
 
   if (N == 1) {
     X[0] = 1.0;
-    double AX = 0.0;
-    op.operator_action(1, 1., X, N, 0., &AX, N);
+    TC x = 1, ax = 0;
+    op.operator_action(1, 1., &x, N, 0., &ax, N);
     if (residual_norm) *residual_norm = 0.0;
-    return std::make_pair(size_t(0), AX);
+    return std::make_pair(size_t(0), double(ax));
   }
 
-  // Elements per inner block of the fused passes (stack buffers)
+  // Elements per inner block of the fused passes (4 KiB stack buffers that
+  // stay in L1; unrelated to the vector width)
   constexpr int64_t chunk = 512;
   using detail::davidson_partition;
   using detail::davidson_reduce;
 
   // Search space V (max_m columns plus one for the new direction) and AV,
-  // addressed through column pointers so that the new direction can be
-  // renamed after a collapse. V is first written by the passes below, which
-  // all use the static partition (its first touch places it); AV is first
-  // written by the operator, so it is first touched here
-  auto v_store = detail::davidson_alloc(N * (max_m + 1));
-  auto av_store = detail::davidson_alloc(N * max_m);
-  std::vector<double*> V(max_m + 1), AV(max_m);
-  for (int64_t j = 0; j <= max_m; ++j) V[j] = v_store.get() + j * N;
-  for (int64_t j = 0; j < max_m; ++j) AV[j] = av_store.get() + j * N;
+  // their first columns in double and the others in TC, addressed through
+  // column pointers so that the new direction can be renamed after a
+  // collapse. V is first written by the passes below, which all use the
+  // static partition (its first touch places it); AV is first written by
+  // the operator, so it is first touched here
+  auto v0_store = detail::davidson_alloc<double>(N);
+  auto av0_store = detail::davidson_alloc<double>(N);
+  auto v_store = detail::davidson_alloc<TC>(N * max_m);
+  auto av_store = detail::davidson_alloc<TC>(N * (max_m - 1));
+  double* const V0 = v0_store.get();
+  double* const AV0 = av0_store.get();
+  std::vector<TC*> V(max_m + 1, nullptr), AV(max_m, nullptr);  // from 1
+  for (int64_t j = 1; j <= max_m; ++j) V[j] = v_store.get() + (j - 1) * N;
+  for (int64_t j = 1; j < max_m; ++j) AV[j] = av_store.get() + (j - 1) * N;
   davidson_partition(N, [&](int64_t, int64_t i0, int64_t i1) {
-    for (auto* v : AV) std::fill(v + i0, v + i1, 0.0);
+    std::fill(AV0 + i0, AV0 + i1, 0.0);
+    for (int64_t j = 1; j < max_m; ++j)
+      std::fill(AV[j] + i0, AV[j] + i1, TC(0));
   });
+
+  // f(p) for p the typed pointer to element i of column j of V or AV
+  auto vcol = [&](int64_t j, int64_t i, auto&& f) {
+    if (j == 0)
+      f(V0 + i);
+    else
+      f(V[j] + i);
+  };
+  auto avcol = [&](int64_t j, int64_t i, auto&& f) {
+    if (j == 0)
+      f(AV0 + i);
+    else
+      f(AV[j] + i);
+  };
+  // *p = x; single precision flushes values below its normal range to zero
+  // (they carry nothing there, and every operation on one is slow on x86)
+  auto store = [](auto* p, double x) {
+    if constexpr (std::is_same_v<std::remove_pointer_t<decltype(p)>, float>)
+      *p = std::abs(x) < double(std::numeric_limits<float>::min()) ? 0.0f
+                                                                   : float(x);
+    else
+      *p = x;
+  };
 
   std::vector<double> H(max_m * max_m), Y(max_m * max_m), LAM(max_m);
   std::vector<double> y_prev(max_m, 0.0), U(2 * max_m), HU(2 * max_m);
   std::vector<double> sums(max_m + 2), proj(max_m + 1);
 
   // t -= V[0:k) c, optionally accumulating V[0:k)^T t (after the update)
-  // into acc, on the block [c0, c0 + len)
+  // into acc, on the block [c0, c0 + len) of t = V[k]
   auto project_out = [&](int64_t k, const double* c, int64_t c0, int64_t len,
                          double* acc) {
-    double* t = V[k] + c0;
+    TC* tk = V[k] + c0;
+    alignas(64) double t[chunk];
+    for (int64_t i = 0; i < len; ++i) t[i] = tk[i];
     for (int64_t j = 0; j < k; ++j) {
-      const double* v = V[j] + c0;
       const double cj = c[j];
-      for (int64_t i = 0; i < len; ++i) t[i] -= cj * v[i];
+      vcol(j, c0, [&](const auto* v) {
+        for (int64_t i = 0; i < len; ++i) t[i] -= cj * v[i];
+      });
+    }
+    for (int64_t i = 0; i < len; ++i) {
+      store(tk + i, t[i]);
+      t[i] = tk[i];
     }
     if (acc)
-      for (int64_t j = 0; j < k; ++j) {
-        const double* v = V[j] + c0;
-        double d = 0.0;
-        for (int64_t i = 0; i < len; ++i) d += v[i] * t[i];
-        acc[j] += d;
-      }
+      for (int64_t j = 0; j < k; ++j)
+        vcol(j, c0, [&](const auto* v) {
+          acc[j] += detail::davidson_lane_sum(
+              len, [&](int64_t i) { return double(v[i]) * t[i]; });
+        });
   };
 
   // V[0] = X / |X|
@@ -632,19 +701,34 @@ auto restarted_davidson(int64_t N, int64_t max_m, int64_t max_iter,
   {
     const double f = 1.0 / std::sqrt(sums[0]);
     davidson_partition(N, [&](int64_t, int64_t i0, int64_t i1) {
-      for (int64_t i = i0; i < i1; ++i) V[0][i] = f * X[i];
+      for (int64_t i = i0; i < i1; ++i) V0[i] = f * X[i];
     });
   }
-  op.operator_action(1, 1., V[0], N, 0., AV[0], N);
+  // Its image: exact when it is the anchor; with op, through the first
+  // column of TC (not in use yet) unless that is double
+  const bool anchor_start = exact != nullptr and std::isinf(anchor_tol);
+  if (anchor_start) {
+    exact->operator_action(1, 1., V0, N, 0., AV0, N);
+  } else if constexpr (std::is_same_v<TC, double>) {
+    op.operator_action(1, 1., V0, N, 0., AV0, N);
+  } else {
+    davidson_partition(N, [&](int64_t, int64_t i0, int64_t i1) {
+      for (int64_t i = i0; i < i1; ++i) store(V[1] + i, V0[i]);
+    });
+    op.operator_action(1, 1., V[1], N, 0., AV[1], N);
+    davidson_partition(N, [&](int64_t, int64_t i0, int64_t i1) {
+      for (int64_t i = i0; i < i1; ++i) AV0[i] = AV[1][i];
+    });
+  }
   davidson_reduce(N, 1, H.data(), [&](int64_t i0, int64_t i1, double* acc) {
-    acc[0] += detail::davidson_sum(
-        i0, i1, [&](int64_t i) { return V[0][i] * AV[0][i]; });
+    acc[0] +=
+        detail::davidson_sum(i0, i1, [&](int64_t i) { return V0[i] * AV0[i]; });
   });
 
   int64_t k = 1;
   bool have_prev = false;
   bool converged = false;
-  bool anchored = exact == nullptr;
+  bool anchored = exact == nullptr or anchor_start;
   double last_res = std::numeric_limits<double>::infinity();
   std::vector<double> res_history;
   size_t iter = 1;
@@ -689,17 +773,26 @@ auto restarted_davidson(int64_t N, int64_t max_m, int64_t max_iter,
       alignas(64) double nv[2][chunk];
       for (int64_t c0 = i0; c0 < i1; c0 += chunk) {
         const int64_t len = std::min(chunk, i1 - c0);
-        for (auto* B : {&V, &AV}) {
+        for (bool image : {false, true}) {
+          auto col = [&](int64_t j, auto&& f) {
+            if (image)
+              avcol(j, c0, f);
+            else
+              vcol(j, c0, f);
+          };
           for (int64_t c = 0; c < kk; ++c) {
             std::fill_n(nv[c], len, 0.0);
             for (int64_t j = 0; j < k; ++j) {
               const double u = U[j + c * k];
-              const double* b = (*B)[j] + c0;
-              for (int64_t i = 0; i < len; ++i) nv[c][i] += u * b[i];
+              col(j, [&](const auto* b) {
+                for (int64_t i = 0; i < len; ++i) nv[c][i] += u * b[i];
+              });
             }
           }
           for (int64_t c = 0; c < kk; ++c)
-            std::copy_n(nv[c], len, (*B)[c] + c0);
+            col(c, [&](auto* b) {
+              for (int64_t i = 0; i < len; ++i) store(b + i, nv[c][i]);
+            });
         }
       }
     });
@@ -733,53 +826,54 @@ auto restarted_davidson(int64_t N, int64_t max_m, int64_t max_iter,
             std::fill_n(xs, len, 0.0);
             std::fill_n(rs, len, 0.0);
             for (int64_t j = 0; j < k; ++j) {
-              const double* v = V[j] + c0;
-              const double* av = AV[j] + c0;
               const double yj = y[j];
-              for (int64_t i = 0; i < len; ++i) {
-                xs[i] += yj * v[i];
-                rs[i] += yj * av[i];
-              }
+              vcol(j, c0, [&](const auto* v) {
+                for (int64_t i = 0; i < len; ++i) xs[i] += yj * v[i];
+              });
+              avcol(j, c0, [&](const auto* av) {
+                for (int64_t i = 0; i < len; ++i) rs[i] += yj * av[i];
+              });
             }
             if (fuse and kk > 1) {
               std::fill_n(x1, len, 0.0);
               std::fill_n(ax1, len, 0.0);
               for (int64_t j = 0; j < k; ++j) {
-                const double* v = V[j] + c0;
-                const double* av = AV[j] + c0;
                 const double uj = U[j + k];
-                for (int64_t i = 0; i < len; ++i) {
-                  x1[i] += uj * v[i];
-                  ax1[i] += uj * av[i];
-                }
+                vcol(j, c0, [&](const auto* v) {
+                  for (int64_t i = 0; i < len; ++i) x1[i] += uj * v[i];
+                });
+                avcol(j, c0, [&](const auto* av) {
+                  for (int64_t i = 0; i < len; ++i) ax1[i] += uj * av[i];
+                });
               }
             }
-            double* t = V[k] + c0;
-            double r2 = 0.0, t2 = 0.0;
+            TC* t = V[k] + c0;
             for (int64_t i = 0; i < len; ++i) {
-              const double r = rs[i] - lam * xs[i];
-              r2 += r * r;
               double denom = D[c0 + i] - lam;
               if (std::abs(denom) < min_abs_denominator)
                 denom = denom >= 0 ? min_abs_denominator : -min_abs_denominator;
-              t[i] = -r / denom;
-              t2 += t[i] * t[i];
+              store(t + i, -(rs[i] - lam * xs[i]) / denom);
             }
-            acc[0] += r2;
-            acc[k + 1] += t2;
-            for (int64_t j = 0; j < k; ++j) {
-              const double* v = V[j] + c0;
-              double d = 0.0;
-              for (int64_t i = 0; i < len; ++i) d += v[i] * t[i];
-              acc[1 + j] += d;
-            }
+            acc[0] += detail::davidson_lane_sum(len, [&](int64_t i) {
+              const double r = rs[i] - lam * xs[i];
+              return r * r;
+            });
+            acc[k + 1] += detail::davidson_lane_sum(
+                len, [&](int64_t i) { return double(t[i]) * double(t[i]); });
+            for (int64_t j = 0; j < k; ++j)
+              vcol(j, c0, [&](const auto* v) {
+                acc[1 + j] += detail::davidson_lane_sum(len, [&](int64_t i) {
+                  return double(v[i]) * double(t[i]);
+                });
+              });
             if (fuse) {
-              std::copy_n(xs, len, V[0] + c0);
-              std::copy_n(rs, len, AV[0] + c0);
-              if (kk > 1) {
-                std::copy_n(x1, len, V[1] + c0);
-                std::copy_n(ax1, len, AV[1] + c0);
-              }
+              std::copy_n(xs, len, V0 + c0);
+              std::copy_n(rs, len, AV0 + c0);
+              if (kk > 1)
+                for (int64_t i = 0; i < len; ++i) {
+                  store(V[1] + c0 + i, x1[i]);
+                  store(AV[1] + c0 + i, ax1[i]);
+                }
             }
           }
         });
@@ -805,8 +899,8 @@ auto restarted_davidson(int64_t N, int64_t max_m, int64_t max_iter,
       for (size_t i = 0; i < nc; ++i) {
         double x = 0.0, ax = 0.0;
         for (int64_t j = 0; j < k; ++j) {
-          x += y[j] * V[j][idx[i]];
-          ax += y[j] * AV[j][idx[i]];
+          vcol(j, idx[i], [&](const auto* v) { x += y[j] * v[0]; });
+          avcol(j, idx[i], [&](const auto* av) { ax += y[j] * av[0]; });
         }
         r_b[i] = ax - lam * x;
       }
@@ -826,10 +920,14 @@ auto restarted_davidson(int64_t N, int64_t max_m, int64_t max_iter,
         for (size_t i = 0; i < nc; ++i) t_b[i] += z[i] * c[a];
       }
       for (size_t i = 0; i < nc; ++i) {
-        double& t = V[k][idx[i]];
-        for (int64_t j = 0; j < k; ++j) proj[j] += V[j][idx[i]] * (t_b[i] - t);
-        t_before2 += t_b[i] * t_b[i] - t * t;
-        t = t_b[i];
+        TC& t = V[k][idx[i]];
+        const double t_old = t;
+        store(&t, t_b[i]);
+        const double t_new = t;
+        for (int64_t j = 0; j < k; ++j)
+          vcol(j, idx[i],
+               [&](const auto* v) { proj[j] += v[0] * (t_new - t_old); });
+        t_before2 += t_new * t_new - t_old * t_old;
       }
     }
     const double res_nrm = std::sqrt(sums[0]);
@@ -859,14 +957,14 @@ auto restarted_davidson(int64_t N, int64_t max_m, int64_t max_iter,
       anchored = true;
       res_history.clear();
       const int64_t ka = fuse ? k : collapse(y);
-      exact->operator_action(1, 1., V[0], N, 0., AV[0], N);
+      exact->operator_action(1, 1., V0, N, 0., AV0, N);
       double h[2] = {0.0, 0.0};
       davidson_reduce(N, ka, h, [&](int64_t i0, int64_t i1, double* acc) {
         acc[0] += detail::davidson_sum(
-            i0, i1, [&](int64_t i) { return V[0][i] * AV[0][i]; });
+            i0, i1, [&](int64_t i) { return V0[i] * AV0[i]; });
         if (ka > 1)
           acc[1] += detail::davidson_sum(
-              i0, i1, [&](int64_t i) { return AV[0][i] * V[1][i]; });
+              i0, i1, [&](int64_t i) { return AV0[i] * double(V[1][i]); });
       });
       H[0] = h[0];
       if (ka > 1) H[1] = H[max_m] = h[1];
@@ -896,36 +994,35 @@ auto restarted_davidson(int64_t N, int64_t max_m, int64_t max_iter,
     for (int64_t unit = -1; unit < N; ++unit) {
       if (unit >= 0) {
         davidson_partition(N, [&](int64_t, int64_t i0, int64_t i1) {
-          for (int64_t i = i0; i < i1; ++i) V[k][i] = i == unit ? 1.0 : 0.0;
+          for (int64_t i = i0; i < i1; ++i) V[k][i] = i == unit ? 1 : 0;
         });
         davidson_reduce(
             N, k, proj.data(), [&](int64_t i0, int64_t i1, double* acc) {
-              for (int64_t j = 0; j < k; ++j)
-                acc[j] += unit >= i0 and unit < i1 ? V[j][unit] : 0.0;
+              if (unit >= i0 and unit < i1)
+                for (int64_t j = 0; j < k; ++j)
+                  vcol(j, unit, [&](const auto* v) { acc[j] += v[0]; });
             });
         t_before2 = 1.0;
       }
-      davidson_reduce(N, k + 1, sums.data(),
-                      [&](int64_t i0, int64_t i1, double* acc) {
-                        for (int64_t c0 = i0; c0 < i1; c0 += chunk) {
-                          const int64_t len = std::min(chunk, i1 - c0);
-                          project_out(k, proj.data(), c0, len, acc);
-                          const double* t = V[k] + c0;
-                          double d = 0.0;
-                          for (int64_t i = 0; i < len; ++i) d += t[i] * t[i];
-                          acc[k] += d;
-                        }
-                      });
+      davidson_reduce(
+          N, k + 1, sums.data(), [&](int64_t i0, int64_t i1, double* acc) {
+            for (int64_t c0 = i0; c0 < i1; c0 += chunk) {
+              const int64_t len = std::min(chunk, i1 - c0);
+              project_out(k, proj.data(), c0, len, acc);
+              const TC* t = V[k] + c0;
+              acc[k] += detail::davidson_lane_sum(
+                  len, [&](int64_t i) { return double(t[i]) * double(t[i]); });
+            }
+          });
       double t2 = sums[k];
       if (not(t2 > 0.5 * t_before2)) {
         davidson_reduce(N, 1, &t2, [&](int64_t i0, int64_t i1, double* acc) {
           for (int64_t c0 = i0; c0 < i1; c0 += chunk) {
             const int64_t len = std::min(chunk, i1 - c0);
             project_out(k, sums.data(), c0, len, nullptr);
-            const double* t = V[k] + c0;
-            double d = 0.0;
-            for (int64_t i = 0; i < len; ++i) d += t[i] * t[i];
-            acc[0] += d;
+            const TC* t = V[k] + c0;
+            acc[0] += detail::davidson_lane_sum(
+                len, [&](int64_t i) { return double(t[i]) * double(t[i]); });
           }
         });
       }
@@ -940,25 +1037,24 @@ auto restarted_davidson(int64_t N, int64_t max_m, int64_t max_iter,
     // inexact: V[j]^T AV[k] would carry the error of op(t) projected on the
     // anchor, which bounds how far the residual can fall.
     op.operator_action(1, 1. / t_nrm, V[k], N, 0., AV[k], N);
-    davidson_reduce(N, k + 1, sums.data(),
-                    [&](int64_t i0, int64_t i1, double* acc) {
-                      const double f = 1.0 / t_nrm;
-                      for (int64_t c0 = i0; c0 < i1; c0 += chunk) {
-                        const int64_t len = std::min(chunk, i1 - c0);
-                        double* t = V[k] + c0;
-                        for (int64_t i = 0; i < len; ++i) t[i] *= f;
-                        for (int64_t j = 0; j < k; ++j) {
-                          const double* av = AV[j] + c0;
-                          double d = 0.0;
-                          for (int64_t i = 0; i < len; ++i) d += av[i] * t[i];
-                          acc[j] += d;
-                        }
-                        const double* av = AV[k] + c0;
-                        double d = 0.0;
-                        for (int64_t i = 0; i < len; ++i) d += t[i] * av[i];
-                        acc[k] += d;
-                      }
-                    });
+    davidson_reduce(
+        N, k + 1, sums.data(), [&](int64_t i0, int64_t i1, double* acc) {
+          const double f = 1.0 / t_nrm;
+          for (int64_t c0 = i0; c0 < i1; c0 += chunk) {
+            const int64_t len = std::min(chunk, i1 - c0);
+            TC* t = V[k] + c0;
+            for (int64_t i = 0; i < len; ++i) store(t + i, f * t[i]);
+            for (int64_t j = 0; j < k; ++j)
+              avcol(j, c0, [&](const auto* av) {
+                acc[j] += detail::davidson_lane_sum(len, [&](int64_t i) {
+                  return double(av[i]) * double(t[i]);
+                });
+              });
+            const TC* av = AV[k] + c0;
+            acc[k] += detail::davidson_lane_sum(
+                len, [&](int64_t i) { return double(t[i]) * double(av[i]); });
+          }
+        });
     for (int64_t j = 0; j <= k; ++j)
       H[j + k * max_m] = H[k + j * max_m] = sums[j];
     ++k;
@@ -972,21 +1068,40 @@ auto restarted_davidson(int64_t N, int64_t max_m, int64_t max_iter,
   else
     logger->info("Davidson stopped after {} iterations", iter);
 
-  // X = V y
+  // X = V y; with single-precision corrections V is orthonormal only to their
+  // precision, so X is normalized
   {
     const double* y = Y.data();
-    davidson_partition(N, [&](int64_t, int64_t i0, int64_t i1) {
-      for (int64_t c0 = i0; c0 < i1; c0 += chunk) {
-        const int64_t len = std::min(chunk, i1 - c0);
-        double* x = X + c0;
-        std::fill_n(x, len, 0.0);
-        for (int64_t j = 0; j < k; ++j) {
-          const double* v = V[j] + c0;
-          const double yj = y[j];
+    auto combine = [&](int64_t c0, int64_t len) {
+      double* x = X + c0;
+      std::fill_n(x, len, 0.0);
+      for (int64_t j = 0; j < k; ++j) {
+        const double yj = y[j];
+        vcol(j, c0, [&](const auto* v) {
           for (int64_t i = 0; i < len; ++i) x[i] += yj * v[i];
-        }
+        });
       }
-    });
+    };
+    if constexpr (std::is_same_v<TC, double>) {
+      davidson_partition(N, [&](int64_t, int64_t i0, int64_t i1) {
+        for (int64_t c0 = i0; c0 < i1; c0 += chunk)
+          combine(c0, std::min(chunk, i1 - c0));
+      });
+    } else {
+      double x2 = 0.0;
+      davidson_reduce(N, 1, &x2, [&](int64_t i0, int64_t i1, double* acc) {
+        for (int64_t c0 = i0; c0 < i1; c0 += chunk) {
+          const int64_t len = std::min(chunk, i1 - c0);
+          combine(c0, len);
+          acc[0] += detail::davidson_sum(
+              c0, c0 + len, [&](int64_t i) { return X[i] * X[i]; });
+        }
+      });
+      const double f = 1.0 / std::sqrt(x2);
+      davidson_partition(N, [&](int64_t, int64_t i0, int64_t i1) {
+        for (int64_t i = i0; i < i1; ++i) X[i] *= f;
+      });
+    }
   }
 
   return std::make_pair(iter, LAM[0]);
