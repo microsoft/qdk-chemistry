@@ -3,7 +3,6 @@
 // license information.
 
 #pragma once
-#include <cmath>
 #include <limits>
 #include <memory>
 #include <qdk/chemistry/algorithms/effective_hamiltonian.hpp>
@@ -27,8 +26,10 @@ class SchriefferWolffPT2Settings : public qdk::chemistry::data::Settings {
     set_default(
         "regularizer_sigma2", 1.0,
         "Sigma parameter of the sigma^2 denominator regularizer, "
-        "1/D -> (1-exp(-sigma*D^2))/D, in units of Eh^-2; equivalently the "
-        "DSRG flow parameter. Larger values regularize less; set to 0 to "
+        "1/D -> (1-exp(-sigma*D^2))/D, in units of Eh^-2. It plays the role of "
+        "the DSRG flow parameter s in the generator; second-order energies "
+        "match DSRG-PT2 at s = sigma/2. Larger values regularize less; set to "
+        "0 to "
         "disable. The unregularized calculation uses a guarded pseudoinverse "
         "that maps coupled denominators smaller than 1e-8 Eh to zero and "
         "logs a warning. This borrows the DSRG damping form; it does not turn "
@@ -53,7 +54,7 @@ class SchriefferWolffPT2Settings : public qdk::chemistry::data::Settings {
         "preserved because the active space receives whatever the folded "
         "orbitals do not take. Must be below 1, so a singly occupied orbital "
         "is never folded on an arbitrary rounding.",
-        data::BoundConstraint<double>{0.0, std::nextafter(1.0, 0.0)});
+        data::BoundConstraint<double>{0.0, 1.0});
   }
   ~SchriefferWolffPT2Settings() override = default;
 };
@@ -84,9 +85,10 @@ class SchriefferWolffPT2Settings : public qdk::chemistry::data::Settings {
  * must select the same orbital indices in both spins. Every singly occupied
  * orbital must lie in the reference active space.
  * Noncanonical orbitals are semicanonicalized independently within inactive,
- * active, and virtual blocks; blocks whose off-diagonal generalized-Fock
- * elements are at most 1e-6 Eh, such as those of a converged SCF, are left
- * unrotated. Intruder diagnostics are logged, with an
+ * active, and virtual blocks. With the regularizer, blocks whose off-diagonal
+ * generalized-Fock elements are at most 1e-6/max(1, sigma) Eh, such as those
+ * of a converged SCF, are left unrotated; bare denominators use 1e-10 Eh.
+ * Intruder diagnostics are logged, with an
  * additional warning for large raw amplitudes.
  *
  * The emitted two-body blocks are only 4-fold symmetric: hermiticity and

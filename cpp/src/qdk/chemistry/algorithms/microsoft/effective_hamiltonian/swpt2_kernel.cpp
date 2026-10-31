@@ -5,6 +5,7 @@
 #include "qdk/chemistry/algorithms/microsoft/effective_hamiltonian/swpt2_kernel.hpp"
 
 #include <btas/btas.h>
+#include <qdk/chemistry/scf/util/blas_threads.h>
 
 #include <SeQuant/core/eval/backends/btas/eval_expr.hpp>
 #include <SeQuant/core/eval/backends/btas/result.hpp>
@@ -109,11 +110,32 @@ std::array<Eigen::MatrixXd, 2> generalized_fock_matrices(
   const bool spin_free = spin_symmetric(one_body, two_body, density);
   for (int spin = 0; spin < (spin_free ? 1 : 2); ++spin) {
     const auto same = pair_matrix(two_body[2 * spin]);
-    // The beta-alpha Coulomb block is the transposed aabb block.
-    const Eigen::VectorXd coulomb =
-        same * pair_density[spin] +
-        (spin == 0 ? Eigen::VectorXd(mixed * pair_density[1])
-                   : Eigen::VectorXd(mixed.transpose() * pair_density[0]));
+    // Each Coulomb element is one row dot product. Spin-free input has
+    // identical same-spin and opposite-spin terms, so one is formed and
+    // doubled.
+    Eigen::VectorXd coulomb(pairs);
+#pragma omp parallel for schedule(static) if (n4(norb) >= min_parallel_work)
+    for (Eigen::Index pair = 0; pair < pairs; ++pair) {
+      const double own = same.row(pair).dot(pair_density[spin]);
+      coulomb(pair) = spin_free   ? 2.0 * own
+                      : spin == 0 ? own + mixed.row(pair).dot(pair_density[1])
+                                  : own;
+    }
+    if (spin == 1) {
+      // The beta-alpha Coulomb block is the transposed aabb block: each task
+      // accumulates a contiguous column range over every row.
+      constexpr Eigen::Index width = 256;
+      const Eigen::Index ranges = (pairs + width - 1) / width;
+#pragma omp parallel for schedule(static) if (n4(norb) >= min_parallel_work)
+      for (Eigen::Index range = 0; range < ranges; ++range) {
+        const Eigen::Index begin = range * width;
+        const Eigen::Index count = std::min(width, pairs - begin);
+        for (Eigen::Index row = 0; row < pairs; ++row)
+          coulomb.segment(begin, count) +=
+              pair_density[0](row) *
+              mixed.row(row).segment(begin, count).transpose();
+      }
+    }
     RowMajorMatrix exchange = RowMajorMatrix::Zero(norb, norb);
 #pragma omp parallel for schedule(static) if (n4(norb) >= min_parallel_work)
     for (int p = 0; p < norb; ++p)
@@ -309,7 +331,6 @@ struct Term {
 struct Equations {
   std::shared_ptr<sq::IndexBasisRegistry> spaces;
   std::vector<Term> terms;
-  std::size_t projected_terms = 0;
 };
 
 struct Plan {
@@ -321,7 +342,6 @@ struct Plan {
 
 struct Plans {
   std::vector<Plan> plans;
-  std::size_t maximum_rank = 0;
 };
 
 // Group by output body rank, spin case and number of density contractions. The
@@ -465,8 +485,7 @@ sq::ExprPtr normal_ordered_operand(const std::string& roles, int offset,
 
 void accumulate_projected_term(const sq::Product& product,
                                const std::vector<DensityPattern>& folding,
-                               EquationSums& sums,
-                               std::size_t& projected_terms) {
+                               EquationSums& sums) {
   std::vector<sq::Index> output;
   std::vector<sq::Tensor> sources;
   for (const auto& factor : product.factors()) {
@@ -490,7 +509,6 @@ void accumulate_projected_term(const sq::Product& product,
         return index.space().base_key()[0] != L'u';
       }))
     return;
-  ++projected_terms;
   std::vector<DensityPattern> reductions;
   if (residual_rank == 3) {
     reductions = folding;
@@ -629,8 +647,7 @@ Equations derive() {
             const auto expansion = wick.compute(false, true);
             for (const auto& term : summands(expansion)) {
               if (!term->is<sq::Product>()) continue;
-              accumulate_projected_term(term->as<sq::Product>(), folding, sums,
-                                        equations.projected_terms);
+              accumulate_projected_term(term->as<sq::Product>(), folding, sums);
             }
           }
         }
@@ -682,10 +699,6 @@ Plans build_plans(const Equations& equations,
                    {.objective_function = sq::ObjectiveFunction::DenseSpaceTime,
                     .idx_to_extent = extent});
     auto tree = sq::binarize<sq::EvalExprBTAS>(result);
-    tree.visit([&](const auto& node) {
-      plans.maximum_rank =
-          std::max(plans.maximum_rank, node->canon_indices().size());
-    });
     plans.plans.push_back(
         {std::move(tree), term.rank, term.spin_case, term.folded});
   }
@@ -717,30 +730,19 @@ std::shared_ptr<const Plans> reusable_plans(std::size_t inactive,
 }
 }  // namespace
 
-DerivationStatistics downfold_statistics(std::size_t inactive,
-                                         std::size_t active,
-                                         std::size_t virtuals) {
-  const auto& equations = reusable_equations();
-  return {equations.projected_terms, equations.terms.size(),
-          reusable_plans(inactive, active, virtuals, false)->maximum_rank};
-}
-
-DownfoldResult downfold(const std::array<Eigen::MatrixXd, 2>& one_body,
-                        const TwoBodyBlocks& two_body,
-                        const std::array<Eigen::VectorXd, 2>& energies,
-                        const std::vector<int>& active,
-                        const std::vector<int>& inactive,
-                        const std::vector<int>& virtuals,
-                        const RegularizerOptions& regularizer,
-                        double core_energy,
-                        const std::array<Eigen::MatrixXd, 2>& density) {
-  const int norb = energies[0].size();
+DownfoldResult downfold(
+    const std::array<Eigen::MatrixXd, 2>& one_body,
+    const TwoBodyBlocks& two_body, const std::array<Eigen::MatrixXd, 2>& fock,
+    const std::vector<int>& active, const std::vector<int>& inactive,
+    const std::vector<int>& virtuals, const RegularizerOptions& regularizer,
+    double core_energy, const std::array<Eigen::MatrixXd, 2>& density) {
+  const int norb = fock[0].rows();
   const int active_count = active.size();
   const bool fold = density[0].size() != 0;
   bool consistent = norb > 0 && active_count > 0;
   for (int spin = 0; spin < 2; ++spin)
     consistent =
-        consistent && energies[spin].size() == norb &&
+        consistent && fock[spin].rows() == norb && fock[spin].cols() == norb &&
         one_body[spin].rows() == norb && one_body[spin].cols() == norb &&
         (fold ? density[spin].rows() == norb && density[spin].cols() == norb
               : density[spin].size() == 0);
@@ -749,6 +751,8 @@ DownfoldResult downfold(const std::array<Eigen::MatrixXd, 2>& one_body,
   if (!consistent)
     throw std::invalid_argument(
         "SW-PT2: inconsistent spatial tensor dimensions");
+  const std::array<Eigen::VectorXd, 2> energies{fock[0].diagonal(),
+                                                fock[1].diagonal()};
   const std::map<wchar_t, const std::vector<int>*> roles{
       {L'i', &inactive}, {L'u', &active}, {L'a', &virtuals}};
   std::vector<char> orbital_roles(norb, 0);
@@ -765,7 +769,7 @@ DownfoldResult downfold(const std::array<Eigen::MatrixXd, 2>& one_body,
         "SW-PT2: spatial roles do not cover the window");
   // A spin-free operator needs only its alpha one-body and aabb blocks.
   const bool spin_free =
-      spin_symmetric(one_body, two_body, density) && energies[0] == energies[1];
+      spin_symmetric(one_body, two_body, density) && fock[0] == fock[1];
   const auto integral = [&](int left, int right, int p, int q, int r, int s) {
     return chemist(two_body, left, right, p, q, r, s, norb);
   };
@@ -848,28 +852,40 @@ DownfoldResult downfold(const std::array<Eigen::MatrixXd, 2>& one_body,
                 : std::array{active_block(0, 0), active_block(1, 1)};
   if (inactive.empty() && virtuals.empty()) return result;
 
-  // Diagnostics use raw couplings, before normal ordering or damping.
+  // Diagnostics scan the terms that act on the reference external occupation:
+  // none annihilates an (empty) virtual orbital, and an inactive orbital is
+  // created only after being annihilated. Every other term is the adjoint of
+  // one of these or annihilates both P and Q states. Couplings are raw, before
+  // damping; one-body amplitudes use the generalized Fock, the reference's
+  // single-excitation coupling.
+  std::vector<int> creatable(active), annihilable(inactive);
+  creatable.insert(creatable.end(), virtuals.begin(), virtuals.end());
+  annihilable.insert(annihilable.end(), active.begin(), active.end());
+  const auto amplitude = [](double coupling, double delta) {
+    return std::abs(coupling) /
+           std::max(std::abs(delta), bare_denominator_floor);
+  };
   double min_denominator = result.min_denominator;
   double max_amplitude = result.max_amplitude;
+  for (const int creator : creatable)
+    for (const int annihilator : annihilable) {
+      if (orbital_roles[creator] == orbital_roles[annihilator]) continue;
+      for (int spin = 0; spin < (spin_free ? 1 : 2); ++spin) {
+        const double delta =
+            energies[spin](creator) - energies[spin](annihilator);
+        if (one_body[spin](creator, annihilator) != 0.0)
+          min_denominator = std::min(min_denominator, std::abs(delta));
+        max_amplitude = std::max(
+            max_amplitude, amplitude(fock[spin](creator, annihilator), delta));
+      }
+    }
 #pragma omp parallel for collapse(2) schedule(static) \
     reduction(min : min_denominator)                  \
     reduction(max : max_amplitude) if (n4(norb) >= min_parallel_work)
   for (int first = 0; first < norb; ++first)
-    for (int second = 0; second < norb; ++second) {
-      const auto track = [&](double coupling, double delta) {
-        if (coupling == 0.0) return;
-        min_denominator = std::min(min_denominator, std::abs(delta));
-        max_amplitude =
-            std::max(max_amplitude,
-                     std::abs(coupling) /
-                         std::max(std::abs(delta), bare_denominator_floor));
-      };
-      if (orbital_roles[first] != orbital_roles[second])
-        for (int spin = 0; spin < (spin_free ? 1 : 2); ++spin)
-          track(one_body[spin](first, second),
-                energies[spin](first) - energies[spin](second));
-      for (int third = 0; third < norb; ++third)
-        for (int fourth = 0; fourth < norb; ++fourth) {
+    for (int second = 0; second < norb; ++second)
+      for (const int third : annihilable)
+        for (const int fourth : annihilable) {
           if (!changes_occupation({orbital_roles[first], orbital_roles[second],
                                    orbital_roles[third],
                                    orbital_roles[fourth]}))
@@ -877,22 +893,30 @@ DownfoldResult downfold(const std::array<Eigen::MatrixXd, 2>& one_body,
           // Particles (first, third) and (second, fourth); beta-alpha repeats
           // alpha-beta with the particles swapped.
           const auto track_pair = [&](int spin, int partner) {
+            const bool same = spin == partner;
+            if ((orbital_roles[first] == 'i' && first != third &&
+                 !(same && first == fourth)) ||
+                (orbital_roles[second] == 'i' && second != fourth &&
+                 !(same && second == third)))
+              return;
             const double direct =
                 integral(spin, partner, first, third, second, fourth);
+            const double coupling =
+                same ? direct -
+                           integral(spin, spin, first, fourth, second, third)
+                     : direct;
+            if (coupling == 0.0) return;
             const double delta =
                 energies[spin](first) + energies[partner](second) -
                 energies[spin](third) - energies[partner](fourth);
-            track(spin == partner ? direct - integral(spin, spin, first, fourth,
-                                                      second, third)
-                                  : direct,
-                  delta);
+            min_denominator = std::min(min_denominator, std::abs(delta));
+            max_amplitude = std::max(max_amplitude, amplitude(coupling, delta));
           };
           track_pair(0, 0);
           track_pair(0, 1);
           // Beta-beta repeats alpha-alpha for spin-free input.
           if (!spin_free) track_pair(1, 1);
         }
-    }
   result.min_denominator = min_denominator;
   result.max_amplitude = max_amplitude;
   using OperandKey =
@@ -976,19 +1000,23 @@ DownfoldResult downfold(const std::array<Eigen::MatrixXd, 2>& one_body,
     selected.push_back(&plan);
   }
   // Concurrent evaluation relies on the SeQuant patch that keeps BTAS off the
-  // process-wide trace-label map. Values are added in plan order below, so the
-  // result does not depend on the thread count.
+  // process-wide trace-label map. BTAS calls BLAS from every plan thread, so
+  // BLAS is pinned to one thread meanwhile. Values are added in plan order
+  // below, so the result does not depend on the thread count.
   std::vector<sq::ResultPtr> plan_values(selected.size());
   std::exception_ptr failure;
   const auto plan_count = static_cast<std::ptrdiff_t>(selected.size());
+  {
+    const qdk::chemistry::scf::util::ScopedBlasThreads blas_thread_guard;
 #pragma omp parallel for schedule(dynamic, 1) if (n4(norb) >= min_parallel_work)
-  for (std::ptrdiff_t ordinal = 0; ordinal < plan_count; ++ordinal) {
-    try {
-      plan_values[ordinal] =
-          sq::evaluate(selected[ordinal]->tree, evaluate_leaf);
-    } catch (...) {
+    for (std::ptrdiff_t ordinal = 0; ordinal < plan_count; ++ordinal) {
+      try {
+        plan_values[ordinal] =
+            sq::evaluate(selected[ordinal]->tree, evaluate_leaf);
+      } catch (...) {
 #pragma omp critical(swpt2_plan_failure)
-      if (!failure) failure = std::current_exception();
+        if (!failure) failure = std::current_exception();
+      }
     }
   }
   if (failure) std::rethrow_exception(failure);

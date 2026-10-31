@@ -16,6 +16,7 @@
 #include <random>
 #include <stdexcept>
 #include <string>
+#include <tuple>
 #include <unordered_set>
 #include <utility>
 #include <vector>
@@ -171,8 +172,9 @@ sw::DownfoldResult run_native(const OneBodyCase& inputs,
       inputs.one_body,
       {std::cref(inputs.same_spin(0)), std::cref(inputs.integrals),
        std::cref(inputs.same_spin(1))},
-      {inputs.spin_energies(0), inputs.spin_energies(1)}, inputs.active,
-      inputs.inactive, inputs.virtuals, regularizer, core_energy,
+      {Eigen::MatrixXd(inputs.spin_energies(0).asDiagonal()),
+       Eigen::MatrixXd(inputs.spin_energies(1).asDiagonal())},
+      inputs.active, inputs.inactive, inputs.virtuals, regularizer, core_energy,
       spin_densities(reference_density, beta_density));
 }
 
@@ -183,11 +185,11 @@ sw::DownfoldResult shared_integral_downfold(
     const std::vector<int>& active, const std::vector<int>& inactive,
     const std::vector<int>& virtuals, const sw::RegularizerOptions& regularizer,
     double core_energy) {
+  const Eigen::MatrixXd fock = energies.asDiagonal();
   return sw::downfold(
       {alpha, beta},
       {std::cref(integrals), std::cref(integrals), std::cref(integrals)},
-      {energies, energies}, active, inactive, virtuals, regularizer,
-      core_energy);
+      {fock, fock}, active, inactive, virtuals, regularizer, core_energy);
 }
 
 // The generalized Fock matrix of a spin-traced density and spin-free integrals.
@@ -279,14 +281,25 @@ FockParts fock_parts(const OneBodyCase& inputs,
             : (delta == 0.0
                    ? 0.0
                    : -std::expm1(-regularizer.sigma2 * delta * delta) / delta);
-    if (off_diagonal) {
+    // The kernel's diagnostics cover terms acting on the reference external
+    // occupation: no virtual annihilated, and an inactive orbital created only
+    // after being annihilated. Its one-body amplitudes use the generalized-Fock
+    // off-diagonals, which these diagonal inputs leave at zero.
+    bool acts_on_reference = true;
+    for (const int index : annihilators)
+      acts_on_reference = acts_on_reference && roles[index / 2] != 'a';
+    for (const int index : creators)
+      acts_on_reference = acts_on_reference &&
+                          (roles[index / 2] != 'i' ||
+                           std::find(annihilators.begin(), annihilators.end(),
+                                     index) != annihilators.end());
+    if (off_diagonal && acts_on_reference) {
       result.min_denominator =
           std::min(result.min_denominator, std::abs(delta));
-      const double raw_coupling =
-          creators.size() == 1 ? coupling : 4.0 * coupling;
-      result.max_amplitude =
-          std::max(result.max_amplitude,
-                   std::abs(raw_coupling) / std::max(std::abs(delta), 1e-8));
+      if (creators.size() == 2)
+        result.max_amplitude =
+            std::max(result.max_amplitude, std::abs(4.0 * coupling) /
+                                               std::max(std::abs(delta), 1e-8));
     }
     visit_matrix_elements(coupling, creators, annihilators, dimension,
                           [&](int bra, int ket, double value) {
@@ -563,48 +576,64 @@ TEST(Swpt2KernelTest, RestoresCallerContextAndReusesPlans) {
   EXPECT_LT((second.two_body - first.two_body).norm(), 1e-14);
 }
 
-TEST(Swpt2KernelTest, DerivationStatistics) {
-  for (const auto& [inactive, active, virtuals] :
-       {std::array<std::size_t, 3>{10, 10, 10}, {2, 4, 60}, {30, 6, 200}}) {
-    const auto statistics = sw::downfold_statistics(inactive, active, virtuals);
-    EXPECT_EQ(statistics.projected_terms, 102);
-    EXPECT_EQ(statistics.contractions, 984);
-    EXPECT_EQ(statistics.maximum_rank, 4);
-  }
-}
-
 TEST(Swpt2KernelTest, ThreadCountDoesNotChangeResults) {
 #ifndef _OPENMP
   GTEST_SKIP() << "OpenMP is disabled";
 #else
-  // Large enough that the Fock, diagnostic, operand and plan loops all run
-  // threaded.
+  // Large enough that the Fock, rotation, diagnostic, operand and plan loops
+  // all run threaded, and the rotation spans several column panels.
   std::vector<int> virtuals;
   for (int orbital = 8; orbital < 36; ++orbital) virtuals.push_back(orbital);
-  auto inputs = make_case({4, 5, 6, 7}, {0, 1, 2, 3}, virtuals);
-  populate_two_body(inputs);
-  const Eigen::MatrixXd density = make_density(inputs, 3);
   const sw::RegularizerOptions regularizer{0.8};
   const int threads = omp_get_max_threads();
-  omp_set_num_threads(1);
-  const auto serial = run_native(inputs, regularizer, density);
-  const Eigen::MatrixXd serial_fock = spin_free_fock(
-      inputs.one_body[0], inputs.integrals, density, inputs.norb());
-  omp_set_num_threads(4);
-  const auto parallel = run_native(inputs, regularizer, density);
-  const Eigen::MatrixXd parallel_fock = spin_free_fock(
-      inputs.one_body[0], inputs.integrals, density, inputs.norb());
-  omp_set_num_threads(threads);
-  EXPECT_EQ(serial.scalar, parallel.scalar);
-  for (int spin = 0; spin < 2; ++spin)
-    EXPECT_TRUE(serial.one_body[spin] == parallel.one_body[spin]);
-  EXPECT_TRUE(serial.two_body == parallel.two_body);
-  for (int spin = 0; spin < 2; ++spin)
-    EXPECT_TRUE(serial.same_spin_two_body[spin] ==
-                parallel.same_spin_two_body[spin]);
-  EXPECT_EQ(serial.min_denominator, parallel.min_denominator);
-  EXPECT_EQ(serial.max_amplitude, parallel.max_amplitude);
-  EXPECT_TRUE(serial_fock == parallel_fock);
+  for (const bool unrestricted : {false, true}) {
+    SCOPED_TRACE(unrestricted ? "unrestricted" : "restricted");
+    auto inputs = make_case({4, 5, 6, 7}, {0, 1, 2, 3}, virtuals);
+    populate_two_body(inputs);
+    if (unrestricted) make_unrestricted(inputs);
+    const int norb = inputs.norb();
+    const Eigen::MatrixXd alpha = 0.5 * make_density(inputs, 3);
+    const Eigen::MatrixXd beta =
+        unrestricted ? Eigen::MatrixXd(0.5 * make_density(inputs, 2)) : alpha;
+    Eigen::MatrixXd rotation(norb, norb);
+    for (int row = 0; row < norb; ++row)
+      for (int col = 0; col < norb; ++col)
+        rotation(row, col) = std::cos(0.3 * row + 0.7 * col);
+    rotation = Eigen::MatrixXd(rotation.householderQr().householderQ());
+    const auto evaluate = [&](int count) {
+      omp_set_num_threads(count);
+      return std::tuple{
+          unrestricted ? run_native(inputs, regularizer, alpha, 0.17, beta)
+                       : run_native(inputs, regularizer, alpha + beta),
+          sw::generalized_fock_matrices(
+              inputs.one_body,
+              {std::cref(inputs.same_spin(0)), std::cref(inputs.integrals),
+               std::cref(inputs.same_spin(1))},
+              {alpha, beta}, norb),
+          sw::rotate_two_body(inputs.integrals, rotation, rotation.transpose(),
+                              norb)};
+    };
+    const auto [serial, serial_fock, serial_rotated] = evaluate(1);
+    const auto [parallel, parallel_fock, parallel_rotated] = evaluate(4);
+    omp_set_num_threads(threads);
+    EXPECT_EQ(serial.scalar, parallel.scalar);
+    for (int spin = 0; spin < 2; ++spin) {
+      EXPECT_TRUE(serial.one_body[spin] == parallel.one_body[spin]);
+      EXPECT_TRUE(serial.same_spin_two_body[spin] ==
+                  parallel.same_spin_two_body[spin]);
+      EXPECT_TRUE(serial_fock[spin] == parallel_fock[spin]);
+    }
+    EXPECT_TRUE(serial.two_body == parallel.two_body);
+    EXPECT_EQ(serial.min_denominator, parallel.min_denominator);
+    EXPECT_EQ(serial.max_amplitude, parallel.max_amplitude);
+    EXPECT_TRUE(serial_rotated == parallel_rotated);
+    EXPECT_LT((sw::rotate_two_body(serial_rotated, rotation.transpose(),
+                                   rotation, norb) -
+               inputs.integrals)
+                  .cwiseAbs()
+                  .maxCoeff(),
+              1e-12);
+  }
 #endif
 }
 

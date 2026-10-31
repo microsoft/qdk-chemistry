@@ -58,11 +58,12 @@ inline constexpr double bare_denominator_floor = 1e-8;
 /// SW energy-denominator options.
 struct RegularizerOptions {
   /// Sigma of the sigma^2 regularizer, 1/D -> (1 - exp(-sigma*D^2))/D, which
-  /// damps near-degenerate (intruder) channels; equivalently the SRG/DSRG flow
-  /// parameter (units of inverse energy squared). Larger values regularize
-  /// less; 0 selects a guarded bare pseudoinverse that maps coupled channels
-  /// with |D| < `bare_denominator_floor` to zero. See Shee et al., J. Phys.
-  /// Chem. Lett. 12, 12084 (2021).
+  /// damps near-degenerate (intruder) channels; it plays the role of the DSRG
+  /// flow parameter s in the generator, and second-order energies match
+  /// DSRG-PT2 at s = sigma/2 (units of inverse energy squared). Larger values
+  /// regularize less; 0 selects a guarded bare pseudoinverse that maps coupled
+  /// channels with |D| < `bare_denominator_floor` to zero. See Shee et al.,
+  /// J. Phys. Chem. Lett. 12, 12084 (2021).
   double sigma2 = 0.0;
 };
 
@@ -112,30 +113,23 @@ struct DownfoldResult {
   Eigen::VectorXd two_body;
   /// Chemist aaaa and bbbb blocks, which are fixed only up to exchange.
   std::array<Eigen::VectorXd, 2> same_spin_two_body;
+  /// Smallest denominator and largest raw amplitude among the excitations
+  /// that connect P and Q.
   double min_denominator = std::numeric_limits<double>::infinity();
   double max_amplitude = 0.0;
 };
 
-struct DerivationStatistics {
-  std::size_t projected_terms = 0, contractions = 0, maximum_rank = 0;
-};
-
-/// Statistics of the contraction plans for the given role extents.
-DerivationStatistics downfold_statistics(std::size_t inactive,
-                                         std::size_t active,
-                                         std::size_t virtuals);
-
-/// Spin-blocked downfold. `density` holds the per-spin reference 1-RDMs used
-/// to fold terms above two-body; leave it empty to discard them.
-DownfoldResult downfold(const std::array<Eigen::MatrixXd, 2>& one_body,
-                        const TwoBodyBlocks& two_body,
-                        const std::array<Eigen::VectorXd, 2>& energies,
-                        const std::vector<int>& active,
-                        const std::vector<int>& inactive,
-                        const std::vector<int>& virtuals,
-                        const RegularizerOptions& regularizer,
-                        double core_energy,
-                        const std::array<Eigen::MatrixXd, 2>& density = {});
+/// Spin-blocked downfold. The diagonals of the per-spin generalized Fock
+/// matrices `fock` are the orbital energies of the denominators; their
+/// off-diagonals are the one-body couplings of the amplitude diagnostic.
+/// `density` holds the per-spin reference 1-RDMs used to fold terms above
+/// two-body; leave it empty to discard them.
+DownfoldResult downfold(
+    const std::array<Eigen::MatrixXd, 2>& one_body,
+    const TwoBodyBlocks& two_body, const std::array<Eigen::MatrixXd, 2>& fock,
+    const std::vector<int>& active, const std::vector<int>& inactive,
+    const std::vector<int>& virtuals, const RegularizerOptions& regularizer,
+    double core_energy, const std::array<Eigen::MatrixXd, 2>& density = {});
 
 /// Window roles chosen by the folding policy, plus the rounding diagnostics a
 /// caller needs to judge how much the fold perturbed the reference density.
