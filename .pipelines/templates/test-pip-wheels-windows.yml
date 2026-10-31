@@ -35,7 +35,7 @@ steps:
       -SrcDir "$(System.DefaultWorkingDirectory)" `
       -PythonVersion '${{ parameters.pythonVersion }}' `
       -PythonEnv $pythonEnv `
-      -Triplet '$(VCPKG_TRIPLET)' `
+      -Triplet '${{ parameters.arch }}-windows-static-md' `
       -RunSlowTests '${{ parameters.runSlowTests }}'
   displayName: Audit and test wheel (Windows, Python ${{ parameters.pythonVersion }})
   condition: ${{ parameters.condition }}
