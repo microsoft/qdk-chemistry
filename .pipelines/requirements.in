@@ -1,4 +1,5 @@
 auditwheel; sys_platform == 'linux'
+wheel; sys_platform == 'linux'
 build
 delocate==0.13.0; sys_platform == 'darwin'
 fonttools>=4.61.0
