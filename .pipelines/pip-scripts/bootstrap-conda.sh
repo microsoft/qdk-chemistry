@@ -46,23 +46,32 @@ _BOOTSTRAP_RETRY_DELAY=30
 
 _bootstrap_conda() {
     echo "Installing ${ENSURECONDA_PKG} (on $(uname -s):$(uname -m)) and bootstrapping conda..."
+    # Inherited Python paths can make a different interpreter miss its stdlib.
+    unset PYTHONHOME PYTHONPATH __PYVENV_LAUNCHER__
+
     # Use a throwaway venv so we don't fight PEP 668 (Homebrew Python on macOS
     # and apt Python on Ubuntu 24.04 are both externally managed).
     # Clean any stale venv first (idempotent on self-hosted agents / retries).
-    rm -rf /tmp/bootstrap-venv
-    python3 -m venv /tmp/bootstrap-venv
-    # shellcheck disable=SC1091
-    . /tmp/bootstrap-venv/bin/activate
-    python3 -m pip install --upgrade pip
-    python3 -m pip install "${ENSURECONDA_PKG}"
+    # Use its interpreter directly so activation state cannot leak into the
+    # environment snapshot produced by ensureconda.
+    local bootstrap_python=/tmp/bootstrap-venv/bin/python3
+    # Explicit returns are needed: the retry loop's `if` disables `set -e` here.
+    rm -rf /tmp/bootstrap-venv || return 1
+    python3 -m venv /tmp/bootstrap-venv || return 1
+    "$bootstrap_python" -m pip install --upgrade pip || return 1
+    "$bootstrap_python" -m pip install "${ENSURECONDA_PKG}" || return 1
 
     # ms-ensureconda's --envfile flag dumps CONDA_BASH_HOOK + friends to a
     # dotenv file we then source to wire up conda for this shell.
-    python3 -m ensureconda --envfile /tmp/ensureconda.env
-    deactivate
-    set -a; . /tmp/ensureconda.env; set +a
+    "$bootstrap_python" -m ensureconda --envfile /tmp/ensureconda.env || return 1
+    set -a
+    # shellcheck disable=SC1091
+    . /tmp/ensureconda.env || { set +a; return 1; }
+    set +a
+    # The snapshot may restore Python-specific paths from the bootstrap process.
+    unset PYTHONHOME PYTHONPATH __PYVENV_LAUNCHER__
     # shellcheck disable=SC1090
-    . "$CONDA_BASH_HOOK"
+    . "$CONDA_BASH_HOOK" || return 1
 
     echo "Creating conda environment '${CONDA_ENV_NAME}' with Python ${PYTHON_VERSION}..."
     # Explicitly include `pip` — fresh conda envs created with conda-standalone do
@@ -95,10 +104,29 @@ _bootstrap_conda() {
     export ARTIFACTS_CONDA_TOKEN="${SYSTEM_ACCESSTOKEN}"
     set -x
     CONDA_FEED_ROOT="https://pkgs.dev.azure.com/ms-azurequantum/AzureQuantum/_packaging/quantum-apps-dependencies/Conda/repo"
+    local platform_args=()
+    if [ "${MAC_BUILD:-OFF}" = ON ]; then
+        # An agent-provided x64 Conda can otherwise solve for osx-64 under Rosetta.
+        platform_args=(--platform osx-arm64)
+    fi
     conda create --override-channels \
+                 "${platform_args[@]}" \
                  --channel "${CONDA_FEED_ROOT}/main" \
                  --channel "${CONDA_FEED_ROOT}/conda-forge" \
-                 --yes --quiet --name "${CONDA_ENV_NAME}" "python=${PYTHON_VERSION}" pip
+                 --yes --quiet --name "${CONDA_ENV_NAME}" "python=${PYTHON_VERSION}" pip || return 1
+    conda run --no-capture-output --name "${CONDA_ENV_NAME}" python -c '
+import encodings
+import platform
+import sys
+
+version = ".".join(map(str, sys.version_info[:2]))
+machine = platform.machine()
+print(f"Python {version} ({machine}): {sys.executable}")
+if version != sys.argv[1]:
+    raise SystemExit(f"Expected Python {sys.argv[1]}, got {version}")
+if sys.argv[2] == "ON" and (sys.platform != "darwin" or machine.lower() != "arm64"):
+    raise SystemExit(f"Expected native macOS ARM64 Python, got {sys.platform}/{machine}")
+' "$PYTHON_VERSION" "${MAC_BUILD:-OFF}"
 }
 
 _bootstrap_attempt=1
