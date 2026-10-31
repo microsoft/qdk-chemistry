@@ -161,7 +161,7 @@ if [ "$MAC_BUILD" == "OFF" ]; then
         export CMAKE_C_FLAGS="-march=${MARCH} -fPIC -Os -fvisibility=hidden"
         export CMAKE_CXX_FLAGS="-march=${MARCH} -fPIC -Os -fvisibility=hidden"
     fi
-    export CMAKE_BUILD_PARALLEL_LEVEL=$(nproc)
+    export CMAKE_BUILD_PARALLEL_LEVEL="${CMAKE_BUILD_PARALLEL_LEVEL:-$(nproc)}"
     python3 -m build --wheel \
         -C build-dir="build/{wheel_tag}" \
         -C cmake.define.QDK_UARCH=${MARCH} \
@@ -179,19 +179,11 @@ if [ "$MAC_BUILD" == "OFF" ]; then
     # Repair wheel
     auditwheel repair dist/qdk_chemistry-*.whl -w repaired_wheelhouse/
 
-    # Fix RPATH
-    WHEEL_FILE=$(ls repaired_wheelhouse/qdk_chemistry-*.whl)
-    FULL_WHEEL_PATH="$PWD/$WHEEL_FILE"
-    TEMP_DIR=$(mktemp -d)
-    python3 -m zipfile -e "$WHEEL_FILE" "$TEMP_DIR"
-
-    find "$TEMP_DIR" -name '*.so*' -type f -not -path '*/qdk_chemistry.libs/*' | while read so_file; do
-        echo "Fixing RPATH for main package: $so_file"
-        patchelf --set-rpath '$ORIGIN/../../qdk_chemistry.libs' "$so_file" || true
-    done
-
-    # We need to do this in order to publish our C++ debug symbols internally.
+    # Keep auditwheel's RPATHs; only x86_64 needs postprocessing for debug symbols.
     if [ "$MARCH" == "x86-64-v3" ]; then
+        WHEEL_FILE=$(ls repaired_wheelhouse/qdk_chemistry-*.whl)
+        TEMP_DIR=$(mktemp -d)
+        python3 -m zipfile -e "$WHEEL_FILE" "$TEMP_DIR"
         export debugdir="debug_symbols"
         mkdir -p "${debugdir}"
         CORE_SO="$(find "$TEMP_DIR" -type f -name '_core*.so' | head -n 1)"
@@ -205,16 +197,11 @@ if [ "$MAC_BUILD" == "OFF" ]; then
         objcopy --add-gnu-debuglink="${debugdir}/${debugfile}" "$CORE_SO"
         echo "Extracted debug symbols to ${debugdir}/${debugfile}"
         ls "${debugdir}"
+
+        # Stripping changes binary hashes, so regenerate RECORD when repacking.
+        python3 -m wheel pack "$TEMP_DIR" --dest-dir repaired_wheelhouse
+        rm -rf "$TEMP_DIR"
     fi
-
-    find "$TEMP_DIR" -path '*/qdk_chemistry.libs/*' -name '*.so*' -type f | while read so_file; do
-        echo "Fixing RPATH for bundled library: $so_file"
-        patchelf --set-rpath '$ORIGIN' "$so_file" || true
-    done
-
-    rm "$WHEEL_FILE"
-    (cd "$TEMP_DIR" && python3 -m zipfile -c "$FULL_WHEEL_PATH" .)
-    rm -rf "$TEMP_DIR"
 
 elif [ "$MAC_BUILD" == "ON" ]; then
     export CMAKE_C_FLAGS="-fPIC -Os -fvisibility=hidden -target arm64-apple-darwin"

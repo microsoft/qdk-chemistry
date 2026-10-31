@@ -59,6 +59,7 @@ steps:
         -e SYSTEM_ACCESSTOKEN \
         -e QDK_UARCH=${{ parameters.march }} \
         -e QDK_CHEMISTRY_RELEASE_BUILD \
+        -e CMAKE_BUILD_PARALLEL_LEVEL \
         -w /workspace/qdk-chemistry \
         ${{ parameters.dockerImage }} \
       bash .pipelines/pip-scripts/build-pip-wheels.sh ${{ parameters.march }} \
@@ -84,6 +85,7 @@ steps:
         -e SYSTEM_ACCESSTOKEN \
         -e QDK_UARCH=${{ parameters.march }} \
         -e QDK_CHEMISTRY_RELEASE_BUILD \
+        -e CMAKE_BUILD_PARALLEL_LEVEL \
         -w /workspace/qdk-chemistry \
         ${{ parameters.dockerImage }} \
       bash .pipelines/pip-scripts/build-pip-wheels.sh ${{ parameters.march }} \

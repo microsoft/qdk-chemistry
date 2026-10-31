@@ -48,6 +48,7 @@ packaging==26.2
     #   build
     #   delocate
     #   scikit-build-core
+    #   wheel
 pathspec==1.1.1
     # via scikit-build-core
 protobuf==5.29.6 ; sys_platform == 'linux'
@@ -69,4 +70,6 @@ typing-extensions==4.15.0 ; sys_platform == 'darwin' or sys_platform == 'linux'
     #   opentelemetry-sdk
     #   opentelemetry-semantic-conventions
 urllib3==2.8.0
+    # via -r requirements.in
+wheel==0.48.0 ; sys_platform == 'linux'
     # via -r requirements.in
