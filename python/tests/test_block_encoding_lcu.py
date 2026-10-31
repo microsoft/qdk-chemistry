@@ -364,6 +364,86 @@ class TestPSPMapperPrepareGuards:
             mapper.run(self._unitary())
 
 
+def _assert_block_encodes(circuit, hamiltonian: QubitOperator, coefficients: np.ndarray, atol: float) -> None:
+    r"""Check :math:`\langle 0|_\mathrm{anc} B[H] |0\rangle_\mathrm{anc} = H/\lambda` up to a global sign."""
+    num_system_qubits = hamiltonian.num_qubits
+    dimension = 2**num_system_qubits
+    expected_block = hamiltonian.to_matrix() / np.sum(np.abs(coefficients))
+    for system_state in [*np.eye(dimension), np.full(dimension, 1.0 / math.sqrt(dimension))]:
+        actual = _block_encoding_action(circuit, num_system_qubits, system_state)
+        expected = expected_block @ system_state
+        assert np.abs(actual.imag).max() <= atol, f"unexpected phase in {actual}"
+        sign = 1.0 if np.vdot(actual, expected).real >= 0.0 else -1.0
+        assert np.allclose(sign * actual, expected, rtol=0.0, atol=atol), (
+            f"block encoding failed on {system_state}: got {sign * actual}, expected {expected}"
+        )
+
+
+class TestPSPMapperSelectMethod:
+    """Tests for the opt-in unary-iteration SELECT, alone and with alias-sampling PREPARE."""
+
+    _PAULIS = ("XX", "ZZ", "XZ", "YY", "ZI")
+    _COEFFICIENTS = np.array([0.25, -0.5, 0.1, -0.3, 0.2])
+
+    def test_defaults_to_multi_controlled(self):
+        """The unary SELECT is opt-in; an unknown method is rejected."""
+        assert registry.create("circuit_mapper", "prepare_select_prepare").settings().get("select_method") == (
+            "multi_controlled"
+        )
+        with pytest.raises(ValueError, match="select_method"):
+            registry.create("circuit_mapper", "prepare_select_prepare", select_method="sparse")
+
+    @pytest.mark.parametrize("num_terms", [1, 2, 3, 5])
+    def test_unary_select_block_encodes_the_hamiltonian(self, num_terms: int):
+        """With exact PREPARE amplitudes the unary SELECT gives the exact block, signs included."""
+        coefficients = self._COEFFICIENTS[:num_terms]
+        hamiltonian = QubitOperator(pauli_strings=list(self._PAULIS[:num_terms]), coefficients=coefficients)
+        circuit = registry.create("circuit_mapper", "prepare_select_prepare", select_method="unary_iteration").run(
+            LCUBuilder().run(hamiltonian)
+        )
+        _assert_block_encodes(circuit, hamiltonian, coefficients, atol=1e-10)
+
+    def test_unary_select_with_alias_sampling_block_encodes_the_hamiltonian(self):
+        """The opt-in pairing for cost projections block-encodes within the alias discretization."""
+        bits_precision = 4
+        coefficients = self._COEFFICIENTS[:3]
+        hamiltonian = QubitOperator(pauli_strings=list(self._PAULIS[:3]), coefficients=coefficients)
+        circuit = registry.create(
+            "circuit_mapper",
+            "prepare_select_prepare",
+            select_method="unary_iteration",
+            prepare=AlgorithmRef("state_prep", "alias_sampling", bits_precision=bits_precision),
+        ).run(LCUBuilder().run(hamiltonian))
+        _assert_block_encodes(circuit, hamiltonian, coefficients, atol=2.0**-bits_precision)
+
+    @pytest.mark.parametrize("prepare", ["dense_pure_state", "alias_sampling"])
+    def test_unary_select_cuts_toffolis_at_the_same_width(self, prepare: str):
+        """Unary iteration replaces per-factor multi-controls by L - 2 ANDs on scratch qubits.
+
+        The declared register is unchanged; only the estimate's scratch qubits differ.
+        """
+        rng = np.random.default_rng(0)
+        paulis = sorted({"".join(rng.choice(list("IXYZ"), 6)) for _ in range(60)})[:20]
+        hamiltonian = QubitOperator(pauli_strings=paulis, coefficients=rng.normal(size=len(paulis)))
+        unitary = LCUBuilder().run(hamiltonian)
+
+        def circuit(select_method: str):
+            return registry.create(
+                "circuit_mapper",
+                "prepare_select_prepare",
+                select_method=select_method,
+                prepare=AlgorithmRef("state_prep", prepare),
+            ).run(unitary)
+
+        default, unary = circuit("multi_controlled"), circuit("unary_iteration")
+        default_counts = default.estimate().logical_counts
+        unary_counts = unary.estimate().logical_counts
+
+        assert unary.num_qubits == default.num_qubits
+        # PREPARE is shared, so the whole drop is SELECT's: measured 618 -> L - 2 = 18 CCZ here.
+        assert default_counts["cczCount"] - unary_counts["cczCount"] >= 20 * (len(paulis) - 2)
+
+
 class TestLCUContainer:
     """Tests for the LCUContainer data class."""
 
