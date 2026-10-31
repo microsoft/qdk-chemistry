@@ -217,8 +217,7 @@ void warn_on_intruders(const sw::DownfoldResult& down, bool regularized) {
   // regularized amplitude would hide the very channels it compensates for.
   // 1.0 is a heuristic flag for a large individual amplitude, not a
   // convergence boundary; SW convergence depends on the perturbation norm and
-  // spectral gap. It sits in a wide empirical gap -- benign folds measured
-  // here top out near 0.51, while a mismatched kept space reaches 1.6-3.0.
+  // spectral gap.
   constexpr double intruder_warn_amplitude = 1.0;
   if (down.max_amplitude <= intruder_warn_amplitude) return;
   if (!regularized)
@@ -272,17 +271,16 @@ std::shared_ptr<data::Hamiltonian> SchriefferWolffPT2Constructor::_run_impl(
 
   const auto [h_alpha, h_beta] = hamiltonian->get_one_body_integrals();
   std::array<Eigen::MatrixXd, 2> one_body{h_alpha, h_beta};
-  // A restricted Hamiltonian keeps one tensor for all three spin blocks, so it
-  // is copied and rotated once.
+  // The kernel reads the Hamiltonian's tensors in place; a semicanonical
+  // rotation below replaces them with rotated copies. A restricted Hamiltonian
+  // keeps one tensor for all three spin blocks.
   const auto [g_aaaa, g_aabb, g_bbbb] = hamiltonian->get_two_body_integrals();
-  std::vector<Eigen::VectorXd> two_body{g_aaaa};
-  if (unrestricted) two_body = {g_aaaa, g_aabb, g_bbbb};
+  std::array<const Eigen::VectorXd*, 3> two_body{&g_aaaa, &g_aaaa, &g_aaaa};
+  if (unrestricted) two_body = {&g_aaaa, &g_aabb, &g_bbbb};
+  std::array<Eigen::VectorXd, 3> rotated_two_body;
   const auto two_body_blocks = [&]() -> sw::TwoBodyBlocks {
-    if (!unrestricted)
-      return {std::cref(two_body[0]), std::cref(two_body[0]),
-              std::cref(two_body[0])};
-    return {std::cref(two_body[0]), std::cref(two_body[1]),
-            std::cref(two_body[2])};
+    return {std::cref(*two_body[0]), std::cref(*two_body[1]),
+            std::cref(*two_body[2])};
   };
   const double e_core = hamiltonian->get_core_energy();
   const int norb = static_cast<int>(h_alpha.rows());
@@ -370,6 +368,15 @@ std::shared_ptr<data::Hamiltonian> SchriefferWolffPT2Constructor::_run_impl(
   const std::vector<int>& virtual_spatial = window_roles.virtual_spatial;
   log_fold_rounding(window_roles);
 
+  sw::RegularizerOptions reg;
+  reg.sigma2 = _settings->get<double>("regularizer_sigma2");
+  // The bound constraint admits NaN, which would then read as "not positive"
+  // and silently select the bare path instead of the requested regularizer.
+  if (!std::isfinite(reg.sigma2))
+    throw std::invalid_argument(
+        "SchriefferWolffPT2: regularizer_sigma2 must be finite.");
+  const bool regularized = reg.sigma2 > 0.0;
+
   // Built from the full 1-RDMs, so a correlated reference's off-diagonal
   // density survives into the denominators.
   auto fock =
@@ -381,11 +388,12 @@ std::shared_ptr<data::Hamiltonian> SchriefferWolffPT2Constructor::_run_impl(
       Eigen::MatrixXd::Identity(norb, norb)};
   bool semicanonical_applied = false;
   if (_settings->get<bool>("semicanonicalize")) {
-    // A converged SCF leaves off-diagonal Fock elements near its orbital-
-    // gradient threshold. Neglecting them perturbs the result only at that
-    // level, while rotating costs an O(N^5) integral transform, so blocks
-    // below this tolerance are left as they are.
-    constexpr double semicanonical_tolerance = 1e-6;
+    // Leaving a block unrotated neglects its off-diagonal Fock elements e,
+    // which shifts H_eff by about e * V^2 * max|dr/dD| for the inverse
+    // denominator r(D): at most sigma with the regularizer, unbounded without
+    // it. A converged SCF leaves e near its orbital-gradient threshold.
+    const double semicanonical_tolerance =
+        regularized ? 1e-6 / std::max(1.0, reg.sigma2) : 1e-10;
     for (int spin = 0; spin < (unrestricted ? 2 : 1); ++spin)
       rotation[spin] = sw::semicanonical_rotation(
           fock[spin], {inactive_spatial, active_spatial, virtual_spatial},
@@ -399,11 +407,17 @@ std::shared_ptr<data::Hamiltonian> SchriefferWolffPT2Constructor::_run_impl(
         fock[spin] = sw::rotate_one_body(fock[spin], rotation[spin]);
         density[spin] = sw::rotate_one_body(density[spin], rotation[spin]);
       }
-      two_body[0] = sw::rotate_two_body(two_body[0], rotation[0], norb);
+      rotated_two_body[0] =
+          sw::rotate_two_body(*two_body[0], rotation[0], norb);
       if (unrestricted) {
-        two_body[1] =
-            sw::rotate_two_body(two_body[1], rotation[0], rotation[1], norb);
-        two_body[2] = sw::rotate_two_body(two_body[2], rotation[1], norb);
+        rotated_two_body[1] =
+            sw::rotate_two_body(*two_body[1], rotation[0], rotation[1], norb);
+        rotated_two_body[2] =
+            sw::rotate_two_body(*two_body[2], rotation[1], norb);
+        two_body = {&rotated_two_body[0], &rotated_two_body[1],
+                    &rotated_two_body[2]};
+      } else {
+        two_body.fill(&rotated_two_body[0]);
       }
     }
   }
@@ -422,19 +436,9 @@ std::shared_ptr<data::Hamiltonian> SchriefferWolffPT2Constructor::_run_impl(
       : fold_requested ? "not folded (kept space holds at most two electrons)"
                        : "discarded (fold_above_two_body is off)";
 
-  sw::RegularizerOptions reg;
-  reg.sigma2 = _settings->get<double>("regularizer_sigma2");
-  // The bound constraint admits NaN, which would then read as "not positive"
-  // and silently select the bare path instead of the requested regularizer.
-  if (!std::isfinite(reg.sigma2))
-    throw std::invalid_argument(
-        "SchriefferWolffPT2: regularizer_sigma2 must be finite.");
-  const bool regularized = reg.sigma2 > 0.0;
-
-  auto down = sw::downfold(
-      one_body, two_body_blocks(), {fock[0].diagonal(), fock[1].diagonal()},
-      active_spatial, inactive_spatial, virtual_spatial, reg, e_core,
-      fold ? density : std::array<Eigen::MatrixXd, 2>{});
+  auto down = sw::downfold(one_body, two_body_blocks(), fock, active_spatial,
+                           inactive_spatial, virtual_spatial, reg, e_core,
+                           fold ? density : std::array<Eigen::MatrixXd, 2>{});
 
   QDK_LOGGER().info(
       "SW-PT2 downfold complete: regularization={}, minimum denominator={:.3g} "

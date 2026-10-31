@@ -238,6 +238,18 @@ class TestEffectiveHamiltonianConstructor:
         # consumers reading only the 8-fold-unique elements get a different operator.
         assert np.abs(g - g.transpose(1, 0, 2, 3)).max() > 1e-6
 
+    def test_downfolded_hamiltonian_round_trips_through_json(self, water_window, tmp_path):
+        """The folded core is inactive without an inactive Fock matrix, and still loads from JSON."""
+        case = water_window
+        h_eff = algorithms.create(_TYPE, "qdk_swpt2").run(case.reference, case.hamiltonian, case.kept_space)
+        assert list(h_eff.get_orbitals().inactive_indices().indices(SymmetryLabel([axes.alpha()])))
+        filename = str(tmp_path / "downfolded.hamiltonian.json")
+        h_eff.to_json_file(filename)
+        loaded = Hamiltonian.from_json_file(filename)
+        assert loaded.get_core_energy() == pytest.approx(h_eff.get_core_energy(), abs=1e-12)
+        np.testing.assert_allclose(loaded.get_one_body_integrals()[0], h_eff.get_one_body_integrals()[0], atol=1e-12)
+        np.testing.assert_allclose(loaded.get_two_body_integrals()[0], h_eff.get_two_body_integrals()[0], atol=1e-12)
+
     def test_rejects_non_finite_regularizer(self, water_window):
         """A non-finite sigma must fail loudly rather than silently selecting the bare path."""
         case = water_window

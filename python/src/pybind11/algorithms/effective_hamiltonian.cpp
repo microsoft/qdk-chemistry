@@ -193,69 +193,23 @@ Returns:
       m, "QdkSchriefferWolffPT2Constructor", R"(
 Second-order Schrieffer-Wolff (Van Vleck) effective-Hamiltonian downfold.
 
-Computes ``H_eff = H_BD + 1/2 [S, H_OD]``, truncated to ``<= 2``-body, folding
-the window's external space ``Q`` onto its kept space ``P``. With bare
-denominators, the generator solves ``[F0, S] = H_OD`` for a diagonal
-generalized-Fock ``F0``. ``regularizer_sigma2`` instead builds a regularized
-generator, which solves that equation only approximately.
-Any restricted MO basis qualifies, however it was produced: RHF, ROHF, CAS,
-localized and natural orbitals, including UHF natural orbitals carried as
-restricted orbitals with their 1-RDM. Unrestricted orbitals use per-spin
-densities and Fock matrices and give an unrestricted result; the window,
-``p_indices`` and the reference active space must then select the same orbital
-indices in both spins. Every singly occupied orbital must lie in the reference
-active space.
-The factory name is ``"qdk_swpt2"``.
+Computes ``H_eff = P (H_BD + 1/2 [S, H_OD]) P``, truncated to ``<= 2``-body,
+folding the external orbitals ``Q`` of the window Hamiltonian's active space
+``W`` onto the kept space ``P``. The generator uses semicanonical
+generalized-Fock denominators, damped by ``regularizer_sigma2``. Restricted
+references (RHF, ROHF, CAS, localized or natural orbitals) give a spin-free
+result and unrestricted references an unrestricted one. The factory name is
+``"qdk_swpt2"``.
 
-Denominator regularization is controlled by ``regularizer_sigma2`` (the
-:math:`\sigma` of the :math:`\sigma^2` regularizer, in :math:`E_h^{-2}`, default
-``1.0``), equivalently the DSRG flow parameter. Larger values regularize less and
-``0`` selects a guarded bare pseudoinverse. Coupled channels with
-:math:`|\Delta| < 10^{-8}\,E_h` are mapped to zero while the remaining channels
-are downfolded, and the constructor logs a warning when this occurs. The
-regularizer borrows the DSRG damping form but is not a full DSRG calculation.
-``semicanonicalize`` is enabled by default and diagonalizes each spin's
-generalized Fock independently within inactive, active, and virtual orbital
-blocks before forming denominators; the emitted Hamiltonian is rotated back to
-the original reference basis. ROHF uses the spin-traced density and common spin-free
-orbital energies, preserving spin symmetry while the active solve selects the
-desired spin sector.
+``p_indices`` is a :class:`~qdk_chemistry.data.symmetry.SymmetryBlockedIndexSet`
+of global orbital indices selecting ``P`` within ``W``; it need not coincide
+with the reference active space. The result's inactive orbitals (the folded
+occupied orbitals and any core outside ``W``) are doubly occupied, so its
+active space holds the reference's electron count minus twice their number.
 
-``fold_above_two_body`` is enabled by default. The transformation generates
-three-body terms that a Hamiltonian cannot hold; folding uses pair contractions
-from the reference 1-RDM and keeps what falls to two-body instead of discarding
-it outright. For a determinant in its own orbitals, restricted closed-shell or
-unrestricted, these are the ordinary Wick contractions, but the residual
-three-body operator is still discarded. For a correlated CAS or spin-averaged
-open-shell reference the approximation additionally neglects the two-body and
-higher density cumulants. It can reduce the truncation error when the kept space holds
-more than two electrons, but makes the downfold more expensive, increasingly so
-as the kept space grows. It is ignored when the kept space holds at most two
-electrons, where a three-body operator has no matrix elements to contribute.
-
-The emitted two-body blocks are only 4-fold symmetric: hermiticity
-``(pq|rs) == (qp|sr)`` and electron exchange ``(pq|rs) == (rs|pq)`` hold as for
-the input integrals, but the bra swap ``(pq|rs) == (qp|rs)`` of a genuine
-Coulomb integral does not. Consumers must be given the full dense ``norb**4``
-blocks; one that reads only the canonical 8-fold-unique elements silently
-reconstructs a different operator.
-
-The active regularization, minimum denominator, maximum raw intruder amplitude,
-and semicanonicalization status are logged when construction completes. A
-warning is also logged when the raw amplitude exceeds one. This is a heuristic
-flag for a large individual amplitude, not a convergence boundary; SW
-convergence depends on the perturbation norm and spectral gap.
-
-The kept space ``P`` is a required ``run()`` argument (``p_indices``): a
-:class:`~qdk_chemistry.data.symmetry.SymmetryBlockedIndexSet` of window
-orbital indices. The reference wavefunction supplies
-the density over ``W``; ``P`` selects which orbitals are kept and need not
-coincide with the reference active space. A folded external orbital has its
-reference occupation rounded to doubly occupied or empty, bounded by
-``max_folded_occupation_deviation``. Rounding never changes the total electron
-count, because the active space receives whatever the folded orbitals do not
-take; the derived active electron count is logged and is the value to pass to
-the active-space solver.
+The emitted two-body blocks are only 4-fold symmetric: the bra swap
+``(pq|rs) == (qp|rs)`` does not hold, so consumers must read the full dense
+``norb**4`` blocks rather than the 8-fold-unique elements.
 
 Typical usage:
 

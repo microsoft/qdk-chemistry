@@ -26,8 +26,10 @@ downfolder = create("effective_hamiltonian_constructor", "qdk_swpt2")
 
 ################################################################################
 # start-cell-configure
-# View available settings
-print(f"Downfolder settings: {downfolder.settings().keys()}")
+# Weaken the denominator regularization, and discard rather than fold the
+# three-body terms the transformation generates
+downfolder.settings().set("regularizer_sigma2", 4.0)
+downfolder.settings().set("fold_above_two_body", False)
 # end-cell-configure
 ################################################################################
 

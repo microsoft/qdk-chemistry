@@ -125,8 +125,8 @@ The generator :math:`S` is calculated from
 
    [F_0, S] = H_{\mathrm{OD}},
 
-where :math:`F_0` -- the generalized Fock operator of the input
-reference wavefunction -- is used to approximate :math:`H_{\mathrm{BD}}`, which
+where :math:`F_0` -- the diagonal part of the input reference wavefunction's
+generalized Fock operator -- is used to approximate :math:`H_{\mathrm{BD}}`, which
 allows for efficient computation of :math:`S`. This results in
 
 .. math::
@@ -157,8 +157,10 @@ reference's per-spin 1-RDMs, so the orbital energies can differ between spins.
 By default, ``semicanonicalize`` diagonalizes each :math:`F^\sigma` within the inactive,
 active, and virtual blocks. Integrals and density are rotated consistently,
 and the emitted integrals are rotated back. A block whose off-diagonal elements
-are at most :math:`10^{-6}\,E_h` is left unrotated: such elements are SCF
-convergence noise, and neglecting them changes the result only at that level.
+are negligible is left unrotated: at most :math:`10^{-6}/\max(1,\sigma)\,E_h`
+with the regularizer described below, the level a converged SCF leaves, and at
+most :math:`10^{-10}\,E_h` without it, because bare denominators can amplify the
+neglected elements without bound.
 With this option disabled, the denominators use the diagonals of
 :math:`F^\sigma` in the supplied basis.
 
@@ -171,7 +173,10 @@ bare inverse denominator with
    \frac{1}{\Delta_T} \to \frac{1 - e^{-\sigma \Delta_T^2}}{\Delta_T},
 
 the :math:`\sigma^2` regularizer :cite:`Shee2021`, whose :math:`\sigma` (in :math:`E_h^{-2}`)
-is equivalently the DSRG flow parameter :cite:`Evangelista2014`. Larger :math:`\sigma`
+plays the role of the DSRG flow parameter :math:`s` in the generator
+:cite:`Evangelista2014`. Because the correction is the half-commutator above,
+second-order energies match DSRG-PT2 at :math:`s = \sigma/2`; the default
+:math:`\sigma = 1` corresponds to :math:`s = 0.5`. Larger :math:`\sigma`
 regularizes less. Setting it to ``0`` selects a guarded bare pseudoinverse:
 coupled channels with :math:`|\Delta_T| < 10^{-8}\,E_h` are omitted, with a warning.
 This differs from the :math:`\sigma \to 0` limit, which damps all channels to zero.
@@ -228,7 +233,9 @@ different states.
 
 The constructor logs regularization, active electron count, folded-occupation
 deviation, minimum coupled denominator, and maximum raw amplitude.
-The amplitude diagnostic uses undamped couplings, with the denominator floored at
+The amplitude diagnostic covers the terms that connect :math:`P` and :math:`Q`
+and uses undamped couplings -- the generalized Fock matrix for single
+excitations -- with the denominator floored at
 :math:`10^{-8}\,E_h`. Large occupation or charge-rounding errors and amplitudes
 above one trigger warnings. These are diagnostics, not convergence guarantees.
 
