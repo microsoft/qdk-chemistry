@@ -1,15 +1,8 @@
 """Migrate the ``sparse`` Hamiltonian container serialization to the current version.
 
-The legacy flat ``two_body_integrals_sparse`` list of ``[p, q, r, s, value]``
-entries became a ``SymmetryBlockedSparseMap`` in version 0.2.0. In both versions
-only the qubit mapper (and readers of exported FCIDUMP files, which held entries as
-stored) expanded each stored two-body entry over its 8-fold permutation class; the
-integral getters read entries literally. Version
-0.3.0 reads entries literally everywhere, and the migration adopts the qubit
-mapper's reading by storing every class member of a Hermitian container;
-non-Hermitian containers keep their entries as stored. The (restricted) one-body sparse
-triplet list and the scalar metadata are schema-stable. Sparse model Hamiltonians
-carry no orbitals.
+The flat ``two_body_integrals_sparse`` list became a ``SymmetryBlockedSparseMap`` in 0.2.0. Version 0.3.0
+reads two-body entries literally, so Hermitian containers are migrated to store every member of each 8-fold
+class, as the qubit mapper read them; non-Hermitian containers keep their entries.
 """
 
 # --------------------------------------------------------------------------------------------
