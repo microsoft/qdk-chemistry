@@ -544,7 +544,9 @@ struct DavidsonBlockPreconditioner {
  * @tparam TC Storage type of the search space and its images except their
  * first vectors (the Ritz vector after a collapse, i.e. the anchor of an
  * inexact op), which are double: float halves the memory traffic and
- * footprint for a single-precision op, whose images carry no more digits
+ * footprint for a single-precision op, whose images carry no more digits.
+ * With float the Rayleigh-Ritz step uses the overlaps of the stored (rounded)
+ * vectors, so that their rounding does not limit the residual.
  * @tparam Functor Type of the matrix-vector operation functor (on vectors of
  * TC)
  * @tparam ExactFunctor Type of the exact operator (on vectors of double)
@@ -563,7 +565,9 @@ struct DavidsonBlockPreconditioner {
  * Ritz pair as computed from the operator applications
  * @param[in] stagnation_window  If positive, also stop (unconverged) once the
  * residual norm has not halved over this many iterations, e.g. at the
- * resolution limit of an inexact operator
+ * resolution limit of an inexact operator. A residual test cannot tell that
+ * limit from a plateau of the iteration itself, so with op_error it is only
+ * a backstop and should be long.
  * @param[in] exact  Optional exact operator, for an inexact (e.g. reduced
  * precision) op: once the residual falls below anchor_tol (or tol, or
  * stagnates) the search space is collapsed onto the Ritz vector, whose image
@@ -573,21 +577,27 @@ struct DavidsonBlockPreconditioner {
  * @param[in] anchor_tol  Residual norm at which to anchor; infinity anchors
  * the start vector
  * @param[in] block  Optional exact block of the preconditioner
+ * @param[in] op_error  With exact: estimated norm of the error of op's image
+ * of a unit vector. If positive, the errors of the images are tracked (in
+ * quadrature through collapses, zero for an exact image) into an estimate of
+ * the error of the residual. The solve then re-anchors in place whenever
+ * that estimate exceeds a quarter of the residual (or of tol, below it),
+ * accepts convergence only when the residual plus the estimate is below
+ * tol, and stops (unconverged) when re-anchoring cannot keep up: two
+ * re-anchors in a row within two iterations of the previous one.
  * @return Pair containing (number of iterations, converged eigenvalue)
  * @throws std::runtime_error if not converged within max_iter iterations
  * and throw_on_failure is true
  */
 template <typename TC = double, typename Functor,
           typename ExactFunctor = Functor>
-auto restarted_davidson(int64_t N, int64_t max_m, int64_t max_iter,
-                        const Functor& op, const double* D, double tol,
-                        double* X, double min_abs_denominator = 1e-12,
-                        bool throw_on_failure = true,
-                        double* residual_norm = nullptr,
-                        int64_t stagnation_window = 0,
-                        const ExactFunctor* exact = nullptr,
-                        double anchor_tol = 0.0,
-                        const DavidsonBlockPreconditioner* block = nullptr) {
+auto restarted_davidson(
+    int64_t N, int64_t max_m, int64_t max_iter, const Functor& op,
+    const double* D, double tol, double* X, double min_abs_denominator = 1e-12,
+    bool throw_on_failure = true, double* residual_norm = nullptr,
+    int64_t stagnation_window = 0, const ExactFunctor* exact = nullptr,
+    double anchor_tol = 0.0, const DavidsonBlockPreconditioner* block = nullptr,
+    double op_error = 0.0) {
   static_assert(std::is_same_v<TC, double> or std::is_same_v<TC, float>,
                 "restarted_davidson: TC must be double or float");
   if (!X) throw std::runtime_error("Davidson: No Guess Provided");
@@ -664,7 +674,18 @@ auto restarted_davidson(int64_t N, int64_t max_m, int64_t max_iter,
 
   std::vector<double> H(max_m * max_m), Y(max_m * max_m), LAM(max_m);
   std::vector<double> y_prev(max_m, 0.0), U(2 * max_m), HU(2 * max_m);
-  std::vector<double> sums(max_m + 2), proj(max_m + 1);
+  std::vector<double> sums(2 * max_m + 8), proj(max_m + 1);
+
+  // Overlaps G = V^T V of the stored basis. Single-precision storage rounds
+  // every stored vector, so V is orthonormal only to about 1e-8, and a
+  // Rayleigh-Ritz step that took G = I would leave a residual component
+  // inside the search space of about |lam| 1e-8, which no new direction can
+  // remove. With float storage G (and every entry of H that involves a
+  // rounded vector) is therefore measured on the stored values and the
+  // projected problem is H y = lam G y; double storage keeps G = I.
+  constexpr bool measure_overlaps = std::is_same_v<TC, float>;
+  std::vector<double> G(max_m * max_m, 0.0), GW(max_m * max_m);
+  G[0] = 1.0;
 
   // t -= V[0:k) c, optionally accumulating V[0:k)^T t (after the update)
   // into acc, on the block [c0, c0 + len) of t = V[k]
@@ -733,6 +754,12 @@ auto restarted_davidson(int64_t N, int64_t max_m, int64_t max_iter,
   std::vector<double> res_history;
   size_t iter = 1;
 
+  // Error estimates of the images of the basis vectors (see op_error)
+  const bool track_errors = exact != nullptr and op_error > 0.0;
+  std::vector<double> image_error(max_m + 1, 0.0);
+  image_error[0] = anchor_start ? 0.0 : op_error;
+  int64_t last_anchor = 0, close_anchors = 0;
+
   // Collapse the search space onto U = [y, y_prev orthogonalized against y]
   // (just y when max_m == 2 or without a previous Ritz vector, leaving room
   // for the new direction): [V|AV][0:kk) <- [V|AV][0:k) U, H <- U^T H U and
@@ -765,6 +792,14 @@ auto restarted_davidson(int64_t N, int64_t max_m, int64_t max_iter,
     for (int64_t c = 0; c < kk; ++c)
       new_proj[c] = blas::dot(k, U.data() + c * k, 1, proj.data(), 1);
     std::copy_n(new_proj, kk, proj.data());
+  };
+  // image_error[0:kk) of the collapsed basis [V|AV][0:k) U
+  auto collapse_errors = [&](int64_t kk) {
+    double e[2] = {0.0, 0.0};
+    for (int64_t c = 0; c < kk; ++c)
+      for (int64_t j = 0; j < k; ++j)
+        e[c] += std::pow(U[j + c * k] * image_error[j], 2);
+    for (int64_t c = 0; c < kk; ++c) image_error[c] = std::sqrt(e[c]);
   };
   auto collapse = [&](const double* y) -> int64_t {
     const int64_t kk = collapse_basis(y);
@@ -804,10 +839,24 @@ auto restarted_davidson(int64_t N, int64_t max_m, int64_t max_iter,
     // Rayleigh-Ritz on the k-dimensional search space
     for (int64_t j = 0; j < k; ++j)
       std::copy_n(H.data() + j * max_m, k, Y.data() + j * k);
-    lapack::syev(lapack::Job::Vec, lapack::Uplo::Lower, k, Y.data(), k,
-                 LAM.data());
+    if constexpr (measure_overlaps) {
+      for (int64_t j = 0; j < k; ++j)
+        std::copy_n(G.data() + j * max_m, k, GW.data() + j * k);
+      if (lapack::sygv(1, lapack::Job::Vec, lapack::Uplo::Lower, k, Y.data(), k,
+                       GW.data(), k, LAM.data()) != 0)
+        throw std::runtime_error("restarted_davidson: Rayleigh-Ritz failed");
+    } else {
+      lapack::syev(lapack::Job::Vec, lapack::Uplo::Lower, k, Y.data(), k,
+                   LAM.data());
+    }
     const double* y = Y.data();
     const double lam = LAM[0];
+    double res_error = 0.0;
+    if (track_errors) {
+      for (int64_t j = 0; j < k; ++j)
+        res_error += std::pow(y[j] * image_error[j], 2);
+      res_error = std::sqrt(res_error);
+    }
 
     // A full search space is collapsed in the same pass (fused): onto the
     // Ritz vector, whose image the residual needs anyway, and the previous
@@ -817,9 +866,11 @@ auto restarted_davidson(int64_t N, int64_t max_m, int64_t max_iter,
 
     // Residual r = AV y - lam V y (not stored), new direction
     // t = -(D - lam)^-1 r in V[k] and V[0:k)^T t, in one pass:
-    // sums = [|r|^2, V^T t, |t|^2]
+    // sums = [|r|^2, V^T t, |t|^2], then for a fused collapse with measured
+    // overlaps [G00, H00, G01, H01, G11, H11] of the stored new [V0, V[1]]
+    const int64_t nsums = k + 2 + (measure_overlaps and fuse ? 6 : 0);
     davidson_reduce(
-        N, k + 2, sums.data(), [&](int64_t i0, int64_t i1, double* acc) {
+        N, nsums, sums.data(), [&](int64_t i0, int64_t i1, double* acc) {
           alignas(64) double xs[chunk], rs[chunk], x1[chunk], ax1[chunk];
           for (int64_t c0 = i0; c0 < i1; c0 += chunk) {
             const int64_t len = std::min(chunk, i1 - c0);
@@ -874,6 +925,27 @@ auto restarted_davidson(int64_t N, int64_t max_m, int64_t max_iter,
                   store(V[1] + c0 + i, x1[i]);
                   store(AV[1] + c0 + i, ax1[i]);
                 }
+              if constexpr (measure_overlaps) {
+                double* g = acc + k + 2;
+                g[0] += detail::davidson_lane_sum(
+                    len, [&](int64_t i) { return xs[i] * xs[i]; });
+                g[1] += detail::davidson_lane_sum(
+                    len, [&](int64_t i) { return xs[i] * rs[i]; });
+                if (kk > 1) {
+                  const TC* v1 = V[1] + c0;
+                  const TC* av1 = AV[1] + c0;
+                  g[2] += detail::davidson_lane_sum(
+                      len, [&](int64_t i) { return xs[i] * double(v1[i]); });
+                  g[3] += detail::davidson_lane_sum(
+                      len, [&](int64_t i) { return rs[i] * double(v1[i]); });
+                  g[4] += detail::davidson_lane_sum(len, [&](int64_t i) {
+                    return double(v1[i]) * double(v1[i]);
+                  });
+                  g[5] += detail::davidson_lane_sum(len, [&](int64_t i) {
+                    return double(v1[i]) * double(av1[i]);
+                  });
+                }
+              }
             }
           }
         });
@@ -883,6 +955,18 @@ auto restarted_davidson(int64_t N, int64_t max_m, int64_t max_iter,
       // The basis is now [V|AV][0:kk) with the Ritz vector first, and t
       // moves to V[kk]
       collapse_projections(kk);
+      if (track_errors) collapse_errors(kk);
+      if constexpr (measure_overlaps) {
+        const double* g = sums.data() + k + 2;
+        G[0] = g[0];
+        H[0] = g[1];
+        if (kk > 1) {
+          G[1] = G[max_m] = g[2];
+          H[1] = H[max_m] = g[3];
+          G[1 + max_m] = g[4];
+          H[1 + max_m] = g[5];
+        }
+      }
       std::swap(V[k], V[kk]);
       k = kk;
       std::fill_n(Y.data(), k, 0.0);
@@ -936,7 +1020,7 @@ auto restarted_davidson(int64_t N, int64_t max_m, int64_t max_iter,
     logger->info("iter = {:4}, LAM(0) = {:20.12e}, RNORM = {:20.12e}", iter,
                  lam, res_nrm);
 
-    if (anchored and res_nrm < tol) {
+    if (anchored and res_nrm + res_error < tol) {
       converged = true;
       break;
     }
@@ -949,25 +1033,64 @@ auto restarted_davidson(int64_t N, int64_t max_m, int64_t max_iter,
             0.5 *
                 res_history[res_history.size() - 1 - size_t(stagnation_window)];
 
-    if (not anchored and (res_nrm < std::max(tol, anchor_tol) or stagnated)) {
+    const bool reanchor =
+        track_errors and anchored and res_error > 0.25 * std::max(res_nrm, tol);
+    if (reanchor) {
+      close_anchors = int64_t(iter) - last_anchor <= 2 ? close_anchors + 1 : 0;
+      if (close_anchors >= 2) {
+        logger->info("Davidson re-anchoring cannot keep up");
+        break;
+      }
+    }
+    if ((not anchored and (res_nrm < std::max(tol, anchor_tol) or stagnated)) or
+        reanchor) {
       // Collapse onto the Ritz vector (and the previous one) and apply the
       // exact operator to the Ritz vector; its coupling to the second basis
       // vector (AV[0]^T V[1]) is then exact as well, while the image of that
       // vector keeps the inexact operator's error at a small coefficient
       anchored = true;
+      last_anchor = int64_t(iter);
       res_history.clear();
       const int64_t ka = fuse ? k : collapse(y);
+      if (track_errors and not fuse) collapse_errors(ka);
+      image_error[0] = 0.0;
       exact->operator_action(1, 1., V0, N, 0., AV0, N);
-      double h[2] = {0.0, 0.0};
-      davidson_reduce(N, ka, h, [&](int64_t i0, int64_t i1, double* acc) {
-        acc[0] += detail::davidson_sum(
-            i0, i1, [&](int64_t i) { return V0[i] * AV0[i]; });
-        if (ka > 1)
-          acc[1] += detail::davidson_sum(
-              i0, i1, [&](int64_t i) { return AV0[i] * double(V[1][i]); });
-      });
+      // h = [V0^T AV0, AV0^T V[1]], then with measured overlaps
+      // [G00, G01, G11, H11] of the stored collapsed vectors
+      double h[6] = {0.0, 0.0, 0.0, 0.0, 0.0, 0.0};
+      davidson_reduce(
+          N, measure_overlaps ? 6 : ka, h,
+          [&](int64_t i0, int64_t i1, double* acc) {
+            acc[0] += detail::davidson_sum(
+                i0, i1, [&](int64_t i) { return V0[i] * AV0[i]; });
+            if (ka > 1)
+              acc[1] += detail::davidson_sum(
+                  i0, i1, [&](int64_t i) { return AV0[i] * double(V[1][i]); });
+            if constexpr (measure_overlaps) {
+              acc[2] += detail::davidson_sum(
+                  i0, i1, [&](int64_t i) { return V0[i] * V0[i]; });
+              if (ka > 1) {
+                acc[3] += detail::davidson_sum(
+                    i0, i1, [&](int64_t i) { return V0[i] * double(V[1][i]); });
+                acc[4] += detail::davidson_sum(i0, i1, [&](int64_t i) {
+                  return double(V[1][i]) * double(V[1][i]);
+                });
+                acc[5] += detail::davidson_sum(i0, i1, [&](int64_t i) {
+                  return double(V[1][i]) * double(AV[1][i]);
+                });
+              }
+            }
+          });
       H[0] = h[0];
       if (ka > 1) H[1] = H[max_m] = h[1];
+      if constexpr (measure_overlaps) {
+        G[0] = h[2];
+        if (ka > 1) {
+          G[1] = G[max_m] = h[3];
+          G[1 + max_m] = h[4];
+          H[1 + max_m] = h[5];
+        }
+      }
       k = ka;
       std::fill(y_prev.begin(), y_prev.end(), 0.0);
       y_prev[0] = 1.0;
@@ -1037,8 +1160,10 @@ auto restarted_davidson(int64_t N, int64_t max_m, int64_t max_iter,
     // inexact: V[j]^T AV[k] would carry the error of op(t) projected on the
     // anchor, which bounds how far the residual can fall.
     op.operator_action(1, 1. / t_nrm, V[k], N, 0., AV[k], N);
+    // With measured overlaps sums also gets G(0:k, k) = V[0:k]^T V[k]
     davidson_reduce(
-        N, k + 1, sums.data(), [&](int64_t i0, int64_t i1, double* acc) {
+        N, measure_overlaps ? 2 * k + 2 : k + 1, sums.data(),
+        [&](int64_t i0, int64_t i1, double* acc) {
           const double f = 1.0 / t_nrm;
           for (int64_t c0 = i0; c0 < i1; c0 += chunk) {
             const int64_t len = std::min(chunk, i1 - c0);
@@ -1053,10 +1178,21 @@ auto restarted_davidson(int64_t N, int64_t max_m, int64_t max_iter,
             const TC* av = AV[k] + c0;
             acc[k] += detail::davidson_lane_sum(
                 len, [&](int64_t i) { return double(t[i]) * double(av[i]); });
+            if constexpr (measure_overlaps)
+              for (int64_t j = 0; j <= k; ++j)
+                vcol(j, c0, [&](const auto* v) {
+                  acc[k + 1 + j] += detail::davidson_lane_sum(
+                      len,
+                      [&](int64_t i) { return double(v[i]) * double(t[i]); });
+                });
           }
         });
     for (int64_t j = 0; j <= k; ++j)
       H[j + k * max_m] = H[k + j * max_m] = sums[j];
+    if constexpr (measure_overlaps)
+      for (int64_t j = 0; j <= k; ++j)
+        G[j + k * max_m] = G[k + j * max_m] = sums[k + 1 + j];
+    image_error[k] = op_error;
     ++k;
   }
 

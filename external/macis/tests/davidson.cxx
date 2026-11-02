@@ -176,6 +176,39 @@ TEST_CASE("Davidson") {
             Catch::Matchers::WithinAbs(E0_ref, testing::davidson_tolerance));
     }
 
+    // Error estimates for an inexact operator anchored early: the errors of
+    // its images keep entering the collapsed basis as the Ritz vector moves
+    // away from the anchor, which without op_error stalls the residual above
+    // tol (at 1.5e-7). Re-anchoring on the estimated error converges, with
+    // the true residual within the estimate. An estimate that re-anchoring
+    // cannot satisfy stops the solve within a few iterations.
+    {
+      const double scale = 1e-3, tol = 1e-7;
+      std::vector<double> d(H.n());
+      for (size_t i = 0; i < d.size(); ++i) d[i] = scale * std::sin(1.0 + i);
+      PerturbedOperator perturbed{H, d};
+      macis::diagonal_guess(H.n(), H, X_guess.data());
+      macis::restarted_davidson(H.n(), 3, 500, perturbed, D.data(), tol,
+                                X_guess.data(), 1e-12, false, &res, 0, &exact,
+                                1e-2, nullptr, scale);
+      REQUIRE(res < tol);
+      sparsexx::spblas::gespmbv(1, 1., H, X_guess.data(), H.n(), 0., R.data(),
+                                H.n());
+      const double rq = blas::dot(H.n(), X_guess.data(), 1, R.data(), 1);
+      blas::axpy(H.n(), -rq, X_guess.data(), 1, R.data(), 1);
+      REQUIRE(blas::nrm2(H.n(), R.data(), 1) < 1.25 * tol);
+
+      macis::diagonal_guess(H.n(), H, X_guess.data());
+      auto [nit, E_stopped] = macis::restarted_davidson(
+          H.n(), 3, 500, perturbed, D.data(), tol, X_guess.data(), 1e-12, false,
+          &res, 0, &exact, 1e-2, nullptr, 1.0);
+      REQUIRE(nit < 30);
+      macis::diagonal_guess(H.n(), H, X_guess.data());
+      REQUIRE_THROWS(macis::restarted_davidson(
+          H.n(), 3, 500, perturbed, D.data(), tol, X_guess.data(), 1e-12, true,
+          nullptr, 0, &exact, 1e-2, nullptr, 1.0));
+    }
+
     // Exact block of the preconditioner on the determinants of lowest
     // diagonal: the same eigenpair in fewer iterations. The guess is the
     // block's own lowest eigenvector, so at the first iteration lam equals

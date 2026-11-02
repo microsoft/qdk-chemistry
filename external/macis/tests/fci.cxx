@@ -22,6 +22,7 @@
 #include <macis/fci/string_space.hpp>
 #include <macis/hamiltonian_generator/double_loop.hpp>
 #include <macis/sd_operations.hpp>
+#include <macis/solvers/davidson.hpp>
 #include <macis/util/fcidump.hpp>
 #include <numeric>
 #include <random>
@@ -715,6 +716,90 @@ TEST_CASE("FCI Mixed Precision") {
       }
     }
   }
+}
+
+TEST_CASE("FCI Single-Precision Davidson Storage") {
+  ROOT_ONLY(MPI_COMM_WORLD);
+  for (auto name : {"ci_solver", "davidson"})
+    if (!spdlog::get(name)) spdlog::null_logger_mt(name);
+
+  // restarted_davidson<float> rounds every stored vector to float, so its
+  // basis is orthonormal only to about 1e-8. With images exact up to that
+  // same rounding (double-precision sigma stored as float), the residual
+  // must still converge far below |E| 1e-8: a diagonal shift of -1000 Eh,
+  // which changes nothing in exact arithmetic, put the floor of a
+  // Rayleigh-Ritz step that took the stored basis as orthonormal above 1e-6.
+  const size_t nfull = macis::read_fcidump_norb(water_ccpvdz_fcidump);
+  std::vector<double> T_full(nfull * nfull),
+      V_full(nfull * nfull * nfull * nfull);
+  macis::read_fcidump_1body(water_ccpvdz_fcidump, T_full.data(), nfull);
+  macis::read_fcidump_2body(water_ccpvdz_fcidump, V_full.data(), nfull);
+  const size_t norb = 11;
+  std::vector<double> T(norb * norb), V(norb * norb * norb * norb);
+  for (size_t p = 0; p < norb; ++p)
+    for (size_t q = 0; q < norb; ++q) {
+      T[p + q * norb] = T_full[p + q * nfull];
+      for (size_t r = 0; r < norb; ++r)
+        for (size_t s = 0; s < norb; ++s)
+          V[p + norb * (q + norb * (r + norb * s))] =
+              V_full[p + nfull * (q + nfull * (r + nfull * s))];
+    }
+  macis::FCIHamiltonian H(norb, 4, 4, T.data(), norb, V.data(), norb);
+  const size_t ndet = H.size();
+  const double shift = -1000.0;
+
+  struct Shifted {
+    const macis::FCIHamiltonian& H;
+    double shift;
+    void operator_action(size_t m, double alpha, const double* V, size_t LDV,
+                         double beta, double* AV, size_t LDAV) const {
+      for (size_t j = 0; j < m; ++j) {
+        H.sigma(V + j * LDV, AV + j * LDAV, alpha, beta);
+        for (size_t i = 0; i < H.size(); ++i)
+          AV[i + j * LDAV] += alpha * shift * V[i + j * LDV];
+      }
+    }
+  } exact{H, shift};
+  struct Rounded {
+    const Shifted& exact;
+    void operator_action(size_t m, double alpha, const float* V, size_t LDV,
+                         double beta, float* AV, size_t LDAV) const {
+      const size_t n = exact.H.size();
+      std::vector<double> v(n), av(n);
+      for (size_t j = 0; j < m; ++j) {
+        std::copy_n(V + j * LDV, n, v.begin());
+        exact.operator_action(1, alpha, v.data(), n, 0.0, av.data(), n);
+        for (size_t i = 0; i < n; ++i)
+          AV[i + j * LDAV] =
+              float(beta == 0.0 ? av[i] : av[i] + beta * AV[i + j * LDAV]);
+      }
+    }
+  } rounded{exact};
+
+  std::vector<double> D(ndet), X(ndet, 0.0);
+  H.diagonal(D.data());
+  for (auto& d : D) d += shift;
+  X[std::min_element(D.begin(), D.end()) - D.begin()] = 1.0;
+
+  const double tol = 1e-8;
+  double res = 0.0;
+  auto [niter, E] = macis::restarted_davidson<float>(
+      ndet, 3, 100, rounded, D.data(), tol, X.data(), 1e-12, false, &res, 0,
+      &exact, 1e-3);
+  REQUIRE(res < tol);
+
+  std::vector<double> C_ref;
+  const double E_ref = macis::fci_ground_state(
+      H, 500, 1e-9, C_ref, 0, 3, macis::FCIPrecision::double_precision);
+  REQUIRE_THAT(E, Catch::Matchers::WithinAbs(E_ref + shift, 1e-8));
+  // The returned vector in double precision: its Rayleigh quotient is
+  // accurate to second order in its residual
+  std::vector<double> R(ndet);
+  exact.operator_action(1, 1.0, X.data(), ndet, 0.0, R.data(), ndet);
+  const double rq = blas::dot(ndet, X.data(), 1, R.data(), 1);
+  REQUIRE_THAT(rq, Catch::Matchers::WithinAbs(E_ref + shift, 1e-10));
+  blas::axpy(ndet, -rq, X.data(), 1, R.data(), 1);
+  REQUIRE(blas::nrm2(ndet, R.data(), 1) < 1e-7);
 }
 
 TEST_CASE("FCI RDMs") {

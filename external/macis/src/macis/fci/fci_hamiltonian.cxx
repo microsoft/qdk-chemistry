@@ -1404,16 +1404,22 @@ double fci_ground_state(const FCIHamiltonian& H, size_t max_iter,
   for (size_t i = 0; i < N; ++i) d_min = std::min(d_min, D[i]);
   const double switch_tol =
       std::max(res_tol, std::max(1e-4, 5e-6 * std::abs(d_min)));
+  // Error of a single-precision image of a unit vector: about twice the
+  // measured 1.4e-7 to 2.0e-7 of the image's norm (H14, H16, [2Fe-2S])
+  const double op_error = 4e-7 * std::abs(d_min);
 
   // Single precision throughout, anchored in place (double-precision sigma
   // of the Ritz vector) at switch_tol, or earlier if single precision stops
-  // the residual from falling; afterwards a stagnating solve stops and is
-  // re-anchored below
-  constexpr int64_t stagnation_window = 6;
+  // the residual from falling, and again whenever the estimated error of the
+  // residual from the single-precision images exceeds a quarter of it. The
+  // stagnation test is only a backstop: Davidson plateaus of strongly
+  // correlated systems (10 to 17 iterations for [2Fe-2S]) must not end the
+  // single-precision phase
+  constexpr int64_t stagnation_window = 24;
   double res = 0.0;
   auto [niter, E] = restarted_davidson<float>(
       N, max_subspace, max_iter, single, D.get(), res_tol, C, 1e-12, false,
-      &res, stagnation_window, &op, switch_tol, block_ptr);
+      &res, stagnation_window, &op, switch_tol, block_ptr, op_error);
   logger->info("  * mixed precision: {} iterations, |r| = {:.3e}", niter, res);
 
   auto S = detail::davidson_alloc(N);
@@ -1425,7 +1431,7 @@ double fci_ground_state(const FCIHamiltonian& H, size_t max_iter,
       auto [it, E2] = restarted_davidson<float>(
           N, max_subspace, max_iter - niter, single, D.get(), res_tol, C, 1e-12,
           false, &res, stagnation_window, &op,
-          std::numeric_limits<double>::infinity(), block_ptr);
+          std::numeric_limits<double>::infinity(), block_ptr, op_error);
       niter += it;
       logger->info("  * anchored: {} iterations, |r| = {:.3e}", it, res);
     }
