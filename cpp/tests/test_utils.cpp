@@ -32,9 +32,8 @@ using namespace qdk::chemistry::data;
 using namespace qdk::chemistry::algorithms;
 using namespace qdk::chemistry::utils;
 
-namespace qdk::chemistry::scf {
+namespace qdk::chemistry::tests::test_support {
 
-namespace {
 struct LineSearchQuadratic {
   using argument_type = Eigen::VectorXd;
   using return_type = double;
@@ -62,7 +61,11 @@ struct LineSearchQuadratic {
     y += alpha * x;
   }
 };
-}  // namespace
+}  // namespace qdk::chemistry::tests::test_support
+
+namespace qdk::chemistry::scf {
+
+using qdk::chemistry::tests::test_support::LineSearchQuadratic;
 
 TEST(LineSearchTest, AcceptsRoundoffLimitedStepInBracketingAndZoom) {
   LineSearchQuadratic objective;
