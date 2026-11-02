@@ -150,6 +150,9 @@ Examples:
       .value("Lv", Element::Lv, "Livermorium")
       .value("Ts", Element::Ts, "Tennessine")
       .value("Og", Element::Og, "Oganesson")
+      .def("__int__", [](Element element) { return static_cast<int>(element); })
+      .def("__index__",
+           [](Element element) { return static_cast<int>(element); })
       .export_values();
 
   // Expose current CIAAW version
