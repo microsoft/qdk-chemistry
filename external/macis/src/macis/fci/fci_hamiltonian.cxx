@@ -155,29 +155,46 @@ T* cache_line_aligned(T* p) {
                               ~uintptr_t(63));
 }
 
-/// Threads for a parallel region doing `flops` of work: one per 2e6 flops
-/// (about 0.1 ms on Cascade Lake), so that small spaces are not dominated by
-/// thread start-up
+/// Threads for a parallel region doing `flops` of work: one below 2e6 flops
+/// (about 0.1 ms on Cascade Lake), else the whole team. Regions of one team
+/// size avoid the cost of growing a team (libgomp: tens of microseconds per
+/// added thread), and fci_ground_state sizes the team for its problem.
 int threads_for(double flops) {
 #ifdef _OPENMP
-  const double max_threads = omp_get_max_threads();
+  return flops < 2e6 ? 1 : omp_get_max_threads();
 #else
-  const double max_threads = 1.0;
+  return 1;
 #endif
-  return int(std::clamp(std::ceil(flops / 2e6), 1.0, max_threads));
 }
 
-/// While alive, OpenMP-threaded BLAS/LAPACK calls of the calling thread run
-/// serially: for the 400 x 400 P-space matrix, 64 MKL threads took 14 ms
-/// instead of 6 (syevr) and up to 170 ms instead of 23 (syevd of a spin-flip
-/// sector matrix) on Cascade Lake; threading only pays from about 1000 x 1000
-struct SerialLapack {
+/// While alive, the calling thread's parallel regions without a num_threads
+/// clause and its OpenMP-threaded BLAS/LAPACK calls use at most `threads`
+/// threads. LAPACK is fastest serial for the 400 x 400 P-space matrix: 64 MKL
+/// threads took 14 ms instead of 6 (syevr) and up to 170 ms instead of 23
+/// (syevd of a spin-flip sector matrix) on Cascade Lake; threading only pays
+/// from about 1000 x 1000
+struct ThreadLimit {
 #ifdef _OPENMP
   int saved = omp_get_max_threads();
-  SerialLapack() { omp_set_num_threads(1); }
-  ~SerialLapack() { omp_set_num_threads(saved); }
+  explicit ThreadLimit(int threads) {
+    omp_set_num_threads(std::min(threads, saved));
+  }
+  ~ThreadLimit() { omp_set_num_threads(saved); }
+#else
+  explicit ThreadLimit(int) {}
 #endif
 };
+
+/// Flops of the alpha-beta pass of FCIHamiltonian::sigma (most of its work)
+double sigma_flops(const FCIHamiltonian& H, int spin_flip) {
+  const auto& sa = H.alpha_strings();
+  const double npair = 0.5 * double(sa.norb()) * double(sa.norb() + 1);
+  const double flops =
+      sa.nelec() > 0 and H.beta_strings().nelec() > 0
+          ? 2.0 * npair * double(sa.num_excitations() + 1) * double(H.size())
+          : double(H.size());
+  return spin_flip ? 0.5 * flops : flops;
+}
 
 }  // namespace
 
@@ -536,7 +553,7 @@ void FCIHamiltonian::sigma_impl(const T* C, T* S, T alpha, T beta,
   // Inner GEMM dimension: alpha excitations plus one merged diagonal column
   const size_t K = nexc_a + 1;
   const bool mixed = sa.nelec() > 0 and sb.nelec() > 0;
-  const double flops = mixed ? 2.0 * npair_ * K * size() : double(size());
+  const double flops = sigma_flops(*this, spin_flip);
   const T* vpair;
   if constexpr (std::is_same_v<T, float>)
     vpair = vpair_f_.data();
@@ -561,7 +578,7 @@ void FCIHamiltonian::sigma_impl(const T* C, T* S, T alpha, T beta,
   const size_t ngroups = (na + row_group - 1) / row_group;
   const size_t nocc_b = sb.nelec();
   Scratch scratch(*workspace_);
-#pragma omp parallel num_threads(threads_for(spin_flip ? 0.5 * flops : flops))
+#pragma omp parallel num_threads(threads_for(flops))
   {
     [[maybe_unused]] FlushDenormals<T> flush;
     // Every element is written before it is read (gemm with beta = 0 does
@@ -731,7 +748,7 @@ void FCIHamiltonian::sigma_impl(const T* C, T* S, T alpha, T beta,
     // come out exactly equal (opposite)
     constexpr size_t tile = 64;
     const size_t ntiles = (na + tile - 1) / tile;
-#pragma omp parallel num_threads(threads_for(size()))
+#pragma omp parallel num_threads(detail::davidson_team(int64_t(size())))
     {
       [[maybe_unused]] FlushDenormals<T> flush;
 #pragma omp for schedule(dynamic)
@@ -834,7 +851,7 @@ void FCIHamiltonian::same_spin_pass(bool alpha_strings, const T* C, T* S,
     fci_detail::SameSpinTileKernel<T> kernels[3];
     for (size_t l = 1, k = 0; l <= max_lines; l *= 2, ++k)
       kernels[k] = fci_detail::same_spin_tile_kernel<T>(simd_, l);
-#pragma omp parallel num_threads(std::min<size_t>(nt, lines.size()))
+#pragma omp parallel num_threads(nt)
     {
       [[maybe_unused]] FlushDenormals<T> flush;
       Work w(scratch, ns, ns, mp, max_lines * TW);
@@ -968,7 +985,7 @@ namespace {
 /// LAPACK's threaded dense solvers took 15-60 ms for the 400 x 400 P-space
 /// matrix on 64 threads (6 ms on one), this about 2 ms.
 double lanczos_lowest(size_t m, const double* A, double* z) {
-  SerialLapack serial;
+  ThreadLimit serial(1);
   const size_t kmax = std::min<size_t>(m, 200);
   std::vector<double> V((kmax + 1) * m), alpha, beta, T, w(kmax);
   uint64_t state = 0x9e3779b97f4a7c15ull;
@@ -1174,6 +1191,16 @@ double fci_ground_state(const FCIHamiltonian& H, size_t max_iter,
         "fci_ground_state: spin-flip symmetry requires equal numbers of alpha "
         "and beta electrons");
 
+  // One team for all parallel regions of the solve (threads_for,
+  // detail::davidson_team), sized for the work W of a sigma: 36 (W /
+  // 1e8)^0.15 threads, from 24 at W = 6e6 flops to 128 at about 1e12, came
+  // within 6 % of the fastest team on Cascade Lake (64 cores, 128 hardware
+  // threads), where all threads made spaces of 6e4 to 9e5 determinants 1.5
+  // to 5 times slower
+  const double flops = sigma_flops(H, spin_flip);
+  ThreadLimit team(
+      flops < 2e6 ? 1 : int(std::lround(36.0 * std::pow(flops / 1e8, 0.15))));
+
   auto logger = spdlog::get("ci_solver");
   if (!logger) {
     logger = spdlog::stdout_color_mt("ci_solver");
@@ -1186,9 +1213,11 @@ double fci_ground_state(const FCIHamiltonian& H, size_t max_iter,
       (precision == FCIPrecision::automatic and N >= mixed_precision_min_size);
   logger->info("[FCI Solver]:");
   logger->info(
-      "  {} = {:6}, {} = {:.5e}, {} = {:4}, {} = {:4}, {} = {:2}, {} = {}",
+      "  {} = {:6}, {} = {:.5e}, {} = {:4}, {} = {:4}, {} = {:2}, {} = {}, "
+      "{} = {}",
       "NDETS", N, "RES_TOL", res_tol, "MAX_SUB", max_subspace, "MAX_ITER",
-      max_iter, "SPIN_FLIP", spin_flip, "MIXED", mixed);
+      max_iter, "SPIN_FLIP", spin_flip, "MIXED", mixed, "THREADS",
+      detail::davidson_max_threads());
 
   using clock_type = std::chrono::high_resolution_clock;
   using duration_type = std::chrono::duration<double, std::milli>;
@@ -1297,7 +1326,7 @@ double fci_ground_state(const FCIHamiltonian& H, size_t max_iter,
       if (use_block) {
         x.Z = x.S.H;
         x.lambda.resize(m);
-        SerialLapack serial;
+        ThreadLimit serial(1);
         lapack::syevd(lapack::Job::Vec, lapack::Uplo::Lower, m, x.Z.data(), m,
                       x.lambda.data());
       } else {

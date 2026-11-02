@@ -442,16 +442,20 @@ inline int64_t davidson_max_threads() {
 #endif
 }
 
+/// Threads of a pass over arrays of n elements: one below 32768 elements,
+/// where thread start-up would dominate, else the whole team (one team size
+/// for all passes also avoids the cost of growing a team between them)
+inline int64_t davidson_team(int64_t n) {
+  return n < 32768 ? 1 : davidson_max_threads();
+}
+
 /// Calls body(thread, begin, end) for a static contiguous partition of
-/// [0, n) over the threads of one parallel region, with at least 32768
-/// elements per thread so that small problems are not dominated by thread
-/// start-up (the partition depends only on n, so arrays first touched
-/// through it stay local to the threads)
+/// [0, n) over the davidson_team(n) threads of one parallel region (the
+/// partition depends only on n and the team, so arrays first touched through
+/// it stay local to the threads)
 template <typename Body>
 void davidson_partition(int64_t n, Body&& body) {
-  const int64_t team =
-      std::clamp<int64_t>(n / 32768, 1, davidson_max_threads());
-#pragma omp parallel num_threads(team)
+#pragma omp parallel num_threads(davidson_team(n))
   {
 #ifdef _OPENMP
     const int64_t nt = omp_get_num_threads(), t = omp_get_thread_num();

@@ -601,6 +601,25 @@ TEST_CASE("FCI Ground State") {
                       std::invalid_argument);
   }
 
+#ifdef _OPENMP
+  SECTION("Caller's thread setting") {
+    // The solve sizes its OpenMP team (one thread for this small space) and
+    // restores the caller's setting, also when it throws
+    struct RestoreThreads {
+      int n = omp_get_max_threads();
+      ~RestoreThreads() { omp_set_num_threads(n); }
+    } restore;
+    omp_set_num_threads(3);
+    macis::FCIHamiltonian H(7, 3, 3, T.data(), norb, V.data(), norb);
+    std::vector<double> C;
+    macis::fci_ground_state(H, 200, 1e-8, C);
+    REQUIRE(omp_get_max_threads() == 3);
+    C.clear();
+    REQUIRE_THROWS(macis::fci_ground_state(H, 1, 1e-12, C));
+    REQUIRE(omp_get_max_threads() == 3);
+  }
+#endif
+
   SECTION("P-space guess") {
     // With at most 400 determinants the P-space of the guess is the whole
     // space: the guess is the ground state and one iteration converges

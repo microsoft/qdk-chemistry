@@ -173,6 +173,10 @@ class FCIHamiltonian {
 /**
  * @brief Lowest eigenpair of a direct FCI Hamiltonian (restarted Davidson).
  *
+ * The solve runs on at most omp_get_max_threads() threads, fewer for small
+ * spaces: one team sized for the work of a sigma, which keeps them from
+ * paying for more threads than their work can use.
+ *
  * @param[in] H            FCI Hamiltonian
  * @param[in] max_iter     Maximum number of Davidson iterations
  * @param[in] res_tol      Convergence tolerance on the residual norm
