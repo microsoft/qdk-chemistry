@@ -300,8 +300,7 @@ class HamiltonianContainer {
    * @param nalpha Number of alpha electrons
    * @param nbeta Number of beta electrons
    * @throws std::runtime_error if I/O error occurs, the Hamiltonian is
-   * unrestricted, or its two-body integrals differ from their 8-fold average
-   * (which each record holds) by more than 1e-5 of the largest integral
+   * unrestricted, or its two-body integrals are not 8-fold symmetric
    * @throws std::invalid_argument if the active space has differing alpha and
    * beta sizes, or a two-body integral is not finite
    */
@@ -641,8 +640,7 @@ class Hamiltonian : public DataClass,
    * @param nalpha Number of alpha electrons
    * @param nbeta Number of beta electrons
    * @throws std::runtime_error if I/O error occurs, the Hamiltonian is
-   * unrestricted, or its two-body integrals differ from their 8-fold average
-   * (which each record holds) by more than 1e-5 of the largest integral
+   * unrestricted, or its two-body integrals are not 8-fold symmetric
    * @throws std::invalid_argument if the active space has differing alpha and
    * beta sizes, or a two-body integral is not finite
    */

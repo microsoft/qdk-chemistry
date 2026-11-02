@@ -56,18 +56,23 @@ macis::MCSCFSettings get_mcscf_settings_(const data::Settings& settings_);
 macis::ASCISettings get_asci_settings_(const data::Settings& settings_);
 
 /**
- * @brief Reject two-body integrals that MACIS would silently misinterpret.
+ * @brief Two-body integrals as MACIS reads them.
  *
- * MACIS assumes (pq|rs) = (rs|pq) and (pq|rs) = (qp|sr); other tensors
- * yield wrong energies rather than an error.
+ * MACIS assumes (pq|rs) = (rs|pq) = (qp|sr), so other tensors are replaced by
+ * their average over these positions, with a warning if they are not
+ * Hermitian.
  *
- * @param hamiltonian Restricted Hamiltonian to validate.
- * @param solver Solver name used in the error message.
- * @throws std::invalid_argument if the two-body integrals define a
- *         non-Hermitian operator or are not stored with (pq|rs) = (rs|pq).
+ * @param hamiltonian Restricted Hamiltonian.
+ * @param solver Solver name used in messages.
+ * @param storage Holds the average if one is needed.
+ * @return The stored tensor if it has this symmetry, otherwise @p storage.
+ * @throws std::runtime_error if the Hamiltonian is not Hermitian.
+ * @throws std::invalid_argument if its two-body integrals contain a non-finite
+ *         value.
  */
-void validate_macis_two_body_symmetry(const data::Hamiltonian& hamiltonian,
-                                      const std::string& solver);
+const Eigen::VectorXd& macis_two_body_integrals(
+    const data::Hamiltonian& hamiltonian, const std::string& solver,
+    Eigen::VectorXd& storage);
 
 /** @brief Dispatch calculation to an implementation specialized by wavefunction
  * bitset size.

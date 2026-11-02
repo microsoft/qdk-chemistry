@@ -48,6 +48,7 @@ from .helpers import (
     create_test_orbitals,
     eightfold_orbit,
     fermionic_reference_matrix,
+    fourfold_average,
     fourfold_orbit,
 )
 
@@ -468,16 +469,24 @@ class TestCholeskyFourFold:
         np.testing.assert_allclose(_native(dense).to_matrix(), reference, atol=1e-11, rtol=0)
         np.testing.assert_allclose(_native(stored).to_matrix(), reference, atol=1e-11, rtol=0)
 
-    def test_restricted_cross_components_rejected(self) -> None:
-        """Factors whose symmetric and antisymmetric parts mix give a non-Hermitian tensor."""
+    @pytest.mark.parametrize("hamiltonian_type", [HamiltonianType.Hermitian, HamiltonianType.NonHermitian])
+    def test_restricted_cross_components(self, hamiltonian_type: HamiltonianType) -> None:
+        """Factors mixing symmetric and antisymmetric parts give a non-Hermitian tensor.
+
+        Declared Hermitian, it maps to its fourfold average; otherwise literally.
+        """
         symmetric = np.array([[0.8, 0.2], [0.2, 0.3]])
         antisymmetric = np.array([[0.0, 0.5], [-0.5, 0.0]])
         factors = (symmetric + antisymmetric).reshape(4, 1)
         tensor = (factors @ factors.T).reshape((2,) * 4)
         assert not np.allclose(tensor, tensor.transpose(1, 0, 3, 2))
-        container = CholeskyHamiltonianContainer(np.eye(2), factors, create_test_orbitals(2), 0.0, np.empty((0, 0)))
-        with pytest.raises(ValueError, match="non-Hermitian"):
-            _native(Hamiltonian(container))
+        container = CholeskyHamiltonianContainer(
+            np.eye(2), factors, create_test_orbitals(2), 0.0, np.empty((0, 0)), None, hamiltonian_type
+        )
+        if hamiltonian_type == HamiltonianType.Hermitian:
+            tensor = fourfold_average(tensor)
+        reference = fermionic_reference_matrix(np.eye(2), np.eye(2), tensor, tensor, tensor)
+        np.testing.assert_allclose(_native(Hamiltonian(container)).to_matrix(), reference, atol=1e-11, rtol=0)
 
 
 class TestSparseLiteralEntries:
@@ -529,17 +538,20 @@ class TestSparseLiteralEntries:
 
     @pytest.mark.parametrize("seed", [(0, 1, 0, 1), (0, 1, 0, 2)], ids=["repeated-four", "eight"])
     @pytest.mark.parametrize("invalid", ["nonhermitian", "partial"])
-    def test_invalid_classes_rejected(self, seed: tuple, invalid: str) -> None:
-        """Classes that are not fourfold when read literally are rejected."""
+    def test_non_fourfold_classes_map_hermitian_part(self, seed: tuple, invalid: str) -> None:
+        """Classes that are not fourfold when read literally map to their fourfold average."""
         primary = fourfold_orbit(seed)
         entries = {indices: 0.7 if indices in primary else 0.0 for indices in eightfold_orbit(seed)}
         if invalid == "partial":
             del entries[sorted(entries)[-1]]
         else:
             entries[seed] += 0.25
-        stored = Hamiltonian(SparseHamiltonianContainer(csc_matrix(np.eye(max(seed) + 1)), entries))
-        with pytest.raises(ValueError, match="non-Hermitian"):
-            _native(stored)
+        tensor = np.zeros((max(seed) + 1,) * 4)
+        for indices, value in entries.items():
+            tensor[indices] = value
+        stored, dense, reference = _sparse_pair(entries, fourfold_average(tensor))
+        np.testing.assert_allclose(_native(dense).to_matrix(), reference, atol=1e-11, rtol=0)
+        np.testing.assert_allclose(_native(stored).to_matrix(), reference, atol=1e-11, rtol=0)
 
     @pytest.mark.parametrize("seed", [(0, 1, 0, 1), (0, 1, 0, 2)], ids=["repeated-four", "eight"])
     def test_fourfold_suborbit_without_zeros_full_matrix(self, seed: tuple) -> None:

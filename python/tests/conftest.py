@@ -42,6 +42,7 @@ from qdk_chemistry.data import (
     StateVectorContainer,
     Wavefunction,
 )
+from qdk_chemistry.utils import Logger
 from qdk_chemistry.utils.qsharp import create_qsharp_context
 
 from .helpers import create_fourfold_test_hamiltonian, create_test_orbitals
@@ -161,6 +162,15 @@ def unrestricted_orbital():
         alpha_energies,
         beta_energies,
     )
+
+
+@pytest.fixture
+def warn_logger():
+    """Temporarily set logger to warn level, restoring on teardown."""
+    prev_level = Logger.get_global_level()
+    Logger.set_global_level("warn")
+    yield
+    Logger.set_global_level(prev_level)
 
 
 @pytest.fixture

@@ -189,23 +189,21 @@ class PackedAccumulator {
 //
 //   spin_symmetric = true   (restricted orbitals)
 //     The caller guarantees that all spin channels share the same integrals
-//     (h_alpha == h_beta, eri_aaaa == eri_bbbb == eri_aabb), which must be
-//     fourfold.  They use spin-summed symmetric and antisymmetric excitation
-//     pairs E_pq ± E_qp with E_pq = E^α_pq + E^β_pq, weighted by
-//     g^S = ((pq|rs) + (pq|sr)) / 2 and g^A = ((pq|rs) - (pq|sr)) / 2.
-//     integral_threshold screens g^S and g^A, so eightfold input, whose g^A
-//     is round-off, adds antisymmetric products only where that round-off
-//     exceeds it.  The δ_{qr} two-body
-//     contraction is folded into the one-body integrals.
+//     (h_alpha == h_beta, eri_aaaa == eri_bbbb == eri_aabb), so excitation
+//     operators are spin-summed, E_pq = E^α_pq + E^β_pq.
 //
 //   spin_symmetric = false  (unrestricted orbitals)
 //     Each spin channel (αα, ββ, αβ, βα) is handled independently
 //     with its own integrals.  This is needed for unrestricted orbitals,
 //     where h^α ≠ h^β and the ERI channels differ — even though the
-//     underlying Hamiltonian is still spin-free.  αβ and βα are each
-//     other's exchange partners, so αβ alone needs only reversal
-//     (pq|rs) = (qp|sr) for the excitation-pair split, which also requires
-//     fourfold αα and ββ; other inputs loop over every channel in full.
+//     underlying Hamiltonian is still spin-free.
+//
+// Hermitian integrals are mapped through their Hermitian part
+// (two_body_symmetry.hpp) with symmetric and antisymmetric excitation pairs
+// E_pq ± E_qp, weighted by g^S, g^A = ((pq|rs) ± (pq|sr)) / 2, which
+// integral_threshold screens; the δ_{qr} two-body contraction is folded into
+// the one-body integrals.  Non-Hermitian integrals are mapped as stored,
+// channel by channel.
 
 // ─── ERI providers ─────────────────────────────────────────────────
 //
@@ -277,17 +275,24 @@ struct DenseEriProvider {
 // yields the entire (pq|·) row, which the mapping loops then consume as
 // plain scalars.  The contraction streams sequentially through the factor
 // columns (vectorizable axpy updates) instead of issuing a strided
-// O(naux) dot product per integral. Row evaluation uses one N^2 row;
-// the separate factor-symmetry QR validation also needs scratch memory.
+// O(naux) dot product per integral.
+//
+// Channels flagged in average_ are read as ((pq|rs) + (qp|sr)) / 2, which for
+// the bra-ket symmetric same-spin reconstructions is the fourfold average.
 struct CholeskyEriProvider {
   static constexpr bool kSparse = false;
+  enum Channel : std::size_t { kAaaa, kAabb, kBbbb };
   const double* La_;
   const double* Lb_;
   std::size_t n_;
   std::size_t naux_;
-  // Scratch row for the aux contraction; the engine is single-threaded
+  std::array<bool, 3> average_{};
+  // Change made by averaging; rows with p <= q cover every integral once.
+  mutable std::array<TwoBodyComparison, 3> change_{};
+  // Scratch rows for the aux contraction; the engine is single-threaded
   // and each row is fully consumed before the next one is requested.
   mutable std::vector<double> row_buf_{};
+  mutable std::vector<double> partner_buf_{};
 
   // Scalar access for the one-body delta fold only (O(N^3) accesses, far
   // below the cost of the two-body row contractions).
@@ -300,27 +305,33 @@ struct CholeskyEriProvider {
     }
     return acc;
   }
+  double element(Channel channel, const double* l1, const double* l2,
+                 std::size_t p, std::size_t q, std::size_t r,
+                 std::size_t s) const {
+    const double value = dot(l1, p * n_ + q, l2, r * n_ + s);
+    if (!average_[channel]) return value;
+    return 0.5 * (value + dot(l1, q * n_ + p, l2, s * n_ + r));
+  }
   double aaaa(std::size_t p, std::size_t q, std::size_t r,
               std::size_t s) const {
-    return dot(La_, p * n_ + q, La_, r * n_ + s);
+    return element(kAaaa, La_, La_, p, q, r, s);
   }
   double bbbb(std::size_t p, std::size_t q, std::size_t r,
               std::size_t s) const {
-    return dot(Lb_, p * n_ + q, Lb_, r * n_ + s);
+    return element(kBbbb, Lb_, Lb_, p, q, r, s);
   }
   double aabb(std::size_t p, std::size_t q, std::size_t r,
               std::size_t s) const {
-    return dot(La_, p * n_ + q, Lb_, r * n_ + s);
+    return element(kAabb, La_, Lb_, p, q, r, s);
   }
 
-  // row[rs] = sum_Q l1[pq + Q*N^2] * l2[rs + Q*N^2] for all rs at once.
+  // out[rs] = sum_Q l1[pq + Q*N^2] * l2[rs + Q*N^2] for all rs at once.
   // The per-element accumulation order over Q matches the scalar dot, so
   // results are identical to the element-wise reconstruction.
-  const double* build_row(const double* l1, std::size_t pair1,
-                          const double* l2) const {
+  void contract(const double* l1, std::size_t pair1, const double* l2,
+                std::vector<double>& out) const {
     const std::size_t n2 = n_ * n_;
-    row_buf_.assign(n2, 0.0);
-    double* out = row_buf_.data();
+    out.assign(n2, 0.0);
     for (std::size_t Q = 0; Q < naux_; ++Q) {
       const double w = l1[pair1 + Q * n2];
       if (w == 0.0) continue;
@@ -329,16 +340,34 @@ struct CholeskyEriProvider {
         out[rs] += w * col[rs];
       }
     }
-    return out;
+  }
+  const double* row(Channel channel, const double* l1, const double* l2,
+                    std::size_t p, std::size_t q) const {
+    contract(l1, p * n_ + q, l2, row_buf_);
+    if (!average_[channel]) return row_buf_.data();
+    contract(l1, q * n_ + p, l2, partner_buf_);
+    auto& change = change_[channel];
+    for (std::size_t r = 0; r < n_; ++r) {
+      for (std::size_t s = 0; s < n_; ++s) {
+        const double value = row_buf_[r * n_ + s];
+        const double partner = partner_buf_[s * n_ + r];
+        const double average = 0.5 * (value + partner);
+        row_buf_[r * n_ + s] = average;
+        if (p > q) continue;
+        change.add(value, average);
+        if (p != q) change.add(partner, average);
+      }
+    }
+    return row_buf_.data();
   }
   const double* row_aaaa(std::size_t p, std::size_t q) const {
-    return build_row(La_, p * n_ + q, La_);
+    return row(kAaaa, La_, La_, p, q);
   }
   const double* row_aabb(std::size_t p, std::size_t q) const {
-    return build_row(La_, p * n_ + q, Lb_);
+    return row(kAabb, La_, Lb_, p, q);
   }
   const double* row_bbbb(std::size_t p, std::size_t q) const {
-    return build_row(Lb_, p * n_ + q, Lb_);
+    return row(kBbbb, Lb_, Lb_, p, q);
   }
 };
 
@@ -361,8 +390,10 @@ struct SparseEriProvider {
   std::unordered_map<std::uint64_t, double> map_;
   // Canonical class positions, sorted lexicographically.
   std::vector<Entry> entries_;
+  // Stored (rs, value) entries of each (pq|·) row, for the row accessors that
+  // the per-channel loop uses.
+  std::vector<std::vector<std::pair<std::size_t, double>>> rows_;
   std::size_t n_ = 0;
-  // Scratch row for the row accessors, which complete the provider interface.
   mutable std::vector<double> row_buf_{};
   const std::vector<Entry>& entries() const { return entries_; }
   std::uint64_t key(std::size_t p, std::size_t q, std::size_t r,
@@ -382,16 +413,9 @@ struct SparseEriProvider {
               std::size_t s) const {
     return aaaa(p, q, r, s);
   }
-  // Build the (pq|·) row from map_.
   const double* build_row(std::size_t p, std::size_t q) const {
     row_buf_.assign(n_ * n_, 0.0);
-    const std::uint64_t n2 = static_cast<std::uint64_t>(n_ * n_);
-    const std::uint64_t pair = static_cast<std::uint64_t>(p * n_ + q);
-    for (const auto& [k, v] : map_) {
-      if (k / n2 == pair) {
-        row_buf_[static_cast<std::size_t>(k % n2)] = v;
-      }
-    }
+    for (const auto& [rs, value] : rows_[p * n_ + q]) row_buf_[rs] = value;
     return row_buf_.data();
   }
   const double* row_aaaa(std::size_t p, std::size_t q) const {
@@ -730,7 +754,8 @@ MajoranaMapResult majorana_map_impl(const MajoranaMapping& mapping,
       }
     }
 
-    // αβ + βα cross-spin channels, related by Coulomb symmetry (pq|rs)=(rs|pq)
+    // αβ + βα cross-spin channels.  Restricted integrals serve both spin
+    // orderings; unrestricted ones store αβ, with (pq|rs)_βα = (rs|pq)_αβ.
     for (std::size_t p = 0; p < n_spatial; ++p) {
       for (std::size_t q = 0; q < n_spatial; ++q) {
         const double* row = eri_provider.row_aabb(p, q);
@@ -740,8 +765,13 @@ MajoranaMapResult majorana_map_impl(const MajoranaMapping& mapping,
             if (std::abs(eri) < integral_threshold) continue;
             accumulate_two_body_product(mode_alpha(p), mode_alpha(q),
                                         mode_beta(r), mode_beta(s), eri);
-            accumulate_two_body_product(mode_beta(r), mode_beta(s),
-                                        mode_alpha(p), mode_alpha(q), eri);
+            if (spin_symmetric) {
+              accumulate_two_body_product(mode_beta(p), mode_beta(q),
+                                          mode_alpha(r), mode_alpha(s), eri);
+            } else {
+              accumulate_two_body_product(mode_beta(r), mode_beta(s),
+                                          mode_alpha(p), mode_alpha(q), eri);
+            }
           }
         }
       }
@@ -972,84 +1002,98 @@ MajoranaMapResult run_with_provider(const MajoranaMapping& mapping,
       threshold, integral_threshold);
 }
 
-}  // namespace detail
-
-MajoranaMapResult majorana_map_hamiltonian(
-    const MajoranaMapping& mapping, double core_energy, const double* h1_alpha,
-    const double* h1_beta, const double* eri_aaaa, const double* eri_aabb,
-    const double* eri_bbbb, std::size_t n_spatial, bool spin_symmetric,
-    double threshold, double integral_threshold) {
-  detail::DenseEriProvider provider{eri_aaaa, eri_aabb, eri_bbbb, n_spatial};
-  bool pair_split = true;
-  if (spin_symmetric) {
-    detail::require_fourfold_two_body(eri_aaaa, n_spatial,
-                                      "majorana_map_hamiltonian");
-  } else {
+MajoranaMapResult map_dense(const MajoranaMapping& mapping, double core_energy,
+                            const double* h1_alpha, const double* h1_beta,
+                            const double* eri_aaaa, const double* eri_aabb,
+                            const double* eri_bbbb, std::size_t n_spatial,
+                            bool spin_symmetric, bool hermitian,
+                            double threshold, double integral_threshold) {
+  const std::string consumer = "majorana_map_hamiltonian";
+  if (!hermitian) {
+    const std::size_t count = n_spatial * n_spatial * n_spatial * n_spatial;
     for (const double* tensor : {eri_aaaa, eri_aabb, eri_bbbb}) {
-      detail::require_finite_two_body(
-          tensor, n_spatial * n_spatial * n_spatial * n_spatial,
-          "majorana_map_hamiltonian");
+      require_finite_two_body(tensor, count, consumer);
     }
-    auto supports_split = [n_spatial](const double* tensor) {
-      const auto symmetry = detail::classify_two_body_symmetry(
-          tensor, n_spatial, detail::two_body_symmetry_tolerance);
-      return symmetry == detail::TwoBodySymmetry::FourFold ||
-             symmetry == detail::TwoBodySymmetry::EightFold;
-    };
-    pair_split = supports_split(eri_aaaa) && supports_split(eri_bbbb) &&
-                 detail::two_body_has_reversal_symmetry(
-                     eri_aabb, n_spatial, detail::two_body_symmetry_tolerance);
+    DenseEriProvider provider{eri_aaaa, eri_aabb, eri_bbbb, n_spatial};
+    return run_with_provider(mapping, core_energy, h1_alpha, h1_beta, provider,
+                             n_spatial, spin_symmetric, false, threshold,
+                             integral_threshold);
   }
-  return detail::run_with_provider(mapping, core_energy, h1_alpha, h1_beta,
-                                   provider, n_spatial, spin_symmetric,
-                                   pair_split, threshold, integral_threshold);
+  auto block_consumer = [&](const std::string& block) {
+    return spin_symmetric ? consumer : consumer + " (" + block + " block)";
+  };
+  Eigen::VectorXd alpha_storage, beta_storage, alpha_beta_storage;
+  const double* aaaa = fourfold_symmetrized(eri_aaaa, n_spatial, alpha_storage,
+                                            block_consumer("alpha-alpha"));
+  const double* aabb = aaaa;
+  const double* bbbb = aaaa;
+  if (!spin_symmetric) {
+    bbbb = fourfold_symmetrized(eri_bbbb, n_spatial, beta_storage,
+                                block_consumer("beta-beta"));
+    aabb = reversal_symmetrized(eri_aabb, n_spatial, alpha_beta_storage,
+                                block_consumer("alpha-beta"));
+  }
+  DenseEriProvider provider{aaaa, aabb, bbbb, n_spatial};
+  return run_with_provider(mapping, core_energy, h1_alpha, h1_beta, provider,
+                           n_spatial, spin_symmetric, true, threshold,
+                           integral_threshold);
 }
 
-MajoranaMapResult majorana_map_hamiltonian_cholesky(
-    const MajoranaMapping& mapping, double core_energy, const double* h1_alpha,
-    const double* h1_beta, const double* three_center_aa,
-    const double* three_center_bb, std::size_t n_spatial, std::size_t naux,
-    bool spin_symmetric, double threshold, double integral_threshold) {
-  auto require_finite = [count = n_spatial * n_spatial *
-                                 naux](const double* factors) {
-    if (!std::all_of(factors, factors + count,
+MajoranaMapResult map_cholesky(const MajoranaMapping& mapping,
+                               double core_energy, const double* h1_alpha,
+                               const double* h1_beta,
+                               const double* three_center_aa,
+                               const double* three_center_bb,
+                               std::size_t n_spatial, std::size_t naux,
+                               bool spin_symmetric, bool hermitian,
+                               double threshold, double integral_threshold) {
+  const std::string consumer = "majorana_map_hamiltonian_cholesky";
+  const std::size_t n2 = n_spatial * n_spatial;
+  auto require_finite = [&](const double* factors) {
+    if (!std::all_of(factors, factors + n2 * naux,
                      [](double value) { return std::isfinite(value); })) {
       throw std::invalid_argument(
-          "majorana_map_hamiltonian_cholesky: the three-center factors "
-          "contain a non-finite value.");
+          consumer + ": the three-center factors contain a non-finite value.");
     }
   };
   require_finite(three_center_aa);
   if (!spin_symmetric) require_finite(three_center_bb);
-  auto reversal_symmetric = [&](const double* left, const double* right) {
-    return detail::cholesky_has_reversal_symmetry(
-        left, right, n_spatial, naux, detail::two_body_symmetry_tolerance);
-  };
-  const bool alpha_hermitian =
-      reversal_symmetric(three_center_aa, three_center_aa);
-  if (spin_symmetric && !alpha_hermitian) {
-    throw std::invalid_argument(
-        "majorana_map_hamiltonian_cholesky: the reconstructed two-body "
-        "integrals violate (pq|rs) = (qp|sr), so they define a non-Hermitian "
-        "operator, which is not supported.");
+
+  CholeskyEriProvider provider{three_center_aa, three_center_bb, n_spatial,
+                               naux};
+  if (hermitian) {
+    const bool alpha =
+        !factors_are_pair_symmetric(three_center_aa, n_spatial, naux);
+    const bool beta = !spin_symmetric && !factors_are_pair_symmetric(
+                                             three_center_bb, n_spatial, naux);
+    provider.average_ = {alpha, !spin_symmetric && (alpha || beta), beta};
   }
-  const bool pair_split =
-      spin_symmetric || (alpha_hermitian &&
-                         reversal_symmetric(three_center_bb, three_center_bb) &&
-                         reversal_symmetric(three_center_aa, three_center_bb));
-  detail::CholeskyEriProvider provider{three_center_aa, three_center_bb,
-                                       n_spatial, naux};
-  return detail::run_with_provider(mapping, core_energy, h1_alpha, h1_beta,
-                                   provider, n_spatial, spin_symmetric,
-                                   pair_split, threshold, integral_threshold);
+  auto result = run_with_provider(mapping, core_energy, h1_alpha, h1_beta,
+                                  provider, n_spatial, spin_symmetric,
+                                  hermitian, threshold, integral_threshold);
+  const std::array<const char*, 3> blocks{"alpha-alpha", "alpha-beta",
+                                          "beta-beta"};
+  const std::array<const char*, 3> partners{
+      fourfold_partners, reversal_partners, fourfold_partners};
+  for (std::size_t channel = 0; channel < 3; ++channel) {
+    if (!provider.average_[channel]) continue;
+    warn_if_not_hermitian(provider.change_[channel],
+                          spin_symmetric
+                              ? consumer
+                              : consumer + " (" + blocks[channel] + " block)",
+                          partners[channel]);
+  }
+  return result;
 }
 
-MajoranaMapResult majorana_map_hamiltonian_sparse(
-    const MajoranaMapping& mapping, double core_energy, const double* h1_alpha,
-    const double* h1_beta, const int* two_body_indices,
-    const double* two_body_values, std::size_t num_entries,
-    std::size_t n_spatial, bool spin_symmetric, double threshold,
-    double integral_threshold) {
+MajoranaMapResult map_sparse(const MajoranaMapping& mapping, double core_energy,
+                             const double* h1_alpha, const double* h1_beta,
+                             const int* two_body_indices,
+                             const double* two_body_values,
+                             std::size_t num_entries, std::size_t n_spatial,
+                             bool spin_symmetric, bool hermitian,
+                             bool expand_shorthand, double threshold,
+                             double integral_threshold) {
   // The sparse fast path is spin-summed: SparseHamiltonianContainer is
   // restricted-only, so all spin channels share the same integrals and the
   // unrestricted branch would only redo identical work per channel.  Callers
@@ -1062,10 +1106,7 @@ MajoranaMapResult majorana_map_hamiltonian_sparse(
         "Hamiltonians.");
   }
 
-  detail::SparseEriProvider provider;
-  provider.n_ = n_spatial;
-
-  detail::SparseTwoBodyTensor tensor;
+  SparseTwoBodyTensor tensor;
   for (std::size_t e = 0; e < num_entries; ++e) {
     // Validate before the int -> size_t cast: a negative index would wrap
     // to a huge value and read out of bounds downstream.
@@ -1078,11 +1119,10 @@ MajoranaMapResult majorana_map_hamiltonian_sparse(
             " is outside [0, " + std::to_string(n_spatial) + ").");
       }
     }
-    const detail::TwoBodyKey k{
-        static_cast<std::size_t>(two_body_indices[4 * e + 0]),
-        static_cast<std::size_t>(two_body_indices[4 * e + 1]),
-        static_cast<std::size_t>(two_body_indices[4 * e + 2]),
-        static_cast<std::size_t>(two_body_indices[4 * e + 3])};
+    const TwoBodyKey k{static_cast<std::size_t>(two_body_indices[4 * e + 0]),
+                       static_cast<std::size_t>(two_body_indices[4 * e + 1]),
+                       static_cast<std::size_t>(two_body_indices[4 * e + 2]),
+                       static_cast<std::size_t>(two_body_indices[4 * e + 3])};
     const double v = two_body_values[e];
     if (!std::isfinite(v)) {
       throw std::invalid_argument(
@@ -1096,40 +1136,37 @@ MajoranaMapResult majorana_map_hamiltonian_sparse(
       throw std::invalid_argument(
           "majorana_map_hamiltonian_sparse: conflicting duplicate values "
           "for two-body entry " +
-          detail::two_body_key_string(k) + ".");
+          two_body_key_string(k) + ".");
     }
   }
 
-  const auto classification = detail::classify_sparse_two_body_symmetry(
-      tensor, detail::two_body_symmetry_tolerance);
-  const auto& [p, q, r, s] = classification.witness;
-  if (classification.symmetry == detail::TwoBodySymmetry::NonHermitian) {
-    throw std::invalid_argument(
-        "majorana_map_hamiltonian_sparse: at " +
-        detail::two_body_key_string(classification.witness) +
-        ", (pq|rs) + (rs|pq) != (qp|sr) + (sr|qp) with absent entries read as "
-        "zero, so the two-body integrals define a non-Hermitian operator, "
-        "which this engine cannot map. Store the missing symmetry partners, "
-        "or expand symmetry representatives with "
-        "SparseHamiltonianContainer.expand_symmetry_representatives.");
+  // Keeps the deprecated shorthand that SparseHamiltonianContainer also
+  // expands at construction.
+  if (expand_shorthand) {
+    const std::size_t stored = tensor.size();
+    expand_legacy_eightfold_representatives(tensor);
+    if (tensor.size() != stored) {
+      QDK_LOGGER().warn(
+          "majorana_map_hamiltonian_sparse: two-body entries that are the "
+          "only stored member of a larger 8-fold permutation class are "
+          "expanded over that class. This shorthand is deprecated: store "
+          "every class member.");
+    }
   }
-  if (classification.symmetry == detail::TwoBodySymmetry::NotBraKetSymmetric) {
-    throw std::invalid_argument(
-        "majorana_map_hamiltonian_sparse: the two-body integrals are "
-        "Hermitian but not stored with (pq|rs) = (rs|pq): " +
-        detail::two_body_key_string(classification.witness) + " and " +
-        detail::two_body_key_string({r, s, p, q}) +
-        " differ, with absent entries read as zero. That swap leaves the "
-        "operator unchanged, so store the bra-ket average ((pq|rs) + (rs|pq)) "
-        "/ 2 at both positions.");
+  if (hermitian) {
+    sparse_fourfold_symmetrize(tensor, "majorana_map_hamiltonian_sparse");
   }
-  constexpr bool pair_split = true;
 
+  SparseEriProvider provider;
+  provider.n_ = n_spatial;
   provider.map_.reserve(tensor.size());
-  std::set<detail::TwoBodyKey> canonical_keys;
+  provider.rows_.resize(n_spatial * n_spatial);
+  std::set<TwoBodyKey> canonical_keys;
   for (const auto& [key, value] : tensor) {
     provider.map_[provider.key(key[0], key[1], key[2], key[3])] = value;
-    canonical_keys.insert(detail::eightfold_canonical(key));
+    provider.rows_[key[0] * n_spatial + key[1]].emplace_back(
+        key[2] * n_spatial + key[3], value);
+    canonical_keys.insert(eightfold_canonical(key));
   }
   // One canonical (p<=q, r<=s, (p,q)<=(r,s)) entry per class, in
   // lexicographic order, so accumulation is independent of input order.
@@ -1141,9 +1178,43 @@ MajoranaMapResult majorana_map_hamiltonian_sparse(
          provider.aaaa(key[0], key[1], key[3], key[2])});
   }
 
-  return detail::run_with_provider(mapping, core_energy, h1_alpha, h1_beta,
-                                   provider, n_spatial, spin_symmetric,
-                                   pair_split, threshold, integral_threshold);
+  return run_with_provider(mapping, core_energy, h1_alpha, h1_beta, provider,
+                           n_spatial, spin_symmetric, hermitian, threshold,
+                           integral_threshold);
+}
+
+}  // namespace detail
+
+MajoranaMapResult majorana_map_hamiltonian(
+    const MajoranaMapping& mapping, double core_energy, const double* h1_alpha,
+    const double* h1_beta, const double* eri_aaaa, const double* eri_aabb,
+    const double* eri_bbbb, std::size_t n_spatial, bool spin_symmetric,
+    double threshold, double integral_threshold) {
+  return detail::map_dense(mapping, core_energy, h1_alpha, h1_beta, eri_aaaa,
+                           eri_aabb, eri_bbbb, n_spatial, spin_symmetric, true,
+                           threshold, integral_threshold);
+}
+
+MajoranaMapResult majorana_map_hamiltonian_cholesky(
+    const MajoranaMapping& mapping, double core_energy, const double* h1_alpha,
+    const double* h1_beta, const double* three_center_aa,
+    const double* three_center_bb, std::size_t n_spatial, std::size_t naux,
+    bool spin_symmetric, double threshold, double integral_threshold) {
+  return detail::map_cholesky(
+      mapping, core_energy, h1_alpha, h1_beta, three_center_aa, three_center_bb,
+      n_spatial, naux, spin_symmetric, true, threshold, integral_threshold);
+}
+
+MajoranaMapResult majorana_map_hamiltonian_sparse(
+    const MajoranaMapping& mapping, double core_energy, const double* h1_alpha,
+    const double* h1_beta, const int* two_body_indices,
+    const double* two_body_values, std::size_t num_entries,
+    std::size_t n_spatial, bool spin_symmetric, double threshold,
+    double integral_threshold) {
+  return detail::map_sparse(mapping, core_energy, h1_alpha, h1_beta,
+                            two_body_indices, two_body_values, num_entries,
+                            n_spatial, spin_symmetric, true, true, threshold,
+                            integral_threshold);
 }
 
 MajoranaMapResult majorana_map_hamiltonian(const MajoranaMapping& mapping,
@@ -1152,6 +1223,8 @@ MajoranaMapResult majorana_map_hamiltonian(const MajoranaMapping& mapping,
                                            double threshold,
                                            double integral_threshold) {
   constexpr double core_energy = 0.0;
+  const bool hermitian = hamiltonian.is_hermitian();
+  spin_symmetric = spin_symmetric || hamiltonian.is_restricted();
 
   auto one_body = hamiltonian.get_one_body_integrals();
   const Eigen::MatrixXd& h1a = std::get<0>(one_body);
@@ -1177,10 +1250,10 @@ MajoranaMapResult majorana_map_hamiltonian(const MajoranaMapping& mapping,
     const Eigen::MatrixXd& three_center_aa = three_center.first;
     const Eigen::MatrixXd& three_center_bb = three_center.second;
     const std::size_t naux = static_cast<std::size_t>(three_center_aa.cols());
-    return majorana_map_hamiltonian_cholesky(
-        mapping, core_energy, h1a_flat.data(), h1b_ptr, three_center_aa.data(),
-        three_center_bb.data(), n, naux, spin_symmetric, threshold,
-        integral_threshold);
+    return detail::map_cholesky(mapping, core_energy, h1a_flat.data(), h1b_ptr,
+                                three_center_aa.data(), three_center_bb.data(),
+                                n, naux, spin_symmetric, hermitian, threshold,
+                                integral_threshold);
   }
 
   if (hamiltonian.has_container_type<SparseHamiltonianContainer>()) {
@@ -1203,19 +1276,19 @@ MajoranaMapResult majorana_map_hamiltonian(const MajoranaMapping& mapping,
       indices.push_back(s);
       values.push_back(val);
     }
-    return majorana_map_hamiltonian_sparse(
-        mapping, core_energy, h1a_flat.data(), h1b_ptr, indices.data(),
-        values.data(), values.size(), n, spin_symmetric, threshold,
-        integral_threshold);
+    return detail::map_sparse(mapping, core_energy, h1a_flat.data(), h1b_ptr,
+                              indices.data(), values.data(), values.size(), n,
+                              spin_symmetric, hermitian, false, threshold,
+                              integral_threshold);
   }
 
   const auto two_body = hamiltonian.get_two_body_integrals();
   const Eigen::VectorXd& aaaa = std::get<0>(two_body);
   const Eigen::VectorXd& aabb = std::get<1>(two_body);
   const Eigen::VectorXd& bbbb = std::get<2>(two_body);
-  return majorana_map_hamiltonian(
+  return detail::map_dense(
       mapping, core_energy, h1a_flat.data(), h1b_ptr, aaaa.data(), aabb.data(),
-      bbbb.data(), n, spin_symmetric, threshold, integral_threshold);
+      bbbb.data(), n, spin_symmetric, hermitian, threshold, integral_threshold);
 }
 
 }  // namespace qdk::chemistry::data

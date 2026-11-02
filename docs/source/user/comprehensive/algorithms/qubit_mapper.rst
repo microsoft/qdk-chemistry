@@ -205,20 +205,16 @@ Custom encodings can be defined by constructing a :class:`~qdk_chemistry.data.Ma
 
 .. rubric:: Integral symmetry
 
-Restricted integrals must have the 4-fold symmetry
-:math:`(pq|rs) = (qp|sr) = (rs|pq)`, which ordinary 8-fold integrals and those
-produced by downfolding both satisfy. They use spin-summed symmetric and
-antisymmetric excitation pairs, weighted by
+The two-body integrals of a Hermitian Hamiltonian enter through their
+average over :math:`(pq|rs)`, :math:`(rs|pq)`, :math:`(qp|sr)` and
+:math:`(sr|qp)`, or over :math:`(pq|rs)` and :math:`(qp|sr)` for an
+unrestricted ``ab`` block, with a warning if they are not Hermitian (for an
+unrestricted same-spin block, also for content that multiplies a vanishing
+operator). They
+use symmetric and antisymmetric excitation pairs, spin-summed for restricted
+integrals, weighted by
 :math:`g^{S,A}_{pq,rs} = \tfrac12\left[(pq|rs) \pm (pq|sr)\right]`.
-A restricted tensor that defines a non-Hermitian operator raises, as does a
-Hermitian one not stored with :math:`(pq|rs) = (rs|pq)`; since that exchange
-leaves the operator unchanged, map its bra-ket average instead.
-
-Unrestricted integrals use the same excitation-pair split when the ``aa`` and
-``bb`` blocks are 4-fold and ``ab`` satisfies
-:math:`(pq|rs)_{ab} = (qp|sr)_{ab}`; ``ab`` need not satisfy
-:math:`(pq|rs)_{ab} = (rs|pq)_{ab}`. Other unrestricted integrals are mapped
-channel by channel.
+Non-Hermitian Hamiltonians are mapped as stored, channel by channel.
 
 The ``integral_threshold`` setting screens :math:`g^S` and :math:`g^A` in the
 excitation-pair split, so symmetry partners are always screened together, and
@@ -244,8 +240,8 @@ compressed form:
   (Cholesky / density-fitted) factors are kept in their
   :math:`O(N^2 \cdot n_\text{aux})` form and the auxiliary index is contracted
   in integral space, one ``(pq|.)`` row at a time (a vectorized matrix-vector
-  product per orbital pair), so the mapping needs one additional
-  :math:`N^2`-length row and suits systems whose dense ERI tensor does not fit
+  product per orbital pair), so the mapping needs up to two additional
+  :math:`N^2`-length rows and suits systems whose dense ERI tensor does not fit
   in memory.
 
 In all cases the result is a :class:`~qdk_chemistry.data.QubitOperator` that
@@ -271,7 +267,7 @@ to use the dense path.
      - Threshold for pruning small Pauli coefficients. Default: ``1e-12``
    * - ``integral_threshold``
      - double
-     - Threshold for filtering small integrals before transformation; 4-fold two-body integrals are screened in the symmetric and antisymmetric combinations above. Default: ``1e-12``
+     - Threshold for filtering small integrals before transformation; the two-body integrals of a Hermitian Hamiltonian are screened in the symmetric and antisymmetric combinations above. Default: ``1e-12``
 
 .. rubric:: Example
 
@@ -297,10 +293,9 @@ Supported base encodings: :ref:`Jordan-Wigner <encoding-jordan-wigner>`, :ref:`B
 Both restricted (RHF) and unrestricted (UHF) Hamiltonians are supported.
 
 The plugin permutes the two-body tensor axes from QDK's chemist ordering to
-Qiskit Nature's operator ordering, so 4-fold integrals are mapped exactly. An
-unrestricted ``ab`` block that violates :math:`(pq|rs) = (qp|sr)` defines a
-non-Hermitian operator, which Qiskit Nature cannot represent, so ``run()``
-raises ``ValueError``.
+Qiskit Nature's operator ordering, so 4-fold integrals are mapped exactly.
+The integrals enter as for the native mapper; non-Hermitian Hamiltonians, which
+Qiskit Nature cannot represent, raise ``ValueError``.
 
 .. rubric:: Settings
 

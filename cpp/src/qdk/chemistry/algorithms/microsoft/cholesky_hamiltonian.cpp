@@ -38,6 +38,7 @@
 #include <qdk/chemistry/data/hamiltonian_containers/cholesky.hpp>
 #include <qdk/chemistry/utils/logger.hpp>
 
+#include "../../data/two_body_symmetry.hpp"
 #include "utils.hpp"
 
 namespace qdk::chemistry::algorithms::microsoft {
@@ -731,13 +732,22 @@ std::shared_ptr<data::Hamiltonian> CholeskyHamiltonianConstructor::_run_impl(
   Eigen::MatrixXd L_mo_alpha;
   Eigen::MatrixXd L_mo_beta;
 
+  // Impose the pair symmetry of real-orbital factors exactly.
+  auto pair_symmetric = [nactive = static_cast<std::size_t>(Ca_active.cols())](
+                            Eigen::MatrixXd factors) {
+    data::detail::pair_symmetrize_factors(
+        factors.data(), nactive, static_cast<std::size_t>(factors.cols()));
+    return factors;
+  };
   if (is_restricted_calc) {
     // Transform to MO
-    L_mo = detail::transform_cholesky_to_mo(L_ao, Ca_active);
+    L_mo = pair_symmetric(detail::transform_cholesky_to_mo(L_ao, Ca_active));
   } else {
     // Transform to MO (Alpha and Beta)
-    L_mo_alpha = detail::transform_cholesky_to_mo(L_ao, Ca_active);
-    L_mo_beta = detail::transform_cholesky_to_mo(L_ao, Cb_active);
+    L_mo_alpha =
+        pair_symmetric(detail::transform_cholesky_to_mo(L_ao, Ca_active));
+    L_mo_beta =
+        pair_symmetric(detail::transform_cholesky_to_mo(L_ao, Cb_active));
   }
 
   // Get inactive space indices for both alpha and beta

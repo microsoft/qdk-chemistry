@@ -8,7 +8,13 @@ import numpy as np
 import pytest
 
 from qdk_chemistry.algorithms import create
-from qdk_chemistry.data import Ansatz, CanonicalFourCenterHamiltonianContainer, Hamiltonian, Structure
+from qdk_chemistry.data import (
+    Ansatz,
+    CanonicalFourCenterHamiltonianContainer,
+    Hamiltonian,
+    HamiltonianType,
+    Structure,
+)
 from qdk_chemistry.data._spin_channels import spin_channel_vector
 from qdk_chemistry.data.symmetry import axes
 
@@ -110,7 +116,7 @@ def h4_chain():
     return wavefunction, create("hamiltonian_constructor").run(wavefunction.get_orbitals())
 
 
-def _mp2_ansatz(h4_chain, two_body):
+def _mp2_ansatz(h4_chain, two_body, hamiltonian_type=HamiltonianType.Hermitian):
     """Ansatz for the H4 chain with its two-body integrals replaced."""
     wavefunction, hamiltonian = h4_chain
     container = CanonicalFourCenterHamiltonianContainer(
@@ -119,23 +125,34 @@ def _mp2_ansatz(h4_chain, two_body):
         wavefunction.get_orbitals(),
         hamiltonian.get_core_energy(),
         np.empty((0, 0)),
+        hamiltonian_type,
     )
     return Ansatz(Hamiltonian(container), wavefunction)
 
 
-@pytest.mark.parametrize(
-    ("kind", "message"),
-    [("exchange", "bra-ket average"), ("hermiticity", "non-Hermitian")],
-    ids=["exchange", "hermiticity"],
-)
-def test_mp2_rejects_non_fourfold_two_body(h4_chain, kind, message):
-    """MP2 reads (ia|jb) directly, so tensors outside the fourfold group would give wrong energies."""
+@pytest.mark.usefixtures("warn_logger")
+@pytest.mark.parametrize("kind", ["exchange", "hermiticity"])
+def test_mp2_uses_hermitian_part_of_two_body(h4_chain, kind, capfd):
+    """MP2 uses the Hermitian part, which neither perturbation changes; only the non-Hermitian one warns."""
     two_body = np.asarray(h4_chain[1].get_two_body_integrals()[0])
     n = round(len(two_body) ** 0.25)
+    two_body = two_body.reshape((n,) * 4)
     perturbation = non_fourfold_perturbation(np.random.default_rng(706).normal(size=(n,) * 4), kind)
     mp2_calculator = create("dynamical_correlation_calculator", "qdk_mp2_calculator")
-    with pytest.raises(ValueError, match=message):
-        mp2_calculator.run(_mp2_ansatz(h4_chain, two_body.reshape((n,) * 4) + 0.05 * perturbation))
+    expected, _, _ = mp2_calculator.run(_mp2_ansatz(h4_chain, two_body))
+    capfd.readouterr()
+    actual, _, _ = mp2_calculator.run(_mp2_ansatz(h4_chain, two_body + 0.05 * perturbation))
+    assert actual == pytest.approx(expected, abs=1e-12)
+    assert ("Hermitian part" in capfd.readouterr().out) == (kind == "hermiticity")
+
+
+def test_mp2_rejects_non_hermitian_hamiltonian(h4_chain):
+    """MP2 assumes a Hermitian Hamiltonian."""
+    two_body = np.asarray(h4_chain[1].get_two_body_integrals()[0])
+    n = round(len(two_body) ** 0.25)
+    ansatz = _mp2_ansatz(h4_chain, two_body.reshape((n,) * 4), HamiltonianType.NonHermitian)
+    with pytest.raises(RuntimeError, match="non-Hermitian"):
+        create("dynamical_correlation_calculator", "qdk_mp2_calculator").run(ansatz)
 
 
 def test_mp2_accepts_fourfold_two_body(h4_chain):
@@ -165,7 +182,7 @@ def test_mp2_accepts_fourfold_two_body(h4_chain):
 
 
 def test_ump2_ignores_same_spin_content_of_vanishing_operators():
-    """Same-spin (ia|ia) multiplies a+_i a+_i a_a a_a = 0, so UMP2 accepts it and its energy is unchanged."""
+    """Same-spin (ia|ia) multiplies a+_i a+_i a_a a_a = 0, so the UMP2 energy is unchanged."""
     scf_solver = create("scf_solver")
     scf_solver.settings().set("method", "hf")
     _, wavefunction = scf_solver.run(create_o2_molecule(), 0, 3, "sto-3g")
@@ -195,8 +212,10 @@ def test_ump2_ignores_same_spin_content_of_vanishing_operators():
     actual, _, _ = calculator.run(with_two_body(gauge, two_bb))
     assert actual == pytest.approx(expected, abs=1e-12)
 
-    # Content that MP2 does read, (ia|jb) - (ib|ja) with i < j and a < b, must still be Hermitian.
+    # Content that MP2 does read enters through its Hermitian part.
     non_hermitian = two_bb.copy()
     non_hermitian[0, 7, 1, 8] += 0.1  # beta occupies 0..6
-    with pytest.raises(ValueError, match="non-Hermitian"):
-        calculator.run(with_two_body(two_aa, non_hermitian))
+    actual, _, _ = calculator.run(with_two_body(two_aa, non_hermitian))
+    hermitian_part, _, _ = calculator.run(with_two_body(two_aa, fourfold_average(non_hermitian)))
+    assert actual == pytest.approx(hermitian_part, abs=1e-12)
+    assert actual != pytest.approx(expected, abs=1e-6)

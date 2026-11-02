@@ -14,6 +14,7 @@ from qdk_chemistry.algorithms import QubitMapper, available, create
 from qdk_chemistry.data import (
     CanonicalFourCenterHamiltonianContainer,
     Hamiltonian,
+    HamiltonianType,
     MajoranaMapping,
     Orbitals,
     QubitOperator,
@@ -96,22 +97,41 @@ class TestQdkQubitMapper:
         assert len(result.coefficients) == len(result.pauli_strings)
         assert result.coefficients.dtype == complex
 
+    @pytest.mark.usefixtures("warn_logger")
     @pytest.mark.parametrize(
-        ("entries", "message"),
+        ("entries", "changes_operator"),
         [
-            ({(0, 0, 1, 1): 0.4, (1, 1, 0, 0): 0.9}, "bra-ket average"),
-            ({(0, 1, 0, 0): 0.25, (0, 0, 0, 1): 0.25, (1, 0, 0, 0): -0.25, (0, 0, 1, 0): -0.25}, "non-Hermitian"),
+            ({(0, 0, 1, 1): 0.4, (1, 1, 0, 0): 0.9}, False),
+            ({(0, 1, 0, 0): 0.25, (0, 0, 0, 1): 0.25, (1, 0, 0, 0): -0.25, (0, 0, 1, 0): -0.25}, True),
         ],
         ids=["exchange", "hermiticity"],
     )
-    def test_restricted_rejects_non_fourfold_two_body(self, entries: dict, message: str) -> None:
-        """Restricted tensors outside the fourfold group are rejected with the reason."""
+    def test_restricted_maps_hermitian_part(self, entries: dict, changes_operator: bool, capfd) -> None:
+        """Restricted tensors map to their fourfold average, warning only if they are not Hermitian.
+
+        Declared non-Hermitian, they map literally.
+        """
         two_body = np.zeros((2,) * 4)
         for indices, value in entries.items():
             two_body[indices] = value
-        hamiltonian = _make_hamiltonian(np.array([[1.0, 0.3], [0.3, 0.5]]), two_body.ravel(), create_test_orbitals(2))
-        with pytest.raises(ValueError, match=message):
-            create("qubit_mapper", "qdk").run(hamiltonian, MajoranaMapping.jordan_wigner(num_modes=4))
+        one_body = np.array([[1.0, 0.3], [0.3, 0.5]])
+        mapping = MajoranaMapping.jordan_wigner(num_modes=4)
+        capfd.readouterr()
+        operator = create("qubit_mapper", "qdk").run(create_dense_test_hamiltonian(one_body, two_body), mapping)
+        assert ("Hermitian part" in capfd.readouterr().out) == changes_operator
+        hermitian_part = fourfold_average(two_body)
+        expected = fermionic_reference_matrix(one_body, one_body, hermitian_part, hermitian_part, hermitian_part)
+        np.testing.assert_allclose(operator.to_matrix(), expected, atol=1e-12, rtol=0)
+
+        literal = create("qubit_mapper", "qdk").run(
+            create_dense_test_hamiltonian(one_body, two_body, hamiltonian_type=HamiltonianType.NonHermitian),
+            mapping,
+        )
+        # Both cross-spin orderings of restricted integrals see their bra-ket average.
+        bra_ket_average = (two_body + two_body.transpose(2, 3, 0, 1)) / 2
+        reference = fermionic_reference_matrix(one_body, one_body, two_body, bra_ket_average, two_body)
+        np.testing.assert_allclose(literal.to_matrix(), reference, atol=1e-12, rtol=0)
+        assert np.allclose(reference, reference.conj().T) != changes_operator
 
     def test_number_operator(self) -> None:
         """Test JW transform of number operator: a†a = (I - Z) / 2."""
@@ -874,8 +894,8 @@ class TestFourFoldReference:
         np.testing.assert_allclose(operator.to_matrix(), reference, atol=1e-11, rtol=0)
 
     @pytest.mark.parametrize("storage", ["dense", "sparse"])
-    def test_fourfold_part_below_rejection_tolerance_is_mapped(self, storage: str) -> None:
-        """A fourfold part below the rejection tolerance is mapped, not dropped."""
+    def test_small_fourfold_part_is_mapped(self, storage: str) -> None:
+        """A small fourfold, non-eightfold part is mapped, not dropped as round-off."""
         random = np.random.default_rng(706)
         fourfold = fourfold_average(random.normal(size=(3,) * 4))
         exchanged = fourfold.transpose(1, 0, 2, 3)

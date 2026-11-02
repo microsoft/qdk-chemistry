@@ -19,6 +19,7 @@ from qdk_chemistry.data import (
     Configuration,
     DFTHCHamiltonianContainer,
     Hamiltonian,
+    HamiltonianType,
     MajoranaMapping,
     ModelOrbitals,
     Orbitals,
@@ -551,20 +552,38 @@ def eightfold_orbit(indices):
     return fourfold_orbit(indices) | fourfold_orbit((second, first, third, fourth))
 
 
-def create_dense_test_hamiltonian(one_alpha, two_aa, one_beta=None, two_ab=None, two_bb=None, *, core_energy=0.0):
+def create_dense_test_hamiltonian(
+    one_alpha,
+    two_aa,
+    one_beta=None,
+    two_ab=None,
+    two_bb=None,
+    *,
+    core_energy=0.0,
+    hamiltonian_type=HamiltonianType.Hermitian,
+):
     """Create a dense Hamiltonian from 4-index tensors, unrestricted when beta integrals are given."""
     num_orbitals = len(one_alpha)
     empty = np.empty((0, 0))
     if one_beta is None:
         container = CanonicalFourCenterHamiltonianContainer(
-            one_alpha, two_aa.ravel(), create_test_orbitals(num_orbitals), core_energy, empty
+            one_alpha, two_aa.ravel(), create_test_orbitals(num_orbitals), core_energy, empty, hamiltonian_type
         )
     else:
         orbitals = Orbitals(
             np.eye(num_orbitals), np.eye(num_orbitals), None, None, None, create_test_basis_set(num_orbitals)
         )
         container = CanonicalFourCenterHamiltonianContainer(
-            one_alpha, one_beta, two_aa.ravel(), two_ab.ravel(), two_bb.ravel(), orbitals, core_energy, empty, empty
+            one_alpha,
+            one_beta,
+            two_aa.ravel(),
+            two_ab.ravel(),
+            two_bb.ravel(),
+            orbitals,
+            core_energy,
+            empty,
+            empty,
+            hamiltonian_type,
         )
     return Hamiltonian(container)
 
@@ -648,19 +667,16 @@ def create_fourfold_test_hamiltonian(num_orbitals: int, restricted: bool):
     return hamiltonian, reference
 
 
-def create_non_hermitian_mixed_block_hamiltonian(asymmetry=1.0):
-    """Unrestricted Hamiltonian whose alpha-beta block breaks (pq|rs) = (qp|sr), and its reference matrix.
-
-    ``asymmetry`` scales the part of the alpha-beta block that breaks the symmetry.
-    """
+def create_non_hermitian_mixed_block_hamiltonian(hamiltonian_type=HamiltonianType.NonHermitian):
+    """Unrestricted Hamiltonian whose alpha-beta block breaks (pq|rs) = (qp|sr), and its literal reference matrix."""
     num_orbitals = 3
     random = np.random.default_rng(684)
     one_alpha, one_beta = random.normal(size=(2, num_orbitals, num_orbitals))
     one_alpha, one_beta = (one_alpha + one_alpha.T) / 2, (one_beta + one_beta.T) / 2
     two_aa, two_bb = (fourfold_average(tensor) for tensor in random.normal(size=(2,) + (num_orbitals,) * 4))
     two_ab = random.normal(size=(num_orbitals,) * 4)
-    hermitian_part = (two_ab + two_ab.transpose(1, 0, 3, 2)) / 2
-    two_ab = hermitian_part + asymmetry * (two_ab - hermitian_part)
     assert not np.array_equal(two_ab, two_ab.transpose(1, 0, 3, 2))
-    hamiltonian = create_dense_test_hamiltonian(one_alpha, two_aa, one_beta, two_ab, two_bb)
+    hamiltonian = create_dense_test_hamiltonian(
+        one_alpha, two_aa, one_beta, two_ab, two_bb, hamiltonian_type=hamiltonian_type
+    )
     return hamiltonian, fermionic_reference_matrix(one_alpha, one_beta, two_aa, two_ab, two_bb)

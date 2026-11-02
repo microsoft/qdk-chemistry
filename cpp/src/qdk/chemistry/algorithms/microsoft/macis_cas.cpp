@@ -56,7 +56,9 @@ struct cas_helper {
     const size_t num_molecular_orbitals = active_indices.size();
 
     const auto& [T_a, T_b] = hamiltonian.get_one_body_integrals();
-    const auto& [V_aaaa, V_aabb, V_bbbb] = hamiltonian.get_two_body_integrals();
+    Eigen::VectorXd V_storage;
+    const auto& V_aaaa =
+        macis_two_body_integrals(hamiltonian, "MacisCas", V_storage);
 
     // get settings
     macis::MCSCFSettings mcscf_settings = get_mcscf_settings_(settings_);
@@ -129,7 +131,6 @@ std::pair<double, std::shared_ptr<data::Wavefunction>> MacisCas::_run_impl(
         "MacisCas does not support unrestricted orbitals. "
         "Only restricted orbitals are supported.");
   }
-  validate_macis_two_body_symmetry(*hamiltonian, "MacisCas");
   const auto active_ai = orbitals->active_indices();
   const auto active_indices =
       data::spin_channel_indices(active_ai, data::axes::alpha());

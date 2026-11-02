@@ -581,11 +581,9 @@ void SparseHamiltonianContainer::to_fcidump_file(const std::string& filename,
                                         static_cast<std::size_t>(idx[3])},
                      value);
     }
-    if (!detail::sparse_is_eightfold_within(
-            tensor, detail::two_body_symmetry_tolerance)) {
-      throw std::runtime_error(
-          "FCIDUMP export requires 8-fold two-body permutation symmetry; "
-          "reduced-symmetry tensors cannot be represented losslessly.");
+    if (const auto comparison = detail::sparse_eightfold_comparison(tensor);
+        !comparison.approx()) {
+      throw detail::not_eightfold_error("FCIDUMP export", comparison);
     }
   }
 

@@ -355,9 +355,9 @@ struct MajoranaMapResult {
  * @param n_spatial Number of spatial orbitals.
  * @param spin_symmetric True for restricted input: the caller guarantees
  *        h_alpha == h_beta and eri_aaaa == eri_bbbb == eri_aabb (not
- *        validated).  The two-body integrals of a Hermitian operator enter
- *        through their average over (pq|rs), (rs|pq), (qp|sr), (sr|qp)
- *        ((pq|rs), (qp|sr) for eri_aabb).
+ *        validated).  The two-body integrals enter through their average
+ *        over (pq|rs), (rs|pq), (qp|sr), (sr|qp) ((pq|rs), (qp|sr) for
+ *        eri_aabb), with a warning if they are not Hermitian.
  * @param threshold Pauli terms with |coeff| < threshold are dropped.
  * @param integral_threshold Screening cutoff for one- and two-body integrals;
  *        two-body ones are screened as ((pq|rs) +/- (pq|sr)) / 2.
@@ -382,10 +382,12 @@ MajoranaMapResult majorana_map_hamiltonian(
  * from the mapped operator (`core_energy = 0`), matching the buffer-based
  * overload as invoked by ``QdkQubitMapper``.
  *
+ * Non-Hermitian Hamiltonians are mapped as stored, without averaging.
+ *
  * @param mapping The Majorana-to-Pauli encoding.
  * @param hamiltonian The fermionic Hamiltonian.
- * @param spin_symmetric True for restricted Hamiltonians; see the
- *        buffer-based overload for how integral symmetry selects the path.
+ * @param spin_symmetric True for restricted Hamiltonians, which are always
+ *        mapped as such.
  * @param threshold Pauli terms with |coeff| < threshold are dropped.
  * @param integral_threshold Screening cutoff, as for the buffer-based
  *        overload.
@@ -409,16 +411,9 @@ MajoranaMapResult majorana_map_hamiltonian(const MajoranaMapping& mapping,
  * matrix-vector product per orbital pair — so the dense four-center
  * tensor is never reconstructed.
  *
- * The reconstructed integrals are checked for (pq|rs) = (qp|sr) element by
- * element, with the dense tolerance.  With S and A the parts of the factors
- * symmetric and antisymmetric in their orbital pair, the largest violation
- * is 2 max_{u,v} (|S_u.A_v| + |A_u.S_v|).  It is bounded from one pass over
- * the factors in O(N^2) memory, which settles factors that are pair-symmetric
- * to round-off; otherwise S and A are copied (as much memory as the factors)
- * and the violation is bounded through their thin QR factors in
- * O(N^2 naux^2), and formed exactly in row blocks, O(N^4 naux), only when
- * both bounds are inconclusive.  The mapping itself needs one additional
- * N^2-length row.
+ * Unless the factors are pair-symmetric, L_pq = L_qp, each (pq|.) row is
+ * averaged with its (qp|.) partner, doubling the contraction cost.  The
+ * mapping needs up to two additional N^2-length rows.
  *
  * @param mapping The Majorana-to-Pauli encoding.
  * @param core_energy Core (nuclear repulsion + frozen core) energy.
@@ -431,16 +426,13 @@ MajoranaMapResult majorana_map_hamiltonian(const MajoranaMapping& mapping,
  *        restricted inputs this may alias @p three_center_aa.
  * @param n_spatial Number of spatial orbitals.
  * @param naux Number of auxiliary (Cholesky) vectors.
- * @param spin_symmetric As for ::majorana_map_hamiltonian, with the integral
- *        symmetry determined from the factors.
+ * @param spin_symmetric As for ::majorana_map_hamiltonian.
  * @param threshold Pauli terms with |coeff| < threshold are dropped.
  * @param integral_threshold Screening cutoff, as for
  *        ::majorana_map_hamiltonian.
  * @return MajoranaMapResult with Pauli words and coefficients.
  * @throws std::invalid_argument If core_energy, a factor, or a one-body
- *         integral is not finite, or spin_symmetric is true and the
- *         reconstructed two-body integrals violate (pq|rs) = (qp|sr), so they
- *         define a non-Hermitian operator.
+ *         integral is not finite.
  */
 MajoranaMapResult majorana_map_hamiltonian_cholesky(
     const MajoranaMapping& mapping, double core_energy, const double* h1_alpha,
@@ -458,8 +450,10 @@ MajoranaMapResult majorana_map_hamiltonian_cholesky(
  *
  * Entries are read literally: positions that are not stored are zero, as in
  * the dense view of SparseHamiltonianContainer, and the resulting tensor is
- * classified like dense restricted integrals.  A complete 4-fold suborbit
+ * treated like dense restricted integrals.  A complete 4-fold suborbit
  * therefore needs no explicit zeros for the rest of its 8-fold orbit.
+ * Deprecated: a nonzero entry that is the only stored member of a larger
+ * 8-fold class is expanded over that class, with a warning.
  *
  * Duplicate entries for the same position must agree exactly; conflicting
  * duplicates are rejected. The result is independent of entry order.
@@ -483,9 +477,8 @@ MajoranaMapResult majorana_map_hamiltonian_cholesky(
  * @return MajoranaMapResult with Pauli words and coefficients.
  * @throws std::invalid_argument If spin_symmetric is false, any two-body
  *         index is outside [0, n_spatial), core_energy or an integral is not
- *         finite, duplicate entries for the same position carry conflicting
- *         values, or the literal tensor defines a non-Hermitian operator or is
- *         not stored with (pq|rs) = (rs|pq).
+ *         finite, or duplicate entries for the same position carry
+ *         conflicting values.
  */
 MajoranaMapResult majorana_map_hamiltonian_sparse(
     const MajoranaMapping& mapping, double core_energy, const double* h1_alpha,

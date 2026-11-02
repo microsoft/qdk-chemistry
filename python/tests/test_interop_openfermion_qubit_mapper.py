@@ -31,6 +31,7 @@ if OPENFERMION_AVAILABLE:
     from qdk_chemistry.data import (
         CanonicalFourCenterHamiltonianContainer,
         Hamiltonian,
+        HamiltonianType,
         MajoranaMapping,
         Orbitals,
         QubitOperator,
@@ -518,3 +519,13 @@ def test_openfermion_non_hermitian_mixed_block_maps_literally():
     hamiltonian, reference = create_non_hermitian_mixed_block_hamiltonian()
     operator = create("qubit_mapper", "openfermion").run(hamiltonian, MajoranaMapping.jordan_wigner(6))
     np.testing.assert_allclose(operator.to_matrix(), reference, atol=1e-11, rtol=0)
+
+
+def test_openfermion_maps_hermitian_part_like_native():
+    """A Hermitian Hamiltonian maps to the Hermitian part of its integrals, as natively."""
+    hamiltonian, reference = create_non_hermitian_mixed_block_hamiltonian(HamiltonianType.Hermitian)
+    mapping = MajoranaMapping.jordan_wigner(6)
+    openfermion = create("qubit_mapper", "openfermion").run(hamiltonian, mapping).to_matrix()
+    np.testing.assert_allclose(openfermion, (reference + reference.conj().T) / 2, atol=1e-11, rtol=0)
+    native = create("qubit_mapper", "qdk").run(hamiltonian, mapping)
+    np.testing.assert_allclose(openfermion, native.to_matrix(), atol=1e-11, rtol=0)

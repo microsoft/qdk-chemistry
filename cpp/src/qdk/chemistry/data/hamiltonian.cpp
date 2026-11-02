@@ -350,17 +350,14 @@ void HamiltonianContainer::to_fcidump_file(const std::string& filename,
 
   // Ordinary FCIDUMP readers reconstruct the eight permutations of every
   // two-electron record, so each record holds the average over its class.
-  // Differences from that average up to the symmetry tolerance are treated as
-  // round-off; larger ones mean the tensor cannot be represented.
   auto [eri_aaaa, eri_aabb, eri_bbbb] = get_two_body_integrals();
   detail::require_finite_two_body(
       eri_aaaa.data(), num_molecular_orbitals3 * num_molecular_orbitals,
       "FCIDUMP export");
-  if (!detail::is_eightfold_within(eri_aaaa.data(), num_molecular_orbitals,
-                                   detail::two_body_symmetry_tolerance)) {
-    throw std::runtime_error(
-        "FCIDUMP export requires 8-fold two-body permutation symmetry; "
-        "reduced-symmetry tensors cannot be represented losslessly.");
+  if (const auto comparison =
+          detail::eightfold_comparison(eri_aaaa.data(), num_molecular_orbitals);
+      !comparison.approx()) {
+    throw detail::not_eightfold_error("FCIDUMP export", comparison);
   }
 
   std::ofstream file(filename);

@@ -10,8 +10,16 @@
 #include <cmath>
 #include <complex>
 #include <limits>
+#include <memory>
+#include <qdk/chemistry/data/hamiltonian.hpp>
+#include <qdk/chemistry/data/hamiltonian_containers/canonical_four_center.hpp>
+#include <qdk/chemistry/data/hamiltonian_containers/cholesky.hpp>
+#include <qdk/chemistry/data/hamiltonian_containers/sparse.hpp>
 #include <qdk/chemistry/data/lattice_graph.hpp>
 #include <qdk/chemistry/data/majorana_mapping.hpp>
+#include <qdk/chemistry/data/orbitals.hpp>
+#include <qdk/chemistry/utils/logger.hpp>
+#include <sstream>
 #include <stdexcept>
 #include <string>
 #include <unordered_map>
@@ -19,6 +27,7 @@
 #include <vector>
 
 #include "../src/qdk/chemistry/data/two_body_symmetry.hpp"
+#include "spdlog/sinks/ostream_sink.h"
 
 using namespace qdk::chemistry::data;
 
@@ -169,39 +178,6 @@ TEST(MajoranaMapEngineTest, SpinSymmetricMatchesUnrestricted) {
   }
 }
 
-TEST(MajoranaMapEngineTest, SymmetryToleranceScalesWithIntegralMagnitude) {
-  auto mapping = MajoranaMapping::jordan_wigner(4);
-  const double h1[4] = {1.0, 0.3, 0.3, 0.5};
-  // Round-off from an integral transformation in a nearly linearly dependent
-  // basis reaches ~1e-6 relative to the largest integral, and must not be
-  // mistaken for genuinely reduced symmetry.
-  const double magnitude = 1.0e6;
-  double eri[16] = {};
-  for (double& value : eri) value = magnitude;
-  eri[1] += 1.0e-6 * magnitude;
-
-  EXPECT_NO_THROW(majorana_map_hamiltonian(mapping, 0.0, h1, h1, eri, eri, eri,
-                                           /*n_spatial=*/2,
-                                           /*spin_symmetric=*/true,
-                                           /*threshold=*/0.0,
-                                           /*integral_threshold=*/0.0));
-}
-
-TEST(MajoranaMapEngineTest, SparseEntriesAreReadLiterally) {
-  const auto mapping = MajoranaMapping::jordan_wigner(4);
-  const double one_body[4] = {1.0, 0.3, 0.3, 0.5};
-  // Each entry is the only stored member of its 8-fold class; only the
-  // container constructor expands that deprecated shorthand.
-  const int indices[8] = {0, 1, 0, 1, 1, 1, 0, 0};
-  const double values[2] = {0.7, 0.4};
-
-  EXPECT_THROW(majorana_map_hamiltonian_sparse(
-                   mapping, 0.5, one_body, one_body, indices, values,
-                   /*num_entries=*/2, /*n_spatial=*/2, /*spin_symmetric=*/true,
-                   /*threshold=*/0.0, /*integral_threshold=*/0.0),
-               std::invalid_argument);
-}
-
 TEST(MajoranaMapEngineTest, TwoBodyIntegralsProduceAdditionalTerms) {
   auto mapping = MajoranaMapping::jordan_wigner(2);
   const double h1_alpha[1] = {1.0};
@@ -294,14 +270,89 @@ std::vector<double> fourfold_test_tensor(std::size_t extent) {
   return tensor;
 }
 
+std::size_t flat_index(std::size_t n, std::size_t p, std::size_t q,
+                       std::size_t r, std::size_t s) {
+  return ((p * n + q) * n + r) * n + s;
+}
+
+// A tensor without permutation symmetry.
+std::vector<double> asymmetric_tensor(std::size_t n, double phase) {
+  std::vector<double> tensor(n * n * n * n);
+  for (std::size_t index = 0; index < tensor.size(); ++index)
+    tensor[index] = 0.3 * std::sin(phase + 1.7 * static_cast<double>(index));
+  return tensor;
+}
+
+// Average over (pq|rs), (rs|pq), (qp|sr) and (sr|qp).
+std::vector<double> fourfold_average(const std::vector<double>& tensor,
+                                     std::size_t n) {
+  std::vector<double> average(tensor.size());
+  for (std::size_t p = 0; p < n; ++p)
+    for (std::size_t q = 0; q < n; ++q)
+      for (std::size_t r = 0; r < n; ++r)
+        for (std::size_t s = 0; s < n; ++s)
+          average[flat_index(n, p, q, r, s)] =
+              0.25 * (tensor[flat_index(n, p, q, r, s)] +
+                      tensor[flat_index(n, r, s, p, q)] +
+                      tensor[flat_index(n, q, p, s, r)] +
+                      tensor[flat_index(n, s, r, q, p)]);
+  return average;
+}
+
+// Average over (pq|rs) and (qp|sr).
+std::vector<double> reversal_average(const std::vector<double>& tensor,
+                                     std::size_t n) {
+  std::vector<double> average(tensor.size());
+  for (std::size_t p = 0; p < n; ++p)
+    for (std::size_t q = 0; q < n; ++q)
+      for (std::size_t r = 0; r < n; ++r)
+        for (std::size_t s = 0; s < n; ++s)
+          average[flat_index(n, p, q, r, s)] =
+              0.5 * (tensor[flat_index(n, p, q, r, s)] +
+                     tensor[flat_index(n, q, p, s, r)]);
+  return average;
+}
+
+std::shared_ptr<ModelOrbitals> model_orbitals(std::size_t n, bool restricted) {
+  return std::make_shared<ModelOrbitals>(
+      n, std::make_shared<const SymmetryProduct>(
+             SymmetryProduct({axes::spin(1, restricted)})));
+}
+
+Eigen::MatrixXd square_matrix(const double* values, std::size_t n) {
+  return Eigen::Map<const Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic,
+                                        Eigen::RowMajor>>(
+      values, static_cast<Eigen::Index>(n), static_cast<Eigen::Index>(n));
+}
+
+Eigen::VectorXd as_vector(const std::vector<double>& values) {
+  return Eigen::Map<const Eigen::VectorXd>(
+      values.data(), static_cast<Eigen::Index>(values.size()));
+}
+
+Hamiltonian model_hamiltonian(const double* one_alpha, const double* one_beta,
+                              const std::vector<double>& aaaa,
+                              const std::vector<double>& aabb,
+                              const std::vector<double>& bbbb, std::size_t n,
+                              bool restricted, HamiltonianType type) {
+  const Eigen::MatrixXd no_fock = Eigen::MatrixXd::Zero(0, 0);
+  if (restricted) {
+    return Hamiltonian(
+        std::make_unique<CanonicalFourCenterHamiltonianContainer>(
+            square_matrix(one_alpha, n), as_vector(aaaa),
+            model_orbitals(n, true), 0.0, no_fock, type));
+  }
+  return Hamiltonian(std::make_unique<CanonicalFourCenterHamiltonianContainer>(
+      square_matrix(one_alpha, n), square_matrix(one_beta, n), as_vector(aaaa),
+      as_vector(aabb), as_vector(bbbb), model_orbitals(n, false), 0.0, no_fock,
+      no_fock, type));
+}
+
 }  // namespace
 
 TEST(MajoranaMapEngineTest, FourFoldSplitMatchesGeneralAcrossMappings) {
+  // Exactly fourfold input maps the same through the split and literally.
   const auto tensor = fourfold_test_tensor(3);
-  // Bra-ket antisymmetric: same operator, but aaaa no longer allows the split.
-  auto general_tensor = tensor;
-  general_tensor[4] += 0.5;
-  general_tensor[36] -= 0.5;
   const double one_alpha[9] = {1.0, 0.2, -0.1, 0.2, 0.5, 0.3, -0.1, 0.3, 0.7};
   const double one_beta[9] = {0.3, -0.2, 0.1, -0.2, 0.4, 0.2, 0.1, 0.2, -0.5};
   // Breaks ab bra-ket symmetry but keeps reversal, which is all the split
@@ -328,14 +379,18 @@ TEST(MajoranaMapEngineTest, FourFoldSplitMatchesGeneralAcrossMappings) {
   for (const auto& mapping : mappings) {
     for (bool restricted : {true, false}) {
       const auto* beta = restricted ? one_alpha : one_beta;
-      const auto* cross = restricted ? tensor.data() : mixed.data();
-      const auto fast = majorana_map_hamiltonian(
-          mapping, 0.375, one_alpha, beta, tensor.data(), cross, tensor.data(),
-          3, restricted, 1e-12, 0.0);
-      const auto general = majorana_map_hamiltonian(
-          mapping, 0.375, one_alpha, beta, general_tensor.data(), cross,
-          tensor.data(), 3, false, 1e-12, 0.0);
-      expect_same_coefficients(fast, general, mapping.num_qubits());
+      const auto& cross = restricted ? tensor : mixed;
+      const auto split = majorana_map_hamiltonian(
+          mapping,
+          model_hamiltonian(one_alpha, beta, tensor, cross, tensor, 3,
+                            restricted, HamiltonianType::Hermitian),
+          restricted, 1e-12, 0.0);
+      const auto literal = majorana_map_hamiltonian(
+          mapping,
+          model_hamiltonian(one_alpha, beta, tensor, cross, tensor, 3,
+                            restricted, HamiltonianType::NonHermitian),
+          restricted, 1e-12, 0.0);
+      expect_same_coefficients(split, literal, mapping.num_qubits());
     }
   }
 }
@@ -360,34 +415,6 @@ TEST(MajoranaMapEngineTest, SparseFourFoldInputOrderIsDeterministic) {
   const auto reverse = map_entries();
   EXPECT_EQ(forward.words, reverse.words);
   EXPECT_EQ(forward.coefficients, reverse.coefficients);
-}
-
-TEST(MajoranaMapEngineTest, CholeskyFourFoldValidationIsScaleInvariant) {
-  namespace detail = qdk::chemistry::data::detail;
-  for (double scale : {1e-150, 1.0, 1e150}) {
-    Eigen::MatrixXd factors(4, 2);
-    factors << 0.8, -0.8, 0.7, 0.3, -0.3, -0.7, 0.3, -0.3;
-    factors *= scale;
-    EXPECT_TRUE(detail::cholesky_has_reversal_symmetry(
-        factors.data(), factors.data(), 2, 2, 1e-8));
-    factors(0, 1) += 0.2 * scale;
-    EXPECT_FALSE(detail::cholesky_has_reversal_symmetry(
-        factors.data(), factors.data(), 2, 2, 1e-8));
-  }
-}
-
-TEST(MajoranaMapEngineTest, CholeskyMixedSpinValidationChecksCrossParity) {
-  namespace detail = qdk::chemistry::data::detail;
-  Eigen::MatrixXd alpha(4, 2);
-  alpha << 0.8, 0.0, 0.2, 0.5, 0.2, -0.5, 0.3, 0.0;
-  Eigen::MatrixXd beta = alpha;
-  EXPECT_TRUE(detail::cholesky_has_reversal_symmetry(alpha.data(), beta.data(),
-                                                     2, 2, 1e-8));
-  beta.col(0).swap(beta.col(1));
-  EXPECT_TRUE(detail::cholesky_has_reversal_symmetry(beta.data(), beta.data(),
-                                                     2, 2, 1e-8));
-  EXPECT_FALSE(detail::cholesky_has_reversal_symmetry(alpha.data(), beta.data(),
-                                                      2, 2, 1e-8));
 }
 
 namespace {
@@ -473,47 +500,6 @@ TEST(MajoranaMapEngineTest, RejectsNonFiniteCoreEnergy) {
   }
 }
 
-TEST(MajoranaMapEngineTest, CholeskyValidationIsElementwiseLikeDense) {
-  // A violation at one pair is not diluted by the size of the tensor.
-  {
-    constexpr std::size_t n = 10;
-    const auto mapping = MajoranaMapping::jordan_wigner(2 * n);
-    const auto one_body = diagonal_one_body(n);
-    Eigen::MatrixXd factors = Eigen::MatrixXd::Ones(n * n, 1);
-    factors(0 * n + 1, 0) = 1.0 + 3e-5;
-    factors(1 * n + 0, 0) = 1.0 - 3e-5;
-    const auto dense = reconstruct_dense(factors);
-    EXPECT_THROW(
-        majorana_map_hamiltonian(mapping, 0.0, one_body.data(), one_body.data(),
-                                 dense.data(), dense.data(), dense.data(), n,
-                                 true, 1e-12, 1e-12),
-        std::invalid_argument);
-    EXPECT_THROW(majorana_map_hamiltonian_cholesky(
-                     mapping, 0.0, one_body.data(), one_body.data(),
-                     factors.data(), factors.data(), n, 1, true, 1e-12, 1e-12),
-                 std::invalid_argument);
-  }
-  // A violation spread thinly over every element is accepted by both, even
-  // though its Frobenius norm exceeds the tolerance.
-  constexpr std::size_t n = 6;
-  const auto mapping = MajoranaMapping::jordan_wigner(2 * n);
-  const auto one_body = diagonal_one_body(n);
-  Eigen::MatrixXd factors = Eigen::MatrixXd::Zero(n * n, 2);
-  for (std::size_t p = 0; p < n; ++p)
-    for (std::size_t q = 0; q < n; ++q)
-      factors(p * n + q, 0) = 1.0 + (p < q ? 1e-6 : p > q ? -1e-6 : 0.0);
-  factors(0 * n + 1, 1) = 0.5;
-  factors(1 * n + 0, 1) = -0.5;
-  const auto dense = reconstruct_dense(factors);
-  const auto from_dense = majorana_map_hamiltonian(
-      mapping, 0.0, one_body.data(), one_body.data(), dense.data(),
-      dense.data(), dense.data(), n, true, 1e-12, 0.0);
-  const auto from_factors = majorana_map_hamiltonian_cholesky(
-      mapping, 0.0, one_body.data(), one_body.data(), factors.data(),
-      factors.data(), n, 2, true, 1e-12, 0.0);
-  expect_same_coefficients(from_factors, from_dense, mapping.num_qubits());
-}
-
 TEST(MajoranaMapEngineTest, CholeskyKeepsAccumulatedFourFoldPart) {
   // Each antisymmetric column is small, but their contribution to the
   // integrals accumulates over the auxiliary index and must be kept.
@@ -594,6 +580,292 @@ TEST(MajoranaMapEngineTest, FourFoldPartBelowIntegralThresholdAddsNoTerms) {
   EXPECT_EQ(test_support::collect_terms(mapped, 2 * n).size(),
             test_support::collect_terms(exact, 2 * n).size());
   expect_same_coefficients(mapped, exact, mapping.num_qubits());
+}
+
+namespace {
+
+// Real part of every coefficient: the Hermitian part of a qubit operator.
+MajoranaMapResult real_part(MajoranaMapResult result) {
+  for (auto& coefficient : result.coefficients)
+    coefficient = coefficient.real();
+  return result;
+}
+
+double largest_imaginary_part(const MajoranaMapResult& result) {
+  double largest = 0.0;
+  for (const auto& coefficient : result.coefficients)
+    largest = std::max(largest, std::abs(coefficient.imag()));
+  return largest;
+}
+
+// Collects warnings logged while it is alive.
+class WarningCapture {
+ public:
+  WarningCapture()
+      : sink_(std::make_shared<spdlog::sinks::ostream_sink_mt>(stream_)),
+        level_(qdk::chemistry::utils::Logger::get_global_level()) {
+    sink_->set_level(spdlog::level::warn);
+    QDK_RAW_LOGGER()->sinks().push_back(sink_);
+    qdk::chemistry::utils::Logger::set_global_level(
+        qdk::chemistry::utils::LogLevel::warn);
+  }
+  ~WarningCapture() {
+    auto& sinks = QDK_RAW_LOGGER()->sinks();
+    sinks.erase(std::remove(sinks.begin(), sinks.end(), sink_), sinks.end());
+    qdk::chemistry::utils::Logger::set_global_level(level_);
+  }
+  WarningCapture(const WarningCapture&) = delete;
+  WarningCapture& operator=(const WarningCapture&) = delete;
+
+  std::string text() const { return stream_.str(); }
+
+ private:
+  std::ostringstream stream_;
+  std::shared_ptr<spdlog::sinks::ostream_sink_mt> sink_;
+  qdk::chemistry::utils::LogLevel level_;
+};
+
+}  // namespace
+
+TEST(MajoranaMapEngineTest, MapsHermitianPartOfTwoBodyIntegrals) {
+  constexpr std::size_t n = 3;
+  const auto mapping = MajoranaMapping::jordan_wigner(2 * n);
+  const auto one_body = diagonal_one_body(n);
+  auto map = [&](const std::vector<double>& aaaa,
+                 const std::vector<double>& aabb,
+                 const std::vector<double>& bbbb, bool restricted) {
+    return majorana_map_hamiltonian(mapping, 0.0, one_body.data(),
+                                    one_body.data(), aaaa.data(), aabb.data(),
+                                    bbbb.data(), n, restricted, 1e-12, 0.0);
+  };
+  const auto alpha = asymmetric_tensor(n, 0.0);
+  const auto alpha_beta = asymmetric_tensor(n, 1.0);
+  const auto beta = asymmetric_tensor(n, 2.0);
+  const auto alpha_part = fourfold_average(alpha, n);
+  const auto restricted = map(alpha_part, alpha_part, alpha_part, true);
+  expect_same_coefficients(map(alpha, alpha, alpha, true), restricted, 2 * n);
+  // Without spin_symmetric the blocks are unrestricted, even in one buffer.
+  expect_same_coefficients(
+      map(alpha, alpha, alpha, false),
+      map(alpha_part, reversal_average(alpha, n), alpha_part, false), 2 * n);
+  expect_same_coefficients(map(alpha, alpha_beta, beta, false),
+                           map(alpha_part, reversal_average(alpha_beta, n),
+                               fourfold_average(beta, n), false),
+                           2 * n);
+}
+
+TEST(MajoranaMapEngineTest, HermitianPartMatchesLiteralOperator) {
+  // The Hermitian mapping is the Hermitian part of the literal one.
+  constexpr std::size_t n = 3;
+  const auto mapping = MajoranaMapping::jordan_wigner(2 * n);
+  const auto one_body = diagonal_one_body(n);
+  auto expect_hermitian_part = [&](const Hamiltonian& hermitian,
+                                   const Hamiltonian& non_hermitian,
+                                   bool restricted) {
+    const auto literal = majorana_map_hamiltonian(mapping, non_hermitian,
+                                                  restricted, 1e-12, 0.0);
+    EXPECT_GT(largest_imaginary_part(literal), 1e-3);
+    expect_same_coefficients(
+        majorana_map_hamiltonian(mapping, hermitian, restricted, 1e-12, 0.0),
+        real_part(literal), 2 * n);
+  };
+  auto dense = [&](const std::vector<double>& aaaa,
+                   const std::vector<double>& aabb,
+                   const std::vector<double>& bbbb, bool restricted,
+                   HamiltonianType type) {
+    return model_hamiltonian(one_body.data(), one_body.data(), aaaa, aabb, bbbb,
+                             n, restricted, type);
+  };
+  const auto restricted = asymmetric_tensor(n, 0.0);
+  for (const auto type :
+       {HamiltonianType::Hermitian, HamiltonianType::NonHermitian}) {
+    // A restricted Hamiltonian is mapped spin-summed even without
+    // spin_symmetric.
+    const auto hamiltonian =
+        dense(restricted, restricted, restricted, true, type);
+    expect_same_coefficients(
+        majorana_map_hamiltonian(mapping, hamiltonian, false, 1e-12, 0.0),
+        majorana_map_hamiltonian(mapping, hamiltonian, true, 1e-12, 0.0),
+        2 * n);
+  }
+  expect_hermitian_part(dense(restricted, restricted, restricted, true,
+                              HamiltonianType::Hermitian),
+                        dense(restricted, restricted, restricted, true,
+                              HamiltonianType::NonHermitian),
+                        true);
+  const auto alpha = asymmetric_tensor(n, 0.0);
+  const auto alpha_beta = asymmetric_tensor(n, 1.0);
+  const auto beta = asymmetric_tensor(n, 2.0);
+  expect_hermitian_part(
+      dense(alpha, alpha_beta, beta, false, HamiltonianType::Hermitian),
+      dense(alpha, alpha_beta, beta, false, HamiltonianType::NonHermitian),
+      false);
+
+  Eigen::MatrixXd factors(n * n, 2);
+  for (Eigen::Index index = 0; index < factors.size(); ++index)
+    factors.data()[index] = std::cos(0.9 * static_cast<double>(index));
+  auto cholesky = [&](HamiltonianType type) {
+    return Hamiltonian(std::make_unique<CholeskyHamiltonianContainer>(
+        square_matrix(one_body.data(), n), factors, model_orbitals(n, true),
+        0.0, Eigen::MatrixXd::Zero(0, 0), std::nullopt, type));
+  };
+  expect_hermitian_part(cholesky(HamiltonianType::Hermitian),
+                        cholesky(HamiltonianType::NonHermitian), true);
+
+  // (01|00) and its bra-ket partner without their Hermitian conjugates.
+  Eigen::SparseMatrix<double> sparse_one_body(n, n);
+  for (std::size_t p = 0; p < n; ++p)
+    sparse_one_body.insert(static_cast<Eigen::Index>(p),
+                           static_cast<Eigen::Index>(p)) =
+        one_body[p * n + p] + 1.0;
+  sparse_one_body.makeCompressed();
+  const SparseHamiltonianContainer::TwoBodyMap entries{{{0, 1, 0, 0}, 0.3},
+                                                       {{0, 0, 0, 1}, 0.3},
+                                                       {{1, 2, 1, 2}, 0.2},
+                                                       {{2, 1, 2, 1}, 0.2}};
+  auto sparse = [&](HamiltonianType type) {
+    return Hamiltonian(std::make_unique<SparseHamiltonianContainer>(
+        sparse_one_body, entries, 0.0, type));
+  };
+  expect_hermitian_part(sparse(HamiltonianType::Hermitian),
+                        sparse(HamiltonianType::NonHermitian), true);
+}
+
+TEST(MajoranaMapEngineTest, SparseEntriesAreReadLiterallyAndAveraged) {
+  namespace detail = qdk::chemistry::data::detail;
+  constexpr std::size_t n = 2;
+  const auto mapping = MajoranaMapping::jordan_wigner(2 * n);
+  const double one_body[4] = {1.0, 0.3, 0.3, 0.5};
+  // (01|01) and (11|00) are the only stored members of their 8-fold classes,
+  // the deprecated shorthand for the whole class; (00|01) and (01|00) are
+  // part of a class read literally.
+  const int indices[16] = {0, 1, 0, 1, 1, 1, 0, 0, 0, 0, 0, 1, 0, 1, 0, 0};
+  const double values[4] = {0.7, 0.4, 0.3, 0.3};
+  std::vector<double> stored(n * n * n * n, 0.0);
+  for (const auto& [key, value] :
+       {std::pair{detail::TwoBodyKey{0, 1, 0, 1}, 0.7},
+        std::pair{detail::TwoBodyKey{1, 1, 0, 0}, 0.4}})
+    for (const auto& k : detail::eightfold_orbit(key))
+      stored[flat_index(n, k[0], k[1], k[2], k[3])] = value;
+  stored[flat_index(n, 0, 0, 0, 1)] = stored[flat_index(n, 0, 1, 0, 0)] = 0.3;
+  const auto average = fourfold_average(stored, n);
+
+  WarningCapture warnings;
+  const auto sparse = majorana_map_hamiltonian_sparse(
+      mapping, 0.5, one_body, one_body, indices, values, 4, n, true, 0.0, 0.0);
+  EXPECT_NE(warnings.text().find("deprecated"), std::string::npos)
+      << warnings.text();
+  EXPECT_NE(warnings.text().find("Hermitian part"), std::string::npos)
+      << warnings.text();
+  expect_same_coefficients(
+      sparse,
+      majorana_map_hamiltonian(mapping, 0.5, one_body, one_body, average.data(),
+                               average.data(), average.data(), n, true, 0.0,
+                               0.0),
+      2 * n);
+}
+
+TEST(MajoranaMapEngineTest, CholeskyAveragesLikeDense) {
+  constexpr std::size_t n = 3;
+  constexpr std::size_t naux = 2;
+  const auto mapping = MajoranaMapping::jordan_wigner(2 * n);
+  const auto one_body = diagonal_one_body(n);
+  Eigen::MatrixXd alpha(n * n, naux);
+  Eigen::MatrixXd beta(n * n, naux);
+  for (Eigen::Index index = 0; index < alpha.size(); ++index) {
+    alpha.data()[index] = std::cos(0.9 * static_cast<double>(index));
+    beta.data()[index] = std::sin(1.3 * static_cast<double>(index));
+  }
+  // Row-major (pq|rs) = sum_Q L^Q_pq R^Q_rs.
+  auto reconstruct = [](const Eigen::MatrixXd& left,
+                        const Eigen::MatrixXd& right) {
+    const Eigen::MatrixXd tensor = right * left.transpose();
+    return std::vector<double>(tensor.data(), tensor.data() + tensor.size());
+  };
+  const auto aaaa = reconstruct(alpha, alpha);
+  const auto aabb = reconstruct(alpha, beta);
+  const auto bbbb = reconstruct(beta, beta);
+  expect_same_coefficients(
+      majorana_map_hamiltonian_cholesky(
+          mapping, 0.0, one_body.data(), one_body.data(), alpha.data(),
+          alpha.data(), n, naux, true, 1e-12, 0.0),
+      majorana_map_hamiltonian(mapping, 0.0, one_body.data(), one_body.data(),
+                               aaaa.data(), aaaa.data(), aaaa.data(), n, true,
+                               1e-12, 0.0),
+      2 * n);
+  expect_same_coefficients(
+      majorana_map_hamiltonian_cholesky(
+          mapping, 0.0, one_body.data(), one_body.data(), alpha.data(),
+          beta.data(), n, naux, false, 1e-12, 0.0),
+      majorana_map_hamiltonian(mapping, 0.0, one_body.data(), one_body.data(),
+                               aaaa.data(), aabb.data(), bbbb.data(), n, false,
+                               1e-12, 0.0),
+      2 * n);
+}
+
+TEST(MajoranaMapEngineTest, WarnsOnlyWhenAveragingChangesTheOperator) {
+  constexpr std::size_t n = 3;
+  const auto mapping = MajoranaMapping::jordan_wigner(2 * n);
+  const auto one_body = diagonal_one_body(n);
+  auto dense_warnings = [&](const std::vector<double>& aaaa,
+                            const std::vector<double>& aabb,
+                            const std::vector<double>& bbbb, bool restricted) {
+    WarningCapture warnings;
+    majorana_map_hamiltonian(mapping, 0.0, one_body.data(), one_body.data(),
+                             aaaa.data(), aabb.data(), bbbb.data(), n,
+                             restricted, 1e-12, 0.0);
+    return warnings.text();
+  };
+  auto cholesky_warnings = [&](const Eigen::MatrixXd& alpha,
+                               const Eigen::MatrixXd& beta, bool restricted) {
+    WarningCapture warnings;
+    majorana_map_hamiltonian_cholesky(
+        mapping, 0.0, one_body.data(), one_body.data(), alpha.data(),
+        beta.data(), n, static_cast<std::size_t>(alpha.cols()), restricted,
+        1e-12, 0.0);
+    return warnings.text();
+  };
+
+  // Exact, or Hermitian in another bra-ket gauge: the operator is unchanged.
+  const auto fourfold = fourfold_test_tensor(n);
+  EXPECT_EQ(dense_warnings(fourfold, fourfold, fourfold, true), "");
+  auto gauge = fourfold;
+  gauge[flat_index(n, 0, 1, 2, 2)] += 0.5;
+  gauge[flat_index(n, 2, 2, 0, 1)] -= 0.5;
+  EXPECT_EQ(dense_warnings(gauge, gauge, gauge, true), "");
+
+  const auto asymmetric = asymmetric_tensor(n, 0.0);
+  EXPECT_NE(dense_warnings(asymmetric, asymmetric, asymmetric, true)
+                .find("Hermitian part"),
+            std::string::npos);
+  EXPECT_NE(dense_warnings(fourfold, asymmetric, fourfold, false)
+                .find("majorana_map_hamiltonian (alpha-beta block)"),
+            std::string::npos);
+
+  // Separate symmetric and antisymmetric pair parts give fourfold integrals.
+  Eigen::MatrixXd fourfold_factors = Eigen::MatrixXd::Zero(n * n, 2);
+  for (std::size_t p = 0; p < n; ++p)
+    for (std::size_t q = 0; q < n; ++q) {
+      const double sign = p < q ? 1.0 : p > q ? -1.0 : 0.0;
+      fourfold_factors(p * n + q, 0) = 1.0 + 0.1 * static_cast<double>(p + q);
+      fourfold_factors(p * n + q, 1) =
+          0.4 * sign * static_cast<double>(1 + p * q);
+    }
+  EXPECT_EQ(cholesky_warnings(fourfold_factors, fourfold_factors, true), "");
+  EXPECT_EQ(cholesky_warnings(fourfold_factors, fourfold_factors, false), "");
+
+  Eigen::MatrixXd factors(n * n, 2);
+  for (Eigen::Index index = 0; index < factors.size(); ++index)
+    factors.data()[index] = std::cos(0.9 * static_cast<double>(index));
+  EXPECT_NE(cholesky_warnings(factors, factors, true).find("Hermitian part"),
+            std::string::npos);
+  const auto unrestricted = cholesky_warnings(fourfold_factors, factors, false);
+  EXPECT_EQ(unrestricted.find("(alpha-alpha block)"), std::string::npos)
+      << unrestricted;
+  EXPECT_NE(unrestricted.find("(alpha-beta block)"), std::string::npos)
+      << unrestricted;
+  EXPECT_NE(unrestricted.find("(beta-beta block)"), std::string::npos)
+      << unrestricted;
 }
 
 TEST(MajoranaMappingHashTest, EqualMappingsHaveStableHash) {

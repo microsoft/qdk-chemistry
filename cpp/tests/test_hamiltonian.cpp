@@ -1964,32 +1964,35 @@ TEST_F(HamiltonianTest, SparseContainerFCIDUMPRequiresEightfoldClasses) {
 }
 
 TEST_F(HamiltonianTest, FCIDUMPWritesEightfoldClassAverages) {
-  // A 4-fold part below the tolerance is round-off: each record holds the
-  // average over its 8-fold class, which readers copy to the whole class.
+  // Each record holds its 8-fold class average; a 4-fold part beyond isApprox
+  // precision is rejected.
   auto idx = [](size_t p, size_t q, size_t r, size_t s) {
     return ((p * 2 + q) * 2 + r) * 2 + s;
   };
-  // Exactly representable, so the average prints exactly; the relative
-  // difference is 5.1e-6.
-  const double high = 0.75 + std::ldexp(1.0, -18);
-  const double low = 0.75 - std::ldexp(1.0, -18);
-  Eigen::VectorXd dense = Eigen::VectorXd::Zero(16);
-  dense(idx(0, 1, 0, 1)) = dense(idx(1, 0, 1, 0)) = high;
-  dense(idx(0, 1, 1, 0)) = dense(idx(1, 0, 0, 1)) = low;
-  const SparseHamiltonianContainer::TwoBodyMap sparse{{{0, 1, 0, 1}, high},
-                                                      {{1, 0, 1, 0}, high},
-                                                      {{0, 1, 1, 0}, low},
-                                                      {{1, 0, 0, 1}, low}};
   Eigen::SparseMatrix<double> sparse_one_body(2, 2);
   sparse_one_body.insert(0, 0) = 1.0;
   sparse_one_body.makeCompressed();
-
-  const std::string filename = "test.average.hamiltonian.fcidump";
-  for (const auto& h :
-       {Hamiltonian(std::make_unique<CanonicalFourCenterHamiltonianContainer>(
+  auto hamiltonians = [&](double offset) {
+    const double high = 0.75 + offset;
+    const double low = 0.75 - offset;
+    Eigen::VectorXd dense = Eigen::VectorXd::Zero(16);
+    dense(idx(0, 1, 0, 1)) = dense(idx(1, 0, 1, 0)) = high;
+    dense(idx(0, 1, 1, 0)) = dense(idx(1, 0, 0, 1)) = low;
+    const SparseHamiltonianContainer::TwoBodyMap sparse{{{0, 1, 0, 1}, high},
+                                                        {{1, 0, 1, 0}, high},
+                                                        {{0, 1, 1, 0}, low},
+                                                        {{1, 0, 0, 1}, low}};
+    return std::vector<Hamiltonian>{
+        Hamiltonian(std::make_unique<CanonicalFourCenterHamiltonianContainer>(
             one_body, dense, orbitals, core_energy, inactive_fock)),
         Hamiltonian(std::make_unique<SparseHamiltonianContainer>(
-            sparse_one_body, sparse, core_energy))}) {
+            sparse_one_body, sparse, core_energy))};
+  };
+
+  const std::string filename = "test.average.hamiltonian.fcidump";
+  // Exactly representable, so the average prints exactly; the relative
+  // difference is 3.0e-13.
+  for (const auto& h : hamiltonians(std::ldexp(1.0, -42))) {
     h.to_fcidump_file(filename, 1, 1);
     std::ifstream file(filename);
     std::stringstream buffer;
@@ -1999,6 +2002,11 @@ TEST_F(HamiltonianTest, FCIDUMPWritesEightfoldClassAverages) {
         << buffer.str();
   }
   std::filesystem::remove(filename);
+  // A relative difference of 4.9e-12.
+  for (const auto& h : hamiltonians(std::ldexp(1.0, -38))) {
+    EXPECT_THROW(h.to_fcidump_file(filename, 1, 1), std::runtime_error);
+  }
+  EXPECT_FALSE(std::filesystem::exists(filename));
 }
 
 TEST_F(HamiltonianTest, FCIDUMPRejectsNonFiniteTwoBodyIntegrals) {
@@ -2391,12 +2399,13 @@ TEST_F(HamiltonianTest, IntegralSymmetriesEnergiesO2Singlet) {
   const auto& [restricted_aaaa, restricted_aabb, restricted_bbbb] =
       rhf_hamiltonian->get_two_body_integrals();
 
-  // Elementwise comparison for restricted aaaa == unrestricted aabb integrals
+  // Elementwise comparison for restricted aaaa == unrestricted aabb integrals,
+  // which are averaged over different permutations.
   EXPECT_EQ(restricted_aaaa.size(), aabb_integrals.size())
       << "Restricted aaaa and unrestricted aabb integral sizes should match";
   for (int i = 0; i < restricted_aaaa.size(); ++i) {
     double diff = std::abs(restricted_aaaa[i] - aabb_integrals[i]);
-    EXPECT_LT(diff, std::numeric_limits<double>::epsilon())
+    EXPECT_LT(diff, testing::integral_tolerance)
         << "Integrals should be identical. "
            ". Difference: "
         << diff;
@@ -3751,5 +3760,80 @@ TEST_F(HamiltonianConstructorTest, X2CTwoBodyAndCoreEnergyUnchanged) {
     auto [eri_x2c, a2, b2] = h_x2c->get_two_body_integrals();
     EXPECT_NEAR((eri_x2c - eri_nr).norm(), 0.0, 1e-12);
     EXPECT_DOUBLE_EQ(h_nr->get_core_energy(), h_x2c->get_core_energy());
+  }
+}
+
+TEST_F(HamiltonianConstructorTest, BuildersImposeRealOrbitalSymmetryExactly) {
+  // An alpha-beta block lacks only the bra-ket swap.
+  auto expect_symmetric = [](const Eigen::VectorXd& tensor, bool same_spin) {
+    const auto n = static_cast<size_t>(
+        std::llround(std::sqrt(std::sqrt(static_cast<double>(tensor.size())))));
+    auto at = [&tensor, n](size_t p, size_t q, size_t r, size_t s) {
+      return tensor(((p * n + q) * n + r) * n + s);
+    };
+    size_t violations = 0;
+    for (size_t p = 0; p < n; ++p)
+      for (size_t q = 0; q < n; ++q)
+        for (size_t r = 0; r < n; ++r)
+          for (size_t s = 0; s < n; ++s) {
+            const double value = at(p, q, r, s);
+            if (value != at(q, p, r, s) || value != at(p, q, s, r) ||
+                (same_spin && value != at(r, s, p, q)))
+              ++violations;
+          }
+    EXPECT_EQ(violations, 0u);
+  };
+  auto expect_pair_symmetric = [](const Eigen::MatrixXd& factors) {
+    const auto n = static_cast<Eigen::Index>(
+        std::llround(std::sqrt(static_cast<double>(factors.rows()))));
+    Eigen::Index violations = 0;
+    for (Eigen::Index aux = 0; aux < factors.cols(); ++aux)
+      for (Eigen::Index p = 0; p < n; ++p)
+        for (Eigen::Index q = 0; q < n; ++q)
+          if (factors(p * n + q, aux) != factors(q * n + p, aux)) ++violations;
+    EXPECT_EQ(violations, 0);
+  };
+
+  {
+    auto [energy, hamiltonian] = run_restricted_o2("qdk");
+    expect_symmetric(std::get<0>(hamiltonian->get_two_body_integrals()), true);
+  }
+  {
+    auto [energy, hamiltonian] = run_unrestricted_o2("qdk");
+    const auto& [aaaa, aabb, bbbb] = hamiltonian->get_two_body_integrals();
+    expect_symmetric(aaaa, true);
+    expect_symmetric(aabb, false);
+    expect_symmetric(bbbb, true);
+  }
+  {
+    auto [energy, hamiltonian] = run_unrestricted_o2("qdk_cholesky");
+    const auto [alpha, beta] =
+        hamiltonian->get_container<CholeskyHamiltonianContainer>()
+            .get_three_center_integrals();
+    expect_pair_symmetric(alpha);
+    expect_pair_symmetric(beta);
+  }
+  {
+    // The container keeps that symmetry in the integrals it reconstructs
+    // from pair-symmetric factors; plain BLAS loses it bitwise at n = 13.
+    constexpr Eigen::Index n = 13;
+    auto factors = [](unsigned seed) {
+      std::srand(seed);
+      Eigen::MatrixXd random = Eigen::MatrixXd::Random(n * n, 40);
+      for (Eigen::Index p = 0; p < n; ++p)
+        for (Eigen::Index q = 0; q < p; ++q)
+          random.row(q * n + p) = random.row(p * n + q);
+      return random;
+    };
+    const Eigen::MatrixXd one_body = Eigen::MatrixXd::Identity(n, n);
+    const Eigen::MatrixXd no_fock = Eigen::MatrixXd::Zero(0, 0);
+    Hamiltonian hamiltonian(std::make_unique<CholeskyHamiltonianContainer>(
+        one_body, one_body, factors(1), factors(2),
+        std::make_shared<ModelOrbitals>(n, model_spin_symmetry(false)), 0.0,
+        no_fock, no_fock));
+    const auto& [aaaa, aabb, bbbb] = hamiltonian.get_two_body_integrals();
+    expect_symmetric(aaaa, true);
+    expect_symmetric(aabb, false);
+    expect_symmetric(bbbb, true);
   }
 }

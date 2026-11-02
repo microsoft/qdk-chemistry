@@ -25,6 +25,7 @@ if QDK_CHEMISTRY_HAS_QISKIT_NATURE:
     from qdk_chemistry.data import (
         CanonicalFourCenterHamiltonianContainer,
         Hamiltonian,
+        HamiltonianType,
         MajoranaMapping,
         Orbitals,
         QubitOperator,
@@ -153,17 +154,18 @@ def test_qiskit_fourfold_jordan_wigner_full_matrix(fourfold_hamiltonian):
     np.testing.assert_allclose(operator.to_matrix(), reference, atol=1e-11, rtol=0)
 
 
-def test_qiskit_rejects_non_hermitian_mixed_block():
-    """Qiskit cannot represent a non-Hermitian mixed block, so it raises instead."""
+def test_qiskit_rejects_non_hermitian_hamiltonian():
+    """Qiskit cannot represent a non-Hermitian Hamiltonian, so it raises instead."""
     hamiltonian, _reference = create_non_hermitian_mixed_block_hamiltonian()
-    with pytest.raises(ValueError, match="non-Hermitian"):
+    with pytest.raises(ValueError, match="only Hermitian Hamiltonians"):
         create("qubit_mapper", "qiskit").run(hamiltonian, MajoranaMapping.jordan_wigner(6))
 
 
-def test_qiskit_accepts_mixed_block_asymmetry_within_native_tolerance():
-    """Asymmetry the native mapper attributes to round-off is accepted by Qiskit too."""
-    hamiltonian, _reference = create_non_hermitian_mixed_block_hamiltonian(asymmetry=1e-6)
+def test_qiskit_maps_hermitian_part_like_native():
+    """A Hermitian Hamiltonian maps to the Hermitian part of its integrals, as natively."""
+    hamiltonian, reference = create_non_hermitian_mixed_block_hamiltonian(HamiltonianType.Hermitian)
     mapping = MajoranaMapping.jordan_wigner(6)
+    qiskit = create("qubit_mapper", "qiskit").run(hamiltonian, mapping).to_matrix()
+    np.testing.assert_allclose(qiskit, (reference + reference.conj().T) / 2, atol=1e-11, rtol=0)
     native = create("qubit_mapper", "qdk").run(hamiltonian, mapping)
-    qiskit = create("qubit_mapper", "qiskit").run(hamiltonian, mapping)
-    np.testing.assert_allclose(qiskit.to_matrix(), native.to_matrix(), atol=1e-5, rtol=0)
+    np.testing.assert_allclose(qiskit, native.to_matrix(), atol=1e-11, rtol=0)

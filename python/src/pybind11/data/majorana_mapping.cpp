@@ -345,11 +345,11 @@ Returns:
 Map a fermionic Hamiltonian to qubit Pauli terms using Majorana loops.
 
 When ``spin_symmetric`` is true, the integrals must be identical across spin
-channels (not validated). Two-body integrals of a Hermitian operator enter
-through their average over ``(pq|rs)``, ``(rs|pq)``, ``(qp|sr)``, ``(sr|qp)``
-(``(pq|rs)``, ``(qp|sr)`` for ``ab``). ``integral_threshold`` screens one-body
-integrals and ``((pq|rs) ± (pq|sr)) / 2``. Non-finite values raise
-``ValueError``.
+channels (not validated). Two-body integrals enter through their average over
+``(pq|rs)``, ``(rs|pq)``, ``(qp|sr)``, ``(sr|qp)`` (``(pq|rs)``, ``(qp|sr)``
+for ``ab``), with a warning if they are not Hermitian. ``integral_threshold``
+screens one-body integrals and ``((pq|rs) ± (pq|sr)) / 2``. Non-finite values
+raise ``ValueError``.
 
 Returns ``(words, coefficients)`` where ``words`` is a list of sparse
 Pauli words.
@@ -376,9 +376,8 @@ Map a fermionic Hamiltonian to qubit Pauli terms.
 The two-body integrals are consumed in the native storage format of the
 Hamiltonian's container: Cholesky (three-center) and sparse containers are
 read directly without reconstructing the dense N^4 two-body tensor; any
-other container uses the dense path. Integral symmetry selects the
-evaluation path as in the buffer-based overload.
-
+other container uses the dense path. Non-Hermitian Hamiltonians are mapped
+as stored, without averaging.
 
 The Hamiltonian's constant energy shift (nuclear repulsion / frozen core)
 is intentionally **not** included in the mapped operator; callers that need
@@ -388,7 +387,8 @@ Args:
     mapping (MajoranaMapping): The Majorana-to-Pauli encoding (no tapering).
     hamiltonian (Hamiltonian): The fermionic Hamiltonian.
     spin_symmetric (bool): Whether the integrals are identical across spin
-      channels (restricted orbitals; not validated).
+      channels (restricted orbitals; not validated). Restricted Hamiltonians
+      are always mapped as such.
     threshold (float): Drop Pauli terms with magnitude below this value.
     integral_threshold (float): Screening cutoff for the two-body integrals, as
       for the buffer-based overload, and for the one-body integrals.
@@ -398,8 +398,6 @@ Returns:
     words and ``coefficients`` is a list of complex coefficients.
 
 Raises:
-    ValueError: If an integral or Cholesky factor is not finite,
-        or restricted two-body integrals define a non-Hermitian operator or
-        are Hermitian but not stored with ``(pq|rs) == (rs|pq)``.
+    ValueError: If an integral or Cholesky factor is not finite.
 )");
 }

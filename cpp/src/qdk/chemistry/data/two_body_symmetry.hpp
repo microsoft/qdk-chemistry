@@ -4,114 +4,27 @@
 
 #pragma once
 
-#include <Eigen/QR>
+#include <Eigen/Core>
 #include <algorithm>
 #include <array>
 #include <cmath>
 #include <cstddef>
+#include <cstdio>
 #include <map>
+#include <qdk/chemistry/utils/logger.hpp>
+#include <set>
 #include <stdexcept>
 #include <string>
 #include <utility>
 #include <vector>
 
+// Consumers use Hermitian two-body integrals through their Hermitian part: the
+// average over (pq|rs), (rs|pq), (qp|sr), (sr|qp), or over (pq|rs), (qp|sr)
+// for an unrestricted alpha-beta block, which has no exchange partner.
+
 namespace qdk::chemistry::data::detail {
 
-/// Symmetry violations up to this fraction of the largest integral in the
-/// tensor are treated as round-off; larger ones as genuinely reduced symmetry.
-inline constexpr double two_body_symmetry_tolerance = 1e-5;
-
 using TwoBodyKey = std::array<std::size_t, 4>;
-
-inline double max_abs(const double* values, std::size_t count) {
-  double scale = 0.0;
-  for (std::size_t i = 0; i < count; ++i) {
-    scale = std::max(scale, std::abs(values[i]));
-  }
-  return scale;
-}
-
-/// Permutation symmetry of a two-body tensor, weakest first.  The operator
-/// sees only the bra-ket average gbar, so `NotBraKetSymmetric` is Hermitian;
-/// in an unrestricted same-spin block the classes only select a path.
-enum class TwoBodySymmetry {
-  NonHermitian,        ///< gbar_pqrs != gbar_qpsr: non-Hermitian if restricted
-  NotBraKetSymmetric,  ///< g_pqrs != g_rspq: Hermitian, but g != gbar
-  FourFold,            ///< (pq|rs) = (qp|sr) = (rs|pq) = (sr|qp)
-  EightFold,           ///< additionally (pq|rs) = (qp|rs) = (pq|sr)
-};
-
-/// Strongest symmetry that holds at `key`, reading partner positions via `at`.
-/// Results order like the enum, so a tensor's symmetry is the minimum over
-/// its positions.
-template <class At>
-TwoBodySymmetry two_body_symmetry_at(const TwoBodyKey& key, double value,
-                                     const At& at, double tolerance) {
-  const auto [p, q, r, s] = key;
-  auto equal = [tolerance](double lhs, double rhs) {
-    return std::abs(lhs - rhs) <= tolerance;
-  };
-  const double swapped = at({r, s, p, q});
-  // Hermiticity and the 8-fold test apply to the bra-ket average, since that
-  // is all the operator sees.
-  const double mean = 0.5 * (value + swapped);
-  if (!equal(mean, 0.5 * (at({q, p, s, r}) + at({s, r, q, p})))) {
-    return TwoBodySymmetry::NonHermitian;
-  }
-  // Both evaluation strategies read the stored tensor directly in the
-  // cross-spin channel, so a Hermitian operator in the wrong gauge still has
-  // to be symmetrized by the caller before it can be mapped.
-  if (!equal(value, swapped)) return TwoBodySymmetry::NotBraKetSymmetric;
-  if (!equal(mean, 0.5 * (at({q, p, r, s}) + at({r, s, q, p})))) {
-    return TwoBodySymmetry::FourFold;
-  }
-  return TwoBodySymmetry::EightFold;
-}
-
-/// Classify `integrals`, a row-major (pq|rs) tensor of extent `n` per index.
-inline TwoBodySymmetry classify_two_body_symmetry(const double* integrals,
-                                                  std::size_t n,
-                                                  double relative_tolerance) {
-  const double tolerance =
-      relative_tolerance * max_abs(integrals, n * n * n * n);
-  auto at = [integrals, n](const TwoBodyKey& k) {
-    return integrals[((k[0] * n + k[1]) * n + k[2]) * n + k[3]];
-  };
-
-  auto symmetry = TwoBodySymmetry::EightFold;
-  for (std::size_t p = 0; p < n; ++p) {
-    for (std::size_t q = 0; q < n; ++q) {
-      for (std::size_t r = 0; r < n; ++r) {
-        for (std::size_t s = 0; s < n; ++s) {
-          const TwoBodyKey key{p, q, r, s};
-          symmetry = std::min(
-              symmetry, two_body_symmetry_at(key, at(key), at, tolerance));
-          if (symmetry == TwoBodySymmetry::NonHermitian) return symmetry;
-        }
-      }
-    }
-  }
-  return symmetry;
-}
-
-/// Whether (pq|rs) = (qp|sr) for every element, the Hermiticity condition of
-/// a mixed-spin block that has no exchange partner within itself.
-inline bool two_body_has_reversal_symmetry(const double* integrals,
-                                           std::size_t n,
-                                           double relative_tolerance) {
-  const double tolerance =
-      relative_tolerance * max_abs(integrals, n * n * n * n);
-  for (std::size_t bra = 0; bra < n; ++bra)
-    for (std::size_t ket = 0; ket < n; ++ket)
-      for (std::size_t other_bra = 0; other_bra < n; ++other_bra)
-        for (std::size_t other_ket = 0; other_ket < n; ++other_ket)
-          if (std::abs(
-                  integrals[((bra * n + ket) * n + other_bra) * n + other_ket] -
-                  integrals[((ket * n + bra) * n + other_ket) * n +
-                            other_bra]) > tolerance)
-            return false;
-  return true;
-}
 
 inline void require_finite_two_body(const double* integrals, std::size_t count,
                                     const std::string& consumer) {
@@ -122,224 +35,125 @@ inline void require_finite_two_body(const double* integrals, std::size_t count,
   }
 }
 
-/// Rejects `NonHermitian` and `NotBraKetSymmetric`, for consumers that
-/// silently assume (pq|rs) = (rs|pq) = (qp|sr).
-inline void throw_unless_fourfold(TwoBodySymmetry symmetry,
-                                  const std::string& consumer) {
-  if (symmetry == TwoBodySymmetry::NonHermitian) {
-    throw std::invalid_argument(
-        consumer +
-        ": (pq|rs) + (rs|pq) != (qp|sr) + (sr|qp), so the two-body integrals "
-        "define a non-Hermitian operator, which is not supported.");
-  }
-  if (symmetry == TwoBodySymmetry::NotBraKetSymmetric) {
-    throw std::invalid_argument(
-        consumer +
-        ": the two-body integrals are Hermitian but not stored with "
-        "(pq|rs) = (rs|pq), which this method assumes. That swap leaves the "
-        "operator unchanged, so replace the tensor by its bra-ket average "
-        "((pq|rs) + (rs|pq)) / 2.");
-  }
-}
+/// Accumulates ||x - y||^2, ||x||^2 and ||y||^2 element by element.
+struct TwoBodyComparison {
+  double difference = 0.0;
+  double first = 0.0;
+  double second = 0.0;
 
-/// Rejects a restricted tensor outside the fourfold group, and returns its
-/// classification (`FourFold` or `EightFold`).
-inline TwoBodySymmetry require_fourfold_two_body(const double* integrals,
-                                                 std::size_t n,
-                                                 const std::string& consumer) {
-  require_finite_two_body(integrals, n * n * n * n, consumer);
-  const auto symmetry =
-      classify_two_body_symmetry(integrals, n, two_body_symmetry_tolerance);
-  throw_unless_fourfold(symmetry, consumer);
-  return symmetry;
-}
-
-/// Three-center factors split into their parts symmetric and antisymmetric in
-/// the orbital pair, one row per pair p <= q in row-major order.
-///
-/// Factors are column-major `[n^2 x naux]` with the pair index in row-major
-/// order, so element (pq, Q) lives at `factors[p * n + q + Q * n^2]`.  With
-/// u = {p, q}, L_pq = S_u + A_u and L_qp = S_u - A_u; A_u is zero for p = q.
-struct CholeskyPairParts {
-  Eigen::MatrixXd symmetric;
-  Eigen::MatrixXd antisymmetric;
+  void add(double x, double y) {
+    const double delta = x - y;
+    difference += delta * delta;
+    first += x * x;
+    second += y * y;
+  }
+  /// Eigen's isApprox: ||x - y|| <= p min(||x||, ||y||).
+  bool approx() const {
+    const double precision = Eigen::NumTraits<double>::dummy_precision();
+    return difference <= precision * precision * std::min(first, second);
+  }
+  /// ||x - y|| / ||x||.
+  double relative() const {
+    return first == 0.0 ? 0.0 : std::sqrt(difference / first);
+  }
 };
 
-inline CholeskyPairParts cholesky_pair_parts(const double* factors,
-                                             std::size_t n, std::size_t naux,
-                                             double scale) {
-  const std::size_t n2 = n * n;
-  const auto pairs = static_cast<Eigen::Index>(n * (n + 1) / 2);
-  const auto columns = static_cast<Eigen::Index>(naux);
-  CholeskyPairParts parts{Eigen::MatrixXd(pairs, columns),
-                          Eigen::MatrixXd(pairs, columns)};
-  for (std::size_t aux = 0; aux < naux; ++aux) {
-    const auto column = static_cast<Eigen::Index>(aux);
-    Eigen::Index row = 0;
-    for (std::size_t p = 0; p < n; ++p) {
-      for (std::size_t q = p; q < n; ++q, ++row) {
-        const double forward = factors[p * n + q + aux * n2] / scale;
-        const double reverse = factors[q * n + p + aux * n2] / scale;
-        parts.symmetric(row, column) = 0.5 * (forward + reverse);
-        parts.antisymmetric(row, column) = 0.5 * (forward - reverse);
-      }
-    }
-  }
-  return parts;
+/// Warns if `change`, made by averaging over `partners`, exceeds round-off.
+inline void warn_if_not_hermitian(const TwoBodyComparison& change,
+                                  const std::string& consumer,
+                                  const std::string& partners) {
+  if (change.approx()) return;
+  QDK_LOGGER().warn(
+      "{}: the two-body integrals differ from their Hermitian part, the "
+      "average over {}, by {:.1e} relative to their norm; the Hermitian part "
+      "is used. Symmetrize the integrals to avoid this warning.",
+      consumer, partners, change.relative());
 }
 
-/// Whether (pq|rs) = sum_Q left^Q_pq right^Q_rs satisfies (pq|rs) = (qp|sr)
-/// element by element to within `relative_tolerance` times its largest
-/// element, as the dense checks require.  For a same-spin block (`left ==
-/// right`) the reconstruction is bra-ket symmetric, so this is its Hermiticity
-/// and its fourfold symmetry.
-///
-/// In the notation of `CholeskyPairParts`, (pq|rs) - (qp|sr) =
-/// 2(±S^l_u.A^r_v ± A^l_u.S^r_v), whose largest magnitude is
-/// 2 max_{u,v} (|S^l_u.A^r_v| + |A^l_u.S^r_v|).  Two sufficient bounds are
-/// tried before that exact maximum: a Cauchy-Schwarz bound from one pass over
-/// the factors in O(n^2) memory, which settles factors that are
-/// pair-symmetric to round-off without copying them, and a Frobenius bound
-/// from thin QR factors of copied S and A in O(n^2 naux^2).  The exact
-/// maximum is formed in row blocks, O(n^4 naux), only when both fail.  The
-/// bounds compare against the largest diagonal element |(pq|pq)|: that is the
-/// largest element of a same-spin block, and a lower bound for a mixed one.
-inline bool cholesky_has_reversal_symmetry(const double* left,
-                                           const double* right, std::size_t n,
-                                           std::size_t naux,
-                                           double relative_tolerance) {
-  const bool same_spin = left == right;
-  const std::size_t count = n * n * naux;
-  const double left_scale = max_abs(left, count);
-  const double right_scale = same_spin ? left_scale : max_abs(right, count);
-  if (left_scale == 0.0 || right_scale == 0.0) return true;
+inline constexpr const char* fourfold_partners =
+    "(pq|rs), (rs|pq), (qp|sr) and (sr|qp)";
+inline constexpr const char* reversal_partners = "(pq|rs) and (qp|sr)";
 
-  // Squared norms of S_u and A_u over the auxiliary index, per side, and the
-  // diagonal elements (pq|pq) and (qp|qp), in units of the two scales.
+/// Average of a row-major restricted or same-spin (pq|rs) block over (pq|rs),
+/// (rs|pq), (qp|sr), (sr|qp): `integrals` if they equal it exactly, otherwise
+/// `storage`, filled with it.
+inline const double* fourfold_symmetrized(const double* integrals,
+                                          std::size_t n,
+                                          Eigen::VectorXd& storage,
+                                          const std::string& consumer) {
   const std::size_t n2 = n * n;
-  const std::size_t pair_count = n * (n + 1) / 2;
-  std::vector<double> left_symmetric_sq(pair_count),
-      left_antisymmetric_sq(pair_count);
-  std::vector<double> right_symmetric_sq(same_spin ? 0 : pair_count);
-  std::vector<double> right_antisymmetric_sq(same_spin ? 0 : pair_count);
-  std::vector<double> forward_diagonal(pair_count),
-      reverse_diagonal(pair_count);
-  for (std::size_t aux = 0; aux < naux; ++aux) {
-    std::size_t pair = 0;
-    for (std::size_t p = 0; p < n; ++p) {
-      for (std::size_t q = p; q < n; ++q, ++pair) {
-        const std::size_t forward = p * n + q + aux * n2;
-        const std::size_t reverse = q * n + p + aux * n2;
-        const double left_forward = left[forward] / left_scale;
-        const double left_reverse = left[reverse] / left_scale;
-        const double symmetric = 0.5 * (left_forward + left_reverse);
-        const double antisymmetric = 0.5 * (left_forward - left_reverse);
-        left_symmetric_sq[pair] += symmetric * symmetric;
-        left_antisymmetric_sq[pair] += antisymmetric * antisymmetric;
-        if (same_spin) {
-          forward_diagonal[pair] += left_forward * left_forward;
-          reverse_diagonal[pair] += left_reverse * left_reverse;
-          continue;
+  require_finite_two_body(integrals, n2 * n2, consumer);
+  auto at = [integrals, n, n2](std::size_t p, std::size_t q, std::size_t r,
+                               std::size_t s) {
+    return integrals[(p * n + q) * n2 + r * n + s];
+  };
+  auto symmetric = [&] {
+    for (std::size_t p = 0; p < n; ++p)
+      for (std::size_t q = 0; q < n; ++q)
+        for (std::size_t r = 0; r < n; ++r)
+          for (std::size_t s = 0; s < n; ++s) {
+            const double value = at(p, q, r, s);
+            if (value != at(r, s, p, q) || value != at(q, p, s, r))
+              return false;
+          }
+    return true;
+  };
+  if (symmetric()) return integrals;
+
+  storage.resize(static_cast<Eigen::Index>(n2 * n2));
+  // The operator depends only on the bra-ket average.
+  TwoBodyComparison change;
+  for (std::size_t p = 0; p < n; ++p)
+    for (std::size_t q = 0; q < n; ++q)
+      for (std::size_t r = 0; r < n; ++r)
+        for (std::size_t s = 0; s < n; ++s) {
+          const double direct = at(p, q, r, s) + at(r, s, p, q);
+          const double reversed = at(q, p, s, r) + at(s, r, q, p);
+          const double average = 0.25 * (direct + reversed);
+          storage[static_cast<Eigen::Index>((p * n + q) * n2 + r * n + s)] =
+              average;
+          change.add(0.5 * direct, average);
         }
-        const double right_forward = right[forward] / right_scale;
-        const double right_reverse = right[reverse] / right_scale;
-        const double right_sym = 0.5 * (right_forward + right_reverse);
-        const double right_anti = 0.5 * (right_forward - right_reverse);
-        right_symmetric_sq[pair] += right_sym * right_sym;
-        right_antisymmetric_sq[pair] += right_anti * right_anti;
-        forward_diagonal[pair] += left_forward * right_forward;
-        reverse_diagonal[pair] += left_reverse * right_reverse;
-      }
-    }
-  }
-  auto max_norm = [](const std::vector<double>& squared_norms) {
-    return std::sqrt(
-        *std::max_element(squared_norms.begin(), squared_norms.end()));
+  warn_if_not_hermitian(change, consumer, fourfold_partners);
+  return storage.data();
+}
+
+/// Average of a row-major alpha-beta (pq|rs) block over (pq|rs), (qp|sr), as
+/// for @ref fourfold_symmetrized.
+inline const double* reversal_symmetrized(const double* integrals,
+                                          std::size_t n,
+                                          Eigen::VectorXd& storage,
+                                          const std::string& consumer) {
+  const std::size_t n2 = n * n;
+  require_finite_two_body(integrals, n2 * n2, consumer);
+  auto at = [integrals, n, n2](std::size_t p, std::size_t q, std::size_t r,
+                               std::size_t s) {
+    return integrals[(p * n + q) * n2 + r * n + s];
   };
-  auto max_abs_of = [](const std::vector<double>& values) {
-    return max_abs(values.data(), values.size());
-  };
-  const double diagonal_max =
-      std::max(max_abs_of(forward_diagonal), max_abs_of(reverse_diagonal));
-  const double bound = relative_tolerance * diagonal_max;
-  const auto& right_symmetric_sq_or_left =
-      same_spin ? left_symmetric_sq : right_symmetric_sq;
-  const auto& right_antisymmetric_sq_or_left =
-      same_spin ? left_antisymmetric_sq : right_antisymmetric_sq;
-  if (2.0 * (max_norm(left_symmetric_sq) *
-                 max_norm(right_antisymmetric_sq_or_left) +
-             max_norm(left_antisymmetric_sq) *
-                 max_norm(right_symmetric_sq_or_left)) <=
-      bound) {
+  auto symmetric = [&] {
+    for (std::size_t p = 0; p < n; ++p)
+      for (std::size_t q = 0; q < n; ++q)
+        for (std::size_t r = 0; r < n; ++r)
+          for (std::size_t s = 0; s < n; ++s)
+            if (at(p, q, r, s) != at(q, p, s, r)) return false;
     return true;
-  }
-
-  const auto l = cholesky_pair_parts(left, n, naux, left_scale);
-  CholeskyPairParts right_parts;
-  if (!same_spin)
-    right_parts = cholesky_pair_parts(right, n, naux, right_scale);
-  const auto& r = same_spin ? l : right_parts;
-
-  // ||X Y^T||_F = ||R_X R_Y^T||_F for thin QR factors X = Q_X R_X.
-  auto reduced_r = [](const Eigen::MatrixXd& matrix) -> Eigen::MatrixXd {
-    Eigen::HouseholderQR<Eigen::MatrixXd> qr(matrix);
-    const Eigen::Index rows = std::min(matrix.rows(), matrix.cols());
-    return qr.matrixQR().topRows(rows).triangularView<Eigen::Upper>();
   };
-  auto product_norm = [](const Eigen::MatrixXd& first,
-                         const Eigen::MatrixXd& second) {
-    Eigen::MatrixXd product(first.rows(), second.rows());
-    product.noalias() = first * second.transpose();
-    return product.stableNorm();
-  };
-  const Eigen::MatrixXd left_symmetric = reduced_r(l.symmetric);
-  const Eigen::MatrixXd left_antisymmetric = reduced_r(l.antisymmetric);
-  const Eigen::MatrixXd right_symmetric =
-      same_spin ? left_symmetric : reduced_r(r.symmetric);
-  const Eigen::MatrixXd right_antisymmetric =
-      same_spin ? left_antisymmetric : reduced_r(r.antisymmetric);
-  if (2.0 * (product_norm(left_symmetric, right_antisymmetric) +
-             product_norm(left_antisymmetric, right_symmetric)) <=
-      bound) {
-    return true;
-  }
+  if (symmetric()) return integrals;
 
-  // Exact maxima.  Element (u, v) of the reconstruction is a ± b ± c ± d with
-  // a = S.S, b = S.A, c = A.S, d = A.A, signs set by the pair orientations.
-  const Eigen::Index pairs = l.symmetric.rows();
-  const Eigen::Index block =
-      std::clamp<Eigen::Index>((Eigen::Index{1} << 20) / pairs, 1, pairs);
-  double max_difference = 0.0;
-  double max_value = diagonal_max;
-  for (Eigen::Index start = 0; start < pairs; start += block) {
-    const Eigen::Index rows = std::min(block, pairs - start);
-    Eigen::MatrixXd symmetric_antisymmetric(rows, pairs);
-    symmetric_antisymmetric.noalias() =
-        l.symmetric.middleRows(start, rows) * r.antisymmetric.transpose();
-    Eigen::MatrixXd antisymmetric_symmetric(rows, pairs);
-    antisymmetric_symmetric.noalias() =
-        l.antisymmetric.middleRows(start, rows) * r.symmetric.transpose();
-    max_difference =
-        std::max(max_difference, (symmetric_antisymmetric.cwiseAbs() +
-                                  antisymmetric_symmetric.cwiseAbs())
-                                     .maxCoeff());
-    if (same_spin) continue;
-    Eigen::MatrixXd symmetric_symmetric(rows, pairs);
-    symmetric_symmetric.noalias() =
-        l.symmetric.middleRows(start, rows) * r.symmetric.transpose();
-    Eigen::MatrixXd antisymmetric_antisymmetric(rows, pairs);
-    antisymmetric_antisymmetric.noalias() =
-        l.antisymmetric.middleRows(start, rows) * r.antisymmetric.transpose();
-    max_value = std::max(
-        {max_value,
-         ((symmetric_symmetric + antisymmetric_antisymmetric).cwiseAbs() +
-          (symmetric_antisymmetric + antisymmetric_symmetric).cwiseAbs())
-             .maxCoeff(),
-         ((symmetric_symmetric - antisymmetric_antisymmetric).cwiseAbs() +
-          (symmetric_antisymmetric - antisymmetric_symmetric).cwiseAbs())
-             .maxCoeff()});
-  }
-  return 2.0 * max_difference <= relative_tolerance * max_value;
+  storage.resize(static_cast<Eigen::Index>(n2 * n2));
+  TwoBodyComparison change;
+  for (std::size_t p = 0; p < n; ++p)
+    for (std::size_t q = 0; q < n; ++q)
+      for (std::size_t r = 0; r < n; ++r)
+        for (std::size_t s = 0; s < n; ++s) {
+          const double value = at(p, q, r, s);
+          const double average = 0.5 * (value + at(q, p, s, r));
+          storage[static_cast<Eigen::Index>((p * n + q) * n2 + r * n + s)] =
+              average;
+          change.add(value, average);
+        }
+  warn_if_not_hermitian(change, consumer, reversal_partners);
+  return storage.data();
 }
 
 /// Representative shared by all eight permutations of (p,q,r,s); also the
@@ -382,34 +196,120 @@ inline std::array<TwoBodyKey, 8> eightfold_orbit(const TwoBodyKey& k) {
   return orbit;
 }
 
-/// Average of `at` over the eightfold class of `key`.
+/// Average of `at` over the eightfold class of `key`, summed pairwise so that
+/// equal values average to themselves exactly.
 template <class At>
 double eightfold_average(const TwoBodyKey& key, const At& at) {
-  double sum = 0.0;
-  for (const auto& position : eightfold_orbit(key)) sum += at(position);
-  return sum / 8.0;
+  const auto o = eightfold_orbit(key);
+  return (((at(o[0]) + at(o[1])) + (at(o[2]) + at(o[3]))) +
+          ((at(o[4]) + at(o[5])) + (at(o[6]) + at(o[7])))) /
+         8.0;
 }
 
-/// Whether a row-major (pq|rs) tensor differs from its eightfold average by
-/// at most `relative_tolerance` times its largest element.  That difference
-/// is exactly what a consumer keeping one value per eightfold class
-/// discards.
-inline bool is_eightfold_within(const double* integrals, std::size_t n,
-                                double relative_tolerance) {
-  const double tolerance =
-      relative_tolerance * max_abs(integrals, n * n * n * n);
+/// Compares a row-major (pq|rs) tensor with its eightfold class averages.
+inline TwoBodyComparison eightfold_comparison(const double* integrals,
+                                              std::size_t n) {
   auto at = [integrals, n](const TwoBodyKey& k) {
     return integrals[((k[0] * n + k[1]) * n + k[2]) * n + k[3]];
   };
+  TwoBodyComparison comparison;
   for (std::size_t p = 0; p < n; ++p)
-    for (std::size_t q = 0; q < n; ++q)
-      for (std::size_t r = 0; r < n; ++r)
-        for (std::size_t s = 0; s < n; ++s) {
+    for (std::size_t q = p; q < n; ++q)
+      for (std::size_t r = p; r < n; ++r)
+        for (std::size_t s = r; s < n; ++s) {
           const TwoBodyKey key{p, q, r, s};
-          if (std::abs(at(key) - eightfold_average(key, at)) > tolerance)
-            return false;
+          if (eightfold_canonical(key) != key) continue;
+          const double average = eightfold_average(key, at);
+          auto orbit = eightfold_orbit(key);
+          std::sort(orbit.begin(), orbit.end());
+          const auto end = std::unique(orbit.begin(), orbit.end());
+          for (auto position = orbit.begin(); position != end; ++position)
+            comparison.add(at(*position), average);
         }
+  return comparison;
+}
+
+inline std::runtime_error not_eightfold_error(
+    const std::string& consumer, const TwoBodyComparison& comparison) {
+  char relative[32];
+  std::snprintf(relative, sizeof(relative), "%.1e", comparison.relative());
+  return std::runtime_error(
+      consumer +
+      " requires 8-fold two-body permutation symmetry; the integrals differ "
+      "from their 8-fold average by " +
+      relative +
+      " relative to their norm, so they cannot be represented losslessly. If "
+      "this is round-off, as in Hamiltonians saved by earlier versions, "
+      "rebuild the Hamiltonian.");
+}
+
+// The averages below are taken one swap at a time, (rs) <-> (sr) within each
+// row, then (pq) <-> (qp) across rows, then (pq|rs) <-> (rs|pq), which visits
+// memory in order and leaves partners bitwise equal.
+
+/// Replaces a row-major alpha-beta (pq|rs) tensor by its average over (pq|rs),
+/// (qp|rs), (pq|sr), (qp|sr).
+inline void pair_symmetrize(double* integrals, std::size_t n) {
+  const std::size_t n2 = n * n;
+  for (std::size_t pq = 0; pq < n2; ++pq) {
+    double* row = integrals + pq * n2;
+    for (std::size_t r = 0; r < n; ++r)
+      for (std::size_t s = r + 1; s < n; ++s) {
+        double& forward = row[r * n + s];
+        double& reverse = row[s * n + r];
+        forward = reverse = 0.5 * (forward + reverse);
+      }
+  }
+  for (std::size_t p = 0; p < n; ++p)
+    for (std::size_t q = p + 1; q < n; ++q) {
+      double* forward = integrals + (p * n + q) * n2;
+      double* reverse = integrals + (q * n + p) * n2;
+      for (std::size_t rs = 0; rs < n2; ++rs)
+        forward[rs] = reverse[rs] = 0.5 * (forward[rs] + reverse[rs]);
+    }
+}
+
+/// Replaces a row-major (pq|rs) tensor by its eightfold class averages.
+inline void eightfold_symmetrize(double* integrals, std::size_t n) {
+  pair_symmetrize(integrals, n);
+  const std::size_t n2 = n * n;
+  constexpr std::size_t tile = 64;
+  for (std::size_t i0 = 0; i0 < n2; i0 += tile)
+    for (std::size_t j0 = i0; j0 < n2; j0 += tile)
+      for (std::size_t i = i0; i < std::min(i0 + tile, n2); ++i)
+        for (std::size_t j = std::max(j0, i + 1); j < std::min(j0 + tile, n2);
+             ++j) {
+          double& upper = integrals[i * n2 + j];
+          double& lower = integrals[j * n2 + i];
+          upper = lower = 0.5 * (upper + lower);
+        }
+}
+
+/// Whether three-center factors, column-major [n^2 x naux], satisfy
+/// L_pq = L_qp exactly; the integrals they reconstruct are then eightfold.
+inline bool factors_are_pair_symmetric(const double* factors, std::size_t n,
+                                       std::size_t naux) {
+  const std::size_t n2 = n * n;
+  for (std::size_t aux = 0; aux < naux; ++aux)
+    for (std::size_t p = 0; p < n; ++p)
+      for (std::size_t q = p + 1; q < n; ++q)
+        if (factors[p * n + q + aux * n2] != factors[q * n + p + aux * n2])
+          return false;
   return true;
+}
+
+/// Replaces three-center factors, column-major [n^2 x naux], by
+/// (L_pq + L_qp) / 2.
+inline void pair_symmetrize_factors(double* factors, std::size_t n,
+                                    std::size_t naux) {
+  const std::size_t n2 = n * n;
+  for (std::size_t aux = 0; aux < naux; ++aux)
+    for (std::size_t p = 0; p < n; ++p)
+      for (std::size_t q = p + 1; q < n; ++q) {
+        double& forward = factors[p * n + q + aux * n2];
+        double& reverse = factors[q * n + p + aux * n2];
+        forward = reverse = 0.5 * (forward + reverse);
+      }
 }
 
 /// Literal sparse two-body tensor: positions that are absent are zero.
@@ -420,65 +320,72 @@ inline std::string two_body_key_string(const TwoBodyKey& key) {
          std::to_string(key[2]) + ", " + std::to_string(key[3]) + ")";
 }
 
-/// Sparse classification, with a stored position that violates the
-/// strongest symmetry the result denies.
-struct SparseTwoBodySymmetry {
-  TwoBodySymmetry symmetry;
-  TwoBodyKey witness{};
-};
-
-/// Sparse counterpart of @ref classify_two_body_symmetry, reading absent
-/// positions as zero.  Every comparison involving a nonzero value is made at
-/// a stored position, so visiting only the stored entries is sufficient.
-inline SparseTwoBodySymmetry classify_sparse_two_body_symmetry(
-    const SparseTwoBodyTensor& tensor, double relative_tolerance) {
-  double scale = 0.0;
-  for (const auto& [key, value] : tensor) {
-    scale = std::max(scale, std::abs(value));
-  }
-  const double tolerance = relative_tolerance * scale;
-  auto at = [&tensor](const TwoBodyKey& key) {
-    const auto it = tensor.find(key);
-    return it == tensor.end() ? 0.0 : it->second;
-  };
-
-  SparseTwoBodySymmetry result{TwoBodySymmetry::EightFold};
-  for (const auto& [key, value] : tensor) {
-    const auto symmetry = two_body_symmetry_at(key, value, at, tolerance);
-    if (symmetry < result.symmetry) {
-      result = {symmetry, key};
-      if (symmetry == TwoBodySymmetry::NonHermitian) break;
-    }
-  }
-  return result;
+/// Distinct positions of an orbit.
+template <std::size_t N>
+std::vector<TwoBodyKey> distinct_positions(std::array<TwoBodyKey, N> orbit) {
+  std::sort(orbit.begin(), orbit.end());
+  return {orbit.begin(), std::unique(orbit.begin(), orbit.end())};
 }
 
-/// Sparse counterpart of @ref is_eightfold_within, reading absent positions
+/// Sparse counterpart of @ref eightfold_comparison, reading absent positions
 /// as zero.  Only classes with a stored member can differ from their average.
-inline bool sparse_is_eightfold_within(const SparseTwoBodyTensor& tensor,
-                                       double relative_tolerance) {
-  double scale = 0.0;
-  for (const auto& [key, value] : tensor) {
-    scale = std::max(scale, std::abs(value));
-  }
-  const double tolerance = relative_tolerance * scale;
+inline TwoBodyComparison sparse_eightfold_comparison(
+    const SparseTwoBodyTensor& tensor) {
   auto at = [&tensor](const TwoBodyKey& key) {
     const auto it = tensor.find(key);
     return it == tensor.end() ? 0.0 : it->second;
   };
+  std::set<TwoBodyKey> classes;
   for (const auto& [key, value] : tensor) {
-    const double average = eightfold_average(key, at);
-    for (const auto& position : eightfold_orbit(key)) {
-      if (std::abs(at(position) - average) > tolerance) return false;
+    classes.insert(eightfold_canonical(key));
+  }
+  TwoBodyComparison comparison;
+  for (const auto& canonical : classes) {
+    const double average = eightfold_average(canonical, at);
+    for (const auto& position : distinct_positions(eightfold_orbit(canonical)))
+      comparison.add(at(position), average);
+  }
+  return comparison;
+}
+
+/// Replaces `tensor` by its average as for @ref fourfold_symmetrized, reading
+/// absent positions as zero.
+inline void sparse_fourfold_symmetrize(SparseTwoBodyTensor& tensor,
+                                       const std::string& consumer) {
+  auto at = [&tensor](const TwoBodyKey& key) {
+    const auto it = tensor.find(key);
+    return it == tensor.end() ? 0.0 : it->second;
+  };
+  auto symmetric = [&] {
+    for (const auto& [key, value] : tensor) {
+      const auto [p, q, r, s] = key;
+      if (value != at({r, s, p, q}) || value != at({q, p, s, r})) return false;
+    }
+    return true;
+  };
+  if (symmetric()) return;
+
+  SparseTwoBodyTensor averaged;
+  TwoBodyComparison change;
+  for (const auto& [key, value] : tensor) {
+    if (averaged.count(key)) continue;
+    const auto orbit = fourfold_orbit(key);
+    const double direct = at(orbit[0]) + at(orbit[1]);
+    const double reversed = at(orbit[2]) + at(orbit[3]);
+    const double average = 0.25 * (direct + reversed);
+    for (const auto& position : distinct_positions(orbit)) {
+      averaged.emplace(position, average);
+      const auto [p, q, r, s] = position;
+      change.add(0.5 * (at(position) + at({r, s, p, q})), average);
     }
   }
-  return true;
+  warn_if_not_hermitian(change, consumer, fourfold_partners);
+  tensor = std::move(averaged);
 }
 
 /// Nonzero entries that are the only stored member of a larger eightfold
 /// class: the deprecated sparse shorthand in which one record stands for its
-/// whole class.  Read literally, such a record is never fourfold symmetric
-/// (only (ii|ii) is its own fourfold orbit), so it would be rejected.
+/// whole class.
 inline std::vector<TwoBodyKey> lone_eightfold_representatives(
     const SparseTwoBodyTensor& tensor) {
   std::map<TwoBodyKey, std::pair<TwoBodyKey, std::size_t>> classes;

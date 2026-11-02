@@ -73,7 +73,8 @@ class QdkQubitMapper(QubitMapper):
     Both restricted (RHF) and unrestricted (UHF) Hamiltonians are supported.
     Two-body integrals of a Hermitian Hamiltonian enter through their average over
     ``(pq|rs)``, ``(rs|pq)``, ``(qp|sr)``, ``(sr|qp)`` (``(pq|rs)``, ``(qp|sr)`` for
-    alpha-beta), which is the same operator.
+    alpha-beta), with a warning if they are not Hermitian; non-Hermitian
+    Hamiltonians are mapped as stored.
 
     The two-body integrals are consumed in the native storage format of the
     Hamiltonian's container (the C++ engine dispatches on the container type):
@@ -88,14 +89,13 @@ class QdkQubitMapper(QubitMapper):
     * :class:`~qdk_chemistry.data.CholeskyHamiltonianContainer`: the
       three-center factors are kept in their ``O(N**2 * naux)`` form and the
       auxiliary index is contracted one ``(pq|.)`` row at a time, so the dense
-      ``N**4`` tensor is never reconstructed and the mapping needs one
-      additional ``N**2`` row. Validating factors that are not pair-symmetric
-      up to round-off copies them once.
+      ``N**4`` tensor is never reconstructed and the mapping needs up to two
+      additional ``N**2`` rows.
     * All other containers use the dense engine path.
 
     In all cases the result is numerically equivalent to mapping the dense
-    integrals. The Hamiltonian's core
-    energy is not included in the output operator.
+    integrals. The Hamiltonian's core energy is not included in the output
+    operator.
 
     The mapper uses canonical blocked spin-orbital ordering internally:
     qubits 0..N-1 for alpha spin, qubits N..2N-1 for beta spin (where N is the
@@ -155,8 +155,7 @@ class QdkQubitMapper(QubitMapper):
             QubitOperator: The qubit operator with Pauli strings and coefficients.
 
         Raises:
-            ValueError: If restricted two-body integrals define a non-Hermitian operator, or are
-                Hermitian but not stored with ``(pq|rs) == (rs|pq)``.
+            ValueError: If an integral or Cholesky factor is not finite.
 
         """
         Logger.trace_entering()

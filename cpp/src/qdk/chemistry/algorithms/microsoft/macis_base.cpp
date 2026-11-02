@@ -135,16 +135,23 @@ macis::ASCISettings get_asci_settings_(const data::Settings& settings_) {
   return asci_settings;
 }
 
-void validate_macis_two_body_symmetry(const data::Hamiltonian& hamiltonian,
-                                      const std::string& solver) {
+const Eigen::VectorXd& macis_two_body_integrals(
+    const data::Hamiltonian& hamiltonian, const std::string& solver,
+    Eigen::VectorXd& storage) {
   QDK_LOG_TRACE_ENTERING();
 
-  if (!hamiltonian.has_two_body_integrals()) return;
+  if (!hamiltonian.is_hermitian()) {
+    throw std::runtime_error(solver +
+                             " does not support non-Hermitian Hamiltonians.");
+  }
   const auto n = static_cast<std::size_t>(
       std::get<0>(hamiltonian.get_one_body_integrals()).rows());
   const auto& aaaa = std::get<0>(hamiltonian.get_two_body_integrals());
-  if (static_cast<std::size_t>(aaaa.size()) != n * n * n * n) return;
-  data::detail::require_fourfold_two_body(aaaa.data(), n, solver);
+  if (data::detail::fourfold_symmetrized(aaaa.data(), n, storage, solver) ==
+      aaaa.data()) {
+    return aaaa;
+  }
+  return storage;
 }
 
 }  // namespace qdk::chemistry::algorithms::microsoft
