@@ -31,6 +31,12 @@ namespace QDKChemistry.Utils.CombinedIterationPhaseEstimation {
     /// - `phaseQubit`: The phase qubit index, distinct from every system index.
     /// - `systems`: Unique system indices, in the order expected by state preparation and the unitary.
     /// - `numAncillaQubits`: Number of ancilla qubits needed by the controlled unitary (0 if none).
+    /// - `prepareSharedOp`: Prepares the shared register once around every round.
+    /// - `numSharedAncillas`: Size of the shared register, allocated after the
+    ///   `Length(systems) + 1 + numAncillaQubits` indexed qubits.
+    /// - `statePrepUsesShared`: Append the shared register to the system qubits `statePrep` acts on.
+    /// - `unitaryUsesShared`: Append the shared register to the targets of every controlled unitary.
+    ///   Each consumer leaves the register prepared, so rounds reset only the systems and ancillas.
     /// All indices must be within a register of `Length(systems) + 1 + numAncillaQubits` qubits.
     /// Ancillas are the unused indices in ascending order, appended after the systems.
     /// # Returns
@@ -44,52 +50,67 @@ namespace QDKChemistry.Utils.CombinedIterationPhaseEstimation {
         phaseQubit : Int,
         systems : Int[],
         numAncillaQubits : Int,
+        prepareSharedOp : Qubit[] => Unit is Adj + Ctl,
+        numSharedAncillas : Int,
+        statePrepUsesShared : Bool,
+        unitaryUsesShared : Bool,
     ) : Result[] {
         if midShots < 1 {
             fail "midShots must be a positive integer.";
         }
+        if numSharedAncillas == 0 and (statePrepUsesShared or unitaryUsesShared) {
+            fail "consuming shared ancillas requires a non-empty shared register";
+        }
         let ancillaIndices = GetIQPEAncillaIndices(phaseQubit, systems, numAncillaQubits);
-        use qs = Qubit[Length(systems) + 1 + numAncillaQubits];
+        let numIndexedQubits = Length(systems) + 1 + numAncillaQubits;
+        use qs = Qubit[numIndexedQubits + numSharedAncillas];
         let phase = qs[phaseQubit];
         let system = Subarray(systems, qs);
         let ancillas = Subarray(ancillaIndices, qs);
+        let shared = qs[numIndexedQubits...];
         let allTargets = system + ancillas;
+        let unitaryTargets = allTargets + (unitaryUsesShared ? shared | []);
+        let statePrepTargets = statePrepUsesShared ? system + shared | system;
 
         mutable results = [Zero, size = numBits];
 
-        for k in 0..numBits - 1 {
-            mutable ones = 0;
-            for _ in 1..midShots {
-                statePrep(system);
+        within {
+            prepareSharedOp(shared);
+        } apply {
+            for k in 0..numBits - 1 {
+                mutable ones = 0;
+                for _ in 1..midShots {
+                    statePrep(statePrepTargets);
 
-                within {
-                    H(phase);
-                } apply {
-                    // Apply the phase correction from previously voted bits as one fixed-angle
-                    // rotation per bit. Summing them into a mutable Double would make that Double
-                    // measurement-dependent, which Adaptive_RI rejects (UseOfDynamicDouble); here
-                    // only the branch depends on a measurement, and Rz angles add under composition.
-                    for j in 0..k - 1 {
-                        if results[j] == One {
-                            Rz(-2.0 * PI() / IntAsDouble(1 <<< (k - j + 1)), phase);
+                    within {
+                        H(phase);
+                    } apply {
+                        // Apply the phase correction from previously voted bits as one fixed-angle
+                        // rotation per bit. Summing them into a mutable Double would make that Double
+                        // measurement-dependent, which Adaptive_RI rejects (UseOfDynamicDouble); here
+                        // only the branch depends on a measurement, and Rz angles add under composition.
+                        for j in 0..k - 1 {
+                            if results[j] == One {
+                                Rz(-2.0 * PI() / IntAsDouble(1 <<< (k - j + 1)), phase);
+                            }
                         }
+                        controlledUnitary[k](phase, unitaryTargets);
                     }
-                    controlledUnitary[k](phase, allTargets);
+
+                    if MResetZ(phase) == One {
+                        set ones += 1;
+                    }
+                    ResetAll(allTargets);
                 }
 
-                if MResetZ(phase) == One {
-                    set ones += 1;
+                // Majority vote, matching the host's tie-to-zero rule. The vote is encoded back
+                // onto the now-idle phase qubit so the round still reports a Result, keeping the
+                // return shape and bit ordering identical to the per-round path.
+                if ones * 2 > midShots {
+                    X(phase);
                 }
-                ResetAll(allTargets);
+                set results w/= k <- MResetZ(phase);
             }
-
-            // Majority vote, matching the host's tie-to-zero rule. The vote is encoded back
-            // onto the now-idle phase qubit so the round still reports a Result, keeping the
-            // return shape and bit ordering identical to the per-round path.
-            if ones * 2 > midShots {
-                X(phase);
-            }
-            set results w/= k <- MResetZ(phase);
         }
 
         return results;

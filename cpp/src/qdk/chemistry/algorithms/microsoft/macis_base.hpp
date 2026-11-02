@@ -79,6 +79,8 @@ void validate_macis_two_body_symmetry(const data::Hamiltonian& hamiltonian,
  *  - `norb < 64`  -> `N = 128`
  *  - `norb < 128` -> `N = 256`
  *  - `norb < 256` -> `N = 512`
+ *  - `norb < 320` -> `N = 640`
+ *  - `norb < 384` -> `N = 768`
  *  - `norb < 512` -> `N = 1024`
  *  - `norb < 1024` -> `N = 2048`
  *  - `norb <= 2048` -> `N = 4096`
@@ -101,6 +103,12 @@ auto dispatch_by_norb(size_t norb, Args&&... args) {
     return Func::template impl<256>(std::forward<Args>(args)...);
   } else if (norb < 256) {
     return Func::template impl<512>(std::forward<Args>(args)...);
+  } else if (norb < 320) {
+    // 64-bit words per spin string from here: the wider powers of two cost
+    // memory and time per determinant
+    return Func::template impl<640>(std::forward<Args>(args)...);
+  } else if (norb < 384) {
+    return Func::template impl<768>(std::forward<Args>(args)...);
   } else if (norb < 512) {
     return Func::template impl<1024>(std::forward<Args>(args)...);
   } else if (norb < 1024) {

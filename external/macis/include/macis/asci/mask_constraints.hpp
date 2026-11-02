@@ -14,6 +14,7 @@
 #include <macis/sd_operations.hpp>
 #include <macis/types.hpp>
 #include <macis/util/mpi.hpp>
+#include <type_traits>
 #include <variant>
 
 namespace macis {
@@ -719,14 +720,26 @@ auto make_triplet(unsigned i, unsigned j, unsigned k) {
  * @param[in] nlevel_min Minimum constraint level to include (default: 0)
  * @param[in] nrec_min Minimum number of records for constraint inclusion
  * (default: -1)
+ * @param[in] work_fn Optional replacement of the work estimates:
+ * work_fn(constraints) returns, for each constraint of a std::vector, the sum
+ * of constraint_histogram over unique_alpha (weighted by the multiplicities);
+ * the default evaluates them with threads (and MPI ranks)
+ * @param[in] triplet_work_fn Optional work estimates of all the triplets at
+ * once (without base levels, nlevel_min == 0): triplet_work_fn() returns
+ * those of the triplets {i, j, k} (i > j > k) at indices C(i,3) + C(j,2) + k,
+ * and only the triplets with work are generated
  * @return Vector of constraint objects with associated computational cost
  * estimates
  */
-template <typename WfnType, typename ContainerType>
+template <typename WfnType, typename ContainerType,
+          typename WorkFn = std::nullptr_t,
+          typename TripletWorkFn = std::nullptr_t>
 auto gen_constraints_general(size_t nlevels, size_t norb, size_t ns_othr,
                              size_t nd_othr, const ContainerType& unique_alpha,
                              int world_size, size_t nlevel_min = 0,
-                             int64_t nrec_min = -1) {
+                             int64_t nrec_min = -1, WorkFn&& work_fn = nullptr,
+                             TripletWorkFn&& triplet_work_fn = nullptr) {
+  constexpr bool external_work = !std::is_null_pointer_v<std::decay_t<WorkFn>>;
   using wfn_traits = wavefunction_traits<WfnType>;
   using constraint_type = alpha_constraint<wfn_traits>;
   using string_type = typename constraint_type::constraint_type;
@@ -735,40 +748,7 @@ auto gen_constraints_general(size_t nlevels, size_t norb, size_t ns_othr,
       std::is_same_v<std::decay_t<WfnType>,
                      std::decay_t<typename ContainerType::value_type>>;
 
-  // Generate triplets + heuristic
   std::vector<std::pair<constraint_type, size_t>> constraint_sizes;
-  constraint_sizes.reserve(norb * norb * norb);
-
-  // Generate all the triplets
-  for (int t_i = 0; t_i < norb; ++t_i)
-    for (int t_j = 0; t_j < t_i; ++t_j)
-      for (int t_k = 0; t_k < t_j; ++t_k) {
-        auto constraint = constraint_type::make_triplet(t_i, t_j, t_k);
-        constraint_sizes.emplace_back(constraint, 0ul);
-      }
-
-  // Build up higher-order constraints as base if requested
-  if (nrec_min < 0 or
-      nrec_min >=
-          static_cast<int64_t>(
-              constraint_sizes.size()))  // nrec_min < 0 implies that you
-                                         // want all the constraints upfront
-    for (size_t ilevel = 0; ilevel < nlevel_min; ++ilevel) {
-      decltype(constraint_sizes) cur_constraints;
-      cur_constraints.reserve(constraint_sizes.size() * norb);
-      for (auto [c, nw] : constraint_sizes) {
-        const auto C_min = c.C_min();
-        for (int q_l = 0; q_l < static_cast<int>(C_min); ++q_l) {
-          // Generate masks / counts
-          string_type cn_C = c.C();
-          cn_C.flip(q_l);
-          string_type cn_B = c.B() >> (C_min - q_l);
-          constraint_type c_next(cn_C, cn_B, q_l);
-          cur_constraints.emplace_back(c_next, 0ul);
-        }
-      }
-      constraint_sizes = std::move(cur_constraints);
-    }
 
   struct atomic_wrapper {
     std::atomic<size_t> value;
@@ -780,57 +760,132 @@ auto gen_constraints_general(size_t nlevels, size_t norb, size_t ns_othr,
       return *this;
     }
   };
+  std::vector<atomic_wrapper> constraint_work;
+  std::vector<size_t> constraint_work_bare;
 
-  // Compute histogram
-  const auto ntrip_full = constraint_sizes.size();
-  std::vector<atomic_wrapper> constraint_work(ntrip_full, 0ul);
-  {
+  bool have_triplets = false;
+  if constexpr (!std::is_null_pointer_v<std::decay_t<TripletWorkFn>>) {
+    if (nlevel_min == 0) {
+      // the triplets with work, in the order of std::partition over all
+      // of them (as below)
+      const auto w = triplet_work_fn();
+      const size_t ntriplets =
+          norb < 3 ? 0 : norb * (norb - 1) * (norb - 2) / 6;
+      if (w.size() != ntriplets)
+        throw std::invalid_argument(
+            "Triplet work estimator returned an invalid size");
+      std::vector<std::pair<size_t, size_t>> tw(w.size());
+      for (size_t t = 0; t < w.size(); ++t) tw[t] = {t, w[t]};
+      const auto end = std::partition(
+          tw.begin(), tw.end(), [](const auto& p) { return p.second > 0; });
+      for (auto p = tw.begin(); p != end; ++p) {
+        size_t t = p->first, i = 2, j = 1;
+        while ((i + 1) * i * (i - 1) / 6 <= t) ++i;
+        t -= i * (i - 1) * (i - 2) / 6;
+        while ((j + 1) * j / 2 <= t) ++j;
+        t -= j * (j - 1) / 2;
+        constraint_sizes.emplace_back(constraint_type::make_triplet(i, j, t),
+                                      p->second);
+      }
+      have_triplets = true;
+    }
+  }
+  if (!have_triplets) {
+    // Generate triplets + heuristic
+    constraint_sizes.reserve(norb * norb * norb);
+
+    // Generate all the triplets
+    for (int t_i = 0; t_i < norb; ++t_i)
+      for (int t_j = 0; t_j < t_i; ++t_j)
+        for (int t_k = 0; t_k < t_j; ++t_k) {
+          auto constraint = constraint_type::make_triplet(t_i, t_j, t_k);
+          constraint_sizes.emplace_back(constraint, 0ul);
+        }
+
+    // Build up higher-order constraints as base if requested
+    if (nrec_min < 0 or
+        nrec_min >=
+            static_cast<int64_t>(
+                constraint_sizes.size()))  // nrec_min < 0 implies that you
+                                           // want all the constraints upfront
+      for (size_t ilevel = 0; ilevel < nlevel_min; ++ilevel) {
+        decltype(constraint_sizes) cur_constraints;
+        cur_constraints.reserve(constraint_sizes.size() * norb);
+        for (auto [c, nw] : constraint_sizes) {
+          const auto C_min = c.C_min();
+          for (int q_l = 0; q_l < static_cast<int>(C_min); ++q_l) {
+            // Generate masks / counts
+            string_type cn_C = c.C();
+            cn_C.flip(q_l);
+            string_type cn_B = c.B() >> (C_min - q_l);
+            constraint_type c_next(cn_C, cn_B, q_l);
+            cur_constraints.emplace_back(c_next, 0ul);
+          }
+        }
+        constraint_sizes = std::move(cur_constraints);
+      }
+
+    // Compute histogram
+    const auto ntrip_full = constraint_sizes.size();
+    constraint_work.resize(external_work ? 0 : ntrip_full);
+    constraint_work_bare.resize(ntrip_full);
+    if constexpr (external_work) {
+      std::vector<constraint_type> cons;
+      cons.reserve(ntrip_full);
+      for (const auto& p : constraint_sizes) cons.push_back(p.first);
+      const auto w = work_fn(cons);
+      if (w.size() != cons.size())
+        throw std::invalid_argument(
+            "Constraint work estimator returned an invalid size");
+      std::copy(w.begin(), w.end(), constraint_work_bare.begin());
+    } else {
 #ifdef MACIS_ENABLE_MPI
-    global_atomic<size_t> nxtval(MPI_COMM_WORLD);
+      global_atomic<size_t> nxtval(MPI_COMM_WORLD);
 #else
-    std::atomic<size_t> nxtval(0);
+      std::atomic<size_t> nxtval(0);
 #endif /* MACIS_ENABLE_MPI */
 #pragma omp parallel
-    {
-      size_t i_trip = 0;
-      while (i_trip < ntrip_full) {
-        i_trip = nxtval.fetch_add(1);
-        if (i_trip >= ntrip_full) break;
-        // if(!(i_trip%1000)) printf("cgen %lu / %lu\n", i_trip, ntrip_full);
-        auto& [constraint, __nw] = constraint_sizes[i_trip];
-        auto& c_nw = constraint_work[i_trip];
-        size_t nw = 0;
-        for (const auto& alpha : unique_alpha) {
-          if constexpr (flat_container)
-            nw += constraint_histogram(wfn_traits::alpha_string(alpha), ns_othr,
-                                       nd_othr, constraint);
-          else
-            nw += alpha.second * constraint_histogram(alpha.first, ns_othr,
-                                                      nd_othr, constraint);
+      {
+        size_t i_trip = 0;
+        while (i_trip < ntrip_full) {
+          i_trip = nxtval.fetch_add(1);
+          if (i_trip >= ntrip_full) break;
+          // if(!(i_trip%1000)) printf("cgen %lu / %lu\n", i_trip, ntrip_full);
+          auto& [constraint, __nw] = constraint_sizes[i_trip];
+          auto& c_nw = constraint_work[i_trip];
+          size_t nw = 0;
+          for (const auto& alpha : unique_alpha) {
+            if constexpr (flat_container)
+              nw += constraint_histogram(wfn_traits::alpha_string(alpha),
+                                         ns_othr, nd_othr, constraint);
+            else
+              nw += alpha.second * constraint_histogram(alpha.first, ns_othr,
+                                                        nd_othr, constraint);
+          }
+          if (nw) c_nw.value.fetch_add(nw);
         }
-        if (nw) c_nw.value.fetch_add(nw);
       }
-    }
-  }  // Scope nxtval
 
-  std::vector<size_t> constraint_work_bare(ntrip_full);
-  for (auto i_trip = 0; i_trip < ntrip_full; ++i_trip) {
-    constraint_work_bare[i_trip] = constraint_work[i_trip].value.load();
-  }
+      for (auto i_trip = 0; i_trip < ntrip_full; ++i_trip) {
+        constraint_work_bare[i_trip] = constraint_work[i_trip].value.load();
+      }
 #ifdef MACIS_ENABLE_MPI
-  allreduce(constraint_work_bare.data(), ntrip_full, MPI_SUM, MPI_COMM_WORLD);
+      allreduce(constraint_work_bare.data(), ntrip_full, MPI_SUM,
+                MPI_COMM_WORLD);
 #endif /* MACIS_ENABLE_MPI */
+    }
 
-  // Copy over constraint work
-  for (auto i_trip = 0; i_trip < ntrip_full; ++i_trip) {
-    constraint_sizes[i_trip].second = constraint_work_bare[i_trip];
-  }
+    // Copy over constraint work
+    for (auto i_trip = 0; i_trip < ntrip_full; ++i_trip) {
+      constraint_sizes[i_trip].second = constraint_work_bare[i_trip];
+    }
 
-  // Remove zeros
-  {
-    auto it = std::partition(constraint_sizes.begin(), constraint_sizes.end(),
-                             [](const auto& p) { return p.second > 0; });
-    constraint_sizes.erase(it, constraint_sizes.end());
+    // Remove zeros
+    {
+      auto it = std::partition(constraint_sizes.begin(), constraint_sizes.end(),
+                               [](const auto& p) { return p.second > 0; });
+      constraint_sizes.erase(it, constraint_sizes.end());
+    }
   }
 
   // Compute average work per worker.
@@ -886,43 +941,54 @@ auto gen_constraints_general(size_t nlevels, size_t norb, size_t ns_othr,
 
     const size_t nrefine = constraint_to_refine.size();
 
-#ifdef MACIS_ENABLE_MPI
-    global_atomic<size_t> nxtval(MPI_COMM_WORLD);
-#else
-    std::atomic<size_t> nxtval(0);
-#endif /* MACIS_ENABLE_MPI */
     std::vector<atomic_wrapper>().swap(constraint_work);
     std::vector<size_t>().swap(constraint_work_bare);
-    constraint_work.resize(nrefine, 0ul);
-#pragma omp parallel
-    {
-      size_t i_ref = 0;
-      while (i_ref < nrefine) {
-        i_ref = nxtval.fetch_add(1);
-        if (i_ref >= nrefine) break;
-        // if(!(i_ref%1000)) printf("cgen %lu / %lu\n", i_ref, nrefine);
-        auto& [constraint, __nw] = constraint_to_refine[i_ref];
-        auto& c_nw = constraint_work[i_ref];
-        size_t nw = 0;
-        for (const auto& alpha : unique_alpha) {
-          if constexpr (flat_container)
-            nw += constraint_histogram(wfn_traits::alpha_string(alpha), ns_othr,
-                                       nd_othr, constraint);
-          else
-            nw += alpha.second * constraint_histogram(alpha.first, ns_othr,
-                                                      nd_othr, constraint);
-        }
-        if (nw) c_nw.value.fetch_add(nw);
-      }  // constraint "loop"
-    }  // OpenMP Context
-
     constraint_work_bare.resize(nrefine);
-    for (auto i_ref = 0; i_ref < nrefine; ++i_ref) {
-      constraint_work_bare[i_ref] = constraint_work[i_ref].value.load();
-    }
+    if constexpr (external_work) {
+      std::vector<constraint_type> cons;
+      cons.reserve(nrefine);
+      for (const auto& p : constraint_to_refine) cons.push_back(p.first);
+      const auto w = work_fn(cons);
+      if (w.size() != cons.size())
+        throw std::invalid_argument(
+            "Constraint work estimator returned an invalid size");
+      std::copy(w.begin(), w.end(), constraint_work_bare.begin());
+    } else {
 #ifdef MACIS_ENABLE_MPI
-    allreduce(constraint_work_bare.data(), nrefine, MPI_SUM, MPI_COMM_WORLD);
+      global_atomic<size_t> nxtval(MPI_COMM_WORLD);
+#else
+      std::atomic<size_t> nxtval(0);
 #endif /* MACIS_ENABLE_MPI */
+      constraint_work.resize(nrefine, 0ul);
+#pragma omp parallel
+      {
+        size_t i_ref = 0;
+        while (i_ref < nrefine) {
+          i_ref = nxtval.fetch_add(1);
+          if (i_ref >= nrefine) break;
+          // if(!(i_ref%1000)) printf("cgen %lu / %lu\n", i_ref, nrefine);
+          auto& [constraint, __nw] = constraint_to_refine[i_ref];
+          auto& c_nw = constraint_work[i_ref];
+          size_t nw = 0;
+          for (const auto& alpha : unique_alpha) {
+            if constexpr (flat_container)
+              nw += constraint_histogram(wfn_traits::alpha_string(alpha),
+                                         ns_othr, nd_othr, constraint);
+            else
+              nw += alpha.second * constraint_histogram(alpha.first, ns_othr,
+                                                        nd_othr, constraint);
+          }
+          if (nw) c_nw.value.fetch_add(nw);
+        }  // constraint "loop"
+      }  // OpenMP Context
+
+      for (auto i_ref = 0; i_ref < nrefine; ++i_ref) {
+        constraint_work_bare[i_ref] = constraint_work[i_ref].value.load();
+      }
+#ifdef MACIS_ENABLE_MPI
+      allreduce(constraint_work_bare.data(), nrefine, MPI_SUM, MPI_COMM_WORLD);
+#endif /* MACIS_ENABLE_MPI */
+    }
 
     // Copy over constraint work
     for (auto i_ref = 0; i_ref < nrefine; ++i_ref) {
@@ -970,31 +1036,40 @@ auto gen_constraints_general(size_t nlevels, size_t norb, size_t ns_othr,
 
     if (!tps_to_next.size()) break;
 
-    // Break apart constraints
+    // Break apart constraints: children with one more element
+    std::vector<constraint_type> children;
     for (auto [c, nw_trip] : tps_to_next) {
       const auto C_min = c.C_min();
-
-      // Loop over possible constraints with one more element
       for (int q_l = 0; q_l < static_cast<int>(C_min); ++q_l) {
-        // Generate masks / counts
         string_type cn_C = c.C();
         cn_C.flip(q_l);
         string_type cn_B = c.B() >> (C_min - q_l);
-        constraint_type c_next(cn_C, cn_B, q_l);
-
-        size_t nw = 0;
-
+        children.emplace_back(cn_C, cn_B, q_l);
+      }
+    }
+    std::vector<size_t> child_work(children.size(), 0);
+    if constexpr (external_work) {
+      const auto w = work_fn(children);
+      if (w.size() != children.size())
+        throw std::invalid_argument(
+            "Constraint work estimator returned an invalid size");
+      std::copy(w.begin(), w.end(), child_work.begin());
+    } else {
+      for (size_t k = 0; k < children.size(); ++k)
         for (const auto& alpha : unique_alpha) {
           if constexpr (flat_container)
-            nw += constraint_histogram(wfn_traits::alpha_string(alpha), ns_othr,
-                                       nd_othr, c_next);
+            child_work[k] += constraint_histogram(
+                wfn_traits::alpha_string(alpha), ns_othr, nd_othr, children[k]);
           else
-            nw += alpha.second *
-                  constraint_histogram(alpha.first, ns_othr, nd_othr, c_next);
+            child_work[k] +=
+                alpha.second * constraint_histogram(alpha.first, ns_othr,
+                                                    nd_othr, children[k]);
         }
-        if (nw) constraint_sizes.emplace_back(c_next, nw);
-        total_work += nw;
-      }
+    }
+    for (size_t k = 0; k < children.size(); ++k) {
+      if (child_work[k])
+        constraint_sizes.emplace_back(children[k], child_work[k]);
+      total_work += child_work[k];
     }
 
     // Recompute average with updated total_work and constraint count

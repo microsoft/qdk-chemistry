@@ -29,6 +29,7 @@ _SOURCE_ROOT = Path(__file__).parent / "src"
 
 #: Q# sources that are supported by ``TargetProfile.Base``.
 _BASE_PROFILE_FILES = (
+    "Arithmetic.qs",
     "StatePreparation.qs",
     "BinaryEncoding.qs",
     "CircuitComposition.qs",
@@ -40,6 +41,7 @@ _BASE_PROFILE_FILES = (
     "HammingWeightPhasing.qs",
     "HubbardPlaquette.qs",
     "PauliExp.qs",
+    "PhaseGradient.qs",
     "MeasurementBasis.qs",
     "Select.qs",
     "PrepSelPrep.qs",
