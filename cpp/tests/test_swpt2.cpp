@@ -322,6 +322,7 @@ TEST(SchriefferWolffPT2Test, ReproducesMp2WhenEveryOccupiedOrbitalIsActive) {
   auto scf = ScfSolverFactory::create();
   // MP2 uses the SCF orbital energies, so agreement tracks SCF convergence.
   scf->settings().set("convergence_threshold", 1e-9);
+  scf->settings().set("enable_gdm", false);
   auto [E_hf, wfn_hf] = scf->run(water, 0, 1, "sto-3g");
   const auto orbitals = wfn_hf->get_orbitals();
   const size_t norb = orbitals->get_num_molecular_orbitals();
