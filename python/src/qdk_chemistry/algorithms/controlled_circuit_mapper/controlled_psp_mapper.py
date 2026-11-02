@@ -21,10 +21,8 @@ class ControlledPSPMapperSettings(ControlledCircuitMapperSettings):
 
     Attributes:
         prepare: Algorithm reference for the PREPARE oracle state preparation.
-            Defaults to ``DensePureStatePreparation``.
-        select_method: How SELECT decodes the index register, as for
-            :class:`~qdk_chemistry.algorithms.circuit_mapper.psp_mapper.PSPMapper`.
-            Defaults to ``"multi_controlled"``.
+            Defaults to alias sampling.
+        select_method: ``"unary_iteration"`` (default) or ``"multi_controlled"``.
 
     """
 
@@ -34,16 +32,14 @@ class ControlledPSPMapperSettings(ControlledCircuitMapperSettings):
         self._set_default(
             "prepare",
             "algorithm_ref",
-            AlgorithmRef("state_prep", "dense_pure_state"),
+            AlgorithmRef("state_prep", "alias_sampling"),
             "Algorithm for the PREPARE oracle state preparation. ",
         )
         self._set_default(
             "select_method",
             "string",
-            "multi_controlled",
-            "How SELECT decodes the index register. 'multi_controlled' controls every term on the "
-            "full index; 'unary_iteration' decodes it by unary iteration, about L - 1 Toffolis for "
-            "L terms.",
+            "unary_iteration",
+            "SELECT construction: 'multi_controlled' or 'unary_iteration'.",
             list(SELECT_METHODS),
         )
 

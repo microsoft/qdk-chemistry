@@ -30,12 +30,8 @@ class PSPMapperSettings(Settings):
 
     Attributes:
         prepare: Algorithm reference for the PREPARE oracle state preparation.
-            Defaults to ``DensePureStatePreparation``. ``AlgorithmRef("state_prep", "alias_sampling")``
-            selects coherent alias sampling (:cite:`Babbush2018` Sec. III D).
-        select_method: How SELECT decodes the index register. ``"multi_controlled"`` (default)
-            controls every term on the full index. ``"unary_iteration"`` decodes it by unary
-            iteration (:cite:`Babbush2018` Sec. III A), about :math:`L - 2` Toffolis for
-            :math:`L` terms.
+            Defaults to alias sampling.
+        select_method: ``"unary_iteration"`` (default, :cite:`Babbush2018`) or ``"multi_controlled"``.
 
     """
 
@@ -45,16 +41,14 @@ class PSPMapperSettings(Settings):
         self._set_default(
             "prepare",
             "algorithm_ref",
-            AlgorithmRef("state_prep", "dense_pure_state"),
+            AlgorithmRef("state_prep", "alias_sampling"),
             "Algorithm for the PREPARE oracle. ",
         )
         self._set_default(
             "select_method",
             "string",
-            "multi_controlled",
-            "How SELECT decodes the index register. 'multi_controlled' controls every term on the "
-            "full index; 'unary_iteration' decodes it by unary iteration, about L - 2 Toffolis for "
-            "L terms.",
+            "unary_iteration",
+            "SELECT construction: 'multi_controlled' or 'unary_iteration'.",
             list(SELECT_METHODS),
         )
 
@@ -65,11 +59,9 @@ class PSPMapper(CircuitMapper):
     Composes a block encoding from:
 
     1. **PREPARE** — amplitude-loading into the ancilla register, resolved via
-       the ``prepare`` setting.  Defaults to ``DensePureStatePreparation``.
+       the ``prepare`` setting.  Defaults to alias sampling.
     2. **SELECT** — Pauli SELECT oracle applied on the system register,
-       constructed directly from the block-encoding container's SELECT data. The
-       ``select_method`` setting picks between multi-controlling every term on the
-       index (default) and decoding the index by unary iteration.
+       constructed directly from the block-encoding container's SELECT data.
 
     The two callables are stitched together by the Q# ``PrepSelPrep`` operation:
 
@@ -135,8 +127,7 @@ class PSPMapper(CircuitMapper):
         """Return the SELECT oracle and the width of the system register it targets.
 
         Each controlled operation's Pauli string becomes a list of Q# ``Pauli`` enums,
-        packaged with the sign phases into a ``PauliSelectParams`` struct. The
-        ``select_method`` setting picks the Q# oracle built from it.
+        packaged with the sign phases into a ``PauliSelectParams`` struct.
 
         Args:
             container: The container held by the unitary representation.

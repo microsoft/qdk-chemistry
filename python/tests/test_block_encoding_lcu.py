@@ -380,31 +380,34 @@ def _assert_block_encodes(circuit, hamiltonian: QubitOperator, coefficients: np.
 
 
 class TestPSPMapperSelectMethod:
-    """Tests for the opt-in unary-iteration SELECT, alone and with alias-sampling PREPARE."""
+    """Tests for the ``select_method`` setting."""
 
     _PAULIS = ("XX", "ZZ", "XZ", "YY", "ZI")
     _COEFFICIENTS = np.array([0.25, -0.5, 0.1, -0.3, 0.2])
 
-    def test_defaults_to_multi_controlled(self):
-        """The unary SELECT is opt-in; an unknown method is rejected."""
-        assert registry.create("circuit_mapper", "prepare_select_prepare").settings().get("select_method") == (
-            "multi_controlled"
-        )
+    def test_defaults(self):
+        """Defaults are unary_iteration SELECT and alias-sampling PREPARE; unknown methods are rejected."""
+        settings = registry.create("circuit_mapper", "prepare_select_prepare").settings()
+        assert settings.get("select_method") == "unary_iteration"
+        assert settings.get("prepare").algorithm_name == "alias_sampling"
         with pytest.raises(ValueError, match="select_method"):
             registry.create("circuit_mapper", "prepare_select_prepare", select_method="sparse")
 
     @pytest.mark.parametrize("num_terms", [1, 2, 3, 5])
     def test_unary_select_block_encodes_the_hamiltonian(self, num_terms: int):
-        """With exact PREPARE amplitudes the unary SELECT gives the exact block, signs included."""
+        """The unary SELECT block-encodes H exactly."""
         coefficients = self._COEFFICIENTS[:num_terms]
         hamiltonian = QubitOperator(pauli_strings=list(self._PAULIS[:num_terms]), coefficients=coefficients)
-        circuit = registry.create("circuit_mapper", "prepare_select_prepare", select_method="unary_iteration").run(
-            LCUBuilder().run(hamiltonian)
-        )
+        circuit = registry.create(
+            "circuit_mapper",
+            "prepare_select_prepare",
+            select_method="unary_iteration",
+            prepare=AlgorithmRef("state_prep", "dense_pure_state"),
+        ).run(LCUBuilder().run(hamiltonian))
         _assert_block_encodes(circuit, hamiltonian, coefficients, atol=1e-10)
 
     def test_unary_select_with_alias_sampling_block_encodes_the_hamiltonian(self):
-        """The opt-in pairing for cost projections block-encodes within the alias discretization."""
+        """Unary SELECT with alias sampling block-encodes H within its precision."""
         bits_precision = 4
         coefficients = self._COEFFICIENTS[:3]
         hamiltonian = QubitOperator(pauli_strings=list(self._PAULIS[:3]), coefficients=coefficients)
@@ -418,10 +421,7 @@ class TestPSPMapperSelectMethod:
 
     @pytest.mark.parametrize("prepare", ["dense_pure_state", "alias_sampling"])
     def test_unary_select_cuts_toffolis_at_the_same_width(self, prepare: str):
-        """Unary iteration replaces per-factor multi-controls by L - 2 ANDs on scratch qubits.
-
-        The declared register is unchanged; only the estimate's scratch qubits differ.
-        """
+        """The unary SELECT keeps the declared width and cuts Toffolis."""
         rng = np.random.default_rng(0)
         paulis = sorted({"".join(rng.choice(list("IXYZ"), 6)) for _ in range(60)})[:20]
         hamiltonian = QubitOperator(pauli_strings=paulis, coefficients=rng.normal(size=len(paulis)))
@@ -435,13 +435,13 @@ class TestPSPMapperSelectMethod:
                 prepare=AlgorithmRef("state_prep", prepare),
             ).run(unitary)
 
-        default, unary = circuit("multi_controlled"), circuit("unary_iteration")
-        default_counts = default.estimate().logical_counts
+        multi, unary = circuit("multi_controlled"), circuit("unary_iteration")
+        multi_counts = multi.estimate().logical_counts
         unary_counts = unary.estimate().logical_counts
 
-        assert unary.num_qubits == default.num_qubits
-        # PREPARE is shared, so the whole drop is SELECT's: measured 618 -> L - 2 = 18 CCZ here.
-        assert default_counts["cczCount"] - unary_counts["cczCount"] >= 20 * (len(paulis) - 2)
+        assert unary.num_qubits == multi.num_qubits
+        # Measured 618 -> 18 CCZ with dense PREPARE.
+        assert multi_counts["cczCount"] - unary_counts["cczCount"] >= 20 * (len(paulis) - 2)
 
 
 class TestLCUContainer:
