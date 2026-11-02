@@ -93,7 +93,7 @@ struct cas_helper {
       E_casci = macis::fci_ground_state(
           fci_ham, settings_.get<int64_t>("max_solver_iterations"),
           settings_.get<double>("ci_residual_tolerance"), C_casci.data(),
-          /*guess=*/false, spin_flip);
+          /*guess=*/false, spin_flip, settings_.get<int64_t>("max_subspace"));
     }
 
     data::Wavefunction wfn = build_wavefunction(

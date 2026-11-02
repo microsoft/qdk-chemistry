@@ -186,12 +186,14 @@ class FCIHamiltonian {
  * @param[in] spin_flip    Sector of FCIHamiltonian::sigma: 0 for no
  *                         restriction, +1 (-1) for the lowest state of even
  *                         (odd) total spin
- * @param[in] max_subspace Davidson search-space dimension (>= 2); memory is
- *                         about (2*max_subspace + 3) CI vectors. The default
- *                         3 (current and previous Ritz vector plus the new
- *                         direction, as in LOBPCG) took as many iterations as
- *                         4 to 16 in all measured cases; 2 converges far
- *                         more slowly
+ * @param[in] max_subspace Davidson search-space dimension (>= 2). Memory per
+ *                         determinant is 8 * (2 * max_subspace + 3) bytes in
+ *                         double precision and 8 * max_subspace + 28 in
+ *                         mixed precision (single-precision corrections).
+ *                         Hydrogen chains took as many iterations with 3 to
+ *                         16 vectors, but strongly correlated systems need
+ *                         fewer with more: [2Fe-2S] (30e, 20o) took 135
+ *                         iterations with 3, 115 with 6 and 100 with 12
  * @param[in] precision    Precision of the Hamiltonian applications:
  *                         FCIPrecision::mixed applies H in single precision
  *                         where that cannot affect the result (a single-
@@ -212,7 +214,7 @@ class FCIHamiltonian {
  */
 double fci_ground_state(const FCIHamiltonian& H, size_t max_iter,
                         double res_tol, std::vector<double>& C,
-                        int spin_flip = 0, size_t max_subspace = 3,
+                        int spin_flip = 0, size_t max_subspace = 10,
                         FCIPrecision precision = FCIPrecision::automatic);
 
 /**
@@ -229,7 +231,7 @@ double fci_ground_state(const FCIHamiltonian& H, size_t max_iter,
  */
 double fci_ground_state(const FCIHamiltonian& H, size_t max_iter,
                         double res_tol, double* C, bool guess,
-                        int spin_flip = 0, size_t max_subspace = 3,
+                        int spin_flip = 0, size_t max_subspace = 10,
                         FCIPrecision precision = FCIPrecision::automatic);
 
 /**

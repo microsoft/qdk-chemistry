@@ -3,8 +3,12 @@
 // license information.
 
 #include <gtest/gtest.h>
+#include <spdlog/sinks/ostream_sink.h>
+#include <spdlog/sinks/stdout_color_sinks.h>
+#include <spdlog/spdlog.h>
 
 #include <filesystem>
+#include <iomanip>
 #include <macis/sd_operations.hpp>
 #include <qdk/chemistry/algorithms/active_space.hpp>
 #include <qdk/chemistry/algorithms/hamiltonian.hpp>
@@ -13,6 +17,8 @@
 #include <qdk/chemistry/data/symmetry/spin_channel_indices.hpp>
 #include <qdk/chemistry/data/wavefunction_containers/cas_state_vector.hpp>
 #include <qdk/chemistry/data/wavefunction_containers/state_vector.hpp>
+#include <qdk/chemistry/utils/logger.hpp>
+#include <sstream>
 
 #include "ut_common.hpp"
 
@@ -449,6 +455,55 @@ TEST_F(MCTest, Water_STO3G_FCI_IterativeSolver) {
 }
 
 /**
+ * @brief max_subspace reaches the Davidson solver of the iterative path.
+ *
+ * The solver logs the size of its search space; the energy does not depend
+ * on it.
+ */
+TEST_F(MCTest, Water_STO3G_FCI_MaxSubspace) {
+  using qdk::chemistry::utils::Logger;
+  using qdk::chemistry::utils::LogLevel;
+  auto water = testing::create_water_structure();
+  auto [E_HF, wfn_HF] = ScfSolverFactory::create()->run(water, 0, 1, "sto-3g");
+  auto ham =
+      HamiltonianConstructorFactory::create()->run(wfn_HF->get_orbitals());
+
+  auto davidson = spdlog::get("davidson");
+  if (!davidson) davidson = spdlog::stdout_color_mt("davidson");
+  std::ostringstream messages;
+  struct LoggerGuard {
+    std::shared_ptr<spdlog::logger> logger;
+    std::vector<spdlog::sink_ptr> sinks;
+    LogLevel level;
+    ~LoggerGuard() {
+      logger->sinks() = std::move(sinks);
+      Logger::set_global_level(level);
+    }
+  } guard{davidson, davidson->sinks(), Logger::get_global_level()};
+  davidson->sinks() = {
+      std::make_shared<spdlog::sinks::ostream_sink_mt>(messages)};
+  Logger::set_global_level(LogLevel::info);
+
+  // 0: the default
+  for (const int64_t max_subspace : {0, 2, 7}) {
+    SCOPED_TRACE(max_subspace);
+    auto mc = MultiConfigurationCalculatorFactory::create("macis_cas");
+    mc->settings().set("iterative_solver_dimension_cutoff",
+                       static_cast<int64_t>(10));
+    if (max_subspace > 0) mc->settings().set("max_subspace", max_subspace);
+    messages.str("");
+    auto [E_fci, wfn_fci] = mc->run(ham, 5, 5);
+    EXPECT_NEAR(E_fci - ham->get_core_energy(), -8.301534669468e+01,
+                testing::ci_energy_tolerance);
+    std::ostringstream expected;
+    expected << "MAX_M = " << std::setw(4)
+             << (max_subspace > 0 ? max_subspace : 10);
+    EXPECT_NE(messages.str().find(expected.str()), std::string::npos)
+        << messages.str();
+  }
+}
+
+/**
  * @brief Alpha and beta agree between the determinants and the RDM spin blocks
  * of an open-shell state; a swap anywhere breaks these identities, which
  * singlets and <S^2> cannot detect.
@@ -523,5 +578,12 @@ TEST_F(MCTest, MCSettings_DefaultsAndConstraints) {
   settings.set("spin_flip_symmetry", std::string("odd"));
   EXPECT_EQ(settings.get<std::string>("spin_flip_symmetry"), "odd");
   EXPECT_THROW(settings.set("spin_flip_symmetry", std::string("singlet")),
+               std::invalid_argument);
+
+  // max_subspace: default, override, constraint (the solver needs two)
+  EXPECT_EQ(settings.get<int64_t>("max_subspace"), 10);
+  settings.set("max_subspace", static_cast<int64_t>(4));
+  EXPECT_EQ(settings.get<int64_t>("max_subspace"), 4);
+  EXPECT_THROW(settings.set("max_subspace", static_cast<int64_t>(1)),
                std::invalid_argument);
 }

@@ -177,6 +177,10 @@ The ``spin_flip_symmetry`` setting restricts the calculation to one of these two
      - string
      - ``"none"``
      - ``"even"`` restricts the solution to even total spin (singlet, quintet, ...), ``"odd"`` to odd total spin (triplet, septet, ...); requires equal numbers of active alpha and beta electrons. ``"none"`` finds the lowest state of any spin
+   * - ``max_subspace``
+     - int
+     - ``10``
+     - Maximum number of vectors in the search space of the iterative (Davidson) solver before it restarts (at least 2). Each vector adds 8 bytes per determinant to the memory (16 in double precision); more vectors can save iterations on strongly correlated systems
 
 .. _macis-asci:
 
