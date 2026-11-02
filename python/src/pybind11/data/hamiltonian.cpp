@@ -872,12 +872,8 @@ Args:
 Warns:
     DeprecationWarning: If, in a Hermitian Hamiltonian, a nonzero entry is the
         only stored member of a larger 8-fold permutation class; such an entry
-        is expanded over its class. Classes with two or more stored members,
-        and every entry of a non-Hermitian Hamiltonian, are read literally,
-        without a warning: ``{(0, 1, 0, 1): v, (1, 0, 1, 0): v}`` gives ``(01|10) == 0``,
-        where earlier versions mapped it with ``(01|10) == v``. Such a map is
-        valid 4-fold input, so this cannot be detected; when porting code, store
-        every class member or use :meth:`expand_symmetry_representatives`.
+        is expanded over its class; :meth:`expand_symmetry_representatives`
+        builds every member. Other entries are read literally.
 )",
       py::arg("one_body_integrals"), py::arg("two_body_integrals"),
       py::arg("core_energy") = 0.0,
