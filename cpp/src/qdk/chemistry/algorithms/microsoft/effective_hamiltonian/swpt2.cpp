@@ -48,6 +48,9 @@ std::array<Eigen::MatrixXd, 2> reference_active_density(
       throw std::invalid_argument(
           "SchriefferWolffPT2: active 1-RDM dimensions do not match the "
           "reference active-space size.");
+    if (!rdm->allFinite())
+      throw std::invalid_argument(
+          "SchriefferWolffPT2: the active 1-RDM contains non-finite values.");
     return Eigen::MatrixXd(0.5 * (*rdm + rdm->transpose()));
   };
   if (unrestricted && reference.has_one_rdm_spin_dependent()) {
@@ -66,6 +69,10 @@ std::array<Eigen::MatrixXd, 2> reference_active_density(
       throw std::invalid_argument(
           "SchriefferWolffPT2: active occupation dimensions do not match "
           "the reference active-space size.");
+    if (!occ_a.allFinite() || !occ_b.allFinite())
+      throw std::invalid_argument(
+          "SchriefferWolffPT2: the active orbital occupations contain "
+          "non-finite values.");
     // This accessor is per-active-index only for a determinant; for a
     // multi-determinant state it returns 1-RDM eigenvalues sorted descending,
     // which need not be the MO-basis diagonal these indices label. Rejecting
@@ -248,6 +255,9 @@ std::shared_ptr<data::Hamiltonian> SchriefferWolffPT2Constructor::_run_impl(
     throw std::invalid_argument(
         "SchriefferWolffPT2: reference, hamiltonian, and p_indices must all "
         "be non-null.");
+  if (!hamiltonian->is_hermitian())
+    throw std::invalid_argument(
+        "SchriefferWolffPT2 requires a Hermitian Hamiltonian.");
   auto win_orbitals = hamiltonian->get_orbitals();
   auto ref_orbitals = reference->get_orbitals();
   // Global orbital labels are only meaningful in a shared MO basis; this also

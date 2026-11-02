@@ -3,6 +3,7 @@
 // license information.
 
 #pragma once
+#include <cmath>
 #include <limits>
 #include <memory>
 #include <qdk/chemistry/algorithms/effective_hamiltonian.hpp>
@@ -54,7 +55,7 @@ class SchriefferWolffPT2Settings : public qdk::chemistry::data::Settings {
         "preserved because the active space receives whatever the folded "
         "orbitals do not take. Must be below 1, so a singly occupied orbital "
         "is never folded on an arbitrary rounding.",
-        data::BoundConstraint<double>{0.0, 1.0});
+        data::BoundConstraint<double>{0.0, std::nextafter(1.0, 0.0)});
   }
   ~SchriefferWolffPT2Settings() override = default;
 };
