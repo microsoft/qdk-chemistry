@@ -346,15 +346,9 @@ struct CholeskyEriProvider {
 // share the same integrals (SparseHamiltonianContainer is always
 // restricted), so a single channel backs the aaaa/aabb/bbbb accessors.
 //
-// Ingestion reads the entries literally:
-//   * entries_ — exactly one canonical (p<=q, r<=s, (p,q)<=(r,s))
-//                position per eightfold class with a stored member, with
-//                its literal value and that of (p,q,s,r), sorted
-//                lexicographically so accumulation order is deterministic
-//                for any input ordering.  The excitation-pair split, which
-//                sparse input always takes, reads only these.
-//   * map_     — every stored position with its literal value; used by
-//                scalar lookups.
+// entries_ holds one canonical position per 8-fold class with a stored
+// member, with the values at (p,q,r,s) and (p,q,s,r), sorted so the sum does
+// not depend on input order; map_ holds every stored entry.
 struct SparseEriProvider {
   // Enables the dedicated non-zero-only two-body loop in majorana_map_impl.
   static constexpr bool kSparse = true;
@@ -490,14 +484,8 @@ MajoranaMapResult majorana_map_impl(const MajoranaMapping& mapping,
   }
 
   // ─── Screening ────────────────────────────────────────────────────
-  //
-  // The excitation-pair split weights pair products by the symmetric and
-  // antisymmetric combinations g^S, g^A = ((pq|rs) ± (pq|sr)) / 2 and screens
-  // those rather than individual integrals.  Symmetry partners are thus
-  // screened together, and eightfold input, whose g^A is round-off, adds
-  // antisymmetric products only where that round-off exceeds the threshold.
-  // The mapped operator is that of the tensor g' = screened(g^S) +
-  // screened(g^A).
+  // The split maps g' = screened(g^S) + screened(g^A), so symmetry partners
+  // are screened together.
   auto screened = [integral_threshold](double value) {
     return std::abs(value) < integral_threshold ? 0.0 : value;
   };

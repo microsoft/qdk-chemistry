@@ -31,23 +31,9 @@ inline double max_abs(const double* values, std::size_t count) {
   return scale;
 }
 
-/// Permutation symmetry of a two-body tensor, in increasing strength.
-///
-/// The three generators have different standing.  a+_p a+_r a_s a_q is
-/// invariant under (p,q) <-> (r,s), so the operator depends only on the
-/// bra-ket average gbar_pqrs = (g_pqrs + g_rspq) / 2: bra-ket symmetry is a
-/// gauge choice, not a property of the physics.  For a restricted tensor,
-/// which represents the spin-summed operator, (pq|rs) = (qp|sr) of that
-/// average is then exactly Hermiticity, and the independent bra swap
-/// (pq|rs) = (qp|rs) additionally requires real orbitals.  In a single
-/// same-spin block of unrestricted integrals, a+_p a+_r a_s a_q is also
-/// antisymmetric under q <-> s, so content symmetric under that swap cancels:
-/// there the classes below are sufficient but not necessary, and consumers use
-/// them only to choose an evaluation path, never to reject.
-///
-/// Genuine electron-repulsion integrals over real orbitals therefore always
-/// reach `EightFold`.  `FourFold` is the general Hermitian two-body operator,
-/// which is what downfolding and effective-Hamiltonian constructions produce.
+/// Permutation symmetry of a two-body tensor, weakest first.  The operator
+/// sees only the bra-ket average gbar, so `NotBraKetSymmetric` is Hermitian;
+/// in an unrestricted same-spin block the classes only select a path.
 enum class TwoBodySymmetry {
   NonHermitian,        ///< gbar_pqrs != gbar_qpsr: non-Hermitian if restricted
   NotBraKetSymmetric,  ///< g_pqrs != g_rspq: Hermitian, but g != gbar
@@ -396,11 +382,7 @@ inline std::array<TwoBodyKey, 8> eightfold_orbit(const TwoBodyKey& k) {
   return orbit;
 }
 
-/// Average of `at` over the eightfold class of `key`, i.e. the element at
-/// `key` of the nearest eightfold-symmetric tensor.  Consumers that keep one
-/// value per eightfold class (FCIDUMP, PySCF) store this average.  Every
-/// distinct position occurs equally often in the orbit, so averaging the
-/// eight images averages the distinct positions.
+/// Average of `at` over the eightfold class of `key`.
 template <class At>
 double eightfold_average(const TwoBodyKey& key, const At& at) {
   double sum = 0.0;

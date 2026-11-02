@@ -355,24 +355,14 @@ struct MajoranaMapResult {
  * @param n_spatial Number of spatial orbitals.
  * @param spin_symmetric True for restricted input: the caller guarantees
  *        h_alpha == h_beta and eri_aaaa == eri_bbbb == eri_aabb (not
- *        validated).  The integrals must be 4-fold, (pq|rs) = (qp|sr) =
- *        (rs|pq), and are mapped with spin-summed symmetric and antisymmetric
- *        excitation pairs (the excitation-pair split).  False for
- *        unrestricted input: the excitation-pair split is used when aa and bb
- *        are 4-fold and ab satisfies (pq|rs) = (qp|sr), and every spin
- *        channel is looped over in full otherwise.
+ *        validated).  The two-body integrals of a Hermitian operator enter
+ *        through their average over (pq|rs), (rs|pq), (qp|sr), (sr|qp)
+ *        ((pq|rs), (qp|sr) for eri_aabb).
  * @param threshold Pauli terms with |coeff| < threshold are dropped.
- * @param integral_threshold The excitation-pair split skips the combinations
- *        ((pq|rs) +/- (pq|sr)) / 2 with magnitude below this, so symmetry
- *        partners are screened together; the full loop skips individual
- *        integrals.  One-body integrals with |value| <= this are skipped.
+ * @param integral_threshold Screening cutoff for one- and two-body integrals;
+ *        two-body ones are screened as ((pq|rs) +/- (pq|sr)) / 2.
  * @return MajoranaMapResult with Pauli words and coefficients.
- * @throws std::invalid_argument If core_energy or an integral is not finite
- *         (beta one-body integrals are read only when spin_symmetric is
- *         false), or spin_symmetric is true and the two-body integrals define
- *         a non-Hermitian operator, or are Hermitian but not stored with
- *         (pq|rs) = (rs|pq); in the latter case, map their bra-ket average
- *         instead.
+ * @throws std::invalid_argument If core_energy or an integral is not finite.
  */
 MajoranaMapResult majorana_map_hamiltonian(
     const MajoranaMapping& mapping, double core_energy, const double* h1_alpha,

@@ -345,20 +345,11 @@ Returns:
 Map a fermionic Hamiltonian to qubit Pauli terms using Majorana loops.
 
 When ``spin_symmetric`` is true, the integrals must be identical across spin
-channels (restricted orbitals; not validated) and 4-fold,
-``(pq|rs) == (qp|sr) == (rs|pq)``; they are mapped with spin-summed symmetric
-and antisymmetric excitation pairs (the excitation-pair split). A
-non-Hermitian tensor raises ``ValueError``, as does a Hermitian tensor not
-stored with ``(pq|rs) == (rs|pq)``; map its bra-ket average instead.
-
-When ``spin_symmetric`` is false (unrestricted orbitals), the excitation-pair
-split is used when ``aa`` and ``bb`` are 4-fold and ``ab`` satisfies
-``(pq|rs) == (qp|sr)``; otherwise every spin channel is looped over in full.
-
-``integral_threshold`` screens the combinations ``((pq|rs) ± (pq|sr)) / 2`` in
-the excitation-pair split, so symmetry partners are screened together, and
-individual integrals in the full loop. A non-finite core energy or integral
-raises ``ValueError``.
+channels (not validated). Two-body integrals of a Hermitian operator enter
+through their average over ``(pq|rs)``, ``(rs|pq)``, ``(qp|sr)``, ``(sr|qp)``
+(``(pq|rs)``, ``(qp|sr)`` for ``ab``). ``integral_threshold`` screens one-body
+integrals and ``((pq|rs) ± (pq|sr)) / 2``. Non-finite values raise
+``ValueError``.
 
 Returns ``(words, coefficients)`` where ``words`` is a list of sparse
 Pauli words.
@@ -388,13 +379,6 @@ read directly without reconstructing the dense N^4 two-body tensor; any
 other container uses the dense path. Integral symmetry selects the
 evaluation path as in the buffer-based overload.
 
-Cholesky factors are checked element by element for
-``(pq|rs) == (qp|sr)``, with the dense tolerance, without reconstructing the
-dense tensor unless cheaper bounds are inconclusive; restricted factors that
-fail this check, and non-finite factors, raise ``ValueError``.
-
-Sparse entries are read literally, with unstored positions equal to zero; a
-complete 4-fold suborbit needs no explicit zeros.
 
 The Hamiltonian's constant energy shift (nuclear repulsion / frozen core)
 is intentionally **not** included in the mapped operator; callers that need

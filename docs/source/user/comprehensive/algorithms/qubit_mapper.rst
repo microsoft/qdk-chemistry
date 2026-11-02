@@ -237,28 +237,16 @@ compressed form:
   Hamiltonians (e.g. those produced by
   :func:`~qdk_chemistry.utils.model_hamiltonians.create_hubbard_hamiltonian`
   and :func:`~qdk_chemistry.utils.model_hamiltonians.create_ppp_hamiltonian`).
-  Stored entries are read **literally**: positions that are not stored are
-  zero, exactly as in the dense view of the container, so a complete 4-fold
-  suborbit needs no explicit zeros for the rest of its 8-fold orbit. To build
-  entries from symmetry representatives, use
+  Stored entries are read literally, with unstored positions zero; use
   :meth:`~qdk_chemistry.data.SparseHamiltonianContainer.expand_symmetry_representatives`
-  with :class:`~qdk_chemistry.data.TwoBodyPermutationGroup`. Entry order does
-  not affect the result.
+  to build them from symmetry representatives.
 - :class:`~qdk_chemistry.data.CholeskyHamiltonianContainer` — the three-center
   (Cholesky / density-fitted) factors are kept in their
   :math:`O(N^2 \cdot n_\text{aux})` form and the auxiliary index is contracted
   in integral space, one ``(pq|.)`` row at a time (a vectorized matrix-vector
   product per orbital pair), so the mapping needs one additional
   :math:`N^2`-length row and suits systems whose dense ERI tensor does not fit
-  in memory. The reconstructed integrals are checked element by element for
-  :math:`(pq|rs) = (qp|sr)`, with the same tolerance as dense integrals. For
-  factors that are symmetric in their orbital pair up to round-off, as
-  Cholesky factors of ordinary integrals are, one pass over the factors with
-  :math:`O(N^2)` memory settles the check. Otherwise the parts of the factors
-  symmetric and antisymmetric in their orbital pair are copied, which doubles
-  the factor memory, and a Frobenius bound in
-  :math:`O(N^2 n_\text{aux}^2)` or, failing that, the exact largest violation
-  in :math:`O(N^4 n_\text{aux})` decides it.
+  in memory.
 
 In all cases the result is a :class:`~qdk_chemistry.data.QubitOperator` that
 is numerically equivalent, term by term, to the dense
