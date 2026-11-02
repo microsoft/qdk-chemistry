@@ -44,18 +44,10 @@ enum class SpinChannel { aa, bb, aaaa, aabb, bbbb };
  * Note that this class does not store two-electron integrals; derived classes
  * are expected to implement storage and access for these integrals.
  *
- * Two-electron integrals are real and in chemist notation (pq|rs). Restricted
- * integrals g represent the spin-free operator
- * ½ Σ_pqrs g_pqrs Σ_στ a†_pσ a†_rτ a_sτ a_qσ, which depends on g only through
- * its bra-ket average ((pq|rs) + (rs|pq)) / 2. Unrestricted blocks represent
- * the operator literally, with the beta-alpha block given by
- * (pq|rs)_ba = (rs|pq)_ab. Restricted integrals and the same-spin blocks of a
- * Hermitian Hamiltonian are expected to have the 4-fold permutation symmetry
- * (pq|rs) = (rs|pq) = (qp|sr); the alpha-beta block need only satisfy
- * (pq|rs) = (qp|sr). The additional 8-fold symmetry of ordinary
- * electron-repulsion integrals is not assumed: consumers that need it reject
- * integrals that differ from their 8-fold average by more than 1e-5 of the
- * largest integral, and average smaller differences away.
+ * Two-electron integrals are real, in chemist notation (pq|rs), with the
+ * beta-alpha block (pq|rs)_ba = (rs|pq)_ab. Restricted integrals and the
+ * same-spin blocks of a Hermitian Hamiltonian are expected to be 4-fold,
+ * (pq|rs) = (rs|pq) = (qp|sr); the alpha-beta block only (pq|rs) = (qp|sr).
  *
  * This class implies that all inactive orbitals are fully occupied when
  * constructing inactive-orbital contributions to the constant energy term and
