@@ -7,7 +7,7 @@
 
 from qdk_chemistry.algorithms.circuit_mapper.psp_mapper import SELECT_METHODS, PSPMapper
 from qdk_chemistry.data import AlgorithmRef
-from qdk_chemistry.data.circuit import Circuit, QsharpFactoryData
+from qdk_chemistry.data.circuit import Circuit, CircuitMetadata, QsharpFactoryData
 from qdk_chemistry.data.unitary_representation.base import UnitaryRepresentation
 from qdk_chemistry.utils.qsharp import QSHARP_UTILS
 
@@ -33,7 +33,8 @@ class ControlledPSPMapperSettings(ControlledCircuitMapperSettings):
             "prepare",
             "algorithm_ref",
             AlgorithmRef("state_prep", "alias_sampling"),
-            "Algorithm for the PREPARE oracle state preparation. ",
+            "Algorithm for the PREPARE oracle state preparation. A PREPARE that rotates through a phase "
+            "gradient (e.g. 'qrom') uses one shared register its caller prepares.",
         )
         self._set_default(
             "select_method",
@@ -121,7 +122,7 @@ class ControlledPSPMapper(ControlledCircuitMapper):
         container = unitary.get_container()
         _, use_quantum_walk = block_mapper.resolve_lcu(container)
         select_op, num_system_qubits = block_mapper.build_select_ops(container)
-        prepare_op, num_select_qubits, num_block_ancillas = block_mapper.build_prep_ops(container)
+        prepare_op, num_select_qubits, num_block_ancillas, num_gradient_qubits = block_mapper.build_prep_ops(container)
 
         step_op = QSHARP_UTILS.PrepSelPrep.MakePrepSelPrepOp(
             prepare_op, select_op, num_system_qubits, num_select_qubits
@@ -145,6 +146,7 @@ class ControlledPSPMapper(ControlledCircuitMapper):
                 "numSystemQubits": num_system_qubits,
                 "numSelectQubits": num_select_qubits,
                 "numBlockAncillaQubits": num_block_ancillas,
+                "numPhaseGradientQubits": num_gradient_qubits,
                 "power": container.power,
                 "useWalk": use_quantum_walk,
             },
@@ -153,5 +155,6 @@ class ControlledPSPMapper(ControlledCircuitMapper):
         return Circuit(
             qsharp_factory=qsharp_factory,
             qsharp_op=QSHARP_UTILS.CircuitComposition.MakeSingleControlOp(controlled_op),
-            num_qubits=1 + num_system_qubits + num_block_ancillas,
+            num_qubits=1 + num_system_qubits + num_block_ancillas + num_gradient_qubits,
+            metadata=CircuitMetadata(num_phase_gradient_ancillas=num_gradient_qubits),
         )

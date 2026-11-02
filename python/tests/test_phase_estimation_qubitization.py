@@ -42,7 +42,11 @@ def _qubitization_circuit_builder_ref(num_bits: int = 4, builder: str = "qdk_ite
         "qpe_circuit_builder",
         builder,
         num_bits=num_bits,
-        controlled_circuit_mapper=AlgorithmRef("controlled_circuit_mapper", "prepare_select_prepare"),
+        controlled_circuit_mapper=AlgorithmRef(
+            "controlled_circuit_mapper",
+            "prepare_select_prepare",
+            prepare=AlgorithmRef("state_prep", "dense_pure_state"),
+        ),
         unitary_builder=AlgorithmRef("hamiltonian_unitary_builder", "lcu", quantum_walk=True),
     )
 

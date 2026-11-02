@@ -16,6 +16,7 @@ namespace QDKChemistry.Utils.PrepSelPrep {
     import Std.Intrinsic.AND;
     import Std.Intrinsic.R;
     import Std.Math.PI;
+    import QDKChemistry.Utils.PhaseGradient.PreparePhaseGradientState;
     import Std.ResourceEstimation.BeginEstimateCaching;
     import Std.ResourceEstimation.EndEstimateCaching;
     import Std.ResourceEstimation.SingleVariant;
@@ -165,20 +166,25 @@ namespace QDKChemistry.Utils.PrepSelPrep {
         }
     }
 
-    /// Circuit entry point: allocates the register and applies the block encoding `power` times.
+    /// Circuit entry point: allocates `[system | block ancilla | phase gradient]`, prepares the
+    /// gradient once, and applies the block encoding `power` times.
     operation MakePrepSelPrepCircuit(
         prepareOp : Qubit[] => Unit is Adj + Ctl,
         selectOp : (Qubit[], Qubit[]) => Unit is Adj + Ctl,
         numSystemQubits : Int,
         numSelectQubits : Int,
         numBlockAncillaQubits : Int,
+        numPhaseGradientQubits : Int,
         power : Int,
         useWalk : Bool,
     ) : Unit {
-        use register = Qubit[numSystemQubits + numBlockAncillaQubits];
+        use register = Qubit[numSystemQubits + numBlockAncillaQubits + numPhaseGradientQubits];
         let systems = register[0..numSystemQubits - 1];
         let prepareRegister = register[numSystemQubits...];
         let blockAncilla = register[numSystemQubits..numSystemQubits + numBlockAncillaQubits - 1];
+        if numPhaseGradientQubits > 0 {
+            PreparePhaseGradientState(register[numSystemQubits + numBlockAncillaQubits...]);
+        }
         for _ in 1..power {
             if BeginEstimateCaching(useWalk ? "PSPWalk" | "PrepSelPrep", SingleVariant()) {
                 PrepSelPrep(prepareOp, selectOp, systems, prepareRegister, numSelectQubits);
@@ -190,21 +196,26 @@ namespace QDKChemistry.Utils.PrepSelPrep {
         }
     }
 
-    /// Circuit entry point for the singly-controlled block encoding
+    /// Circuit entry point for the singly-controlled block encoding; prepares the phase
+    /// gradient like `MakePrepSelPrepCircuit`.
     operation MakeControlledPrepSelPrepCircuit(
         prepareOp : Qubit[] => Unit is Adj + Ctl,
         selectOp : (Qubit[], Qubit[]) => Unit is Adj + Ctl,
         numSystemQubits : Int,
         numSelectQubits : Int,
         numBlockAncillaQubits : Int,
+        numPhaseGradientQubits : Int,
         power : Int,
         useWalk : Bool,
     ) : Unit {
         use control = Qubit();
-        use register = Qubit[numSystemQubits + numBlockAncillaQubits];
+        use register = Qubit[numSystemQubits + numBlockAncillaQubits + numPhaseGradientQubits];
         let systems = register[0..numSystemQubits - 1];
         let prepareRegister = register[numSystemQubits...];
         let blockAncilla = register[numSystemQubits..numSystemQubits + numBlockAncillaQubits - 1];
+        if numPhaseGradientQubits > 0 {
+            PreparePhaseGradientState(register[numSystemQubits + numBlockAncillaQubits...]);
+        }
         for _ in 1..power {
             if BeginEstimateCaching(useWalk ? "ControlledPSPWalk" | "ControlledPrepSelPrep", SingleVariant()) {
                 Controlled PrepSelPrep(

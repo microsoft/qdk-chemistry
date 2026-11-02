@@ -153,7 +153,10 @@ iqpe_circuit_builder = AlgorithmRef(
     "qdk_iterative",
     num_bits=10,
     controlled_circuit_mapper=AlgorithmRef(
-        "controlled_circuit_mapper", "prepare_select_prepare"
+        "controlled_circuit_mapper",
+        "prepare_select_prepare",
+        # Dense PREPARE keeps the simulation small; alias sampling is the default.
+        prepare=AlgorithmRef("state_prep", "dense_pure_state"),
     ),
     unitary_builder=AlgorithmRef(
         "hamiltonian_unitary_builder", "lcu", quantum_walk=True
@@ -180,7 +183,11 @@ unary_circuit_builder = AlgorithmRef(
     "qpe_circuit_builder",
     "qdk_unary",
     num_queries=7,
-    circuit_mapper=AlgorithmRef("circuit_mapper", "prepare_select_prepare"),
+    circuit_mapper=AlgorithmRef(
+        "circuit_mapper",
+        "prepare_select_prepare",
+        prepare=AlgorithmRef("state_prep", "dense_pure_state"),
+    ),
     unitary_builder=AlgorithmRef(
         "hamiltonian_unitary_builder", "lcu", quantum_walk=True
     ),

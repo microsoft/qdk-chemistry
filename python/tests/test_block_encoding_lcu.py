@@ -349,19 +349,16 @@ class TestPSPMapperPrepareGuards:
         hamiltonian = QubitOperator(pauli_strings=["XX", "ZZ", "XZ"], coefficients=np.array([0.25, 0.5, 0.1]))
         return LCUBuilder().run(hamiltonian)
 
-    def test_rejects_a_prepare_that_wants_a_phase_gradient(self):
-        """QROM state prep declares shared ancilla this mapper never allocates.
-
-        Only when it is asked to share one: left to its default the callable allocates and
-        prepares its own gradient internally, declares none, and embeds fine.
-        """
-        mapper = registry.create(
-            "circuit_mapper",
-            "prepare_select_prepare",
-            prepare=AlgorithmRef("state_prep", "qrom", rotation_bit_precision=4, allocate_phase_gradient=False),
+    @pytest.mark.parametrize("allocate_phase_gradient", [True, False])
+    def test_qrom_prepare_uses_an_outside_phase_gradient(self, allocate_phase_gradient: bool):
+        """QROM PREPARE always rotates through a gradient the caller prepares, declared at the tail."""
+        prepare = AlgorithmRef(
+            "state_prep", "qrom", rotation_bit_precision=4, allocate_phase_gradient=allocate_phase_gradient
         )
-        with pytest.raises(ValueError, match="phase gradient ancilla"):
-            mapper.run(self._unitary())
+        circuit = registry.create("circuit_mapper", "prepare_select_prepare", prepare=prepare).run(self._unitary())
+
+        assert circuit.metadata.num_phase_gradient_ancillas == 4
+        assert circuit.num_qubits == 2 + 2 + 4
 
 
 def _assert_block_encodes(circuit, hamiltonian: QubitOperator, coefficients: np.ndarray, atol: float) -> None:

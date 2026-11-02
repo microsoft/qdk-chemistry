@@ -62,7 +62,10 @@ good_state_oracle = create(
             "hamiltonian_unitary_builder", "lcu", quantum_walk=True
         ),
         controlled_circuit_mapper=AlgorithmRef(
-            "controlled_circuit_mapper", "prepare_select_prepare"
+            "controlled_circuit_mapper",
+            "prepare_select_prepare",
+            # Dense PREPARE keeps the simulation small; alias sampling is the default.
+            prepare=AlgorithmRef("state_prep", "dense_pure_state"),
         ),
     ),
 ).run(qubit_hamiltonian)

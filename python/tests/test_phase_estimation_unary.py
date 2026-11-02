@@ -494,7 +494,11 @@ class TestUnaryQpeEndToEnd:
 
     @pytest.mark.parametrize("num_queries", [6, 8, 11, 23, 63])
     def test_builder_defaults_recover_the_ground_state_energy(self, num_queries):
-        r"""The shipped defaults must recover :math:`H = (X + Z)/2` end to end."""
+        r"""The shipped builder defaults must recover :math:`H = (X + Z)/2` end to end.
+
+        PREPARE is pinned dense because alias sampling makes this simulation far slower. The two
+        most likely outcomes are close, so 200 shots made the result depend on the simulator seed.
+        """
         num_bits = num_queries.bit_length()
         assert (num_queries + 1 < 1 << num_bits) == (num_queries != 63), "sweep must mix padded and exact registers"
 
@@ -514,17 +518,36 @@ class TestUnaryQpeEndToEnd:
             qsharp_op=QSHARP_UTILS.StatePreparation.MakeStatePreparationOp(state_prep_params),
         )
 
-        qpe = UnaryPhaseEstimation(shots=200)
+        qpe = UnaryPhaseEstimation(shots=1000)
         qpe.settings().set(
-            "qpe_circuit_builder", AlgorithmRef("qpe_circuit_builder", "qdk_unary", num_queries=num_queries)
+            "qpe_circuit_builder",
+            AlgorithmRef(
+                "qpe_circuit_builder",
+                "qdk_unary",
+                num_queries=num_queries,
+                circuit_mapper=AlgorithmRef(
+                    "circuit_mapper", "prepare_select_prepare", prepare=AlgorithmRef("state_prep", "dense_pure_state")
+                ),
+            ),
         )
         qpe.settings().set("circuit_executor", AlgorithmRef("circuit_executor", "qdk_sparse_state_simulator"))
         result = qpe.run(qubit_hamiltonian=hamiltonian, state_preparation=state_preparation)
 
         assert result.raw_energy == pytest.approx(float(energies[0]), abs=1e-9)
 
-    def test_alias_sampling_lcu_recovers_the_ground_state_energy(self):
-        """Unary QPE returns the ground-state energy with alias-sampling PREPARE in the LCU walk."""
+    @pytest.mark.parametrize(
+        "prepare",
+        [
+            AlgorithmRef("state_prep", "alias_sampling", bits_precision=2),
+            AlgorithmRef("state_prep", "qrom", rotation_bit_precision=5),
+        ],
+        ids=["alias_sampling", "qrom"],
+    )
+    def test_lcu_prepare_recovers_the_ground_state_energy(self, prepare: AlgorithmRef):
+        """Unary QPE returns the ground-state energy with alias or QROM PREPARE in the LCU walk.
+
+        QROM rotates through the phase gradient the QPE circuit prepares once.
+        """
         num_queries = 7
         # Multiples of 1/16 keep the alias table exact, and this ground energy lands on a
         # phase bin. Retuning them can push it between bins, where the error exceeds the bound.
@@ -554,7 +577,7 @@ class TestUnaryQpeEndToEnd:
                 circuit_mapper=AlgorithmRef(
                     "circuit_mapper",
                     "prepare_select_prepare",
-                    prepare=AlgorithmRef("state_prep", "alias_sampling", bits_precision=2),
+                    prepare=prepare,
                 ),
             ),
         )
@@ -591,6 +614,9 @@ class TestUnaryQpeEndToEnd:
                 "qdk_unary",
                 num_queries=7,
                 unitary_builder=AlgorithmRef("hamiltonian_unitary_builder", "lcu", quantum_walk=False),
+                circuit_mapper=AlgorithmRef(
+                    "circuit_mapper", "prepare_select_prepare", prepare=AlgorithmRef("state_prep", "dense_pure_state")
+                ),
             ),
         )
         qpe.settings().set("circuit_executor", AlgorithmRef("circuit_executor", "qdk_sparse_state_simulator"))
@@ -692,7 +718,17 @@ def test_qrom_initial_state_prep_recovers_the_ground_state_energy():
     )
 
     qpe = UnaryPhaseEstimation(shots=200)
-    qpe.settings().set("qpe_circuit_builder", AlgorithmRef("qpe_circuit_builder", "qdk_unary", num_queries=6))
+    qpe.settings().set(
+        "qpe_circuit_builder",
+        AlgorithmRef(
+            "qpe_circuit_builder",
+            "qdk_unary",
+            num_queries=6,
+            circuit_mapper=AlgorithmRef(
+                "circuit_mapper", "prepare_select_prepare", prepare=AlgorithmRef("state_prep", "dense_pure_state")
+            ),
+        ),
+    )
     qpe.settings().set("circuit_executor", AlgorithmRef("circuit_executor", "qdk_sparse_state_simulator"))
 
     result = qpe.run(qubit_hamiltonian=hamiltonian, state_preparation=state_preparation)

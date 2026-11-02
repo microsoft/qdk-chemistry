@@ -152,7 +152,11 @@ def test_qpe_preserves_legacy_mapper_width_with_warning(mode: str) -> None:
     builder = builder_type(
         num_bits=2,
         unitary_builder=AlgorithmRef("hamiltonian_unitary_builder", "lcu", quantum_walk=True),
-        controlled_circuit_mapper=AlgorithmRef("controlled_circuit_mapper", "prepare_select_prepare"),
+        controlled_circuit_mapper=AlgorithmRef(
+            "controlled_circuit_mapper",
+            "prepare_select_prepare",
+            prepare=AlgorithmRef("state_prep", "dense_pure_state"),
+        ),
     )
     if mode != "standard":
         builder.settings().update({"num_iteration": 0, "combine_iterations": mode == "combined"})

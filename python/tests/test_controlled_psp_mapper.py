@@ -230,6 +230,8 @@ class TestPrepareSelectMapper:
             return circuit.num_qubits, logical_counts["numQubits"], logical_counts["cczCount"]
 
         assert counts() == (38, 48, 84)
+        # QROM rotates through one shared gradient the circuit prepares once.
+        assert counts(prepare=AlgorithmRef("state_prep", "qrom", rotation_bit_precision=10)) == (22, 42, 159)
         assert counts(select_method="multi_controlled", prepare=AlgorithmRef("state_prep", "dense_pure_state")) == (
             12,
             16,

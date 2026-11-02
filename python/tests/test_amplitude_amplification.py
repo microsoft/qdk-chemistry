@@ -104,6 +104,10 @@ def _subspace_oracle(
     unitary: AlgorithmRef | None = None,
 ) -> Circuit:
     """Build the oracle marking the QPE window above ``energy_lower_bound``."""
+    # Dense PREPARE: the default alias sampling makes these simulations far slower.
+    mapper_settings = (
+        {"prepare": AlgorithmRef("state_prep", "dense_pure_state")} if mapper == "prepare_select_prepare" else {}
+    )
     return create(
         "amplitude_amplification_oracle",
         "qdk_qpe_subspace",
@@ -112,7 +116,7 @@ def _subspace_oracle(
             "qpe_circuit_builder",
             "qdk_standard",
             num_bits=num_bits,
-            controlled_circuit_mapper=AlgorithmRef("controlled_circuit_mapper", mapper),
+            controlled_circuit_mapper=AlgorithmRef("controlled_circuit_mapper", mapper, **mapper_settings),
             unitary_builder=unitary or AlgorithmRef("hamiltonian_unitary_builder", "lcu", quantum_walk=True),
         ),
     ).run(qubit_hamiltonian)
