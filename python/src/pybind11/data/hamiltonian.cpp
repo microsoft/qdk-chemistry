@@ -832,6 +832,9 @@ Args:
     two_body_integrals (numpy.ndarray): Dense two-body integrals [n^4].
     core_energy (float, optional): Scalar energy offset. Defaults to 0.0.
     type (HamiltonianType, optional): Hamiltonian type. Defaults to Hermitian.
+
+Raises:
+    ValueError: If one_body_integrals is not square or two_body_integrals does not have n^4 elements.
 )",
                        py::arg("one_body_integrals"),
                        py::arg("two_body_integrals"),

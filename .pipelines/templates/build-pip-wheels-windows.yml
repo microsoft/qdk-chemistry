@@ -45,16 +45,20 @@ steps:
 - ${{ if eq(parameters.arch, 'arm64') }}:
   - pwsh: >-
       $(System.DefaultWorkingDirectory)\.pipelines\install-scripts\ensure-python-windows.ps1
-      -Arch arm64 -Version ${{ parameters.pythonVersion }} -IncludePip
+      -Arch arm64 -Version "$env:QDK_PYTHON_VERSION" -IncludePip
     displayName: Use Python ${{ parameters.pythonVersion }} (arm64)
+    env:
+      QDK_PYTHON_VERSION: ${{ parameters.pythonVersion }}
 
 - pwsh: |
     python "$(System.DefaultWorkingDirectory)\.pipelines\pip-scripts\versioning.py" `
       --version-file "$(System.DefaultWorkingDirectory)\VERSION" `
-      --dev-tag ${{ parameters.devTag }}
+      --dev-tag "$env:QDK_DEV_TAG"
     Get-Content "$(System.DefaultWorkingDirectory)\VERSION"
   displayName: Validate/Set Development Version for Wheels
   condition: ne('${{ parameters.devTag }}', 'None')
+  env:
+    QDK_DEV_TAG: ${{ parameters.devTag }}
 
 # Import the VS developer environment (INCLUDE, LIB, PATH, etc.) so that
 # cl.exe and the MSVC linker are available to all subsequent steps.
@@ -86,7 +90,7 @@ steps:
 - pwsh: |
     $fp = & "$(System.DefaultWorkingDirectory)\.pipelines\install-scripts\install-cpp-deps-windows.ps1" `
         -SrcDir    "$(System.DefaultWorkingDirectory)" `
-        -BuildType "${{ parameters.buildType }}" `
+        -BuildType "$env:QDK_BUILD_TYPE" `
         -Triplet   "$(VCPKG_TRIPLET)" `
         -ClPath    "$(CL_PATH)" `
         -EmitFingerprint | Select-Object -Last 1
@@ -94,6 +98,8 @@ steps:
     Write-Host "deps build plan fingerprint: $fp"
     Write-Host "##vso[task.setvariable variable=DEPS_FINGERPRINT]$fp"
   displayName: Compute dependency build plan fingerprint
+  env:
+    QDK_BUILD_TYPE: ${{ parameters.buildType }}
 
 - task: Cache@2
   displayName: Restore/save C++ deps install cache
@@ -115,16 +121,22 @@ steps:
     $pythonEnv = if ('${{ parameters.arch }}' -eq 'arm64') { 'venv' } else { 'conda' }
     & "$(System.DefaultWorkingDirectory)\.pipelines\pip-scripts\build-pip-wheels-windows.ps1" `
         -SrcDir         "$(System.DefaultWorkingDirectory)" `
-        -March          "${{ parameters.march }}" `
-        -BuildType      "${{ parameters.buildType }}" `
-        -BuildTesting   "${{ parameters.buildTesting }}" `
-        -EnableCoverage "${{ parameters.enableCoverage }}" `
+        -March          "$env:QDK_MARCH" `
+        -BuildType      "$env:QDK_BUILD_TYPE" `
+        -BuildTesting   "$env:QDK_BUILD_TESTING" `
+        -EnableCoverage "$env:QDK_ENABLE_COVERAGE" `
         -ClPath         "$(CL_PATH)" `
         -Triplet        "$(VCPKG_TRIPLET)" `
         -PythonEnv      $pythonEnv `
-        -PythonVersion  "${{ parameters.pythonVersion }}" `
-        -DevTag         "${{ parameters.devTag }}"
+        -PythonVersion  "$env:QDK_PYTHON_VERSION" `
+        -DevTag         "$env:QDK_DEV_TAG"
   displayName: Build C++ library, run tests, build Python wheel
   env:
+    QDK_MARCH: ${{ parameters.march }}
+    QDK_BUILD_TYPE: ${{ parameters.buildType }}
+    QDK_BUILD_TESTING: ${{ parameters.buildTesting }}
+    QDK_ENABLE_COVERAGE: ${{ parameters.enableCoverage }}
+    QDK_PYTHON_VERSION: ${{ parameters.pythonVersion }}
+    QDK_DEV_TAG: ${{ parameters.devTag }}
     SYSTEM_ACCESSTOKEN: $(System.AccessToken)
     OMP_NUM_THREADS: '2'

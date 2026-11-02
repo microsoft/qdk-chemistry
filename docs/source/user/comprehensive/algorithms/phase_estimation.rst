@@ -332,7 +332,11 @@ See :doc:`qpe_circuit_builder` for configuring:
 
 
 The SOSSA path supports canonical blocked Jordan-Wigner input and the
-sparse-state simulator. Standard and iterative SOSSA QPE are not supported.
+sparse-state simulator. Standard QPE also accepts SOSSA through
+``controlled_circuit_mapper="sossa"``, which completes and controls the walk.
+Iterative SOSSA QPE is not supported: a system eigenstate is an equal mix of
+the walk eigenvectors at :math:`\pm\phi`, and the iterative phase feedback
+cannot separate them.
 See :ref:`sossa-query-guidance` for explicit query selection and the
 :ref:`2.3 example <release-v2.3.0>` for a complete workflow.
 
