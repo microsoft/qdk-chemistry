@@ -3,6 +3,7 @@
 // license information.
 
 #include <gtest/gtest.h>
+#include <qdk/chemistry/scf/config.h>
 
 #include <Eigen/Dense>
 #include <cmath>
@@ -12,11 +13,22 @@
 #include <qdk/chemistry/algorithms/scf.hpp>
 #include <qdk/chemistry/data/basis_set.hpp>
 #include <qdk/chemistry/data/structure.hpp>
+#include <qdk/chemistry/utils/basis_archive.hpp>
 #include <stdexcept>
 #include <string>
 #include <vector>
 
 #include "ut_common.hpp"
+
+#ifdef _WIN32
+#ifndef NOMINMAX
+#define NOMINMAX
+#endif
+// clang-format off
+#include <windows.h>
+#include <aclapi.h>
+// clang-format on
+#endif
 
 #define EXPECT_STRING_CONTAINS(str, query)                            \
   do {                                                                \
@@ -1867,6 +1879,123 @@ TEST_F(BasisSetTest, BasisSetNameNormalization) {
   EXPECT_EQ("sto-3g", detail::denormalize_basis_set_name("sto-3g"));
   EXPECT_EQ("def2-TZVP", detail::normalize_basis_set_name("def2-TZVP"));
   EXPECT_EQ("def2-TZVP", detail::denormalize_basis_set_name("def2-TZVP"));
+}
+
+TEST_F(BasisSetTest, BasisArchiveStemsSelectShippedArchives) {
+  using qdk::chemistry::utils::BasisArchive;
+  EXPECT_EQ("6-31g_st_", BasisArchive::stem("6-31g*"));
+  EXPECT_EQ("cc-pvtz_sl_dk", BasisArchive::stem("cc-pvtz/dk"));
+  EXPECT_EQ("6-311+g", BasisArchive::stem("6-311+g"));
+  EXPECT_EQ("6-31g_st_", BasisArchive::stem("6-31g_st_"));
+
+  EXPECT_TRUE(BasisArchive::exists("sto-3g"));
+  EXPECT_TRUE(BasisArchive::exists("6-31g*"));
+  EXPECT_TRUE(BasisArchive::exists("6-311+g"));
+  EXPECT_FALSE(BasisArchive::exists(""));
+  EXPECT_FALSE(BasisArchive::exists("../compressed/sto-3g"));
+  EXPECT_FALSE(BasisArchive::exists("..\\compressed\\sto-3g"));
+  EXPECT_FALSE(BasisArchive::exists("invalid-basis-set-name"));
+  EXPECT_THROW(BasisArchive("invalid-basis-set-name"), std::invalid_argument);
+}
+
+TEST_F(BasisSetTest, BasisArchiveDirectoriesArePrivateAndScoped) {
+  std::filesystem::path first_file;
+  std::filesystem::path second_file;
+  {
+    const qdk::chemistry::utils::BasisArchive first("sto-3g");
+    const qdk::chemistry::utils::BasisArchive second("sto-3g");
+    first_file = first.json();
+    second_file = second.json();
+    EXPECT_NE(first_file, second_file);
+    EXPECT_TRUE(std::filesystem::is_regular_file(first_file));
+    EXPECT_TRUE(std::filesystem::is_regular_file(second_file));
+    EXPECT_TRUE(first.guess(true).has_value());
+    EXPECT_TRUE(first.guess(false).has_value());
+    const auto root = first_file.parent_path().parent_path();
+#ifdef _WIN32
+    // Windows has no mode bits: the directory's protected DACL grants access
+    // only to its owner, and the extracted files inherit that DACL.
+    for (const auto& path : {root, first_file}) {
+      PSID owner = nullptr;
+      PACL dacl = nullptr;
+      PSECURITY_DESCRIPTOR descriptor = nullptr;
+      ASSERT_EQ(GetNamedSecurityInfoW(
+                    path.c_str(), SE_FILE_OBJECT,
+                    OWNER_SECURITY_INFORMATION | DACL_SECURITY_INFORMATION,
+                    &owner, nullptr, &dacl, nullptr, &descriptor),
+                static_cast<DWORD>(ERROR_SUCCESS));
+      const std::unique_ptr<void, decltype(&LocalFree)> security(descriptor,
+                                                                 &LocalFree);
+      if (path == root) {
+        SECURITY_DESCRIPTOR_CONTROL control = 0;
+        DWORD revision = 0;
+        ASSERT_TRUE(
+            GetSecurityDescriptorControl(descriptor, &control, &revision));
+        EXPECT_TRUE((control & SE_DACL_PROTECTED) != 0);
+      }
+      ASSERT_NE(dacl, nullptr) << path;
+      for (WORD i = 0; i < dacl->AceCount; ++i) {
+        void* ace = nullptr;
+        ASSERT_TRUE(GetAce(dacl, i, &ace));
+        const auto* allowed = static_cast<const ACCESS_ALLOWED_ACE*>(ace);
+        EXPECT_EQ(allowed->Header.AceType, ACCESS_ALLOWED_ACE_TYPE) << path;
+        PSID sid = const_cast<DWORD*>(&allowed->SidStart);
+        EXPECT_TRUE(IsWellKnownSid(sid, WinCreatorOwnerRightsSid) ||
+                    EqualSid(sid, owner))
+            << path;
+      }
+    }
+#else
+    const auto permissions = std::filesystem::status(root).permissions();
+    EXPECT_EQ(permissions & (std::filesystem::perms::group_all |
+                             std::filesystem::perms::others_all),
+              std::filesystem::perms::none);
+#endif
+  }
+  EXPECT_FALSE(std::filesystem::exists(first_file));
+  EXPECT_FALSE(std::filesystem::exists(second_file));
+}
+
+TEST_F(BasisSetTest, BasisArchivePathIsNotShellCode) {
+  using qdk::chemistry::scf::QDKChemistryConfig;
+  const auto read_json = [] {
+    const qdk::chemistry::utils::BasisArchive archive("sto-3g");
+    std::ifstream stream(archive.json());
+    return nlohmann::json::parse(stream);
+  };
+  const auto resources = QDKChemistryConfig::get_resources_dir();
+  struct RestoreResources {
+    std::filesystem::path path;
+    ~RestoreResources() {
+      qdk::chemistry::scf::QDKChemistryConfig::set_resources_dir(path);
+    }
+  } restore{resources};
+  const auto expected = read_json();
+
+  std::vector<std::string> names{
+      "literal $(printf unused) %USERPROFILE% ; & ' resources"};
+#ifndef _WIN32
+  names.emplace_back("literal:resources");
+#endif
+  for (const auto& name : names) {
+    const auto literal = std::filesystem::temp_directory_path() / name;
+    std::filesystem::create_directories(literal / "compressed");
+    std::filesystem::copy_file(
+        resources / "compressed" / "sto-3g.tar.gz",
+        literal / "compressed" / "sto-3g.tar.gz",
+        std::filesystem::copy_options::overwrite_existing);
+    QDKChemistryConfig::set_resources_dir(literal);
+    EXPECT_EQ(expected, read_json());
+  }
+}
+
+TEST_F(BasisSetTest, FromBasisNameKeepsPlusInArchiveName) {
+  auto structure = testing::create_water_structure();
+  EXPECT_EQ(19u, BasisSet::from_basis_name("6-311g", structure)
+                     ->get_num_atomic_orbitals());
+  // The diffuse sp shell on oxygen adds four functions.
+  EXPECT_EQ(23u, BasisSet::from_basis_name("6-311+g", structure)
+                     ->get_num_atomic_orbitals());
 }
 
 TEST_F(BasisSetTest, DataTypeName) {
