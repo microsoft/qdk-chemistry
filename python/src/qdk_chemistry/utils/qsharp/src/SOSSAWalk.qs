@@ -6,7 +6,8 @@
 ///
 /// Composable design: each sub-operation (OuterPrepare, InnerPrepare, Select)
 /// is built independently as a Q# callable, and this module assembles them into
-/// the block encoding B that phase estimation queries.
+/// the block encoding B that unary-iteration phase estimation queries, and into the
+/// controlled walk that standard and iterative phase estimation query.
 ///
 /// Walk operator (Low et al., Phys. Rev. X 15 (2025), inline above Eq. (9); App. A 2):
 ///   W = Ref_{a,B} · B,  B = U† · Ref_B · U
@@ -36,6 +37,9 @@ namespace QDKChemistry.Utils.SOSSAWalk {
     import Std.Math.PI;
     import Std.Math.Round;
     import Std.Measurement.MResetX;
+    import Std.ResourceEstimation.BeginEstimateCaching;
+    import Std.ResourceEstimation.EndEstimateCaching;
+    import Std.ResourceEstimation.SingleVariant;
     import Std.StatePreparation.PreparePureStateD;
     import Std.TableLookup.Select;
     import QDKChemistry.Utils.AliasSampling.ConditionalAliasSamplingPrepareWithFreeRider, QDKChemistry.Utils.AliasSampling.ConditionalAliasSwapBits;
@@ -120,6 +124,26 @@ namespace QDKChemistry.Utils.SOSSAWalk {
         let spinStart = innerStart + layout.numReflectInner;
         let gradientStart = spinStart + 2;
         [outerStart, innerStart, spinStart, gradientStart, gradientStart + layout.numPhaseGradientQubits]
+    }
+
+    /// Slice the flat target register into the registers `layout` describes.
+    internal function SOSSAWalkRegistersOf(layout : SOSSAWalkLayout, allQubits : Qubit[]) : SOSSAWalkRegisters {
+        let bounds = SOSSAWalkRegisterBounds(layout);
+        let outerStart = bounds[0];
+        let innerStart = bounds[1];
+        let spinStart = bounds[2];
+        let gradientStart = bounds[3];
+        new SOSSAWalkRegisters {
+            systemReg = allQubits[0..outerStart - 1],
+            outerReg = allQubits[outerStart..innerStart - 1],
+            innerReg = allQubits[innerStart..spinStart - 1],
+            spinReg = allQubits[spinStart..gradientStart - 1],
+            phaseGradientReg = if bounds[4] > gradientStart {
+                allQubits[gradientStart..bounds[4] - 1]
+            } else {
+                []
+            }
+        }
     }
 
     /// Angles `first..last` of the DQ table, quantized and concatenated low-index first; the
@@ -390,6 +414,45 @@ namespace QDKChemistry.Utils.SOSSAWalk {
         systemReg : Qubit[],
         phaseGradientReg : Qubit[],
     ) : Unit is Adj {
+        ApplySOSSABlockEncoding(
+            [],
+            outerPrepareOp,
+            freeRiderOp,
+            innerPrepareOp,
+            selectOp,
+            numReflectInner,
+            numOuterIndexQubits,
+            numOuterPrepareGradientQubits,
+            numFreeRiderQubits,
+            outerReg,
+            innerReg,
+            spinReg,
+            systemReg,
+            phaseGradientReg,
+        );
+    }
+
+    /// Apply B = U† · Ref_B · U with Ref_B controlled on `controls`.
+    ///
+    /// U runs unconditionally: with the controls off U† · U = I, so this is controlled-B
+    /// without a controlled PREPARE, which the inner alias-sampling PREPARE does not provide.
+    /// With no controls it is the uncontrolled B.
+    internal operation ApplySOSSABlockEncoding(
+        controls : Qubit[],
+        outerPrepareOp : (Qubit[]) => Unit is Adj + Ctl,
+        freeRiderOp : (Qubit[], Qubit[]) => Unit is Adj + Ctl,
+        innerPrepareOp : (Qubit[], Qubit[], Qubit[]) => Unit is Adj,
+        selectOp : (Qubit[], Qubit[], Qubit[], Qubit[], Qubit[]) => Unit is Adj + Ctl,
+        numReflectInner : Int,
+        numOuterIndexQubits : Int,
+        numOuterPrepareGradientQubits : Int,
+        numFreeRiderQubits : Int,
+        outerReg : Qubit[],
+        innerReg : Qubit[],
+        spinReg : Qubit[],
+        systemReg : Qubit[],
+        phaseGradientReg : Qubit[],
+    ) : Unit is Adj {
         let outerIndexReg = outerReg[0..numOuterIndexQubits - 1];
         let outerPrepareReg = outerReg + phaseGradientReg[0..numOuterPrepareGradientQubits - 1];
         let freeRiderReg = if numFreeRiderQubits > 0 {
@@ -414,7 +477,12 @@ namespace QDKChemistry.Utils.SOSSAWalk {
                         selectOp(outerIndexReg, innerReg, spinReg, systemReg, phaseGradientReg);
                     }
                 } apply {
-                    Reflect(innerReg[0..numReflectInner - 1] + [spinReg[1]]);
+                    let reflected = innerReg[0..numReflectInner - 1] + [spinReg[1]];
+                    if Length(controls) == 0 {
+                        Reflect(reflected);
+                    } else {
+                        Controlled Reflect(controls, reflected);
+                    }
                 }
             }
         }
@@ -434,22 +502,7 @@ namespace QDKChemistry.Utils.SOSSAWalk {
         layout : SOSSAWalkLayout,
         allQubits : Qubit[],
     ) : Unit is Adj {
-        let bounds = SOSSAWalkRegisterBounds(layout);
-        let outerStart = bounds[0];
-        let innerStart = bounds[1];
-        let spinStart = bounds[2];
-        let gradientStart = bounds[3];
-        let regs = new SOSSAWalkRegisters {
-            systemReg = allQubits[0..outerStart - 1],
-            outerReg = allQubits[outerStart..innerStart - 1],
-            innerReg = allQubits[innerStart..spinStart - 1],
-            spinReg = allQubits[spinStart..gradientStart - 1],
-            phaseGradientReg = if bounds[4] > gradientStart {
-                allQubits[gradientStart..bounds[4] - 1]
-            } else {
-                []
-            }
-        };
+        let regs = SOSSAWalkRegistersOf(layout, allQubits);
         use innerScratch = Qubit[layout.numInnerQubits - layout.numReflectInner];
         SOSSABlockEncoding(
             outerPrepareOp,
@@ -466,6 +519,79 @@ namespace QDKChemistry.Utils.SOSSAWalk {
             regs.systemReg,
             regs.phaseGradientReg,
         );
+    }
+
+    /// Apply controlled-W^power, W = Ref_a · B, to a flat target register.
+    ///
+    /// Ref_a reflects about the zero state of `[outerReg | innerReg | spinReg]`, the same
+    /// register the unary-iteration QPE reflects; the phase-gradient tail is not reflected.
+    /// Both reflections are controlled and U runs unconditionally, see `ApplySOSSABlockEncoding`.
+    /// Register layout: [systemReg | outerReg | innerReg | spinReg | phaseGradientReg].
+    /// `cacheName` keys the resource-estimation cache of one walk step. It must identify the walk,
+    /// so that distinct walks in one program are estimated separately and the powers of one walk share it.
+    /// W and W† cost the same, so both directions share the entry. The adjoint is written out because
+    /// a generated one would run `EndEstimateCaching` before the step and cache an empty estimate.
+    operation ControlledSOSSAWalkOnRegister(
+        outerPrepareOp : (Qubit[]) => Unit is Adj + Ctl,
+        freeRiderOp : (Qubit[], Qubit[]) => Unit is Adj + Ctl,
+        innerPrepareOp : (Qubit[], Qubit[], Qubit[]) => Unit is Adj,
+        selectOp : (Qubit[], Qubit[], Qubit[], Qubit[], Qubit[]) => Unit is Adj + Ctl,
+        layout : SOSSAWalkLayout,
+        cacheName : String,
+        power : Int,
+        control : Qubit,
+        allQubits : Qubit[],
+    ) : Unit is Adj {
+        body ... {
+            for _ in 1..power {
+                if BeginEstimateCaching(cacheName, SingleVariant()) {
+                    ControlledSOSSAWalkStep(outerPrepareOp, freeRiderOp, innerPrepareOp, selectOp, layout, control, allQubits);
+                    EndEstimateCaching();
+                }
+            }
+        }
+        adjoint ... {
+            for _ in 1..power {
+                if BeginEstimateCaching(cacheName, SingleVariant()) {
+                    Adjoint ControlledSOSSAWalkStep(outerPrepareOp, freeRiderOp, innerPrepareOp, selectOp, layout, control, allQubits);
+                    EndEstimateCaching();
+                }
+            }
+        }
+    }
+
+    /// Apply one step of controlled-W, see `ControlledSOSSAWalkOnRegister`.
+    operation ControlledSOSSAWalkStep(
+        outerPrepareOp : (Qubit[]) => Unit is Adj + Ctl,
+        freeRiderOp : (Qubit[], Qubit[]) => Unit is Adj + Ctl,
+        innerPrepareOp : (Qubit[], Qubit[], Qubit[]) => Unit is Adj,
+        selectOp : (Qubit[], Qubit[], Qubit[], Qubit[], Qubit[]) => Unit is Adj + Ctl,
+        layout : SOSSAWalkLayout,
+        control : Qubit,
+        allQubits : Qubit[],
+    ) : Unit is Adj {
+        let regs = SOSSAWalkRegistersOf(layout, allQubits);
+        {
+            // The block encoding returns the inner scratch to |0⟩, so release it before Ref_a.
+            use innerScratch = Qubit[layout.numInnerQubits - layout.numReflectInner];
+            ApplySOSSABlockEncoding(
+                [control],
+                outerPrepareOp,
+                freeRiderOp,
+                innerPrepareOp,
+                selectOp,
+                layout.numReflectInner,
+                layout.numOuterIndexQubits,
+                layout.numOuterPrepareGradientQubits,
+                layout.numFreeRiderQubits,
+                regs.outerReg,
+                regs.innerReg + innerScratch,
+                regs.spinReg,
+                regs.systemReg,
+                regs.phaseGradientReg,
+            );
+        }
+        Controlled Reflect([control], regs.outerReg + regs.innerReg + regs.spinReg);
     }
 
     /// Select spin qubit and SWAP up/down registers (arXiv:2502.15882v1, Step 4).
@@ -1004,5 +1130,41 @@ namespace QDKChemistry.Utils.SOSSAWalk {
         }
         SOSSABlockEncodingOnRegister(outerPrepareOp, freeRiderOp, innerPrepareOp, selectOp, layout, allQubits);
         ResetAll(allQubits);
+    }
+
+    /// Controlled-W^power as the `(control, targets)` callable standard and iterative QPE consume.
+    ///
+    /// Target layout: [systemReg | outerReg | innerReg | spinReg | phaseGradientReg].
+    function MakeControlledSOSSAWalkOp(
+        outerPrepareOp : (Qubit[]) => Unit is Adj + Ctl,
+        freeRiderOp : (Qubit[], Qubit[]) => Unit is Adj + Ctl,
+        innerPrepareOp : (Qubit[], Qubit[], Qubit[]) => Unit is Adj,
+        selectOp : (Qubit[], Qubit[], Qubit[], Qubit[], Qubit[]) => Unit is Adj + Ctl,
+        layout : SOSSAWalkLayout,
+        cacheName : String,
+        power : Int,
+    ) : ((Qubit, Qubit[]) => Unit is Adj) {
+        ControlledSOSSAWalkOnRegister(outerPrepareOp, freeRiderOp, innerPrepareOp, selectOp, layout, cacheName, power, _, _)
+    }
+
+    /// Circuit entry point: allocates the control and the flat target register and applies
+    /// controlled-W^power once.
+    operation MakeControlledSOSSAWalkCircuit(
+        outerPrepareOp : (Qubit[]) => Unit is Adj + Ctl,
+        freeRiderOp : (Qubit[], Qubit[]) => Unit is Adj + Ctl,
+        innerPrepareOp : (Qubit[], Qubit[], Qubit[]) => Unit is Adj,
+        selectOp : (Qubit[], Qubit[], Qubit[], Qubit[], Qubit[]) => Unit is Adj + Ctl,
+        layout : SOSSAWalkLayout,
+        cacheName : String,
+        power : Int,
+    ) : Unit {
+        let bounds = SOSSAWalkRegisterBounds(layout);
+        use control = Qubit();
+        use allQubits = Qubit[bounds[4]];
+        if layout.numPhaseGradientQubits > 0 {
+            PreparePhaseGradientState(allQubits[bounds[3]...]);
+        }
+        ControlledSOSSAWalkOnRegister(outerPrepareOp, freeRiderOp, innerPrepareOp, selectOp, layout, cacheName, power, control, allQubits);
+        ResetAll([control] + allQubits);
     }
 }
