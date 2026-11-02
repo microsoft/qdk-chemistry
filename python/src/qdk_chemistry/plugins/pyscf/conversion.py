@@ -648,11 +648,8 @@ def hamiltonian_to_scf(hamiltonian: Hamiltonian, alpha_occ: np.ndarray, beta_occ
         from the molecular basis, requiring ordinary Coulomb interactions and supporting AO-direct CCSD.
 
         Restricted closed-shell model references use stored one- and two-body integrals with identity
-        coefficients and overlap. PySCF keeps one value per 8-fold permutation class, so two-body
-        integrals are passed as their 8-fold class averages: differences from that average up to 1e-5
-        of the largest integral are treated as round-off, and larger ones, as in downfolded integrals
-        with only the 4-fold symmetry, are rejected. Unrestricted and open-shell model references are
-        not supported.
+        coefficients and overlap; their two-body integrals must be 8-fold symmetric, as PySCF stores one
+        value per 8-fold class. Unrestricted and open-shell model references are not supported.
 
         All represented MOs must be active, with no inactive orbitals. Overlap-rank reduction is allowed;
         active-space effective Hamiltonians with folded core contributions are not supported.
