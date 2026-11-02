@@ -81,9 +81,6 @@ block()
     foreach(_var IN LISTS _qdk_seeded)
         unset(${_var} CACHE)
     endforeach()
-    if(NOT TARGET BTAS::BTAS)
-        message(FATAL_ERROR "SeQuant at ${SeQuant_DIR} was built without its BTAS backend")
-    endif()
 
     # SeQuant's unit-test objects are otherwise part of `all`.
     FetchContent_GetProperties(SeQuant)

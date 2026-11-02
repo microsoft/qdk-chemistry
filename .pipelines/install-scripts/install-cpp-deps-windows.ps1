@@ -173,13 +173,8 @@ Write-Host "=== Dependency versions ==="
 Write-Host "  libint2 : $libintUrl"
 Write-Host "  ecpint  : $ecpintCommit"
 Write-Host "  gauxc   : $gauxcCommit"
-Write-Host "  blaspp/lapackpp : $linalgppVersion"
-Write-Host "  SeQuant : $sequantCommit"
-
-# Content hash of in-repo CMake files that a dependency build runs, so the plan changes with them.
-function Get-SetupHash([string[]]$Paths) {
-    return ($Paths | ForEach-Object { (Get-FileHash (Join-Path $SrcDir $_) -Algorithm SHA256).Hash }) -join '/'
-}
+Write-Host "  linalgpp: $linalgppVersion"
+Write-Host "  sequant : $sequantCommit"
 
 # ─── Dependency build plan ───────────────────────────────────────────────────
 # The single source of truth for everything that determines what gets built.
@@ -241,15 +236,12 @@ $plan = [ordered]@{
         [ordered]@{
             Name       = 'linalgpp'
             Version    = $linalgppVersion
-            Setup      = Get-SetupHash @('external\macis\src\lobpcgxx\CMakeLists.txt')
             ConfigGlob = 'lobpcgxx*'
             CMakeArgs  = @('-DLOBPCGXX_ENABLE_TESTS=OFF')
         },
         [ordered]@{
             Name       = 'sequant'
             Version    = $sequantCommit
-            Setup      = Get-SetupHash @('cpp\cmake\sequant.cmake', 'cpp\cmake\sequant\CMakeLists.txt',
-                                         'cpp\cmake\modules\DependencyManager.cmake')
             ConfigGlob = 'sequant*'
             CMakeArgs  = @()
         }
@@ -439,7 +431,7 @@ if (-not (Test-DepInstalled 'linalgpp' $linalgppVersion 'lobpcgxx*')) {
 } else { Write-Host "=== BLAS++/LAPACK++ already installed; skipping ===" }
 
 # ─── SeQuant ─────────────────────────────────────────────────────────────────
-# Set up exactly as the qdk-chemistry build does, from its pins and patches.
+# Set up exactly as the qdk-chemistry build does. Only the Windows builds turn off dependency fetching.
 if (-not (Test-DepInstalled 'sequant' $sequantCommit 'sequant*')) {
     Write-Host "=== Installing SeQuant ==="
     Invoke-CMakeDep 'sequant' "$SrcDir\cpp\cmake\sequant" `

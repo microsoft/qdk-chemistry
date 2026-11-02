@@ -63,17 +63,11 @@ COPY .pipelines/install-scripts/install-lapackpp.sh /tmp/install-scripts/install
 COPY .devcontainer/scripts/install_cpp_dependencies.sh /tmp/install_cpp_dependencies.sh
 COPY cpp/manifest/qdk-chemistry/cgmanifest.json /tmp/cpp_cgmanifest.json
 COPY external/macis/manifest/cgmanifest.json /tmp/macis_cgmanifest.json
-# SeQuant is built through qdk's own CMake setup, which holds its pins and patches.
-COPY cpp/cmake/sequant.cmake /tmp/qdk-cmake/sequant.cmake
-COPY cpp/cmake/sequant/ /tmp/qdk-cmake/sequant/
-COPY cpp/cmake/modules/DependencyManager.cmake /tmp/qdk-cmake/modules/DependencyManager.cmake
-COPY cpp/cmake/patches/apply-patch.cmake cpp/cmake/patches/kit-cmake-* cpp/cmake/patches/sequant-* /tmp/qdk-cmake/patches/
 
 # Delete build directory after installation
 ENV KEEP_BUILD_DIR=0
-RUN INSTALL_SCRIPTS=/tmp/install-scripts QDK_CMAKE_DIR=/tmp/qdk-cmake \
-    bash /tmp/install_cpp_dependencies.sh /tmp/cpp_cgmanifest.json /tmp/macis_cgmanifest.json && \
-    rm -rf /tmp/install-scripts /tmp/qdk-cmake /tmp/install_cpp_dependencies.sh /tmp/cpp_cgmanifest.json /tmp/macis_cgmanifest.json
+RUN INSTALL_SCRIPTS=/tmp/install-scripts bash /tmp/install_cpp_dependencies.sh /tmp/cpp_cgmanifest.json /tmp/macis_cgmanifest.json && \
+    rm -rf /tmp/install-scripts /tmp/install_cpp_dependencies.sh /tmp/cpp_cgmanifest.json /tmp/macis_cgmanifest.json
 
 # Create/align the non-root user and group (safe for repeated builds)
 RUN if getent group "$USER_GID" >/dev/null; then \
