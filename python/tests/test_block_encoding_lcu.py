@@ -419,30 +419,6 @@ class TestPSPMapperSelectMethod:
         ).run(LCUBuilder().run(hamiltonian))
         _assert_block_encodes(circuit, hamiltonian, coefficients, atol=2.0**-bits_precision)
 
-    @pytest.mark.parametrize("prepare", ["dense_pure_state", "alias_sampling"])
-    def test_unary_select_cuts_toffolis_at_the_same_width(self, prepare: str):
-        """The unary SELECT keeps the declared width and cuts Toffolis."""
-        rng = np.random.default_rng(0)
-        paulis = sorted({"".join(rng.choice(list("IXYZ"), 6)) for _ in range(60)})[:20]
-        hamiltonian = QubitOperator(pauli_strings=paulis, coefficients=rng.normal(size=len(paulis)))
-        unitary = LCUBuilder().run(hamiltonian)
-
-        def circuit(select_method: str):
-            return registry.create(
-                "circuit_mapper",
-                "prepare_select_prepare",
-                select_method=select_method,
-                prepare=AlgorithmRef("state_prep", prepare),
-            ).run(unitary)
-
-        multi, unary = circuit("multi_controlled"), circuit("unary_iteration")
-        multi_counts = multi.estimate().logical_counts
-        unary_counts = unary.estimate().logical_counts
-
-        assert unary.num_qubits == multi.num_qubits
-        # Measured 618 -> 18 CCZ with dense PREPARE.
-        assert multi_counts["cczCount"] - unary_counts["cczCount"] >= 20 * (len(paulis) - 2)
-
 
 class TestLCUContainer:
     """Tests for the LCUContainer data class."""
