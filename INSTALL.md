@@ -35,7 +35,7 @@ from qdk_chemistry.algorithms import create
 solver = create("scf_solver", "qdk")
 solver.settings().set("device", "gpu")
 solver.settings().set("eri_method", "auto")
-solver.settings().set("gpu_incore_max_basis_functions", 300)  # Default: 160
+solver.settings().set("gpu_incore_max_basis_functions", 300)  # Default: 250
 
 checker = create("stability_checker", "qdk")
 checker.settings().set("gpu_incore_max_basis_functions", 300)  # Default: 250

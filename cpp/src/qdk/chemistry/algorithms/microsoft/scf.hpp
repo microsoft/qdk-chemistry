@@ -80,7 +80,7 @@ class ScfSettings
                 "Number of OpenMP threads to use for SCF calculation. "
                 "Set to -1 to use all available threads.");
     set_default(
-        "gpu_incore_max_basis_functions", static_cast<int64_t>(160),
+        "gpu_incore_max_basis_functions", static_cast<int64_t>(250),
         "Maximum AO basis size for automatic GPU in-core ERIs. "
         "Zero disables automatic in-core selection; free GPU memory is "
         "checked independently. Applies only to eri_method='auto'.",

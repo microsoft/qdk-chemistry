@@ -70,7 +70,7 @@ StabilizedScfSettings::StabilizedScfSettings()
               data::ListConstraint<std::string>{
                   {std::vector<std::string>{"auto", "cpu", "gpu"}}});
   set_default(
-      "gpu_incore_max_basis_functions", static_cast<int64_t>(160),
+      "gpu_incore_max_basis_functions", static_cast<int64_t>(250),
       "Maximum AO basis size for automatic GPU in-core ERIs in the nested "
       "SCF solver. Configure the stability cutoff on stability_checker.",
       data::BoundConstraint<int64_t>{0, std::numeric_limits<int64_t>::max()});

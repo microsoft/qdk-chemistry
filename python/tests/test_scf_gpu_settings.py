@@ -13,8 +13,8 @@ from qdk_chemistry.algorithms import create
 @pytest.mark.parametrize(
     ("algorithm", "backend", "default"),
     [
-        ("scf_solver", "qdk", 160),
-        ("scf_solver", "qdk_stabilized", 160),
+        ("scf_solver", "qdk", 250),
+        ("scf_solver", "qdk_stabilized", 250),
         ("stability_checker", "qdk", 250),
     ],
 )
