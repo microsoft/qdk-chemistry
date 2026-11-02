@@ -331,7 +331,7 @@ These dependencies are automatically downloaded and built by the CMake build sys
 
 **NOTE**: The source code of MACIS is included in the `external` directory of QDK/Chemistry. `MACIS` carries its own set of dependencies which are automatically managed by the `MACIS` build system. While building `MACIS` and its dependencies can be time consuming, it is strongly encouraged to allow the QDK/Chemistry build system handle this dependency to ensure proper interaction of up- and down-stream components.
 
-**NOTE**: SeQuant is always built from source at its pinned revision, with BTAS as its numerical backend. BTAS uses the BLAS++/LAPACK++ libraries that `MACIS` brings in.
+**NOTE**: SeQuant is built from source at its pinned revision, with BTAS as its numerical backend. BTAS uses the BLAS++/LAPACK++ libraries that `MACIS` brings in.
 
 ### Note on LAPACK Usage
 

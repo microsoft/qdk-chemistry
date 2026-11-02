@@ -4,7 +4,8 @@
 
 .DESCRIPTION
     Reads dependency versions from the cgmanifest JSON files, runs vcpkg for
-    vcpkg-managed packages, then builds libint2, ecpint, and gauxc from source.
+    vcpkg-managed packages, then builds libint2, ecpint, gauxc, BLAS++/LAPACK++,
+    and SeQuant with BTAS from source.
     gauxc fetches its own transitive deps (ExchCXX, IntegratorXX, gau2grid,
     linalg-cmake-modules) via CMake FetchContent. Mirrors the approach of
     .devcontainer/scripts/install_cpp_dependencies.sh for Linux/macOS.
@@ -163,10 +164,22 @@ $libintUrl    = Get-ManifestUrl    $cppManifest 'Libint'
 $ecpintCommit = Get-ManifestCommit $cppManifest 'robashaw/libecpint'
 $gauxcCommit  = Get-ManifestCommit $cppManifest 'wavefunction91/gauxc'
 
+$macisManifest   = "$SrcDir\external\macis\manifest\cgmanifest.json"
+$linalgppVersion = (Get-ManifestCommit $macisManifest 'icl-utk-edu/blaspp') + '/' +
+                   (Get-ManifestCommit $macisManifest 'icl-utk-edu/lapackpp')
+$sequantCommit   = Get-ManifestCommit $cppManifest 'ValeevGroup/SeQuant'
+
 Write-Host "=== Dependency versions ==="
 Write-Host "  libint2 : $libintUrl"
 Write-Host "  ecpint  : $ecpintCommit"
 Write-Host "  gauxc   : $gauxcCommit"
+Write-Host "  blaspp/lapackpp : $linalgppVersion"
+Write-Host "  SeQuant : $sequantCommit"
+
+# Content hash of in-repo CMake files that a dependency build runs, so the plan changes with them.
+function Get-SetupHash([string[]]$Paths) {
+    return ($Paths | ForEach-Object { (Get-FileHash (Join-Path $SrcDir $_) -Algorithm SHA256).Hash }) -join '/'
+}
 
 # ─── Dependency build plan ───────────────────────────────────────────────────
 # The single source of truth for everything that determines what gets built.
@@ -224,6 +237,21 @@ $plan = [ordered]@{
                 '-DGAUXC_ENABLE_MPI=OFF',
                 '-DGAUXC_ENABLE_OPENMP=OFF'
             )
+        },
+        [ordered]@{
+            Name       = 'linalgpp'
+            Version    = $linalgppVersion
+            Setup      = Get-SetupHash @('external\macis\src\lobpcgxx\CMakeLists.txt')
+            ConfigGlob = 'lobpcgxx*'
+            CMakeArgs  = @('-DLOBPCGXX_ENABLE_TESTS=OFF')
+        },
+        [ordered]@{
+            Name       = 'sequant'
+            Version    = $sequantCommit
+            Setup      = Get-SetupHash @('cpp\cmake\sequant.cmake', 'cpp\cmake\sequant\CMakeLists.txt',
+                                         'cpp\cmake\modules\DependencyManager.cmake')
+            ConfigGlob = 'sequant*'
+            CMakeArgs  = @()
         }
     )
 }
@@ -400,6 +428,24 @@ if (-not (Test-DepInstalled 'gauxc' $gauxcCommit 'gauxc*')) {
     Remove-Item $gauxcSrc -Recurse -Force
     Set-DepStamp 'gauxc' $gauxcCommit
 } else { Write-Host "=== gauxc already installed; skipping ===" }
+
+# ─── BLAS++ / LAPACK++ ───────────────────────────────────────────────────────
+# Built by MACIS's lobpcgxx setup (pins, MSVC patches), so MACIS and BTAS share this copy.
+if (-not (Test-DepInstalled 'linalgpp' $linalgppVersion 'lobpcgxx*')) {
+    Write-Host "=== Installing BLAS++/LAPACK++ ==="
+    Invoke-CMakeDep 'linalgpp' "$SrcDir\external\macis\src\lobpcgxx" `
+        ((Get-DepPlan 'linalgpp').CMakeArgs + "-DQDK_CMAKE_PATCHES_DIR=$($SrcDir -replace '\\', '/')/cpp/cmake/patches")
+    Set-DepStamp 'linalgpp' $linalgppVersion
+} else { Write-Host "=== BLAS++/LAPACK++ already installed; skipping ===" }
+
+# ─── SeQuant ─────────────────────────────────────────────────────────────────
+# Set up exactly as the qdk-chemistry build does, from its pins and patches.
+if (-not (Test-DepInstalled 'sequant' $sequantCommit 'sequant*')) {
+    Write-Host "=== Installing SeQuant ==="
+    Invoke-CMakeDep 'sequant' "$SrcDir\cpp\cmake\sequant" `
+        ((Get-DepPlan 'sequant').CMakeArgs + "-DCMAKE_PREFIX_PATH=$DepsInstallDir")
+    Set-DepStamp 'sequant' $sequantCommit
+} else { Write-Host "=== SeQuant already installed; skipping ===" }
 
 # ─── Cleanup ─────────────────────────────────────────────────────────────────
 if (-not $KeepBuildDir) {

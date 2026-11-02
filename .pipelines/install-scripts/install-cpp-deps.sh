@@ -3,7 +3,8 @@ set -e
 
 # install-cpp-deps.sh — shared C++ dependency build used by CI and the devcontainer.
 #
-# Builds from source: nlohmann_json, googletest, Catch2, spdlog, BLAS++, LAPACK++, LibInt2, ECPint, GauXC.
+# Builds from source: nlohmann_json, googletest, Catch2, spdlog, BLAS++, LAPACK++, LibInt2, ECPint, GauXC, and
+# SeQuant with BTAS.
 # The BLAS/LAPACK implementation is provided by the caller (OpenBLAS or Apple Accelerate) and is not built here.
 #
 # GoogleTest/Catch2 are installed here so qdk-chemistry's own find_package() calls succeed, avoiding a
@@ -30,6 +31,8 @@ BLAS_VENDOR="${3:-auto}"
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 INSTALL_SCRIPTS="${INSTALL_SCRIPTS:-$SCRIPT_DIR}"
+# qdk's cpp/cmake, whose SeQuant setup holds SeQuant's pins and patches.
+QDK_CMAKE_DIR="${QDK_CMAKE_DIR:-$SCRIPT_DIR/../../cpp/cmake}"
 source "${INSTALL_SCRIPTS}/common.sh"
 
 if [[ ! -f "$CGMANIFEST" ]]; then
@@ -306,6 +309,18 @@ make -j"$JOBS"
 make install
 cd "$BUILD_DIR"
 rm -rf gauxc
+
+# Install SeQuant with BTAS, set up exactly as the qdk-chemistry build does. BTAS uses the BLAS++/LAPACK++ above.
+echo "=== Installing SeQuant ==="
+cmake -S "$QDK_CMAKE_DIR/sequant" -B sequant-build \
+      -DCMAKE_BUILD_TYPE="$BUILD_TYPE" \
+      -DCMAKE_INSTALL_PREFIX="$INSTALL_PREFIX" \
+      -DCMAKE_PREFIX_PATH="$INSTALL_PREFIX" \
+      -DCMAKE_POSITION_INDEPENDENT_CODE=ON \
+      -DBUILD_SHARED_LIBS="$BUILD_SHARED_LIBS"
+cmake --build sequant-build -j"$JOBS"
+cmake --install sequant-build
+rm -rf sequant-build
 
 # Cleanup
 if [[ "$KEEP_BUILD_DIR" != "1" ]]; then

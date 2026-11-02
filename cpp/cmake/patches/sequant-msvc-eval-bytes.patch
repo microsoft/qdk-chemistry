@@ -1,0 +1,27 @@
+# MSVC 19.44 (VS 2022 17.14) mis-evaluates requires-expressions on a generic lambda's own parameter
+# and fails with C2039 on std::shared_ptr; testing the parameter's type works on every compiler.
+diff --git a/SeQuant/core/eval/eval.hpp b/SeQuant/core/eval/eval.hpp
+--- a/SeQuant/core/eval/eval.hpp
++++ b/SeQuant/core/eval/eval.hpp
+@@ -66,16 +66,16 @@ struct Bytes {
+ 
+ template <typename T, typename... Ts>
+ [[nodiscard]] inline auto bytes(T const& arg, Ts const&... args) {
+-  auto one = [](auto const& a) -> size_t {
+-    if constexpr (requires {
+-                    static_cast<bool>(a);
+-                    a->size_in_bytes();
++  auto one = []<typename A>(A const& a) -> size_t {
++    if constexpr (requires(A const& x) {
++                    static_cast<bool>(x);
++                    x->size_in_bytes();
+                   }) {
+       // Smart-pointer-like operand: tolerate null so callers (e.g. the
+       // EvalOp::Adjoint dispatcher, which leaves `right` unevaluated) can
+       // pass an empty ResultPtr without an external guard.
+       return a ? a->size_in_bytes() : size_t{0};
+-    } else if constexpr (requires { a->size_in_bytes(); })
++    } else if constexpr (requires(A const& x) { x->size_in_bytes(); })
+       return a->size_in_bytes();
+     else
+       return a.size_in_bytes();
