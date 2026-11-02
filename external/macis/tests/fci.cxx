@@ -535,6 +535,11 @@ TEST_CASE("FCI Ground State") {
               REQUIRE(C_eta[i * ns + j] == eta * C_eta[j * ns + i]);
           E_lowest = std::min(E_lowest, E_eta);
 
+          // A converged sector vector is accepted as a warm start
+          std::vector<double> C_warm_eta = C_eta;
+          REQUIRE_THAT(macis::fci_ground_state(H, 1, 1e-8, C_warm_eta, eta),
+                       Catch::Matchers::WithinAbs(E_eta, 1e-12));
+
           // Total spin from the opposite-spin 2-RDM (Ms = 0):
           // <S^2> = N_beta - sum_pq <E^b_qp E^a_pq> = N_beta - 2 sum_pq
           // aabb(q,p,p,q)

@@ -1150,6 +1150,110 @@ void expand(const SubspaceMatrix& S, const double* z,
         vector.emplace_back(S.P[S.pos[f][t]], z[f] * S.coef[f][t]);
 }
 
+/// Address of the first sector coordinate of row a: the coordinates of a
+/// spin-flip sector on its orthonormal basis (|a,b> + spin_flip |b,a>) /
+/// sqrt(2), a > b, and |a,a> for spin_flip = 1 are stored row by row, b
+/// ascending, so there are sector_row(ns, spin_flip) of them
+inline size_t sector_row(size_t a, int spin_flip) {
+  return (spin_flip == 1 ? a * (a + 1) : a * (a - 1)) / 2;
+}
+
+/// C = the ns x ns CI vector with sector coordinates x: C(a, b) = x_ab /
+/// sqrt(2) and C(b, a) = spin_flip C(a, b) for a > b, C(a, a) = x_aa for
+/// spin_flip = 1 (else 0)
+template <typename T>
+void sector_expand(size_t ns, int spin_flip, const T* x, T* C) {
+  constexpr size_t tile = 64;
+  const size_t ntiles = (ns + tile - 1) / tile;
+  const T r = T(std::sqrt(0.5));
+#pragma omp parallel for schedule(dynamic) \
+    num_threads(detail::davidson_team(int64_t(ns* ns)))
+  for (size_t ti = 0; ti < ntiles; ++ti)
+    for (size_t tj = 0; tj <= ti; ++tj)
+      for (size_t a = ti * tile; a < std::min(ns, (ti + 1) * tile); ++a) {
+        const T* xa = x + sector_row(a, spin_flip);
+        const size_t b1 = ti == tj ? a : std::min(ns, (tj + 1) * tile);
+        for (size_t b = tj * tile; b < b1; ++b) {
+          const T c = r * xa[b];
+          C[a * ns + b] = c;
+          C[b * ns + a] = T(spin_flip) * c;
+        }
+        if (ti == tj) C[a * ns + a] = spin_flip == 1 ? xa[a] : T(0);
+      }
+}
+
+/// y = the sector coordinates of the ns x ns matrix S plus beta y (y is not
+/// read for beta == 0): the adjoint of sector_expand, y_ab = (S(a, b) +
+/// spin_flip S(b, a)) / sqrt(2) and y_aa = S(a, a), which projects S onto
+/// the sector
+template <typename T>
+void sector_fold(size_t ns, int spin_flip, const T* S, T beta, T* y) {
+  constexpr size_t tile = 64;
+  const size_t ntiles = (ns + tile - 1) / tile;
+  const T r = T(std::sqrt(0.5));
+#pragma omp parallel for schedule(dynamic) \
+    num_threads(detail::davidson_team(int64_t(ns* ns)))
+  for (size_t ti = 0; ti < ntiles; ++ti)
+    for (size_t tj = 0; tj <= ti; ++tj)
+      for (size_t a = ti * tile; a < std::min(ns, (ti + 1) * tile); ++a) {
+        T* ya = y + sector_row(a, spin_flip);
+        const size_t b1 = ti == tj ? a : std::min(ns, (tj + 1) * tile);
+        for (size_t b = tj * tile; b < b1; ++b) {
+          const T v = r * (S[a * ns + b] + T(spin_flip) * S[b * ns + a]);
+          ya[b] = beta == T(0) ? v : v + beta * ya[b];
+        }
+        if (ti == tj and spin_flip == 1)
+          ya[a] = beta == T(0) ? S[a * ns + a] : S[a * ns + a] + beta * ya[a];
+      }
+}
+
+/// H on the vectors of fci_ground_state: CI vectors, or in a spin-flip sector
+/// their sector coordinates, which H acts on through CI vectors in buffers
+/// of its precision. Only one precision's buffers are held at a time, so
+/// switching precision needs no more memory: double reads C, the caller's
+/// storage (free during the solve), and writes N elements; float uses 2 N.
+struct SolverOperator {
+  const FCIHamiltonian& H;
+  int spin_flip;
+  double* C;
+  mutable detail::davidson_buffer<double> out_d;
+  mutable detail::davidson_buffer<float> in_f, out_f;
+
+  template <typename T>
+  void operator_action(size_t m, double alpha, const T* V, size_t LDV,
+                       double beta, T* AV, size_t LDAV) const {
+    if (spin_flip == 0) {
+      for (size_t i = 0; i < m; ++i)
+        H.sigma(V + i * LDV, AV + i * LDAV, T(alpha), T(beta));
+      return;
+    }
+    const size_t N = H.size(), ns = H.alpha_strings().size();
+    T *in, *out;
+    if constexpr (std::is_same_v<T, double>) {
+      if (!out_d) {
+        in_f.reset();
+        out_f.reset();
+        out_d = detail::davidson_alloc<double>(N);
+      }
+      in = C;
+      out = out_d.get();
+    } else {
+      if (!in_f) {
+        out_d.reset();
+        in_f = detail::davidson_alloc<float>(N);
+        out_f = detail::davidson_alloc<float>(N);
+      }
+      in = in_f.get();
+      out = out_f.get();
+    }
+    for (size_t i = 0; i < m; ++i) {
+      sector_expand(ns, spin_flip, V + i * LDV, in);
+      H.sigma(in, out, T(alpha), T(0), spin_flip);
+      sector_fold(ns, spin_flip, out, T(beta), AV + i * LDAV);
+    }
+  }
+};
+
 }  // namespace
 
 double fci_subspace_ground_state(const FCIHamiltonian& H,
@@ -1208,6 +1312,9 @@ double fci_ground_state(const FCIHamiltonian& H, size_t max_iter,
 
   const size_t N = H.size();
   const size_t ns = H.alpha_strings().size();
+  // In a spin-flip sector the solver works on the sector coordinates
+  // (sector_row), about half as many as determinants
+  const size_t n = spin_flip == 0 ? N : sector_row(ns, spin_flip);
   const bool mixed =
       precision == FCIPrecision::mixed or
       (precision == FCIPrecision::automatic and N >= mixed_precision_min_size);
@@ -1229,24 +1336,21 @@ double fci_ground_state(const FCIHamiltonian& H, size_t max_iter,
   H.diagonal(D.get());
   logger->info("  * diagonal: {:.1f} ms",
                duration_type(clock_type::now() - st).count());
+  // The vector solved for: C, or in a sector its sector coordinates (a guess
+  // in C is projected onto the sector)
+  detail::davidson_buffer<double> x_store;
+  double* X = C;
   if (spin_flip != 0) {
-    // An exactly symmetric diagonal and a guess exactly in the sector keep
-    // every Davidson vector exactly in the sector
-#pragma omp parallel for schedule(dynamic) num_threads(threads_for(N))
+    // The diagonal of H in the sector (read from the lower triangle): the
+    // mean of D(a, b) and D(b, a), which differ only by rounding
+#pragma omp parallel for schedule(dynamic) \
+    num_threads(detail::davidson_team(int64_t(N)))
     for (size_t i = 0; i < ns; ++i)
-      for (size_t j = 0; j < i; ++j) {
-        const double d = 0.5 * (D[i * ns + j] + D[j * ns + i]);
-        D[i * ns + j] = D[j * ns + i] = d;
-      }
-    if (guess)
-      for (size_t i = 0; i < ns; ++i) {
-        for (size_t j = 0; j < i; ++j) {
-          const double c = 0.5 * (C[i * ns + j] + spin_flip * C[j * ns + i]);
-          C[i * ns + j] = c;
-          C[j * ns + i] = spin_flip * c;
-        }
-        if (spin_flip == -1) C[i * ns + i] = 0.0;
-      }
+      for (size_t j = 0; j < i; ++j)
+        D[i * ns + j] = 0.5 * (D[i * ns + j] + D[j * ns + i]);
+    x_store = detail::davidson_alloc(n);
+    X = x_store.get();
+    if (guess) sector_fold(ns, spin_flip, C, 0.0, X);
   }
 
   // P-space: the determinants (sector functions, represented by their Ia >=
@@ -1267,7 +1371,7 @@ double fci_ground_state(const FCIHamiltonian& H, size_t max_iter,
   // taken from the lower. The lowest vector of a P-space of 400 determinants
   // had the parity of an excited state in stretched N2, C2 and O2 (3 of 15
   // exactly diagonalized minimal-basis cases, 4 of 15 in 6-31G; now none).
-  const bool need_guess = not guess or blas::nrm2(N, C, 1) == 0.0;
+  const bool need_guess = not guess or blas::nrm2(n, X, 1) == 0.0;
   const bool use_block = N >= block_preconditioner_min_size;
   const bool both_parities =
       spin_flip == 0 and &H.alpha_strings() == &H.beta_strings();
@@ -1334,7 +1438,19 @@ double fci_ground_state(const FCIHamiltonian& H, size_t max_iter,
         x.lambda = {lanczos_lowest(m, x.S.H.data(), x.Z.data())};
       }
     }
-    if (use_block) {
+    // In a sector, the coordinate of sector function f is that of its
+    // Ia >= Ib determinant
+    auto coordinate = [&](const SubspaceMatrix& S, size_t f) {
+      const size_t d = S.P[S.pos[f][0]];
+      return sector_row(d / ns, spin_flip) + d % ns;
+    };
+    if (use_block and spin_flip != 0) {
+      const auto& x = sectors[0];
+      for (size_t f = 0; f < x.S.size(); ++f)
+        block.index.push_back(int64_t(coordinate(x.S, f)));
+      block.Z = x.Z;
+      block.lambda = x.lambda;
+    } else if (use_block) {
       // The sectors share their determinants (closed under spin flip), and
       // their eigenvectors together are an orthonormal basis of them
       const auto& P = sectors[0].S.P;
@@ -1365,14 +1481,18 @@ double fci_ground_state(const FCIHamiltonian& H, size_t max_iter,
         if (sectors[s].lambda[0] < sectors[lowest_sector].lambda[0])
           lowest_sector = s;
       const auto& x = sectors[lowest_sector];
-      std::vector<std::pair<size_t, double>> vector;
-      expand(x.S, x.Z.data(), vector);
-      // C is written (first touched) with the partition of the solver
-      detail::davidson_partition(int64_t(N),
+      // X is written (first touched) with the partition of the solver
+      detail::davidson_partition(int64_t(n),
                                  [&](int64_t, int64_t i0, int64_t i1) {
-                                   std::fill(C + i0, C + i1, 0.0);
+                                   std::fill(X + i0, X + i1, 0.0);
                                  });
-      for (auto [d, c] : vector) C[d] = c;
+      if (spin_flip != 0) {
+        for (size_t f = 0; f < x.S.size(); ++f) X[coordinate(x.S, f)] = x.Z[f];
+      } else {
+        std::vector<std::pair<size_t, double>> vector;
+        expand(x.S, x.Z.data(), vector);
+        for (auto [d, c] : vector) X[d] = c;
+      }
     }
     logger->info("  * P-space ({} determinants{}{}): {:.1f} ms",
                  sectors[0].S.P.size(), need_guess ? ", guess" : "",
@@ -1381,28 +1501,36 @@ double fci_ground_state(const FCIHamiltonian& H, size_t max_iter,
   }
   if (not need_guess) logger->info("  * Will use passed vector as guess");
   const DavidsonBlockPreconditioner* block_ptr = use_block ? &block : nullptr;
+  if (spin_flip != 0) {
+    // The diagonal in sector coordinates, first touched with the partition
+    // of the solver
+    auto D_sector = detail::davidson_alloc(n);
+    detail::davidson_partition(
+        int64_t(n), [&](int64_t, int64_t i0, int64_t i1) {
+          std::fill(D_sector.get() + i0, D_sector.get() + i1, 0.0);
+        });
+#pragma omp parallel for schedule(static) \
+    num_threads(detail::davidson_team(int64_t(N)))
+    for (size_t a = 0; a < ns; ++a)
+      std::copy_n(D.get() + a * ns, a + (spin_flip == 1),
+                  D_sector.get() + sector_row(a, spin_flip));
+    D = std::move(D_sector);
+  }
 
-  struct SectorOperator {
-    const FCIHamiltonian& H;
-    int spin_flip;
-    void operator_action(size_t m, double alpha, const double* V, size_t LDV,
-                         double beta, double* AV, size_t LDAV) const {
-      for (size_t i = 0; i < m; ++i)
-        H.sigma(V + i * LDV, AV + i * LDAV, alpha, beta, spin_flip);
-    }
-  } op{H, spin_flip};
+  SolverOperator op{H, spin_flip, C};
 
   auto finish = [&](size_t niter, double E) {
+    if (spin_flip != 0) sector_expand(ns, spin_flip, X, C);
     logger->info("  {} = {:4}, {} = {:.6e} Eh, {} = {:.5e} ms", "DAV_NITER",
                  niter, "E0", E, "DAVIDSON_DUR",
                  duration_type(clock_type::now() - st).count());
     return E;
   };
 
-  if (not mixed or N == 1) {
+  if (not mixed or n == 1) {
     auto [niter, E] = restarted_davidson(
-        N, max_subspace, max_iter, op, D.get(), res_tol, C, 1e-12, true,
-        nullptr, 0, static_cast<const SectorOperator*>(nullptr), 0.0,
+        n, max_subspace, max_iter, op, D.get(), res_tol, X, 1e-12, true,
+        nullptr, 0, static_cast<const SolverOperator*>(nullptr), 0.0,
         block_ptr);
     return finish(niter, E);
   }
@@ -1414,23 +1542,13 @@ double fci_ground_state(const FCIHamiltonian& H, size_t max_iter,
   // start vector in double precision and keeps the corrections in single
   // precision (stored so: their images carry no more digits), and the final
   // Ritz pair is accepted on its double-precision residual.
-  struct SingleOperator {
-    const FCIHamiltonian& H;
-    int spin_flip;
-    void operator_action(size_t m, double alpha, const float* V, size_t LDV,
-                         double beta, float* AV, size_t LDAV) const {
-      for (size_t i = 0; i < m; ++i)
-        H.sigma(V + i * LDV, AV + i * LDAV, float(alpha), float(beta),
-                spin_flip);
-    }
-  } single{H, spin_flip};
 
   // Single-precision sigma resolves residuals down to about 1e-7 |E| (H c ~
   // E c involves no cancellation); the switch keeps a wide margin above
   // that, with the lowest diagonal element as the energy scale
   double d_min = std::numeric_limits<double>::infinity();
 #pragma omp parallel for schedule(static) reduction(min : d_min)
-  for (size_t i = 0; i < N; ++i) d_min = std::min(d_min, D[i]);
+  for (size_t i = 0; i < n; ++i) d_min = std::min(d_min, D[i]);
   const double switch_tol =
       std::max(res_tol, std::max(1e-4, 5e-6 * std::abs(d_min)));
   // Error of a single-precision image of a unit vector: about twice the
@@ -1447,39 +1565,39 @@ double fci_ground_state(const FCIHamiltonian& H, size_t max_iter,
   constexpr int64_t stagnation_window = 24;
   double res = 0.0;
   auto [niter, E] = restarted_davidson<float>(
-      N, max_subspace, max_iter, single, D.get(), res_tol, C, 1e-12, false,
-      &res, stagnation_window, &op, switch_tol, block_ptr, op_error);
+      n, max_subspace, max_iter, op, D.get(), res_tol, X, 1e-12, false, &res,
+      stagnation_window, &op, switch_tol, block_ptr, op_error);
   logger->info("  * mixed precision: {} iterations, |r| = {:.3e}", niter, res);
 
-  auto S = detail::davidson_alloc(N);
+  auto S = detail::davidson_alloc(n);
   constexpr int max_rounds = 4;
   for (int round = 0; round < max_rounds; ++round) {
     if (round > 0) {
       // Restart anchored at the current vector
       if (niter >= max_iter) break;
       auto [it, E2] = restarted_davidson<float>(
-          N, max_subspace, max_iter - niter, single, D.get(), res_tol, C, 1e-12,
+          n, max_subspace, max_iter - niter, op, D.get(), res_tol, X, 1e-12,
           false, &res, stagnation_window, &op,
           std::numeric_limits<double>::infinity(), block_ptr, op_error);
       niter += it;
       logger->info("  * anchored: {} iterations, |r| = {:.3e}", it, res);
     }
-    // Rayleigh quotient of C and its residual in double precision (C is
+    // Rayleigh quotient of X and its residual in double precision (X is
     // normalized to the precision of the single-precision corrections)
-    op.operator_action(1, 1.0, C, N, 0.0, S.get(), N);
+    op.operator_action(1, 1.0, X, n, 0.0, S.get(), n);
     double sums[2] = {0.0, 0.0}, r2 = 0.0;
     detail::davidson_reduce(
-        int64_t(N), 2, sums, [&](int64_t i0, int64_t i1, double* acc) {
+        int64_t(n), 2, sums, [&](int64_t i0, int64_t i1, double* acc) {
           acc[0] += detail::davidson_sum(
-              i0, i1, [&](int64_t i) { return C[i] * C[i]; });
+              i0, i1, [&](int64_t i) { return X[i] * X[i]; });
           acc[1] += detail::davidson_sum(
-              i0, i1, [&](int64_t i) { return C[i] * S[i]; });
+              i0, i1, [&](int64_t i) { return X[i] * S[i]; });
         });
     const double e = sums[1] / sums[0];
     detail::davidson_reduce(
-        int64_t(N), 1, &r2, [&](int64_t i0, int64_t i1, double* acc) {
+        int64_t(n), 1, &r2, [&](int64_t i0, int64_t i1, double* acc) {
           acc[0] += detail::davidson_sum(i0, i1, [&](int64_t i) {
-            const double r = S[i] - e * C[i];
+            const double r = S[i] - e * X[i];
             return r * r;
           });
         });
@@ -1487,9 +1605,9 @@ double fci_ground_state(const FCIHamiltonian& H, size_t max_iter,
     logger->info("  * double-precision residual {:.3e}", res64);
     if (res64 < res_tol) {
       const double f = 1.0 / std::sqrt(sums[0]);
-      detail::davidson_partition(int64_t(N),
+      detail::davidson_partition(int64_t(n),
                                  [&](int64_t, int64_t i0, int64_t i1) {
-                                   for (int64_t i = i0; i < i1; ++i) C[i] *= f;
+                                   for (int64_t i = i0; i < i1; ++i) X[i] *= f;
                                  });
       return finish(niter, e);
     }
@@ -1497,9 +1615,9 @@ double fci_ground_state(const FCIHamiltonian& H, size_t max_iter,
 
   logger->info("  * continuing in double precision");
   auto [it, E3] = restarted_davidson(
-      N, max_subspace, max_iter > niter ? max_iter - niter : 1, op, D.get(),
-      res_tol, C, 1e-12, true, nullptr, 0,
-      static_cast<const SectorOperator*>(nullptr), 0.0, block_ptr);
+      n, max_subspace, max_iter > niter ? max_iter - niter : 1, op, D.get(),
+      res_tol, X, 1e-12, true, nullptr, 0,
+      static_cast<const SolverOperator*>(nullptr), 0.0, block_ptr);
   return finish(niter + it, E3);
 }
 

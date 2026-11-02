@@ -159,7 +159,7 @@ This implementation uses the common settings described above, plus the following
 For larger spaces the Davidson solver applies the Hamiltonian in single precision wherever that cannot change the result, and accepts the final eigenpair only once its residual, computed in double precision, meets ``ci_residual_tolerance``, so the results match a double-precision calculation to that tolerance.
 
 With equal numbers of active alpha and beta electrons, the :term:`CI` coefficients of a state with total spin :math:`S` form a matrix over alpha and beta strings that is symmetric for even :math:`S` and antisymmetric for odd :math:`S`.
-The ``spin_flip_symmetry`` setting restricts the calculation to one of these two sectors, which roughly halves the cost of each iteration and can target, for example, the lowest triplet when the lowest state overall is a singlet.
+The ``spin_flip_symmetry`` setting restricts the calculation to one of these two sectors, which roughly halves the cost of each iteration and the memory of each search-space vector, and can target, for example, the lowest triplet when the lowest state overall is a singlet.
 
 .. list-table::
    :header-rows: 1
@@ -180,7 +180,7 @@ The ``spin_flip_symmetry`` setting restricts the calculation to one of these two
    * - ``max_subspace``
      - int
      - ``10``
-     - Maximum number of vectors in the search space of the iterative (Davidson) solver before it restarts (at least 2). Each vector adds 8 bytes per determinant to the memory (16 in double precision); more vectors can save iterations on strongly correlated systems
+     - Maximum number of vectors in the search space of the iterative (Davidson) solver before it restarts (at least 2). Each vector adds 8 bytes per determinant to the memory (16 in double precision, half as much with ``spin_flip_symmetry``); more vectors can save iterations on strongly correlated systems
 
 .. _macis-asci:
 

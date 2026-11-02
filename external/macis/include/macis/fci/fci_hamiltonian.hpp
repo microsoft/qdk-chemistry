@@ -193,7 +193,10 @@ class FCIHamiltonian {
  * @param[in] max_subspace Davidson search-space dimension (>= 2). Memory per
  *                         determinant is 8 * (2 * max_subspace + 3) bytes in
  *                         double precision and 8 * max_subspace + 28 in
- *                         mixed precision (single-precision corrections).
+ *                         mixed precision (single-precision corrections); in
+ *                         a spin-flip sector, whose vectors have about half
+ *                         as many coordinates, 8 * max_subspace + 28 and
+ *                         4 * max_subspace + 30.
  *                         Hydrogen chains took as many iterations with 3 to
  *                         16 vectors, but strongly correlated systems need
  *                         fewer with more: [2Fe-2S] (30e, 20o) took 135
