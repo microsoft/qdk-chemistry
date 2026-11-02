@@ -1133,42 +1133,25 @@ void expand(const SubspaceMatrix& S, const double* z,
         vector.emplace_back(S.P[S.pos[f][t]], z[f] * S.coef[f][t]);
 }
 
-/// fci_subspace_ground_state with the eigenvector returned as its nonzero
-/// (determinant, coefficient) pairs, from LAPACK or (iterative) Lanczos
-double subspace_ground_state(const FCIHamiltonian& H,
-                             const std::vector<size_t>& dets, int spin_flip,
-                             bool iterative,
-                             std::vector<std::pair<size_t, double>>& vector) {
-  SubspaceMatrix S = subspace_matrix(H, dets, spin_flip);
-  const size_t m = S.size();
-  double E = 0.0;
-  std::vector<double> Z(m);
-  if (iterative) {
-    E = lanczos_lowest(m, S.H.data(), Z.data());
-  } else {
-    std::vector<double> W(m);
-    // lapackpp copies back 2*n support indices whatever the range
-    std::vector<int64_t> support(2 * m);
-    int64_t found = 0;
-    lapack::syevr(lapack::Job::Vec, lapack::Range::Index, lapack::Uplo::Lower,
-                  m, S.H.data(), m, 0.0, 0.0, 1, 1, 0.0, &found, W.data(),
-                  Z.data(), m, support.data());
-    E = W[0];
-  }
-  expand(S, Z.data(), vector);
-  return E;
-}
-
 }  // namespace
 
 double fci_subspace_ground_state(const FCIHamiltonian& H,
                                  const std::vector<size_t>& dets,
                                  std::vector<double>& C, int spin_flip) {
+  SubspaceMatrix S = subspace_matrix(H, dets, spin_flip);
+  const size_t m = S.size();
+  std::vector<double> W(m), Z(m);
+  // lapackpp copies back 2*n support indices whatever the range
+  std::vector<int64_t> support(2 * m);
+  int64_t found = 0;
+  lapack::syevr(lapack::Job::Vec, lapack::Range::Index, lapack::Uplo::Lower, m,
+                S.H.data(), m, 0.0, 0.0, 1, 1, 0.0, &found, W.data(), Z.data(),
+                m, support.data());
   std::vector<std::pair<size_t, double>> vector;
-  const double E = subspace_ground_state(H, dets, spin_flip, false, vector);
+  expand(S, Z.data(), vector);
   assign_zeros(C, H.size());
   for (auto [d, c] : vector) C[d] = c;
-  return E;
+  return W[0];
 }
 
 double fci_ground_state(const FCIHamiltonian& H, size_t max_iter,
@@ -1238,16 +1221,27 @@ double fci_ground_state(const FCIHamiltonian& H, size_t max_iter,
   }
 
   // P-space: the determinants (sector functions, represented by their Ia >=
-  // Ib determinant) with the lowest diagonal elements. Its lowest
-  // eigenvector is the guess: unlike a single determinant, it couples to the
-  // ground state even when the lowest determinant belongs to another
-  // spatial-symmetry sector. In large spaces it is also an exact block of
-  // the preconditioner, which saved one iteration (two for a stretched
-  // H12) in every measured case for the cost of its eigendecomposition
-  // (about 25 ms on Cascade Lake); larger P-spaces, or the largest
-  // components of the converged vector, converged no faster or slower.
+  // Ib determinant) with the lowest diagonal elements, closed under spin flip
+  // for equal alpha and beta strings. Its lowest eigenvector is the guess:
+  // unlike a single determinant, it couples to the ground state even when
+  // the lowest determinant belongs to another spatial-symmetry sector. In
+  // large spaces it is also an exact block of the preconditioner, which saved
+  // one iteration (two for a stretched H12) in every measured case for the
+  // cost of its eigendecomposition (about 25 ms on Cascade Lake); larger
+  // P-spaces, or the largest components of the converged vector, converged
+  // no faster or slower.
+  //
+  // With equal alpha and beta strings outside a sector, the Davidson
+  // iteration keeps the spin-flip parity of its start vector (H and the
+  // diagonal commute with C -> C^T), so the guess decides the parity of the
+  // solution: the P-space is solved in both parity sectors and the guess
+  // taken from the lower. The lowest vector of a P-space of 400 determinants
+  // had the parity of an excited state in stretched N2, C2 and O2 (3 of 15
+  // exactly diagonalized minimal-basis cases, 4 of 15 in 6-31G; now none).
   const bool need_guess = not guess or blas::nrm2(N, C, 1) == 0.0;
   const bool use_block = N >= block_preconditioner_min_size;
+  const bool both_parities =
+      spin_flip == 0 and &H.alpha_strings() == &H.beta_strings();
   DavidsonBlockPreconditioner block;
   if (need_guess or use_block) {
     constexpr size_t pspace_size = 400;
@@ -1258,7 +1252,7 @@ double fci_ground_state(const FCIHamiltonian& H, size_t max_iter,
       heap.reserve(pspace_size);
 #pragma omp for schedule(static) nowait
       for (size_t i = 0; i < N; ++i) {
-        if (spin_flip != 0 and
+        if ((spin_flip != 0 or both_parities) and
             (i / ns < i % ns or (i / ns == i % ns and spin_flip == -1)))
           continue;
         const std::pair<double, size_t> di(D[i], i);
@@ -1283,30 +1277,67 @@ double fci_ground_state(const FCIHamiltonian& H, size_t max_iter,
     for (size_t i = 0; i < np; ++i) pspace[i] = lowest[i].second;
 
     const auto t_guess = clock_type::now();
-    std::vector<std::pair<size_t, double>> vector;
-    if (use_block) {
-      SubspaceMatrix S = subspace_matrix(H, pspace, spin_flip);
-      const size_t m = S.size();
-      std::vector<double> Z = S.H;
-      block.lambda.resize(m);
-      {
+    // The sectors of the P-space: the requested one, or both parities
+    std::vector<int> parities{spin_flip};
+    if (both_parities) {
+      parities = {1};
+      if (std::any_of(pspace.begin(), pspace.end(),
+                      [&](size_t d) { return d / ns != d % ns; }))
+        parities.push_back(-1);
+    }
+    struct PSector {
+      SubspaceMatrix S;
+      std::vector<double> Z, lambda;  // all eigenpairs, or the lowest
+    };
+    std::vector<PSector> sectors(parities.size());
+    for (size_t s = 0; s < parities.size(); ++s) {
+      auto& x = sectors[s];
+      x.S = subspace_matrix(H, pspace, parities[s]);
+      const size_t m = x.S.size();
+      if (use_block) {
+        x.Z = x.S.H;
+        x.lambda.resize(m);
         SerialLapack serial;
-        lapack::syevd(lapack::Job::Vec, lapack::Uplo::Lower, m, Z.data(), m,
-                      block.lambda.data());
+        lapack::syevd(lapack::Job::Vec, lapack::Uplo::Lower, m, x.Z.data(), m,
+                      x.lambda.data());
+      } else {
+        x.Z.resize(m);
+        x.lambda = {lanczos_lowest(m, x.S.H.data(), x.Z.data())};
       }
-      block.index.assign(S.P.begin(), S.P.end());
-      const size_t nc = S.P.size();
-      block.Z.assign(nc * m, 0.0);
-      for (size_t a = 0; a < m; ++a)
-        for (size_t f = 0; f < m; ++f)
-          for (size_t t = 0; t < 2; ++t)
-            if (S.pos[f][t] != SubspaceMatrix::unused)
-              block.Z[S.pos[f][t] + a * nc] = S.coef[f][t] * Z[f + a * m];
-      if (need_guess) expand(S, Z.data(), vector);
-    } else {
-      subspace_ground_state(H, pspace, spin_flip, true, vector);
+    }
+    if (use_block) {
+      // The sectors share their determinants (closed under spin flip), and
+      // their eigenvectors together are an orthonormal basis of them
+      const auto& P = sectors[0].S.P;
+      const size_t nc = P.size();
+      size_t ncol = 0;
+      for (const auto& x : sectors) ncol += x.S.size();
+      block.index.assign(P.begin(), P.end());
+      block.Z.assign(nc * ncol, 0.0);
+      size_t col = 0;
+      for (const auto& x : sectors) {
+        const size_t m = x.S.size();
+        for (size_t a = 0; a < m; ++a, ++col) {
+          block.lambda.push_back(x.lambda[a]);
+          for (size_t f = 0; f < m; ++f)
+            for (size_t t = 0; t < 2; ++t)
+              if (x.S.pos[f][t] != SubspaceMatrix::unused)
+                block.Z[x.S.pos[f][t] + col * nc] =
+                    x.S.coef[f][t] * x.Z[f + a * m];
+        }
+      }
     }
     if (need_guess) {
+      // The lowest vector of the parity with the lower P-space energy. Adding
+      // some of the other parity's (weights 1e-3 to 1) found no other states
+      // in stretched N2, C2 and O2 but cost 37-220 % more iterations there
+      size_t lowest_sector = 0;
+      for (size_t s = 1; s < sectors.size(); ++s)
+        if (sectors[s].lambda[0] < sectors[lowest_sector].lambda[0])
+          lowest_sector = s;
+      const auto& x = sectors[lowest_sector];
+      std::vector<std::pair<size_t, double>> vector;
+      expand(x.S, x.Z.data(), vector);
       // C is written (first touched) with the partition of the solver
       detail::davidson_partition(int64_t(N),
                                  [&](int64_t, int64_t i0, int64_t i1) {
@@ -1314,8 +1345,8 @@ double fci_ground_state(const FCIHamiltonian& H, size_t max_iter,
                                  });
       for (auto [d, c] : vector) C[d] = c;
     }
-    logger->info("  * P-space ({} determinants{}{}): {:.1f} ms", np,
-                 need_guess ? ", guess" : "",
+    logger->info("  * P-space ({} determinants{}{}): {:.1f} ms",
+                 sectors[0].S.P.size(), need_guess ? ", guess" : "",
                  use_block ? ", preconditioner block" : "",
                  duration_type(clock_type::now() - t_guess).count());
   }

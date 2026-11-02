@@ -615,6 +615,36 @@ TEST_CASE("FCI Ground State") {
                                               1e-10));
     }
   }
+
+  SECTION("Spin-flip parity of the guess") {
+    // Orbital windows (first orbital, orbitals, electrons per spin) of the
+    // water integrals whose lowest P-space vector over 400 determinants had
+    // the other spin-flip parity than the ground state; as the Davidson
+    // iteration keeps that parity, the solve converged to an excited state
+    // (0.006 to 0.038 Eh too high)
+    const std::vector<std::array<size_t, 3>> windows = {
+        {4, 7, 4}, {5, 9, 2}, {5, 10, 2}, {12, 9, 2}, {4, 10, 2}};
+    for (auto [first, n, k] : windows) {
+      std::vector<double> Tw(n * n), Vw(n * n * n * n);
+      for (size_t p = 0; p < n; ++p)
+        for (size_t q = 0; q < n; ++q) {
+          Tw[p + q * n] = T_full[first + p + (first + q) * nfull];
+          for (size_t r = 0; r < n; ++r)
+            for (size_t s = 0; s < n; ++s)
+              Vw[p + n * (q + n * (r + n * s))] =
+                  V_full[first + p +
+                         nfull * (first + q +
+                                  nfull * (first + r + nfull * (first + s)))];
+        }
+      macis::FCIHamiltonian H(n, k, k, Tw.data(), n, Vw.data(), n);
+      std::vector<size_t> all(H.size());
+      std::iota(all.begin(), all.end(), size_t{0});
+      std::vector<double> C, C_dense;
+      const double E_dense = macis::fci_subspace_ground_state(H, all, C_dense);
+      CHECK_THAT(macis::fci_ground_state(H, 200, 1e-8, C),
+                 Catch::Matchers::WithinAbs(E_dense, 1e-10));
+    }
+  }
 }
 
 TEST_CASE("FCI Mixed Precision") {
