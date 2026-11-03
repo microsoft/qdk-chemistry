@@ -20,8 +20,8 @@ from . import _io, _sbt
 CONTAINER_VERSION = "0.3.0"
 EIGHTFOLD_VERSIONS = ("0.1.0", "0.2.0")
 
-# Relative to the largest integral, as in the library's symmetry checks.
-_CLASS_TOLERANCE = 1e-5
+# Eigen's default isApprox precision, as in the library's symmetry checks.
+_PRECISION = 1e-12
 
 
 def step_key(version: str) -> str:
@@ -135,19 +135,28 @@ def _fill_eightfold_classes(entries) -> list:
     for p, q, r, s, value in entries:
         key = (int(p), int(q), int(r), int(s))
         classes.setdefault(min(_eightfold_orbit(*key)), {})[key] = float(value)
-    scale = max((abs(value) for stored in classes.values() for value in stored.values()), default=0.0)
     filled: list[list] = []
+    difference = stored_norm = written_norm = 0.0
+    worst = (0.0,)
     for canonical, stored in sorted(classes.items()):
         # The canonical position is also the smallest, which earlier mappers preferred.
         first = min(stored)
         for key, value in stored.items():
-            if abs(value - stored[first]) > _CLASS_TOLERANCE * scale:
-                raise ValueError(
-                    f"Two-body entries {first} and {key} of one 8-fold permutation class differ "
-                    f"({stored[first]} vs {value}). Sparse containers before version {CONTAINER_VERSION} "
-                    "read every class as 8-fold symmetric, so the file cannot be migrated unambiguously."
-                )
+            change = abs(value - stored[first])
+            difference += change**2
+            stored_norm += value**2
+            written_norm += stored[first] ** 2
+            if change > worst[0]:
+                worst = (change, first, key, stored[first], value)
         filled.extend([*member, stored[first]] for member in sorted(_eightfold_orbit(*canonical)))
+    # Eigen's isApprox: ||stored - written|| <= p min(||stored||, ||written||).
+    if difference > _PRECISION**2 * min(stored_norm, written_norm):
+        _, first, key, first_value, value = worst
+        raise ValueError(
+            f"Two-body entries {first} and {key} of one 8-fold permutation class differ "
+            f"({first_value} vs {value}). Sparse containers before version {CONTAINER_VERSION} "
+            "read every class as 8-fold symmetric, so the file cannot be migrated unambiguously."
+        )
     return filled
 
 

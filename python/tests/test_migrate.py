@@ -659,13 +659,25 @@ def test_sparse_0_2_0_stores_every_eightfold_class_member(tmp_path, fmt):
     np.testing.assert_array_equal(actual.reshape(expected.shape), expected)
 
 
-def test_sparse_inconsistent_eightfold_class_refused(tmp_path):
-    """A class whose stored members differ has no unambiguous 0.2.0 meaning."""
+@pytest.mark.parametrize("partner", [-0.2, 0.7 * (1 + 1e-8)])
+def test_sparse_inconsistent_eightfold_class_refused(tmp_path, partner):
+    """A class whose stored members differ beyond round-off has no unambiguous 0.2.0 meaning."""
     src = tmp_path / "e.hamiltonian.h5"
-    two_body = [[0, 1, 0, 1, 0.7], [1, 0, 1, 0, 0.7], [0, 1, 1, 0, -0.2]]
+    two_body = [[0, 1, 0, 1, 0.7], [1, 0, 1, 0, 0.7], [0, 1, 1, 0, partner]]
     _write_v1_sparse_hdf5(src, 2, [[0, 0, 1.0]], two_body, version="0.2.0")
     with pytest.raises(migrate.MigrationError, match="cannot be migrated unambiguously"):
         migrate.convert_file(src, tmp_path / "e_new.hamiltonian.h5")
+
+
+def test_sparse_eightfold_class_round_off_migrated(tmp_path):
+    """Round-off between class members migrates to the value 0.2.0 mapped."""
+    src = tmp_path / "e.hamiltonian.h5"
+    dst = tmp_path / "e_new.hamiltonian.h5"
+    two_body = [[0, 1, 0, 1, 0.7], [0, 1, 1, 0, np.nextafter(0.7, 1.0)]]
+    _write_v1_sparse_hdf5(src, 2, [[0, 0, 1.0]], two_body, version="0.2.0")
+    migrate.convert_file(src, dst)
+    actual = np.asarray(Hamiltonian.from_file(str(dst), "hdf5").get_two_body_integrals()[0]).reshape((2,) * 4)
+    assert actual[0, 1, 1, 0] == 0.7
 
 
 def test_sparse_0_2_0_non_hermitian_entries_stay_literal(tmp_path):
