@@ -138,7 +138,7 @@ namespace QDKChemistry.Utils.UnaryIteration {
     internal function UncomputeStep() : Int { 2 }
     internal function ActionStep() : Int { 3 }
 
-    /// Gate sequence of Fig. 5 of arXiv:1805.03662 below the control `control` (-1 for the
+    /// Gate sequence of Fig. 7 of arXiv:1805.03662 below the control `control` (-1 for the
     /// caller's qubit, otherwise a helper index), as (step, control, address bit or action
     /// index, helper) tuples.
     ///

@@ -78,6 +78,11 @@ class PSPMapper(CircuitMapper):
 
         W = (2|0\rangle\langle 0| - I) \cdot B[H]
 
+    Note:
+        With an alias or QROM PREPARE, ``Circuit.get_qir()`` and ``Circuit.to_json()`` currently
+        fail inside the Q# compiler (its measurement-based ``Adjoint Std.TableLookup.Select``);
+        ``estimate()`` and simulation work. Use ``dense_pure_state`` when QIR export is needed.
+
     """
 
     def __init__(self):
