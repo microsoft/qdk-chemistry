@@ -194,6 +194,35 @@ class TestRightFactor:
         mapper = create("circuit_mapper", "unitary_synthesis", num_input_qubits=2)
         np.testing.assert_array_equal(mapper.right_factor(_representation(matrix)), np.eye(4))
 
+    def test_reuses_factor_of_last_run(self, monkeypatch):
+        """After ``run`` the helper returns the synthesized ``V`` without factorizing again."""
+        from qdk_chemistry.algorithms.circuit_mapper import unitary_synthesis_mapper  # noqa: PLC0415
+
+        calls: list[int] = []
+
+        def counting_right_factor(matrix, num_input_states):
+            calls.append(num_input_states)
+            return dense_isometry_right_factor(matrix, num_input_states)
+
+        monkeypatch.setattr(unitary_synthesis_mapper, "dense_isometry_right_factor", counting_right_factor)
+        matrix = ortho_group.rvs(16, random_state=7)[:, :4]
+        expected = dense_isometry_right_factor(matrix, 4)
+        mapper = create("circuit_mapper", "unitary_synthesis", omit_right_factor=True)
+        mapper.run(_representation(matrix))
+
+        reused = mapper.right_factor(_representation(matrix.copy()))
+        assert calls == []
+        np.testing.assert_array_equal(reused, expected)
+        reused[:] = 0.0
+        np.testing.assert_array_equal(mapper.right_factor(_representation(matrix)), expected)
+        assert calls == []
+
+        other = ortho_group.rvs(16, random_state=8)[:, :4]
+        np.testing.assert_array_equal(
+            mapper.right_factor(_representation(other)), dense_isometry_right_factor(other, 4)
+        )
+        assert calls == [4]
+
     def test_omitting_saves_gates(self):
         """Leaving ``V`` out lowers the Toffoli count of the resource estimate."""
         representation = _representation(ortho_group.rvs(8, random_state=3)[:, :2])

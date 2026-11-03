@@ -34,6 +34,7 @@ if TYPE_CHECKING:
 __all__: list[str] = ["UnitarySynthesisMapper", "UnitarySynthesisMapperSettings"]
 
 _MAX_ADDED_QUBITS = 2  # Most qubits the dense synthesis adds to its input register.
+_HASH_CHARS = 64  # Full SHA-256 digest, so a reused right factor cannot belong to another matrix.
 
 
 class UnitarySynthesisMapperSettings(Settings):
@@ -119,6 +120,8 @@ class UnitarySynthesisMapper(CircuitMapper):
         """Initialize the UnitarySynthesisMapper."""
         super().__init__()
         self._settings = UnitarySynthesisMapperSettings()
+        # V of the last dense run with its matrix hash and input width, which right_factor reuses.
+        self._last_right_factor: tuple[str, int, np.ndarray] | None = None
 
     def name(self) -> str:
         """Return the algorithm name.
@@ -141,6 +144,9 @@ class UnitarySynthesisMapper(CircuitMapper):
     def right_factor(self, unitary: UnitaryRepresentation) -> np.ndarray:
         """Return the right factor ``V`` that ``omit_right_factor`` leaves out of the dense circuit.
 
+        After :meth:`run` on the same matrix and input width, this returns the factor that the
+        synthesis already computed instead of factorizing the matrix again.
+
         Args:
             unitary: The unitary representation that will be mapped, with the current settings.
 
@@ -158,6 +164,10 @@ class UnitarySynthesisMapper(CircuitMapper):
         if self._settings.get("method") != "dense":
             raise ValueError("Only the dense method has a right factor.")
         num_input_qubits = self._num_input_qubits(container)
+        if self._last_right_factor is not None:
+            matrix_hash, last_input_qubits, right_factor = self._last_right_factor
+            if last_input_qubits == num_input_qubits and matrix_hash == container.content_hash(_HASH_CHARS):
+                return right_factor.copy()
         return dense_isometry_right_factor(container.to_dense(), 1 << num_input_qubits)
 
     @staticmethod
@@ -222,6 +232,11 @@ class UnitarySynthesisMapper(CircuitMapper):
                 container.to_dense(),
                 1 << num_input_qubits,
                 omit_right_factor=self._settings.get("omit_right_factor"),
+            )
+            self._last_right_factor = (
+                container.content_hash(_HASH_CHARS),
+                num_input_qubits,
+                synthesis.right_factor.copy(),
             )
             parameter: dict[str, Any] = {
                 "synthesis": _dense_to_qsharp(synthesis),
