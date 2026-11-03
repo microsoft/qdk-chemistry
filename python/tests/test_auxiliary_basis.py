@@ -148,7 +148,9 @@ def test_content_hash_tracks_all_owned_data():
     assert baseline.content_hash() != AuxiliaryBasis("aux", shells, structure, AOType.Cartesian).content_hash()
 
     changed_shells = _make_shells()
-    changed_shells[0].coefficients[0] = 0.5
+    coefficients = changed_shells[0].coefficients.copy()
+    coefficients[0] = 0.5
+    changed_shells[0].coefficients = coefficients
     assert baseline.content_hash() != AuxiliaryBasis("aux", changed_shells, structure).content_hash()
 
     shifted_structure = Structure(
