@@ -707,6 +707,19 @@ class TestCholeskyHamiltonian:
         h = Hamiltonian(CholeskyHamiltonianContainer(one_body, cholesky_vecs, orbitals, 0.0, np.array([])))
         assert h.has_two_body_integrals()
 
+    def test_two_body_integrals_after_loading(self, tmp_path: Path) -> None:
+        """Check the four-center integrals of a loaded Hamiltonian with asymmetric factors."""
+        factors = np.random.default_rng(17).random((4, 5))
+        h = Hamiltonian(CholeskyHamiltonianContainer(np.eye(2), factors, create_test_orbitals(2), 0.0, np.array([])))
+        path = tmp_path / "factors.hamiltonian.h5"
+        h.to_file(str(path), "hdf5")
+        loaded = Hamiltonian.from_file(str(path), "hdf5")
+        actual = loaded.get_two_body_integrals()[0].reshape(2, 2, 2, 2)
+        expected = np.einsum("ijq,klq->ijkl", factors.reshape(2, 2, 5), factors.reshape(2, 2, 5))
+        np.testing.assert_allclose(actual, expected, rtol=0.0, atol=1e-12)
+        np.testing.assert_array_equal(actual, actual.transpose(2, 3, 0, 1))
+        np.testing.assert_array_equal(loaded.get_container().get_three_center_integrals()[0], factors)
+
     def test_two_body_element_access(self):
         """Test individual two-body element access."""
         one_body = np.eye(2)

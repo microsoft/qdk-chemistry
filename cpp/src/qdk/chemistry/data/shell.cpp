@@ -97,6 +97,20 @@ Shell Shell::from_json(const nlohmann::json& json, const size_t atom_index,
 
 namespace detail {
 
+/**
+ * @brief Sort shells and their primitives in a standardized order.
+ *
+ * This function performs two levels of sorting:
+ * 1. Sorts the shells themselves by orbital type, then largest primitive
+ *    exponent (descending order)
+ * 2. Within each shell, sorts the primitive Gaussian functions by exponent
+ *    (descending order)
+ *
+ * The primitive sorting reorders exponents, coefficients, and radial powers (if
+ * present) consistently to maintain the correspondence between these arrays.
+ *
+ * @param shells Vector of Shell objects to be sorted in-place.
+ */
 void sort_shells_inplace(std::vector<Shell>& shells) {
   if (std::any_of(shells.begin(), shells.end(), [](const Shell& shell) {
         return shell.get_num_primitives() == 0;
@@ -104,7 +118,9 @@ void sort_shells_inplace(std::vector<Shell>& shells) {
     throw std::invalid_argument("Cannot sort a shell with no primitives");
   }
 
+  // sort primitives (together with coefficients and rpowers) within each shell
   auto sort_shell_primitives = [](Shell& shell) {
+    // get exponent sorting indices
     std::vector<size_t> indices(shell.get_num_primitives());
     std::iota(indices.begin(), indices.end(), 0);
     std::stable_sort(indices.begin(), indices.end(),
@@ -112,6 +128,7 @@ void sort_shells_inplace(std::vector<Shell>& shells) {
                        return shell.exponents(lhs) > shell.exponents(rhs);
                      });
 
+    // sort exponents, coefficients, and rpowers
     Eigen::VectorXd sorted_exponents(shell.get_num_primitives());
     Eigen::VectorXd sorted_coefficients(shell.get_num_primitives());
     Eigen::VectorXi sorted_rpowers(shell.get_num_primitives());
@@ -129,14 +146,19 @@ void sort_shells_inplace(std::vector<Shell>& shells) {
     }
   };
 
+  // sorting shells by angular momentum -> exponent
   auto shell_comparator = [](const Shell& lhs, const Shell& rhs) {
+    // s -> p -> d -> f ...
     if (lhs.orbital_type != rhs.orbital_type) {
       return lhs.orbital_type < rhs.orbital_type;
     }
+    // descending order of largest exponent
     return lhs.exponents(0) > rhs.exponents(0);
   };
 
+  // ensure primitives are sorted by exponent within each shell
   std::for_each(shells.begin(), shells.end(), sort_shell_primitives);
+  // sort shells by angular momentum and exponent
   std::stable_sort(shells.begin(), shells.end(), shell_comparator);
 }
 

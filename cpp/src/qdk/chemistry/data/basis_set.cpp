@@ -10,6 +10,7 @@
 #include <map>
 #include <qdk/chemistry/data/basis_set.hpp>
 #include <qdk/chemistry/data/structure.hpp>
+#include <qdk/chemistry/utils/basis_archive.hpp>
 #include <qdk/chemistry/utils/logger.hpp>
 #include <set>
 #include <sstream>

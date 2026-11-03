@@ -91,68 +91,94 @@ std::filesystem::path get_correct_basis_set_file(std::string& basis_set_name) {
 
 }  // namespace
 
+/**
+ * @brief Get basis set shells and ECP information for a given nuclear charge.
+ * @param nuclear_charge Nuclear charge of the element.
+ * @param basis_set_name Name of the basis set.
+ * @param atom_index Index of the atom in the structure.
+ * @return A tuple containing:
+ *         - vector of Shells for the element,
+ *         - vector of ECP Shells for the element,
+ *         - number of ECP electrons for the element.
+ */
 std::tuple<std::vector<Shell>, std::vector<Shell>, size_t>
 get_basis_for_nuclear_charge(const double nuclear_charge,
                              std::string basis_set_name,
                              const size_t atom_index) {
-  std::filesystem::path json_file_path =
-      get_correct_basis_set_file(basis_set_name);
+  const utils::BasisArchive archive(basis_set_name);
+  std::ifstream fin(archive.json());
+  auto data = nlohmann::json::parse(fin);
 
-  std::ifstream input(json_file_path);
-  auto data = nlohmann::json::parse(input);
-  size_t num_ecp_electrons = 0;
+  // extract basis set information for each nuclear charge
+  size_t num_ecp_elecs = 0;
   std::vector<Shell> ecp_shells;
+
   std::vector<Shell> shells;
+  // convert nuclear_charge to int and then to string for JSON lookup
   auto nuclear_charge_string = std::to_string(static_cast<int>(nuclear_charge));
+
+  // get element specific data
   auto element_data = data["elements"][nuclear_charge_string];
 
+  // iterate over electron shells
   for (const auto& shell : element_data["electron_shells"]) {
-    for (size_t contraction = 0; contraction < shell["coefficients"].size();
-         ++contraction) {
-      size_t angular_momentum_size = shell["angular_momentum"].size();
-      size_t momentum = shell["angular_momentum"]
-                             [angular_momentum_size > 1 ? contraction : 0];
+    for (size_t i = 0; i < shell["coefficients"].size(); i++) {
+      size_t am_size = shell["angular_momentum"].size();
+      size_t momentum = shell["angular_momentum"][am_size > 1 ? i : 0];
 
+      // fill exponents and coefficients
       std::vector<double> exponents;
       std::vector<double> coefficients;
-      for (size_t primitive = 0; primitive < shell["exponents"].size();
-           ++primitive) {
+      std::vector<int> rpowers;
+      int power = 0;
+      for (size_t k = 0; k < shell["exponents"].size(); k++) {
         exponents.push_back(
-            std::stod(shell["exponents"][primitive].get<std::string>()));
-        coefficients.push_back(std::stod(
-            shell["coefficients"][contraction][primitive].get<std::string>()));
+            std::stod(shell["exponents"][k].get<std::string>()));
+        coefficients.push_back(
+            std::stod(shell["coefficients"][i][k].get<std::string>()));
+        rpowers.push_back(0);
+        power++;
       }
-      shells.emplace_back(atom_index, static_cast<OrbitalType>(momentum),
-                          exponents, coefficients);
+
+      // create shell and add to list
+      Shell sh{atom_index, static_cast<OrbitalType>(momentum), exponents,
+               coefficients, rpowers};
+      shells.push_back(sh);
     }
   }
 
+  // handle ecps
   if (element_data.contains("ecp_electrons")) {
-    num_ecp_electrons =
-        static_cast<size_t>(element_data["ecp_electrons"].get<int>());
-    for (const auto& ecp_entry : element_data["ecp_potentials"]) {
+    auto num_core_elec = element_data["ecp_electrons"].get<int>();
+    num_ecp_elecs = static_cast<size_t>(num_core_elec);
+    auto ecp_data = element_data["ecp_potentials"];
+    for (const auto& ecp_entry : ecp_data) {
+      // only support scalar_ecp
       if (ecp_entry["ecp_type"].get<std::string>() != "scalar_ecp") {
         throw std::invalid_argument("only scalar_ecp is supported");
       }
-      auto angular_momentum = ecp_entry["angular_momentum"];
-      if (angular_momentum.size() != 1) {
+      auto am_entry = ecp_entry["angular_momentum"];
+      if (am_entry.size() != 1) {
         throw std::invalid_argument("only one angular momentum is expected");
       }
+      auto contraction_size = ecp_entry["gaussian_exponents"].size();
 
+      // fill exponents, coefficients, and rpowers
       std::vector<double> exponents;
       std::vector<double> coefficients;
-      std::vector<int> radial_powers;
-      for (size_t primitive = 0;
-           primitive < ecp_entry["gaussian_exponents"].size(); ++primitive) {
-        exponents.push_back(std::stod(
-            ecp_entry["gaussian_exponents"][primitive].get<std::string>()));
-        coefficients.push_back(std::stod(
-            ecp_entry["coefficients"][0][primitive].get<std::string>()));
-        radial_powers.push_back(ecp_entry["r_exponents"][primitive].get<int>());
+      std::vector<int> rpowers;
+      for (size_t i = 0; i < contraction_size; i++) {
+        exponents.push_back(
+            std::stod(ecp_entry["gaussian_exponents"][i].get<std::string>()));
+        coefficients.push_back(
+            std::stod(ecp_entry["coefficients"][0][i].get<std::string>()));
+        rpowers.push_back(ecp_entry["r_exponents"][i].get<int>());
       }
-      ecp_shells.emplace_back(atom_index,
-                              static_cast<OrbitalType>(angular_momentum[0]),
-                              exponents, coefficients, radial_powers);
+
+      // create shell and add to ecp list
+      Shell sh{atom_index, static_cast<OrbitalType>(am_entry[0]), exponents,
+               coefficients, rpowers};
+      ecp_shells.push_back(sh);
     }
     // The basis library stores the local term at the highest angular momentum.
     const auto local_term =
@@ -164,7 +190,7 @@ get_basis_for_nuclear_charge(const double nuclear_charge,
       local_term->orbital_type = OrbitalType::UL;
     }
   }
-  return {shells, ecp_shells, num_ecp_electrons};
+  return {shells, ecp_shells, num_ecp_elecs};
 }
 
 }  // namespace qdk::chemistry::data::detail
