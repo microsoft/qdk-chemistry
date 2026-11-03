@@ -23,8 +23,9 @@ namespace qdk::chemistry::data {
  * block is a matrix with rows (local_left * physical_extent + local_physical)
  * and columns local_right. Missing blocks represent zero.
  *
- * Physical states use Configuration's binary or spin-half encoding. Symmetry
- * labels describe explicit basis states.
+ * Physical states use Configuration's binary or spin-half encoding. Physical
+ * sector labels must match the particle number, and for spin-half states the
+ * spin projection, of the basis states they contain.
  */
 class MPSSite {
  public:
@@ -111,8 +112,11 @@ class MPSSite {
  */
 class MPSContainer : public WavefunctionContainer {
  public:
+  /** @brief Real or complex matrix (e.g. one-particle RDMs). */
   using MatrixVariant = ContainerTypes::MatrixVariant;
+  /** @brief Real or complex vector (e.g. flattened two-particle RDMs). */
   using VectorVariant = ContainerTypes::VectorVariant;
+  /** @brief Real or complex scalar. */
   using ScalarVariant = ContainerTypes::ScalarVariant;
   /** @brief Shared immutable site in the chain. */
   using SitePtr = std::shared_ptr<const MPSSite>;

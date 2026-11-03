@@ -220,7 +220,8 @@ class ParticleNumberValue : public SymmetryAxisValue {
    * @return Shared pointer to the deserialized value typed as the
    *         polymorphic @ref SymmetryAxisValue base.
    * @throws std::runtime_error if @p j is missing the particle-number
-   *         payload or it is of the wrong type.
+   *         payload or it is not a nonnegative integer that fits
+   *         std::size_t.
    */
   static std::shared_ptr<const SymmetryAxisValue> from_json(
       const nlohmann::json& j);
@@ -813,6 +814,7 @@ SymmetryAxis spin(unsigned two_s, bool equivalent = true);
  * @param maximum_number Upper bound on the particle count (inclusive).
  * @return A fully populated, non-equivalent @ref SymmetryAxis for the
  *         particle-number degree of freedom.
+ * @throws std::length_error if @p maximum_number + 1 labels cannot be stored.
  */
 SymmetryAxis particle_number(std::size_t maximum_number);
 

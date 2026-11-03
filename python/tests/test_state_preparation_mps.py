@@ -29,6 +29,7 @@ from qdk_chemistry.algorithms.phase_estimation.standard_phase_estimation import 
 from qdk_chemistry.algorithms.state_preparation.matrix_product_state import MatrixProductStatePreparation
 from qdk_chemistry.data import (
     AlgorithmRef,
+    Configuration,
     MPSContainer,
     MPSSite,
     Orbitals,
@@ -422,19 +423,27 @@ def test_dense_and_block_sparse_prepare_same_state(fixture_name, reversed_order)
 def test_sparse_site_isometry_scatters_symmetry_blocks():
     """The block-sparse site matrix is built from the symmetry blocks and equals the padded dense isometry.
 
-    Every slot has two spin sectors whose sector order is not the label order, and only some sector
-    triples hold a block, so the sector offsets and the empty blocks are both exercised.
+    The bonds have two spin sectors and the physical slot has three particle-number sectors. No slot
+    stores its sectors in label order, and only some sector triples hold a block, so the sector offsets
+    and the empty blocks are both exercised.
     """
-    syms = sym.SymmetryProduct([sym.axes.spin(1, False)])
+    bond_syms = sym.SymmetryProduct([sym.axes.spin(1, False)])
+    physical_syms = sym.SymmetryProduct([sym.axes.particle_number(2)])
     alpha, beta = sym.SymmetryLabel([sym.axes.alpha()]), sym.SymmetryLabel([sym.axes.beta()])
-    extents = [{alpha: 2, beta: 1}, {alpha: 3, beta: 1}, {alpha: 1, beta: 2}]
+    zero, one, two = (sym.SymmetryLabel([sym.axes.particle_number_value(n)]) for n in range(3))
+    physical_basis = [Configuration.from_spin_half_string(state) for state in ("u", "d", "0", "2")]
+    extents = [{alpha: 2, beta: 1}, {zero: 1, one: 2, two: 1}, {alpha: 1, beta: 2}]
     rng = np.random.default_rng(3)
     blocks = []
-    for labels in [(alpha, alpha, beta), (beta, alpha, alpha), (alpha, beta, alpha), (beta, beta, beta)]:
+    for labels in [(alpha, one, beta), (beta, one, alpha), (alpha, zero, alpha), (beta, two, beta)]:
         left, physical, right = (extents[slot][label] for slot, label in enumerate(labels))
         blocks.append((labels, rng.standard_normal((left * physical, right))))
     site = MPSSite(
-        sym.SymmetryBlockedTensorRank3([syms] * 3, extents, blocks), [beta, alpha], [beta, alpha], [beta, alpha]
+        sym.SymmetryBlockedTensorRank3([bond_syms, physical_syms, bond_syms], extents, blocks),
+        [beta, alpha],
+        [one, zero, two],
+        [beta, alpha],
+        physical_basis,
     )
     ancilla_dim = 4
 

@@ -42,6 +42,31 @@ std::vector<Configuration> default_physical_basis(std::size_t dimension) {
   return basis;
 }
 
+// Binary states carry no spin projection, so only their particle number is
+// compared with the label.
+bool label_describes_state(const SymmetryLabel& label,
+                           const Configuration& state) {
+  for (const auto& [axis, value] : label.values()) {
+    switch (axis) {
+      case AxisName::ParticleNumber:
+        if (!value->equals(ParticleNumberValue(state.total_occupation()))) {
+          return false;
+        }
+        break;
+      case AxisName::Spin:
+        if (state.bits_per_mode() == 2) {
+          const auto [alpha, beta] = state.get_n_electrons();
+          const auto two_ms = static_cast<int>(alpha) - static_cast<int>(beta);
+          if (!value->equals(SpinValue(two_ms))) {
+            return false;
+          }
+        }
+        break;
+    }
+  }
+  return true;
+}
+
 std::size_t read_index(const nlohmann::json& value) {
   if (!value.is_number_integer() ||
       (!value.is_number_unsigned() && value.get<std::int64_t>() < 0) ||
@@ -234,6 +259,19 @@ void MPSSite::_validate() {
     }
     seen[value] = true;
   }
+  std::visit(
+      [&](const auto& tensor) {
+        std::size_t index = 0;
+        for (const auto& label : _sector_orders[1]) {
+          for (auto n = tensor.extents()[1].at(label); n > 0; --n) {
+            if (!label_describes_state(label, _physical_basis[index++])) {
+              throw std::invalid_argument(
+                  "MPS physical states must match their sector labels.");
+            }
+          }
+        }
+      },
+      *_tensor);
 }
 
 std::size_t MPSSite::left_bond_dimension() const { return _dimensions[0]; }

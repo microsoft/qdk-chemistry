@@ -160,7 +160,7 @@ class MatrixProductStatePreparation(StatePreparation):
         """
         if not isinstance(mps, MPSContainer):
             raise TypeError(f"MatrixProductStatePreparation requires an MPSContainer, got {type(mps)}.")
-        if mps.is_complex:
+        if mps.is_complex():
             raise ValueError(f"{_DESCRIPTION} currently supports only real-valued MPS tensors.")
         mps_sites = mps.sites
         self._validate_physical_basis(mps_sites)

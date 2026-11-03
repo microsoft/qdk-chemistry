@@ -763,6 +763,16 @@ auto gen_constraints_general(size_t nlevels, size_t norb, size_t ns_othr,
   std::vector<atomic_wrapper> constraint_work;
   std::vector<size_t> constraint_work_bare;
 
+  // Refinement adds one occupied orbital to a constraint, so constraints that
+  // already fix every alpha electron stay whole: no child covers their strings
+  size_t nalpha = 0;
+  if (!unique_alpha.empty()) {
+    if constexpr (flat_container)
+      nalpha = wfn_traits::alpha_string(*unique_alpha.begin()).count();
+    else
+      nalpha = unique_alpha.begin()->first.count();
+  }
+
   bool have_triplets = false;
   if constexpr (!std::is_null_pointer_v<std::decay_t<TripletWorkFn>>) {
     if (nlevel_min == 0) {
@@ -812,6 +822,10 @@ auto gen_constraints_general(size_t nlevels, size_t norb, size_t ns_othr,
         decltype(constraint_sizes) cur_constraints;
         cur_constraints.reserve(constraint_sizes.size() * norb);
         for (auto [c, nw] : constraint_sizes) {
+          if (c.count() >= nalpha) {
+            cur_constraints.emplace_back(c, 0ul);
+            continue;
+          }
           const auto C_min = c.C_min();
           for (int q_l = 0; q_l < static_cast<int>(C_min); ++q_l) {
             // Generate masks / counts
@@ -926,6 +940,10 @@ auto gen_constraints_general(size_t nlevels, size_t norb, size_t ns_othr,
       decltype(constraint_sizes) cur_constraints;
       cur_constraints.reserve(constraint_to_refine.size() * norb);
       for (auto [c, nw] : constraint_to_refine) {
+        if (c.count() >= nalpha) {
+          cur_constraints.emplace_back(c, 0ul);
+          continue;
+        }
         const auto C_min = c.C_min();
         for (int q_l = 0; q_l < static_cast<int>(C_min); ++q_l) {
           // Generate masks / counts
@@ -1005,8 +1023,8 @@ auto gen_constraints_general(size_t nlevels, size_t norb, size_t ns_othr,
 
     // Concatenate the arrays
     constraint_sizes.reserve(nrefine + nleave);
-    std::copy_n(constraint_to_refine.begin(), nrefine,
-                std::back_inserter(constraint_sizes));
+    std::copy(constraint_to_refine.begin(), constraint_to_refine.end(),
+              std::back_inserter(constraint_sizes));
     std::copy_n(constraint_to_leave.begin(), nleave,
                 std::back_inserter(constraint_sizes));
 
@@ -1025,7 +1043,7 @@ auto gen_constraints_general(size_t nlevels, size_t norb, size_t ns_othr,
       auto it = std::partition(
           constraint_sizes.begin(), constraint_sizes.end(), [=](const auto& a) {
             return a.second <= local_average or a.first.C_min() == 0 or
-                   a.first.C_min() == 1;
+                   a.first.C_min() == 1 or a.first.count() >= nalpha;
           });
 
       // Remove constraints from full list
