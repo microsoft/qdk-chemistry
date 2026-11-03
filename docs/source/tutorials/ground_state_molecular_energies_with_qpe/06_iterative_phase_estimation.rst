@@ -48,10 +48,12 @@ An :term:`IQPE` calculation requires four kinds of information:
    An evolution time, number of phase bits, shots per bit, and number of complete runs.
 
 Previous chapters supplied the qubit Hamiltonian and trial state for the selected molecular problem.
-Those chapters also recorded two classical quantities with distinct roles: the core energy and the selected-space :term:`CASCI` reference.
-When the IQPE problem is prepared, the active-space component of the known CASCI reference configures the evolution time.
+Those chapters also recorded two classical quantities with distinct roles: the core energy :math:`E_{\mathrm{core}}` and the selected-space :term:`CASCI` total energy :math:`E_{\mathrm{CASCI}}`.
+The corresponding active-space reference is :math:`E_{\mathrm{ref}}=E_{\mathrm{CASCI}}-E_{\mathrm{core}}`.
+The mapping workflow independently obtains this active-space energy by diagonalizing the qubit Hamiltonian in the same fixed-electron-number sector.
+When the IQPE problem is prepared, that mapped active-space reference energy configures the evolution time.
 After phase estimation, adding the core energy reconstructs the selected-space total energy.
-The selected-space CASCI reference then validates that reconstructed total.
+The selected-space CASCI total energy then validates that reconstructed total.
 
 During IQPE, the compute register stores the encoded active-space wavefunction.
 One additional readout ancilla extracts phase information without representing another spin orbital.
