@@ -254,7 +254,7 @@ QDK/Chemistry requires both a C and a C++ compiler supporting the ISO C++20 stan
 |-----------------|-----------------|----------|
 | GNU  | 13+ | Linux |
 | AppleClang | 17+ | macOS |
-| MSVC | Visual Studio 2022 Build Tools | Windows |
+| MSVC | Visual Studio 2026 Build Tools | Windows |
 | clang-cl | 17+ | Windows |
 
 **NOTE**: Before installing dependencies on Ubuntu/Debian, update package indices with:
@@ -270,7 +270,7 @@ sudo dnf makecache
 ```
 
 On Windows, dependencies come from two places: the compiler, CMake, and Ninja ship with the
-Visual Studio 2022 Build Tools, and the C++ libraries come from
+Visual Studio 2026 Build Tools, and the C++ libraries come from
 [vcpkg](https://learn.microsoft.com/vcpkg/). The Windows column below gives the vcpkg port name for
 each library; they are all declared in [`vcpkg.json`](vcpkg.json), so a single
 `vcpkg install --overlay-ports=vcpkg-overlay/ports` resolves the whole set.
@@ -297,11 +297,11 @@ sudo apt install python3 python3-pip python3-venv cmake ninja-build libeigen3-de
 
 #### Quick install (Windows)
 
-Install the Visual Studio 2022 Build Tools with the C++ workload, which also provides CMake and
+Install the Visual Studio 2026 Build Tools with the C++ workload, which also provides CMake and
 Ninja:
 
 ```powershell
-winget install --id Microsoft.VisualStudio.2022.BuildTools -e -s winget `
+winget install --id Microsoft.VisualStudio.BuildTools -e -s winget `
     --override "--quiet --wait --norestart --add Microsoft.VisualStudio.Workload.VCTools --includeRecommended"
 ```
 
@@ -331,7 +331,7 @@ These dependencies are automatically downloaded and built by the CMake build sys
 
 **NOTE**: The source code of MACIS is included in the `external` directory of QDK/Chemistry. `MACIS` carries its own set of dependencies which are automatically managed by the `MACIS` build system. While building `MACIS` and its dependencies can be time consuming, it is strongly encouraged to allow the QDK/Chemistry build system handle this dependency to ensure proper interaction of up- and down-stream components.
 
-**NOTE**: SeQuant is built from source at its pinned revision, with BTAS as its numerical backend. BTAS uses the BLAS++/LAPACK++ libraries that `MACIS` brings in.
+**NOTE**: SeQuant is built from source at its pinned revision, with BTAS as its numerical backend. BTAS uses the BLAS++/LAPACK++ libraries that `MACIS` brings in. Builds with `QDK_ALLOW_DEPENDENCY_FETCH=OFF` use an installed SeQuant instead: install the standalone project [`cpp/cmake/sequant`](cpp/cmake/sequant/CMakeLists.txt), which applies the same pins and patches, into the prefix that holds BLAS++/LAPACK++.
 
 ### Note on LAPACK Usage
 
@@ -393,7 +393,7 @@ cd ..
 
 **Windows (PowerShell):**
 
-Run from a **Developer PowerShell for VS 2022** so that the compiler is on `PATH`, with the vcpkg
+Run from a Visual Studio 2026 **Developer PowerShell** so that the compiler is on `PATH`, with the vcpkg
 dependencies already installed. The [build scripts](#building-on-windows) do both for you.
 
 ```powershell
@@ -561,7 +561,7 @@ cmake --build cpp/build
 
 **Windows (PowerShell):**
 
-From a Developer PowerShell for VS 2022, with the vcpkg dependencies already installed:
+From a Visual Studio 2026 Developer PowerShell, with the vcpkg dependencies already installed:
 
 ```powershell
 cd C:\full\path\to\qdk-chemistry

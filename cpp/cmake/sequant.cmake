@@ -25,6 +25,11 @@ block()
             "-DPATCH_FILE=${CMAKE_CURRENT_LIST_DIR}/patches/kit-cmake-build-testing.patch"
             -P "${CMAKE_CURRENT_LIST_DIR}/patches/apply-patch.cmake"
     )
+    # The cgmanifest revision; kit-cmake's older pin misses vcpkg's OpenBLAS headers.
+    FetchContent_Declare(linalg-cmake-modules
+        GIT_REPOSITORY https://github.com/wavefunction91/linalg-cmake-modules.git
+        GIT_TAG        222364df5e7639f371bf2f37ceb0f476301101a1
+    )
     # SeQuant would otherwise take an installed BTAS over the pinned one; a preinstalled SeQuant needs its own.
     if(QDK_ALLOW_DEPENDENCY_FETCH)
         set(CMAKE_DISABLE_FIND_PACKAGE_BTAS ON)
@@ -33,10 +38,6 @@ block()
     # Concurrent evaluation otherwise races on SeQuant's trace-label map, even with tracing off.
     set(_sequant_patch PATCH_COMMAND "${CMAKE_COMMAND}"
         "-DPATCH_FILE=${CMAKE_CURRENT_LIST_DIR}/patches/sequant-eval-trace-labels.patch"
-        -P "${CMAKE_CURRENT_LIST_DIR}/patches/apply-patch.cmake")
-    # MSVC 19.44 (VS 2022 17.14) otherwise rejects SeQuant's evaluation byte counter.
-    list(APPEND _sequant_patch COMMAND "${CMAKE_COMMAND}"
-        "-DPATCH_FILE=${CMAKE_CURRENT_LIST_DIR}/patches/sequant-msvc-eval-bytes.patch"
         -P "${CMAKE_CURRENT_LIST_DIR}/patches/apply-patch.cmake")
     # clang-cl ignores [[no_unique_address]] like MSVC, which fails a SeQuant size check.
     if(CMAKE_CXX_COMPILER_ID MATCHES "Clang" AND CMAKE_CXX_SIMULATE_ID STREQUAL "MSVC")
@@ -81,6 +82,10 @@ block()
     foreach(_var IN LISTS _qdk_seeded)
         unset(${_var} CACHE)
     endforeach()
+    # An installed SeQuant may have been built without the BTAS backend.
+    if(NOT TARGET SeQuant::eval::btas)
+        message(FATAL_ERROR "SeQuant at ${SeQuant_DIR} lacks its BTAS backend; install it with cpp/cmake/sequant.")
+    endif()
 
     # SeQuant's unit-test objects are otherwise part of `all`.
     FetchContent_GetProperties(SeQuant)

@@ -328,7 +328,7 @@ Then build with CMake, pointing to your QDK/Chemistry installation:
 
 .. note::
 
-   On Windows, run these commands from a *Developer PowerShell for VS 2022* so that the MSVC
+   On Windows, run these commands from a Visual Studio 2026 *Developer PowerShell* so that the MSVC
    toolchain is on ``PATH``. If the library was built against vcpkg dependencies, also pass
    ``-DCMAKE_TOOLCHAIN_FILE`` and ``-DVCPKG_TARGET_TRIPLET`` as described in the
    `installation instructions <https://github.com/microsoft/qdk-chemistry/blob/main/INSTALL.md#building-on-windows>`_.
