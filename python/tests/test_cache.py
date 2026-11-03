@@ -10,11 +10,15 @@ from __future__ import annotations
 import importlib.metadata
 import json
 import logging
+import sys
+from typing import Any
+from unittest.mock import Mock
 
 import numpy as np
 import pytest
 
 import qdk_chemistry.remote.cache as cache_module
+import qdk_chemistry.remote.cache.folder as folder_module
 from qdk_chemistry.data import EnergyExpectationResult, MeasurementData, Orbitals, QubitOperator
 from qdk_chemistry.data._spin_channels import spin_channel_matrix
 from qdk_chemistry.data.symmetry import axes
@@ -180,6 +184,23 @@ class TestFolderCacheJobs:
         # Job should be gone but data blob should still be present
         assert folder_cache.get_job("run_abc") is None
         assert folder_cache.get_data("hash_wfn_result") is not None
+
+    def test_job_symlink_outside_root_is_miss(self, folder_cache, cache_dir, tmp_path, sample_job, caplog):
+        """A job record that resolves outside the cache is a logged miss, and deleting it removes only the link."""
+        FolderCache(tmp_path / "outside").put_job("run1", sample_job)
+        outside = tmp_path / "outside" / "run1.job.json"
+        cache_dir.mkdir()
+        try:
+            (cache_dir / "run1.job.json").symlink_to(outside)
+        except OSError as exc:
+            pytest.skip(f"Symlink creation is not supported: {exc}")
+
+        with caplog.at_level(logging.WARNING, logger=folder_module.__name__):
+            assert folder_cache.get_job("run1") is None
+        assert "outside the cache root" in caplog.text
+
+        assert folder_cache.delete_job("run1")
+        assert outside.exists()
 
 
 # ── FolderCache: DataClass blobs ─────────────────────────────────────────────
@@ -414,6 +435,13 @@ class TestFolderCacheData:
 
         assert folder_cache.get_data("list_hash") is None
 
+    def test_get_data_non_object_sequence_manifest_is_miss(self, folder_cache, cache_dir):
+        """Sequence manifests that are not JSON objects behave like cache misses."""
+        cache_dir.mkdir()
+        (cache_dir / "list_hash.list.json").write_text(json.dumps([1]))
+
+        assert folder_cache.get_data("list_hash") is None
+
     def test_put_and_get_nested_list_tuple_result(self, folder_cache):
         """Nested list/tuple results with mixed DataClass items round-trip."""
         energy = EnergyExpectationResult(
@@ -445,6 +473,174 @@ class TestFolderCacheData:
         manifest_path = cache_dir / "list_hash.list[orbitals].json"
 
         assert folder_cache._get_data_list(manifest_path) is None
+
+    @pytest.mark.parametrize("manifest_kind", ["legacy", "dataclass", "ndarray"])
+    def test_nested_references_reject_invalid_keys(self, folder_cache, cache_dir, tmp_path, monkeypatch, manifest_kind):
+        """Nested references are validated before any blob loader is invoked."""
+        cache_dir.mkdir()
+        (tmp_path / "outside.orbitals.h5").write_bytes(b"not an HDF5 file")
+        loader = Mock()
+        monkeypatch.setattr(folder_module, "_resolve_dataclass_type", lambda _name: loader)
+        array_loader = Mock()
+        monkeypatch.setattr(folder_module.np, "load", array_loader)
+        manifest: dict[str, Any]
+        if manifest_kind == "legacy":
+            manifest = {"type": "orbitals", "items": ["../outside"]}
+            path = cache_dir / "list_hash.list[orbitals].json"
+        else:
+            manifest = {
+                "kind": "sequence",
+                "sequence_type": "list",
+                "items": [{"kind": manifest_kind, "hash": "../outside", "type": "orbitals"}],
+            }
+            path = cache_dir / "list_hash.list.json"
+        path.write_text(json.dumps(manifest))
+
+        assert folder_cache.get_data("list_hash") is None
+        loader.from_hdf5_file.assert_not_called()
+        array_loader.assert_not_called()
+
+    def test_nested_reference_rejects_path_in_type_name(self, folder_cache, cache_dir, caplog):
+        """Registered type dispatch cannot turn a manifest type into a path."""
+        cache_dir.mkdir()
+        manifest = {
+            "kind": "sequence",
+            "sequence_type": "list",
+            "items": [{"kind": "dataclass", "hash": "safe", "type": "../orbitals"}],
+        }
+        (cache_dir / "list_hash.list.json").write_text(json.dumps(manifest))
+
+        with caplog.at_level(logging.WARNING, logger=folder_module.__name__):
+            assert folder_cache.get_data("list_hash") is None
+
+        assert "Unknown cached data type" in caplog.text
+
+    @pytest.mark.skipif(sys.platform == "win32", reason="Windows file names cannot contain ':'")
+    @pytest.mark.parametrize("manifest_kind", ["legacy", "dataclass"])
+    def test_registered_type_name_with_colon_loads(self, folder_cache, cache_dir, monkeypatch, manifest_kind):
+        """Type names follow the registration rules, which allow ':' unlike cache keys."""
+        cache_dir.mkdir()
+        blob = cache_dir / "item_hash.vendor:orbitals.h5"
+        blob.write_bytes(b"stub")
+        loader = Mock()
+        loader.from_hdf5_file.return_value = "loaded"
+        monkeypatch.setattr(
+            folder_module, "_resolve_dataclass_type", lambda name: loader if name == "vendor:orbitals" else None
+        )
+        if manifest_kind == "legacy":
+            manifest: dict[str, Any] = {"type": "vendor:orbitals", "items": ["item_hash"]}
+            path = cache_dir / "list_hash.list[vendor:orbitals].json"
+        else:
+            manifest = {
+                "kind": "sequence",
+                "sequence_type": "list",
+                "items": [{"kind": "dataclass", "hash": "item_hash", "type": "vendor:orbitals"}],
+            }
+            path = cache_dir / "list_hash.list.json"
+        path.write_text(json.dumps(manifest))
+
+        assert folder_cache.get_data("list_hash") == ["loaded"]
+        loader.from_hdf5_file.assert_called_once_with(str(blob))
+
+    @pytest.mark.parametrize("manifest_kind", ["legacy", "dataclass", "ndarray"])
+    def test_delete_nested_reference_cannot_escape_root(self, folder_cache, cache_dir, tmp_path, manifest_kind):
+        """Deleting a corrupt sequence never deletes a referenced external file."""
+        cache_dir.mkdir()
+        suffix = "ndarray.npy" if manifest_kind == "ndarray" else "orbitals.h5"
+        outside = tmp_path / f"outside.{suffix}"
+        outside.write_bytes(b"preserve")
+        manifest: dict[str, Any]
+        if manifest_kind == "legacy":
+            manifest = {"type": "orbitals", "items": ["../outside"]}
+            path = cache_dir / "list_hash.list[orbitals].json"
+        else:
+            manifest = {
+                "kind": "sequence",
+                "sequence_type": "list",
+                "items": [{"kind": manifest_kind, "hash": "../outside", "type": "orbitals"}],
+            }
+            path = cache_dir / "list_hash.list.json"
+        path.write_text(json.dumps(manifest))
+
+        assert folder_cache.delete_data("list_hash")
+        assert outside.read_bytes() == b"preserve"
+
+    @pytest.mark.parametrize("invalid_first", [False, True])
+    @pytest.mark.parametrize("manifest_kind", ["legacy", "dataclass"])
+    def test_delete_skips_invalid_references_in_any_order(self, folder_cache, cache_dir, manifest_kind, invalid_first):
+        """Invalid references are skipped wherever they appear, so valid ones still protect and delete blobs."""
+        cache_dir.mkdir()
+        shared = cache_dir / "shared.orbitals.h5"
+        shared.write_bytes(b"shared")
+
+        def write_manifest(name: str, keys: list[Any]) -> None:
+            manifest: dict[str, Any]
+            if manifest_kind == "legacy":
+                manifest = {"type": "orbitals", "items": keys}
+                path = cache_dir / f"{name}.list[orbitals].json"
+            else:
+                # A non-string key stands in for an entry that is not a reference at all.
+                items = [{"kind": manifest_kind, "hash": key} if isinstance(key, str) else key for key in keys]
+                manifest = {"kind": "sequence", "sequence_type": "list", "items": items}
+                path = cache_dir / f"{name}.list.json"
+            path.write_text(json.dumps(manifest))
+
+        invalid = ["../outside", 5]
+        write_manifest("first", ["shared"])
+        write_manifest("second", [*invalid, "shared"] if invalid_first else ["shared", *invalid])
+
+        assert folder_cache.delete_data("first")
+        assert shared.exists()
+        assert folder_cache.delete_data("second")
+        assert not shared.exists()
+
+    @pytest.mark.parametrize(
+        ("name", "manifest"),
+        [
+            ("list_hash.list.json", {"kind": "sequence", "sequence_type": "list", "items": [1]}),
+            ("list_hash.list[orbitals].json", {"type": "orbitals", "items": 7}),
+        ],
+    )
+    def test_delete_malformed_manifest_is_removed(self, folder_cache, cache_dir, name, manifest):
+        """A manifest of the wrong shape is logged and removed instead of aborting deletion."""
+        cache_dir.mkdir()
+        (cache_dir / name).write_text(json.dumps(manifest))
+
+        assert folder_cache.delete_data("list_hash")
+        assert not (cache_dir / name).exists()
+
+    def test_data_symlink_outside_root_is_miss(self, folder_cache, cache_dir, tmp_path, caplog):
+        """A cache blob symlink that leaves the cache is a logged miss, and the next tier serves the data."""
+        cache_dir.mkdir()
+        outside = tmp_path / "outside.ndarray.npy"
+        np.save(outside, np.array([1.0]), allow_pickle=False)
+        try:
+            (cache_dir / "array_hash.ndarray.npy").symlink_to(outside)
+        except OSError as exc:
+            pytest.skip(f"Symlink creation is not supported: {exc}")
+
+        with caplog.at_level(logging.WARNING, logger=folder_module.__name__):
+            assert folder_cache.get_data("array_hash") is None
+        assert "outside the cache root" in caplog.text
+        assert not folder_cache.has_data("array_hash")
+
+        shared = FolderCache(tmp_path / "shared")
+        shared.put_data("array_hash", np.array([2.0]))
+        np.testing.assert_array_equal(TieredCache([folder_cache, shared]).get_data("array_hash"), [2.0])
+        np.testing.assert_array_equal(np.load(outside), [1.0])
+
+    def test_symlink_loop_is_miss(self, folder_cache, cache_dir):
+        """A cache entry that is a symlink loop is a miss, and deleting it removes the link."""
+        cache_dir.mkdir()
+        loop = cache_dir / "list_hash.list[orbitals].json"
+        try:
+            loop.symlink_to(loop)
+        except OSError as exc:
+            pytest.skip(f"Symlink creation is not supported: {exc}")
+
+        assert folder_cache.get_data("list_hash") is None
+        assert folder_cache.delete_data("list_hash")
+        assert not loop.is_symlink()
 
 
 # ── FolderCache: clear ───────────────────────────────────────────────────────
