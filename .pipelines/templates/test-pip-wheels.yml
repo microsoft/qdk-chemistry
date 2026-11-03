@@ -29,49 +29,65 @@ steps:
   - script: |
       echo "Running wheel tests (Docker linux/amd64)..."
       docker run --rm \
-        --platform ${{ parameters.imageTag }} \
+        --platform "$QDK_TEST_PLATFORM" \
         -e PIP_INDEX_URL \
         -e SYSTEM_ACCESSTOKEN \
         -e QSHARP_PYTHON_TELEMETRY=false \
-        -e QDK_CHEMISTRY_RUN_SLOW_TESTS=${{ parameters.runSlowTests }} \
-        -e EXACHEM_REQUIRED=${{ parameters.exachemRequired }} \
-        -v ${{ parameters.agentBuildDirectory }}:/workspace \
+        -e QDK_CHEMISTRY_RUN_SLOW_TESTS \
+        -e EXACHEM_REQUIRED \
+        -v "$QDK_AGENT_BUILD_DIRECTORY:/workspace" \
         -w /workspace/qdk-chemistry/python \
-        ${{ parameters.dockerImage }} \
-        bash ../.pipelines/pip-scripts/test-pip-wheels.sh ${{ parameters.pythonVersion }} \
-                                                          ${{ parameters.macBuild }}
+        "$QDK_TEST_IMAGE" \
+        bash ../.pipelines/pip-scripts/test-pip-wheels.sh "$QDK_PYTHON_VERSION" \
+                                                          "$QDK_MAC_BUILD"
     displayName: Test wheel (Docker linux/amd64)
     condition: ${{ parameters.condition }}
     env:
+      QDK_TEST_PLATFORM: ${{ parameters.imageTag }}
+      QDK_AGENT_BUILD_DIRECTORY: ${{ parameters.agentBuildDirectory }}
+      QDK_TEST_IMAGE: ${{ parameters.dockerImage }}
+      QDK_PYTHON_VERSION: ${{ parameters.pythonVersion }}
+      QDK_MAC_BUILD: ${{ parameters.macBuild }}
+      QDK_CHEMISTRY_RUN_SLOW_TESTS: ${{ parameters.runSlowTests }}
+      EXACHEM_REQUIRED: ${{ parameters.exachemRequired }}
       SYSTEM_ACCESSTOKEN: $(System.AccessToken)
 
 - ${{ if and(eq(parameters.macBuild, 'OFF'), ne(parameters.imageTag, 'linux/amd64')) }}:
   - script: |
-      echo "Running wheel tests (Docker ${{ parameters.imageTag }})..."
+      echo "Running wheel tests (Docker $QDK_TEST_PLATFORM)..."
       docker run --rm \
-        --platform ${{ parameters.imageTag }} \
+        --platform "$QDK_TEST_PLATFORM" \
         -e PIP_INDEX_URL \
         -e SYSTEM_ACCESSTOKEN \
         -e QSHARP_PYTHON_TELEMETRY=false \
-        -e QDK_CHEMISTRY_RUN_SLOW_TESTS=${{ parameters.runSlowTests }} \
-        -v ${{ parameters.agentBuildDirectory }}:/workspace \
+        -e QDK_CHEMISTRY_RUN_SLOW_TESTS \
+        -v "$QDK_AGENT_BUILD_DIRECTORY:/workspace" \
         -w /workspace/qdk-chemistry/python \
-        ${{ parameters.dockerImage }} \
-        bash ../.pipelines/pip-scripts/test-pip-wheels.sh ${{ parameters.pythonVersion }} \
-                                                          ${{ parameters.macBuild }}
+        "$QDK_TEST_IMAGE" \
+        bash ../.pipelines/pip-scripts/test-pip-wheels.sh "$QDK_PYTHON_VERSION" \
+                                                          "$QDK_MAC_BUILD"
     displayName: Test wheel (Docker ${{ parameters.imageTag }})
     condition: ${{ parameters.condition }}
     env:
+      QDK_TEST_PLATFORM: ${{ parameters.imageTag }}
+      QDK_AGENT_BUILD_DIRECTORY: ${{ parameters.agentBuildDirectory }}
+      QDK_TEST_IMAGE: ${{ parameters.dockerImage }}
+      QDK_PYTHON_VERSION: ${{ parameters.pythonVersion }}
+      QDK_MAC_BUILD: ${{ parameters.macBuild }}
+      QDK_CHEMISTRY_RUN_SLOW_TESTS: ${{ parameters.runSlowTests }}
       SYSTEM_ACCESSTOKEN: $(System.AccessToken)
 
 - ${{ if eq(parameters.macBuild, 'ON') }}:
   - script: |
       echo "Running wheel tests (native)..."
-      cd ${{ parameters.agentBuildDirectory }}/qdk-chemistry/python
-      export QDK_CHEMISTRY_RUN_SLOW_TESTS=${{ parameters.runSlowTests }}
-      bash ../.pipelines/pip-scripts/test-pip-wheels.sh ${{ parameters.pythonVersion }} \
-                                                        ${{ parameters.macBuild }}
+      cd "$QDK_AGENT_BUILD_DIRECTORY/qdk-chemistry/python"
+      bash ../.pipelines/pip-scripts/test-pip-wheels.sh "$QDK_PYTHON_VERSION" \
+                                                        "$QDK_MAC_BUILD"
     displayName: Test wheel (native)
     condition: ${{ parameters.condition }}
     env:
+      QDK_AGENT_BUILD_DIRECTORY: ${{ parameters.agentBuildDirectory }}
+      QDK_PYTHON_VERSION: ${{ parameters.pythonVersion }}
+      QDK_MAC_BUILD: ${{ parameters.macBuild }}
+      QDK_CHEMISTRY_RUN_SLOW_TESTS: ${{ parameters.runSlowTests }}
       SYSTEM_ACCESSTOKEN: $(System.AccessToken)
