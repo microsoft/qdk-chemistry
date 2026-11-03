@@ -74,6 +74,12 @@ class TestAliasSamplingStatePreparation:
         assert circuit._qsharp_op is not None
         assert circuit._qsharp_factory is not None
 
+    def test_qir_generation(self):
+        """The classical alias table must survive QIR partial evaluation, not just simulation."""
+        prep = AliasSamplingStatePreparation(bits_precision=4)
+        circuit = prep.run(create_dense_wavefunction([0.25, 0.5, 0.1, 0.0]))
+        assert str(circuit.get_qir())
+
     def test_resource_counts(self, qsharp_test_context, qsharp_test_utils):
         """Pin the logical resource counts so a costing regression is visible."""
         prep = AliasSamplingStatePreparation(bits_precision=4)

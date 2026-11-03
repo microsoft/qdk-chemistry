@@ -87,16 +87,24 @@ namespace QDKChemistry.Utils.AliasSampling {
         // Flooring keeps the residual non-negative, so bar heights only increase. Sorting once
         // costs O(L log L); rescanning every remainder per leftover unit would be O(L²).
         let residual = MinI(targetTotal - scaledTotal, nCoeffs);
-        let finalRemainders = remainders;
-        let byRemainder = Sorted(
-            (i, j) -> finalRemainders[i] > finalRemainders[j] or (finalRemainders[i] == finalRemainders[j] and i <= j),
-            MappedOverRange(i -> i, 0..nCoeffs - 1)
+        mutable keyed : (Double, Int)[] = [];
+        for i in 0..nCoeffs - 1 {
+            set keyed += [(remainders[i], i)];
+        }
+        // QIR partial evaluation mishandles a capturing comparator and indexing by sorted
+        // values, so sort (remainder, index) pairs and mark the winners in a separate pass.
+        let byRemainder = Mapped(
+            Snd,
+            Sorted((a, b) -> Fst(a) > Fst(b) or (Fst(a) == Fst(b) and Snd(a) <= Snd(b)), keyed)
         );
+        mutable gainsUnit = [false, size = nCoeffs];
         for k in 0..residual - 1 {
-            let bestIdx = byRemainder[k];
+            set gainsUnit w/= byRemainder[k] <- true;
+        }
+        for i in 0..nCoeffs - 1 {
             // Sentinel remainders mark zero coefficients, which must never gain weight.
-            if finalRemainders[bestIdx] >= 0.0 {
-                set scaledProbs w/= bestIdx <- scaledProbs[bestIdx] + 1;
+            if gainsUnit[i] and remainders[i] >= 0.0 {
+                set scaledProbs w/= i <- scaledProbs[i] + 1;
             }
         }
 
