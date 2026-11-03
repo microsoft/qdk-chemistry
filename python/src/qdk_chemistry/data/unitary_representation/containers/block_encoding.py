@@ -226,6 +226,11 @@ class LCUContainer(BlockEncodingContainer):
         return self.select.num_target_qubits + self.num_prepare_ancillas
 
     @property
+    def num_system_qubits(self) -> int:
+        """Number of system qubits, the qubits the select acts on."""
+        return self.select.num_target_qubits
+
+    @property
     def type(self) -> str:
         """Get the type of the unitary container.
 

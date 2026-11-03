@@ -74,18 +74,19 @@ struct SpinCache {
         beta[i] = wfn_traits::beta_string(dets[i]);
         spin_wfn_traits::state_to_occ(alpha[i], tmp);
         std::copy_n(tmp.data(), n_alpha_elec,
-                    &occ_alpha_flat[i * n_alpha_elec]);
+                    occ_alpha_flat.data() + i * n_alpha_elec);
         spin_wfn_traits::state_to_occ(beta[i], tmp);
-        std::copy_n(tmp.data(), n_beta_elec, &occ_beta_flat[i * n_beta_elec]);
+        std::copy_n(tmp.data(), n_beta_elec,
+                    occ_beta_flat.data() + i * n_beta_elec);
       }
     }
   }
 
   const uint32_t* occ_a(size_t i) const {
-    return &occ_alpha_flat[i * n_alpha_elec];
+    return occ_alpha_flat.data() + i * n_alpha_elec;
   }
   const uint32_t* occ_b(size_t i) const {
-    return &occ_beta_flat[i * n_beta_elec];
+    return occ_beta_flat.data() + i * n_beta_elec;
   }
 };
 

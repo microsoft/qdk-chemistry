@@ -25,30 +25,30 @@ class DrivenQubitHamiltonian(TimeDependentQubitHamiltonian):
 
     Convenience subclass of :class:`TimeDependentQubitHamiltonian` that
     creates a :class:`~qdk_chemistry.data.time_dependent_qubit_hamiltonian.containers.driven.DrivenContainer`
-    under the hood.
+    under the hood. Omitting *h1* and *drive* gives the static Hamiltonian *H0*.
 
     Args:
         h0: Time-independent qubit operator.
-        h1: Time-dependent qubit operator (modulated by *drive*).
-        drive: Scalar function f(t) that modulates *h1*.
+        h1: Time-dependent qubit operator (modulated by *drive*), or None for a static Hamiltonian.
+        drive: Scalar function f(t) that modulates *h1*, or None for a static Hamiltonian.
 
     Raises:
-        ValueError: If *h0* and *h1* have different qubit counts.
+        ValueError: If only one of *h1* and *drive* is given, or *h0* and *h1* have different qubit counts.
 
     """
 
     def __init__(
         self,
         h0: QubitOperator,
-        h1: QubitOperator,
-        drive: Callable[[float], float],
+        h1: QubitOperator | None = None,
+        drive: Callable[[float], float] | None = None,
     ) -> None:
         """Initialize a driven time-dependent qubit Hamiltonian.
 
         Args:
             h0: Time-independent qubit operator.
-            h1: Time-dependent qubit operator (modulated by *drive*).
-            drive: Scalar function f(t) that modulates *h1*.
+            h1: Time-dependent qubit operator (modulated by *drive*), or None for a static Hamiltonian.
+            drive: Scalar function f(t) that modulates *h1*, or None for a static Hamiltonian.
 
         """
         super().__init__(DrivenContainer(h0, h1, drive))
@@ -60,13 +60,13 @@ class DrivenQubitHamiltonian(TimeDependentQubitHamiltonian):
         return container.base_hamiltonian
 
     @property
-    def h1(self) -> QubitOperator:
-        """The time-dependent Hamiltonian (modulated by the drive)."""
+    def h1(self) -> QubitOperator | None:
+        """The time-dependent Hamiltonian (modulated by the drive), or None for a static Hamiltonian."""
         container: DrivenContainer = self.get_container()  # type: ignore[assignment]
         return container.drive_hamiltonian
 
     @property
-    def drive(self) -> Callable[[float], float]:
-        """The scalar drive function f(t)."""
+    def drive(self) -> Callable[[float], float] | None:
+        """The scalar drive function f(t), or None for a static Hamiltonian."""
         container: DrivenContainer = self.get_container()  # type: ignore[assignment]
         return container.drive

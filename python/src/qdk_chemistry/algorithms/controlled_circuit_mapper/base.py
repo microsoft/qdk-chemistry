@@ -42,7 +42,13 @@ class ControlledCircuitMapperSettings(Settings):
 
 
 class ControlledCircuitMapper(Algorithm):
-    """Base class for circuit mapper for controlled-unitary in QDK/Chemistry algorithms."""
+    """Map a unitary to a controlled circuit with declared callable requirements.
+
+    ``Circuit.num_qubits`` counts all caller-supplied qubits, including controls and
+    working qubits, but not internally allocated scratch. Q# callables used by QPE
+    take their single control separately from the target register; it is still included
+    in this width. Placement indices describe the standalone circuit factory.
+    """
 
     def __init__(self):
         """Initialize the ControlledCircuitMapper."""

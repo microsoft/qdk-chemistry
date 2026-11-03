@@ -5,9 +5,13 @@
 # Licensed under the MIT License. See LICENSE.txt in the project root for license information.
 # --------------------------------------------------------------------------------------------
 
+from contextlib import nullcontext
+from itertools import pairwise, product
+
 import numpy as np
 import pytest
 import scipy
+from qdk import TargetProfile
 
 try:
     from qdk._native import Circuit as QdkCircuitType
@@ -34,10 +38,18 @@ from qdk_chemistry.data.unitary_representation.containers.pauli_product_formula 
     PauliProductFormulaContainer,
 )
 from qdk_chemistry.plugins.qiskit import QDK_CHEMISTRY_HAS_QISKIT
-from qdk_chemistry.utils.model_hamiltonians import create_ising_hamiltonian
+from qdk_chemistry.utils.model_hamiltonians import create_heisenberg_hamiltonian, create_ising_hamiltonian
+from qdk_chemistry.utils.qsharp import create_qsharp_context, get_qsharp_context, use_qsharp_context
 
+from .helpers import (
+    apply_operation,
+    assert_states_match_up_to_global_phase,
+    controlled_product_formula_state,
+    create_nontrivial_test_hamiltonian,
+    create_test_orbitals,
+    random_state,
+)
 from .reference_tolerances import float_comparison_absolute_tolerance, float_comparison_relative_tolerance
-from .test_helpers import create_nontrivial_test_hamiltonian, create_test_orbitals
 
 if QDK_CHEMISTRY_HAS_QISKIT:
     from qiskit import QuantumCircuit
@@ -142,15 +154,23 @@ def make_two_qubit_rep():
     return _make
 
 
-@pytest.fixture
-def vacuum_annihilating_unitary():
+@pytest.fixture(params=list(product([1, 2, 4], [False, True], [False, True])))
+def vacuum_annihilating_unitary(request: pytest.FixtureRequest) -> UnitaryRepresentation:
     """Group the end-to-end Hamiltonian with ``vacuum_annihilating`` and Trotterise it."""
     # 0.5 (XX + YY) - 0.5 Z0 + 0.5 Z1: number conserving, so H|00> = 0.
     hamiltonian = QubitOperator(["XX", "YY", "IZ", "ZI"], np.array([0.5, 0.5, -0.5, 0.5]))
     grouped = registry.create("term_grouper", "vacuum_annihilating").run(hamiltonian)
 
-    trotter = registry.create("hamiltonian_unitary_builder", "trotter")
-    trotter.settings().update({"order": 1, "num_divisions": 1, "time": 0.5})
+    order, fuse, minimize = request.param
+    trotter = registry.create(
+        "hamiltonian_unitary_builder",
+        "trotter",
+        order=order,
+        num_divisions=3,
+        time=0.5,
+        fuse_group_boundaries=fuse,
+        minimize_pauli_exponentials=minimize,
+    )
     return trotter.run(grouped)
 
 
@@ -284,19 +304,23 @@ class TestControlledSwapPauliSequenceMapper:
         assert amplitudes[5] / amplitudes[1] == pytest.approx(np.exp(-0.4j), abs=float_comparison_absolute_tolerance)
 
     @pytest.mark.skipif(not QDK_CHEMISTRY_HAS_QISKIT, reason="Qiskit not available.")
-    def test_vacuum_phase_covers_every_repetition(self, cswap_mapper, diagonal_ppf_container):
-        """``step_reps`` copies of the step imprint ``step_reps`` times the phase."""
-        repetitions = 3
+    @pytest.mark.parametrize("profile", [TargetProfile.Base, TargetProfile.Adaptive_RIF])
+    @pytest.mark.parametrize("empty_body", [False, True])
+    def test_vacuum_phase_covers_every_repetition(
+        self, cswap_mapper, diagonal_ppf_container, profile: TargetProfile, empty_body: bool
+    ) -> None:
+        """Endpoint phases occur once, including with an empty body, in either target profile."""
         container = PauliProductFormulaContainer(
-            step_terms=diagonal_ppf_container.step_terms,
-            step_reps=repetitions,
+            step_terms=[] if empty_body else diagonal_ppf_container.step_terms,
+            step_reps=3,
             num_qubits=2,
+            prefix_terms=[ExponentiatedPauliTerm(Z0, 0.17)],
+            suffix_terms=[ExponentiatedPauliTerm(IDENTITY, 0.23)],
         )
-        circuit = cswap_mapper.run(UnitaryRepresentation(container=container))
-
-        block = Operator(circuit.get_qiskit_circuit()).data[0:8, 0:8]
-        step = build_product_formula_matrix([(t.pauli_term, t.angle) for t in container.step_terms], 2)
-        expected_matrix = controlled_unitary(np.linalg.matrix_power(step, repetitions))
+        with use_qsharp_context(create_qsharp_context(profile)):
+            block = Operator(cswap_mapper.run(UnitaryRepresentation(container)).get_qiskit_circuit()).data[0:8, 0:8]
+        terms = container.prefix_terms + container.step_terms * container.step_reps + container.suffix_terms
+        expected_matrix = controlled_unitary(build_product_formula_matrix([(t.pauli_term, t.angle) for t in terms], 2))
 
         assert np.allclose(
             block / block[0, 0],
@@ -305,9 +329,45 @@ class TestControlledSwapPauliSequenceMapper:
             rtol=float_comparison_relative_tolerance,
         )
 
+    def test_compact_payload_and_linear_logical_counts(self, cswap_mapper, diagonal_ppf_container) -> None:
+        """Large repetitions stay symbolic; small traces grow only by the repeated body."""
+        counts = []
+        for repetitions in (1, 3, 7, 10**9):
+            container = PauliProductFormulaContainer(
+                diagonal_ppf_container.step_terms,
+                repetitions,
+                2,
+                prefix_terms=[ExponentiatedPauliTerm(Z0, 0.17)],
+                suffix_terms=[ExponentiatedPauliTerm(IDENTITY, 0.23)],
+            )
+            circuit = cswap_mapper.run(UnitaryRepresentation(container))
+            evolution = vars(circuit._qsharp_factory.parameter["evolution"])
+            assert evolution["repetitions"] == repetitions
+            assert len(evolution["pauliCoefficients"]) == 4
+            if repetitions < 10**9:  # Never expand the billion-step circuit into a trace.
+                application = circuit.get_qre_application()
+                counts.append(dict(get_qsharp_context().logical_counts(application.entry_expr, *application.args)))
+        assert counts[1]["rotationCount"] - counts[0]["rotationCount"] == 4
+        assert counts[2]["rotationCount"] - counts[1]["rotationCount"] == 8
+        assert counts[0]["cczCount"] == counts[1]["cczCount"] == counts[2]["cczCount"]
+
 
 class TestVacuumPreservationValidation:
     """Tests for the vacuum-preservation validation of the input product formula."""
+
+    @pytest.mark.parametrize(
+        "leaking_sections",
+        [("prefix_terms",), ("step_terms",), ("suffix_terms",), ("prefix_terms", "suffix_terms")],
+    )
+    def test_leaking_section_is_rejected(self, cswap_mapper, leaking_sections: tuple[str, ...]) -> None:
+        """Each section must preserve the vacuum, even when inverse endpoint rotations cancel."""
+        sections: dict[str, list[ExponentiatedPauliTerm]] = {
+            name: [] for name in ("prefix_terms", "step_terms", "suffix_terms")
+        }
+        for section in leaking_sections:
+            sections[section] = [ExponentiatedPauliTerm({0: "X"}, -0.3 if section == "suffix_terms" else 0.3)]
+        with pytest.raises(ValueError, match="vacuum-preserving product formula"):
+            cswap_mapper.run(UnitaryRepresentation(PauliProductFormulaContainer(**sections, step_reps=3, num_qubits=2)))
 
     def test_grouped_cancellation_partners_are_accepted(self, cswap_mapper, make_two_qubit_rep):
         """``XX, YY, Z0`` keeps the partners adjacent and preserves the vacuum."""
@@ -349,19 +409,30 @@ class TestVacuumPreservationValidation:
 
         assert isinstance(cswap_mapper.run(make_two_qubit_rep(terms)), Circuit)
 
-    def test_tolerance_is_budgeted_over_the_repetitions(self, cswap_mapper, make_two_qubit_rep):
-        """A residual that is harmless once leaks ``step_reps`` times over, so the budget scales."""
-        terms = [(XX, 0.5), (YY, 0.5 + 1e-10)]
+    @pytest.mark.parametrize(
+        ("repetitions", "sections", "residual"),
+        [
+            (1000, ("step_terms",), 1e-10),
+            (1, ("prefix_terms", "step_terms", "suffix_terms"), 0.9e-9),
+            (3, ("prefix_terms", "step_terms", "suffix_terms"), 0.3e-9),
+            (1000, ("prefix_terms", "suffix_terms"), 0.4e-9),
+        ],
+    )
+    def test_tolerance_is_budgeted_over_the_repetitions(
+        self, cswap_mapper, make_two_qubit_rep, repetitions: int, sections: tuple[str, ...], residual: float
+    ) -> None:
+        """Residuals must share a budget across nonempty sections and repetitions."""
+        terms = [(XX, 0.5), (YY, 0.5 + residual)]
         assert isinstance(cswap_mapper.run(make_two_qubit_rep(terms)), Circuit)
 
-        step_terms = [ExponentiatedPauliTerm(pauli_term=pauli_term, angle=angle) for pauli_term, angle in terms]
-        repeated = UnitaryRepresentation(
-            container=PauliProductFormulaContainer(step_terms, step_reps=1000, num_qubits=2)
-        )
-        mapper = ControlledSwapPauliSequenceMapper()
-        mapper.settings().set("control_indices", [2])
-        with pytest.raises(ValueError, match="vacuum-preserving product formula"):
-            mapper.run(repeated)
+        step_terms = [ExponentiatedPauliTerm(pauli_term, angle) for pauli_term, angle in terms]
+        sequences = {
+            name: step_terms if name in sections else [] for name in ("prefix_terms", "step_terms", "suffix_terms")
+        }
+        container = PauliProductFormulaContainer(**sequences, step_reps=repetitions, num_qubits=2)
+        rejection = pytest.raises(ValueError, match="vacuum-preserving product formula")
+        with rejection if container.step_terms else nullcontext():
+            assert isinstance(cswap_mapper.run(UnitaryRepresentation(container)), Circuit)
 
 
 class TestVacuumPreservingBlocks:
@@ -384,6 +455,11 @@ class TestVacuumPreservingBlocks:
     def test_diagonal_terms_set_the_eigenphase(self):
         """Diagonal terms leave the vacuum in place and contribute -sum(angles) of phase."""
         assert _vacuum_eigenphase([(Z0, 0.3), (IDENTITY, 0.2)], 1e-9) == pytest.approx(-0.5)
+
+    def test_identity_factors_do_not_split_a_block(self):
+        """An explicit identity factor commutes with every Pauli on its qubit."""
+        terms = [({0: "X", 1: "X", 2: "I"}, 0.5), ({2: "Z"}, 0.1), ({0: "Y", 1: "Y", 2: "I"}, 0.5)]
+        assert _vacuum_eigenphase(terms, 1e-9) == pytest.approx(-0.1)
 
     def test_tolerance_controls_amplitude_cancellation(self):
         """Residual amplitude below ``atol`` counts as cancelled."""
@@ -437,7 +513,8 @@ class TestVacuumAnnihilatingGroupingEndToEnd:
     def test_grouped_trotter_step_preserves_the_vacuum(self, vacuum_annihilating_unitary):
         """The Trotterised product formula fixes |00>, which is what the mapper requires."""
         container = vacuum_annihilating_unitary.get_container()
-        terms = [(term.pauli_term, term.angle) for term in container.step_terms]
+        expanded = container.prefix_terms + container.step_terms * container.step_reps + container.suffix_terms
+        terms = [(term.pauli_term, term.angle) for term in expanded]
 
         vacuum = np.zeros(2**container.num_qubits, dtype=complex)
         vacuum[0] = 1.0
@@ -464,9 +541,9 @@ class TestVacuumAnnihilatingGroupingEndToEnd:
         assert qc.num_qubits == 5
         block = Operator(qc).data[0:8, 0:8]
 
-        terms = [(term.pauli_term, term.angle) for term in container.step_terms]
-        step = build_product_formula_matrix(terms, container.num_qubits)
-        u = np.linalg.matrix_power(step, container.step_reps)
+        expanded = container.prefix_terms + container.step_terms * container.step_reps + container.suffix_terms
+        terms = [(term.pauli_term, term.angle) for term in expanded]
+        u = build_product_formula_matrix(terms, container.num_qubits)
 
         expected_matrix = controlled_unitary(u)
 
@@ -611,3 +688,46 @@ class TestVacuumAnnihilatingAcrossFermionToQubitMappings:
         mapper.settings().set("control_indices", [unitary.get_num_qubits()])
 
         assert isinstance(mapper.run(unitary), Circuit)
+
+
+class TestHammingWeightPhasing:
+    """Equal-angle terms of a declared layer are phased through Hamming-weight registers on the vacuum."""
+
+    @pytest.mark.parametrize(
+        ("field", "phasing", "cap"),
+        [
+            (0.0, True, -1),
+            (0.4, True, -1),
+            (0.4, True, 12),
+            (0.4, True, 1),
+            (0.4, False, -1),
+        ],
+    )
+    def test_spin_chain_matches_the_controlled_trotter_product(self, field: float, phasing: bool, cap: int) -> None:
+        """Phased, split and unphased layers all give the controlled Trotter product up to a global phase.
+
+        Each bond color of the 16-site XXZ ring is a layer of 8 equal-angle terms per axis, and a nonzero ``field``
+        adds a layer of 16 Z terms. The vacuum grouper keeps each XX/YY cancellation block in one commuting
+        group while retaining disjoint layers; no test-only reordering is needed. The control is in |+>,
+        so a wrong vacuum phase fails the comparison.
+        """
+        hamiltonian = create_heisenberg_hamiltonian(
+            LatticeGraph.chain(16, periodic=True), jx=1.0, jy=1.0, jz=1.0, hx=0.0, hy=0.0, hz=field
+        )
+        grouped = registry.create("term_grouper", "vacuum_annihilating").run(hamiltonian)
+        trotter = registry.create("hamiltonian_unitary_builder", "trotter")
+        trotter.settings().update({"order": 1, "num_divisions": 2, "time": 0.6})
+        unitary = trotter.run(grouped)
+        container = unitary.get_container()
+        assert container.layer_offsets is not None
+        assert any(stop - start >= 8 for start, stop in pairwise(container.layer_offsets))
+        circuit = registry.create(
+            "controlled_circuit_mapper",
+            "cswap_pauli_sequence",
+            use_hamming_weight_phasing=phasing,
+            max_hamming_weight_phasing_batch_size=cap,
+        ).run(unitary)
+        system = random_state(container.num_qubits, seed=cap + 2, support=2)
+        state = np.kron(np.ones(2) / np.sqrt(2), system)
+        actual = apply_operation(circuit._qsharp_op, state, split_control=True)
+        assert_states_match_up_to_global_phase(actual, controlled_product_formula_state(container, state), 1e-10)

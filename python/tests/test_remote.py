@@ -46,7 +46,7 @@ from qdk_chemistry.remote.serialization import (
 )
 from qdk_chemistry.remote.worker import execute_job
 
-from .test_helpers import create_test_orbitals
+from .helpers import create_test_orbitals
 
 
 @pytest.fixture

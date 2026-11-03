@@ -5,7 +5,7 @@
 # Licensed under the MIT License. See LICENSE.txt in the project root for license information.
 # --------------------------------------------------------------------------------------------
 
-from .test_helpers import create_test_ansatz
+from .helpers import create_test_ansatz
 
 
 def test_ansatz_property_bindings():

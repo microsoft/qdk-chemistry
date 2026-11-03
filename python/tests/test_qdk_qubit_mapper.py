@@ -20,7 +20,7 @@ from qdk_chemistry.data import (
 )
 from qdk_chemistry.plugins.qiskit import QDK_CHEMISTRY_HAS_QISKIT_NATURE
 
-from .test_helpers import (
+from .helpers import (
     create_nontrivial_test_hamiltonian,
     create_test_basis_set,
     create_test_hamiltonian,

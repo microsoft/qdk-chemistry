@@ -764,6 +764,7 @@ def _register_cpp_factories():
         EffectiveHamiltonianConstructorFactory,
         GeometryOptimizerFactory,
         HamiltonianConstructorFactory,
+        HamiltonianFactorizationFactory,
         LocalizerFactory,
         MultiConfigurationCalculatorFactory,
         MultiConfigurationScfFactory,
@@ -779,6 +780,7 @@ def _register_cpp_factories():
     register_factory(EffectiveHamiltonianConstructorFactory)
     register_factory(GeometryOptimizerFactory)
     register_factory(HamiltonianConstructorFactory)
+    register_factory(HamiltonianFactorizationFactory)
     register_factory(LocalizerFactory)
     register_factory(MultiConfigurationCalculatorFactory)
     register_factory(MultiConfigurationScfFactory)
@@ -908,11 +910,19 @@ def _register_python_algorithms():
         QdkFullStateSimulator,
         QdkSparseStateSimulator,
     )
-    from qdk_chemistry.algorithms.circuit_mapper import PauliSequenceMapper, PSPMapper  # noqa: PLC0415
+    from qdk_chemistry.algorithms.circuit_mapper import (  # noqa: PLC0415
+        PauliSequenceMapper,
+        PSPMapper,
+        SOSSAMapper,
+    )
     from qdk_chemistry.algorithms.controlled_circuit_mapper import (  # noqa: PLC0415
         ControlledPauliSequenceMapper,
         ControlledPSPMapper,
+        ControlledSOSSAMapper,
         ControlledSwapPauliSequenceMapper,
+    )
+    from qdk_chemistry.algorithms.controlled_circuit_mapper.controlled_hubbard_plaquette_mapper import (  # noqa: PLC0415
+        ControlledHubbardPlaquetteMapper,
     )
     from qdk_chemistry.algorithms.expectation_estimator.qdk import QdkExpectationEstimator  # noqa: PLC0415
     from qdk_chemistry.algorithms.hadamard_test.circuit_builder.qdk_builder import (  # noqa: PLC0415
@@ -921,6 +931,12 @@ def _register_python_algorithms():
     from qdk_chemistry.algorithms.hadamard_test.hadamard_test import HadamardTest  # noqa: PLC0415
     from qdk_chemistry.algorithms.hamiltonian_unitary_builder.block_encoding.lcu import (  # noqa: PLC0415
         LCUBuilder,
+    )
+    from qdk_chemistry.algorithms.hamiltonian_unitary_builder.block_encoding.sossa import (  # noqa: PLC0415
+        SOSSABuilder,
+    )
+    from qdk_chemistry.algorithms.hamiltonian_unitary_builder.time_evolution.hubbard_plaquette_trotter import (  # noqa: PLC0415
+        HubbardPlaquetteTrotter,
     )
     from qdk_chemistry.algorithms.hamiltonian_unitary_builder.time_evolution.partially_randomized import (  # noqa: PLC0415
         PartiallyRandomized,
@@ -951,6 +967,7 @@ def _register_python_algorithms():
     from qdk_chemistry.algorithms.propagator import MagnusPropagator  # noqa: PLC0415
     from qdk_chemistry.algorithms.qubit_hamiltonian_solver import DenseMatrixSolver, SparseMatrixSolver  # noqa: PLC0415
     from qdk_chemistry.algorithms.qubit_mapper import QdkQubitMapper  # noqa: PLC0415
+    from qdk_chemistry.algorithms.qubit_mapper.sum_of_squares import SumOfSquaresQubitMapper  # noqa: PLC0415
     from qdk_chemistry.algorithms.state_preparation import SparseIsometryStatePreparation  # noqa: PLC0415
     from qdk_chemistry.algorithms.state_preparation.alias_sampling import AliasSamplingStatePreparation  # noqa: PLC0415
     from qdk_chemistry.algorithms.state_preparation.dense_pure_state import DensePureStatePreparation  # noqa: PLC0415
@@ -978,6 +995,8 @@ def _register_python_algorithms():
     register(lambda: IdentityTermGrouper())
     register(lambda: VacuumAnnihilatingTermGrouper())
     register(lambda: Trotter())
+    register(lambda: HubbardPlaquetteTrotter())
+    register(lambda: ControlledHubbardPlaquetteMapper())
     register(lambda: Zassenhaus())
     register(lambda: QDrift())
     register(lambda: PartiallyRandomized())
@@ -989,6 +1008,10 @@ def _register_python_algorithms():
     register(lambda: QROMStatePreparation())
     register(lambda: ControlledPauliSequenceMapper())
     register(lambda: ControlledSwapPauliSequenceMapper())
+    register(lambda: SOSSAMapper())
+    register(lambda: ControlledSOSSAMapper())
+    register(lambda: SOSSABuilder())
+    register(lambda: SumOfSquaresQubitMapper())
     register(lambda: EulerIntegrator())
     register(lambda: EulerEvolutionCircuitBuilder())
     register(lambda: MagnusPropagator())

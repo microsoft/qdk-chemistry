@@ -2,17 +2,17 @@ Hamiltonian Unitary Builder
 ===========================
 
 The :class:`~qdk_chemistry.algorithms.HamiltonianUnitaryBuilder` algorithm in QDK/Chemistry constructs a unitary based on the Hamiltonian, such as time simulation unitary :math:`U(t) = e^{-iHt}` or block-encoded unitary :math:`U = \frac{H}{\|H\|}`.
-Following QDK/Chemistry's :doc:`algorithm design principles <../design/index>`, it takes a :class:`~qdk_chemistry.data.QubitOperator` and produces a :class:`~qdk_chemistry.data.UnitaryRepresentation` as output.
+Following QDK/Chemistry's :doc:`algorithm design principles <../design/index>`, it takes a :class:`~qdk_chemistry.data.HamiltonianDescription` (for example a :class:`~qdk_chemistry.data.QubitOperator` or a :class:`~qdk_chemistry.data.ModelHamiltonianDescription`) and produces a :class:`~qdk_chemistry.data.UnitaryRepresentation` as output.
 
 Overview
 --------
 
 Building unitary from Hamiltonian — such as the Hamiltonian simulation unitary :math:`U(t) = e^{-iHt}` or block encoding unitary :math:`U = \frac{H}{\|H\|}` — is a central subroutine in many quantum algorithms.
-The :class:`~qdk_chemistry.algorithms.HamiltonianUnitaryBuilder` provides a unified interface for methods that construct this operator from a :class:`~qdk_chemistry.data.QubitOperator`.
+The :class:`~qdk_chemistry.algorithms.HamiltonianUnitaryBuilder` provides a unified interface for methods that construct this operator from a :class:`~qdk_chemistry.data.HamiltonianDescription`.
 
-QDK/Chemistry currently provides two families of implementations for this task: Trotter-Suzuki product formulas and block encoding.
+QDK/Chemistry currently provides two families of implementations for this task: product formulas (Trotter-Suzuki, Zassenhaus, and a plaquette Trotterization specialized to the Fermi-Hubbard model) and block encoding.
 
-The resulting :class:`~qdk_chemistry.data.UnitaryRepresentation` objects wrap either a ``PauliProductFormulaContainer`` (Trotter) or an ``LCUContainer`` (block encoding).
+The resulting :class:`~qdk_chemistry.data.UnitaryRepresentation` objects wrap a ``PauliProductFormulaContainer`` (Trotter-Suzuki and Zassenhaus), a ``HubbardPlaquetteContainer`` (plaquette Trotterization, by default), or a block-encoding container (``LCUContainer``, ``LCUWalkContainer`` for the LCU quantum walk, or ``SOSSABlockEncodingContainer``).
 
 
 Using the HamiltonianUnitaryBuilder
@@ -29,9 +29,10 @@ Input requirements
 
 The :class:`~qdk_chemistry.algorithms.HamiltonianUnitaryBuilder` requires the following inputs:
 
-QubitOperator
-   A :class:`~qdk_chemistry.data.QubitOperator` containing the Pauli-string representation of the Hamiltonian.
-   This can be obtained from the :doc:`QubitMapper <qubit_mapper>` algorithm, constructed from a :doc:`model Hamiltonian <../model_hamiltonians>`, or built directly.
+HamiltonianDescription
+   A :class:`~qdk_chemistry.data.HamiltonianDescription`, such as a :class:`~qdk_chemistry.data.QubitOperator` containing the Pauli-string representation of the Hamiltonian or a :class:`~qdk_chemistry.data.ModelHamiltonianDescription` like :class:`~qdk_chemistry.data.FermiHubbardModelHamiltonianDescription` holding a lattice and the model parameters.
+   A :class:`~qdk_chemistry.data.QubitOperator` can be obtained from the :doc:`QubitMapper <qubit_mapper>` algorithm, constructed from a :doc:`model Hamiltonian <../model_hamiltonians>`, or built directly.
+   The ``hubbard_plaquette`` builder takes a :class:`~qdk_chemistry.data.FermiHubbardModelHamiltonianDescription`.
 
 .. rubric:: Creating a builder
 
@@ -129,6 +130,9 @@ When both ``num_divisions`` and ``target_accuracy`` are specified, the builder u
    * - ``order``
      - int
      - Trotter-Suzuki order (1 for first-order, 2+ for higher even orders). Default is 1.
+   * - ``minimize_pauli_exponentials``
+     - bool
+     - Reorder groups to minimize the number of Pauli exponentials for a fixed partition and even Suzuki order. Default is ``False``; first-order ordering is unchanged.
    * - ``target_accuracy``
      - float
      - Target approximation error :math:`\epsilon`. When set to 0.0 (default), automatic step-count estimation is disabled.
@@ -141,6 +145,9 @@ When both ``num_divisions`` and ``target_accuracy`` are specified, the builder u
    * - ``weight_threshold``
      - float
      - Coefficient threshold below which Pauli terms are discarded. Default is 1e-12.
+   * - ``fuse_group_boundaries``
+     - bool
+     - Fuse matching commuting-group boundaries without unrolling repetitions. Default is ``False``; independent of ``minimize_pauli_exponentials``.
 
 
 .. _zassenhaus-builder:
@@ -200,6 +207,59 @@ When ``order`` is set to ``0`` (auto), the builder dynamically sweeps orders 2, 
      - float
      - Coefficient threshold below which Pauli terms are discarded. Default is 1e-12.
 
+.. _hubbard-plaquette-builder:
+
+Hubbard plaquette Trotterization
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+.. rubric:: Factory name: ``"hubbard_plaquette"``
+
+The plaquette builder Trotterizes the Fermi-Hubbard model with uniform hopping :math:`t` and on-site interaction :math:`U` on a two-dimensional square lattice, two spin orbitals per site.
+Unlike the other builders, it takes a :class:`~qdk_chemistry.data.FermiHubbardModelHamiltonianDescription` rather than a :class:`~qdk_chemistry.data.QubitOperator`, and builds the Hamiltonian from its lattice and its parameters ``t``, ``u`` and ``epsilon``.
+The lattice has to be periodic in both directions, with both sides even and at least four, or 2x2, because only then do the two plaquette tilings cover every bond exactly once.
+Its geometry has to be the one :meth:`LatticeGeometry.square(width, height, periodic_x=True, periodic_y=True) <qdk_chemistry.data.LatticeGeometry.square>` builds: unit-spaced sites numbered ``y * width + x``, with period vectors ``(width, 0)`` and ``(0, height)``.
+A translated, scaled, rotated or renumbered square lattice is rejected.
+
+The hopping term splits into two layers of disjoint four-site plaquettes, :math:`P` and :math:`G`, each of which is evolved exactly :cite:`Campbell2022`.
+The interaction is taken in its particle-hole symmetric form :math:`U \sum_i (n_{i\uparrow} - 1/2)(n_{i\downarrow} - 1/2)`, whose Jordan-Wigner image is pure :math:`ZZ`.
+Each second-order step is the symmetric product :math:`P^{1/2} I^{1/2} G I^{1/2} P^{1/2}`, the "PIG" ordering of :cite:`Apel2026`.
+The half-angle pink layers of neighbouring steps merge into one full-angle layer, so a repeated evolution emits a single half-angle pink layer only at each end.
+The modes are likewise routed into pink order once at each end, so every pink plaquette stays local and only the gold layers route.
+Setting ``num_electrons`` records the scalar offset to the described model, with its on-site energy :math:`\epsilon` and interaction :math:`U \sum_i n_{i\uparrow} n_{i\downarrow}`, so that phase estimation reports that model's energy.
+
+By default the output is a ``HubbardPlaquetteContainer`` that stores the angles and step count rather than individual Pauli terms.
+It is consumed by the :ref:`"hubbard_plaquette" controlled circuit mapper <hubbard-plaquette-mapper>`, :class:`~qdk_chemistry.algorithms.controlled_circuit_mapper.ControlledHubbardPlaquetteMapper`.
+
+Setting ``container_type`` to ``"pauli_product_formula"`` instead emits every fermionic swap, Fourier butterfly and phase as a Pauli exponential, for the ``"pauli_sequence"`` and :ref:`"cswap_pauli_sequence" <cswap-pauli-sequence-mapper>` mappers.
+The ``num_electrons`` shift then becomes an identity term in the circuit, so the phase-estimation window must cover the described model's energy rather than the particle-hole symmetric one.
+Prefer ``"cswap_pauli_sequence"``, which applies the formula uncontrolled; ``"pauli_sequence"`` controls every swap and butterfly rotation as well, so it is costlier and mainly useful for compatibility.
+
+The number of steps can be set directly (``num_divisions``) or estimated from ``target_accuracy`` with Campbell's error constant for the related IPG ordering :cite:`Campbell2022`.
+
+.. rubric:: Settings
+
+.. list-table::
+   :header-rows: 1
+   :widths: 25 15 60
+
+   * - Setting
+     - Type
+     - Description
+   * - ``order``
+     - int
+     - Trotter order. Only 2 is supported. Default is 2.
+   * - ``num_electrons``
+     - int
+     - Electron count for the scalar shift to the estimated energy. When set to -1 (default), the particle-hole symmetric model's energy is reported.
+   * - ``target_accuracy``
+     - float
+     - Energy error budget that sizes the automatic step count. When set to 0.0 (default), automatic step-count estimation is disabled.
+   * - ``num_divisions``
+     - int
+     - Explicit number of plaquette Trotter steps. When set to 0 (default), determined from ``target_accuracy``; otherwise the larger of the two is used.
+   * - ``container_type``
+     - str
+     - Output container: ``"hubbard_plaquette"`` (default) or ``"pauli_product_formula"``.
+
 
 Consuming term partitions
 -------------------------
@@ -207,10 +267,34 @@ Consuming term partitions
 When the input :class:`~qdk_chemistry.data.QubitOperator` carries a populated :attr:`~qdk_chemistry.data.QubitOperator.term_partition`, the Trotter builder consumes it directly:
 
 * :class:`~qdk_chemistry.data.LayeredPartition` (group → layer → index) is used as-is — the outer level controls the Strang/Suzuki splitting and each inner layer becomes one parallelisable sub-step.
-* :class:`~qdk_chemistry.data.FlatPartition` (group → index) is interpreted as a layered partition with one layer per group.
+* :class:`~qdk_chemistry.data.FlatPartition` (group → index) supplies commuting groups, but does not certify disjoint qubit supports.
 
-In both cases groups are sorted by ascending layer count so that the smallest groups sit on the outside of the Strang/Suzuki splitting, which maximises merging at recursion boundaries.
-This typically reduces the number of distinct exponentials per Trotter step and the saving compounds through the recursion at higher orders.
+The emitted formula retains each nonempty :class:`~qdk_chemistry.data.LayeredPartition` layer in ``layer_offsets``, after coefficient filtering and for every Suzuki schedule occurrence.
+The :class:`~qdk_chemistry.algorithms.controlled_circuit_mapper.ControlledPauliSequenceMapper` uses these declared boundaries directly; no downstream regrouping is performed.
+Layer propagation is independent of ``minimize_pauli_exponentials`` and ``fuse_group_boundaries``.
+
+By default, groups are sorted by ascending layer count, preserving the historical splitting order.
+This ordering does not generally minimize the number of individual Pauli exponentials.
+
+Set ``minimize_pauli_exponentials=True`` on the ``"trotter"`` algorithm to place the group with the most active terms centrally and the second-largest group outside the Strang/Suzuki splitting.
+Group sizes are counted after ``weight_threshold`` filtering, rather than by their number of disjoint layers.
+Groups are moved only when this strictly lowers the structural count below; otherwise, including ties, the declared order and its Trotter error are kept.
+Other groups retain their relative order, and ties between group sizes are resolved stably from the existing order.
+Neither the input partition nor the layers within its groups are mutated.
+
+For order :math:`2k`, let :math:`f=5^{k-1}`, :math:`M` be the number of active terms, and :math:`a,c` the sizes of the outer and central groups.
+The internally fused one-step schedule contains :math:`2fM-(f-1)a-fc` individual Pauli exponentials.
+Thus the selected endpoints minimize this structural count over permutations of the given partition.
+The setting does not add fusion across symbolic repetitions, change the requested time or number of steps, or optimize angle-dependent gate synthesis.
+Reordering can change Trotter error, so a lower count at fixed step size is not an equal-accuracy guarantee.
+First-order formulas retain the default ordering even when the setting is enabled.
+
+This is an algorithm :class:`~qdk_chemistry.data.Settings` option: it can be supplied to :func:`~qdk_chemistry.algorithms.create`, updated through ``settings()``, or passed in a nested :class:`~qdk_chemistry.data.AlgorithmRef` used by evolution or QPE builders.
+
+Independently, ``fuse_group_boundaries=True`` retains ``group_offsets`` after ordering and ``weight_threshold`` filtering, with each group spanning all its layers, and calls :meth:`~qdk_chemistry.data.PauliProductFormulaContainer.fuse_boundaries` with ``atol=0.0``.
+This preserves group order, requested time, and the Trotter approximation apart from floating-point rounding; see :ref:`compact-product-formulas` and :ref:`mapper compatibility <compact-formula-mappers>`.
+Fusion trades storage for executed rotations: the rewritten formula stores the interior of the step twice, roughly doubling :attr:`~qdk_chemistry.data.PauliProductFormulaContainer.num_stored_terms`, while saving about one boundary group per repetition in :attr:`~qdk_chemistry.data.PauliProductFormulaContainer.num_pauli_exponentials`.
+The relative saving is small when the boundary group is small compared with the step, as in higher-order Suzuki steps whose internal boundaries are already merged.
 
 When ``term_partition is None`` each Pauli term is exponentiated as its own group.
 Pre-populate the partition using the :ref:`term_grouper algorithm <algorithms-term-grouper>` or one of the :ref:`spin model Hamiltonian builders <model-term-partition>` to enable group-aware scheduling.
@@ -267,6 +351,36 @@ Example::
     #   exp(-i * +0.2500 * XIII)
 
 
+.. _compact-product-formulas:
+
+Compact product-formula containers
+----------------------------------
+
+A :class:`~qdk_chemistry.data.PauliProductFormulaContainer` executes ``prefix_terms`` once, then ``step_terms`` repeated ``step_reps`` times, then ``suffix_terms`` once.
+``step_terms`` is the repeated block: one product-formula step, or a rewritten block after boundary fusion.
+:attr:`~qdk_chemistry.data.PauliProductFormulaContainer.num_pauli_exponentials` counts ``len(prefix_terms) + step_reps * len(step_terms) + len(suffix_terms)``; :attr:`~qdk_chemistry.data.PauliProductFormulaContainer.num_stored_terms` counts ``len(prefix_terms) + len(step_terms) + len(suffix_terms)``.
+These are structural counts, not synthesized gate counts.
+
+Optional ``group_offsets`` delimit validated commuting groups in ``step_terms`` only, increasing strictly from zero to the body length.
+Without this metadata, boundary fusion treats each term as a singleton group.
+
+Optional ``layer_offsets`` delimit validated disjoint-support layers over the stored concatenation ``prefix_terms + step_terms + suffix_terms``.
+They increase strictly from zero to the stored term count and include both prefix/body and body/suffix boundaries; an empty formula uses ``(0,)``.
+Fusion and composition retain the surviving terms' declared layers without merging neighboring layers; arbitrary body reordering falls back to singleton body layers.
+Formulas without this metadata retain term-by-term controlled mapping.
+
+:meth:`~qdk_chemistry.data.PauliProductFormulaContainer.fuse_boundaries` fuses repetition boundaries with equal commuting Pauli-word sets by adding signed angles, without unrolling.
+A single commuting group absorbs the repetition count into its angles; formulas with nonempty ``prefix_terms`` or ``suffix_terms`` are returned unchanged, making the rewrite idempotent.
+The finite, nonnegative ``atol`` (default ``1e-12``) drops only merged rotations with absolute angle at most that tolerance; unmatched small rotations remain.
+
+:meth:`~qdk_chemistry.data.PauliProductFormulaContainer.combine` appends another formula's evolution, requiring the same register width and finite ``scale`` values with a finite sum.
+It adds both formulas' ``scale`` values and uses compact fast paths for eligible identical bodies with matching layer schedules; otherwise the original flatten-and-adjacent-merge fallback expands both evolutions, including prefix and suffix terms, and returns ``step_reps=1``.
+
+:doc:`JSON and HDF5 serialization <../data/serialization>` write schema ``0.3.0`` without expanding repetitions; convert ``0.2.0`` files from earlier releases with the :doc:`migration tool <../../migrating-data-files>`.
+Plain formulas without prefix or suffix terms or group/layer metadata retain their legacy content hashes.
+Compact storage and :ref:`mapping <compact-formula-mappers>` do not guarantee compact circuit export, simulation, or resource estimation.
+
+
 .. _block-encoding-builder:
 
 Block encoding
@@ -283,7 +397,8 @@ where :math:`\lambda \geq \|H\|` is a normalization factor (typically the L1 nor
 The Hamiltonian is encoded in the top-left block of the larger unitary — hence the name "block encoding."
 
 Block encodings are the foundation for quantum algorithms such as qubitization, QSVT, and quantum linear system solvers.
-QDK/Chemistry currently provides the **LCU** (Linear Combination of Unitaries) method for constructing block encodings.
+QDK/Chemistry provides **LCU** (Linear Combination of Unitaries) block encoding
+and **SOSSA** (sum-of-squares spectral amplification).
 
 .. _lcu-builder:
 
@@ -367,12 +482,138 @@ To use alias sampling for the PREPARE oracle, pass an
 
 The resulting :class:`~qdk_chemistry.data.UnitaryRepresentation` wraps an ``LCUContainer`` containing the Prepare and Select oracles.
 
+.. _sossa-builder:
+
+Sum-of-squares spectral amplification
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+.. rubric:: Factory name: ``"sossa"``
+
+The SOSSA builder :cite:`Low2025` takes the structured operator produced by
+the :ref:`sum-of-squares mapper <sum-of-squares-qubit-mapper>`.
+It returns a
+:class:`~qdk_chemistry.data.unitary_representation.containers.sossa.SOSSABlockEncodingContainer`
+with numerical PREPARE/SELECT data and normalization :math:`\Lambda`.
+The corresponding ``circuit_mapper`` / ``sossa`` emits
+
+.. math::
+
+   B = U^\dagger R_{\mathrm{inner}} U,\qquad
+   W = R_{\mathrm{outer}} B.
+
+The mapper returns :math:`B`, not the completed walk :math:`W`.
+:ref:`Unary QPE <unary-qpe-algorithm>` supplies the outer reflections.
+This circuit path requires unit power, canonical blocked Jordan-Wigner
+ordering, and untapered input.
+
+For a completed-walk eigenphase :math:`\varphi`, the energy decoder is
+
+.. math::
+
+   E = E_{\mathrm{shift}} + 2\Lambda\cos^2(\pi\varphi).
+
+This is a total energy, including the input Hamiltonian's core energy.
+The normalization must be positive and finite. Individual zero-weight
+generator rows remain valid when the total normalization is positive.
+
+.. _sossa-query-guidance:
+
+Reference energies and query precision
+"""""""""""""""""""""""""""""""""""""""
+
+The builder accepts either ``reference_ground_state_energy`` (a total
+energy) or ``reference_energy_gap``:
+
+.. math::
+
+   E_{\mathrm{gap}} = E_{\mathrm{ref}} - E_{\mathrm{shift}},\qquad
+   \lambda_{\mathrm{eff}}
+   = \sqrt{E_{\mathrm{gap}}(2\Lambda-E_{\mathrm{gap}})}.
+
+A supplied reference must satisfy :math:`0<E_{\mathrm{gap}}<2\Lambda`.
+Without either reference, the block encoding can still be built, but
+accessing ``lambda_eff`` for a query-count estimate raises an error.
+
+The factor container's ``get_lambda()``, the mapped normalization
+:math:`\Lambda`, and :math:`\lambda_{\mathrm{eff}}` are distinct quantities.
+The last is the local magnitude of the energy derivative with respect to
+the walk phase angle at the reference energy.
+For the unary cosine-window convention, a query-count guide is
+
+.. math::
+
+   p_{\mathrm{guide}}
+   = \left\lceil\frac{\pi s}{2\epsilon_{\mathrm{PEA}}}\right\rceil,
+   \qquad
+   s=\begin{cases}
+       \lambda & \text{LCU},\\
+       \lambda_{\mathrm{eff}} & \text{SOSSA near the reference}.
+     \end{cases}
+
+This uses a local sensitivity and the phase-estimation error convention of
+the query schedule :cite:`Babbush2018,Lee2021`.
+It is not a global, fixed-confidence energy-error guarantee.
+Reference uncertainty, branch selection, trial-state overlap, sampling,
+factorization, screening, coefficient rounding, and rotation synthesis
+must be accounted for separately.
+The unary phase-estimation caller sets a positive ``num_queries`` explicitly; it need not be a
+power of two, and the library does not select it automatically.
+
+See the `SOSSA resource-estimation notebook
+<https://github.com/microsoft/qdk-chemistry/blob/main/examples/sossa_qre.ipynb>`_
+for factorization, simulation, and resource estimation, or the
+:ref:`compact resource-estimation example <release-v2.3.0>`.
+
+Circuit precision and shared registers
+""""""""""""""""""""""""""""""""""""""
+
+.. rubric:: SOSSA circuit mapper settings
+
+.. list-table::
+   :header-rows: 1
+   :widths: 25 15 60
+
+   * - Setting
+     - Type
+     - Description
+   * - ``outer_prepare_algorithm``
+     - :class:`~qdk_chemistry.data.AlgorithmRef`
+     - Outer PREPARE implementation. Default: ``state_prep`` / ``alias_sampling``.
+   * - ``inner_prepare_algorithm``
+     - str
+     - Inner PREPARE implementation: ``"direct"`` or ``"controlled_alias_sampling"``. Default: ``"controlled_alias_sampling"``.
+   * - ``select_algorithm``
+     - str
+     - SELECT implementation: ``"direct"`` or ``"qrom_phase_gradient"``. Default: ``"qrom_phase_gradient"``.
+   * - ``coefficient_bit_precision``
+     - int
+     - Alias-sampling coefficient precision, from 1 through 30. Default: 10.
+   * - ``rotation_bit_precision``
+     - int
+     - Givens-rotation angle precision, from 1 through 30. Default: 10.
+
+``coefficient_bit_precision`` and ``rotation_bit_precision`` control
+different approximations and do not define a total energy-error budget.
+The mapper applies ``coefficient_bit_precision`` to both outer and inner
+alias sampling. For an outer PREPARE exposing ``bits_precision`` or
+``allocate_phase_gradient``, it sets those to its coefficient precision
+and ``False``, respectively, overriding the nested values.
+For outer QROM preparation, set its ``rotation_bit_precision`` to agree
+with SELECT.
+
+The mapped :class:`~qdk_chemistry.data.Circuit` declares its complete
+argument width through ``num_qubits``.
+Its ``num_phase_gradient_ancillas`` metadata identifies a caller-owned
+suffix that must be initialized once and excluded from zero-state
+reflections. Shared PREPARE and SELECT gradients must have identical
+nonzero widths.
+Internal lookup scratch is not part of the caller-visible register.
 
 Related classes
 ---------------
 
-- :class:`~qdk_chemistry.data.UnitaryRepresentation`: Output data class wrapping the exponentiated Pauli terms or LCU container
-- :class:`~qdk_chemistry.data.QubitOperator`: Input qubit Hamiltonian
+- :class:`~qdk_chemistry.data.UnitaryRepresentation`: Output data class wrapping the product formula, plaquette, or block-encoding container
+- :class:`~qdk_chemistry.data.HamiltonianDescription`: Input Hamiltonian, such as a :class:`~qdk_chemistry.data.QubitOperator` or a :class:`~qdk_chemistry.data.ModelHamiltonianDescription`
 - :doc:`PhaseEstimation <phase_estimation>`: Consumer of the hamiltonian unitary
 
 Further reading

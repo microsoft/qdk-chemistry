@@ -8,7 +8,9 @@
         "other": {
           "name": "Boost",
           "version": "1.86.0",
-          "downloadUrl": "https://archives.boost.io/release/1.86.0/source/boost_1_86_0.tar.bz2"
+          "downloadUrl": "https://archives.boost.io/release/1.86.0/source/boost_1_86_0.tar.bz2",
+          "hash": "sha1:fd0d26a7d5eadf454896942124544120e3b7a38f",
+          "sha256": "1bed88e40401b2cb7a1f76d4bab499e352fa4d0c5f31c0dbae64e24d34d7513b"
         }
       },
       "developmentDependency": false
@@ -42,7 +44,8 @@
           "name": "Libint",
           "version": "2.13.1",
           "downloadUrl": "https://github.com/evaleev/libint/releases/download/v2.13.1/libint-2.13.1-mpqc4.tgz",
-          "hash": "d22f42c475bd487c07cb41f0e76c109568d0d4ca"
+          "hash": "sha1:d22f42c475bd487c07cb41f0e76c109568d0d4ca",
+          "sha256": "890f568142ee330ad474699e703d342c85427568e9c6d8e9bee6de9a4644782d"
         }
       },
       "developmentDependency": false
@@ -85,8 +88,8 @@
         "type": "git",
         "git": {
           "repositoryUrl": "https://github.com/catchorg/Catch2",
-          "commitHash": "182c910b4b63ff587a3440e08f84f70497e49a81",
-          "tag": "v2.13.10"
+          "commitHash": "3f0283de7a9c43200033da996ff9093be3ac84dc",
+          "tag": "v3.3.2"
         }
       },
       "developmentDependency": true
@@ -178,11 +181,13 @@
     },
     {
       "component": {
-        "type": "git",
-        "git": {
-          "repositoryUrl": "https://github.com/HDFGroup/hdf5.git",
-          "commitHash": "34ae2775ac67f03f352a340352043e499e90141c",
-          "tag": "hdf5-1_13_0"
+        "type": "other",
+        "other": {
+          "name": "HDF5",
+          "version": "1.13.0",
+          "downloadUrl": "https://support.hdfgroup.org/ftp/HDF5/releases/hdf5-1.13/hdf5-1.13.0/src/hdf5-1.13.0.tar.bz2",
+          "hash": "sha1:f47d88abcbdacbc05419be9b69d96da8c585ebe0",
+          "sha256": "1826e198df8dac679f0d3dc703aba02af4c614fd6b7ec936cf4a55e6aa0646ec"
         }
       },
       "developmentDependency": false
@@ -199,8 +204,113 @@
     },
     {
       "component": {
-        "type": "pypi",
-        "pypi": {
+        "type": "git",
+        "git": {
+          "repositoryUrl": "https://github.com/ValeevGroup/SeQuant.git",
+          "commitHash": "be931075ebb4d15d252045ab4ba4b3065845355d"
+        }
+      },
+      "developmentDependency": false
+    },
+    {
+      "component": {
+        "type": "git",
+        "git": {
+          "repositoryUrl": "https://github.com/BTAS/btas.git",
+          "commitHash": "5b435cfdd3cb423f5a40229572c38f6700ba0456"
+        }
+      },
+      "developmentDependency": false
+    },
+    {
+      "component": {
+        "type": "git",
+        "git": {
+          "repositoryUrl": "https://github.com/ericniebler/range-v3.git",
+          "commitHash": "a81477931a8aa2ad025c6bda0609f38e09e4d7ec",
+          "tag": "0.12.0"
+        }
+      },
+      "developmentDependency": false
+    },
+    {
+      "component": {
+        "type": "git",
+        "git": {
+          "repositoryUrl": "https://github.com/Krzmbrzl/libPerm.git",
+          "commitHash": "cada3e185549896203cf4d0c7f26ea22c7de428f"
+        }
+      },
+      "developmentDependency": false
+    },
+    {
+      "component": {
+        "type": "git",
+        "git": {
+          "repositoryUrl": "https://github.com/Krzmbrzl/polymorphic_variant.git",
+          "commitHash": "010c69786104c07c5faccffe0e99f99de5a69fd8"
+        }
+      },
+      "developmentDependency": false
+    },
+    {
+      "component": {
+        "type": "git",
+        "git": {
+          "repositoryUrl": "https://github.com/nemtrif/utfcpp.git",
+          "commitHash": "2d8e20b22dcb3e9b3c4f52103182ebda949c6089",
+          "tag": "v4.2.0"
+        }
+      },
+      "developmentDependency": false
+    },
+    {
+      "component": {
+        "type": "git",
+        "git": {
+          "repositoryUrl": "https://github.com/ValeevGroup/kit-cmake.git",
+          "commitHash": "e820ffd200aebf6b97f2cf223d7b14134755d82e"
+        }
+      },
+      "developmentDependency": true
+    },
+    {
+      "component": {
+        "type": "git",
+        "git": {
+          "repositoryUrl": "https://github.com/Krzmbrzl/cmake-compiler-flags.git",
+          "commitHash": "cf17d6916debae445a0f2dae7be21c4230360d1e",
+          "tag": "v2.1.0"
+        }
+      },
+      "developmentDependency": true
+    },
+    {
+      "component": {
+        "type": "git",
+        "git": {
+          "repositoryUrl": "https://github.com/cubicdaiya/dtl",
+          "commitHash": "32567bb9ec704f09040fb1ed7431a3d967e3df03",
+          "tag": "v1.21"
+        }
+      },
+      "developmentDependency": true
+    },
+    {
+      "component": {
+        "type": "git",
+        "git": {
+          "repositoryUrl": "https://github.com/catchorg/Catch2",
+          "commitHash": "8b08d4d79514f45f7e4ce2a607ac9c94e920d1bb",
+          "tag": "v3.15.3"
+        }
+      },
+      "developmentDependency": true
+    },
+    {
+      "component": {
+        "type": "pip",
+        "pip": {
           "name": "azure-ai-discovery",
           "version": "1.0.0"
         }
@@ -209,8 +319,8 @@
     },
     {
       "component": {
-        "type": "pypi",
-        "pypi": {
+        "type": "pip",
+        "pip": {
           "name": "azure-identity",
           "version": "1.19.0"
         }
@@ -219,13 +329,53 @@
     },
     {
       "component": {
-        "type": "pypi",
-        "pypi": {
+        "type": "pip",
+        "pip": {
           "name": "azure-storage-blob",
           "version": "12.25.0"
         }
       },
       "developmentDependency": false
+    },
+    {
+      "component": {
+        "type": "git",
+        "git": {
+          "repositoryUrl": "https://github.com/GlobalArrays/ga.git",
+          "commitHash": "635d6b341faf928cb5a0cddc38b1a0cbbc2b5bc4"
+        }
+      },
+      "developmentDependency": true
+    },
+    {
+      "component": {
+        "type": "git",
+        "git": {
+          "repositoryUrl": "https://github.com/NWChemEx/TAMM.git",
+          "commitHash": "63c274e37c102a316e844f954bb2387988b0256c"
+        }
+      },
+      "developmentDependency": true
+    },
+    {
+      "component": {
+        "type": "git",
+        "git": {
+          "repositoryUrl": "https://github.com/ExaChem/exachem.git",
+          "commitHash": "45c192e840fd1e0417871d926e9ab87748111e53"
+        }
+      },
+      "developmentDependency": true
+    },
+    {
+      "component": {
+        "type": "git",
+        "git": {
+          "repositoryUrl": "https://github.com/NWChemEx-Project/CMakeBuild.git",
+          "commitHash": "f5be7e2472e8ebb9bc51163d424da7c25716ce9a"
+        }
+      },
+      "developmentDependency": true
     }
   ]
 }

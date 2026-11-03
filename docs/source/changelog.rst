@@ -4,6 +4,44 @@ Changelog
 
 For detailed release notes with code examples and feature walkthroughs, see the :doc:`release-notes/index` section.
 
+Version 2.3.1
+=============
+
+- Fix dependency versions and metadata for component compliance
+- Fix Python/Q# interoperability by using concrete types
+- Optimize SOSSA lookups with batching and qubit reuse
+
+Version 2.3.0
+=============
+
+See :ref:`release-v2.3.0` for full details.
+
+- Double factorization of restricted Cholesky Hamiltonians, with a shared ``DFTHCHamiltonianContainer`` for ordinary DF and general DFTHC data
+- Sum-of-squares qubit operators and spectral-amplification block encodings for unary QPE, with an end-to-end simulation and resource-estimation example
+- Coherent alias sampling and QROM-based state preparation, including explicit phase-gradient ownership
+- Sparse Pauli storage, lattice geometry and labeled graphs, and flavored spin-model Hamiltonians
+- Compact product formulas with boundary fusion, layer-preserving orderings, and Hamming-weight phasing in controlled circuit mappers
+- A Hubbard plaquette Trotter builder and controlled mapper, and sine-window standard QPE
+- ``HamiltonianDescription`` inputs for unitary builders and QPE, including model Hamiltonians without prior Pauli materialization
+- Spin-free one-electron X2C in native SCF and Hamiltonian construction
+- Azure Quantum circuit execution through the ``azure-quantum`` extra
+- Measured bitstring histograms in standard and unary ``QpeResult`` objects
+
+Behavior changes and fixes:
+
+- Product-formula containers use serialization schema ``0.3.0``; migrate older data with ``python -m qdk_chemistry.migrate``
+- Phase inversion respects stored unitary powers and exposes ambiguous quantum-walk energy branches instead of silently choosing one
+- Controlled QPE sizes work registers from the mapper's declared callable width, including alias-sampling ancillas; custom mappers omitting ``Circuit.num_qubits`` retain legacy allocation with a deprecation warning
+- SOSSA JSON loading preserves empty SELECT array shapes, and direct construction/loading rejects non-positive or non-finite normalization
+- Corrected ECP integral evaluation and PySCF basis conversion, and BLAS thread handling around GauXC operations
+- Vacuum-preserving grouping now supports layered term partitions
+
+Packaging and build changes:
+
+- Raised the QDK minimum from ``1.31.0`` to ``1.33.1``
+- Added Linux Arm64 CI coverage
+- Moved Q# test helpers out of the installed project and added ExaChem integration coverage to CI
+
 Version 2.2.1
 =============
 

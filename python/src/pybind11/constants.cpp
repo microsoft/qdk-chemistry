@@ -141,6 +141,9 @@ Examples:
   constants.attr("ELEMENTARY_CHARGE") =
       py::cast(qdk::chemistry::constants::elementary_charge);
 
+  constants.attr("BOHR_MAGNETON") =
+      py::cast(qdk::chemistry::constants::bohr_magneton);
+
   // Energy conversion factors
   constants.attr("HARTREE_TO_EV") =
       py::cast(qdk::chemistry::constants::hartree_to_ev);
@@ -175,6 +178,7 @@ Examples:
   annotations["REDUCED_PLANCK_CONSTANT"] = py::type::of(py::float_(0.0));
   annotations["SPEED_OF_LIGHT"] = py::type::of(py::float_(0.0));
   annotations["ELEMENTARY_CHARGE"] = py::type::of(py::float_(0.0));
+  annotations["BOHR_MAGNETON"] = py::type::of(py::float_(0.0));
   annotations["HARTREE_TO_EV"] = py::type::of(py::float_(0.0));
   annotations["EV_TO_HARTREE"] = py::type::of(py::float_(0.0));
   annotations["HARTREE_TO_KCAL_PER_MOL"] = py::type::of(py::float_(0.0));

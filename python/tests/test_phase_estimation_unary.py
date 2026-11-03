@@ -7,10 +7,11 @@
 
 import numpy as np
 import pytest
-from qdk.test_utils import dump_operation_on_state
+from qdk.test_utils import ArithmeticOpTester, dump_operation_on_state
 
 from qdk_chemistry.algorithms.circuit_mapper.psp_mapper import PSPMapper
 from qdk_chemistry.algorithms.hamiltonian_unitary_builder.block_encoding.lcu import LCUBuilder
+from qdk_chemistry.algorithms.hamiltonian_unitary_builder.time_evolution.trotter import Trotter
 from qdk_chemistry.algorithms.phase_estimation.circuit_builder import unary_phase_estimation_builder
 from qdk_chemistry.algorithms.phase_estimation.circuit_builder.unary_phase_estimation_builder import (
     QdkUnaryQpeCircuitBuilder,
@@ -32,8 +33,17 @@ from qdk_chemistry.data import (
 )
 from qdk_chemistry.data.circuit import Circuit, QsharpFactoryData
 from qdk_chemistry.data.unitary_representation.base import UnitaryRepresentation
+from qdk_chemistry.data.unitary_representation.containers.block_encoding import LCUContainer
 from qdk_chemistry.data.unitary_representation.containers.quantum_walk import LCUWalkContainer
 from qdk_chemistry.utils.qsharp import QSHARP_UTILS, get_qsharp_context
+from tests.reference_tolerances import float_comparison_absolute_tolerance, float_comparison_relative_tolerance
+
+try:
+    import qdk.qre  # noqa: F401
+
+    _HAS_QRE = True
+except ImportError:
+    _HAS_QRE = False
 
 
 def _address_qubits(num_actions: int) -> int:
@@ -48,15 +58,6 @@ def _dumped_address_index(address_value: int, num_address_qubits: int) -> int:
     return int(format(address_value, f"0{num_address_qubits}b")[::-1], 2)
 
 
-def _dump_op(op, num_qubits: int) -> np.ndarray:
-    """Simulate ``op`` on the all-zero state and return the resulting statevector.
-
-    The context has to be the one the operation was resolved from, otherwise the helper
-    that ``dump_operation_on_state`` evaluates cannot bind the callable.
-    """
-    return np.array(dump_operation_on_state(op, num_qubits, context=get_qsharp_context()))
-
-
 def _decode(counts: dict[str, int], num_bits: int, *, resolve_positive_branch: bool = False):
     """Run the decoder against a walk whose block encoding has ``lambda = 1``."""
     return _post_process_phase_estimation(
@@ -67,12 +68,36 @@ def _decode(counts: dict[str, int], num_bits: int, *, resolve_positive_branch: b
 class TestUnaryIterationQsharp:
     """Statevector checks of the unary-iteration primitives against exact references."""
 
+    @pytest.mark.parametrize("num_actions", [1, 2, 3, 5, 6, 7, 8, 9, 10, 13])
+    def test_action_index_matches_every_address(self, qsharp_test_context, qsharp_test_utils, num_actions):
+        """Classical routing must match the circuit, including unused address states."""
+        tests = qsharp_test_utils.UnaryIterationTests
+        num_address_qubits = _address_qubits(num_actions)
+        tester = ArithmeticOpTester(
+            tests.TestMakeFlagActionsOp(num_actions), [num_address_qubits, num_actions], context=qsharp_test_context
+        )
+        for address_value in range(1 << num_address_qubits):
+            expected_index = tests.TestUnaryIterationActionIndex(num_actions, address_value)
+            assert tester.run([address_value, 0]) == [address_value, 1 << expected_index], f"address {address_value}"
+
+    @pytest.mark.parametrize("num_actions", [1, 2, 3, 5, 8])
+    def test_one_hot_address_selects_exactly_one_action(self, qsharp_test_context, qsharp_test_utils, num_actions):
+        """A basis-state address must fire the matching action and only that one."""
+        num_address_qubits = _address_qubits(num_actions)
+        for address_value in range(num_actions):
+            op = qsharp_test_utils.UnaryIterationTests.TestMakeOneHotOp(num_actions, address_value)
+            state = np.array(dump_operation_on_state(op, num_address_qubits + num_actions, context=qsharp_test_context))
+
+            expected = np.zeros(1 << (num_address_qubits + num_actions), dtype=complex)
+            expected[1 << (num_actions - 1 - address_value)] = 1.0
+            np.testing.assert_allclose(state, expected, atol=1e-10, err_msg=f"address {address_value}")
+
     @pytest.mark.parametrize("num_actions", [2, 4, 8])
-    def test_superposed_address_stays_coherent(self, num_actions):
+    def test_superposed_address_stays_coherent(self, qsharp_test_context, qsharp_test_utils, num_actions):
         """A superposed address must produce sum_a |a>|onehot(a)> with no ancilla residue."""
         num_address_qubits = _address_qubits(num_actions)
-        op = QSHARP_UTILS.UnaryIteration.MakeTestUnaryIterationSuperposedAddressOp(num_actions)
-        state = _dump_op(op, num_address_qubits + num_actions)
+        op = qsharp_test_utils.UnaryIterationTests.TestMakeSuperposedAddressOp(num_actions)
+        state = np.array(dump_operation_on_state(op, num_address_qubits + num_actions, context=qsharp_test_context))
 
         expected = np.zeros(1 << (num_address_qubits + num_actions), dtype=complex)
         for address_value in range(num_actions):
@@ -88,11 +113,11 @@ class TestUnaryIterationQsharp:
             (7, [True, False, False, False, False, True, True]),
         ],
     )
-    def test_exposed_control_is_an_equality_predicate(self, num_actions, data):
+    def test_exposed_control_is_an_equality_predicate(self, qsharp_test_context, qsharp_test_utils, num_actions, data):
         """Phasing the exposed control must imprint exactly the flagged sign pattern."""
         num_address_qubits = _address_qubits(num_actions)
-        op = QSHARP_UTILS.UnaryIteration.MakeTestUnaryIterationControlPhasesOp(num_actions, data)
-        state = _dump_op(op, num_address_qubits)
+        op = qsharp_test_utils.UnaryIterationTests.TestMakeControlPhasesOp(num_actions, data)
+        state = np.array(dump_operation_on_state(op, num_address_qubits, context=qsharp_test_context))
 
         # Addresses at or above num_actions are outside the iteration's promise: the last
         # leaf fires on its control alone, so they alias onto a neighbouring action.
@@ -105,32 +130,52 @@ class TestUnaryIterationQsharp:
 class TestBlockEncodingAgnosticSchedule:
     """The signed-power schedule must work for any self-inverse block encoding."""
 
+    @pytest.mark.parametrize("num_queries", [1, 2, 3, 5, 7])
+    def test_resource_optimization_preserves_logical_counts(self, qsharp_test_context, qsharp_test_utils, num_queries):
+        """Repeating one representative slot must match the literal schedule's costs."""
+        operation = qsharp_test_utils.UnaryPhaseEstimationTests.TestSignedPowerScheduleResources
+
+        optimized = qsharp_test_context.logical_counts(operation, num_queries, True)
+        direct = qsharp_test_context.logical_counts(operation, num_queries, False)
+
+        assert optimized == direct
+
     @pytest.mark.parametrize(
         ("num_queries", "address_value"),
         [(p, t) for p in (1, 2, 3, 5) for t in range(p + 1)],
     )
-    def test_psp_schedule_matches_the_explicit_walk_power(self, num_queries, address_value):
+    def test_psp_schedule_matches_the_explicit_walk_power(
+        self, qsharp_test_context, qsharp_test_utils, num_queries, address_value
+    ):
         """A PREPARE-SELECT-PREPARE walk must obey the same ``W^(p - 2t)`` contract."""
-        psp = QSHARP_UTILS.PrepSelPrep
-        op = QSHARP_UTILS.UnaryPhaseEstimation.MakeTestSignedPowerScheduleAgainstWalkOp(
-            psp.MakeTestBlockEncodingOp(0.7), psp.MakeAncillaReflectionOp(1, 1), num_queries, address_value, 0.9
+        psp = qsharp_test_context.code.QDKChemistry.Utils.PrepSelPrep
+        op = qsharp_test_utils.UnaryPhaseEstimationTests.TestMakeSignedPowerScheduleAgainstWalkOp(
+            qsharp_test_utils.PrepSelPrepTests.TestMakeBlockEncodingOp(0.7),
+            psp.MakeAncillaReflectionOp(1, 1),
+            num_queries,
+            address_value,
+            0.9,
         )
         num_address_qubits = _address_qubits(num_queries + 1)
-        state = _dump_op(op, num_address_qubits + 2)
+        state = np.array(dump_operation_on_state(op, num_address_qubits + 2, context=qsharp_test_context))
 
         expected = np.zeros(1 << (num_address_qubits + 2), dtype=complex)
         expected[0] = np.cos(0.45)  # system |0>, ancilla |0>
         expected[2] = np.sin(0.45)  # system |1>, ancilla |0>
         np.testing.assert_allclose(state, expected, atol=1e-10)
 
-    @pytest.mark.parametrize("theta", [0.0, 1.3, np.pi / 2])
-    def test_psp_schedule_holds_for_every_encoded_eigenvalue(self, theta):
+    @pytest.mark.parametrize("theta", [0.35, 1.3, np.pi / 2])
+    def test_psp_schedule_holds_for_every_encoded_eigenvalue(self, qsharp_test_context, qsharp_test_utils, theta):
         """The contract must not depend on what the block encoding encodes."""
-        psp = QSHARP_UTILS.PrepSelPrep
-        op = QSHARP_UTILS.UnaryPhaseEstimation.MakeTestSignedPowerScheduleAgainstWalkOp(
-            psp.MakeTestBlockEncodingOp(theta), psp.MakeAncillaReflectionOp(1, 1), 3, 1, 0.9
+        psp = qsharp_test_context.code.QDKChemistry.Utils.PrepSelPrep
+        op = qsharp_test_utils.UnaryPhaseEstimationTests.TestMakeSignedPowerScheduleAgainstWalkOp(
+            qsharp_test_utils.PrepSelPrepTests.TestMakeBlockEncodingOp(theta),
+            psp.MakeAncillaReflectionOp(1, 1),
+            3,
+            1,
+            0.9,
         )
-        state = _dump_op(op, 4)
+        state = np.array(dump_operation_on_state(op, 4, context=qsharp_test_context))
 
         expected = np.zeros(1 << 4, dtype=complex)
         expected[0] = np.cos(0.45)
@@ -188,6 +233,7 @@ class TestPhaseDecoding:
         # The reported bin and its fraction name the folded phase, so both branches agree.
         assert result.bitstring_msb_first == "010"
         assert result.phase_fraction == pytest.approx(0.25)
+        assert result.bitstring_counts == counts
 
     @pytest.mark.parametrize("num_bits", [1, 2, 3, 4])
     def test_the_two_sign_branches_partition_the_spectrum(self, num_bits):
@@ -199,6 +245,21 @@ class TestPhaseDecoding:
             assert 0.0 <= positive.canonical_phase_fraction <= 0.25
             assert positive.canonical_phase_fraction + negative.canonical_phase_fraction == pytest.approx(0.5)
             assert positive.raw_energy == pytest.approx(-negative.raw_energy)
+            # The flag names which of the two branches is resolved, not which magnitude is reported.
+            assert np.isclose(
+                positive.resolved_energy,
+                positive.raw_energy,
+                rtol=float_comparison_relative_tolerance,
+                atol=float_comparison_absolute_tolerance,
+            )
+            assert np.isclose(
+                negative.resolved_energy,
+                negative.raw_energy,
+                rtol=float_comparison_relative_tolerance,
+                atol=float_comparison_absolute_tolerance,
+            )
+            assert np.greater_equal(positive.raw_energy, -float_comparison_absolute_tolerance)
+            assert np.less_equal(negative.raw_energy, float_comparison_absolute_tolerance)
 
     def test_branching_is_still_two_candidates_at_the_degenerate_phase(self):
         """The half-way bin is the one that collapses, so pin it directly."""
@@ -262,10 +323,16 @@ class TestMisconfigurationIsSurfaced:
         with pytest.raises(ValueError, match="num_queries must be a positive integer"):
             QdkUnaryQpeCircuitBuilder(num_queries=num_queries).resolve_num_queries()
 
-    def test_a_plain_block_encoding_is_rejected(self):
-        """The schedule drops one reflection, so a bare LCU has nothing to drop."""
-        with pytest.raises(ValueError, match="Requires a LCU walk unitary representation"):
-            _run_builder(_make_builder(unitary_builder=LCUBuilder(quantum_walk=False)))
+    @pytest.mark.parametrize("compute_capacity", [0, -2])
+    def test_an_invalid_compute_capacity_is_rejected(self, compute_capacity):
+        """Memory placement accepts a positive compute capacity or the disabled sentinel."""
+        with pytest.raises(ValueError, match="compute_capacity must be -1 or a positive integer"):
+            _run_builder(QdkUnaryQpeCircuitBuilder(num_queries=3, compute_capacity=compute_capacity))
+
+    def test_time_evolution_is_rejected(self):
+        """Unary QPE rejects a Trotter step, which is not self-inverse."""
+        with pytest.raises(ValueError, match="Requires an LCU or SOSSA block encoding"):
+            _run_builder(_make_builder(unitary_builder=Trotter(time=0.1, num_divisions=1)))
 
     @pytest.mark.parametrize(
         ("declared_width", "message"),
@@ -317,13 +384,16 @@ class TestMisconfigurationIsSurfaced:
 
         assert any("num_bits=7 is ignored" in message for message in warnings), warnings
 
-    def test_a_carried_walk_power_is_ignored_with_a_warning(self, monkeypatch):
+    @pytest.mark.parametrize("quantum_walk", [True, False])
+    def test_a_carried_power_is_ignored_with_a_warning(self, monkeypatch, quantum_walk):
         """The schedule picks its own power per slot, so a container power is meaningless."""
         warnings: list[str] = []
         monkeypatch.setattr(unary_phase_estimation_builder.Logger, "warn", warnings.append)
         container = LCUBuilder(quantum_walk=True).run(_hamiltonian()).get_container()
         powered = UnitaryRepresentation(
             container=LCUWalkContainer(container.block_encoding, power=2, scale=container.scale)
+            if quantum_walk
+            else LCUContainer(container.block_encoding.prepare, container.block_encoding.select, power=2)
         )
 
         _run_builder(_make_builder(unitary_builder=_Stub(powered)))
@@ -372,38 +442,38 @@ class TestUnaryQpeEndToEnd:
     """End-to-end checks of ``MakeUnaryQPECircuit`` on a walk with an exact eigenphase."""
 
     @staticmethod
-    def _measure(num_queries: int, k: int, system_angle: float) -> int:
+    def _measure(test_utils, num_queries: int, k: int, system_angle: float) -> int:
         """Run the synthetic-walk QPE circuit from ``Ry(system_angle)|0>`` and decode the phase register."""
         num_states = num_queries + 1
         theta = -np.pi * k / num_states
-        results = QSHARP_UTILS.UnaryPhaseEstimation.TestUnaryQpeSyntheticWalk(num_queries, theta, system_angle)
+        results = test_utils.UnaryPhaseEstimationTests.TestRunSyntheticWalkQpe(num_queries, theta, system_angle)
         return int("".join("1" if str(bit) == "One" else "0" for bit in reversed(results)), 2)
 
     @pytest.mark.parametrize(
         ("num_queries", "k", "system_state"),
         [(m, k, s) for m in (3, 7) for k in range(m + 1) for s in (0, 1)],
     )
-    def test_measured_bin_is_twice_the_walk_phase(self, num_queries, k, system_state):
+    def test_measured_bin_is_twice_the_walk_phase(self, qsharp_test_utils, num_queries, k, system_state):
         """The measured register must read exactly ``2*phi*N``."""
         num_states = num_queries + 1
         expected = (-k) % num_states if system_state == 1 else k
-        assert self._measure(num_queries, k, system_state * np.pi) == expected
+        assert self._measure(qsharp_test_utils, num_queries, k, system_state * np.pi) == expected
 
     @pytest.mark.parametrize("system_angle", [np.pi / 2, 2 * np.pi / 3])
-    def test_superposed_input_splits_across_both_eigenphase_bins(self, system_angle):
+    def test_superposed_input_splits_across_both_eigenphase_bins(self, qsharp_test_utils, system_angle):
         """A non-eigenstate must land in the two eigenphase bins with the overlap weights."""
         num_queries, k, shots = 7, 3, 256
         num_states = num_queries + 1
         ground_bin, excited_bin = k, (-k) % num_states
 
-        measured = np.array([self._measure(num_queries, k, system_angle) for _ in range(shots)])
+        measured = np.array([self._measure(qsharp_test_utils, num_queries, k, system_angle) for _ in range(shots)])
 
         assert set(np.unique(measured).tolist()) == {ground_bin, excited_bin}
         assert np.mean(measured == excited_bin) == pytest.approx(np.sin(system_angle / 2) ** 2, abs=0.12)
 
     @pytest.mark.parametrize("resolve_positive_branch", [True, False])
     @pytest.mark.parametrize("k", [1, 2, 3])
-    def test_decoder_recovers_the_walk_phase(self, k, resolve_positive_branch):
+    def test_decoder_recovers_the_walk_phase(self, qsharp_test_utils, k, resolve_positive_branch):
         """The measured bin, run through the decoder, returns the walk phase.
 
         The two eigenvectors carry conjugate phases ``+-phi`` and land in
@@ -417,7 +487,7 @@ class TestUnaryQpeEndToEnd:
         walk_phase = k / (2 * num_states)
         expected_phase = walk_phase if resolve_positive_branch else 0.5 - walk_phase
         for system_state in (0, 1):
-            measured_bin = self._measure(num_queries, k, system_state * np.pi)
+            measured_bin = self._measure(qsharp_test_utils, num_queries, k, system_state * np.pi)
             counts = {format(measured_bin, f"0{num_bits}b"): 1}
             result = _decode(counts, num_bits, resolve_positive_branch=resolve_positive_branch)
             assert result.canonical_phase_fraction == pytest.approx(expected_phase)
@@ -494,6 +564,41 @@ class TestUnaryQpeEndToEnd:
 
         assert result.raw_energy == pytest.approx(float(energies[0]), abs=0.02)
 
+    def test_a_plain_lcu_block_encoding_recovers_the_ground_state_energy(self):
+        """Unary QPE recovers the energy from an LCU built without ``quantum_walk``."""
+        # lambda = 1.5 puts the phase on a bin; a decode without lambda would miss.
+        hamiltonian = QubitOperator(pauli_strings=["X", "Z"], coefficients=np.array([0.75, 0.75]))
+        energies, vectors = np.linalg.eigh(hamiltonian.to_matrix())
+        state_prep_params = {
+            "rowMap": list(range(hamiltonian.num_qubits - 1, -1, -1)),
+            "stateVector": np.real(vectors[:, 0]).tolist(),
+            "expansionOps": [],
+            "numQubits": hamiltonian.num_qubits,
+        }
+        state_preparation = Circuit(
+            qsharp_factory=QsharpFactoryData(
+                program=QSHARP_UTILS.StatePreparation.MakeStatePreparationCircuit,
+                parameter=state_prep_params,
+            ),
+            qsharp_op=QSHARP_UTILS.StatePreparation.MakeStatePreparationOp(state_prep_params),
+        )
+
+        qpe = UnaryPhaseEstimation(shots=200)
+        qpe.settings().set(
+            "qpe_circuit_builder",
+            AlgorithmRef(
+                "qpe_circuit_builder",
+                "qdk_unary",
+                num_queries=7,
+                unitary_builder=AlgorithmRef("hamiltonian_unitary_builder", "lcu", quantum_walk=False),
+            ),
+        )
+        qpe.settings().set("circuit_executor", AlgorithmRef("circuit_executor", "qdk_sparse_state_simulator"))
+
+        result = qpe.run(qubit_hamiltonian=hamiltonian, state_preparation=state_preparation)
+
+        assert result.raw_energy == pytest.approx(float(energies[0]), abs=1e-9)
+
 
 def test_the_builder_reflects_the_ancilla_tail_the_mapper_declared():
     """Every qubit the mapper exposes past the system register is reflected about."""
@@ -509,6 +614,65 @@ def test_the_builder_reflects_the_ancilla_tail_the_mapper_declared():
     )[0]
 
     assert circuit._qsharp_factory.parameter["numAncillas"] == declared - hamiltonian.num_qubits
+
+
+@pytest.mark.parametrize("compute_capacity", [-1, 2])
+def test_the_builder_passes_compute_capacity_to_qsharp(compute_capacity):
+    """The Python setting must reach the Q# factory unchanged."""
+    circuit = _run_builder(QdkUnaryQpeCircuitBuilder(num_queries=3, compute_capacity=compute_capacity))[0]
+
+    assert circuit._qsharp_factory.parameter["computeCapacity"] == compute_capacity
+
+
+@pytest.mark.skipif(not _HAS_QRE, reason="qdk.qre not available")
+def test_a_positive_compute_capacity_moves_qubits_into_memory():
+    """A honoured ``computeCapacity`` splits the estimate into a compute and a memory area.
+
+    ``Circuit.estimate`` reports one ``numQubits`` total and cannot see the split, so an
+    ignored capacity looks identical to an honoured one. Only a memory-aware ISA, which
+    yokes a memory code onto the compute code, supplies the ``MEMORY`` instruction the
+    capacity-bounded trace requires.
+    """
+    from qdk.qre import PSSPC, LatticeSurgery, estimate  # noqa: PLC0415
+    from qdk.qre.models import (  # noqa: PLC0415
+        GateBased,
+        RoundBasedFactory,
+        SurfaceCode,
+        TwoDimensionalYokedSurfaceCode,
+    )
+    from qdk.qre.property_keys import LOGICAL_COMPUTE_QUBITS, LOGICAL_MEMORY_QUBITS  # noqa: PLC0415
+
+    distances = list(range(5, 26, 2))
+    isa_query = (
+        SurfaceCode.q(distance=distances)
+        * RoundBasedFactory.q(use_cache=True, code_query=SurfaceCode.q(distance=distances))
+        * TwoDimensionalYokedSurfaceCode.q(source=SurfaceCode.q(distance=distances))
+    )
+    trace_query = PSSPC.q() * LatticeSurgery.q()
+    architecture = GateBased(error_rate=1e-4, gate_time=50, measurement_time=100)
+
+    def split(compute_capacity: int) -> tuple[int, int]:
+        circuit = _run_builder(QdkUnaryQpeCircuitBuilder(num_queries=3, compute_capacity=compute_capacity))[0]
+        result = estimate(circuit.get_qre_application(), architecture, isa_query, trace_query, max_error=0.1)
+        entries = list(result)
+        assert entries, f"capacity {compute_capacity} admitted no feasible estimate"
+        best = min(entries, key=lambda entry: entry.qubits)
+        return best.properties.get(LOGICAL_COMPUTE_QUBITS, 0), best.properties.get(LOGICAL_MEMORY_QUBITS, 0)
+
+    disabled_compute, disabled_memory = split(-1)
+    capacities = (1, 2, 4)
+    capped = {capacity: split(capacity) for capacity in capacities}
+
+    assert disabled_memory == 0, f"the disabled sentinel reserved {disabled_memory} memory qubits"
+    for capacity, (compute, memory) in capped.items():
+        assert memory > 0, f"capacity {capacity} left every qubit in compute ({compute}, {memory})"
+        assert compute < disabled_compute, (
+            f"capacity {capacity} did not shrink the compute area: {compute} against {disabled_compute} when disabled"
+        )
+
+    computes = [capped[capacity][0] for capacity in capacities]
+    assert computes == sorted(computes), f"the compute area is not monotone in the capacity: {capped}"
+    assert len(set(computes)) > 1, f"every capacity produced the same compute area, so it is ignored: {capped}"
 
 
 def _ground_state_wavefunction(hamiltonian: QubitOperator) -> Wavefunction:

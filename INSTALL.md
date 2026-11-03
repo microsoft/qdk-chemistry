@@ -122,6 +122,7 @@ If you chose the minimal `pip install qdk-chemistry` above, you can add specific
 
 | Extra | Description | Included Packages |
 |-------|-------------|-------------------|
+| `azure-quantum` | Azure Quantum circuit executor backend | azure-identity, azure-quantum (no win-arm64 wheels) |
 | `coverage` | Coverage reporting tools | coverage, pytest, pytest-cov, gcovr |
 | `discovery` | Microsoft Discovery remote backend | azure-ai-discovery, azure-identity, azure-storage-blob |
 | `jupyter` | Jupyter notebook support | ipykernel, pandas |
@@ -133,8 +134,8 @@ If you chose the minimal `pip install qdk-chemistry` above, you can add specific
 | `docs` | [Sphinx documentation build tools](docs/README.md) | sphinx, sphinx-rtd-theme, myst-parser, breathe, sphinx-autodoc-typehints, sphinx-inline-tabs, sphinxcontrib-napoleon, sphinxcontrib-bibtex, sphinx_copybutton |
 | `qre` | Quantum Resource Estimator support | qdk[qre,jupyter]>=1.31.0 |
 | `dev` | Development and testing tools | pytest, ruff, mypy, and related tooling |
-| `test` | Testing tools and optional runtime dependencies; does not include `docs` | qdk-chemistry[coverage,discovery,jupyter,mcp,networkx-extras,openfermion-extras,plugins,qiskit-extras,qre], nbclient, nbformat, pennylane, rdkit, requests>=2.33.0 |
-| `all` | Union of all defined extras | coverage, dev, discovery, docs, jupyter, mcp, networkx-extras, openfermion-extras, plugins, qiskit-extras, qre, test |
+| `test` | Testing tools and optional runtime dependencies; does not include `docs` | qdk-chemistry[azure-quantum,coverage,discovery,jupyter,mcp,networkx-extras,openfermion-extras,plugins,qiskit-extras,qre], nbclient, nbformat, pennylane, rdkit, requests>=2.33.0 |
+| `all` | Union of all defined extras | azure-quantum, coverage, dev, discovery, docs, jupyter, mcp, networkx-extras, openfermion-extras, plugins, qiskit-extras, qre, test |
 
 To build the documentation, install the `docs` extra (for example,
 `python3 -m pip install 'qdk-chemistry[docs]'`), install the Doxygen system
@@ -177,7 +178,7 @@ to native Windows installs; none of them apply under
 |-------|--------|
 | Visual C++ runtime | Install the current [Microsoft Visual C++ v14 Redistributable x64 package](https://aka.ms/vc14/vc_redist.x64.exe), which includes both x64 and ARM64 runtimes. It is a machine-level prerequisite and may require administrator approval. |
 | PySCF plugin | PySCF publishes no Windows wheels, so the `plugins` extra installs no PySCF and the PySCF plugin is unavailable. The native implementations are unaffected. |
-| arm64 dependencies and extras | MCP is omitted from the `all` and `test` extras because its `cryptography` dependency publishes no win-arm64 wheel. A base, `all`, or `test` install therefore needs neither Rust nor a source build of `cryptography`; installing the `mcp` extra explicitly may require an ARM64 Rust toolchain, MSVC C/C++ build tools, and ARM64 OpenSSL development libraries. Qiskit (and Qiskit Aer, Nature, IBM Runtime), PennyLane and RDKit are skipped because they require `rustworkx`, which also publishes no win-arm64 wheel. The Microsoft Discovery backend (`azure-ai-discovery`, `azure-identity`, `azure-storage-blob`) is skipped as well. The features that depend on those skipped extras are unavailable. |
+| arm64 dependencies and extras | MCP is omitted from the `all` and `test` extras because its `cryptography` dependency publishes no win-arm64 wheel. A base, `all`, or `test` install therefore needs neither Rust nor a source build of `cryptography`; installing the `mcp` extra explicitly may require an ARM64 Rust toolchain, MSVC C/C++ build tools, and ARM64 OpenSSL development libraries. Qiskit (and Qiskit Aer, Nature, IBM Runtime), PennyLane and RDKit are skipped because they require `rustworkx`, which also publishes no win-arm64 wheel. The Microsoft Discovery backend (`azure-ai-discovery`, `azure-identity`, `azure-storage-blob`) is skipped as well, as is the Azure Quantum backend (`azure-quantum`, `azure-identity`), which depends on the same `cryptography` wheel. The features that depend on those skipped extras are unavailable. |
 | OpenMP | Shared-memory threading via OpenMP is disabled on Windows. |
 
 ---
@@ -277,12 +278,12 @@ each library; they are all declared in [`vcpkg.json`](vcpkg.json), so a single
 | Dependency | Description | Requirements | Source Location | Ubuntu / Debian | Redhat | Windows |
 |------------|-------------|--------------------|-----------------|-----------------|---------|-----------------|
 | Python 3 | Python interpreter and package tools | Version 3.10+ | [source](https://www.python.org/) | `apt install python3 python3-pip python3-venv` | `dnf install python3 python3-pip` | `winget install --id Python.Python.3.12 -e -s winget` |
-| CMake | Build system manager | Version > 3.15 | [source](https://github.com/Kitware/CMake) | `apt install cmake` | `dnf install cmake` | VS Build Tools |
+| CMake | Build system manager | Version 3.28+ | [source](https://github.com/Kitware/CMake) | `apt install cmake` | `dnf install cmake` | VS Build Tools |
 | Ninja | Build tool used for the Windows builds | N/A | [source](https://github.com/ninja-build/ninja) | `apt install ninja-build` | `dnf install ninja-build` | VS Build Tools |
 | Eigen | C++ linear algebra templates | Version > 3.4.0 | [source](https://libeigen.gitlab.io/) | `apt install libeigen3-dev` | `dnf install eigen3-devel` | `eigen3` |
 | LAPACK | C library for linear algebra. See [this note](#note-on-lapack-usage) for further information | N/A | e.g. [source](https://github.com/OpenMathLib/OpenBLAS) | e.g. `apt install libopenblas-dev` | e.g. `dnf install openblas-devel`| `openblas` |
 | HDF5 | A portable data file library | Version > 1.12 + C++ bindings | [source](https://www.hdfgroup.org/download-hdf5/) | `apt install libhdf5-serial-dev` | `dnf install hdf5-devel`| `hdf5[cpp]` |
-| Boost | A collection of useful C++ libraries | Version > 1.80 | [source](https://github.com/boostorg/wiki/wiki/Getting-Started%3A-Overview) | `apt install libboost-all-dev` | `dnf install boost-devel` | `boost-headers`, `boost-container-hash`, `boost-dynamic-bitset`, `boost-sort` |
+| Boost | A collection of useful C++ libraries | Version > 1.80 (1.85+ with MSVC), including the compiled Locale, Random, and Regex libraries | [source](https://github.com/boostorg/wiki/wiki/Getting-Started%3A-Overview) | `apt install libboost-all-dev` | `dnf install boost-devel` | `boost-headers`, `boost-container`, `boost-container-hash`, `boost-dynamic-bitset`, `boost-hana`, `boost-interval`, `boost-locale`, `boost-multiprecision`, `boost-numeric-conversion`, `boost-random`, `boost-range`, `boost-regex`, `boost-sort`, `boost-spirit` |
 
 See [Python dependencies](#python-dependencies) for a list of dependencies installed by `pip`.
 
@@ -323,10 +324,14 @@ These dependencies are automatically downloaded and built by the CMake build sys
 | Libecpint | A C++ library for molecular integrals involving [effective core potentials](https://en.wikipedia.org/wiki/Pseudopotential) | v1.0.7 | [source](https://github.com/robashaw/libecpint) | `apt install libecpint-dev` | N/A | N/A |
 | GauXC | A C++ library for molecular integrals on numerical grids | v1.0 | [source](https://github.com/wavefunction91/gauxc) | N/A | N/A | N/A |
 | MACIS | A C++ library for configuration interaction methods | N/A | [source](https://github.com/wavefunction91/macis) | N/A | N/A | N/A |
+| SeQuant | A C++ library for symbolic tensor algebra in many-body methods | be93107 | [source](https://github.com/ValeevGroup/SeQuant) | N/A | N/A | N/A |
+| BTAS | A C++ tensor library, used as SeQuant's numerical backend | 5b435cf | [source](https://github.com/BTAS/btas) | N/A | N/A | N/A |
 
 **NOTE**: As Libint and GauXC exhibit very long build times, it is **strongly encouraged** that these dependencies are separately installed to avoid excessive build costs. See the [Libint2](https://github.com/evaleev/libint) and [GauXC](https://github.com/wavefunction91/gauxc) project documentation for build instructions.
 
 **NOTE**: The source code of MACIS is included in the `external` directory of QDK/Chemistry. `MACIS` carries its own set of dependencies which are automatically managed by the `MACIS` build system. While building `MACIS` and its dependencies can be time consuming, it is strongly encouraged to allow the QDK/Chemistry build system handle this dependency to ensure proper interaction of up- and down-stream components.
+
+**NOTE**: SeQuant is always built from source at its pinned revision, with BTAS as its numerical backend. BTAS uses the BLAS++/LAPACK++ libraries that `MACIS` brings in.
 
 ### Note on LAPACK Usage
 

@@ -12,7 +12,7 @@ import pytest
 
 from qdk_chemistry.data import Symmetries
 
-from .test_helpers import create_test_ansatz, create_test_wavefunction
+from .helpers import create_test_ansatz, create_test_wavefunction
 
 
 class TestSymmetriesConstruction:

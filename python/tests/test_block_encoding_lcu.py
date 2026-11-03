@@ -17,12 +17,22 @@ from qdk.test_utils import dump_operation_on_state
 from qdk_chemistry.algorithms import registry
 from qdk_chemistry.algorithms.hamiltonian_unitary_builder.block_encoding.lcu import LCUBuilder
 from qdk_chemistry.data import AlgorithmRef, QubitOperator
+from qdk_chemistry.data.qubit_operator.containers.sparse_pauli_decomposition import SparsePauliTerms
 from qdk_chemistry.data.unitary_representation.base import UnitaryRepresentation
 from qdk_chemistry.data.unitary_representation.containers.block_encoding import BlockEncodingContainer, LCUContainer
 from qdk_chemistry.data.unitary_representation.containers.quantum_walk import LCUWalkContainer
 from qdk_chemistry.utils.qsharp import get_qsharp_context
 
-from .reference_tolerances import float_comparison_absolute_tolerance, float_comparison_relative_tolerance
+from .reference_tolerances import (
+    float_comparison_absolute_tolerance,
+    float_comparison_relative_tolerance,
+)
+
+
+def _lcu_container() -> LCUContainer:
+    """Build a small LCU block encoding to wrap in a walk operator."""
+    hamiltonian = QubitOperator(pauli_strings=["XX", "ZZ"], coefficients=np.array([0.25, 0.5]))
+    return LCUBuilder().run(hamiltonian).get_container()
 
 
 def _reverse_bits(value: int, num_bits: int) -> int:
@@ -95,6 +105,49 @@ class TestLCUBuilder:
         builder3 = LCUBuilder()
         result3 = builder3.run(hamiltonian3)
         assert result3.get_container().num_prepare_ancillas == 2
+
+        # A below-threshold term is dropped from PREPARE and SELECT, so it does not widen the register.
+        roundoff = QubitOperator(pauli_strings=["XX", "ZZ", "XZ"], coefficients=np.array([0.25, 0.5, 1e-17]))
+        container = LCUBuilder().run(roundoff).get_container()
+        assert container.num_prepare_ancillas == 1
+        assert len(container.select.controlled_operations) == 2
+
+        single = QubitOperator(pauli_strings=["XX", "ZZ", "XZ"], coefficients=np.array([0.25, 1e-12, 1e-17]))
+        container = LCUBuilder().run(single).get_container()
+        assert container.num_prepare_ancillas == 0
+        assert [op.operation for op in container.select.controlled_operations] == ["XX"]
+
+    @pytest.mark.parametrize("sparse", [False, True])
+    @pytest.mark.parametrize("quantum_walk", [False, True])
+    @pytest.mark.parametrize("coefficients", [[6e-13, 6e-13], [1e-12, -1e-12]])
+    def test_rejects_all_filtered_terms(self, sparse: bool, quantum_walk: bool, coefficients: list[float]) -> None:
+        """A positive raw L1 norm does not make an empty filtered Hamiltonian encodable."""
+        hamiltonian = (
+            QubitOperator.from_sparse_terms(2, [{0: "X"}, {1: "Z"}], np.array(coefficients))
+            if sparse
+            else QubitOperator(["IX", "ZI"], np.array(coefficients))
+        )
+        with pytest.raises(ValueError, match="non-empty Hamiltonian after coefficient filtering"):
+            LCUBuilder(quantum_walk=quantum_walk).run(hamiltonian)
+
+    def test_sparse_labels_are_materialized_once(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        """Sizing, PREPARE and SELECT reuse the same retained labels instead of expanding them repeatedly."""
+        hamiltonian = QubitOperator.from_sparse_terms(
+            1000, [{0: "X"}, {999: "Z"}, {2: "Y"}], np.array([0.25, 0.5, 1e-17])
+        )
+        label_reads: list[int] = []
+        original = SparsePauliTerms.__getitem__
+
+        def track_label(terms: SparsePauliTerms, index: int) -> str:
+            """Record each full-width label expansion."""
+            label_reads.append(index)
+            return original(terms, index)
+
+        monkeypatch.setattr(SparsePauliTerms, "__getitem__", track_label)
+        container = LCUBuilder().run(hamiltonian).get_container()
+        assert label_reads == [0, 1]
+        assert container.num_prepare_ancillas == 1
+        assert [op.operation for op in container.select.controlled_operations] == ["I" * 999 + "X", "Z" + "I" * 999]
 
     def test_lcu_builder_registered_in_registry(self):
         """Verify block encoding builder is accessible via the registry."""
@@ -184,13 +237,59 @@ class TestLCUBuilder:
         assert isinstance(container_no_walk, LCUContainer)
         assert not isinstance(container_no_walk, LCUWalkContainer)
 
-    def test_rejects_zero_l1_norm(self):
+    def test_rejects_zero_coefficients(self):
         """Verify LCUBuilder raises ValueError when all coefficients are zero."""
         hamiltonian = QubitOperator(
             pauli_strings=["XX", "ZZ"],
             coefficients=np.array([0.0, 0.0]),
         )
         builder = LCUBuilder()
+        with pytest.raises(ValueError, match="non-empty Hamiltonian after coefficient filtering"):
+            builder.run(hamiltonian)
+
+    def test_rejects_l1_norm_below_tolerance(self) -> None:
+        """The norm tolerance remains independent of per-coefficient filtering."""
+        hamiltonian = QubitOperator(["XX", "ZZ"], np.array([0.25, 0.5]))
+        builder = LCUBuilder()
+        builder.settings().set("tolerance", 1.0)
+        with pytest.raises(ValueError, match="L1 norm is too small"):
+            builder.run(hamiltonian)
+
+    @pytest.mark.parametrize("sparse", [False, True])
+    @pytest.mark.parametrize("quantum_walk", [False, True])
+    @pytest.mark.parametrize("retained_coefficients", [[2e-12], [2e-12, -4e-12]])
+    def test_normalization_uses_retained_coefficients(
+        self, sparse: bool, quantum_walk: bool, retained_coefficients: list[float]
+    ) -> None:
+        """Discarded coefficients contribute neither to PREPARE normalization nor to the quantum-walk scale."""
+        labels = ["IX", "ZI"][: len(retained_coefficients)] + ["YI"] * 100
+        coefficients = np.array(retained_coefficients + [6e-13] * 100)
+        hamiltonian = (
+            QubitOperator.from_sparse_terms(
+                2, [LCUBuilder._pauli_label_to_map(label) for label in labels], coefficients
+            )
+            if sparse
+            else QubitOperator(labels, coefficients)
+        )
+        container = LCUBuilder(quantum_walk=quantum_walk).run(hamiltonian).get_container()
+        lcu = container.block_encoding if quantum_walk else container
+        retained_norm = sum(abs(coefficient) for coefficient in retained_coefficients)
+        expected_amplitudes = np.sqrt(np.abs(retained_coefficients) / retained_norm)
+        np.testing.assert_allclose(
+            lcu.prepare.get_coefficients(),
+            expected_amplitudes,
+            rtol=float_comparison_relative_tolerance,
+            atol=float_comparison_absolute_tolerance,
+        )
+        assert len(lcu.select.controlled_operations) == len(retained_coefficients)
+        if quantum_walk:
+            assert container.scale == pytest.approx(retained_norm, rel=float_comparison_relative_tolerance, abs=0.0)
+
+    def test_norm_tolerance_uses_retained_coefficients(self) -> None:
+        """A large discarded coefficient sum cannot bypass the retained Hamiltonian's minimum-norm check."""
+        hamiltonian = QubitOperator(["IX"] + ["YI"] * 100, np.array([2e-12] + [6e-13] * 100))
+        builder = LCUBuilder()
+        builder.settings().set("tolerance", 3e-12)
         with pytest.raises(ValueError, match="L1 norm is too small"):
             builder.run(hamiltonian)
 
@@ -482,15 +581,93 @@ class TestLCUContainer:
         lam = hamiltonian.schatten_norm
 
         # φ=0 → E=λ
-        assert np.isclose(
+        assert np.allclose(
             container.eigenvalue_from_phase(0.0),
             lam,
             rtol=float_comparison_relative_tolerance,
             atol=float_comparison_absolute_tolerance,
         )
         # φ=0.25 → E=0
-        assert np.isclose(
-            container.eigenvalue_from_phase(0.25),
-            0.0,
+        assert isinstance(container.eigenvalue_from_phase(0.25), float)
+        assert np.isclose(container.eigenvalue_from_phase(0.25), 0.0, atol=float_comparison_absolute_tolerance)
+
+    def test_walk_container_squared_folds_the_energy_sign(self):
+        """Squaring the walk sends θ and π-θ to the same eigenphases, so both signs are reported."""
+        container = LCUWalkContainer(_lcu_container(), power=2, scale=6.0)
+        energy = 6.0 * np.cos(np.pi * 0.1)
+
+        with pytest.raises(ValueError, match=r"ambiguous.*power 2"):
+            container.eigenvalue_from_phase(0.1)
+        assert np.allclose(
+            container.eigenvalue_branches_from_phase(0.1),
+            (-energy, energy),
+            rtol=float_comparison_relative_tolerance,
             atol=float_comparison_absolute_tolerance,
         )
+
+    @pytest.mark.parametrize(
+        ("power", "phase_fraction", "expected_count"),
+        [
+            # Degeneracy is exact, not approximate: only phi = 0 and phi = 1/2 pair branches up.
+            (4, 0.0, 3),
+            (4, 0.5, 2),
+            (4, 1.99e-12, 4),
+            (9243, 0.5, 4622),
+        ],
+    )
+    def test_walk_container_branch_count_is_exact(self, power, phase_fraction, expected_count):
+        """A phase a hair away from a degeneracy keeps every branch distinct."""
+        container = LCUWalkContainer(_lcu_container(), power=power, scale=6.0)
+
+        branches = container.eigenvalue_branches_from_phase(phase_fraction)
+
+        assert len(branches) == expected_count
+        assert len(set(branches)) == expected_count
+
+    @pytest.mark.parametrize("power", [1, 2, 3, 4])
+    @pytest.mark.parametrize("energy", [-5.5, -1.25, 0.0, 3.0, 6.0])
+    def test_walk_container_branches_are_sound_and_complete(self, power, energy):
+        """Every branch re-encodes to the measured phase, and the true energy is among them."""
+        lam = 6.0
+        container = LCUWalkContainer(_lcu_container(), power=power, scale=lam)
+        phase_fraction = (power * np.arccos(energy / lam) / (2 * np.pi)) % 1.0
+
+        branches = np.array(container.eigenvalue_branches_from_phase(phase_fraction))
+
+        assert len(branches) <= power
+        assert np.all(np.diff(branches) > 0.0)
+        # Soundness: pushing a branch back through W^p must reproduce the measured phase, up to
+        # the conjugate eigenphase the walk cannot distinguish.
+        walk_phase = power * np.arccos(np.clip(branches / lam, -1.0, 1.0)) / (2 * np.pi)
+        offsets = np.stack([walk_phase - phase_fraction, walk_phase + phase_fraction]) % 1.0
+        drift = np.minimum(offsets, 1.0 - offsets).min(axis=0)
+        assert np.allclose(
+            drift, 0.0, atol=float_comparison_absolute_tolerance, rtol=float_comparison_relative_tolerance
+        )
+        # Completeness: the energy the phase was built from is one of them.
+        assert np.isclose(
+            branches, energy, atol=float_comparison_absolute_tolerance, rtol=float_comparison_relative_tolerance
+        ).any()
+
+    def test_walk_container_powered_branches_survive_serialization(self):
+        """Serialized walk containers keep the power that defines their inverse branches."""
+        container = LCUWalkContainer(_lcu_container(), power=3, scale=6.0)
+
+        restored = LCUWalkContainer.from_json(container.to_json())
+
+        assert restored.power == 3
+        assert restored.eigenvalue_branches_from_phase(0.1) == container.eigenvalue_branches_from_phase(0.1)
+        with pytest.raises(ValueError, match="ambiguous"):
+            restored.eigenvalue_from_phase(0.1)
+
+    def test_walk_container_powered_scalar_inversion_when_branches_coincide(self):
+        """A powered walk can still have a unique energy at a special phase."""
+        container = LCUWalkContainer(_lcu_container(), power=2, scale=6.0)
+
+        assert len(container.eigenvalue_branches_from_phase(0.5)) == 1
+        assert container.eigenvalue_from_phase(0.5) == pytest.approx(0.0, abs=1e-12)
+
+    def test_walk_container_rejects_a_non_positive_power(self):
+        """A walk operator applied fewer than once represents nothing."""
+        with pytest.raises(ValueError, match="power must be a positive integer"):
+            LCUWalkContainer(_lcu_container(), power=0, scale=6.0)

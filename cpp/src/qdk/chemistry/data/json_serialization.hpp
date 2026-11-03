@@ -5,10 +5,13 @@
 #pragma once
 #include <Eigen/Dense>
 #include <complex>
+#include <cstdint>
+#include <limits>
 #include <memory>
 #include <nlohmann/json.hpp>
 #include <stdexcept>
 #include <string>
+#include <type_traits>
 #include <variant>
 #include <vector>
 
@@ -143,5 +146,39 @@ std::vector<T> json_to_vector(const nlohmann::json& j) {
   }
   return vector;
 }
+
+namespace detail {
+
+/**
+ * @brief Read a JSON integer without converting floats, booleans, or values
+ * out of range
+ * @tparam Integer Target integer type
+ * @param value JSON value to read
+ * @return The value as Integer
+ * @throws std::invalid_argument if value is not an integer in range of Integer
+ */
+template <typename Integer>
+Integer json_integer(const nlohmann::json& value) {
+  bool valid = value.is_number_integer();
+  if (valid && value.is_number_unsigned()) {
+    valid = value.get<std::uint64_t>() <=
+            static_cast<std::uint64_t>(std::numeric_limits<Integer>::max());
+  } else if (valid) {
+    const auto integer = value.get<std::int64_t>();
+    if constexpr (std::is_unsigned_v<Integer>) {
+      valid = integer >= 0 && static_cast<std::uint64_t>(integer) <=
+                                  std::numeric_limits<Integer>::max();
+    } else {
+      valid = integer >= std::numeric_limits<Integer>::min() &&
+              integer <= std::numeric_limits<Integer>::max();
+    }
+  }
+  if (!valid) {
+    throw std::invalid_argument("JSON integer is invalid or out of range.");
+  }
+  return value.get<Integer>();
+}
+
+}  // namespace detail
 
 }  // namespace qdk::chemistry::data

@@ -39,10 +39,4 @@ class IdentityTermGrouper(TermGrouper):
             strategy="identity",
             groups=tuple((i,) for i in range(n)),
         )
-        return QubitOperator(
-            pauli_strings=list(qubit_hamiltonian.pauli_strings),
-            coefficients=qubit_hamiltonian.coefficients.copy(),
-            encoding=qubit_hamiltonian.encoding,
-            fermion_mode_order=qubit_hamiltonian.fermion_mode_order,
-            term_partition=partition,
-        )
+        return self._with_partition(qubit_hamiltonian, partition)

@@ -5,13 +5,16 @@
 # Licensed under the MIT License. See LICENSE.txt in the project root for license information.
 # --------------------------------------------------------------------------------------------
 
+import warnings
 from abc import abstractmethod
+from collections.abc import Container
 
 import numpy as np
 
 from qdk_chemistry.algorithms.base import Algorithm, AlgorithmFactory
 from qdk_chemistry.data import (
     FlatPartition,
+    HamiltonianDescription,
     LayeredPartition,
     QubitOperator,
     Settings,
@@ -37,12 +40,39 @@ class HamiltonianUnitaryBuilder(Algorithm):
         """Initialize the HamiltonianUnitaryBuilder."""
         super().__init__()
 
+    def run(self, qubit_hamiltonian: HamiltonianDescription) -> UnitaryRepresentation:
+        """Build the unitary and check the result.
+
+        Args:
+            qubit_hamiltonian: The Hamiltonian description to build the unitary from.
+
+        Returns:
+            UnitaryRepresentation: The unitary for the given Hamiltonian.
+
+        Raises:
+            TypeError: If the builder does not take the input's type, or the result is not a UnitaryRepresentation.
+
+        """
+        if not isinstance(qubit_hamiltonian, HamiltonianDescription):
+            warnings.warn(
+                f"{type(self).__name__} received a {type(qubit_hamiltonian).__name__}; unitary builders will "
+                "require a HamiltonianDescription.",
+                DeprecationWarning,
+                stacklevel=2,
+            )
+        unitary = super().run(qubit_hamiltonian)
+        if not isinstance(unitary, UnitaryRepresentation):
+            raise TypeError(
+                f"The {self.name()!r} builder returned a {type(unitary).__name__}, not a UnitaryRepresentation."
+            )
+        return unitary
+
     @abstractmethod
-    def _run_impl(self, qubit_hamiltonian: QubitOperator) -> UnitaryRepresentation:
+    def _run_impl(self, qubit_hamiltonian: HamiltonianDescription) -> UnitaryRepresentation:
         """Construct a UnitaryRepresentation for the given Hamiltonian.
 
         Args:
-            qubit_hamiltonian: The qubit Hamiltonian.
+            qubit_hamiltonian: The Hamiltonian description. Raise ``TypeError`` for a type the builder does not take.
 
         Returns:
             UnitaryRepresentation: A UnitaryRepresentation for the given Hamiltonian.
@@ -133,14 +163,14 @@ class TimeEvolutionBuilder(HamiltonianUnitaryBuilder):
         return time, power
 
     @abstractmethod
-    def _run_impl(self, qubit_hamiltonian: QubitOperator) -> UnitaryRepresentation:
-        """Construct a UnitaryRepresentation representing the time evolution unitary for the given QubitOperator.
+    def _run_impl(self, qubit_hamiltonian: HamiltonianDescription) -> UnitaryRepresentation:
+        """Construct a UnitaryRepresentation representing the time evolution unitary for the given Hamiltonian.
 
         Args:
-            qubit_hamiltonian: The qubit Hamiltonian.
+            qubit_hamiltonian: The Hamiltonian description. Raise ``TypeError`` for a type the builder does not take.
 
         Returns:
-            UnitaryRepresentation: A UnitaryRepresentation representing the evolution of the given QubitOperator.
+            UnitaryRepresentation: A UnitaryRepresentation representing the evolution of the given Hamiltonian.
 
         """
 
@@ -191,23 +221,30 @@ class TimeEvolutionBuilder(HamiltonianUnitaryBuilder):
                 fermion_mode_order=fmo,
             )
 
+        return [[_make(layer) for layer in group] for group in self._partition_indices(partition)]
+
+    @staticmethod
+    def _partition_indices(
+        partition: TermPartition, active: Container[int] | None = None
+    ) -> list[list[tuple[int, ...]]]:
+        """Return nonempty index layers, with groups stably ordered by layer count.
+
+        Indices outside ``active`` are dropped first, so filtered terms cannot add layers or groups.
+        """
         if isinstance(partition, LayeredPartition):
             layered_groups = partition.groups
         elif isinstance(partition, FlatPartition):
-            layered_groups = tuple((g,) for g in partition.groups)
+            layered_groups = tuple((g,) for g in partition.groups if g)
         else:
             raise TypeError(
                 f"Unsupported TermPartition subtype: {type(partition).__name__}. "
                 "Expected FlatPartition or LayeredPartition."
             )
 
-        groups: list[list[QubitOperator]] = [
-            [_make(layer) for layer in group_layers if layer] for group_layers in layered_groups
-        ]
-
-        groups = [g for g in groups if g]
-        groups.sort(key=len)
-        return groups
+        if active is not None:
+            layered_groups = tuple(tuple(tuple(i for i in layer if i in active) for layer in g) for g in layered_groups)
+        groups = [[layer for layer in layers if layer] for layers in layered_groups]
+        return sorted((group for group in groups if group), key=len)
 
     def _exponentiate_commuting(
         self,
