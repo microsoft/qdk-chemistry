@@ -168,20 +168,6 @@ def _execute_notebook(
     return client.execute()
 
 
-def _execute_notebook_skip_visualizations(
-    notebook_path: Path,
-    timeout: int = 1800,
-    cell_patches: dict[int, dict[str, str]] | None = None,
-) -> Any:
-    """Execute a notebook after removing visualization-only code."""
-    return _execute_notebook(
-        notebook_path,
-        timeout=timeout,
-        cell_patches=cell_patches,
-        skip_visualizations=True,
-    )
-
-
 def _run_workflow(cmd, cwd: Path) -> subprocess.CompletedProcess[str]:
     """Execute the workflow CLI with coverage-friendly defaults."""
     return subprocess.run(

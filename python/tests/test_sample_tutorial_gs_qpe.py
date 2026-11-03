@@ -60,6 +60,12 @@ TUTORIAL_VERSIONS_FILE = Path(__file__).parent.parent.parent / "docs" / "source"
 GROUND_STATE_TUTORIAL_VERSION = str(runpy.run_path(str(TUTORIAL_VERSIONS_FILE))["GROUND_STATE_TUTORIAL_VERSION"])
 
 
+@pytest.fixture
+def notebook_inline_backend(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Enable rich figure outputs in notebook kernels even when CI uses Agg."""
+    monkeypatch.setenv("MPLBACKEND", "module://matplotlib_inline.backend_inline")
+
+
 def _assert_notebook_library_logs_suppressed(notebook) -> None:
     """Check that executed notebook output excludes QDK/Chemistry library logs."""
     stream_text = "\n".join(
@@ -611,6 +617,7 @@ def test_tutorial_run_iqpe_simulation():
     not _HAS_JUPYTER_KERNEL,
     reason="Jupyter kernel 'python3' not available. Install ipykernel and register the kernel.",
 )
+@pytest.mark.usefixtures("notebook_inline_backend")
 def test_tutorial_choose_active_space_notebook():
     """Test the Chapter 3 notebook chemistry and rich visualization outputs."""
     notebook_path = DOCS_PYTHON_EXAMPLES_DIR / "tutorial_choose_active_space.ipynb"
@@ -673,6 +680,7 @@ def test_tutorial_choose_active_space_notebook():
     not _HAS_JUPYTER_KERNEL,
     reason="Jupyter kernel 'python3' not available. Install ipykernel and register the kernel.",
 )
+@pytest.mark.usefixtures("notebook_inline_backend")
 def test_tutorial_prepare_trial_state_notebook():
     """Test the Chapter 5 notebook circuit data and rich outputs."""
     notebook_path = DOCS_PYTHON_EXAMPLES_DIR / "tutorial_prepare_trial_state.ipynb"
@@ -734,6 +742,7 @@ def test_tutorial_prepare_trial_state_notebook():
     not _HAS_JUPYTER_KERNEL,
     reason="Jupyter kernel 'python3' not available. Install ipykernel and register the kernel.",
 )
+@pytest.mark.usefixtures("notebook_inline_backend")
 def test_tutorial_visualize_iqpe_circuit_notebook():
     """Test the Chapter 6 notebook circuit construction and rich outputs."""
     notebook_path = DOCS_PYTHON_EXAMPLES_DIR / "tutorial_visualize_iqpe_circuit.ipynb"
