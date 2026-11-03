@@ -160,7 +160,8 @@ and the emitted integrals are rotated back. A block whose off-diagonal elements
 are negligible is left unrotated: at most :math:`10^{-6}/\max(1,\sigma)\,E_h`
 with the regularizer described below, the level a converged SCF leaves, and at
 most :math:`10^{-10}\,E_h` without it, because bare denominators can amplify the
-neglected elements without bound.
+neglected elements without bound. Without the regularizer, even a converged SCF
+reference is therefore rotated, an :math:`O(N^5)` integral transformation.
 With this option disabled, the denominators use the diagonals of
 :math:`F^\sigma` in the supplied basis.
 
@@ -175,7 +176,8 @@ bare inverse denominator with
 the :math:`\sigma^2` regularizer :cite:`Shee2021`, whose :math:`\sigma` (in :math:`E_h^{-2}`)
 plays the role of the DSRG flow parameter :math:`s` in the generator
 :cite:`Evangelista2014`. Because the correction is the half-commutator above,
-second-order energies match DSRG-PT2 at :math:`s = \sigma/2`; the default
+second-order energies of a single-determinant reference match DSRG-PT2 at
+:math:`s = \sigma/2`; the default
 :math:`\sigma = 1` corresponds to :math:`s = 0.5`. Larger :math:`\sigma`
 regularizes less. Setting it to ``0`` selects a guarded bare pseudoinverse:
 coupled channels with :math:`|\Delta_T| < 10^{-8}\,E_h` are omitted, with a warning.
@@ -249,20 +251,30 @@ contraction workspace, and cached plans.
 
 .. rubric:: Settings
 
-``regularizer_sigma2`` (float, default ``1.0``)
-   Strength :math:`\sigma` of the :math:`\sigma^2` denominator regularizer, in
-   :math:`E_h^{-2}`; ``0`` selects the guarded bare pseudoinverse.
+.. list-table::
+   :header-rows: 1
+   :widths: 25 25 50
 
-``semicanonicalize`` (bool, default ``True``)
-   Diagonalize each spin's generalized Fock matrix blockwise before forming denominators.
-
-``fold_above_two_body`` (bool, default ``True``)
-   Approximate the three-body terms using reference-1-RDM pair contractions
-   instead of discarding them; higher density cumulants are neglected.
-
-``max_folded_occupation_deviation`` (float, default ``0.5``)
-   Largest deviation from an integer reference occupation allowed for a folded orbital.
-   This tolerance must lie in :math:`[0,1)`.
+   * - Setting
+     - Type
+     - Description
+   * - ``regularizer_sigma2``
+     - float
+     - Strength :math:`\sigma` of the :math:`\sigma^2` denominator regularizer, in
+       :math:`E_h^{-2}`; ``0`` selects the guarded bare pseudoinverse. Default: 1.0
+   * - ``semicanonicalize``
+     - bool
+     - Diagonalize each spin's generalized Fock matrix blockwise before forming
+       denominators. Default: true
+   * - ``fold_above_two_body``
+     - bool
+     - Approximate the three-body terms using reference-1-RDM pair contractions
+       instead of discarding them; higher density cumulants are neglected.
+       Default: true
+   * - ``max_folded_occupation_deviation``
+     - float
+     - Largest deviation from an integer reference occupation allowed for a folded
+       orbital, in :math:`[0,1)`. Default: 0.5
 
 .. tab:: Python API
 

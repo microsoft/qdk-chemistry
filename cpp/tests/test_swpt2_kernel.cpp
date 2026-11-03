@@ -205,8 +205,6 @@ Eigen::MatrixXd spin_free_fock(const Eigen::MatrixXd& one_body,
 
 struct FockParts {
   Eigen::MatrixXd diagonal, off_diagonal, generator;
-  double min_denominator = std::numeric_limits<double>::infinity();
-  double max_amplitude = 0.0;
 };
 
 template <typename Scalar, typename Emit>
@@ -281,26 +279,6 @@ FockParts fock_parts(const OneBodyCase& inputs,
             : (delta == 0.0
                    ? 0.0
                    : -std::expm1(-regularizer.sigma2 * delta * delta) / delta);
-    // The kernel's diagnostics cover terms acting on the reference external
-    // occupation: no virtual annihilated, and an inactive orbital created only
-    // after being annihilated. Its one-body amplitudes use the generalized-Fock
-    // off-diagonals, which these diagonal inputs leave at zero.
-    bool acts_on_reference = true;
-    for (const int index : annihilators)
-      acts_on_reference = acts_on_reference && roles[index / 2] != 'a';
-    for (const int index : creators)
-      acts_on_reference = acts_on_reference &&
-                          (roles[index / 2] != 'i' ||
-                           std::find(annihilators.begin(), annihilators.end(),
-                                     index) != annihilators.end());
-    if (off_diagonal && acts_on_reference) {
-      result.min_denominator =
-          std::min(result.min_denominator, std::abs(delta));
-      if (creators.size() == 2)
-        result.max_amplitude =
-            std::max(result.max_amplitude, std::abs(4.0 * coupling) /
-                                               std::max(std::abs(delta), 1e-8));
-    }
     visit_matrix_elements(coupling, creators, annihilators, dimension,
                           [&](int bra, int ket, double value) {
                             if (off_diagonal) {
@@ -478,8 +456,6 @@ sw::DownfoldResult project_fock_reference(
                 sign * (folded(bra, ket) - one_body(bra, ket));
           }
   }
-  result.min_denominator = parts.min_denominator;
-  result.max_amplitude = parts.max_amplitude;
   return result;
 }
 
@@ -527,8 +503,6 @@ void compare(const sw::DownfoldResult& actual,
             .maxCoeff(),
         5e-12 * (1.0 + reference.cwiseAbs().maxCoeff()));
   }
-  EXPECT_DOUBLE_EQ(actual.min_denominator, expected.min_denominator);
-  EXPECT_DOUBLE_EQ(actual.max_amplitude, expected.max_amplitude);
 }
 
 Eigen::MatrixXd fock_matrix(const sw::DownfoldResult& result) {
@@ -635,6 +609,40 @@ TEST(Swpt2KernelTest, ThreadCountDoesNotChangeResults) {
               1e-12);
   }
 #endif
+}
+
+TEST(Swpt2KernelTest, DiagnosticsTrackConnectingCouplings) {
+  // Inactive 0, active 1 and virtuals 2, 3. The one-body coupling between 0
+  // and 2 differs between the bare integrals and the generalized Fock, and
+  // (20|31) is the only two-body coupling: a double excitation 0,1 -> 2,3.
+  constexpr int norb = 4;
+  const Eigen::Vector4d energies(-1.0, 0.25, 1.5, 2.0);
+  Eigen::VectorXd integrals = Eigen::VectorXd::Zero(norb * norb * norb * norb);
+  for (const auto& [first, second] : {std::pair{2, 0}, std::pair{0, 2}})
+    for (const auto& [third, fourth] : {std::pair{3, 1}, std::pair{1, 3}}) {
+      integrals(sw::idx4(first, second, third, fourth, norb)) = 0.3;
+      integrals(sw::idx4(third, fourth, first, second, norb)) = 0.3;
+    }
+  const auto run = [&](const Eigen::MatrixXd& one_body,
+                       const Eigen::MatrixXd& fock) {
+    return sw::downfold(
+        {one_body, one_body},
+        {std::cref(integrals), std::cref(integrals), std::cref(integrals)},
+        {fock, fock}, {1}, {0}, {2, 3}, {}, 0.0);
+  };
+  const Eigen::MatrixXd diagonal = energies.asDiagonal();
+  Eigen::MatrixXd one_body = diagonal, fock = diagonal;
+  one_body(2, 0) = one_body(0, 2) = 0.05;
+  fock(2, 0) = fock(0, 2) = 0.4;
+  // The single excitation 0 -> 2 dominates through its generalized-Fock
+  // coupling, not the bare integral.
+  const auto single = run(one_body, fock);
+  EXPECT_DOUBLE_EQ(single.max_amplitude, 0.4 / 2.5);
+  EXPECT_DOUBLE_EQ(single.min_denominator, 2.5);
+  // Without one-body couplings only the double excitation remains.
+  const auto pair = run(diagonal, diagonal);
+  EXPECT_DOUBLE_EQ(pair.max_amplitude, 0.3 / 4.25);
+  EXPECT_DOUBLE_EQ(pair.min_denominator, 4.25);
 }
 
 TEST(Swpt2KernelTest, RejectsMalformedDimensionsAndPartitions) {
@@ -1284,46 +1292,61 @@ TEST(Swpt2KernelTest, GeneralizedFockFromDefinition) {
                 .maxCoeff(),
             1e-12);
 
-  // Per spin: Coulomb with both densities, exchange with its own.
-  std::array<Eigen::VectorXd, 3> blocks;
-  for (int block = 0; block < 3; ++block) {
-    blocks[block].resize(integrals.size());
-    for (int index = 0; index < integrals.size(); ++index)
-      blocks[block](index) = 0.2 * std::sin(0.37 * index + 0.4 * block);
+  // Per spin: Coulomb with both densities, exchange with its own. Seventeen
+  // orbitals also run the threaded loops and a partial column block of the
+  // beta-alpha Coulomb term.
+  for (const int size : {count, 17}) {
+    SCOPED_TRACE("size=" + std::to_string(size));
+    Eigen::MatrixXd base_one_body(size, size), base_density(size, size);
+    for (int row = 0; row < size; ++row)
+      for (int col = 0; col < size; ++col) {
+        base_one_body(row, col) =
+            0.1 * (std::cos(row + 2.0 * col) + std::cos(col + 2.0 * row));
+        base_density(row, col) =
+            0.05 * (std::sin(row + 3.0 * col) + std::sin(col + 3.0 * row));
+      }
+    base_density.diagonal().array() += 1.0;
+    std::array<Eigen::VectorXd, 3> blocks;
+    for (int block = 0; block < 3; ++block) {
+      blocks[block].resize(size * size * size * size);
+      for (int index = 0; index < blocks[block].size(); ++index)
+        blocks[block](index) = 0.2 * std::sin(0.37 * index + 0.4 * block);
+    }
+    const std::array<Eigen::MatrixXd, 2> spin_one_body{base_one_body,
+                                                       1.3 * base_one_body};
+    const std::array<Eigen::MatrixXd, 2> spin_density{0.6 * base_density,
+                                                      0.4 * base_density};
+    const auto spin_result = sw::generalized_fock_matrices(
+        spin_one_body,
+        {std::cref(blocks[0]), std::cref(blocks[1]), std::cref(blocks[2])},
+        spin_density, size);
+    const auto chemist = [&](int left, int right, int p, int q, int r, int s) {
+      if (left == right) return blocks[2 * left](sw::idx4(p, q, r, s, size));
+      return left == 0 ? blocks[1](sw::idx4(p, q, r, s, size))
+                       : blocks[1](sw::idx4(r, s, p, q, size));
+    };
+    for (int spin = 0; spin < 2; ++spin) {
+      Eigen::MatrixXd spin_expected = spin_one_body[spin];
+      for (int row = 0; row < size; ++row)
+        for (int col = 0; col < size; ++col)
+          for (int first = 0; first < size; ++first)
+            for (int second = 0; second < size; ++second) {
+              for (int other = 0; other < 2; ++other)
+                spin_expected(row, col) +=
+                    spin_density[other](first, second) *
+                    chemist(spin, other, row, col, first, second);
+              spin_expected(row, col) -=
+                  spin_density[spin](first, second) *
+                  chemist(spin, spin, row, first, second, col);
+            }
+      EXPECT_LT((spin_result[spin] -
+                 0.5 * (spin_expected + spin_expected.transpose()).eval())
+                    .cwiseAbs()
+                    .maxCoeff(),
+                1e-12);
+    }
+    EXPECT_GT((spin_result[0] - spin_result[1]).cwiseAbs().maxCoeff(), 1e-3);
   }
-  const std::array<Eigen::MatrixXd, 2> spin_one_body{one_body, 1.3 * one_body};
-  const std::array<Eigen::MatrixXd, 2> spin_density{0.6 * density,
-                                                    0.4 * density.transpose()};
-  const auto spin_result = sw::generalized_fock_matrices(
-      spin_one_body,
-      {std::cref(blocks[0]), std::cref(blocks[1]), std::cref(blocks[2])},
-      spin_density, count);
-  const auto chemist = [&](int left, int right, int p, int q, int r, int s) {
-    if (left == right) return blocks[2 * left](sw::idx4(p, q, r, s, count));
-    return left == 0 ? blocks[1](sw::idx4(p, q, r, s, count))
-                     : blocks[1](sw::idx4(r, s, p, q, count));
-  };
-  for (int spin = 0; spin < 2; ++spin) {
-    Eigen::MatrixXd spin_expected = spin_one_body[spin];
-    for (int row = 0; row < count; ++row)
-      for (int col = 0; col < count; ++col)
-        for (int first = 0; first < count; ++first)
-          for (int second = 0; second < count; ++second) {
-            for (int other = 0; other < 2; ++other)
-              spin_expected(row, col) +=
-                  spin_density[other](first, second) *
-                  chemist(spin, other, row, col, first, second);
-            spin_expected(row, col) -=
-                spin_density[spin](first, second) *
-                chemist(spin, spin, row, first, second, col);
-          }
-    EXPECT_LT((spin_result[spin] -
-               0.5 * (spin_expected + spin_expected.transpose()).eval())
-                  .cwiseAbs()
-                  .maxCoeff(),
-              1e-12);
-  }
-  EXPECT_GT((spin_result[0] - spin_result[1]).cwiseAbs().maxCoeff(), 1e-3);
 }
 
 TEST(Swpt2KernelTest, InactiveFockFoldMeanField) {

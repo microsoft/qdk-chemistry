@@ -2,7 +2,7 @@
 // Licensed under the MIT License. See LICENSE.txt in the project root for
 // license information.
 
-#include "qdk/chemistry/algorithms/microsoft/effective_hamiltonian/swpt2_kernel.hpp"
+#include "swpt2_kernel.hpp"
 
 #include <btas/btas.h>
 #include <qdk/chemistry/scf/util/blas_threads.h>
@@ -60,11 +60,6 @@ bool spin_symmetric(const std::array<Eigen::MatrixXd, 2>& one_body,
 }
 }  // namespace
 
-// ===========================================================================
-// Shared kernel foundations: denominator regularization, generalized Fock,
-// and orbital rotations.
-// ===========================================================================
-
 double regularized_inverse(double delta, const RegularizerOptions& reg) {
   if (reg.sigma2 > 0.0) {
     if (delta == 0.0) return 0.0;  // the damped inverse vanishes in the limit
@@ -110,9 +105,8 @@ std::array<Eigen::MatrixXd, 2> generalized_fock_matrices(
   const bool spin_free = spin_symmetric(one_body, two_body, density);
   for (int spin = 0; spin < (spin_free ? 1 : 2); ++spin) {
     const auto same = pair_matrix(two_body[2 * spin]);
-    // Each Coulomb element is one row dot product. Spin-free input has
-    // identical same-spin and opposite-spin terms, so one is formed and
-    // doubled.
+    // Spin-free input has equal same-spin and opposite-spin Coulomb terms, so
+    // one is formed and doubled.
     Eigen::VectorXd coulomb(pairs);
 #pragma omp parallel for schedule(static) if (n4(norb) >= min_parallel_work)
     for (Eigen::Index pair = 0; pair < pairs; ++pair) {
@@ -122,8 +116,8 @@ std::array<Eigen::MatrixXd, 2> generalized_fock_matrices(
                                   : own;
     }
     if (spin == 1) {
-      // The beta-alpha Coulomb block is the transposed aabb block: each task
-      // accumulates a contiguous column range over every row.
+      // The beta-alpha Coulomb block is the transposed aabb block, accumulated
+      // over column ranges so that each task writes its own elements.
       constexpr Eigen::Index width = 256;
       const Eigen::Index ranges = (pairs + width - 1) / width;
 #pragma omp parallel for schedule(static) if (n4(norb) >= min_parallel_work)
@@ -224,10 +218,9 @@ Eigen::VectorXd rotate_two_body(const Eigen::VectorXd& two_body,
       Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic, Eigen::RowMajor>;
   const Eigen::Index n = norb;
   const Eigen::Index n3 = n * n * n;
-  // Each pass transforms the leading index and cycles it to the back, so four
+  // Each pass transforms the leading index and moves it to the back, so four
   // passes restore (p, q, r, s) order. The column-major (n, n^3) product
-  // already is the cycled tensor, so it is written in place, one column panel
-  // per task.
+  // already has the moved index last, so it needs no transpose.
   constexpr Eigen::Index panel = 1024;
   const Eigen::Index panels = (n3 + panel - 1) / panel;
   Eigen::VectorXd current(n4(norb));
@@ -257,13 +250,13 @@ WindowPartition partition_window(
     double max_folded_occupation_deviation) {
   if (occupation.size() != window_global.size())
     throw std::invalid_argument(
-        "SchriefferWolffPT2: occupation and window index lists differ in "
+        "SW-PT2: occupation and window index lists differ in "
         "length.");
   if (!std::isfinite(max_folded_occupation_deviation) ||
       max_folded_occupation_deviation < 0.0 ||
       max_folded_occupation_deviation >= 1.0)
     throw std::invalid_argument(
-        "SchriefferWolffPT2: max_folded_occupation_deviation must lie in "
+        "SW-PT2: max_folded_occupation_deviation must lie in "
         "[0, 1); a half-occupied orbital cannot be folded unambiguously.");
 
   WindowPartition out;
@@ -278,7 +271,7 @@ WindowPartition partition_window(
     const double deviation = std::min(to_occupied, to_empty);
     if (deviation > max_folded_occupation_deviation)
       throw std::invalid_argument(
-          "SchriefferWolffPT2: folded external orbital " +
+          "SW-PT2: folded external orbital " +
           std::to_string(window_global[i]) + " has reference occupation " +
           std::to_string(occupation[i]) +
           ", which deviates from an integer occupation by more than "
@@ -294,19 +287,17 @@ WindowPartition partition_window(
         .push_back(i);
   }
   if (out.active_spatial.empty())
-    throw std::invalid_argument(
-        "SchriefferWolffPT2: the kept active space P is empty.");
+    throw std::invalid_argument("SW-PT2: the kept active space P is empty.");
 
-  // Rounding preserves the total, so the active electron count is fixed by
-  // what the folded orbitals take. This is the count to hand the active-space
-  // solver; it need not equal the reference occupation summed over P.
+  // The active space takes the electrons the rounded fold leaves, which need
+  // not equal the reference occupation of P.
   const int folded_electrons =
       2 * static_cast<int>(out.inactive_spatial.size());
   out.active_electrons = window_electrons - folded_electrons;
   if (out.active_electrons < 0 ||
       out.active_electrons > 2 * static_cast<int>(out.active_spatial.size()))
     throw std::invalid_argument(
-        "SchriefferWolffPT2: the rounded external occupation leaves an "
+        "SW-PT2: the rounded external occupation leaves an "
         "impossible active electron count; the active/external partition is "
         "inconsistent with the reference density.");
 
@@ -338,10 +329,6 @@ struct Plan {
   int rank;
   int spin_case;
   bool folded;
-};
-
-struct Plans {
-  std::vector<Plan> plans;
 };
 
 // Group by output body rank, spin case and number of density contractions. The
@@ -678,8 +665,9 @@ const Equations& reusable_equations() {
   return equations;
 }
 
-Plans build_plans(const Equations& equations,
-                  const std::array<std::size_t, 3>& extents, bool spin_free) {
+std::vector<Plan> build_plans(const Equations& equations,
+                              const std::array<std::size_t, 3>& extents,
+                              bool spin_free) {
   auto context = sq::set_scoped_default_context(
       {.index_basis_registry_shared_ptr = equations.spaces,
        .vacuum = sq::Vacuum::SingleProduct});
@@ -687,7 +675,7 @@ Plans build_plans(const Equations& equations,
     const wchar_t role = index.space().base_key()[0];
     return extents[role == L'i' ? 0 : role == L'u' ? 1 : 2];
   };
-  Plans plans;
+  std::vector<Plan> plans;
   for (const auto& term : equations.terms) {
     // Spin-free input needs only the alpha one-body and aabb outputs.
     if (spin_free && term.spin_case != (term.rank == 2 ? 1 : 0)) continue;
@@ -699,16 +687,15 @@ Plans build_plans(const Equations& equations,
                    {.objective_function = sq::ObjectiveFunction::DenseSpaceTime,
                     .idx_to_extent = extent});
     auto tree = sq::binarize<sq::EvalExprBTAS>(result);
-    plans.plans.push_back(
-        {std::move(tree), term.rank, term.spin_case, term.folded});
+    plans.push_back({std::move(tree), term.rank, term.spin_case, term.folded});
   }
   return plans;
 }
 
-std::shared_ptr<const Plans> reusable_plans(std::size_t inactive,
-                                            std::size_t active,
-                                            std::size_t virtuals,
-                                            bool spin_free) {
+std::shared_ptr<const std::vector<Plan>> reusable_plans(std::size_t inactive,
+                                                        std::size_t active,
+                                                        std::size_t virtuals,
+                                                        bool spin_free) {
   // Plans touching an empty role are skipped, so empty roles share extent one.
   const std::array<std::size_t, 3> extents{std::max<std::size_t>(inactive, 1),
                                            std::max<std::size_t>(active, 1),
@@ -717,11 +704,11 @@ std::shared_ptr<const Plans> reusable_plans(std::size_t inactive,
   static std::mutex mutex;
   static std::array<std::size_t, 3> cached_extents{};
   static bool cached_spin_free = false;
-  static std::shared_ptr<const Plans> cached;
+  static std::shared_ptr<const std::vector<Plan>> cached;
   const std::lock_guard lock(mutex);
   if (!cached || cached_extents != extents || cached_spin_free != spin_free) {
     cached.reset();
-    cached = std::make_shared<const Plans>(
+    cached = std::make_shared<const std::vector<Plan>>(
         build_plans(reusable_equations(), extents, spin_free));
     cached_extents = extents;
     cached_spin_free = spin_free;
@@ -767,7 +754,6 @@ DownfoldResult downfold(
       orbital_roles.end())
     throw std::invalid_argument(
         "SW-PT2: spatial roles do not cover the window");
-  // A spin-free operator needs only its alpha one-body and aabb blocks.
   const bool spin_free =
       spin_symmetric(one_body, two_body, density) && fock[0] == fock[1];
   const auto integral = [&](int left, int right, int p, int q, int r, int s) {
@@ -787,6 +773,7 @@ DownfoldResult downfold(
   std::array<Eigen::MatrixXd, 2> generator_one_body = one_body;
   for (int spin = 0; spin < 2; ++spin) {
     const auto& eps = energies[spin];
+#pragma omp parallel for schedule(static) if (n4(norb) >= min_parallel_work)
     for (int row = 0; row < norb; ++row)
       for (int col = 0; col < norb; ++col) {
         generator_one_body[spin](row, col) *=
@@ -852,12 +839,13 @@ DownfoldResult downfold(
                 : std::array{active_block(0, 0), active_block(1, 1)};
   if (inactive.empty() && virtuals.empty()) return result;
 
-  // Diagnostics scan the terms that act on the reference external occupation:
-  // none annihilates an (empty) virtual orbital, and an inactive orbital is
-  // created only after being annihilated. Every other term is the adjoint of
-  // one of these or annihilates both P and Q states. Couplings are raw, before
-  // damping; one-body amplitudes use the generalized Fock, the reference's
-  // single-excitation coupling.
+  // Diagnostics scan the excitations out of the reference external
+  // occupation: active or virtual orbitals created, inactive or active ones
+  // annihilated. Other terms are adjoints of these or never act on P, and
+  // inactive spectators are already part of the generalized-Fock one-body
+  // coupling. Couplings are raw, before damping; those below
+  // `negligible_coupling` are numerical zeros of symmetry-forbidden integrals.
+  constexpr double negligible_coupling = 1e-12;
   std::vector<int> creatable(active), annihilable(inactive);
   creatable.insert(creatable.end(), virtuals.begin(), virtuals.end());
   annihilable.insert(annihilable.end(), active.begin(), active.end());
@@ -873,17 +861,23 @@ DownfoldResult downfold(
       for (int spin = 0; spin < (spin_free ? 1 : 2); ++spin) {
         const double delta =
             energies[spin](creator) - energies[spin](annihilator);
-        if (one_body[spin](creator, annihilator) != 0.0)
+        // The generator's one-body coefficient is the normal-ordered one.
+        if (std::abs(normal_ordered_one_body[spin](creator, annihilator)) >
+            negligible_coupling)
           min_denominator = std::min(min_denominator, std::abs(delta));
         max_amplitude = std::max(
             max_amplitude, amplitude(fock[spin](creator, annihilator), delta));
       }
     }
+  const int creatable_count = creatable.size();
 #pragma omp parallel for collapse(2) schedule(static) \
     reduction(min : min_denominator)                  \
     reduction(max : max_amplitude) if (n4(norb) >= min_parallel_work)
-  for (int first = 0; first < norb; ++first)
-    for (int second = 0; second < norb; ++second)
+  for (int first_ordinal = 0; first_ordinal < creatable_count; ++first_ordinal)
+    for (int second_ordinal = 0; second_ordinal < creatable_count;
+         ++second_ordinal) {
+      const int first = creatable[first_ordinal];
+      const int second = creatable[second_ordinal];
       for (const int third : annihilable)
         for (const int fourth : annihilable) {
           if (!changes_occupation({orbital_roles[first], orbital_roles[second],
@@ -893,19 +887,13 @@ DownfoldResult downfold(
           // Particles (first, third) and (second, fourth); beta-alpha repeats
           // alpha-beta with the particles swapped.
           const auto track_pair = [&](int spin, int partner) {
-            const bool same = spin == partner;
-            if ((orbital_roles[first] == 'i' && first != third &&
-                 !(same && first == fourth)) ||
-                (orbital_roles[second] == 'i' && second != fourth &&
-                 !(same && second == third)))
-              return;
             const double direct =
                 integral(spin, partner, first, third, second, fourth);
             const double coupling =
-                same ? direct -
-                           integral(spin, spin, first, fourth, second, third)
-                     : direct;
-            if (coupling == 0.0) return;
+                spin == partner ? direct - integral(spin, spin, first, fourth,
+                                                    second, third)
+                                : direct;
+            if (std::abs(coupling) <= negligible_coupling) return;
             const double delta =
                 energies[spin](first) + energies[partner](second) -
                 energies[spin](third) - energies[partner](fourth);
@@ -917,6 +905,7 @@ DownfoldResult downfold(
           // Beta-beta repeats alpha-alpha for spin-free input.
           if (!spin_free) track_pair(1, 1);
         }
+    }
   result.min_denominator = min_denominator;
   result.max_amplitude = max_amplitude;
   using OperandKey =
@@ -984,7 +973,7 @@ DownfoldResult downfold(
   const auto plans = reusable_plans(inactive.size(), active.size(),
                                     virtuals.size(), spin_free);
   std::vector<const Plan*> selected;
-  for (const auto& plan : plans->plans) {
+  for (const auto& plan : *plans) {
     if (plan.folded && !fold) continue;
     bool empty = false;
     plan.tree.visit([&](const auto& node) {
@@ -999,10 +988,10 @@ DownfoldResult downfold(
     });
     selected.push_back(&plan);
   }
-  // Concurrent evaluation relies on the SeQuant patch that keeps BTAS off the
-  // process-wide trace-label map. BTAS calls BLAS from every plan thread, so
-  // BLAS is pinned to one thread meanwhile. Values are added in plan order
-  // below, so the result does not depend on the thread count.
+  // Concurrent evaluation relies on the SeQuant patch that keeps BTAS off its
+  // process-wide trace-label map. BLAS is pinned to one thread meanwhile, and
+  // values are added in plan order, so the result does not depend on the
+  // thread count.
   std::vector<sq::ResultPtr> plan_values(selected.size());
   std::exception_ptr failure;
   const auto plan_count = static_cast<std::ptrdiff_t>(selected.size());

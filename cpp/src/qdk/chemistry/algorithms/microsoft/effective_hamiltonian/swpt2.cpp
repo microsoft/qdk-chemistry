@@ -2,7 +2,7 @@
 // Licensed under the MIT License. See LICENSE.txt in the project root for
 // license information.
 
-#include "qdk/chemistry/algorithms/microsoft/effective_hamiltonian/swpt2.hpp"
+#include "swpt2.hpp"
 
 #include <Eigen/Dense>
 #include <algorithm>
@@ -23,7 +23,7 @@
 #include <unordered_set>
 #include <vector>
 
-#include "qdk/chemistry/algorithms/microsoft/effective_hamiltonian/swpt2_kernel.hpp"
+#include "swpt2_kernel.hpp"
 
 namespace qdk::chemistry::algorithms::microsoft {
 
@@ -34,7 +34,8 @@ namespace {
 /// The reference's per-spin 1-RDMs over its own active space, from its active
 /// 1-RDMs when available and from the reference determinant otherwise. A
 /// restricted reference splits its spin-traced density evenly, so H0 stays spin
-/// free and preserves S^2.
+/// free and preserves S^2; for ROHF the active-space solve then selects the
+/// spin sector.
 std::array<Eigen::MatrixXd, 2> reference_active_density(
     const data::Wavefunction& reference, std::size_t n_ref_active,
     bool unrestricted) {
@@ -43,14 +44,14 @@ std::array<Eigen::MatrixXd, 2> reference_active_density(
     const auto* rdm = std::get_if<Eigen::MatrixXd>(&variant);
     if (!rdm)
       throw std::invalid_argument(
-          "SchriefferWolffPT2 requires a real-valued active 1-RDM.");
+          "SW-PT2 requires a real-valued active 1-RDM.");
     if (rdm->rows() != size || rdm->cols() != size)
       throw std::invalid_argument(
-          "SchriefferWolffPT2: active 1-RDM dimensions do not match the "
+          "SW-PT2: active 1-RDM dimensions do not match the "
           "reference active-space size.");
     if (!rdm->allFinite())
       throw std::invalid_argument(
-          "SchriefferWolffPT2: the active 1-RDM contains non-finite values.");
+          "SW-PT2: the active 1-RDM contains non-finite values.");
     return Eigen::MatrixXd(0.5 * (*rdm + rdm->transpose()));
   };
   if (unrestricted && reference.has_one_rdm_spin_dependent()) {
@@ -67,11 +68,11 @@ std::array<Eigen::MatrixXd, 2> reference_active_density(
     const auto [occ_a, occ_b] = reference.get_active_orbital_occupations();
     if (occ_a.size() != size || occ_b.size() != size)
       throw std::invalid_argument(
-          "SchriefferWolffPT2: active occupation dimensions do not match "
+          "SW-PT2: active occupation dimensions do not match "
           "the reference active-space size.");
     if (!occ_a.allFinite() || !occ_b.allFinite())
       throw std::invalid_argument(
-          "SchriefferWolffPT2: the active orbital occupations contain "
+          "SW-PT2: the active orbital occupations contain "
           "non-finite values.");
     // This accessor is per-active-index only for a determinant; for a
     // multi-determinant state it returns 1-RDM eigenvalues sorted descending,
@@ -83,7 +84,7 @@ std::array<Eigen::MatrixXd, 2> reference_active_density(
         if (std::abs(n) > determinant_tolerance &&
             std::abs(n - 1.0) > determinant_tolerance)
           throw std::invalid_argument(
-              "SchriefferWolffPT2: the reference reports fractional active "
+              "SW-PT2: the reference reports fractional active "
               "orbital occupations but exposes no active 1-RDM, so they "
               "cannot be assigned to orbitals. Enable one-RDM calculation "
               "on the reference.");
@@ -94,15 +95,13 @@ std::array<Eigen::MatrixXd, 2> reference_active_density(
     return {half, half};
   } catch (const std::runtime_error&) {
     throw std::runtime_error(
-        "SchriefferWolffPT2: reference wavefunction exposes neither an "
+        "SW-PT2: reference wavefunction exposes neither an "
         "active 1-RDM nor active orbital occupations");
   }
 }
 
-/// A per-spin reference 1-RDM over the whole window W: its active 1-RDM block,
-/// 1 on the diagonal for occupied inactive orbitals, 0 for empty virtuals.
-/// Off-diagonals are therefore confined to the active block, and the diagonal
-/// is the occupation, so the trace counts the window's electrons of that spin.
+/// A per-spin reference 1-RDM over the whole window W: the reference's active
+/// 1-RDM block, 1 on the diagonal of its inactive orbitals, and 0 elsewhere.
 Eigen::MatrixXd window_density(
     const std::vector<std::size_t>& window_global,
     const std::vector<std::size_t>& ref_active_global,
@@ -135,7 +134,7 @@ Eigen::MatrixXd window_density(
   for (int i = 0; i < norb; ++i)
     if (density(i, i) < -occupation_bound_tolerance ||
         density(i, i) > 1.0 + occupation_bound_tolerance)
-      throw std::invalid_argument("SchriefferWolffPT2: window orbital " +
+      throw std::invalid_argument("SW-PT2: window orbital " +
                                   std::to_string(window_global[i]) +
                                   " has unphysical reference occupation " +
                                   std::to_string(density(i, i)) +
@@ -143,10 +142,8 @@ Eigen::MatrixXd window_density(
   return density;
 }
 
-/// Label the effective operator with `p_indices` as its active index set.
-/// `Orbitals` is immutable, so the reference orbitals' coefficients, energies,
-/// overlap, basis and spin restriction are reused and only the index sets are
-/// relabeled.
+/// The reference orbitals relabeled with `p_indices` as active and
+/// `emit_inactive` as inactive orbitals.
 std::shared_ptr<data::Orbitals> relabeled_orbitals(
     const data::Orbitals& ref_orbitals,
     const std::shared_ptr<const data::SymmetryBlockedIndexSet>& p_indices,
@@ -199,7 +196,7 @@ void log_fold_rounding(const sw::WindowPartition& roles) {
       roles.worst_deviation <= deviation_warning)
     return;
   QDK_LOGGER().warn(
-      "swpt2 downfold: folded orbital {} has fractional reference "
+      "SW-PT2: folded orbital {} has fractional reference "
       "occupation {:.4f} (deviation {:.3g}), and the folded core carries "
       "{:.3g} electrons more than the reference density. Rounding the "
       "folded density perturbs the mean field the active space feels at "
@@ -213,30 +210,29 @@ void log_fold_rounding(const sw::WindowPartition& roles) {
 void warn_on_intruders(const sw::DownfoldResult& down, bool regularized) {
   if (!regularized && down.min_denominator < sw::bare_denominator_floor)
     QDK_LOGGER().warn(
-        "swpt2 downfold: coupled channels with energy denominators below "
+        "SW-PT2: coupled channels with energy denominators below "
         "{:.3g} Eh were omitted by the guarded bare pseudoinverse. The "
         "remaining channels were downfolded, but the result depends on this "
         "cutoff; consider enlarging the active space or setting "
         "regularizer_sigma2.",
         sw::bare_denominator_floor);
 
-  // Warn on the RAW amplitude: the regularizer damps the operator, so a
-  // regularized amplitude would hide the very channels it compensates for.
-  // 1.0 is a heuristic flag for a large individual amplitude, not a
-  // convergence boundary; SW convergence depends on the perturbation norm and
-  // spectral gap.
+  // Warn on the raw amplitude: a regularized one would hide the very channels
+  // the regularizer compensates for. 1.0 is a heuristic flag for a large
+  // individual amplitude, not a convergence bound; SW convergence depends on
+  // the perturbation norm and spectral gap.
   constexpr double intruder_warn_amplitude = 1.0;
   if (down.max_amplitude <= intruder_warn_amplitude) return;
   if (!regularized)
     QDK_LOGGER().warn(
-        "swpt2 downfold: large excitation amplitude {:.3g} (smallest "
+        "SW-PT2: large excitation amplitude {:.3g} (smallest "
         "energy denominator {:.3g} Eh) -- the unregularized second-order "
         "result may be unreliable. Consider enlarging the active space, or "
         "setting regularizer_sigma2.",
         down.max_amplitude, down.min_denominator);
   else
     QDK_LOGGER().warn(
-        "swpt2 downfold: large excitation amplitude {:.3g} (smallest energy "
+        "SW-PT2: large excitation amplitude {:.3g} (smallest energy "
         "denominator {:.3g} Eh) -- a near-degenerate/intruder channel. The "
         "result relies on sigma^2 denominator regularization; consider "
         "enlarging the active space so near-degenerate orbitals are not "
@@ -253,16 +249,14 @@ std::shared_ptr<data::Hamiltonian> SchriefferWolffPT2Constructor::_run_impl(
   QDK_LOG_TRACE_ENTERING();
   if (!reference || !hamiltonian || !p_indices)
     throw std::invalid_argument(
-        "SchriefferWolffPT2: reference, hamiltonian, and p_indices must all "
+        "SW-PT2: reference, hamiltonian, and p_indices must all "
         "be non-null.");
   if (!hamiltonian->is_hermitian())
-    throw std::invalid_argument(
-        "SchriefferWolffPT2 requires a Hermitian Hamiltonian.");
+    throw std::invalid_argument("SW-PT2 requires a Hermitian Hamiltonian.");
   auto win_orbitals = hamiltonian->get_orbitals();
   auto ref_orbitals = reference->get_orbitals();
-  // Global orbital labels are only meaningful in a shared MO basis; this also
-  // checks P and the reference active space against the window, and that both
-  // orbital sets share one spin restriction.
+  // Checks a shared MO basis and spin restriction, and P and the reference
+  // active space against the window.
   _validate_inputs(reference, hamiltonian, p_indices);
   const bool unrestricted =
       hamiltonian->is_unrestricted() || ref_orbitals->is_unrestricted();
@@ -271,12 +265,12 @@ std::shared_ptr<data::Hamiltonian> SchriefferWolffPT2Constructor::_run_impl(
       data::spin_channel_indices(p_indices, data::axes::alpha());
   if (kept_global.empty())
     throw std::invalid_argument(
-        "SchriefferWolffPT2 requires a non-empty p_indices argument: the "
+        "SW-PT2 requires a non-empty p_indices argument: the "
         "kept space P as a SymmetryBlockedIndexSet of global orbital indices "
         "into the window Hamiltonian's active space W = P u Q.");
   if (data::spin_channel_indices(p_indices, data::axes::beta()) != kept_global)
     throw std::invalid_argument(
-        "SchriefferWolffPT2 requires p_indices to select the same orbitals in "
+        "SW-PT2 requires p_indices to select the same orbitals in "
         "both spin channels.");
 
   const auto [h_alpha, h_beta] = hamiltonian->get_one_body_integrals();
@@ -301,10 +295,15 @@ std::shared_ptr<data::Hamiltonian> SchriefferWolffPT2Constructor::_run_impl(
       data::spin_channel_indices(win_orbitals->active_indices(),
                                  data::axes::beta()) != W_global)
     throw std::invalid_argument(
-        "SchriefferWolffPT2: the window Hamiltonian's active index set must "
+        "SW-PT2: the window Hamiltonian's active index set must "
         "be spin-independent and match the rank of its integrals.");
   const auto win_inactive_global = data::spin_channel_indices(
       win_orbitals->inactive_indices(), data::axes::alpha());
+  if (data::spin_channel_indices(win_orbitals->inactive_indices(),
+                                 data::axes::beta()) != win_inactive_global)
+    throw std::invalid_argument(
+        "SW-PT2: the window Hamiltonian's inactive index set must be "
+        "spin-independent.");
   const auto ref_active_global = data::spin_channel_indices(
       ref_orbitals->active_indices(), data::axes::alpha());
   const auto ref_inactive_global = data::spin_channel_indices(
@@ -313,22 +312,18 @@ std::shared_ptr<data::Hamiltonian> SchriefferWolffPT2Constructor::_run_impl(
   if (data::spin_channel_indices(ref_orbitals->inactive_indices(),
                                  data::axes::beta()) != ref_inactive_global)
     throw std::invalid_argument(
-        "SchriefferWolffPT2 requires all singly occupied orbitals in an "
+        "SW-PT2 requires all singly occupied orbitals in an "
         "open-shell reference to belong to the active space; inactive "
         "orbitals must be doubly occupied.");
   if (data::spin_channel_indices(ref_orbitals->active_indices(),
                                  data::axes::beta()) != ref_active_global)
     throw std::invalid_argument(
-        "SchriefferWolffPT2 requires the reference active space to select the "
+        "SW-PT2 requires the reference active space to select the "
         "same orbitals in both spin channels.");
 
   const std::unordered_set<std::size_t> ref_inactive_set(
       ref_inactive_global.begin(), ref_inactive_global.end());
 
-  // Per-spin reference 1-RDMs over W. A restricted reference splits its
-  // spin-traced density evenly; for ROHF each singly occupied active orbital
-  // then holds half an electron of each spin, the spin-free H0 preserves S^2
-  // and the active solve selects the desired spin sector.
   const auto ref_density = reference_active_density(
       *reference, ref_active_global.size(), unrestricted);
   std::array<Eigen::MatrixXd, 2> density;
@@ -349,12 +344,12 @@ std::shared_ptr<data::Hamiltonian> SchriefferWolffPT2Constructor::_run_impl(
     if (!window_set.count(g)) expected_win_inactive.push_back(g);
   if (win_inactive_global != expected_win_inactive)
     throw std::invalid_argument(
-        "SchriefferWolffPT2: the window Hamiltonian's inactive orbitals must "
+        "SW-PT2: the window Hamiltonian's inactive orbitals must "
         "be exactly the reference core orbitals outside the window.");
 
-  // Every fractionally occupied reference orbital lies inside the window (the
-  // containment check above), and the rest are exactly doubly occupied or
-  // empty, so the window must carry an integer number of electrons.
+  // Fractionally occupied reference orbitals all lie in the window and the
+  // rest are doubly occupied or empty, so the window holds an integer number
+  // of electrons.
   const Eigen::VectorXd diagonal =
       density[0].diagonal() + density[1].diagonal();
   const double window_electrons = diagonal.sum();
@@ -363,7 +358,7 @@ std::shared_ptr<data::Hamiltonian> SchriefferWolffPT2Constructor::_run_impl(
   if (std::abs(window_electrons - window_electrons_integer) >
       electron_count_tolerance)
     throw std::invalid_argument(
-        "SchriefferWolffPT2: the reference density over the window does not "
+        "SW-PT2: the reference density over the window does not "
         "carry an integer number of electrons (" +
         std::to_string(window_electrons) + ").");
 
@@ -383,16 +378,15 @@ std::shared_ptr<data::Hamiltonian> SchriefferWolffPT2Constructor::_run_impl(
   // The bound constraint admits NaN, which would then read as "not positive"
   // and silently select the bare path instead of the requested regularizer.
   if (!std::isfinite(reg.sigma2))
-    throw std::invalid_argument(
-        "SchriefferWolffPT2: regularizer_sigma2 must be finite.");
+    throw std::invalid_argument("SW-PT2: regularizer_sigma2 must be finite.");
   const bool regularized = reg.sigma2 > 0.0;
 
   // Built from the full 1-RDMs, so a correlated reference's off-diagonal
   // density survives into the denominators.
   auto fock =
       sw::generalized_fock_matrices(one_body, two_body_blocks(), density, norb);
-  // The fold reads occupations in the basis it runs in, so the 1-RDMs follow
-  // the rotation.
+  // The density follows the rotation, since the fold reads it in the
+  // semicanonical basis.
   std::array<Eigen::MatrixXd, 2> rotation{
       Eigen::MatrixXd::Identity(norb, norb),
       Eigen::MatrixXd::Identity(norb, norb)};
@@ -432,12 +426,8 @@ std::shared_ptr<data::Hamiltonian> SchriefferWolffPT2Constructor::_run_impl(
     }
   }
 
-  // Terms above two-body cannot be emitted, and discarding them throws away
-  // their reference contractions, which dominate. The densities let the
-  // kernel fold them onto the reference instead; they are read in the
-  // semicanonical basis, so they had to follow the rotation above. Below three
-  // active electrons a three-body operator has no matrix elements at all, so
-  // folding would only add reference-specific terms.
+  // A three-body operator has no matrix elements below three active
+  // electrons, so there the fold would only add reference-specific terms.
   const bool fold_pays = window_roles.active_electrons > 2;
   const bool fold_requested = _settings->get<bool>("fold_above_two_body");
   const bool fold = fold_requested && fold_pays;

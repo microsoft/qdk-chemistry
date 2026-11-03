@@ -112,54 +112,6 @@ class TestEffectiveHamiltonianConstructor:
         settings.set("regularizer_sigma2", 0.4)
         assert constructor.settings().get("regularizer_sigma2") == pytest.approx(0.4)
 
-    def test_accepts_mean_field_hf_reference(self):
-        """A mean-field HF reference (no active 1-RDM) is accepted directly."""
-        alpha = SymmetryLabel([axes.alpha()])
-        water = Structure(
-            ["O", "H", "H"],
-            np.array(
-                [
-                    [0.0, -0.0757918436, 0.0],
-                    [0.866811829, 0.6014357793, 0.0],
-                    [-0.866811829, 0.6014357793, 0.0],
-                ]
-            )
-            * ANGSTROM_TO_BOHR,
-        )
-        _, wfn_hf = algorithms.create("scf_solver").run(water, 0, 1, "sto-3g")
-        orbitals = wfn_hf.get_orbitals()
-
-        selector = algorithms.create("active_space_selector", "qdk_valence")
-        selector.settings().set("num_active_electrons", 2)
-        selector.settings().set("num_active_orbitals", 2)
-        reference = selector.run(wfn_hf)  # single-determinant HF, no 1-RDM
-
-        def with_active_space(orb, active, inactive):
-            """Return a copy of `orb` with the given active/inactive index sets."""
-            n = orb.get_num_molecular_orbitals()
-            return Orbitals(
-                orb.coefficients().block([alpha, alpha]),
-                orb.energies().block([alpha]),
-                None,
-                orb.get_basis_set(),
-                active_indices=spin_index_set(n, list(active), list(active)),
-                inactive_indices=spin_index_set(n, list(inactive), list(inactive)),
-            )
-
-        # small window = active P + the lowest orbital outside P and the core
-        ref_orbs = reference.get_orbitals()
-        active = list(ref_orbs.active_indices().indices(alpha))
-        core = list(ref_orbs.inactive_indices().indices(alpha))
-        norb = orbitals.get_num_molecular_orbitals()
-        used = set(active) | set(core)
-        window = sorted([*active, next(i for i in range(norb) if i not in used)])
-
-        h_window = algorithms.create("hamiltonian_constructor").run(with_active_space(orbitals, window, core))
-        downfolder = algorithms.create(_TYPE, "qdk_swpt2")
-        p_space = spin_index_set(norb, active, active)  # kept space P as an index set
-        h_eff = downfolder.run(reference, h_window, p_space)  # must not raise
-        assert isinstance(h_eff, Hamiltonian)
-
     def test_full_window_spanning_reference_core(self):
         """Downfold a full-orbital window (the natural ``ham.run(orbitals)`` path).
 
@@ -169,18 +121,7 @@ class TestEffectiveHamiltonianConstructor:
         back labelled inactive, exactly once each.
         """
         alpha = SymmetryLabel([axes.alpha()])
-        water = Structure(
-            ["O", "H", "H"],
-            np.array(
-                [
-                    [0.0, -0.0757918436, 0.0],
-                    [0.866811829, 0.6014357793, 0.0],
-                    [-0.866811829, 0.6014357793, 0.0],
-                ]
-            )
-            * ANGSTROM_TO_BOHR,
-        )
-        _, wfn_hf = algorithms.create("scf_solver").run(water, 0, 1, "sto-3g")
+        _, wfn_hf = algorithms.create("scf_solver").run(_WATER, 0, 1, "sto-3g")
 
         selector = algorithms.create("active_space_selector", "qdk_valence")
         selector.settings().set("num_active_electrons", 2)

@@ -4,15 +4,12 @@
 
 // Second-order Schrieffer-Wolff downfolding kernel.
 //
-// Implements an orbital, diagonal-Fock second-order Schrieffer-Wolff downfold.
-// Split H into H_BD, block diagonal in the external occupation, and the
-// occupation-changing H_OD. For
-// bare denominators, a separate diagonal generalized-Fock operator F0 defines
-// the anti-Hermitian generator through [F0, S] = H_OD. The sigma^2 regularizer
-// instead builds a regularized generator, which solves that equation only
-// approximately. In either case the implemented
-// approximation is H_eff = H_BD + 1/2 [S, H_OD], projected onto the reference
-// external occupation and truncated to <= 2-body. SeQuant spin-traces the
+// H splits into H_BD, block diagonal in the external occupation, and the
+// occupation-changing H_OD. The anti-Hermitian generator S solves
+// [F0, S] = H_OD for a diagonal generalized-Fock F0, exactly with bare
+// denominators and approximately with the sigma^2 regularizer. The kernel
+// evaluates H_eff = H_BD + 1/2 [S, H_OD], projected onto the reference
+// external occupation and truncated to <= 2-body; SeQuant spin-traces the
 // projected commutator into contractions over spatial alpha/beta blocks.
 //
 // Representation: per-spin one-body blocks and chemist aaaa, aabb and bbbb
@@ -23,12 +20,11 @@
 //   Schrieffer & Wolff, Phys. Rev. 149, 491 (1966)
 //   Bravyi, DiVincenzo & Loss, Ann. Phys. 326, 2793 (2011)
 //   Kutzelnigg & Mukherjee, J. Chem. Phys. 107, 432 (1997)  [generalized
-//     normal-ordering framework motivating the higher-body fold; this
-//     implementation retains 1-RDM pair contractions only]
-//   Evangelista, J. Chem. Phys. 141, 054109 (2014)          [sigma^2 / DSRG
-//     flow form of the denominator regularizer]
-//   Shee et al., J. Phys. Chem. Lett. 12, 12084 (2021)      [survey of the
-//     sigma, sigma^2 and kappa regularizers]
+//     normal ordering behind the 1-RDM fold of three-body terms]
+//   Evangelista, J. Chem. Phys. 141, 054109 (2014)          [DSRG flow form
+//     of the sigma^2 regularizer]
+//   Shee et al., J. Phys. Chem. Lett. 12, 12084 (2021)      [denominator
+//     regularizers]
 
 #pragma once
 
@@ -47,23 +43,14 @@ inline std::size_t idx4(int p, int q, int r, int s, int n) {
   return ((static_cast<std::size_t>(p) * n + q) * n + r) * n + s;
 }
 
-// ===========================================================================
-// Shared kernel foundations.
-// ===========================================================================
-
-/// Fixed cutoff for the guarded bare pseudoinverse. Coupled channels below
-/// this magnitude are omitted rather than divided by a singular denominator.
+/// Denominator cutoff of the guarded bare pseudoinverse: coupled channels
+/// below it are omitted rather than divided by a near-zero denominator.
 inline constexpr double bare_denominator_floor = 1e-8;
 
-/// SW energy-denominator options.
 struct RegularizerOptions {
-  /// Sigma of the sigma^2 regularizer, 1/D -> (1 - exp(-sigma*D^2))/D, which
-  /// damps near-degenerate (intruder) channels; it plays the role of the DSRG
-  /// flow parameter s in the generator, and second-order energies match
-  /// DSRG-PT2 at s = sigma/2 (units of inverse energy squared). Larger values
-  /// regularize less; 0 selects a guarded bare pseudoinverse that maps coupled
-  /// channels with |D| < `bare_denominator_floor` to zero. See Shee et al.,
-  /// J. Phys. Chem. Lett. 12, 12084 (2021).
+  /// Sigma of the sigma^2 regularizer, 1/D -> (1 - exp(-sigma*D^2))/D, in
+  /// Eh^-2. 0 selects the guarded bare pseudoinverse, which maps channels with
+  /// |D| < `bare_denominator_floor` to zero.
   double sigma2 = 0.0;
 };
 
@@ -76,9 +63,7 @@ using TwoBodyBlocks =
 
 /// Generalized Fock matrices from per-spin 1-RDMs D^s,
 /// F^s_pq = h^s_pq + sum_t sum_rs D^t_rs (pq|rs)^st - sum_rs D^s_rs (pr|sq)^ss.
-/// Their diagonals supply the denominator energies. A restricted caller splits
-/// the spin-traced density evenly, so eps_alpha == eps_beta and H0 preserves
-/// S^2; high-spin states are then realized by the active-space solve.
+/// Their diagonals supply the denominator energies.
 std::array<Eigen::MatrixXd, 2> generalized_fock_matrices(
     const std::array<Eigen::MatrixXd, 2>& one_body,
     const TwoBodyBlocks& two_body,
@@ -95,8 +80,7 @@ Eigen::MatrixXd semicanonical_rotation(
 Eigen::MatrixXd rotate_one_body(const Eigen::MatrixXd& one_body,
                                 const Eigen::MatrixXd& rotation);
 
-/// Transform chemist integrals
-/// (pq|rs)' = U_ap U_bq U_cr U_ds (ab|cd), retaining the full dense tensor.
+/// Transform chemist integrals (pq|rs)' = U_ap U_bq U_cr U_ds (ab|cd).
 Eigen::VectorXd rotate_two_body(const Eigen::VectorXd& two_body,
                                 const Eigen::MatrixXd& rotation, int norb);
 
@@ -147,19 +131,16 @@ struct WindowPartition {
 };
 
 /// Apply the folding policy to a window: orbitals in `kept_global` become the
-/// active space, and each remaining orbital is folded into the external space
-/// as inactive or virtual by rounding its reference occupation to the nearer of
-/// 2 or 0. Rounding preserves the total electron count -- the active space
-/// receives whatever the folded orbitals do not take -- but it perturbs the
-/// mean field the active space feels, so the deviations are reported.
+/// active space, and each remaining orbital is folded as inactive or virtual by
+/// rounding its reference occupation to the nearer of 2 or 0. The active space
+/// receives the electrons the folded orbitals do not take, so the total is
+/// preserved, but the rounding perturbs the mean field the active space feels.
 ///
-/// `occupation` is indexed by window position and `window_global` maps those
-/// positions to global orbital indices; `window_electrons` is the (integer)
-/// electron count the reference density places in the window. Throws
-/// `std::invalid_argument` if a folded orbital deviates from an integer
-/// occupation by more than `max_folded_occupation_deviation`, which must lie in
-/// [0, 1) so a singly occupied orbital is never folded on an arbitrary
-/// rounding.
+/// `occupation` is indexed by window position, `window_global` maps those
+/// positions to global orbital indices, and `window_electrons` is the integer
+/// electron count of the reference density over the window. Throws
+/// `std::invalid_argument` if a folded orbital deviates from 0 or 2 by more
+/// than `max_folded_occupation_deviation`, which must lie in [0, 1).
 WindowPartition partition_window(
     const std::vector<double>& occupation,
     const std::vector<std::size_t>& window_global,
