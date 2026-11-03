@@ -21,11 +21,10 @@ namespace QDKChemistry.Utils.IsometrySynthesis {
     import Std.Arrays.IsEmpty;
     import Std.Arrays.Mapped;
     import Std.Arrays.Reversed;
+    import Std.Arrays.Zipped;
+    import Std.Canon.ApplyToEachA;
     import Std.Convert.IntAsBoolArray;
-    import Std.Convert.IntAsDouble;
     import Std.Diagnostics.Fact;
-    import Std.Math.Ceiling;
-    import Std.Math.Lg;
     import Std.Math.PI;
     import Std.TableLookup.Select;
     import QDKChemistry.Utils.PhaseGradient.PreparePhaseGradientState;
@@ -86,14 +85,11 @@ namespace QDKChemistry.Utils.IsometrySynthesis {
 
     /// Returns the bit-string tables of a permutation and of its inverse.
     function PermutationData(permTargets : Int[], numBits : Int) : (Bool[][], Bool[][]) {
-        mutable data = Repeated(Repeated(false, numBits), Length(permTargets));
-        mutable inverseData = data;
+        mutable inverse = Repeated(0, Length(permTargets));
         for source in IndexRange(permTargets) {
-            let target = permTargets[source];
-            set data w/= source <- IntAsBoolArray(target, numBits);
-            set inverseData w/= target <- IntAsBoolArray(source, numBits);
+            set inverse w/= permTargets[source] <- source;
         }
-        return (data, inverseData);
+        (Mapped(IntAsBoolArray(_, numBits), permTargets), Mapped(IntAsBoolArray(_, numBits), inverse))
     }
 
     /// Applies |i⟩ → |P(i)⟩ with `permTargets[i]` = P(i) and `invPermTargets[j]` = P⁻¹(j) as
@@ -107,16 +103,11 @@ namespace QDKChemistry.Utils.IsometrySynthesis {
         invPermTargets : Bool[][],
         target : Qubit[]
     ) : Unit is Adj {
-        let n = Length(target);
-        let N = Length(permTargets);
-        let nRequired = Ceiling(Lg(IntAsDouble(N)));
-
-        use loaded = Qubit[n];
-        Select(permTargets, target[...nRequired - 1], loaded);
-        for i in 0..n - 1 {
-            SWAP(target[i], loaded[i]);
-        }
-        Adjoint Select(invPermTargets, target[...nRequired - 1], loaded);
+        // Select uses only the address bits its table needs.
+        use loaded = Qubit[Length(target)];
+        Select(permTargets, target, loaded);
+        ApplyToEachA(SWAP, Zipped(target, loaded));
+        Adjoint Select(invPermTargets, target, loaded);
     }
 
     /// Applies a dense isometry (Appendix B of Rupprecht & Wölk, arXiv:2605.28489) to the
@@ -148,9 +139,10 @@ namespace QDKChemistry.Utils.IsometrySynthesis {
         // A Givens layer on an n-qubit register is addressed by its n - 1 upper qubits.
         let inputAddresses = inputDim / 2;
         let blockAddresses = (inputDim <<< numAdded) / 2;
+        let quantize = givens -> QuantizeGivensDecomposition(givens, inputAddresses, rotationBitPrecision);
         let rotations = Mapped(angles -> QuantizeRyAngles(angles, rotationBitPrecision), synthesis.rotationAngles);
-        let mixingGivens = Mapped(givens -> QuantizeGivensDecomposition(givens, inputAddresses, rotationBitPrecision), synthesis.mixingGivens);
-        let rightFactorGivens = Mapped(givens -> QuantizeGivensDecomposition(givens, inputAddresses, rotationBitPrecision), synthesis.rightFactorGivens);
+        let mixingGivens = Mapped(quantize, synthesis.mixingGivens);
+        let rightFactorGivens = Mapped(quantize, synthesis.rightFactorGivens);
         let blockGivens = QuantizeGivensDecomposition(synthesis.blockGivens, blockAddresses, rotationBitPrecision);
 
         // The rotation tables are addressed by the little-endian input register; the Givens
