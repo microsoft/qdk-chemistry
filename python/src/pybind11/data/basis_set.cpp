@@ -466,7 +466,7 @@ Args:
     shell_index (int): Global index of the shell
 
 Returns:
-    Shell: Copy of the specified shell. Modifying it does not change the basis set
+    Shell: Reference to the specified shell
 
 Raises:
     IndexError: If shell index is out of range
