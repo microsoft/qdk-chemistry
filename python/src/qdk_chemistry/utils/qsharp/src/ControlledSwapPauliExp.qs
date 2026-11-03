@@ -34,7 +34,8 @@ namespace QDKChemistry.Utils.ControlledSwapPauliExp {
                     Mapped(term -> params.pauliOps[term], group),
                     Mapped(term -> Subarray(params.pauliIndices[term], systems), group),
                     useHammingWeightPhasing,
-                    maxBatchSize
+                    maxBatchSize,
+                    []
                 );
             }
         }

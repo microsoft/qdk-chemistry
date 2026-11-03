@@ -125,6 +125,26 @@ CholeskyHamiltonianContainer::get_two_body_integrals() const {
       std::cref(*std::get<2>(_cached_four_center_integrals)));
 }
 
+// Copy the strictly lower triangle of the column-major n x n matrix a into its
+// strictly upper triangle, one square tile at a time.
+static void copy_lower_to_upper(double* a, size_t n) {
+  constexpr size_t tile = 64;
+#ifdef _OPENMP
+#pragma omp parallel for schedule(dynamic)
+#endif
+  for (size_t c0 = 0; c0 < n; c0 += tile) {
+    const size_t c1 = std::min(c0 + tile, n);
+    for (size_t r0 = c0; r0 < n; r0 += tile) {
+      const size_t r1 = std::min(r0 + tile, n);
+      for (size_t c = c0; c < c1; ++c) {
+        for (size_t r = std::max(r0, c + 1); r < r1; ++r) {
+          a[c + r * n] = a[r + c * n];
+        }
+      }
+    }
+  }
+}
+
 void CholeskyHamiltonianContainer::_build_four_center_cache() const {
   QDK_LOG_TRACE_ENTERING();
 
@@ -132,19 +152,28 @@ void CholeskyHamiltonianContainer::_build_four_center_cache() const {
       spin_channel_indices(_orbitals->active_indices(), axes::alpha()).size();
   size_t norb2 = norb * norb;
   size_t norb4 = norb2 * norb2;
+  const bool hermitian = is_hermitian();
 
-  // 4-center build from 3-center: (ij|kl) = sum_Q L_ij,Q * R_Q,kl.
-  // The two reshaped dense matrices have shape [norb*norb, naux] in
-  // column-major order; the resulting 4-center has shape [norb2, norb2] in
-  // column-major (= row-major (ij|kl)).
+  // (ij|kl) = sum_Q L_ij,Q * R_kl,Q, written directly into the cached array.
+  // The three-center integrals are column-major [norb2, naux] matrices; the
+  // result is the column-major [norb2, norb2] matrix (kl, ij), i.e. the
+  // row-major (ij|kl) array.
   auto build_four_center = [&](const Eigen::MatrixXd& three_left,
                                const Eigen::MatrixXd& three_right)
       -> std::shared_ptr<Eigen::VectorXd> {
     auto four_center = std::make_shared<Eigen::VectorXd>(norb4);
+    double* out = four_center->data();
     size_t naux = three_left.cols();
-    blas::gemm(blas::Layout::ColMajor, blas::Op::NoTrans, blas::Op::Trans,
-               norb2, norb2, naux, 1.0, three_right.data(), norb2,
-               three_left.data(), norb2, 0.0, four_center->data(), norb2);
+    if (hermitian && &three_left == &three_right) {
+      // One computed triangle, mirrored, makes (ij|kl) == (kl|ij) exact
+      blas::syrk(blas::Layout::ColMajor, blas::Uplo::Lower, blas::Op::NoTrans,
+                 norb2, naux, 1.0, three_left.data(), norb2, 0.0, out, norb2);
+      copy_lower_to_upper(out, norb2);
+    } else {
+      blas::gemm(blas::Layout::ColMajor, blas::Op::NoTrans, blas::Op::Trans,
+                 norb2, norb2, naux, 1.0, three_right.data(), norb2,
+                 three_left.data(), norb2, 0.0, out, norb2);
+    }
     return four_center;
   };
 

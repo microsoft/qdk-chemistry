@@ -9,9 +9,12 @@
 #include <array>
 #include <blas.hh>
 #include <cmath>
+#include <cstdint>
+#include <cstring>
 #include <filesystem>
 #include <fstream>
 #include <lapack.hh>
+#include <limits>
 #include <map>
 #include <nlohmann/json.hpp>
 #include <numeric>
@@ -1030,6 +1033,17 @@ TEST_F(HamiltonianConstructorTest, CholeskyRestrictedO2) {
         hamiltonian->get_container<CholeskyHamiltonianContainer>();
     EXPECT_EQ(container.get_container_type(), "cholesky");
   });
+
+  // The MO Cholesky vectors are exactly symmetric in their orbital pair
+  const auto norb = std::get<0>(hamiltonian->get_one_body_integrals()).rows();
+  const Eigen::MatrixXd& L =
+      hamiltonian->get_container<CholeskyHamiltonianContainer>()
+          .get_three_center_integrals()
+          .first;
+  for (Eigen::Index k = 0; k < L.cols(); ++k) {
+    const Eigen::Map<const Eigen::MatrixXd> L_k(L.col(k).data(), norb, norb);
+    EXPECT_EQ((L_k - L_k.transpose()).cwiseAbs().maxCoeff(), 0.0);
+  }
 }
 
 TEST_F(HamiltonianConstructorTest, CholeskyUnrestrictedO2) {
@@ -1224,6 +1238,61 @@ TEST_F(HamiltonianTest, CholeskyContainerClone) {
   auto [h1_one_alpha, h1_one_beta] = h1.get_one_body_integrals();
   auto [h2_one_alpha, h2_one_beta] = h2.get_one_body_integrals();
   EXPECT_TRUE(h1_one_alpha.isApprox(h2_one_alpha));
+}
+
+TEST_F(HamiltonianTest, CholeskyContainerTwoBodyIntegrals) {
+  // Four-center integrals are the product of the stored, here asymmetric,
+  // three-center integrals, which access leaves unchanged. Hermitian same-spin
+  // channels are exactly symmetric under ij <-> kl. Twelve orbitals give
+  // enough orbital pairs to span several tiles of the triangle mirror.
+  constexpr Eigen::Index norb = 12;
+  constexpr Eigen::Index naux = 4;
+  const Eigen::MatrixXd L_a = Eigen::MatrixXd::Random(norb * norb, naux);
+  const Eigen::MatrixXd L_b = Eigen::MatrixXd::Random(norb * norb, naux);
+  const Eigen::MatrixXd one_body = Eigen::MatrixXd::Identity(norb, norb);
+  const Eigen::MatrixXd fock = Eigen::MatrixXd::Zero(0, 0);
+
+  Hamiltonian hermitian(std::make_unique<CholeskyHamiltonianContainer>(
+      one_body, one_body, L_a, L_b,
+      std::make_shared<ModelOrbitals>(norb, model_spin_symmetry(false)), 0.0,
+      fock, fock));
+  Hamiltonian non_hermitian(std::make_unique<CholeskyHamiltonianContainer>(
+      one_body, L_a,
+      std::make_shared<ModelOrbitals>(norb, model_spin_symmetry(true)), 0.0,
+      fock, std::nullopt, HamiltonianType::NonHermitian));
+  const auto& [aaaa, aabb, bbbb] = hermitian.get_two_body_integrals();
+  const Eigen::VectorXd& plain =
+      std::get<0>(non_hermitian.get_two_body_integrals());
+  const auto [stored_a, stored_b] =
+      hermitian.get_container<CholeskyHamiltonianContainer>()
+          .get_three_center_integrals();
+  EXPECT_TRUE(stored_a == L_a);
+  EXPECT_TRUE(stored_b == L_b);
+
+  auto at = [&](const Eigen::VectorXd& v, Eigen::Index i, Eigen::Index j,
+                Eigen::Index k, Eigen::Index l) {
+    return v(((i * norb + j) * norb + k) * norb + l);
+  };
+  for (Eigen::Index i = 0; i < norb; ++i) {
+    for (Eigen::Index j = 0; j < norb; ++j) {
+      for (Eigen::Index k = 0; k < norb; ++k) {
+        for (Eigen::Index l = 0; l < norb; ++l) {
+          const Eigen::Index ij = i * norb + j;
+          const Eigen::Index kl = k * norb + l;
+          EXPECT_NEAR(at(aaaa, i, j, k, l), L_a.row(ij).dot(L_a.row(kl)),
+                      testing::numerical_zero_tolerance);
+          EXPECT_NEAR(at(aabb, i, j, k, l), L_a.row(ij).dot(L_b.row(kl)),
+                      testing::numerical_zero_tolerance);
+          EXPECT_NEAR(at(bbbb, i, j, k, l), L_b.row(ij).dot(L_b.row(kl)),
+                      testing::numerical_zero_tolerance);
+          EXPECT_NEAR(at(plain, i, j, k, l), L_a.row(ij).dot(L_a.row(kl)),
+                      testing::numerical_zero_tolerance);
+          EXPECT_EQ(at(aaaa, k, l, i, j), at(aaaa, i, j, k, l));
+          EXPECT_EQ(at(bbbb, k, l, i, j), at(bbbb, i, j, k, l));
+        }
+      }
+    }
+  }
 }
 
 TEST_F(HamiltonianTest, SparseContainerConstructionWithTwoBody) {
@@ -1492,6 +1561,227 @@ TEST_F(HamiltonianTest, SparseContainerHDF5Serialization) {
   EXPECT_TRUE(h_two_aaaa.isApprox(hl_two_aaaa, testing::hdf5_tolerance));
 
   std::filesystem::remove(filename);
+}
+
+TEST_F(HamiltonianTest,
+       SparseContainerJSONRejectsMalformedDimensionsAndIndices) {
+  SparseHamiltonianContainer container(one_body, core_energy);
+  const auto valid = container.to_json();
+  for (const auto& index : std::vector<nlohmann::json>{-1, 2, 0.5}) {
+    for (int slot = 0; slot < 2; ++slot) {
+      auto malformed = valid;
+      malformed["one_body_integrals_alpha_sparse"][0][slot] = index;
+      EXPECT_THROW(SparseHamiltonianContainer::from_json(malformed),
+                   std::invalid_argument);
+    }
+  }
+  for (const auto& count : std::vector<nlohmann::json>{
+           -1, 2.5, std::numeric_limits<std::uint64_t>::max()}) {
+    auto malformed = valid;
+    malformed["num_orbitals"] = count;
+    EXPECT_THROW(SparseHamiltonianContainer::from_json(malformed),
+                 std::invalid_argument);
+  }
+  auto malformed = valid;
+  malformed["one_body_integrals_alpha_sparse"] = {{0, 0}};
+  EXPECT_THROW(SparseHamiltonianContainer::from_json(malformed),
+               std::invalid_argument);
+
+  // One-body integrals are read only from the sparse triplets.
+  auto dense = valid;
+  dense.erase("one_body_integrals_alpha_sparse");
+  dense["one_body_integrals_alpha"] = {{1.0, 0.0}, {0.0, 1.0}};
+  EXPECT_THROW(SparseHamiltonianContainer::from_json(dense),
+               std::runtime_error);
+}
+
+TEST_F(HamiltonianTest, SparseContainerRejectsDenseTwoBodySizeMismatch) {
+  const Eigen::MatrixXd three = Eigen::MatrixXd::Identity(3, 3);
+  for (const Eigen::Index size : {0, 10, 82}) {
+    const Eigen::VectorXd values = Eigen::VectorXd::Zero(size);
+    EXPECT_THROW(SparseHamiltonianContainer(three, values, core_energy),
+                 std::invalid_argument)
+        << size;
+  }
+  const Eigen::MatrixXd empty(0, 0);
+  const Eigen::VectorXd one = Eigen::VectorXd::Zero(1);
+  EXPECT_THROW(SparseHamiltonianContainer(empty, one, core_energy),
+               std::invalid_argument);
+  EXPECT_NO_THROW(SparseHamiltonianContainer(one_body, two_body, core_energy));
+}
+
+TEST_F(HamiltonianTest, SparseContainerRejectsInconsistentTwoBodyExtents) {
+  Eigen::SparseMatrix<double> h1(2, 2);
+  h1.insert(0, 0) = 1.0;
+  SparseMapBlock<4, double> entries;
+  entries[{2, 2, 2, 2}] = 1.0;
+  const auto h2 = make_spin_diagonal_rank4_sbsm<double>(entries, 3);
+  EXPECT_THROW(SparseHamiltonianContainer(h1, h2, 0.0), std::invalid_argument);
+
+  auto json = SparseHamiltonianContainer(h1, 0.0).to_json();
+  json["two_body_integrals"] = h2->to_json();
+  EXPECT_THROW(SparseHamiltonianContainer::from_json(json),
+               std::invalid_argument);
+
+  SparseHamiltonianContainer::TwoBodyMap oversized_index;
+  oversized_index[{std::numeric_limits<std::size_t>::max(), 0, 0, 0}] = 1.0;
+  EXPECT_THROW(SparseHamiltonianContainer(h1, oversized_index, 0.0),
+               std::invalid_argument);
+}
+
+TEST_F(HamiltonianTest, SparseContainerHDF5RejectsMalformedDatasetShapes) {
+  SparseHamiltonianContainer container(one_body, core_energy);
+  H5::FileAccPropList properties;
+  properties.setCore(65536, false);
+  for (const bool two_body_dataset : {false, true}) {
+    const auto* name = two_body_dataset ? "two_body_integrals_sparse"
+                                        : "one_body_integrals_alpha_sparse";
+    // Only the packed width is read, so the unpacked [row, col, value] and
+    // [p, q, r, s, value] layouts are rejected along with any other shape.
+    const std::vector<std::vector<hsize_t>> shapes{
+        {1}, {1, two_body_dataset ? hsize_t{5} : hsize_t{3}}};
+    for (const auto& dims : shapes) {
+      H5::H5File file("sparse-invalid-shape.h5", H5F_ACC_TRUNC,
+                      H5::FileCreatPropList::DEFAULT, properties);
+      auto group = file.createGroup("container");
+      container.to_hdf5(group);
+      if (group.nameExists(name)) {
+        group.unlink(name);
+      }
+      group.createDataSet(
+          name, H5::PredType::NATIVE_DOUBLE,
+          H5::DataSpace(static_cast<int>(dims.size()), dims.data()));
+      EXPECT_THROW(SparseHamiltonianContainer::from_hdf5(group),
+                   std::invalid_argument);
+    }
+  }
+}
+
+TEST_F(HamiltonianTest, SparseContainerHDF5BoundsRowsBeforeReading) {
+  SparseHamiltonianContainer container(one_body, two_body, core_energy);
+  H5::FileAccPropList properties;
+  properties.setCore(65536, false);
+  for (const bool two_body_dataset : {false, true}) {
+    H5::H5File file("sparse-row-bound.h5", H5F_ACC_TRUNC,
+                    H5::FileCreatPropList::DEFAULT, properties);
+    auto group = file.createGroup("container");
+    container.to_hdf5(group);
+    const auto* name = two_body_dataset ? "two_body_integrals_sparse"
+                                        : "one_body_integrals_alpha_sparse";
+    group.unlink(name);
+    // Unwritten chunks are not stored, so the file stays small while it
+    // declares more rows than the reader accepts.
+    const hsize_t dims[] = {hsize_t{1} << 31,
+                            two_body_dataset ? hsize_t{3} : hsize_t{2}};
+    const hsize_t chunk[] = {1, dims[1]};
+    H5::DSetCreatPropList chunked;
+    chunked.setChunk(2, chunk);
+    auto dataset = group.createDataSet(name, H5::PredType::NATIVE_DOUBLE,
+                                       H5::DataSpace(2, dims), chunked);
+    if (!two_body_dataset) {
+      const int n = 2;
+      auto attribute = dataset.createAttribute(
+          "num_orbitals", H5::PredType::NATIVE_INT, H5::DataSpace(H5S_SCALAR));
+      attribute.write(H5::PredType::NATIVE_INT, &n);
+    }
+    EXPECT_THROW(SparseHamiltonianContainer::from_hdf5(group),
+                 std::invalid_argument);
+  }
+}
+
+TEST_F(HamiltonianTest, SparseContainerHDF5RejectsNonNativePackedTypes) {
+  SparseHamiltonianContainer container(one_body, two_body, core_energy);
+  H5::FileAccPropList properties;
+  properties.setCore(65536, false);
+  const auto* swapped = H5::PredType::NATIVE_DOUBLE.getOrder() == H5T_ORDER_LE
+                            ? &H5::PredType::IEEE_F64BE
+                            : &H5::PredType::IEEE_F64LE;
+  for (const bool two_body_dataset : {false, true}) {
+    const auto* name = two_body_dataset ? "two_body_integrals_sparse"
+                                        : "one_body_integrals_alpha_sparse";
+    const hsize_t dims[] = {1, two_body_dataset ? hsize_t{3} : hsize_t{2}};
+    H5::H5File file("sparse-packed-type.h5", H5F_ACC_TRUNC,
+                    H5::FileCreatPropList::DEFAULT, properties);
+    auto group = file.createGroup("container");
+    container.to_hdf5(group);
+    group.unlink(name);
+    group.createDataSet(name, *swapped, H5::DataSpace(2, dims));
+    EXPECT_THROW(SparseHamiltonianContainer::from_hdf5(group),
+                 std::invalid_argument);
+  }
+}
+
+TEST_F(HamiltonianTest, SparseContainerHDF5RejectsMalformedScalarAttributes) {
+  SparseHamiltonianContainer container(one_body, core_energy);
+  H5::FileAccPropList properties;
+  properties.setCore(65536, false);
+  {
+    H5::H5File file("sparse-invalid-attribute.h5", H5F_ACC_TRUNC,
+                    H5::FileCreatPropList::DEFAULT, properties);
+    auto group = file.createGroup("container");
+    container.to_hdf5(group);
+    const hsize_t dims[] = {2};
+    auto dataset = group.openDataSet("one_body_integrals_alpha_sparse");
+    dataset.removeAttr("num_orbitals");
+    dataset.createAttribute("num_orbitals", H5::PredType::NATIVE_INT,
+                            H5::DataSpace(1, dims));
+    EXPECT_THROW(SparseHamiltonianContainer::from_hdf5(group),
+                 std::invalid_argument);
+  }
+  for (const long long count : {-1LL, std::numeric_limits<long long>::max()}) {
+    H5::H5File file("sparse-invalid-count.h5", H5F_ACC_TRUNC,
+                    H5::FileCreatPropList::DEFAULT, properties);
+    auto group = file.createGroup("container");
+    container.to_hdf5(group);
+    auto dataset = group.openDataSet("one_body_integrals_alpha_sparse");
+    dataset.removeAttr("num_orbitals");
+    auto attribute = dataset.createAttribute(
+        "num_orbitals", H5::PredType::NATIVE_LLONG, H5::DataSpace(H5S_SCALAR));
+    attribute.write(H5::PredType::NATIVE_LLONG, &count);
+    EXPECT_THROW(SparseHamiltonianContainer::from_hdf5(group),
+                 std::invalid_argument);
+  }
+}
+
+TEST_F(HamiltonianTest, SparseContainerHDF5RejectsInvalidPackedIndices) {
+  SparseHamiltonianContainer container(one_body, two_body, core_energy);
+  H5::FileAccPropList properties;
+  properties.setCore(65536, false);
+  for (const bool two_body_dataset : {false, true}) {
+    H5::H5File file("sparse-invalid-packed-index.h5", H5F_ACC_TRUNC,
+                    H5::FileCreatPropList::DEFAULT, properties);
+    auto group = file.createGroup("container");
+    container.to_hdf5(group);
+    const auto* name = two_body_dataset ? "two_body_integrals_sparse"
+                                        : "one_body_integrals_alpha_sparse";
+    auto dataset = group.openDataSet(name);
+    const auto space = dataset.getSpace();
+    std::vector<double> entries(space.getSimpleExtentNpoints());
+    dataset.read(entries.data(), H5::PredType::NATIVE_DOUBLE);
+    const std::uint32_t indices[] = {0,
+                                     std::numeric_limits<std::uint32_t>::max()};
+    static_assert(sizeof(indices) == sizeof(double));
+    std::memcpy(entries.data(), indices, sizeof(double));
+    dataset.write(entries.data(), H5::PredType::NATIVE_DOUBLE);
+    EXPECT_THROW(SparseHamiltonianContainer::from_hdf5(group),
+                 std::invalid_argument);
+  }
+}
+
+TEST_F(HamiltonianTest, SparseContainerHDF5ReadsTwoBodyOnlyFromDataset) {
+  SparseHamiltonianContainer container(one_body, core_energy);
+  H5::FileAccPropList properties;
+  properties.setCore(65536, false);
+  H5::H5File file("sparse-two-body-group.h5", H5F_ACC_TRUNC,
+                  H5::FileCreatPropList::DEFAULT, properties);
+  auto group = file.createGroup("container");
+  container.to_hdf5(group);
+  EXPECT_FALSE(
+      SparseHamiltonianContainer::from_hdf5(group)->has_two_body_integrals());
+
+  group.createGroup("two_body_integrals_sparse");
+  EXPECT_THROW(SparseHamiltonianContainer::from_hdf5(group),
+               std::runtime_error);
 }
 
 TEST_F(HamiltonianTest, SparseContainerFCIDUMP) {
@@ -2662,6 +2952,27 @@ TEST_F(CholeskyTest, O2_Unrestricted_Comparison) {
         aabb_incore.isApprox(aabb_chol, testing::numerical_zero_tolerance));
     EXPECT_TRUE(
         bbbb_incore.isApprox(bbbb_chol, testing::numerical_zero_tolerance));
+
+    // Hermitian same-spin channels are exactly symmetric under ij <-> kl
+    const Eigen::Index norb = aa_chol.rows();
+    auto at = [&](const Eigen::VectorXd& v, Eigen::Index i, Eigen::Index j,
+                  Eigen::Index k, Eigen::Index l) {
+      return v(((i * norb + j) * norb + k) * norb + l);
+    };
+    size_t asymmetric = 0;
+    for (Eigen::Index i = 0; i < norb; ++i) {
+      for (Eigen::Index j = 0; j < norb; ++j) {
+        for (Eigen::Index k = 0; k < norb; ++k) {
+          for (Eigen::Index l = 0; l < norb; ++l) {
+            asymmetric +=
+                at(aaaa_chol, k, l, i, j) != at(aaaa_chol, i, j, k, l);
+            asymmetric +=
+                at(bbbb_chol, k, l, i, j) != at(bbbb_chol, i, j, k, l);
+          }
+        }
+      }
+    }
+    EXPECT_EQ(asymmetric, 0u);
   }
 
   // continuous active space

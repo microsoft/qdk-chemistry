@@ -137,7 +137,8 @@ namespace QDKChemistry.Utils.ControlledPauliExp {
                             [[PauliZ], size = Length(group)],
                             Mapped(term -> [systems[params.pauliIndices[term][0]]], group),
                             useHammingWeightPhasing,
-                            maxBatchSize
+                            maxBatchSize,
+                            []
                         ));
                     }
                 }

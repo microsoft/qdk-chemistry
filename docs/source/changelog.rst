@@ -4,6 +4,13 @@ Changelog
 
 For detailed release notes with code examples and feature walkthroughs, see the :doc:`release-notes/index` section.
 
+Version 2.3.1
+=============
+
+- Fix dependency versions and metadata for component compliance
+- Fix Python/Q# interoperability by using concrete types
+- Optimize SOSSA lookups with batching and qubit reuse
+
 Version 2.3.0
 =============
 
