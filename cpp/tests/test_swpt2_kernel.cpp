@@ -269,10 +269,12 @@ FockParts fock_parts(const OneBodyCase& inputs,
       for (const int index : annihilators) change -= roles[index / 2] == role;
       off_diagonal = off_diagonal || change != 0;
     }
+    double removed = 0.0;
     for (const int index : creators)
       delta += inputs.spin_energies(index % 2)(index / 2);
     for (const int index : annihilators)
-      delta -= inputs.spin_energies(index % 2)(index / 2);
+      removed += inputs.spin_energies(index % 2)(index / 2);
+    delta -= removed;
     const double inverse =
         regularizer.sigma2 == 0.0
             ? (std::abs(delta) < 1e-8 ? 0.0 : 1.0 / delta)

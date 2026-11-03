@@ -761,11 +761,11 @@ DownfoldResult downfold(
   };
   const auto inverse_two_body = [&](double first, double second, double third,
                                     double fourth) {
-    const double creators = first + second;
-    // Keep creator-first arithmetic at the bare cutoff; average annihilator
-    // orders to preserve their exchange symmetry despite roundoff.
-    return 0.5 * (regularized_inverse(creators - third - fourth, regularizer) +
-                  regularized_inverse(creators - fourth - third, regularizer));
+    // Summing creators and annihilators separately makes the denominator
+    // exactly antisymmetric under the adjoint and symmetric under exchange,
+    // so S stays anti-Hermitian even at the bare cutoff.
+    return regularized_inverse((first + second) - (third + fourth),
+                               regularizer);
   };
   // Normal order against the filled inactive space, not the density used for
   // the generalized Fock. Each generator trace must be regularized separately.
@@ -834,10 +834,14 @@ DownfoldResult downfold(
     return block;
   };
   result.two_body = active_block(0, 1);
-  result.same_spin_two_body =
-      spin_free ? std::array{result.two_body, result.two_body}
-                : std::array{active_block(0, 0), active_block(1, 1)};
-  if (inactive.empty() && virtuals.empty()) return result;
+  // Spin-free same-spin blocks are copies of the final aabb block.
+  if (!spin_free)
+    result.same_spin_two_body = {active_block(0, 0), active_block(1, 1)};
+  if (inactive.empty() && virtuals.empty()) {
+    if (spin_free)
+      result.same_spin_two_body = {result.two_body, result.two_body};
+    return result;
+  }
 
   // Diagnostics scan the excitations out of the reference external
   // occupation: active or virtual orbitals created, inactive or active ones
@@ -895,8 +899,8 @@ DownfoldResult downfold(
                                 : direct;
             if (std::abs(coupling) <= negligible_coupling) return;
             const double delta =
-                energies[spin](first) + energies[partner](second) -
-                energies[spin](third) - energies[partner](fourth);
+                (energies[spin](first) + energies[partner](second)) -
+                (energies[spin](third) + energies[partner](fourth));
             min_denominator = std::min(min_denominator, std::abs(delta));
             max_amplitude = std::max(max_amplitude, amplitude(coupling, delta));
           };

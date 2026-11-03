@@ -199,7 +199,8 @@ occupied if its spin-traced reference occupation rounds to two and as empty if i
 an occupation that is far from 2 or 0 perturbs the mean field the active space feels, so
 ``max_folded_occupation_deviation`` bounds how far it may stray before the downfold is
 rejected. A singly occupied orbital therefore cannot be folded and must be kept in :math:`P`.
-The active space keeps whatever electrons the folded orbitals do not take.
+The active space keeps whatever electrons the folded orbitals do not take; the downfold is
+rejected if that leaves either spin with fewer than zero or more electrons than active orbitals.
 
 The commutator :math:`[S, H_{\mathrm{OD}}]` generates three-body terms that the emitted
 two-body operator cannot carry. With ``fold_above_two_body``, reference-1-RDM pair

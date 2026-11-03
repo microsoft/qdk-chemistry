@@ -371,6 +371,28 @@ std::shared_ptr<data::Hamiltonian> SchriefferWolffPT2Constructor::_run_impl(
   const std::vector<int>& active_spatial = window_roles.active_spatial;
   const std::vector<int>& inactive_spatial = window_roles.inactive_spatial;
   const std::vector<int>& virtual_spatial = window_roles.virtual_spatial;
+  // The folded core is closed-shell, so the active space keeps the
+  // reference's spin imbalance; a restricted reference's spin-averaged density
+  // cannot show it, so the counts come from the reference itself.
+  const auto [ref_alpha, ref_beta] = reference->get_active_num_electrons();
+  const auto core_in_window = static_cast<long long>(
+      std::count_if(ref_inactive_global.begin(), ref_inactive_global.end(),
+                    [&](std::size_t g) { return window_set.count(g) != 0; }));
+  const auto folded_pairs = static_cast<long long>(inactive_spatial.size());
+  const long long active_alpha =
+      static_cast<long long>(ref_alpha) + core_in_window - folded_pairs;
+  const long long active_beta =
+      static_cast<long long>(ref_beta) + core_in_window - folded_pairs;
+  const auto kept_count = static_cast<long long>(active_spatial.size());
+  if (std::min(active_alpha, active_beta) < 0 ||
+      std::max(active_alpha, active_beta) > kept_count)
+    throw std::invalid_argument(
+        "SW-PT2: rounding the folded occupations leaves " +
+        std::to_string(active_alpha) + " alpha and " +
+        std::to_string(active_beta) + " beta electrons in " +
+        std::to_string(kept_count) +
+        " active orbitals. Keep the partially occupied orbitals in the "
+        "active space P (p_indices).");
   log_fold_rounding(window_roles);
 
   sw::RegularizerOptions reg;
