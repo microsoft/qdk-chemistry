@@ -10,13 +10,17 @@
 /// Circuits for real unitaries given as Givens rotation layers and sign corrections.
 namespace QDKChemistry.Utils.UnitarySynthesis {
 
-    import Std.Arrays.Any;
+    import Std.Arrays.IndexRange;
     import Std.Arrays.IsEmpty;
     import Std.Arrays.Mapped;
     import Std.Arrays.MappedOverRange;
     import Std.Arrays.Most;
     import Std.Arrays.Reversed;
+    import Std.Arrays.Subarray;
     import Std.Arrays.Tail;
+    import Std.Arrays.Where;
+    import Std.Arrays.Zipped;
+    import Std.Convert.IntAsBoolArray;
     import Std.Diagnostics.Fact;
     import Std.Math.PI;
     import Std.ResourceEstimation.BeginEstimateCaching;
@@ -77,17 +81,15 @@ namespace QDKChemistry.Utils.UnitarySynthesis {
         phaseGradient : Qubit[],
         angleReg : Qubit[]
     ) : Unit is Adj + Ctl {
-        within {
-            SelectSwap(-1, data, address, angleReg);
-        } apply {
-            RyViaPhaseGradient(targetQubit, angleReg, phaseGradient);
-        }
+        ApplyControlledMultiplexedRy(data, address, [], targetQubit, phaseGradient, angleReg);
     }
 
     /// `ApplyMultiplexedRy` that rotates only when every qubit of `controls` is |1⟩.
     ///
     /// Only the lookup is controlled, since a zero angle register already gives the identity.
     /// This is cheaper than `Controlled ApplyMultiplexedRy`, which also controls the adder.
+    /// Without controls the lookup is erased by measurement; `Controlled Adjoint SelectSwap`
+    /// would erase it coherently even for an empty control register.
     operation ApplyControlledMultiplexedRy(
         data : Bool[][],
         address : Qubit[],
@@ -97,7 +99,11 @@ namespace QDKChemistry.Utils.UnitarySynthesis {
         angleReg : Qubit[]
     ) : Unit is Adj + Ctl {
         within {
-            Controlled SelectSwap(controls, (-1, data, address, angleReg));
+            if IsEmpty(controls) {
+                SelectSwap(-1, data, address, angleReg);
+            } else {
+                Controlled SelectSwap(controls, (-1, data, address, angleReg));
+            }
         } apply {
             RyViaPhaseGradient(targetQubit, angleReg, phaseGradient);
         }
@@ -114,52 +120,32 @@ namespace QDKChemistry.Utils.UnitarySynthesis {
     /// register is transformed, so the classical cost does not grow with the number of controls.
     operation ApplyPhasePolynomial(phases : Bool[], register : Qubit[]) : Unit is Adj + Ctl {
         body (...) {
-            ApplyPhasePolynomialWithControls([], phases, register);
+            Controlled ApplyPhasePolynomial([], (phases, register));
         }
         adjoint self;
         controlled (controls, ...) {
-            ApplyPhasePolynomialWithControls(controls, phases, register);
-        }
-        controlled adjoint self;
-    }
-
-    /// `ApplyPhasePolynomial` controlled on every qubit of `controls`.
-    internal operation ApplyPhasePolynomialWithControls(controls : Qubit[], phases : Bool[], register : Qubit[]) : Unit {
-        let n = Length(register);
-        let dim = Length(phases);
-        Fact(dim == 0 or dim == 1 <<< n, "Phase data needs one entry per basis state of the register.");
-
-        // In-place Möbius butterfly; bitmask s encodes the subset S.
-        mutable coeffs = phases;
-        mutable step = 1;
-        while step < dim {
-            for j in 0..dim - 1 {
-                if (j / step) % 2 == 1 {
-                    set coeffs w/= j <- coeffs[j] != coeffs[j - step];
-                }
-            }
-            set step = step * 2;
-        }
-
-        for s in 0..dim - 1 {
-            if coeffs[s] {
-                mutable qubits : Qubit[] = [];
-                for bit in 0..n - 1 {
-                    if (s >>> bit) &&& 1 == 1 {
-                        set qubits += [register[bit]];
+            let n = Length(register);
+            Fact(IsEmpty(phases) or Length(phases) == 1 <<< n, "Phase data needs one entry per basis state of the register.");
+            // In-place Möbius butterfly; bit i of index s marks qubit i of the monomial S.
+            mutable coeffs = phases;
+            for i in 0..n - 1 {
+                for s in IndexRange(coeffs) {
+                    if (s >>> i) &&& 1 == 1 {
+                        set coeffs w/= s <- coeffs[s] != coeffs[s - (1 <<< i)];
                     }
                 }
-                set qubits += controls;
+            }
+            for s in Where(c -> c, coeffs) {
+                let qubits = Subarray(Where(b -> b, IntAsBoolArray(s, n)), register) + controls;
                 if IsEmpty(qubits) {
                     Fact(n > 0, "A constant sign needs a nonempty register to carry it.");
                     R(PauliI, 2.0 * PI(), register[0]);
-                } elif Length(qubits) == 1 {
-                    Z(qubits[0]);
                 } else {
                     Controlled Z(Most(qubits), Tail(qubits));
                 }
             }
         }
+        controlled adjoint self;
     }
 
     /// Applies the real unitary U = D · L_{m-1} ⋯ L_0 of `givens` to `target`, controlled on
@@ -182,39 +168,25 @@ namespace QDKChemistry.Utils.UnitarySynthesis {
         angleReg : Qubit[]
     ) : Unit is Adj {
         let n = Length(target);
-        let layers = givens.layers;
-        let layerIsShifted = givens.layerShifted;
-        let phaseFlips = givens.phases;
-        Fact(Length(layerIsShifted) == Length(layers), "Givens data needs one shift flag per layer.");
-        Fact(IsEmpty(phaseFlips) or Length(phaseFlips) == 1 <<< n, "Givens phase data needs one entry per basis state of the target register.");
-        Fact(n > 0 or IsEmpty(layers), "Givens rotation layers need a nonempty target register.");
+        Fact(Length(givens.layerShifted) == Length(givens.layers), "Givens data needs one shift flag per layer.");
+        Fact(IsEmpty(givens.phases) or Length(givens.phases) == 1 <<< n, "Givens phase data needs one entry per basis state of the target register.");
+        Fact(n > 0 or IsEmpty(givens.layers), "Givens rotation layers need a nonempty target register.");
 
         // Layers differ only in data, so cache the shifted and unshifted circuits. The key holds
         // every width that sets a layer's cost, so compositions at other precisions or table
         // sizes are counted separately.
-        for i in 0..Length(layers) - 1 {
-            let activeQubit = target[n - 1];
-            let address = Reversed(target[0..n - 2]);
-            let variant = n * 2 + (if layerIsShifted[i] { 1 } else { 0 });
-            let cacheName = $"GivensLayer_c{Length(controls)}_g{Length(phaseGradient)}_a{Length(angleReg)}_d{Length(layers[i])}";
-            if BeginEstimateCaching(cacheName, variant) {
-                if layerIsShifted[i] {
-                    AddConstant(-1, Reversed(target));
-                }
-                if IsEmpty(controls) {
-                    ApplyMultiplexedRy(layers[i], address, activeQubit, phaseGradient, angleReg);
-                } else {
-                    ApplyControlledMultiplexedRy(layers[i], address, controls, activeQubit, phaseGradient, angleReg);
-                }
-                if layerIsShifted[i] {
-                    AddConstant(1, Reversed(target));
+        for (layer, shifted) in Zipped(givens.layers, givens.layerShifted) {
+            let cacheName = $"GivensLayer_c{Length(controls)}_g{Length(phaseGradient)}_a{Length(angleReg)}_d{Length(layer)}";
+            if BeginEstimateCaching(cacheName, 2 * n + (shifted ? 1 | 0)) {
+                // Decrementing maps the shifted pairs (1, 2), (3, 4), … onto (0, 1), (2, 3), ….
+                within {
+                    if shifted { AddConstant(-1, Reversed(target)); }
+                } apply {
+                    ApplyControlledMultiplexedRy(layer, Reversed(Most(target)), controls, Tail(target), phaseGradient, angleReg);
                 }
                 EndEstimateCaching();
             }
         }
-
-        if Any(flip -> flip, phaseFlips) {
-            Controlled ApplyPhasePolynomial(controls, (phaseFlips, Reversed(target)));
-        }
+        Controlled ApplyPhasePolynomial(controls, (givens.phases, Reversed(target)));
     }
 }
