@@ -39,6 +39,28 @@ executor.settings().set("transpile_optimization_level", 0)
 ################################################################################
 
 ################################################################################
+# start-cell-configure-azure-quantum
+# Configure the Azure Quantum backend. The connection settings must be provided.
+import json
+
+executor = create("circuit_executor", "azure_quantum_backend")
+executor.settings().set("subscription_id", "my-subscription-id")
+executor.settings().set("resource_group", "my-resource-group")
+executor.settings().set("workspace_name", "my-workspace")
+executor.settings().set("location", "my-location")
+executor.settings().set("target_name", "my.backend.target")
+executor.settings().set("auth_mode", "azure-cli")
+
+# Target-specific job parameters, passed through as-is
+executor.settings().set("input_params", json.dumps({"seed": 42}))
+
+# Keep job artifacts locally
+executor.settings().set("output_dir", "./job_artifacts")
+executor.settings().set("attachments", ["output"])
+# end-cell-configure-azure-quantum
+################################################################################
+
+################################################################################
 # start-cell-run
 from qdk_chemistry.algorithms import create
 from qdk_chemistry.data import Circuit
@@ -104,8 +126,8 @@ from qdk_chemistry.algorithms import registry
 
 # List all registered circuit executor implementations
 implementations = registry.available("circuit_executor")
-print(
-    implementations
-)  # e.g. ['qdk_sparse_state_simulator', 'qdk_full_state_simulator', 'qiskit_aer_simulator']
+print(implementations)
+# e.g. ['qdk_full_state_simulator', 'qdk_sparse_state_simulator',
+#       'qiskit_aer_simulator', 'azure_quantum_backend']
 # end-cell-list-implementations
 ################################################################################

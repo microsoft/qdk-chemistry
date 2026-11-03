@@ -10,7 +10,7 @@ namespace QDKChemistry.Utils.CircuitComposition {
     import Std.ResourceEstimation.SingleVariant;
 
     /// Returns the controlled version of `op`, taking the control register as its first argument.
-    function MakeControlledOp<'T>(op : 'T => Unit is Adj + Ctl) : ((Qubit[], 'T) => Unit is Adj + Ctl) {
+    function MakeControlledOp(op : Qubit[] => Unit is Adj + Ctl) : ((Qubit[], Qubit[]) => Unit is Adj + Ctl) {
         Controlled op
     }
 
@@ -32,16 +32,16 @@ namespace QDKChemistry.Utils.CircuitComposition {
     /// Returns an operation applying `op` `power` times.
     /// Parameters:
     /// - `cacheName`: A string used for caching the resource estimation
-    function MakeRepeatedOp<'T>(
+    function MakeRepeatedOp(
         cacheName : String,
-        op : 'T => Unit is Adj + Ctl,
+        op : Qubit[] => Unit is Adj + Ctl,
         power : Int
-    ) : ('T => Unit is Adj + Ctl) {
+    ) : (Qubit[] => Unit is Adj + Ctl) {
         ApplyRepeated(cacheName, op, power, _)
     }
 
     /// Adapts a control-register operation to the single-control-qubit shape phase estimation takes.
-    function MakeSingleControlOp<'T>(op : (Qubit[], 'T) => Unit is Adj + Ctl) : ((Qubit, 'T) => Unit is Adj + Ctl) {
+    function MakeSingleControlOp(op : (Qubit[], Qubit[]) => Unit is Adj + Ctl) : ((Qubit, Qubit[]) => Unit is Adj + Ctl) {
         (control, target) => op([control], target)
     }
 
@@ -81,7 +81,7 @@ namespace QDKChemistry.Utils.CircuitComposition {
     function MaxInt(values : Int[]) : Int {
         // Caller is responsible for not passing an empty array.
         mutable max = values[0];
-        for idx in 1 .. Length(values) - 1 {
+        for idx in 1..Length(values) - 1 {
             let value = values[idx];
             if (value > max) {
                 set max = value;

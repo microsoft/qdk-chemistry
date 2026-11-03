@@ -1,5 +1,5 @@
 #!/bin/bash
-set -ex
+set -exo pipefail
 PYTHON_VERSION=${1:-3.11}
 MAC_BUILD=${2:-OFF}
 export MAC_BUILD
@@ -12,6 +12,22 @@ if [ -d "/workspace/qdk-chemistry/python" ]; then
 else
     PYTHON_DIR="$REPO_ROOT/python"
 fi
+
+EXACHEM_INSTALL_DIR="/workspace/exachem_install"
+EXACHEM_REQUIRED="${EXACHEM_REQUIRED:-false}"
+if [ -f "${EXACHEM_INSTALL_DIR}/bin/ExaChem" ]; then
+    # ADO pipeline artifact ZIPs don't retain the executable bit.
+    chmod +x "${EXACHEM_INSTALL_DIR}/bin/ExaChem"
+fi
+
+case "$EXACHEM_REQUIRED" in
+    [Tt][Rr][Uu][Ee])
+        if [ ! -x "${EXACHEM_INSTALL_DIR}/bin/ExaChem" ] || [ ! -d "${EXACHEM_INSTALL_DIR}/basis" ]; then
+            echo "ERROR: ExaChem is required, but ${EXACHEM_INSTALL_DIR} is missing or incomplete." >&2
+            exit 1
+        fi
+        ;;
+esac
 
 export DEBIAN_FRONTEND=noninteractive
 
@@ -62,6 +78,17 @@ if [ "$MAC_BUILD" == "OFF" ]; then
         wget \
         xz-utils \
         zlib1g-dev
+
+    # ExaChem runs as a separate process in a fresh container, so install its runtime dependencies here.
+    if [ -d "$EXACHEM_INSTALL_DIR" ]; then
+        echo "Installing ExaChem runtime apt dependencies..."
+        apt-get install -y -q \
+            gfortran \
+            libhdf5-dev \
+            libnuma-dev \
+            openmpi-bin \
+            libopenmpi-dev
+    fi
 
 elif [ "$MAC_BUILD" == "ON" ]; then
     arch -arm64 brew update
@@ -117,6 +144,23 @@ python3 -m pip install --dry-run --ignore-installed --quiet \
 
 # Disable telemetry during testing
 export QSHARP_PYTHON_TELEMETRY=false
+
+# ExaChem/TAMM is optional: only present for the Linux x86_64 leg (built separately, downloaded as an artifact).
+if [ -d "$EXACHEM_INSTALL_DIR" ]; then
+
+    # Libint reads basis files from $LIBINT_DATA_PATH/basis.
+    export LIBINT_DATA_PATH="${EXACHEM_INSTALL_DIR}"
+    # Scoped to just this pytest invocation, for the (upcoming, PR #611) ExaChem CCSD integration test's
+    # shutil.which("ExaChem") lookup.
+    export PATH="${EXACHEM_INSTALL_DIR}/bin:${PATH}"
+    # ${LD_LIBRARY_PATH:+...} avoids a trailing/empty ":" component when unset -- the dynamic loader treats
+    # that as the current working directory, an untrusted-search-path risk.
+    export LD_LIBRARY_PATH="${EXACHEM_INSTALL_DIR}/lib:${EXACHEM_INSTALL_DIR}/lib64${LD_LIBRARY_PATH:+:${LD_LIBRARY_PATH}}"
+
+    # command -v confirms the binary is actually reachable on PATH.
+    command -v ExaChem
+fi
+
 
 # Run pytest suite
 echo '=== Running pytest suite ==='

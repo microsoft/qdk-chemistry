@@ -470,7 +470,7 @@ std::vector<std::pair<int, int>> OneBodyIntegral::compute_shell_pairs(
   return shell_pairs;
 }
 
-void OneBodyIntegral::integral_(size_t nopers, EngineFactory engine_fn,
+void OneBodyIntegral::integral_(size_t nresults, EngineFactory engine_fn,
                                 RowMajorMatrix* res) {
   QDK_LOG_TRACE_ENTERING();
   const auto& shell2bf = obs_.shell2bf();
@@ -479,6 +479,9 @@ void OneBodyIntegral::integral_(size_t nopers, EngineFactory engine_fn,
 #else
   int nthreads = 1;
 #endif
+  // Constructing engines can grow Libint's shared cache; do it serially.
+  std::vector<std::unique_ptr<OneBodyIntegralEngine>> engines(nthreads);
+  for (auto& engine : engines) engine = engine_fn();
 #ifdef ENABLE_NVTX3
   nvtx3::scoped_range r{"int1e"};
 #endif
@@ -493,9 +496,10 @@ void OneBodyIntegral::integral_(size_t nopers, EngineFactory engine_fn,
 #endif
     int world_thread_size = mpi_.world_size * nthreads;
     int world_thread_id = mpi_.world_rank * nthreads + local_thread_id;
-    auto engine = engine_fn();
-    if (engine->nopers() != nopers) {
-      throw std::invalid_argument("nopers is inconsistent");
+    auto& engine = engines[local_thread_id];
+    if (engine->nopers() < nresults) {
+      throw std::invalid_argument(
+          "Integral engine provides fewer components than requested");
     }
 
     for (size_t p = world_thread_id; p < shell_pairs_.size();
@@ -504,7 +508,7 @@ void OneBodyIntegral::integral_(size_t nopers, EngineFactory engine_fn,
       size_t bf1 = shell2bf[i], bf2 = shell2bf[j];
       size_t n1 = obs_[i].size(), n2 = obs_[j].size();
       auto buf = engine->compute(i, j);
-      for (auto k = 0; k < nopers; ++k) {
+      for (auto k = 0; k < nresults; ++k) {
         Eigen::Map<const RowMajorMatrix> mat(buf[k], n1, n2);
         res[k].block(bf1, bf2, n1, n2) = mat;
         if (i != j) {
@@ -696,6 +700,26 @@ void OneBodyIntegral::ecp_integral(double* res) {
 #endif
 }
 
+void OneBodyIntegral::pvp_integral(double* res) {
+  QDK_LOG_TRACE_ENTERING();
+  // Libint2 opVop component 0 is scalar; omit its spin-orbit components.
+  RowMajorMatrix mat = RowMajorMatrix::Zero(obs_.nbf(), obs_.nbf());
+  auto engine_fn = [&]() {
+    auto engine = std::make_unique<Libint2Engine>(libint2::Operator::opVop,
+                                                  obs_, 0, basis_mode_);
+    engine->get().set_params(atoms_);
+    return engine;
+  };
+  integral_(1, engine_fn, &mat);
+  memcpy(res, mat.data(), sizeof(double) * mat.size());
+#ifdef QDK_CHEMISTRY_ENABLE_MPI
+  if (mpi_.world_size > 1) {
+    MPI_Reduce(mpi_.world_rank == 0 ? MPI_IN_PLACE : res, res, mat.size(),
+               MPI_DOUBLE, MPI_SUM, 0, MPI_COMM_WORLD);
+  }
+#endif
+}
+
 void OneBodyIntegral::integral_deriv_(EngineFactory engine_fn,
                                       const RowMajorMatrix& coeff,
                                       AtomCenterFn center_fn, double* res) {
@@ -706,6 +730,9 @@ void OneBodyIntegral::integral_deriv_(EngineFactory engine_fn,
 #else
   int nthreads = 1;
 #endif
+  // Constructing engines can grow Libint's shared cache; do it serially.
+  std::vector<std::unique_ptr<OneBodyIntegralEngine>> engines(nthreads);
+  for (auto& engine : engines) engine = engine_fn();
 #ifdef ENABLE_NVTX3
   nvtx3::scoped_range r{"int1e_deriv"};
 #endif
@@ -720,7 +747,7 @@ void OneBodyIntegral::integral_deriv_(EngineFactory engine_fn,
 #endif
     int world_thread_size = mpi_.world_size * nthreads;
     int world_thread_id = mpi_.world_rank * nthreads + local_thread_id;
-    auto engine = engine_fn();
+    auto& engine = engines[local_thread_id];
 
     for (size_t p = world_thread_id; p < shell_pairs_.size();
          p += world_thread_size) {

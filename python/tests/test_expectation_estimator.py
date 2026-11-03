@@ -19,10 +19,11 @@ from qdk_chemistry.algorithms.expectation_estimator.qdk import (
     _compute_expval_and_variance_from_bitstrings,
     _determine_measurement_basis,
     _is_identity_only,
+    _measurement_masks,
     _parity,
     _paulis_to_nonid_masks,
 )
-from qdk_chemistry.data import AlgorithmRef, Circuit, MeasurementData, QubitOperator
+from qdk_chemistry.data import AlgorithmRef, Circuit, FlatPartition, LayeredPartition, MeasurementData, QubitOperator
 from qdk_chemistry.plugins.qiskit import QDK_CHEMISTRY_HAS_QISKIT, QDK_CHEMISTRY_HAS_QISKIT_AER
 from qdk_chemistry.utils import Logger
 
@@ -145,7 +146,7 @@ def test_create_measurement_circuits_basic(wavefunction_4e4o):
 )
 def test_compute_expval_and_variance_for_paulis_from_bitstring_counts(counts, paulis, expected_expvals, expected_vars):
     """Test the statistics (mean and variance) calculation for Pauli observables."""
-    expvals, vars_ = _compute_expval_and_variance_from_bitstrings(counts, paulis)
+    expvals, vars_ = _compute_expval_and_variance_from_bitstrings(counts, _measurement_masks(paulis))
     assert np.allclose(
         expvals, expected_expvals, rtol=float_comparison_relative_tolerance, atol=float_comparison_absolute_tolerance
     )
@@ -161,7 +162,7 @@ def test_compute_expval_invalid_bitstring_format():
     paulis = ["Z"]
 
     with pytest.raises(ValueError, match="Unsupported bitstring format"):
-        _compute_expval_and_variance_from_bitstrings(counts, paulis)
+        _compute_expval_and_variance_from_bitstrings(counts, _measurement_masks(paulis))
 
 
 def test_compute_expval_mixed_bitstring_formats():
@@ -170,7 +171,7 @@ def test_compute_expval_mixed_bitstring_formats():
     counts = {"0x0": 30, "1": 70}  # Mix of hex and binary
     paulis = ["Z"]
 
-    expvals, vars_ = _compute_expval_and_variance_from_bitstrings(counts, paulis)
+    expvals, vars_ = _compute_expval_and_variance_from_bitstrings(counts, _measurement_masks(paulis))
 
     # Should handle both formats correctly
     assert len(expvals) == 1
@@ -191,7 +192,7 @@ def test_compute_expval_empty_counts() -> None:
     paulis = ["Z"]
 
     with pytest.raises(ValueError, match=r"Bitstring counts are empty\."):
-        _compute_expval_and_variance_from_bitstrings(counts, paulis)
+        _compute_expval_and_variance_from_bitstrings(counts, _measurement_masks(paulis))
 
 
 def test_paulis_to_nonid_masks():
@@ -223,6 +224,25 @@ def test_calculate_energy_expval_variance_none_counts():
         atol=float_comparison_absolute_tolerance,
         rtol=float_comparison_relative_tolerance,
     )
+
+
+@pytest.mark.parametrize(("coefficients", "expected_variance"), [((1.0, 1.0), 0.04), ((1.0, -1.0), 0.0)])
+def test_energy_variance_includes_covariance_of_terms_measured_together(coefficients, expected_variance):
+    """Bell-state outcomes correlate Z0 and Z1, doubling or cancelling the summed term variances of 0.02."""
+    group = QubitOperator(["IZ", "ZI"], np.array(coefficients))
+
+    result = QdkExpectationEstimator._compute_energy_expectation_from_bitstrings([group], [{"00": 50, "11": 50}])
+
+    assert np.isclose(result.energy_variance, expected_variance, atol=float_comparison_absolute_tolerance)
+
+
+def test_energy_variance_is_not_masked_by_a_large_constant_term():
+    """A constant term far larger than the fluctuating one must not round the variance away."""
+    group = QubitOperator(["I", "Z"], np.array([1e16, 1.0]))
+
+    result = QdkExpectationEstimator._compute_energy_expectation_from_bitstrings([group], [{"0": 50, "1": 50}])
+
+    assert np.isclose(result.energy_variance, 0.01, atol=float_comparison_absolute_tolerance)
 
 
 def test_measurement_data_to_json():
@@ -436,3 +456,74 @@ def test_estimator_multiple_identity_terms(wavefunction_4e4o):
         atol=float_comparison_absolute_tolerance,
         rtol=float_comparison_relative_tolerance,
     )
+
+
+@pytest.mark.skipif(not QDK_CHEMISTRY_HAS_QISKIT, reason="Qiskit not available")
+@pytest.mark.parametrize(
+    "partition",
+    [
+        None,
+        FlatPartition(strategy="manual", groups=((0, 3), (1,), (2,))),
+        LayeredPartition(strategy="manual", groups=(((0, 3),), ((1,), (2,)))),
+        LayeredPartition(strategy="manual", groups=((), ((1, 2), (), (0, 3)))),
+    ],
+    ids=["unpartitioned", "partitioned", "layered", "hand_built_layers"],
+)
+def test_estimator_sparse_matches_dense(partition):
+    """Sparse storage yields the dense energy, measuring the Bell state's ZZ, XX and YY eigenvalues exactly."""
+    circuit = Circuit(qasm='OPENQASM 3.0;\ninclude "stdgates.inc";\nqubit[2] q;\nh q[0];\ncx q[0], q[1];\n')
+    labels, coefficients = ["ZZ", "XX", "YY", "II"], np.array([1.0, 0.5, -0.25, 2.0])
+    dense = QubitOperator(labels, coefficients, term_partition=partition)
+    words = [{0: label[1], 1: label[0]} if label != "II" else {} for label in labels]
+    sparse = QubitOperator.from_sparse_terms(2, words, coefficients, term_partition=partition)
+    estimator = QdkExpectationEstimator()
+    estimator.settings().set("circuit_executor", AlgorithmRef("circuit_executor", "qdk_sparse_state_simulator"))
+
+    energies = [estimator.run(circuit, op, total_shots=300)[0].energy_expectation_value for op in (dense, sparse)]
+
+    np.testing.assert_allclose(energies, 3.75, atol=float_comparison_absolute_tolerance)
+
+
+@pytest.mark.skipif(not QDK_CHEMISTRY_HAS_QISKIT, reason="Qiskit not available")
+@pytest.mark.parametrize("sparse", [False, True])
+def test_estimator_measures_qubit_wise_commuting_layered_group_once(sparse):
+    """A qubit-wise commuting group spanning several layers needs one circuit, so a single shot suffices."""
+    circuit = Circuit(qasm='OPENQASM 3.0;\ninclude "stdgates.inc";\nqubit[2] q;\n')
+    partition = LayeredPartition(strategy="manual", groups=(((0,), (1,)),))
+    coefficients = np.array([1.0, 2.0])
+    observable = (
+        QubitOperator.from_sparse_terms(2, [{0: "Z"}, {1: "Z"}], coefficients, term_partition=partition)
+        if sparse
+        else QubitOperator(["IZ", "ZI"], coefficients, term_partition=partition)
+    )
+    estimator = QdkExpectationEstimator()
+    estimator.settings().set("circuit_executor", AlgorithmRef("circuit_executor", "qdk_sparse_state_simulator"))
+
+    energy_result, measurement_data = estimator.run(circuit, observable, total_shots=1)
+
+    assert measurement_data.shots_list == [1]
+    assert np.isclose(energy_result.energy_expectation_value, 3.0, atol=float_comparison_absolute_tolerance)
+
+
+@pytest.mark.skipif(not QDK_CHEMISTRY_HAS_QISKIT, reason="Qiskit not available")
+@pytest.mark.parametrize("sparse", [False, True])
+def test_estimator_measures_each_vacuum_grouped_layer_in_one_circuit(sparse):
+    """XX, YY and ZZ on two bonds form one group of three two-term layers: three circuits, not six."""
+    circuit = Circuit(
+        qasm='OPENQASM 3.0;\ninclude "stdgates.inc";\nqubit[4] q;\nh q[0];\ncx q[0], q[1];\nh q[2];\ncx q[2], q[3];\n'
+    )
+    labels = ["IIXX", "XXII", "IIYY", "YYII", "IIZZ", "ZZII"]
+    coefficients = np.array([0.5, 0.5, 0.5, 0.5, 1.0, 1.0])
+    words = [{q: label[3 - q] for q in range(4) if label[3 - q] != "I"} for label in labels]
+    observable = (
+        QubitOperator.from_sparse_terms(4, words, coefficients) if sparse else QubitOperator(labels, coefficients)
+    )
+    grouped = create("term_grouper", "vacuum_annihilating").run(observable)
+    estimator = QdkExpectationEstimator()
+    estimator.settings().set("circuit_executor", AlgorithmRef("circuit_executor", "qdk_sparse_state_simulator"))
+
+    energy_result, measurement_data = estimator.run(circuit, grouped, total_shots=300)
+
+    assert [len(layer) for group in grouped.term_partition.groups for layer in group] == [2, 2, 2]
+    assert measurement_data.shots_list == [100, 100, 100]
+    assert np.isclose(energy_result.energy_expectation_value, 2.0, atol=float_comparison_absolute_tolerance)

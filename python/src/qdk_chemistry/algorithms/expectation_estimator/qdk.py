@@ -5,6 +5,8 @@
 # Licensed under the MIT License. See LICENSE.txt in the project root for license information.
 # --------------------------------------------------------------------------------------------
 
+from collections.abc import Iterator
+
 import numpy as np
 from qdk import qsharp
 
@@ -17,6 +19,7 @@ from qdk_chemistry.data import (
     QubitOperator,
 )
 from qdk_chemistry.data.circuit import QsharpFactoryData
+from qdk_chemistry.data.qubit_operator.containers.pauli_decomposition import PauliDecompositionContainer
 from qdk_chemistry.utils import Logger
 from qdk_chemistry.utils.pauli_matrix import pauli_string_to_masks
 from qdk_chemistry.utils.qsharp import QSHARP_UTILS
@@ -44,6 +47,19 @@ def _is_identity_only(pauli_strings: list[str]) -> bool:
     return all(set(ps) == {"I"} for ps in pauli_strings)
 
 
+def _is_qubit_wise_commuting(pauli_strings: list[str]) -> bool:
+    """Return True if the Pauli strings can be measured in a single Pauli basis.
+
+    Args:
+        pauli_strings: List of Pauli label strings.
+
+    Returns:
+        True if no qubit carries two different non-identity Paulis.
+
+    """
+    return all(len(set(column) - {"I"}) <= 1 for column in zip(*pauli_strings, strict=True))
+
+
 def _paulis_to_nonid_masks(pauli_strings: list[str]) -> list[int]:
     """Converts a list of Pauli operators into a list of non-identity bitmasks.
 
@@ -60,20 +76,16 @@ def _paulis_to_nonid_masks(pauli_strings: list[str]) -> list[int]:
     return [x | z for x, z, _ in (pauli_string_to_masks(ps) for ps in pauli_strings)]
 
 
-def _compute_expval_and_variance_from_bitstrings(
-    bitstring_counts: dict[str, int], pauli_strings: list[str]
-) -> tuple[np.ndarray, np.ndarray]:
-    """Computes the expectation values and variances for a given set of Pauli operators.
+def _measurement_masks(pauli_strings: list[str]) -> list[int]:
+    """Return each Pauli string's support as a mask over the bits of a measured outcome.
 
     Args:
-        bitstring_counts: A dictionary of measurement outcomes.
-        pauli_strings: List of Pauli label strings for computing expectation values.
+        pauli_strings: List of qubit-wise commuting Pauli label strings.
 
     Returns:
-        A tuple containing expectation values and variances.
+        One mask per Pauli string, selecting the outcome bits whose parity gives its eigenvalue.
 
     """
-    Logger.trace_entering()
     # Determine measurement basis and restrict Paulis to measured qubits (drop I terms)
     basis = _determine_measurement_basis(pauli_strings)
     n_qubits = len(basis)
@@ -89,10 +101,12 @@ def _compute_expval_and_variance_from_bitstrings(
             if nonid & (1 << q):
                 val |= 1 << bit_pos
         diag_inds.append(val)
+    return diag_inds
 
-    expvals = np.zeros(len(pauli_strings), dtype=float)
-    nshots = sum(bitstring_counts.values())
-    if nshots == 0:
+
+def _outcome_signs(bitstring_counts: dict[str, int], masks: list[int]) -> Iterator[tuple[int, np.ndarray]]:
+    """Yield each outcome's frequency and the eigenvalue (+1 or -1) it gives every masked Pauli string."""
+    if sum(bitstring_counts.values()) == 0:
         raise ValueError("Bitstring counts are empty.")
 
     for bitstr, freq in bitstring_counts.items():
@@ -100,12 +114,50 @@ def _compute_expval_and_variance_from_bitstrings(
             outcome = int(bitstr, 16) if bitstr.startswith("0x") else int(bitstr, 2)
         except ValueError as err:
             raise ValueError(f"Unsupported bitstring format: {bitstr}") from err
-        for i, mask in enumerate(diag_inds):
-            expvals[i] += freq * (-1) ** _parity(mask & outcome)
+        yield freq, np.array([(-1) ** _parity(mask & outcome) for mask in masks])
 
-    expvals /= nshots
+
+def _compute_expval_and_variance_from_bitstrings(
+    bitstring_counts: dict[str, int], masks: list[int]
+) -> tuple[np.ndarray, np.ndarray]:
+    """Computes the expectation values and variances for a given set of Pauli operators.
+
+    Args:
+        bitstring_counts: A dictionary of measurement outcomes.
+        masks: Outcome masks of the Pauli strings, from ``_measurement_masks``.
+
+    Returns:
+        A tuple containing expectation values and variances.
+
+    """
+    Logger.trace_entering()
+    nshots = sum(bitstring_counts.values())
+    expvals = sum(freq * signs for freq, signs in _outcome_signs(bitstring_counts, masks)) / nshots
     variances = (1 - expvals**2) / nshots
     return expvals, variances
+
+
+def _compute_energy_variance_from_bitstrings(
+    bitstring_counts: dict[str, int], masks: list[int], coefficients: np.ndarray, expvals: np.ndarray
+) -> float:
+    """Compute the variance of a group's estimated energy from its per-shot energies.
+
+    Terms measured in the same circuit share shots, so their covariances contribute. Each term is centered on its
+    expectation value first, so constant terms cannot mask the fluctuations.
+
+    Args:
+        bitstring_counts: A dictionary of measurement outcomes.
+        masks: Outcome masks of the Pauli strings, from ``_measurement_masks``.
+        coefficients: Coefficient of each Pauli string.
+        expvals: Expectation value of each Pauli string over the same outcomes.
+
+    Returns:
+        The variance of the group's mean energy.
+
+    """
+    outcomes = _outcome_signs(bitstring_counts, masks)
+    total = sum(freq * abs(np.dot(signs - expvals, coefficients)) ** 2 for freq, signs in outcomes)
+    return total / sum(bitstring_counts.values()) ** 2
 
 
 def _determine_measurement_basis(pauli_strings: list[str]) -> str:
@@ -223,6 +275,12 @@ class QdkExpectationEstimator(ExpectationEstimator):
 
         """
         Logger.trace_entering()
+        container_type = qubit_hamiltonian.get_container_type()
+        if not isinstance(qubit_hamiltonian.get_container(), PauliDecompositionContainer):
+            raise ValueError(
+                f"Expectation estimation requires a Pauli decomposition qubit operator; "
+                f"got the {container_type!r} representation."
+            )
         circuit_executor = self._create_nested("circuit_executor")
 
         qubit_hamiltonians = self._resolve_measurement_groups(qubit_hamiltonian)
@@ -288,7 +346,9 @@ class QdkExpectationEstimator(ExpectationEstimator):
         partition is consumed and each group becomes one measurement circuit.
         The groups must be compatible with the measurement backend — at
         present, each group must be qubit-wise commuting so that a single
-        Pauli basis suffices.
+        Pauli basis suffices. Layered groups that are not qubit-wise
+        commuting are split into their layers, and such layers into single
+        terms.
 
         When no partition is present, each Pauli term is measured
         individually.
@@ -302,21 +362,41 @@ class QdkExpectationEstimator(ExpectationEstimator):
         """
         partition = qubit_hamiltonian.term_partition
         if partition is not None:
-            from qdk_chemistry.data.term_partition import FlatPartition  # noqa: PLC0415
+            from qdk_chemistry.data.term_partition import FlatPartition, LayeredPartition  # noqa: PLC0415
 
+            labels = qubit_hamiltonian.pauli_strings
+            groups: list[tuple[int, ...]] | None = None
             if isinstance(partition, FlatPartition):
+                groups = list(partition.groups)
+            elif isinstance(partition, LayeredPartition):
+                groups = []
+                for layers in partition.groups:
+                    members = tuple(i for layer in layers for i in layer)
+                    if members and _is_qubit_wise_commuting([labels[i] for i in members]):
+                        groups.append(members)
+                        continue
+                    # Commuting terms such as XX and YY may still need different measurement bases.
+                    for layer in layers:
+                        if not layer:
+                            continue
+                        if _is_qubit_wise_commuting([labels[i] for i in layer]):
+                            groups.append(layer)
+                        else:
+                            groups.extend((i,) for i in layer)
+
+            if groups is not None:
                 Logger.debug(
                     f"ExpectationEstimator: consuming term_partition "
                     f"(strategy={partition.strategy!r}, num_groups={partition.num_groups})."
                 )
                 return [
                     QubitOperator(
-                        pauli_strings=[qubit_hamiltonian.pauli_strings[i] for i in group],
+                        pauli_strings=[labels[i] for i in group],
                         coefficients=np.asarray([qubit_hamiltonian.coefficients[i] for i in group]),
                         encoding=qubit_hamiltonian.encoding,
                         fermion_mode_order=qubit_hamiltonian.fermion_mode_order,
                     )
-                    for group in partition.groups
+                    for group in groups
                 ]
 
             Logger.debug(
@@ -397,15 +477,15 @@ class QdkExpectationEstimator(ExpectationEstimator):
         for counts, group in zip(bitstring_counts_list, hamiltonians, strict=True):
             if counts is None:
                 continue
-            paulis = group.pauli_strings
+            masks = _measurement_masks(group.pauli_strings)
             coeffs = group.coefficients
 
-            expvals, variances = _compute_expval_and_variance_from_bitstrings(counts, paulis)
+            expvals, variances = _compute_expval_and_variance_from_bitstrings(counts, masks)
             expvals_list.append(expvals)
             vars_list.append(variances)
 
             total_expval += np.dot(expvals, coeffs)
-            total_var += np.dot(variances, np.abs(coeffs) ** 2)
+            total_var += _compute_energy_variance_from_bitstrings(counts, masks, coeffs, expvals)
 
         return EnergyExpectationResult(
             energy_expectation_value=float(np.real_if_close(total_expval)),

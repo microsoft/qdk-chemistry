@@ -276,7 +276,7 @@ class MeasurementData(DataClass):
         data = {
             str(i): {
                 "hamiltonian": {
-                    "paulis": hamiltonian.pauli_strings,
+                    "paulis": list(hamiltonian.pauli_strings),
                     "coefficients": hamiltonian.coefficients.tolist(),
                 },
                 "bitstring": self.bitstring_counts[i] if i < len(self.bitstring_counts) else None,

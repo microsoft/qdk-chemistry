@@ -19,7 +19,7 @@ from qdk_chemistry.algorithms.state_preparation._binary_encoding_utils import (
 from qdk_chemistry.algorithms.state_preparation.sparse_isometry import gf2x_with_tracking
 from qdk_chemistry.plugins.qiskit import QDK_CHEMISTRY_HAS_QISKIT
 
-from .test_helpers import create_random_bitstring_matrix
+from .helpers import create_random_bitstring_matrix
 
 
 def _dense_register_width(num_cols: int) -> int:

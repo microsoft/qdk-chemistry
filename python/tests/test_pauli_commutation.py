@@ -12,10 +12,12 @@ from qdk_chemistry.data import QubitOperator
 from qdk_chemistry.utils.pauli_commutation import (
     commutator,
     commutator_bound_first_order,
+    commutator_bound_second_order,
     do_pauli_labels_commute,
     do_pauli_labels_qw_commute,
     do_pauli_maps_commute,
     do_pauli_maps_qw_commute,
+    does_nested_commutator_vanish,
     get_commutation_checker,
 )
 
@@ -139,6 +141,56 @@ class TestCommutatorBoundFirstOrder:
         h = QubitOperator(pauli_strings=["X"], coefficients=[1.0])
         bound = commutator_bound_first_order(h)
         assert bound == 0.0
+
+
+def _exhaustive_commutator_bounds(hamiltonian: QubitOperator) -> tuple[float, float]:
+    """Evaluate the first- and second-order bounds by checking every pair and triple of terms."""
+    terms = hamiltonian.get_real_coefficients()
+    labels = [label for label, _ in terms]
+    weights = [abs(coefficient) for _, coefficient in terms]
+    n = len(labels)
+    first = 0.0
+    for j in range(n):
+        for k in range(j + 1, n):
+            if not do_pauli_labels_commute(labels[j], labels[k]):
+                first += 2.0 * weights[j] * weights[k]
+    nested = 0.0
+    for i in range(n):
+        for j in range(i + 1, n):
+            for k in range(i + 1, n):
+                if not does_nested_commutator_vanish(labels[k], labels[j], labels[i]):
+                    nested += 2.0**2 * weights[i] * weights[j] * weights[k]
+    repeated = 0.0
+    for i in range(n):
+        for j in range(i + 1, n):
+            if not does_nested_commutator_vanish(labels[i], labels[i], labels[j]):
+                repeated += 2.0**2 * weights[i] ** 2 * weights[j]
+    return first, nested + 0.5 * repeated
+
+
+class TestCommutatorBoundsMatchExhaustiveEvaluation:
+    """Skipping terms on disjoint qubits must not change either bound."""
+
+    @pytest.mark.parametrize("sparse", [False, True])
+    @pytest.mark.parametrize("seed", range(4))
+    def test_bounds_equal_exhaustive_evaluation(self, seed: int, sparse: bool):
+        rng = np.random.default_rng(seed)
+        num_qubits = 6
+        labels = sorted({"".join(rng.choice(list("IIXYZ"), size=num_qubits)) for _ in range(30)})
+        coefficients = rng.normal(size=len(labels)).astype(complex)
+        coefficients[::7] *= 1e-13  # below the default weight threshold
+        if sparse:
+            words = [
+                sorted((num_qubits - 1 - position, pauli) for position, pauli in enumerate(label) if pauli != "I")
+                for label in labels
+            ]
+            hamiltonian = QubitOperator.from_sparse_terms(num_qubits, words, coefficients)
+        else:
+            hamiltonian = QubitOperator(labels, coefficients)
+
+        bounds = (commutator_bound_first_order(hamiltonian), commutator_bound_second_order(hamiltonian))
+        assert bounds == _exhaustive_commutator_bounds(hamiltonian)
+        assert bounds[0] > 0.0
 
 
 class TestDoPauliLabelsQwCommute:

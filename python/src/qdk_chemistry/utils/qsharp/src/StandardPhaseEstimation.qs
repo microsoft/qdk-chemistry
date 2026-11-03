@@ -6,6 +6,9 @@ namespace QDKChemistry.Utils.StandardPhaseEstimation {
 
     import Std.Arrays.Subarray;
     import Std.Canon.ApplyQFT;
+    import Std.Diagnostics.Fact;
+    import Std.ResourceEstimation.EnableMemoryComputeArchitecture;
+    import Std.ResourceEstimation.LeastRecentlyUsed;
 
     /// A struct to hold parameters for standard Quantum Phase Estimation (QPE).
     /// - `statePrep`: A function to prepare the initial quantum state on system qubits.
@@ -16,6 +19,12 @@ namespace QDKChemistry.Utils.StandardPhaseEstimation {
     /// - `ancillas`: An array of indices representing the ancilla qubits.
     /// - `systems`: An array of indices representing the system qubits.
     /// - `numAncillaQubits`: Number of extra ancilla qubits needed by the controlled unitary (0 for Trotter, >0 for block encoding).
+    /// - `prepareSharedOp`: Prepares the shared register once around the state preparation and every
+    ///   controlled unitary.
+    /// - `numSharedAncillas`: Size of the shared register, appended after the unitary's ancillas.
+    /// - `statePrepUsesShared`: Append the shared register to the system qubits `statePrep` acts on.
+    /// - `unitaryUsesShared`: Append the shared register to the targets of every controlled unitary.
+    ///   Each consumer leaves the register prepared.
     struct StandardPhaseEstimationParams {
         statePrep : Qubit[] => Unit is Adj,
         controlledUnitary : ((Qubit, Qubit[]) => Unit is Adj)[],
@@ -24,6 +33,10 @@ namespace QDKChemistry.Utils.StandardPhaseEstimation {
         ancillas : Int[],
         systems : Int[],
         numAncillaQubits : Int,
+        prepareSharedOp : Qubit[] => Unit is Adj + Ctl,
+        numSharedAncillas : Int,
+        statePrepUsesShared : Bool,
+        unitaryUsesShared : Bool,
     }
 
     /// Runs the standard Quantum Phase Estimation (QPE) circuit based on the provided parameters.
@@ -34,26 +47,33 @@ namespace QDKChemistry.Utils.StandardPhaseEstimation {
     /// - `params`: A `StandardPhaseEstimationParams` struct.
     /// - `qs`: The register to act on, indexed by `params.ancillas` and `params.systems`.
     operation RunStandardQPE(params : StandardPhaseEstimationParams, qs : Qubit[]) : Unit is Adj {
+        Fact(
+            params.numSharedAncillas > 0 or not (params.statePrepUsesShared or params.unitaryUsesShared),
+            "consuming shared ancillas requires a non-empty shared register"
+        );
         let ancillas = Subarray(params.ancillas, qs);
         let systems = Subarray(params.systems, qs);
-        let unitaryAncillas = if params.numAncillaQubits == 0 {
-            []
-        } else {
-            qs[params.numBits + Length(params.systems)..Length(qs) - 1]
-        };
-        let allTargets = systems + unitaryAncillas;
+        let ancillaStart = params.numBits + Length(params.systems);
+        let unitaryAncillas = qs[ancillaStart..ancillaStart + params.numAncillaQubits - 1];
+        let sharedStart = ancillaStart + params.numAncillaQubits;
+        let shared = qs[sharedStart..sharedStart + params.numSharedAncillas - 1];
+        let unitaryTargets = systems + unitaryAncillas + (params.unitaryUsesShared ? shared | []);
 
-        // Step 1: Prepare the initial state on system qubits
-        params.statePrep(systems);
+        within {
+            params.prepareSharedOp(shared);
+        } apply {
+            // Step 1: Prepare the initial state on system qubits
+            params.statePrep(params.statePrepUsesShared ? systems + shared | systems);
 
-        // Step 2: Prepare phase (ancilla) qubits
-        params.phaseQubitPrep(ancillas);
+            // Step 2: Prepare phase (ancilla) qubits
+            params.phaseQubitPrep(ancillas);
 
-        // Step 3: Apply controlled-U^(2^k) for each ancilla qubit k
-        // Each controlledUnitary[k] already implements the correct power.
-        // ApplyQFT uses big-endian: ancillas[0] = MSB, so ancillas[0] controls U^(2^(n-1))
-        for ancillaIdx in 0..params.numBits - 1 {
-            params.controlledUnitary[ancillaIdx](ancillas[ancillaIdx], allTargets);
+            // Step 3: Apply controlled-U^(2^k) for each ancilla qubit k
+            // Each controlledUnitary[k] already implements the correct power.
+            // ApplyQFT uses big-endian: ancillas[0] = MSB, so ancillas[0] controls U^(2^(n-1))
+            for ancillaIdx in 0..params.numBits - 1 {
+                params.controlledUnitary[ancillaIdx](ancillas[ancillaIdx], unitaryTargets);
+            }
         }
 
         // Step 4: Apply inverse QFT on ancilla qubits
@@ -72,6 +92,10 @@ namespace QDKChemistry.Utils.StandardPhaseEstimation {
         systems : Int[],
         phaseQubitPrep : Qubit[] => Unit is Adj,
         numAncillaQubits : Int,
+        prepareSharedOp : Qubit[] => Unit is Adj + Ctl,
+        numSharedAncillas : Int,
+        statePrepUsesShared : Bool,
+        unitaryUsesShared : Bool,
     ) : Qubit[] => Unit is Adj {
         RunStandardQPE(
             new StandardPhaseEstimationParams {
@@ -82,6 +106,10 @@ namespace QDKChemistry.Utils.StandardPhaseEstimation {
                 ancillas = ancillas,
                 systems = systems,
                 numAncillaQubits = numAncillaQubits,
+                prepareSharedOp = prepareSharedOp,
+                numSharedAncillas = numSharedAncillas,
+                statePrepUsesShared = statePrepUsesShared,
+                unitaryUsesShared = unitaryUsesShared,
             },
             _
         )
@@ -97,7 +125,14 @@ namespace QDKChemistry.Utils.StandardPhaseEstimation {
     /// - `systems`: An array of indices for the system qubits.
     /// - `phaseQubitPrep`: A function to prepare the phase qubits (e.g., Hadamard on all).
     /// - `numAncillaQubits`: Number of extra ancilla qubits needed by the controlled unitary (0 for Trotter).
+    /// - `prepareSharedOp`: Prepares the shared register once around the state preparation and every
+    ///   controlled unitary.
+    /// - `numSharedAncillas`: Size of the shared register, placed after the unitary's ancillas.
+    /// - `statePrepUsesShared`: Append the shared register to the system qubits `statePrep` acts on.
+    /// - `unitaryUsesShared`: Append the shared register to the targets of every controlled unitary.
     /// - `measurePhase`: Measure the ancilla qubits. When `false` nothing is measured.
+    /// - `computeCapacity`: Positive logical-qubit capacity to enable least-recently-used memory
+    ///   placement, or -1 to keep all logical qubits in compute.
     /// # Returns
     /// The measurement results of the ancilla qubits, or an empty array when `measurePhase` is `false`.
     operation MakeStandardQPECircuit(
@@ -108,9 +143,21 @@ namespace QDKChemistry.Utils.StandardPhaseEstimation {
         systems : Int[],
         phaseQubitPrep : Qubit[] => Unit is Adj,
         numAncillaQubits : Int,
+        prepareSharedOp : Qubit[] => Unit is Adj + Ctl,
+        numSharedAncillas : Int,
+        statePrepUsesShared : Bool,
+        unitaryUsesShared : Bool,
         measurePhase : Bool,
+        computeCapacity : Int,
     ) : Result[] {
-        let totalQubits = numBits + Length(systems) + numAncillaQubits;
+        Fact(computeCapacity == -1 or computeCapacity > 0, "computeCapacity must be -1 or positive");
+
+        if computeCapacity > 0 {
+            EnableMemoryComputeArchitecture(computeCapacity, LeastRecentlyUsed());
+        }
+
+        Fact(numSharedAncillas >= 0, "numSharedAncillas must be non-negative");
+        let totalQubits = numBits + Length(systems) + numAncillaQubits + numSharedAncillas;
         use qs = Qubit[totalQubits];
         RunStandardQPE(
             new StandardPhaseEstimationParams {
@@ -121,6 +168,10 @@ namespace QDKChemistry.Utils.StandardPhaseEstimation {
                 ancillas = ancillas,
                 systems = systems,
                 numAncillaQubits = numAncillaQubits,
+                prepareSharedOp = prepareSharedOp,
+                numSharedAncillas = numSharedAncillas,
+                statePrepUsesShared = statePrepUsesShared,
+                unitaryUsesShared = unitaryUsesShared,
             },
             qs
         );

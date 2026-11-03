@@ -7,10 +7,13 @@
 #include <algorithm>
 #include <fstream>
 #include <iostream>
+#include <map>
 #include <qdk/chemistry/data/basis_set.hpp>
 #include <qdk/chemistry/data/structure.hpp>
+#include <qdk/chemistry/utils/basis_archive.hpp>
 #include <qdk/chemistry/utils/logger.hpp>
 #include <regex>
+#include <set>
 #include <sstream>
 #include <stdexcept>
 
@@ -19,6 +22,10 @@
 #include "json_serialization.hpp"
 
 namespace qdk::chemistry::data {
+
+// Serialization version that stored each atom's local ECP term at its highest
+// angular momentum, retained so legacy files load with that term as UL.
+static constexpr const char* LEGACY_ECP_SERIALIZATION_VERSION = "0.1.0";
 
 namespace detail {
 
@@ -34,73 +41,6 @@ std::string denormalize_basis_set_name(const std::string& normalized) {
   name = std::regex_replace(name, std::regex("_sl_"), "/");
   name = std::regex_replace(name, std::regex("_pl_"), "+");
   return name;
-}
-
-/**
- * @brief Unpack the basis set archive and return the path to the temporary
- * directory containing the extracted files.
- * @param basis_set_name Name of the basis set to unpack.
- * @return Path to the temporary directory with extracted files.
- */
-std::filesystem::path unpack_basis_set_archive(std::string& basis_set_name) {
-  // Normalize the basis set name for filesystem operations
-  std::string normalized_name = normalize_basis_set_name(basis_set_name);
-  std::filesystem::path file_path =
-      qdk::chemistry::scf::QDKChemistryConfig::get_resources_dir() /
-      "compressed" / (normalized_name + ".tar.gz");
-
-  if (!std::filesystem::exists(file_path)) {
-    throw std::invalid_argument("Basis set file does not exist: " +
-                                file_path.string());
-  }
-
-  // create temporary directory to extract the tar.gz file
-  std::filesystem::path temp_dir =
-      std::filesystem::temp_directory_path() / "qdk" / "chemistry";
-  if (!std::filesystem::exists(temp_dir)) {
-    std::filesystem::create_directories(temp_dir);
-  }
-
-  // unpack the tar.gz file
-  // On Windows, GNU tar needs --force-local so it doesn't treat "C:/..." as a
-  // host:path. BSD tar (System32\tar.exe) rejects the flag, detect at runtime.
-#ifdef _WIN32
-  static const bool tar_has_force_local =
-      (std::system("tar --force-local --version > nul 2>&1") == 0);
-  const std::string tar_cmd =
-      tar_has_force_local ? "tar --force-local -xzf " : "tar -xzf ";
-#else
-  const std::string tar_cmd = "tar -xzf ";
-#endif
-  auto cmd = tar_cmd + "\"" + file_path.generic_string() + "\" --directory \"" +
-             temp_dir.generic_string() + "\"";
-  int return_code = std::system(cmd.c_str());
-  if (return_code != 0) {
-    throw std::runtime_error("command execution failed: " + cmd);
-  }
-
-  return temp_dir;
-}
-
-/**
- * @brief Get the correct basis set JSON file path after unpacking the archive.
- * @param basis_set_name Name of the basis set.
- * @return Path to the basis set JSON file.
- */
-std::filesystem::path get_correct_basis_set_file(std::string& basis_set_name) {
-  // unpack basis set archive
-  std::filesystem::path temp_dir = unpack_basis_set_archive(basis_set_name);
-
-  // Normalize the basis set name for the JSON file path
-  std::string normalized_name = normalize_basis_set_name(basis_set_name);
-  // return path to the extracted JSON file
-  std::filesystem::path json_file_path =
-      temp_dir / "basis" / (normalized_name + ".json");
-  if (!std::filesystem::exists(json_file_path)) {
-    throw std::invalid_argument("Basis set JSON file does not exist: " +
-                                json_file_path.string());
-  }
-  return json_file_path;
 }
 
 /**
@@ -161,6 +101,35 @@ void sort_shells_inplace(std::vector<Shell>& shells) {
   std::stable_sort(shells.begin(), shells.end(), shell_comparator);
 }
 
+// Labels each atom's highest ECP channel UL unless the atom already has one.
+void relabel_legacy_ecp_shells(std::vector<Shell>& ecp_shells) {
+  std::map<size_t, OrbitalType> highest;
+  std::set<size_t> has_local;
+  for (const auto& sh : ecp_shells) {
+    if (sh.orbital_type == OrbitalType::UL) {
+      has_local.insert(sh.atom_index);
+    }
+    auto it = highest.try_emplace(sh.atom_index, sh.orbital_type).first;
+    it->second = std::max(it->second, sh.orbital_type);
+  }
+  bool relabeled = false;
+  for (auto& sh : ecp_shells) {
+    if (!has_local.contains(sh.atom_index) &&
+        sh.orbital_type == highest[sh.atom_index]) {
+      sh.orbital_type = OrbitalType::UL;
+      relabeled = true;
+    }
+  }
+  if (relabeled) {
+    QDK_LOGGER().warn(
+        "BasisSet serialization version {} stored each atom's local ECP term "
+        "at its highest angular momentum; it was relabeled UL on load. To "
+        "update the file, migrate it with: python -m qdk_chemistry.migrate "
+        "<old_file> <new_file>.",
+        LEGACY_ECP_SERIALIZATION_VERSION);
+  }
+}
+
 /**
  * @brief Get basis set shells and ECP information for a given nuclear charge.
  * @param nuclear_charge Nuclear charge of the element.
@@ -175,10 +144,8 @@ std::tuple<std::vector<Shell>, std::vector<Shell>, size_t>
 get_basis_for_nuclear_charge(const double nuclear_charge,
                              std::string basis_set_name,
                              const size_t atom_index) {
-  std::filesystem::path json_file_path =
-      get_correct_basis_set_file(basis_set_name);
-
-  std::ifstream fin(json_file_path);
+  const utils::BasisArchive archive(basis_set_name);
+  std::ifstream fin(archive.json());
   auto data = nlohmann::json::parse(fin);
 
   // extract basis set information for each nuclear charge
@@ -251,6 +218,15 @@ get_basis_for_nuclear_charge(const double nuclear_charge,
       Shell sh{atom_index, static_cast<OrbitalType>(am_entry[0]), exponents,
                coefficients, rpowers};
       ecp_shells.push_back(sh);
+    }
+    // The basis library stores the local term at the highest angular momentum.
+    const auto local_term =
+        std::max_element(ecp_shells.begin(), ecp_shells.end(),
+                         [](const Shell& lhs, const Shell& rhs) {
+                           return lhs.orbital_type < rhs.orbital_type;
+                         });
+    if (local_term != ecp_shells.end()) {
+      local_term->orbital_type = OrbitalType::UL;
     }
   }
   return {shells, ecp_shells, num_ecp_elecs};
@@ -1715,7 +1691,10 @@ std::shared_ptr<BasisSet> BasisSet::from_hdf5(H5::Group& group) {
     H5::Attribute version_attr = group.openAttribute("version");
     std::string version_str;
     version_attr.read(string_type, version_str);
-    validate_serialization_version(SERIALIZATION_VERSION, version_str);
+    const bool legacy_ecp = version_str == LEGACY_ECP_SERIALIZATION_VERSION;
+    validate_serialization_version(
+        legacy_ecp ? LEGACY_ECP_SERIALIZATION_VERSION : SERIALIZATION_VERSION,
+        version_str);
 
     // Load metadata
     H5::Group metadata_group = group.openGroup("metadata");
@@ -1907,6 +1886,10 @@ std::shared_ptr<BasisSet> BasisSet::from_hdf5(H5::Group& group) {
       }
     }
 
+    if (legacy_ecp) {
+      detail::relabel_legacy_ecp_shells(ecp_shells);
+    }
+
     // Load ECP name and electrons
     std::string ecp_name;
     std::vector<size_t> ecp_electrons;
@@ -2063,7 +2046,10 @@ std::shared_ptr<BasisSet> BasisSet::from_json(const nlohmann::json& j) {
     if (!j.contains("version")) {
       throw std::runtime_error("Invalid JSON: missing version field");
     }
-    validate_serialization_version(SERIALIZATION_VERSION, j["version"]);
+    const bool legacy_ecp = j["version"] == LEGACY_ECP_SERIALIZATION_VERSION;
+    validate_serialization_version(
+        legacy_ecp ? LEGACY_ECP_SERIALIZATION_VERSION : SERIALIZATION_VERSION,
+        j["version"]);
 
     std::string name = j.value("name", "");
 
@@ -2259,6 +2245,10 @@ std::shared_ptr<BasisSet> BasisSet::from_json(const nlohmann::json& j) {
                               shell_coefficients);
         }
       }
+    }
+
+    if (legacy_ecp) {
+      detail::relabel_legacy_ecp_shells(ecp_shells);
     }
 
     // Load ECP name and electrons if present

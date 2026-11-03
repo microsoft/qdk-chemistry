@@ -7,25 +7,35 @@
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, TypeVar
 
 import networkx as nx
 
 from qdk_chemistry.algorithms.term_grouper.base import TermGrouper
-from qdk_chemistry.data import FlatPartition, QubitOperator
-from qdk_chemistry.utils.pauli_commutation import do_pauli_labels_commute, do_pauli_labels_qw_commute
+from qdk_chemistry.data import FlatPartition
+from qdk_chemistry.data.qubit_operator.containers.sparse_pauli_decomposition import SparsePauliDecompositionContainer
+from qdk_chemistry.utils.pauli_commutation import (
+    do_pauli_labels_commute,
+    do_pauli_labels_qw_commute,
+    do_pauli_maps_commute,
+    do_pauli_maps_qw_commute,
+)
 
 if TYPE_CHECKING:
-    from collections.abc import Callable
+    from collections.abc import Callable, Sequence
+
+    from qdk_chemistry.data import QubitOperator
 
 __all__ = ["NxFullCommutingTermGrouper", "NxQubitWiseCommutingTermGrouper"]
 
+_Term = TypeVar("_Term")
+
 
 def _dsatur_commutation_grouping(
-    pauli_strings: list[str],
-    commutes: Callable[[str, str], bool],
+    pauli_strings: Sequence[_Term],
+    commutes: Callable[[_Term, _Term], bool],
 ) -> tuple[tuple[int, ...], ...]:
-    """Partition Pauli labels using networkx DSATUR graph coloring.
+    """Partition Pauli terms using networkx DSATUR graph coloring.
 
     Builds the non-commutation graph (vertices = Pauli terms, edges between
     non-commuting pairs) and colors it using the saturation-largest-first
@@ -33,8 +43,8 @@ def _dsatur_commutation_grouping(
     saturation degree (most distinct colors among neighbours).
 
     Args:
-        pauli_strings: Pauli labels to partition.
-        commutes: Predicate returning ``True`` when two labels commute.
+        pauli_strings: Pauli labels or sparse Pauli maps to partition.
+        commutes: Predicate returning ``True`` when two terms commute.
 
     Returns:
         Tuple of groups; each group is a tuple of indices into ``pauli_strings``.
@@ -60,6 +70,19 @@ def _dsatur_commutation_grouping(
     return tuple(tuple(indices) for indices in color_to_indices.values())
 
 
+def _dsatur_partition(
+    qubit_hamiltonian: QubitOperator,
+    label_commutes: Callable[[str, str], bool],
+    map_commutes: Callable[[dict[int, str], dict[int, str]], bool],
+) -> tuple[tuple[int, ...], ...]:
+    """Color the non-commutation graph, comparing sparse words without building labels."""
+    container = qubit_hamiltonian.get_container()
+    if isinstance(container, SparsePauliDecompositionContainer):
+        maps = [dict(word) for word, _ in container.iter_sparse_terms()]
+        return _dsatur_commutation_grouping(maps, map_commutes)
+    return _dsatur_commutation_grouping(qubit_hamiltonian.pauli_strings, label_commutes)
+
+
 class NxFullCommutingTermGrouper(TermGrouper):
     """Group terms by full Pauli commutation using networkx DSATUR.
 
@@ -83,15 +106,9 @@ class NxFullCommutingTermGrouper(TermGrouper):
             QubitOperator: New instance with a ``FlatPartition`` (strategy ``"nx_commuting"``).
 
         """
-        groups = _dsatur_commutation_grouping(qubit_hamiltonian.pauli_strings, do_pauli_labels_commute)
+        groups = _dsatur_partition(qubit_hamiltonian, do_pauli_labels_commute, do_pauli_maps_commute)
         partition = FlatPartition(strategy="nx_commuting", groups=groups)
-        return QubitOperator(
-            pauli_strings=list(qubit_hamiltonian.pauli_strings),
-            coefficients=qubit_hamiltonian.coefficients.copy(),
-            encoding=qubit_hamiltonian.encoding,
-            fermion_mode_order=qubit_hamiltonian.fermion_mode_order,
-            term_partition=partition,
-        )
+        return self._with_partition(qubit_hamiltonian, partition)
 
 
 class NxQubitWiseCommutingTermGrouper(TermGrouper):
@@ -117,12 +134,6 @@ class NxQubitWiseCommutingTermGrouper(TermGrouper):
             QubitOperator: New instance with a ``FlatPartition`` (strategy ``"nx_qubit_wise_commuting"``).
 
         """
-        groups = _dsatur_commutation_grouping(qubit_hamiltonian.pauli_strings, do_pauli_labels_qw_commute)
+        groups = _dsatur_partition(qubit_hamiltonian, do_pauli_labels_qw_commute, do_pauli_maps_qw_commute)
         partition = FlatPartition(strategy="nx_qubit_wise_commuting", groups=groups)
-        return QubitOperator(
-            pauli_strings=list(qubit_hamiltonian.pauli_strings),
-            coefficients=qubit_hamiltonian.coefficients.copy(),
-            encoding=qubit_hamiltonian.encoding,
-            fermion_mode_order=qubit_hamiltonian.fermion_mode_order,
-            term_partition=partition,
-        )
+        return self._with_partition(qubit_hamiltonian, partition)

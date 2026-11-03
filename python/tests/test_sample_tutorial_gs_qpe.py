@@ -40,8 +40,6 @@ from .test_sample_workflow_utils import (
     _requires_notebook_deps,
 )
 
-# Environment variable to enable slow tests (including notebook e2e tests)
-_RUN_SLOW_TESTS = os.getenv("QDK_CHEMISTRY_RUN_SLOW_TESTS", "").lower() in {"1", "true", "yes"}
 _RUN_TUTORIAL_SNAPSHOTS = os.getenv("QDK_CHEMISTRY_RUN_TUTORIAL_SNAPSHOTS", "").lower() in {
     "1",
     "true",
@@ -60,6 +58,12 @@ COMPLETED_LAB_NOTEBOOK = (
 )
 TUTORIAL_VERSIONS_FILE = Path(__file__).parent.parent.parent / "docs" / "source" / "tutorials" / "_versions.py"
 GROUND_STATE_TUTORIAL_VERSION = str(runpy.run_path(str(TUTORIAL_VERSIONS_FILE))["GROUND_STATE_TUTORIAL_VERSION"])
+
+
+@pytest.fixture
+def notebook_inline_backend(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Enable rich figure outputs in notebook kernels even when CI uses Agg."""
+    monkeypatch.setenv("MPLBACKEND", "module://matplotlib_inline.backend_inline")
 
 
 def _assert_notebook_library_logs_suppressed(notebook) -> None:
@@ -594,10 +598,6 @@ def test_tutorial_run_iqpe_configuration(capsys):
 
 @pytest.mark.slow
 @pytest.mark.tutorial_baseline
-@pytest.mark.skipif(
-    not _RUN_SLOW_TESTS,
-    reason="Skipping slow test. Set QDK_CHEMISTRY_RUN_SLOW_TESTS=1 to enable.",
-)
 def test_tutorial_run_iqpe_simulation():
     """Check one seeded IQPE run against its configured phase-grid target."""
     _load_tutorial_module("tutorial_choose_active_space")
@@ -617,6 +617,7 @@ def test_tutorial_run_iqpe_simulation():
     not _HAS_JUPYTER_KERNEL,
     reason="Jupyter kernel 'python3' not available. Install ipykernel and register the kernel.",
 )
+@pytest.mark.usefixtures("notebook_inline_backend")
 def test_tutorial_choose_active_space_notebook():
     """Test the Chapter 3 notebook chemistry and rich visualization outputs."""
     notebook_path = DOCS_PYTHON_EXAMPLES_DIR / "tutorial_choose_active_space.ipynb"
@@ -679,6 +680,7 @@ def test_tutorial_choose_active_space_notebook():
     not _HAS_JUPYTER_KERNEL,
     reason="Jupyter kernel 'python3' not available. Install ipykernel and register the kernel.",
 )
+@pytest.mark.usefixtures("notebook_inline_backend")
 def test_tutorial_prepare_trial_state_notebook():
     """Test the Chapter 5 notebook circuit data and rich outputs."""
     notebook_path = DOCS_PYTHON_EXAMPLES_DIR / "tutorial_prepare_trial_state.ipynb"
@@ -740,6 +742,7 @@ def test_tutorial_prepare_trial_state_notebook():
     not _HAS_JUPYTER_KERNEL,
     reason="Jupyter kernel 'python3' not available. Install ipykernel and register the kernel.",
 )
+@pytest.mark.usefixtures("notebook_inline_backend")
 def test_tutorial_visualize_iqpe_circuit_notebook():
     """Test the Chapter 6 notebook circuit construction and rich outputs."""
     notebook_path = DOCS_PYTHON_EXAMPLES_DIR / "tutorial_visualize_iqpe_circuit.ipynb"

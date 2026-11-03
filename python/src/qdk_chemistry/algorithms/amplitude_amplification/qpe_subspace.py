@@ -13,6 +13,7 @@ from qdk_chemistry.data import AlgorithmRef, Circuit, QubitOperator, Settings
 from qdk_chemistry.data.circuit import QsharpFactoryData
 from qdk_chemistry.data.unitary_representation.containers.base import UnitaryContainer
 from qdk_chemistry.data.unitary_representation.containers.quantum_walk import QuantumWalkContainer
+from qdk_chemistry.data.unitary_representation.containers.sossa import SOSSABlockEncodingContainer
 from qdk_chemistry.utils import Logger
 from qdk_chemistry.utils.qsharp import QSHARP_UTILS
 
@@ -112,7 +113,7 @@ class QPESubspaceMarking(Algorithm):
         for phase_bin in range(phase_bin_count):
             canonical_bin = (
                 min(phase_bin, phase_bin_count - phase_bin)
-                if isinstance(container, QuantumWalkContainer)
+                if isinstance(container, QuantumWalkContainer | SOSSABlockEncodingContainer)
                 else phase_bin
             )
             if container.eigenvalue_from_phase(canonical_bin / phase_bin_count) < energy_lower_bound:
@@ -166,8 +167,11 @@ class QPESubspaceMarking(Algorithm):
             raise ValueError(f"The nested qpe_circuit_builder needs a positive num_bits. Got {num_bits}.")
 
         num_system_qubits = qubit_hamiltonian.num_qubits
-        unitary = create_from_ref(builder.settings(), "unitary_builder").run(qubit_hamiltonian)
-        num_signal_ancillas = unitary.get_num_qubits() - num_system_qubits
+        # The QPE builder overrides the unitary's power per phase bit, so marking must
+        # use the base (power=1) unitary.
+        unitary_builder = create_from_ref(builder.settings(), "unitary_builder")
+        unitary_builder.settings().update("power", 1)
+        unitary = unitary_builder.run(qubit_hamiltonian)
         bin_ranges = self._marked_phase_bins(energy_lower_bound, unitary.get_container(), num_bits)
         lower_bounds = [start for start, _ in bin_ranges]
         upper_bounds = [stop for _, stop in bin_ranges]
@@ -185,6 +189,12 @@ class QPESubspaceMarking(Algorithm):
         qpe_operation = qpe_circuit._qsharp_op  # noqa: SLF001
         if qpe_operation is None:
             raise RuntimeError("Failed to create the subspace oracle: the Q# phase estimation is not available.")
+        # The QPE register holds the phase and system qubits, then every ancilla the controlled unitaries need,
+        # including scratch their mapper adds and the shared phase gradient, none of which the container counts.
+        if qpe_circuit.num_qubits is None:
+            num_signal_ancillas = unitary.get_num_qubits() - num_system_qubits
+        else:
+            num_signal_ancillas = qpe_circuit.num_qubits - num_bits - num_system_qubits
 
         amplification = QSHARP_UTILS.AmplitudeAmplification
         parameters = {
