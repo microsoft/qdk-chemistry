@@ -134,3 +134,32 @@ def eightfold_average(eri: np.ndarray, consumer: str) -> np.ndarray:
             "Hamiltonians saved by earlier versions, rebuild the Hamiltonian."
         )
     return average
+
+
+def pair_average(eri: np.ndarray, consumer: str) -> np.ndarray:
+    """Average an alpha-beta ``(pq|rs)`` block over ``(pq|rs)``, ``(qp|rs)``, ``(pq|sr)`` and ``(qp|sr)``.
+
+    Args:
+        eri: Two-body integrals of shape ``(n, n, n, n)``.
+        consumer: Name used in error messages.
+
+    Returns:
+        The average, of the same shape.
+
+    Raises:
+        ValueError: If the tensor has a non-finite value or is not symmetric under these swaps.
+
+    """
+    _require_finite(eri, consumer)
+    views = [eri, eri.transpose(1, 0, 2, 3), eri.transpose(0, 1, 3, 2), eri.transpose(1, 0, 3, 2)]
+    average = np.empty_like(eri)
+    for index, (a, b, c, d) in enumerate(zip(*views, strict=True)):
+        average[index] = ((a + b) + (c + d)) / 4
+    difference, eri_norm, average_norm = _squared_norms(eri, average)
+    if difference > _PRECISION**2 * min(eri_norm, average_norm):
+        raise ValueError(
+            f"{consumer} requires two-body integrals with pair permutation symmetry, (pq|rs) = (qp|rs) = (pq|sr); "
+            f"they differ from their pair average by {np.sqrt(difference / eri_norm):.1e} relative to their norm. "
+            "If this is round-off, as in Hamiltonians saved by earlier versions, rebuild the Hamiltonian."
+        )
+    return average
