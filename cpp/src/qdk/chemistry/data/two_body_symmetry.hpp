@@ -298,20 +298,6 @@ inline bool factors_are_pair_symmetric(const double* factors, std::size_t n,
   return true;
 }
 
-/// Replaces three-center factors, column-major [n^2 x naux], by
-/// (L_pq + L_qp) / 2.
-inline void pair_symmetrize_factors(double* factors, std::size_t n,
-                                    std::size_t naux) {
-  const std::size_t n2 = n * n;
-  for (std::size_t aux = 0; aux < naux; ++aux)
-    for (std::size_t p = 0; p < n; ++p)
-      for (std::size_t q = p + 1; q < n; ++q) {
-        double& forward = factors[p * n + q + aux * n2];
-        double& reverse = factors[q * n + p + aux * n2];
-        forward = reverse = 0.5 * (forward + reverse);
-      }
-}
-
 /// Literal sparse two-body tensor: positions that are absent are zero.
 using SparseTwoBodyTensor = std::map<TwoBodyKey, double>;
 
