@@ -538,7 +538,7 @@ Args:
     shell_index (int): Global index of the ECP shell
 
 Returns:
-    Shell: Copy of the specified ECP shell. Modifying it does not change the basis set
+    Shell: Reference to the specified ECP shell
 
 Raises:
     IndexError: If ECP shell index is out of range
