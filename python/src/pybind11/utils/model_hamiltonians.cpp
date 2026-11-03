@@ -189,7 +189,8 @@ Args:
     epsilon (float or numpy.ndarray): On-site orbital energy/energies.
     t (float or numpy.ndarray): Hopping integral(s).
     U (float or numpy.ndarray): On-site Coulomb repulsion(s).
-    V (float or numpy.ndarray): Intersite Coulomb interaction(s).
+    V (float or numpy.ndarray): Intersite Coulomb interaction(s); only the
+        symmetric part (V + V^T)/2 of a matrix enters the Hamiltonian.
     z (float or numpy.ndarray): Effective core charge(s).
 
 Returns:

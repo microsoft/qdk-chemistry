@@ -70,7 +70,7 @@ def _spatial_to_spinorb_two_body(
 
     OpenFermion defines ``h[p,q,r,s]`` via
     ``H₂ = ½ Σ h[p,q,r,s] a†_p a†_q a_r a_s``, which in physicist (Dirac)
-    notation is ``⟨pq|sr⟩``, or equivalently ``(ps|rq)`` in chemist notation.
+    notation is ``⟨pq|sr⟩``, or equivalently ``(ps|qr)`` in chemist notation.
 
     Args:
         h2_aaaa: Alpha-alpha two-body integrals in chemist notation, shape ``(norb, norb, norb, norb)``.
@@ -85,30 +85,22 @@ def _spatial_to_spinorb_two_body(
     norb = h2_aaaa.shape[0]
     n_spinorb = 2 * norb
 
-    # Convert chemist notation (pq|rs) to physicist notation <pr|qs>
-    # OpenFermion InteractionOperator convention: h[p,q,r,s] for a†_p a†_q a_r a_s
-    # which is <pq|sr> in physicist notation = (ps|rq) in chemist notation
     h2_so = np.zeros((n_spinorb, n_spinorb, n_spinorb, n_spinorb), dtype=float)
-
-    # The loop body assigns h2_so[2p,2q,2r,2s] = h2_aaaa[p,s,r,q], i.e. a
-    # transpose (0,3,2,1) of the source block placed into even-index slots.
-    # The same pattern applies to every spin block.
 
     # Slice objects for even (alpha) and odd (beta) spin-orbital indices
     e = slice(0, n_spinorb, 2)  # even: 0,2,4,...
     o = slice(1, n_spinorb, 2)  # odd:  1,3,5,...
 
     # alpha-alpha block
-    h2_so[e, e, e, e] = h2_aaaa.transpose(0, 3, 2, 1)
+    h2_so[e, e, e, e] = h2_aaaa.transpose(0, 2, 3, 1)
 
     # beta-beta block
-    h2_so[o, o, o, o] = h2_bbbb.transpose(0, 3, 2, 1)
+    h2_so[o, o, o, o] = h2_bbbb.transpose(0, 2, 3, 1)
 
-    # alpha-beta block: h2_so[2p, 2q+1, 2r+1, 2s] = h2_aabb[p,s,r,q]
-    h2_so[e, o, o, e] = h2_aabb.transpose(0, 3, 2, 1)
+    # alpha-beta and beta-alpha blocks
+    h2_so[e, o, o, e] = h2_aabb.transpose(0, 2, 3, 1)
 
-    # beta-alpha block: h2_so[2p+1, 2q, 2r, 2s+1] = h2_aabb[q,r,s,p]
-    h2_so[o, e, e, o] = h2_aabb.transpose(3, 0, 1, 2)
+    h2_so[o, e, e, o] = h2_aabb.transpose(2, 0, 1, 3)
 
     return h2_so
 
@@ -141,21 +133,31 @@ def hamiltonian_to_interaction_operator(
     Logger.trace_entering()
 
     h1_alpha, h1_beta = hamiltonian.get_one_body_integrals()
-    h2_aaaa_flat, h2_aabb_flat, h2_bbbb_flat = hamiltonian.get_two_body_integrals()
-    core_energy = hamiltonian.get_core_energy()
-
     norb = h1_alpha.shape[0]
-    h2_aaaa = h2_aaaa_flat.reshape((norb, norb, norb, norb))
+    h2_aaaa, h2_aabb, h2_bbbb = (
+        np.reshape(tensor, (norb, norb, norb, norb)) for tensor in hamiltonian.get_two_body_integrals()
+    )
+    return _interaction_operator(
+        (h1_alpha, h1_beta), (h2_aaaa, h2_aabb, h2_bbbb), hamiltonian.get_core_energy(), hamiltonian.is_restricted()
+    )
 
-    if hamiltonian.is_restricted():
+
+def _interaction_operator(
+    one_body: tuple[np.ndarray, np.ndarray],
+    two_body: tuple[np.ndarray, np.ndarray, np.ndarray],
+    core_energy: float,
+    restricted: bool,
+) -> "of.InteractionOperator":
+    """Build the InteractionOperator of spatial integrals, as in :func:`hamiltonian_to_interaction_operator`."""
+    h1_alpha, h1_beta = one_body
+    h2_aaaa, h2_aabb, h2_bbbb = two_body
+    if restricted:
         Logger.debug("Using restricted (RHF) integral conversion via spinorb_from_spatial.")
         # Convert chemist notation (pq|rs) to physicist notation <pr|qs>
         h2_phys = np.transpose(h2_aaaa, (0, 2, 3, 1))
         one_body_so, two_body_so = of.chem.molecular_data.spinorb_from_spatial(h1_alpha, h2_phys)
         return of.InteractionOperator(core_energy, one_body_so, 0.5 * two_body_so)
     Logger.debug("Using unrestricted (UHF) integral conversion with explicit spin channels.")
-    h2_aabb = h2_aabb_flat.reshape((norb, norb, norb, norb))
-    h2_bbbb = h2_bbbb_flat.reshape((norb, norb, norb, norb))
 
     one_body_so = _spatial_to_spinorb_one_body(h1_alpha, h1_beta)
     two_body_so = _spatial_to_spinorb_two_body(h2_aaaa, h2_aabb, h2_bbbb)

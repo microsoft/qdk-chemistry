@@ -165,6 +165,15 @@ def sparse_rank4_dict(entries, norb: int) -> dict:
     return _serialize(sparse_map)
 
 
+def sparse_rank4_entries(doc: dict) -> list:
+    """``[p, q, r, s, v]`` entries of a restricted rank-4 ``SymmetryBlockedSparseMap`` JSON."""
+    with tempfile.TemporaryDirectory() as tmp:
+        path = Path(tmp) / "m.json"
+        path.write_text(json.dumps(doc), encoding="utf-8")
+        sparse_map = _sym.SymmetryBlockedSparseMapRank4.from_json_file(str(path))
+    return [[*index, value] for index, value in sparse_map.block((_ALPHA,) * 4).items()]
+
+
 def rank4_rdm_dict(aaaa, aabb, bbbb: np.ndarray | None = None) -> dict:
     """Rank-4 SBT JSON for a spin-dependent active 2-RDM.
 
