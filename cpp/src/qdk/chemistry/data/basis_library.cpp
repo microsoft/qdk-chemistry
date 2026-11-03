@@ -12,6 +12,7 @@
 #include <filesystem>
 #include <fstream>
 #include <nlohmann/json.hpp>
+#include <qdk/chemistry/utils/basis_archive.hpp>
 #include <regex>
 #include <stdexcept>
 
@@ -129,21 +130,16 @@ get_basis_for_nuclear_charge(const double nuclear_charge,
       // fill exponents and coefficients
       std::vector<double> exponents;
       std::vector<double> coefficients;
-      std::vector<int> rpowers;
-      int power = 0;
       for (size_t k = 0; k < shell["exponents"].size(); k++) {
         exponents.push_back(
             std::stod(shell["exponents"][k].get<std::string>()));
         coefficients.push_back(
             std::stod(shell["coefficients"][i][k].get<std::string>()));
-        rpowers.push_back(0);
-        power++;
       }
 
       // create shell and add to list
-      Shell sh{atom_index, static_cast<OrbitalType>(momentum), exponents,
-               coefficients, rpowers};
-      shells.push_back(sh);
+      shells.emplace_back(atom_index, static_cast<OrbitalType>(momentum),
+                          exponents, coefficients);
     }
   }
 
