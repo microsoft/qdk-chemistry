@@ -6,6 +6,7 @@
 # --------------------------------------------------------------------------------------------
 
 import numpy as np
+import pytest
 
 from qdk_chemistry import algorithms
 from qdk_chemistry.algorithms import (
@@ -19,8 +20,20 @@ from qdk_chemistry.data import (
 )
 from qdk_chemistry.data._spin_channels import spin_channel_matrix
 from qdk_chemistry.data.symmetry import axes
+from qdk_chemistry.utils import Logger
 
 from .reference_tolerances import float_comparison_absolute_tolerance
+
+
+@pytest.fixture
+def scf_diagnostic_logging():
+    """Keep SCF diagnostics enabled independently of earlier logger tests."""
+    previous_level = Logger.get_global_level()
+    Logger.set_global_level("debug")
+    try:
+        yield
+    finally:
+        Logger.set_global_level(previous_level)
 
 
 class TestNaturalOrbitalLocalizerBindings:
@@ -51,6 +64,7 @@ class TestNaturalOrbitalLocalizerBindings:
         settings = localizer.settings()
         assert settings is not None
 
+    @pytest.mark.usefixtures("scf_diagnostic_logging")
     def test_stretched_n2_has_fractional_occupations(self):
         """Stretched N2 with broken-symmetry UKS should yield fractional NOONs."""
         structure = Structure.from_xyz("2\nN2\nN 0 0 0\nN 0 0 2.0\n")

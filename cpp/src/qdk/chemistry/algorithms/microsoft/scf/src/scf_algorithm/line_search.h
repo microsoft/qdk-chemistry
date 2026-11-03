@@ -8,6 +8,7 @@
 #include <cmath>
 #include <cstddef>
 #include <limits>
+#include <qdk/chemistry/utils/logger.hpp>
 #include <stdexcept>
 
 namespace qdk::chemistry::scf::impl {
@@ -58,6 +59,11 @@ void nocedal_wright_line_search(Functor& op,
   const auto dgi = Functor::dot(p, gfx);
   const auto initial_grad_norm_squared = Functor::dot(gfx, gfx);
 
+  QDK_LOGGER().debug(
+      "Line search start: energy={:.17e}, directional_derivative={:.17e}, "
+      "gradient_norm_squared={:.17e}, step={:.17e}",
+      fx0, dgi, initial_grad_norm_squared, step);
+
   if (!std::isfinite(fx0) || !std::isfinite(dgi) ||
       !std::isfinite(initial_grad_norm_squared) || !std::isfinite(step)) {
     throw std::runtime_error("Nonfinite line search starting point");
@@ -82,6 +88,15 @@ void nocedal_wright_line_search(Functor& op,
     const auto energy_roundoff =
         8 * std::numeric_limits<ret_type>::epsilon() *
         std::max({ret_type(1), std::abs(fx0), std::abs(fx)});
+    QDK_LOGGER().debug(
+        "Line search trial: step={:.17e}, energy={:.17e}, "
+        "energy_change={:.17e}, predicted_decrease={:.17e}, "
+        "energy_roundoff={:.17e}, armijo_limit={:.17e}, "
+        "directional_derivative={:.17e}, curvature_limit={:.17e}, "
+        "gradient_norm_squared={:.17e}, roundoff_gradient_limit={:.17e}",
+        step, fx, fx - fx0, -step * dgi, energy_roundoff,
+        step * armijo_test_val, dg, wolfe_test_curv, grad_norm_squared,
+        c2 * c2 * initial_grad_norm_squared);
     return dgi < 0 && -step * dgi <= energy_roundoff &&
            fx - fx0 <= energy_roundoff && std::abs(dg) <= wolfe_test_curv &&
            grad_norm_squared <= c2 * c2 * initial_grad_norm_squared;

@@ -407,9 +407,10 @@ jobs:
           "${XDIST_ARGS[@]}" \
           "${COV_ARGS[@]}" \
           --junitxml=../test-results/pytest_report.xml \
+          -o junit_logging=all \
           -v \
           --tb=short \
-          2>&1 | if [ "$ENABLE_COVERAGE" = "true" ]; then tee ../coverage-reports/python_coverage.txt; else cat; fi
+          2>&1 | tee ../test-results/python_tests.log | if [ "$ENABLE_COVERAGE" = "true" ]; then tee ../coverage-reports/python_coverage.txt; else cat; fi
 
         PYTEST_EXIT_CODE=${PIPESTATUS[0]}
         set -e
@@ -601,7 +602,7 @@ jobs:
       uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
       with:
         name: junit-${{ matrix.os-name }}-py${{ matrix.python-version }}
-        path: test-results/*.xml
+        path: test-results/*
         retention-days: 7
 
   coverage-windows:
