@@ -5,6 +5,7 @@
 #include <gtest/gtest.h>
 
 #include <filesystem>
+#include <limits>
 #include <qdk/chemistry/data/symmetry/symmetry.hpp>
 #include <stdexcept>
 #include <unordered_map>
@@ -58,6 +59,8 @@ TEST(SymmetryVocabTest, ParticleNumberValueAndAxis) {
   const auto vacuum = axes::particle_number(0);
   ASSERT_EQ(vacuum.labels().size(), 1u);
   EXPECT_TRUE(vacuum.admits(ParticleNumberValue(0)));
+  EXPECT_THROW(axes::particle_number(std::numeric_limits<std::size_t>::max()),
+               std::length_error);
 }
 
 TEST(SymmetryVocabTest, RoundTripParticleNumberJsonAndHash) {
@@ -87,6 +90,19 @@ TEST(SymmetryVocabTest, RoundTripParticleNumberJsonAndHash) {
   EXPECT_TRUE(restored_label.has(AxisName::ParticleNumber));
   std::unordered_map<SymmetryLabel, std::size_t> sectors{{label, 7u}};
   EXPECT_EQ(sectors.at(restored_label), 7u);
+}
+
+TEST(SymmetryVocabTest, RejectsInvalidParticleNumberJson) {
+  for (const std::string number : {"-1", "1.5", "18446744073709551616"}) {
+    SCOPED_TRACE(number);
+    const auto json = nlohmann::json::parse(
+        R"({"kind": "particle_number", "number": )" + number + "}");
+    EXPECT_THROW(symmetry_axis_value_from_json(json), std::runtime_error);
+  }
+  // In-memory JSON may hold a nonnegative count as a signed integer.
+  const auto restored = symmetry_axis_value_from_json(
+      {{"kind", "particle_number"}, {"number", 2}});
+  EXPECT_TRUE(restored->equals(ParticleNumberValue(2)));
 }
 
 TEST(SymmetryVocabTest, SymmetriesAxisLookup) {

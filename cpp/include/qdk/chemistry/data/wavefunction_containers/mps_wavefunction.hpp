@@ -22,8 +22,9 @@ namespace qdk::chemistry::data {
  * block is a matrix with rows (local_left * physical_extent + local_physical)
  * and columns local_right. Missing blocks represent zero.
  *
- * Physical states use Configuration's binary or spin-half encoding. Symmetry
- * labels describe explicit basis states.
+ * Physical states use Configuration's binary or spin-half encoding. Physical
+ * sector labels must match the particle number, and for spin-half states the
+ * spin projection, of the basis states they contain.
  */
 class MPSSite {
  public:

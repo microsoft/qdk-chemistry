@@ -127,10 +127,6 @@ void bind_mps_wavefunction(py::module& data) {
       .def_property_readonly("orbitals", &MPSContainer::get_orbitals)
       .def("has_total_num_particles", &MPSContainer::has_total_num_particles)
       .def("has_active_num_particles", &MPSContainer::has_active_num_particles)
-      .def_property_readonly("total_num_particles",
-                             &MPSContainer::total_num_particles)
-      .def_property_readonly("active_num_particles",
-                             &MPSContainer::active_num_particles)
       .def_property_readonly("orthogonality_center",
                              &MPSContainer::orthogonality_center,
                              "Asserted canonical center, or None if unknown.")
@@ -139,7 +135,6 @@ void bind_mps_wavefunction(py::module& data) {
                              "Permutation of active-mode slots, not full "
                              "orbital indices.")
       .def_property_readonly("num_sites", &MPSContainer::num_sites)
-      .def_property_readonly("is_complex", &MPSContainer::is_complex)
       .def_property_readonly("max_bond_dimension",
                              &MPSContainer::max_bond_dimension)
       .def(

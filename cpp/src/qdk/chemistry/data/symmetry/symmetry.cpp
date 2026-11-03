@@ -5,7 +5,9 @@
 #include <H5Cpp.h>
 
 #include <algorithm>
+#include <cstdint>
 #include <fstream>
+#include <limits>
 #include <qdk/chemistry/data/symmetry/symmetry.hpp>
 #include <qdk/chemistry/utils/logger.hpp>
 #include <sstream>
@@ -75,8 +77,15 @@ nlohmann::json ParticleNumberValue::to_json() const {
 
 std::shared_ptr<const SymmetryAxisValue> ParticleNumberValue::from_json(
     const nlohmann::json& j) {
-  return std::make_shared<const ParticleNumberValue>(
-      j.at("number").get<std::size_t>());
+  const auto& number = j.at("number");
+  if (!number.is_number_integer() ||
+      (!number.is_number_unsigned() && number.get<std::int64_t>() < 0) ||
+      number.get<std::uint64_t>() > std::numeric_limits<std::size_t>::max()) {
+    throw std::runtime_error(
+        "Particle-number label must be a nonnegative integer that fits "
+        "std::size_t.");
+  }
+  return std::make_shared<const ParticleNumberValue>(number.get<std::size_t>());
 }
 
 // ---------------------------------------------------------------------------
@@ -681,6 +690,9 @@ std::shared_ptr<const ParticleNumberValue> particle_number_value(
 
 SymmetryAxis particle_number(std::size_t maximum_number) {
   std::vector<std::shared_ptr<const SymmetryAxisValue>> labels;
+  if (maximum_number >= labels.max_size()) {
+    throw std::length_error("Particle-number axis has too many labels.");
+  }
   labels.reserve(maximum_number + 1);
   for (std::size_t number = 0; number <= maximum_number; ++number) {
     labels.push_back(particle_number_value(number));

@@ -156,6 +156,34 @@ TEST_F(MPSContainerTest, BlockedSitePreservesBlocksAndSectorOrder) {
                   .isApprox(expected, testing::wf_tolerance));
 }
 
+TEST_F(MPSContainerTest, RejectsPhysicalBasisThatContradictsSectorLabels) {
+  using SBT = SymmetryBlockedTensor<3>;
+  const SymmetryAxis spin_projection(
+      AxisName::Spin, {axes::beta(), axes::spin_value(0), axes::alpha()},
+      false);
+  auto symmetry = std::make_shared<const SymmetryProduct>(
+      SymmetryProduct({axes::particle_number(2), spin_projection}));
+  const SymmetryLabel empty(
+      {axes::particle_number_value(0), axes::spin_value(0)});
+  const SymmetryLabel up({axes::particle_number_value(1), axes::alpha()});
+  const SymmetryLabel down({axes::particle_number_value(1), axes::beta()});
+  const SymmetryLabel pair(
+      {axes::particle_number_value(2), axes::spin_value(0)});
+  SBT::ExtentsArray extents;
+  extents[0] = {{empty, 1}};
+  extents[1] = {{empty, 1}, {up, 1}, {down, 1}, {pair, 1}};
+  extents[2] = {{empty, 1}};
+  auto tensor = std::make_shared<const MPSSite::TensorVariant>(
+      SBT({symmetry, symmetry, symmetry}, extents, SBT::BlockMap{}));
+  // The default basis is (0, u, d, 2).
+  auto site_with = [&](std::vector<SymmetryLabel> physical_order) {
+    return MPSSite(tensor, {{{empty}, std::move(physical_order), {empty}}});
+  };
+  EXPECT_NO_THROW(site_with({empty, up, down, pair}));
+  EXPECT_THROW(site_with({empty, down, up, pair}), std::invalid_argument);
+  EXPECT_THROW(site_with({pair, up, down, empty}), std::invalid_argument);
+}
+
 TEST_F(MPSContainerTest, SerializationAndClone) {
   Wavefunction original(make_container());
   H5::FileAccPropList access;
@@ -283,20 +311,20 @@ TEST_F(MPSContainerTest, RejectsDifferentBondSectorsWithEqualDimensions) {
   const SymmetryLabel two({axes::particle_number_value(2)});
   SBT::ExtentsArray first_extents;
   first_extents[0] = {{zero, 1}};
-  first_extents[1] = {{zero, 2}};
+  first_extents[1] = {{zero, 1}, {one, 1}};
   first_extents[2] = {{zero, 1}, {one, 2}};
   auto first = std::make_shared<const MPSSite>(
       std::make_shared<const MPSSite::TensorVariant>(SBT(
           {symmetry, symmetry, symmetry}, first_extents,
           {{{zero, zero, one},
-            std::make_shared<const Eigen::MatrixXd>(random_matrix(2, 2))}})),
-      MPSSite::SectorOrders{{{zero}, {zero}, {zero, one}}});
+            std::make_shared<const Eigen::MatrixXd>(random_matrix(1, 2))}})),
+      MPSSite::SectorOrders{{{zero}, {zero, one}, {zero, one}}});
   for (const std::string mismatch : {"none", "labels", "order"}) {
     SCOPED_TRACE(mismatch);
     const auto label = mismatch == "labels" ? two : zero;
     SBT::ExtentsArray extents;
     extents[0] = {{label, 1}, {one, 2}};
-    extents[1] = {{zero, 2}};
+    extents[1] = {{zero, 1}, {one, 1}};
     extents[2] = {{two, 1}};
     const std::vector<SymmetryLabel> order =
         mismatch == "order" ? std::vector<SymmetryLabel>{one, label}
@@ -305,8 +333,8 @@ TEST_F(MPSContainerTest, RejectsDifferentBondSectorsWithEqualDimensions) {
         std::make_shared<const MPSSite::TensorVariant>(SBT(
             {symmetry, symmetry, symmetry}, extents,
             {{{one, zero, two},
-              std::make_shared<const Eigen::MatrixXd>(random_matrix(4, 1))}})),
-        MPSSite::SectorOrders{{order, {zero}, {two}}});
+              std::make_shared<const Eigen::MatrixXd>(random_matrix(2, 1))}})),
+        MPSSite::SectorOrders{{order, {zero, one}, {two}}});
     ASSERT_EQ(first->right_bond_dimension(), second->left_bond_dimension());
     if (mismatch == "none") {
       EXPECT_NO_THROW(MPSContainer({first, second}, orbitals));
