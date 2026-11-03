@@ -475,7 +475,8 @@ Examples:
     >>> shell = basis_set.get_shell(0)
     >>> print(f"First shell type: {shell.orbital_type}")
 )",
-                py::arg("shell_index"), py::return_value_policy::copy);
+                py::arg("shell_index"),
+                py::return_value_policy::reference_internal);
 
   basis_set.def("get_num_shells", &BasisSet::get_num_shells,
                 R"(
