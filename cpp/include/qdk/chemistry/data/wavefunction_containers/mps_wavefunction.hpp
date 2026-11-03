@@ -110,6 +110,12 @@ class MPSSite {
  */
 class MPSContainer : public WavefunctionContainer {
  public:
+  /** @brief Real or complex matrix (e.g. one-particle RDMs). */
+  using MatrixVariant = ContainerTypes::MatrixVariant;
+  /** @brief Real or complex vector (e.g. flattened two-particle RDMs). */
+  using VectorVariant = ContainerTypes::VectorVariant;
+  /** @brief Real or complex scalar. */
+  using ScalarVariant = ContainerTypes::ScalarVariant;
   /** @brief Shared immutable site in the chain. */
   using SitePtr = std::shared_ptr<const MPSSite>;
   /** @brief Symmetry-blocked occupation-count metadata. */
