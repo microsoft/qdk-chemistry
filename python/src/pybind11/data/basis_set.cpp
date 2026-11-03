@@ -547,7 +547,8 @@ Examples:
     >>> ecp_shell = basis_set.get_ecp_shell(0)
     >>> print(f"First ECP shell has {ecp_shell.get_num_primitives()} primitives")
 )",
-                py::arg("shell_index"), py::return_value_policy::copy);
+                py::arg("shell_index"),
+                py::return_value_policy::reference_internal);
 
   basis_set.def("get_num_ecp_shells", &BasisSet::get_num_ecp_shells,
                 R"(
