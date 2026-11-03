@@ -137,7 +137,8 @@ def _fill_eightfold_classes(entries) -> list:
         classes.setdefault(min(_eightfold_orbit(*key)), {})[key] = float(value)
     filled: list[list] = []
     difference = stored_norm = written_norm = 0.0
-    worst = (0.0,)
+    worst_change = 0.0
+    conflict = ""
     for canonical, stored in sorted(classes.items()):
         # The canonical position is also the smallest, which earlier mappers preferred.
         first = min(stored)
@@ -146,15 +147,14 @@ def _fill_eightfold_classes(entries) -> list:
             difference += change**2
             stored_norm += value**2
             written_norm += stored[first] ** 2
-            if change > worst[0]:
-                worst = (change, first, key, stored[first], value)
+            if change > worst_change:
+                worst_change = change
+                conflict = f"{first} and {key} of one 8-fold permutation class differ ({stored[first]} vs {value})"
         filled.extend([*member, stored[first]] for member in sorted(_eightfold_orbit(*canonical)))
     # Eigen's isApprox: ||stored - written|| <= p min(||stored||, ||written||).
     if difference > _PRECISION**2 * min(stored_norm, written_norm):
-        _, first, key, first_value, value = worst
         raise ValueError(
-            f"Two-body entries {first} and {key} of one 8-fold permutation class differ "
-            f"({first_value} vs {value}). Sparse containers before version {CONTAINER_VERSION} "
+            f"Two-body entries {conflict}. Sparse containers before version {CONTAINER_VERSION} "
             "read every class as 8-fold symmetric, so the file cannot be migrated unambiguously."
         )
     return filled
