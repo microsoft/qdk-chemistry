@@ -27,7 +27,7 @@ from qdk_chemistry.plugins.qiskit import QDK_CHEMISTRY_HAS_QISKIT
 from .test_hubbard_plaquette_trotter import _assert_counts_match_the_pins
 from .test_sample_workflow_utils import (
     _HAS_JUPYTER_KERNEL,
-    _execute_notebook_skip_visualizations,
+    _execute_notebook,
     _requires_notebook_deps,
 )
 
@@ -57,7 +57,7 @@ def test_factory_list():
     """Test the factory-list notebook executes without errors."""
     notebook_path = EXAMPLES_DIR / "factory_list.ipynb"
     assert notebook_path.exists(), f"Notebook not found: {notebook_path}"
-    _execute_notebook_skip_visualizations(notebook_path)
+    _execute_notebook(notebook_path, skip_visualizations=True)
 
 
 @_requires_notebook_deps
@@ -78,8 +78,9 @@ def test_state_prep_energy():
     """Test the state-preparation energy notebook executes without errors."""
     notebook_path = EXAMPLES_DIR / "state_prep_energy.ipynb"
     assert notebook_path.exists(), f"Notebook not found: {notebook_path}"
-    _execute_notebook_skip_visualizations(
+    _execute_notebook(
         notebook_path,
+        skip_visualizations=True,
         cell_patches={
             25: {
                 "total_shots=600000": "total_shots=50000",
@@ -110,8 +111,9 @@ def test_qpe_stretched_n2():
     """Test the stretched-N2 QPE notebook executes without errors."""
     notebook_path = EXAMPLES_DIR / "qpe_stretched_n2.ipynb"
     assert notebook_path.exists(), f"Notebook not found: {notebook_path}"
-    _execute_notebook_skip_visualizations(
+    _execute_notebook(
         notebook_path,
+        skip_visualizations=True,
         cell_patches={
             34: {
                 "NUM_TRIALS = 20": "NUM_TRIALS = 3",
@@ -138,7 +140,7 @@ def test_estimation_hubbard_2d():
     """
     notebook_path = EXAMPLES_DIR / "resource_estimation" / "estimation_hubbard_2d.ipynb"
     assert notebook_path.exists(), f"Notebook not found: {notebook_path}"
-    executed = _execute_notebook_skip_visualizations(notebook_path)
+    executed = _execute_notebook(notebook_path, skip_visualizations=True)
     code_cells = [cell for cell in executed.cells if cell.cell_type == "code"]
     (size,) = (
         int(match.group(1))
@@ -165,7 +167,7 @@ def test_estimation_spin_models(notebook_name: str) -> None:
     """Run the spin-model resource-estimation notebooks and require nonempty QRE tables."""
     notebook_path = EXAMPLES_DIR / "resource_estimation" / f"{notebook_name}.ipynb"
     assert notebook_path.exists(), f"Notebook not found: {notebook_path}"
-    executed = _execute_notebook_skip_visualizations(notebook_path)
+    executed = _execute_notebook(notebook_path, skip_visualizations=True)
     (results_cell,) = (
         cell
         for cell in executed.cells
@@ -190,4 +192,4 @@ def test_sossa_qre():
     """Test the sequential SOSSA notebook workflow executes without errors."""
     notebook_path = EXAMPLES_DIR / "sossa_qre.ipynb"
     assert notebook_path.exists(), f"Notebook not found: {notebook_path}"
-    _execute_notebook_skip_visualizations(notebook_path)
+    _execute_notebook(notebook_path, skip_visualizations=True)
