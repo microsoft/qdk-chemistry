@@ -432,13 +432,13 @@ Args:
     atom_index (int): Index of the atom
 
 Returns:
-    list[Shell]: Copies of the shells for the specified atom. Modifying them does not change the basis set
-
+    list[Shell]: Vector of shells for the specified atom
 Examples:
     >>> atom_shells = basis_set.get_shells_for_atom(0)
     >>> print(f"Atom 0 has {len(atom_shells)} shells")
 )",
-                py::arg("atom_index"), py::return_value_policy::copy);
+                py::arg("atom_index"),
+                py::return_value_policy::reference_internal);
 
   basis_set.def("get_shell", &BasisSet::get_shell,
                 R"(
@@ -505,13 +505,13 @@ Args:
     atom_index (int): Index of the atom
 
 Returns:
-    list[Shell]: Copies of the ECP shells for the specified atom. Modifying them does not change the basis set
-
+    list[Shell]: Vector of ECP shells for the specified atom
 Examples:
     >>> ecp_atom_shells = basis_set.get_ecp_shells_for_atom(0)
     >>> print(f"Atom 0 has {len(ecp_atom_shells)} ECP shells")
 )",
-                py::arg("atom_index"), py::return_value_policy::copy);
+                py::arg("atom_index"),
+                py::return_value_policy::reference_internal);
 
   basis_set.def("get_ecp_shell", &BasisSet::get_ecp_shell,
                 R"(
