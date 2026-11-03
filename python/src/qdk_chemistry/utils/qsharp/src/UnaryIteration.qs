@@ -114,48 +114,86 @@ namespace QDKChemistry.Utils.UnaryIteration {
             $"address register is too small, requires at least {n} qubits",
         );
 
+        // Walks the leaves of the Fig. 7 tree of arXiv:1805.03662 in order. Between leaves the
+        // right-going nodes below the branch point are uncomputed, the branch node toggled, and
+        // the next leaf's left-going nodes computed. Each step holds two O(log L) paths, never
+        // the whole schedule, and `action` is never passed recursively, which QIR generation
+        // cannot resolve.
         use helpers = Qubit[n];
-        for (step, control, value, helper) in UnaryIterationSchedule(numActions, actionOffset, -1) {
-            let controlQubit = control < 0 ? ctl | helpers[control];
-            if step == ComputeStep() {
-                within {
-                    X(address[value]);
-                } apply {
-                    ExactAnd(controlQubit, address[value], helpers[helper]);
+        for leaf in 0..numActions - 1 {
+            let path = UnaryIterationPath(numActions, leaf);
+            if leaf == 0 {
+                for depth in 0..Length(path) - 1 {
+                    ComputeUnaryNode(ctl, helpers, address, depth, Fst(path[depth]));
                 }
-            } elif step == ToggleStep() {
-                CNOT(controlQubit, helpers[helper]);
-            } elif step == UncomputeStep() {
-                Adjoint ExactAnd(controlQubit, address[value], helpers[helper]);
             } else {
-                action(value, controlQubit);
+                let previous = UnaryIterationPath(numActions, leaf - 1);
+                let branch = UnaryIterationBranchDepth(previous, path);
+                for depth in Length(previous) - 1..-1..branch + 1 {
+                    UncomputeUnaryNode(ctl, helpers, address, depth, Fst(previous[depth]));
+                }
+                CNOT(UnaryNodeControl(ctl, helpers, branch), helpers[branch]);
+                for depth in branch + 1..Length(path) - 1 {
+                    ComputeUnaryNode(ctl, helpers, address, depth, Fst(path[depth]));
+                }
             }
+            action(actionOffset + leaf, UnaryNodeControl(ctl, helpers, Length(path)));
+        }
+        let last = UnaryIterationPath(numActions, numActions - 1);
+        for depth in Length(last) - 1..-1..0 {
+            UncomputeUnaryNode(ctl, helpers, address, depth, Fst(last[depth]));
         }
     }
 
-    internal function ComputeStep() : Int { 0 }
-    internal function ToggleStep() : Int { 1 }
-    internal function UncomputeStep() : Int { 2 }
-    internal function ActionStep() : Int { 3 }
+    /// Qubit controlling the tree node at `depth`: the caller's control at the root, otherwise
+    /// the helper of its parent.
+    internal function UnaryNodeControl(ctl : Qubit, helpers : Qubit[], depth : Int) : Qubit {
+        depth == 0 ? ctl | helpers[depth - 1]
+    }
 
-    /// Gate sequence of Fig. 7 of arXiv:1805.03662 below the control `control` (-1 for the
-    /// caller's qubit, otherwise a helper index), as (step, control, address bit or action
-    /// index, helper) tuples.
-    ///
-    /// The recursion is classical so the callable `action` is never passed recursively, which
-    /// QIR generation cannot resolve.
-    internal function UnaryIterationSchedule(numActions : Int, actionOffset : Int, control : Int) : (Int, Int, Int, Int)[] {
-        if numActions == 1 {
-            return [(ActionStep(), control, actionOffset, 0)];
+    /// Sets the helper of the node at `depth` for its left branch (address bit `bit` is 0).
+    internal operation ComputeUnaryNode(ctl : Qubit, helpers : Qubit[], address : Qubit[], depth : Int, bit : Int) : Unit is Adj {
+        within {
+            X(address[bit]);
+        } apply {
+            ExactAnd(UnaryNodeControl(ctl, helpers, depth), address[bit], helpers[depth]);
         }
-        let n = AddressQubits(numActions);
-        let half = 1 <<< (n - 1);
-        let helper = control + 1;
-        [(ComputeStep(), control, n - 1, helper)]
-            + UnaryIterationSchedule(half, actionOffset, helper)
-            + [(ToggleStep(), control, 0, helper)]
-            + UnaryIterationSchedule(numActions - half, actionOffset + half, helper)
-            + [(UncomputeStep(), control, n - 1, helper)]
+    }
+
+    /// Clears the helper of the node at `depth` after its right branch (address bit `bit` is 1).
+    internal operation UncomputeUnaryNode(ctl : Qubit, helpers : Qubit[], address : Qubit[], depth : Int, bit : Int) : Unit is Adj {
+        Adjoint ExactAnd(UnaryNodeControl(ctl, helpers, depth), address[bit], helpers[depth]);
+    }
+
+    /// Root-to-leaf path of `leaf` in the unary iteration tree over `numActions` leaves, as
+    /// (address bit, goes right) per internal node.
+    internal function UnaryIterationPath(numActions : Int, leaf : Int) : (Int, Bool)[] {
+        mutable path = [];
+        mutable remaining = numActions;
+        mutable index = leaf;
+        while remaining > 1 {
+            let n = AddressQubits(remaining);
+            let half = 1 <<< (n - 1);
+            let goesRight = index >= half;
+            set path += [(n - 1, goesRight)];
+            if goesRight {
+                set remaining -= half;
+                set index -= half;
+            } else {
+                set remaining = half;
+            }
+        }
+        path
+    }
+
+    /// Depth of the node where the paths of consecutive leaves split: `previous` goes left there
+    /// and `next` goes right.
+    internal function UnaryIterationBranchDepth(previous : (Int, Bool)[], next : (Int, Bool)[]) : Int {
+        mutable depth = 0;
+        while Snd(previous[depth]) == Snd(next[depth]) {
+            set depth += 1;
+        }
+        depth
     }
 
     /// `AND`, uncomputed by measurement.

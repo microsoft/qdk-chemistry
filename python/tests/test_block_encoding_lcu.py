@@ -7,6 +7,7 @@
 
 import math
 import tempfile
+import warnings
 from pathlib import Path
 
 import h5py
@@ -64,6 +65,21 @@ def _block_encoding_action(circuit, num_system_qubits: int, system_amplitudes: n
         circuit._qsharp_op, circuit.num_qubits, initial_state, context=get_qsharp_context()
     )
     return np.array([statevector[_reverse_bits(index, num_system_qubits) * stride] for index in range(dimension)])
+
+
+def _assert_block_encodes(circuit, hamiltonian: QubitOperator, coefficients: np.ndarray, atol: float) -> None:
+    r"""Check :math:`\langle 0|_\mathrm{anc} B[H] |0\rangle_\mathrm{anc} = H/\lambda` up to a global sign."""
+    num_system_qubits = hamiltonian.num_qubits
+    dimension = 2**num_system_qubits
+    expected_block = hamiltonian.to_matrix() / np.sum(np.abs(coefficients))
+    for system_state in [*np.eye(dimension), np.full(dimension, 1.0 / math.sqrt(dimension))]:
+        actual = _block_encoding_action(circuit, num_system_qubits, system_state)
+        expected = expected_block @ system_state
+        assert np.abs(actual.imag).max() <= atol, f"unexpected phase in {actual}"
+        sign = 1.0 if np.vdot(actual, expected).real >= 0.0 else -1.0
+        assert np.allclose(sign * actual, expected, rtol=0.0, atol=atol), (
+            f"block encoding failed on {system_state}: got {sign * actual}, expected {expected}"
+        )
 
 
 class TestLCUBuilder:
@@ -323,21 +339,7 @@ class TestLCUBuilder:
             prepare=AlgorithmRef("state_prep", "alias_sampling", bits_precision=bits_precision),
         ).run(LCUBuilder().run(hamiltonian))
 
-        num_system_qubits = hamiltonian.num_qubits
-        dimension = 2**num_system_qubits
-        expected_block = hamiltonian.to_matrix() / np.sum(np.abs(coefficients))
-        alias_tolerance = 2.0**-bits_precision
-
-        inputs = [*np.eye(dimension), np.full(dimension, 1.0 / math.sqrt(dimension))]
-        for system_state in inputs:
-            actual = _block_encoding_action(circuit, num_system_qubits, system_state)
-            expected = expected_block @ system_state
-
-            assert np.abs(actual.imag).max() < alias_tolerance, f"unexpected phase in {actual}"
-            sign = 1.0 if np.vdot(actual, expected).real >= 0.0 else -1.0
-            assert np.allclose(sign * actual, expected, rtol=0.0, atol=alias_tolerance), (
-                f"block encoding failed on {system_state}: got {sign * actual}, expected {expected}"
-            )
+        _assert_block_encodes(circuit, hamiltonian, coefficients, atol=2.0**-bits_precision)
 
 
 class TestPSPMapperPrepareGuards:
@@ -360,20 +362,23 @@ class TestPSPMapperPrepareGuards:
         assert circuit.metadata.num_phase_gradient_ancillas == 4
         assert circuit.num_qubits == 2 + 2 + 4
 
-
-def _assert_block_encodes(circuit, hamiltonian: QubitOperator, coefficients: np.ndarray, atol: float) -> None:
-    r"""Check :math:`\langle 0|_\mathrm{anc} B[H] |0\rangle_\mathrm{anc} = H/\lambda` up to a global sign."""
-    num_system_qubits = hamiltonian.num_qubits
-    dimension = 2**num_system_qubits
-    expected_block = hamiltonian.to_matrix() / np.sum(np.abs(coefficients))
-    for system_state in [*np.eye(dimension), np.full(dimension, 1.0 / math.sqrt(dimension))]:
-        actual = _block_encoding_action(circuit, num_system_qubits, system_state)
-        expected = expected_block @ system_state
-        assert np.abs(actual.imag).max() <= atol, f"unexpected phase in {actual}"
-        sign = 1.0 if np.vdot(actual, expected).real >= 0.0 else -1.0
-        assert np.allclose(sign * actual, expected, rtol=0.0, atol=atol), (
-            f"block encoding failed on {system_state}: got {sign * actual}, expected {expected}"
+    @pytest.mark.parametrize(
+        ("prepare", "warns"), [("alias_sampling", True), ("qrom", True), ("dense_pure_state", False)]
+    )
+    def test_table_lookup_prepare_warns_about_qir_export(self, prepare: str, warns: bool):
+        """A table-lookup PREPARE warns that the block encoding cannot be exported to QIR yet."""
+        mapper = registry.create(
+            "circuit_mapper", "prepare_select_prepare", prepare=AlgorithmRef("state_prep", prepare)
         )
+        with warnings.catch_warnings(record=True) as caught:
+            warnings.simplefilter("always")
+            mapper.run(self._unitary())
+
+        qir_warnings = [w for w in caught if "QIR" in str(w.message)]
+        assert len(qir_warnings) == int(warns)
+        if warns:
+            assert issubclass(qir_warnings[0].category, UserWarning)
+            assert prepare in str(qir_warnings[0].message)
 
 
 class TestPSPMapperSelectMethod:

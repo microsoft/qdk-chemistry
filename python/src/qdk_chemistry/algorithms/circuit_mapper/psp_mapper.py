@@ -5,6 +5,7 @@
 # Licensed under the MIT License. See LICENSE.txt in the project root for license information.
 # --------------------------------------------------------------------------------------------
 
+import warnings
 from contextlib import suppress
 from typing import Any
 
@@ -25,13 +26,28 @@ __all__: list[str] = ["PSPMapper", "PSPMapperSettings"]
 #: SELECT constructions available through the ``select_method`` setting.
 SELECT_METHODS = ("multi_controlled", "unary_iteration")
 
+#: Q# ``state_prep`` algorithms that can serve as PREPARE.
+PREPARE_METHODS = ("alias_sampling", "dense_pure_state", "sparse_isometry", "qrom")
+
+#: PREPAREs whose measurement-based ``Adjoint Std.TableLookup.Select`` the Q# compiler cannot
+#: yet lower to QIR, so the block encoding fails ``Circuit.get_qir()`` and ``Circuit.to_json()``.
+_TABLE_LOOKUP_PREPARES = frozenset({"alias_sampling", "qrom"})
+
+_PREPARE_DESCRIPTION = (
+    "Algorithm for the PREPARE oracle, one of 'alias_sampling' (default: Toffolis only, no rotations), "
+    "'dense_pure_state' (exact amplitudes, one rotation per amplitude), 'sparse_isometry' (dense "
+    "preparation on the qubits the nonzero amplitudes span), or 'qrom' (QROM-loaded rotations). "
+    "A PREPARE that rotates through a phase gradient (e.g. 'qrom') uses one shared register its "
+    "caller prepares."
+)
+
 
 class PSPMapperSettings(Settings):
     """Settings for the PSPMapper.
 
     Attributes:
-        prepare: Algorithm reference for the PREPARE oracle state preparation.
-            Defaults to alias sampling.
+        prepare: Algorithm reference for the PREPARE oracle state preparation. One of
+            ``"alias_sampling"`` (default), ``"dense_pure_state"``, ``"sparse_isometry"``, or ``"qrom"``.
         select_method: ``"unary_iteration"`` (default, :cite:`Babbush2018`) or ``"multi_controlled"``.
 
     """
@@ -43,8 +59,7 @@ class PSPMapperSettings(Settings):
             "prepare",
             "algorithm_ref",
             AlgorithmRef("state_prep", "alias_sampling"),
-            "Algorithm for the PREPARE oracle. A PREPARE that rotates through a phase gradient (e.g. 'qrom') "
-            "uses one shared register its caller prepares.",
+            _PREPARE_DESCRIPTION,
         )
         self._set_default(
             "select_method",
@@ -81,7 +96,8 @@ class PSPMapper(CircuitMapper):
     Note:
         With an alias or QROM PREPARE, ``Circuit.get_qir()`` and ``Circuit.to_json()`` currently
         fail inside the Q# compiler (its measurement-based ``Adjoint Std.TableLookup.Select``);
-        ``estimate()`` and simulation work. Use ``dense_pure_state`` when QIR export is needed.
+        ``estimate()`` and simulation work. Building such a block encoding emits a ``UserWarning``.
+        Use ``dense_pure_state`` when QIR export is needed.
 
     """
 
@@ -184,6 +200,15 @@ class PSPMapper(CircuitMapper):
             return QSHARP_UTILS.PrepSelPrep.NoOpPrepare, 0, 0, 0
 
         prepare_algorithm = self._create_nested("prepare")
+        if prepare_algorithm.name() in _TABLE_LOOKUP_PREPARES:
+            warnings.warn(
+                f"PREPARE '{prepare_algorithm.name()}' uncomputes its table lookup by measurement, which the "
+                "Q# compiler cannot lower to QIR yet: Circuit.get_qir() and Circuit.to_json() fail on this "
+                "block encoding, while estimate() and simulation work. Use "
+                "prepare=AlgorithmRef('state_prep', 'dense_pure_state') when QIR export is needed.",
+                UserWarning,
+                stacklevel=2,
+            )
         with suppress(SettingNotFound):
             prepare_algorithm.settings().set("allocate_phase_gradient", False)
         prepare_circuit = prepare_algorithm.run(lcu.prepare)

@@ -5,7 +5,7 @@
 # Licensed under the MIT License. See LICENSE.txt in the project root for license information.
 # --------------------------------------------------------------------------------------------
 
-from qdk_chemistry.algorithms.circuit_mapper.psp_mapper import SELECT_METHODS, PSPMapper
+from qdk_chemistry.algorithms.circuit_mapper.psp_mapper import _PREPARE_DESCRIPTION, SELECT_METHODS, PSPMapper
 from qdk_chemistry.data import AlgorithmRef
 from qdk_chemistry.data.circuit import Circuit, CircuitMetadata, QsharpFactoryData
 from qdk_chemistry.data.unitary_representation.base import UnitaryRepresentation
@@ -20,8 +20,8 @@ class ControlledPSPMapperSettings(ControlledCircuitMapperSettings):
     """Settings for the ControlledPSPMapper.
 
     Attributes:
-        prepare: Algorithm reference for the PREPARE oracle state preparation.
-            Defaults to alias sampling.
+        prepare: Algorithm reference for the PREPARE oracle state preparation. One of
+            ``"alias_sampling"`` (default), ``"dense_pure_state"``, ``"sparse_isometry"``, or ``"qrom"``.
         select_method: ``"unary_iteration"`` (default) or ``"multi_controlled"``.
 
     """
@@ -33,8 +33,7 @@ class ControlledPSPMapperSettings(ControlledCircuitMapperSettings):
             "prepare",
             "algorithm_ref",
             AlgorithmRef("state_prep", "alias_sampling"),
-            "Algorithm for the PREPARE oracle state preparation. A PREPARE that rotates through a phase "
-            "gradient (e.g. 'qrom') uses one shared register its caller prepares.",
+            _PREPARE_DESCRIPTION,
         )
         self._set_default(
             "select_method",
