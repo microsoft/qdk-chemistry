@@ -21,7 +21,6 @@
 #include <exception>
 #include <map>
 #include <memory>
-#include <mutex>
 #include <span>
 #include <stdexcept>
 #include <string>
@@ -45,18 +44,6 @@ double chemist(const TwoBodyBlocks& two_body, int left, int right, int p, int q,
   return left == 0 ? two_body[1].get()(idx4(p, q, r, s, norb))
                    : two_body[1].get()(idx4(r, s, p, q, norb));
 }
-
-// Identical spin blocks make the operator spin free.
-bool spin_symmetric(const std::array<Eigen::MatrixXd, 2>& one_body,
-                    const TwoBodyBlocks& two_body,
-                    const std::array<Eigen::MatrixXd, 2>& density) {
-  const auto same = [](const Eigen::VectorXd& left,
-                       const Eigen::VectorXd& right) {
-    return &left == &right || left == right;
-  };
-  return one_body[0] == one_body[1] && density[0] == density[1] &&
-         same(two_body[0], two_body[1]) && same(two_body[1], two_body[2]);
-}
 }  // namespace
 
 double regularized_inverse(double delta, const RegularizerOptions& reg) {
@@ -73,18 +60,7 @@ double regularized_inverse(double delta, const RegularizerOptions& reg) {
 std::array<Eigen::MatrixXd, 2> generalized_fock_matrices(
     const std::array<Eigen::MatrixXd, 2>& one_body,
     const TwoBodyBlocks& two_body,
-    const std::array<Eigen::MatrixXd, 2>& density, int norb) {
-  bool consistent = true;
-  for (int spin = 0; spin < 2; ++spin)
-    consistent = consistent && one_body[spin].rows() == norb &&
-                 one_body[spin].cols() == norb &&
-                 density[spin].rows() == norb && density[spin].cols() == norb;
-  for (const auto& block : two_body)
-    consistent = consistent && block.get().size() == n4(norb);
-  if (!consistent)
-    throw std::invalid_argument(
-        "generalized_fock_matrices: inconsistent tensor dimensions");
-
+    const std::array<Eigen::MatrixXd, 2>& density, int norb, bool spin_free) {
   using RowMajorMatrix =
       Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic, Eigen::RowMajor>;
   const Eigen::Index pairs = static_cast<Eigen::Index>(norb) * norb;
@@ -101,7 +77,6 @@ std::array<Eigen::MatrixXd, 2> generalized_fock_matrices(
   const auto mixed = pair_matrix(two_body[1]);
 
   std::array<Eigen::MatrixXd, 2> fock = one_body;
-  const bool spin_free = spin_symmetric(one_body, two_body, density);
   for (int spin = 0; spin < (spin_free ? 1 : 2); ++spin) {
     const auto same = pair_matrix(two_body[2 * spin]);
     // Spin-free input has equal same-spin and opposite-spin Coulomb terms, so
@@ -153,49 +128,27 @@ std::array<Eigen::MatrixXd, 2> generalized_fock_matrices(
 Eigen::MatrixXd semicanonical_rotation(
     const Eigen::MatrixXd& fock, const std::vector<std::vector<int>>& blocks,
     double tolerance) {
-  if (fock.rows() != fock.cols() || !std::isfinite(tolerance) ||
-      tolerance < 0.0)
-    throw std::invalid_argument(
-        "semicanonical_rotation: invalid Fock matrix or tolerance");
-
-  const int norb = static_cast<int>(fock.rows());
-  Eigen::MatrixXd rotation = Eigen::MatrixXd::Identity(norb, norb);
-  std::vector<char> used(norb, 0);
+  Eigen::MatrixXd rotation =
+      Eigen::MatrixXd::Identity(fock.rows(), fock.cols());
   for (const auto& block : blocks) {
-    for (int p : block) {
-      if (p < 0 || p >= norb || used[p])
-        throw std::invalid_argument(
-            "semicanonical_rotation: invalid or repeated block index");
-      used[p] = 1;
-    }
     if (block.size() < 2) continue;
-
-    Eigen::MatrixXd sub(block.size(), block.size());
-    double max_offdiag = 0.0;
-    for (int i = 0; i < static_cast<int>(block.size()); ++i)
-      for (int j = 0; j < static_cast<int>(block.size()); ++j) {
-        sub(i, j) = fock(block[i], block[j]);
-        if (i != j) max_offdiag = std::max(max_offdiag, std::abs(sub(i, j)));
-      }
-    if (max_offdiag <= tolerance) continue;
+    const Eigen::MatrixXd sub = fock(block, block);
+    Eigen::MatrixXd off_diagonal = sub;
+    off_diagonal.diagonal().setZero();
+    if (off_diagonal.cwiseAbs().maxCoeff() <= tolerance) continue;
 
     Eigen::SelfAdjointEigenSolver<Eigen::MatrixXd> solver(
         0.5 * (sub + sub.transpose()).eval());
     if (solver.info() != Eigen::Success)
       throw std::runtime_error(
           "semicanonical_rotation: Fock block diagonalization failed");
-    for (int i = 0; i < static_cast<int>(block.size()); ++i)
-      for (int j = 0; j < static_cast<int>(block.size()); ++j)
-        rotation(block[i], block[j]) = solver.eigenvectors()(i, j);
+    rotation(block, block) = solver.eigenvectors();
   }
   return rotation;
 }
 
 Eigen::MatrixXd rotate_one_body(const Eigen::MatrixXd& one_body,
                                 const Eigen::MatrixXd& rotation) {
-  if (one_body.rows() != one_body.cols() ||
-      rotation.rows() != one_body.rows() || rotation.cols() != one_body.cols())
-    throw std::invalid_argument("rotate_one_body: inconsistent dimensions");
   return rotation.transpose() * one_body * rotation;
 }
 
@@ -207,12 +160,6 @@ Eigen::VectorXd rotate_two_body(const Eigen::VectorXd& two_body,
 Eigen::VectorXd rotate_two_body(const Eigen::VectorXd& two_body,
                                 const Eigen::MatrixXd& first_pair,
                                 const Eigen::MatrixXd& second_pair, int norb) {
-  for (const auto* rotation : {&first_pair, &second_pair})
-    if (rotation->rows() != norb || rotation->cols() != norb)
-      throw std::invalid_argument("rotate_two_body: inconsistent dimensions");
-  if (two_body.size() != n4(norb))
-    throw std::invalid_argument("rotate_two_body: inconsistent dimensions");
-
   using RowMajorMatrix =
       Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic, Eigen::RowMajor>;
   const Eigen::Index n = norb;
@@ -240,71 +187,6 @@ Eigen::VectorXd rotate_two_body(const Eigen::VectorXd& two_body,
     current.swap(next);
   }
   return current;
-}
-
-WindowPartition partition_window(
-    const std::vector<double>& occupation,
-    const std::vector<std::size_t>& window_global,
-    const std::unordered_set<std::size_t>& kept_global, int window_electrons,
-    double max_folded_occupation_deviation) {
-  if (occupation.size() != window_global.size())
-    throw std::invalid_argument(
-        "SW-PT2: occupation and window index lists differ in "
-        "length.");
-  if (!std::isfinite(max_folded_occupation_deviation) ||
-      max_folded_occupation_deviation < 0.0 ||
-      max_folded_occupation_deviation >= 1.0)
-    throw std::invalid_argument(
-        "SW-PT2: max_folded_occupation_deviation must lie in "
-        "[0, 1); a half-occupied orbital cannot be folded unambiguously.");
-
-  WindowPartition out;
-  const int norb = static_cast<int>(occupation.size());
-  for (int i = 0; i < norb; ++i) {
-    if (kept_global.count(window_global[i])) {
-      out.active_spatial.push_back(i);
-      continue;
-    }
-    const double to_occupied = std::abs(occupation[i] - 2.0);
-    const double to_empty = std::abs(occupation[i]);
-    const double deviation = std::min(to_occupied, to_empty);
-    if (deviation > max_folded_occupation_deviation)
-      throw std::invalid_argument(
-          "SW-PT2: folded external orbital " +
-          std::to_string(window_global[i]) + " has reference occupation " +
-          std::to_string(occupation[i]) +
-          ", which deviates from an integer occupation by more than "
-          "max_folded_occupation_deviation. Keep strongly correlated or "
-          "open-shell orbitals in the active space P (p_indices), or raise "
-          "the setting to accept the rounding.");
-    if (deviation > out.worst_deviation) {
-      out.worst_deviation = deviation;
-      out.worst_occupation = occupation[i];
-      out.worst_orbital = window_global[i];
-    }
-    (to_occupied <= to_empty ? out.inactive_spatial : out.virtual_spatial)
-        .push_back(i);
-  }
-  if (out.active_spatial.empty())
-    throw std::invalid_argument("SW-PT2: the kept active space P is empty.");
-
-  // The active space takes the electrons the rounded fold leaves, which need
-  // not equal the reference occupation of P.
-  const int folded_electrons =
-      2 * static_cast<int>(out.inactive_spatial.size());
-  out.active_electrons = window_electrons - folded_electrons;
-  if (out.active_electrons < 0 ||
-      out.active_electrons > 2 * static_cast<int>(out.active_spatial.size()))
-    throw std::invalid_argument(
-        "SW-PT2: the rounded external occupation leaves an "
-        "impossible active electron count; the active/external partition is "
-        "inconsistent with the reference density.");
-
-  double folded_occupation = 0.0;
-  for (int i : out.inactive_spatial) folded_occupation += occupation[i];
-  for (int i : out.virtual_spatial) folded_occupation += occupation[i];
-  out.folded_charge_error = folded_electrons - folded_occupation;
-  return out;
 }
 
 namespace {
@@ -691,314 +573,303 @@ std::vector<Plan> build_plans(const Equations& equations,
   return plans;
 }
 
-std::shared_ptr<const std::vector<Plan>> reusable_plans(std::size_t inactive,
-                                                        std::size_t active,
-                                                        std::size_t virtuals,
-                                                        bool spin_free) {
-  // Plans touching an empty role are skipped, so empty roles share extent one.
-  const std::array<std::size_t, 3> extents{std::max<std::size_t>(inactive, 1),
-                                           std::max<std::size_t>(active, 1),
-                                           std::max<std::size_t>(virtuals, 1)};
-  static std::mutex mutex;
-  static std::array<std::size_t, 3> cached_extents{};
-  static bool cached_spin_free = false;
-  static std::shared_ptr<const std::vector<Plan>> cached;
-  const std::lock_guard lock(mutex);
-  if (!cached || cached_extents != extents || cached_spin_free != spin_free) {
-    cached.reset();
-    cached = std::make_shared<const std::vector<Plan>>(
-        build_plans(reusable_equations(), extents, spin_free));
-    cached_extents = extents;
-    cached_spin_free = spin_free;
-  }
-  return cached;
-}
-}  // namespace
+// Couplings at or below this are numerical zeros of symmetry-forbidden
+// integrals and stay out of the diagnostics.
+constexpr double negligible_coupling = 1e-12;
 
-DownfoldResult downfold(
-    const std::array<Eigen::MatrixXd, 2>& one_body,
-    const TwoBodyBlocks& two_body, const std::array<Eigen::MatrixXd, 2>& fock,
-    const std::vector<int>& active, const std::vector<int>& inactive,
-    const std::vector<int>& virtuals, const RegularizerOptions& regularizer,
-    double core_energy, const std::array<Eigen::MatrixXd, 2>& density) {
-  const int norb = fock[0].rows();
-  const int active_count = active.size();
-  const bool fold = density[0].size() != 0;
-  bool consistent = norb > 0 && active_count > 0;
-  for (int spin = 0; spin < 2; ++spin)
-    consistent =
-        consistent && fock[spin].rows() == norb && fock[spin].cols() == norb &&
-        one_body[spin].rows() == norb && one_body[spin].cols() == norb &&
-        (fold ? density[spin].rows() == norb && density[spin].cols() == norb
-              : density[spin].size() == 0);
-  for (const auto& block : two_body)
-    consistent = consistent && block.get().size() == n4(norb);
-  if (!consistent)
-    throw std::invalid_argument(
-        "SW-PT2: inconsistent spatial tensor dimensions");
-  const std::array<Eigen::VectorXd, 2> energies{fock[0].diagonal(),
-                                                fock[1].diagonal()};
-  const std::map<wchar_t, const std::vector<int>*> roles{
-      {L'i', &inactive}, {L'u', &active}, {L'a', &virtuals}};
-  std::vector<char> orbital_roles(norb, 0);
-  for (const auto& [role, orbitals] : roles)
-    for (const int orbital : *orbitals) {
-      if (orbital < 0 || orbital >= norb || orbital_roles[orbital] != 0)
-        throw std::invalid_argument(
-            "SW-PT2: invalid or repeated spatial role index");
-      orbital_roles[orbital] = static_cast<char>(role);
-    }
-  if (std::find(orbital_roles.begin(), orbital_roles.end(), 0) !=
-      orbital_roles.end())
-    throw std::invalid_argument(
-        "SW-PT2: spatial roles do not cover the window");
-  const bool spin_free =
-      spin_symmetric(one_body, two_body, density) && fock[0] == fock[1];
-  const auto integral = [&](int left, int right, int p, int q, int r, int s) {
+// Raw (undamped) amplitude, with the denominator floored at the bare cutoff.
+double raw_amplitude(double coupling, double delta) {
+  return std::abs(coupling) / std::max(std::abs(delta), bare_denominator_floor);
+}
+
+// Inputs shared by the steps of one downfold call.
+struct Inputs {
+  const TwoBodyBlocks& two_body;
+  const std::vector<int>& active;
+  const std::vector<int>& inactive;
+  const std::vector<int>& virtuals;
+  const RegularizerOptions& regularizer;
+  const std::array<Eigen::MatrixXd, 2>& density;
+  bool spin_free;
+  int norb;
+  std::array<Eigen::VectorXd, 2> energies;
+
+  const std::vector<int>& orbitals(wchar_t role) const {
+    return role == L'i' ? inactive : role == L'u' ? active : virtuals;
+  }
+  double integral(int left, int right, int p, int q, int r, int s) const {
     return chemist(two_body, left, right, p, q, r, s, norb);
-  };
-  const auto inverse_two_body = [&](double first, double second, double third,
-                                    double fourth) {
-    // Summing creators and annihilators separately makes the denominator
-    // exactly antisymmetric under the adjoint and symmetric under exchange,
-    // so S stays anti-Hermitian even at the bare cutoff.
-    return regularized_inverse((first + second) - (third + fourth),
+  }
+  // Summing creators and annihilators separately makes the denominator
+  // exactly antisymmetric under the adjoint and symmetric under exchange,
+  // so S stays anti-Hermitian even at the bare cutoff.
+  static double denominator(double first, double second, double third,
+                            double fourth) {
+    return (first + second) - (third + fourth);
+  }
+  double inverse_two_body(double first, double second, double third,
+                          double fourth) const {
+    return regularized_inverse(denominator(first, second, third, fourth),
                                regularizer);
-  };
-  // Normal order against the filled inactive space, not the density used for
-  // the generalized Fock. Each generator trace must be regularized separately.
-  std::array<Eigen::MatrixXd, 2> normal_ordered_one_body = one_body;
-  std::array<Eigen::MatrixXd, 2> generator_one_body = one_body;
+  }
+};
+
+struct OneBodyOperators {
+  std::array<Eigen::MatrixXd, 2> normal_ordered, generator;
+};
+
+// Normal order against the filled inactive space, not the density used for
+// the generalized Fock. Each generator trace must be regularized separately.
+OneBodyOperators one_body_operators(
+    const Inputs& in, const std::array<Eigen::MatrixXd, 2>& one_body) {
+  OneBodyOperators out{one_body, one_body};
+  const int norb = in.norb;
   for (int spin = 0; spin < 2; ++spin) {
-    const auto& eps = energies[spin];
+    const auto& eps = in.energies[spin];
 #pragma omp parallel for schedule(static) if (n4(norb) >= min_parallel_work)
     for (int row = 0; row < norb; ++row)
       for (int col = 0; col < norb; ++col) {
-        generator_one_body[spin](row, col) *=
-            regularized_inverse(eps(row) - eps(col), regularizer);
-        for (const int occupied : inactive) {
+        out.generator[spin](row, col) *=
+            regularized_inverse(eps(row) - eps(col), in.regularizer);
+        for (const int occupied : in.inactive) {
           // Coulomb with both spins of the occupied orbital, exchange with one.
           double trace = 0.0, generator_trace = 0.0;
           for (int other = 0; other < 2; ++other) {
             const double coulomb =
-                integral(spin, other, row, col, occupied, occupied);
+                in.integral(spin, other, row, col, occupied, occupied);
             trace += coulomb;
             generator_trace +=
-                coulomb * inverse_two_body(eps(row), energies[other](occupied),
-                                           energies[other](occupied), eps(col));
+                coulomb *
+                in.inverse_two_body(eps(row), in.energies[other](occupied),
+                                    in.energies[other](occupied), eps(col));
           }
           const double exchange =
-              integral(spin, spin, row, occupied, occupied, col);
+              in.integral(spin, spin, row, occupied, occupied, col);
           trace -= exchange;
           generator_trace -=
-              exchange * inverse_two_body(eps(row), eps(occupied),
-                                          eps(occupied), eps(col));
-          normal_ordered_one_body[spin](row, col) += trace;
-          generator_one_body[spin](row, col) += generator_trace;
+              exchange * in.inverse_two_body(eps(row), eps(occupied),
+                                             eps(occupied), eps(col));
+          out.normal_ordered[spin](row, col) += trace;
+          out.generator[spin](row, col) += generator_trace;
         }
       }
   }
+  return out;
+}
 
-  // Start with P H_BD P; the contraction plans add 1/2 P [S, H_OD] P below.
+// P H_BD P: the energy of the filled inactive space and the active blocks of
+// the normal-ordered operator.
+DownfoldResult block_diagonal_part(
+    const Inputs& in, const std::array<Eigen::MatrixXd, 2>& one_body,
+    const std::array<Eigen::MatrixXd, 2>& normal_ordered, double core_energy) {
   DownfoldResult result;
   result.scalar = core_energy;
-  for (const int occupied : inactive)
+  for (const int occupied : in.inactive)
     for (int spin = 0; spin < 2; ++spin) {
       result.scalar += one_body[spin](occupied, occupied);
-      for (const int other : inactive) {
+      for (const int other : in.inactive) {
         for (int partner = 0; partner < 2; ++partner)
-          result.scalar +=
-              0.5 * integral(spin, partner, occupied, occupied, other, other);
+          result.scalar += 0.5 * in.integral(spin, partner, occupied, occupied,
+                                             other, other);
         result.scalar -=
-            0.5 * integral(spin, spin, occupied, other, other, occupied);
+            0.5 * in.integral(spin, spin, occupied, other, other, occupied);
       }
     }
-  for (int spin = 0; spin < 2; ++spin) {
-    result.one_body[spin].resize(active_count, active_count);
-    for (int row = 0; row < active_count; ++row)
-      for (int col = 0; col < active_count; ++col)
-        result.one_body[spin](row, col) =
-            normal_ordered_one_body[spin](active[row], active[col]);
-  }
+  for (int spin = 0; spin < 2; ++spin)
+    result.one_body[spin] = normal_ordered[spin](in.active, in.active);
+  const int count = static_cast<int>(in.active.size());
   const auto active_block = [&](int left, int right) {
-    Eigen::VectorXd block(n4(active_count));
-    for (int first = 0; first < active_count; ++first)
-      for (int second = 0; second < active_count; ++second)
-        for (int third = 0; third < active_count; ++third)
-          for (int fourth = 0; fourth < active_count; ++fourth)
-            block(idx4(first, second, third, fourth, active_count)) =
-                integral(left, right, active[first], active[second],
-                         active[third], active[fourth]);
+    Eigen::VectorXd block(n4(count));
+    for (int first = 0; first < count; ++first)
+      for (int second = 0; second < count; ++second)
+        for (int third = 0; third < count; ++third)
+          for (int fourth = 0; fourth < count; ++fourth)
+            block(idx4(first, second, third, fourth, count)) =
+                in.integral(left, right, in.active[first], in.active[second],
+                            in.active[third], in.active[fourth]);
     return block;
   };
   result.two_body = active_block(0, 1);
   // Spin-free same-spin blocks are copies of the final aabb block.
-  if (!spin_free)
+  if (!in.spin_free)
     result.same_spin_two_body = {active_block(0, 0), active_block(1, 1)};
-  if (inactive.empty() && virtuals.empty()) {
-    if (spin_free)
-      result.same_spin_two_body = {result.two_body, result.two_body};
-    return result;
-  }
+  return result;
+}
 
-  // Diagnostics scan the excitations out of the reference external
-  // occupation: active or virtual orbitals created, inactive or active ones
-  // annihilated. Other terms are adjoints of these or never act on P, and
-  // inactive spectators are already part of the generalized-Fock one-body
-  // coupling. Couplings are raw, before damping; those below
-  // `negligible_coupling` are numerical zeros of symmetry-forbidden integrals.
-  constexpr double negligible_coupling = 1e-12;
-  std::vector<int> creatable(active), annihilable(inactive);
-  creatable.insert(creatable.end(), virtuals.begin(), virtuals.end());
-  annihilable.insert(annihilable.end(), active.begin(), active.end());
-  const auto amplitude = [](double coupling, double delta) {
-    return std::abs(coupling) /
-           std::max(std::abs(delta), bare_denominator_floor);
-  };
-  double min_denominator = result.min_denominator;
-  double max_amplitude = result.max_amplitude;
+// One-body diagnostics: the single excitations out of the reference external
+// occupation (active or virtual created, inactive or active annihilated),
+// with the generalized-Fock coupling, which includes inactive spectators.
+// Double excitations are recorded while their generator operands are built.
+void track_single_couplings(
+    const Inputs& in, const std::array<Eigen::MatrixXd, 2>& normal_ordered,
+    const std::array<Eigen::MatrixXd, 2>& fock, DownfoldResult& result) {
+  std::vector<char> active(in.norb, 0);
+  for (const int orbital : in.active) active[orbital] = 1;
+  std::vector<int> creatable(in.active), annihilable(in.inactive);
+  creatable.insert(creatable.end(), in.virtuals.begin(), in.virtuals.end());
+  annihilable.insert(annihilable.end(), in.active.begin(), in.active.end());
   for (const int creator : creatable)
     for (const int annihilator : annihilable) {
-      if (orbital_roles[creator] == orbital_roles[annihilator]) continue;
-      for (int spin = 0; spin < (spin_free ? 1 : 2); ++spin) {
+      // Active-active excitations leave the external occupation unchanged.
+      if (active[creator] && active[annihilator]) continue;
+      for (int spin = 0; spin < (in.spin_free ? 1 : 2); ++spin) {
         const double delta =
-            energies[spin](creator) - energies[spin](annihilator);
+            in.energies[spin](creator) - in.energies[spin](annihilator);
         // The generator's one-body coefficient is the normal-ordered one.
-        if (std::abs(normal_ordered_one_body[spin](creator, annihilator)) >
+        if (std::abs(normal_ordered[spin](creator, annihilator)) >
             negligible_coupling)
-          min_denominator = std::min(min_denominator, std::abs(delta));
-        max_amplitude = std::max(
-            max_amplitude, amplitude(fock[spin](creator, annihilator), delta));
+          result.min_denominator =
+              std::min(result.min_denominator, std::abs(delta));
+        result.max_amplitude =
+            std::max(result.max_amplitude,
+                     raw_amplitude(fock[spin](creator, annihilator), delta));
       }
     }
-  const int creatable_count = creatable.size();
-#pragma omp parallel for collapse(2) schedule(static) \
-    reduction(min : min_denominator)                  \
-    reduction(max : max_amplitude) if (n4(norb) >= min_parallel_work)
-  for (int first_ordinal = 0; first_ordinal < creatable_count; ++first_ordinal)
-    for (int second_ordinal = 0; second_ordinal < creatable_count;
-         ++second_ordinal) {
-      const int first = creatable[first_ordinal];
-      const int second = creatable[second_ordinal];
-      for (const int third : annihilable)
-        for (const int fourth : annihilable) {
-          if (!changes_occupation({orbital_roles[first], orbital_roles[second],
-                                   orbital_roles[third],
-                                   orbital_roles[fourth]}))
-            continue;
-          // Particles (first, third) and (second, fourth); beta-alpha repeats
-          // alpha-beta with the particles swapped.
-          const auto track_pair = [&](int spin, int partner) {
-            const double direct =
-                integral(spin, partner, first, third, second, fourth);
-            const double coupling =
-                spin == partner ? direct - integral(spin, spin, first, fourth,
-                                                    second, third)
-                                : direct;
-            if (std::abs(coupling) <= negligible_coupling) return;
-            const double delta =
-                (energies[spin](first) + energies[partner](second)) -
-                (energies[spin](third) + energies[partner](fourth));
-            min_denominator = std::min(min_denominator, std::abs(delta));
-            max_amplitude = std::max(max_amplitude, amplitude(coupling, delta));
-          };
-          track_pair(0, 0);
-          track_pair(0, 1);
-          // Beta-beta repeats alpha-alpha for spin-free input.
-          if (!spin_free) track_pair(1, 1);
-        }
-    }
-  result.min_denominator = min_denominator;
-  result.max_amplitude = max_amplitude;
-  using OperandKey =
-      std::tuple<std::wstring, std::vector<wchar_t>, std::vector<int>>;
-  std::map<OperandKey, sq::ResultPtr> operand_cache;
-  const auto evaluate_leaf =
-      [&](const sq::EvalNodeBTAS& node) -> sq::ResultPtr {
-    if (!node->is_tensor())
-      return sq::eval_result<sq::ResultScalar<double>>(
-          node->as_constant().value<double>());
-    const auto& source = node->as_tensor();
-    std::vector<wchar_t> block_roles;
-    std::vector<int> spins;
-    std::vector<const std::vector<int>*> orbitals;
-    std::vector<std::size_t> extents;
-    for (const auto& index : source.const_braket_indices()) {
-      block_roles.push_back(index.space().base_key()[0]);
-      spins.push_back(!spin_free && sq::mbpt::to_spin(index.space().qns()) ==
-                                        sq::mbpt::Spin::beta);
-      orbitals.push_back(roles.at(block_roles.back()));
-      extents.push_back(orbitals.back()->size());
-    }
-    const OperandKey key{std::wstring(source.label()), block_roles, spins};
-    if (operand_cache.contains(key)) return operand_cache.at(key);
-    const bool is_generator = source.label() == L"S";
-    const bool is_density = source.label() == L"D";
-    const bool is_one_body = source.bra_rank() == 1;
-    // Two-body slots (0, 2) and (1, 3) belong to the same particle.
-    const int spin = spins[0], partner = is_one_body ? spin : spins[1];
-    const auto& one_body_block =
-        (is_generator ? generator_one_body : normal_ordered_one_body)[spin];
-    const auto& eps = energies[spin];
-    const auto& partner_eps = energies[partner];
-    Tensor values{btas::Range{extents}};
-    const auto size = static_cast<std::ptrdiff_t>(values.size());
-#pragma omp parallel for schedule(static) if (size >= min_parallel_work)
-    for (std::ptrdiff_t ordinal = 0; ordinal < size; ++ordinal) {
-      // BTAS tensors are row-major.
-      std::array<int, 4> orbital{};
-      auto rest = static_cast<std::size_t>(ordinal);
-      for (std::size_t axis = orbitals.size(); axis-- > 0;) {
-        orbital[axis] = (*orbitals[axis])[rest % extents[axis]];
-        rest /= extents[axis];
-      }
-      double value;
-      if (is_density) {
-        value = density[spin](orbital[1], orbital[0]);
-      } else if (is_one_body) {
-        value = one_body_block(orbital[0], orbital[1]);
-      } else {
-        // Symbolic (bra, ket) slots map to chemist (pq|rs) order.
-        value = integral(spin, partner, orbital[0], orbital[2], orbital[1],
-                         orbital[3]);
-        if (is_generator)
-          value *= inverse_two_body(eps(orbital[0]), partner_eps(orbital[1]),
-                                    eps(orbital[2]), partner_eps(orbital[3]));
-      }
-      values.data()[ordinal] = value;
-    }
-    auto value =
-        sq::eval_result<sq::ResultTensorBTAS<Tensor>>(std::move(values));
-    operand_cache.emplace(key, value);
-    return value;
-  };
-  const auto plans = reusable_plans(inactive.size(), active.size(),
-                                    virtuals.size(), spin_free);
+}
+
+// Plans whose operands touch an empty role, and folded plans without a
+// density, contribute nothing.
+std::vector<const Plan*> select_plans(const std::vector<Plan>& plans,
+                                      const Inputs& in) {
+  const bool fold = in.density[0].size() != 0;
   std::vector<const Plan*> selected;
-  for (const auto& plan : *plans) {
+  for (const auto& plan : plans) {
     if (plan.folded && !fold) continue;
     bool empty = false;
     plan.tree.visit([&](const auto& node) {
       if (!node.leaf() || !node->is_tensor()) return;
       for (const auto& index : node->as_tensor().const_braket_indices())
-        empty = empty || roles.at(index.space().base_key()[0])->empty();
+        empty = empty || in.orbitals(index.space().base_key()[0]).empty();
     });
-    if (empty) continue;
-    plan.tree.visit([&](const auto& node) {
-      if (node.leaf()) evaluate_leaf(node);
-    });
-    selected.push_back(&plan);
+    if (!empty) selected.push_back(&plan);
   }
-  std::vector<sq::ResultPtr> plan_values(selected.size());
+  return selected;
+}
+
+// Label, orbital roles and spins of a plan leaf.
+using OperandKey =
+    std::tuple<std::wstring, std::vector<wchar_t>, std::vector<int>>;
+
+OperandKey operand_key(const sq::Tensor& tensor, bool spin_free) {
+  OperandKey key{std::wstring(tensor.label()), {}, {}};
+  for (const auto& index : tensor.const_braket_indices()) {
+    std::get<1>(key).push_back(index.space().base_key()[0]);
+    std::get<2>(key).push_back(!spin_free &&
+                               sq::mbpt::to_spin(index.space().qns()) ==
+                                   sq::mbpt::Spin::beta);
+  }
+  return key;
+}
+
+// The numerical operand of one leaf: an integral, generator or density block.
+// Generator two-body operands also record the diagnostics of their raw
+// couplings; a spin-free operand stands for both the same-spin channel, which
+// subtracts exchange, and the opposite-spin one.
+sq::ResultPtr build_operand(const Inputs& in, const OneBodyOperators& operators,
+                            const OperandKey& key, DownfoldResult& result) {
+  const auto& [label, block_roles, spins] = key;
+  std::vector<const std::vector<int>*> orbitals;
+  std::vector<std::size_t> extents;
+  for (const wchar_t role : block_roles) {
+    orbitals.push_back(&in.orbitals(role));
+    extents.push_back(orbitals.back()->size());
+  }
+  const bool is_generator = label == L"S";
+  const bool is_density = label == L"D";
+  const bool is_one_body = block_roles.size() == 2;
+  // Two-body slots (0, 2) and (1, 3) belong to the same particle.
+  const int spin = spins[0], partner = is_one_body ? spin : spins[1];
+  const auto& one_body_block =
+      (is_generator ? operators.generator : operators.normal_ordered)[spin];
+  const auto& eps = in.energies[spin];
+  const auto& partner_eps = in.energies[partner];
+  const bool same_spin = in.spin_free || spin == partner;
+  const bool opposite_spin = in.spin_free || spin != partner;
+  double min_denominator = result.min_denominator;
+  double max_amplitude = result.max_amplitude;
+  Tensor values{btas::Range{extents}};
+  const auto size = static_cast<std::ptrdiff_t>(values.size());
+#pragma omp parallel for schedule(static) reduction(min : min_denominator) \
+    reduction(max : max_amplitude) if (size >= min_parallel_work)
+  for (std::ptrdiff_t ordinal = 0; ordinal < size; ++ordinal) {
+    // BTAS tensors are row-major.
+    std::array<int, 4> orbital{};
+    auto rest = static_cast<std::size_t>(ordinal);
+    for (std::size_t axis = orbitals.size(); axis-- > 0;) {
+      orbital[axis] = (*orbitals[axis])[rest % extents[axis]];
+      rest /= extents[axis];
+    }
+    double value;
+    if (is_density) {
+      value = in.density[spin](orbital[1], orbital[0]);
+    } else if (is_one_body) {
+      value = one_body_block(orbital[0], orbital[1]);
+    } else {
+      // Symbolic (bra, ket) slots map to chemist (pq|rs) order.
+      const double direct = in.integral(spin, partner, orbital[0], orbital[2],
+                                        orbital[1], orbital[3]);
+      value = direct;
+      if (is_generator) {
+        const double delta =
+            Inputs::denominator(eps(orbital[0]), partner_eps(orbital[1]),
+                                eps(orbital[2]), partner_eps(orbital[3]));
+        value *= regularized_inverse(delta, in.regularizer);
+        const auto record = [&](double coupling) {
+          if (std::abs(coupling) <= negligible_coupling) return;
+          min_denominator = std::min(min_denominator, std::abs(delta));
+          max_amplitude =
+              std::max(max_amplitude, raw_amplitude(coupling, delta));
+        };
+        if (opposite_spin) record(direct);
+        if (same_spin)
+          record(direct - in.integral(spin, spin, orbital[0], orbital[3],
+                                      orbital[1], orbital[2]));
+      }
+    }
+    values.data()[ordinal] = value;
+  }
+  result.min_denominator = min_denominator;
+  result.max_amplitude = max_amplitude;
+  return sq::eval_result<sq::ResultTensorBTAS<Tensor>>(std::move(values));
+}
+
+using Operands = std::map<OperandKey, sq::ResultPtr>;
+
+Operands build_operands(const std::vector<const Plan*>& selected,
+                        const Inputs& in, const OneBodyOperators& operators,
+                        DownfoldResult& result) {
+  Operands operands;
+  for (const Plan* plan : selected)
+    plan->tree.visit([&](const auto& node) {
+      if (!node.leaf() || !node->is_tensor()) return;
+      auto key = operand_key(node->as_tensor(), in.spin_free);
+      if (!operands.contains(key))
+        operands.emplace(key, build_operand(in, operators, key, result));
+    });
+  return operands;
+}
+
+// Plans run concurrently with BLAS pinned to one thread, reading the
+// prebuilt operands.
+std::vector<sq::ResultPtr> evaluate_plans(
+    const std::vector<const Plan*>& selected, const Operands& operands,
+    const Inputs& in) {
+  const auto leaf = [&](const sq::EvalNodeBTAS& node) -> sq::ResultPtr {
+    if (!node->is_tensor())
+      return sq::eval_result<sq::ResultScalar<double>>(
+          node->as_constant().value<double>());
+    return operands.at(operand_key(node->as_tensor(), in.spin_free));
+  };
+  std::vector<sq::ResultPtr> values(selected.size());
   std::exception_ptr failure;
   const auto plan_count = static_cast<std::ptrdiff_t>(selected.size());
   {
     const qdk::chemistry::scf::util::ScopedBlasThreads blas_thread_guard;
-#pragma omp parallel for schedule(dynamic, 1) if (n4(norb) >= min_parallel_work)
+#pragma omp parallel for schedule(dynamic, \
+                                      1) if (n4(in.norb) >= min_parallel_work)
     for (std::ptrdiff_t ordinal = 0; ordinal < plan_count; ++ordinal) {
       try {
-        plan_values[ordinal] =
-            sq::evaluate(selected[ordinal]->tree, evaluate_leaf);
+        values[ordinal] = sq::evaluate(selected[ordinal]->tree, leaf);
       } catch (...) {
 #pragma omp critical(swpt2_plan_failure)
         if (!failure) failure = std::current_exception();
@@ -1006,37 +877,81 @@ DownfoldResult downfold(
     }
   }
   if (failure) std::rethrow_exception(failure);
-  for (std::ptrdiff_t ordinal = 0; ordinal < plan_count; ++ordinal) {
-    const Plan& plan = *selected[ordinal];
-    const auto value = std::move(plan_values[ordinal]);
-    if (plan.rank == 0) {
-      result.scalar += value->get<double>();
+  return values;
+}
+
+// Adds one plan's value to the active-space operator.
+void merge(const Plan& plan, const sq::ResultPtr& value, int active_count,
+           DownfoldResult& result) {
+  if (plan.rank == 0) {
+    result.scalar += value->get<double>();
+    return;
+  }
+  const auto& values = value->get<Tensor>();
+  // BTAS stores canonical axes, which need not match the requested output.
+  std::vector<std::size_t> output_axes;
+  for (const auto& index : plan.tree->as_tensor().const_braket_indices())
+    output_axes.push_back(std::find(plan.tree->canon_indices().begin(),
+                                    plan.tree->canon_indices().end(), index) -
+                          plan.tree->canon_indices().begin());
+  for (const auto& index : values.range()) {
+    const auto at = [&](int axis) { return index[output_axes[axis]]; };
+    if (plan.rank == 1) {
+      result.one_body[plan.spin_case](at(0), at(1)) += values(index);
       continue;
     }
-    const auto& values = value->get<Tensor>();
-    // BTAS stores canonical axes, which need not match the requested output.
-    std::vector<std::size_t> output_axes;
-    for (const auto& index : plan.tree->as_tensor().const_braket_indices())
-      output_axes.push_back(std::find(plan.tree->canon_indices().begin(),
-                                      plan.tree->canon_indices().end(), index) -
-                            plan.tree->canon_indices().begin());
-    for (const auto& index : values.range()) {
-      const auto at = [&](int axis) { return index[output_axes[axis]]; };
-      if (plan.rank == 1) {
-        result.one_body[plan.spin_case](at(0), at(1)) += values(index);
-        continue;
-      }
-      // Chemist storage reverses the annihilator pair, giving the minus sign.
-      if (plan.spin_case == 1) {
-        result.two_body(idx4(at(0), at(2), at(1), at(3), active_count)) -=
-            values(index);
-        continue;
-      }
-      // A same-spin block also takes the copy with the particles exchanged.
-      auto& block = result.same_spin_two_body[plan.spin_case / 2];
-      block(idx4(at(0), at(2), at(1), at(3), active_count)) -= values(index);
-      block(idx4(at(1), at(3), at(0), at(2), active_count)) -= values(index);
+    // Chemist storage reverses the annihilator pair, giving the minus sign.
+    if (plan.spin_case == 1) {
+      result.two_body(idx4(at(0), at(2), at(1), at(3), active_count)) -=
+          values(index);
+      continue;
     }
+    // A same-spin block also takes the copy with the particles exchanged.
+    auto& block = result.same_spin_two_body[plan.spin_case / 2];
+    block(idx4(at(0), at(2), at(1), at(3), active_count)) -= values(index);
+    block(idx4(at(1), at(3), at(0), at(2), active_count)) -= values(index);
+  }
+}
+}  // namespace
+
+DownfoldResult downfold(const std::array<Eigen::MatrixXd, 2>& one_body,
+                        const TwoBodyBlocks& two_body,
+                        const std::array<Eigen::MatrixXd, 2>& fock,
+                        const std::vector<int>& active,
+                        const std::vector<int>& inactive,
+                        const std::vector<int>& virtuals,
+                        const RegularizerOptions& regularizer,
+                        double core_energy, bool spin_free,
+                        const std::array<Eigen::MatrixXd, 2>& density) {
+  const Inputs in{two_body,
+                  active,
+                  inactive,
+                  virtuals,
+                  regularizer,
+                  density,
+                  spin_free,
+                  static_cast<int>(fock[0].rows()),
+                  {fock[0].diagonal(), fock[1].diagonal()}};
+  const auto operators = one_body_operators(in, one_body);
+  // Start with P H_BD P; the contraction plans add 1/2 P [S, H_OD] P.
+  auto result =
+      block_diagonal_part(in, one_body, operators.normal_ordered, core_energy);
+  if (!inactive.empty() || !virtuals.empty()) {
+    track_single_couplings(in, operators.normal_ordered, fock, result);
+    // Plans touching an empty role are skipped, so empty roles share extent
+    // one.
+    const auto extent = [](const std::vector<int>& orbitals) {
+      return std::max<std::size_t>(orbitals.size(), 1);
+    };
+    const auto plans = build_plans(
+        reusable_equations(),
+        {extent(inactive), extent(active), extent(virtuals)}, spin_free);
+    const auto selected = select_plans(plans, in);
+    const auto operands = build_operands(selected, in, operators, result);
+    const auto values = evaluate_plans(selected, operands, in);
+    for (std::size_t ordinal = 0; ordinal < selected.size(); ++ordinal)
+      merge(*selected[ordinal], values[ordinal],
+            static_cast<int>(active.size()), result);
   }
   if (spin_free) {
     result.one_body[1] = result.one_body[0];

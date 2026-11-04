@@ -646,6 +646,56 @@ TEST(SchriefferWolffPT2Test, AcceptsRestrictedOpenShellHfReference) {
   auto cas = MultiConfigurationCalculatorFactory::create("macis_cas");
   auto [E_sw, wfn_sw] = cas->run(H_eff, 1, 0);
   EXPECT_TRUE(std::isfinite(E_sw));
+
+  // Folding the singly occupied orbital would need an arbitrary rounding.
+  std::vector<size_t> unused;
+  for (const size_t orbital : window)
+    if (!used.count(orbital)) unused.push_back(orbital);
+  EXPECT_THROW(swpt2->run(reference, H_window,
+                          testing::restricted_index_set(
+                              orbitals->get_num_molecular_orbitals(), unused)),
+               std::invalid_argument);
+}
+
+// The folded core is closed-shell, so each spin of a restricted reference must
+// keep a feasible electron count in P, not just their sum.
+TEST(SchriefferWolffPT2Test, RejectsFoldThatLeavesNegativeSpinCount) {
+  namespace qcd = qdk::chemistry::data;
+  auto water = testing::create_water_structure();
+  auto scf = ScfSolverFactory::create();
+  auto [E_hf, wfn_hf] = scf->run(water, 0, 1, "sto-3g");
+  const auto orbitals = wfn_hf->get_orbitals();
+  const size_t norb = orbitals->get_num_molecular_orbitals();
+  const std::vector<size_t> core{0};
+  const std::vector<size_t> reference_active{1, 2, 3, 4, 5};
+
+  // Five alpha and three beta electrons; each determinant lacks one beta
+  // electron in orbitals 1-4, whose spin-traced occupations become 1.75.
+  std::vector<qcd::Configuration> determinants;
+  for (const char* occupation : {"u222u", "2u22u", "22u2u", "222uu"})
+    determinants.push_back(
+        qcd::Configuration::from_spin_half_string(occupation));
+  Eigen::MatrixXd rdm = Eigen::MatrixXd::Identity(5, 5);
+  rdm.topLeftCorner(4, 4) +=
+      Eigen::MatrixXd::Identity(4, 4) - Eigen::MatrixXd::Constant(4, 4, 0.25);
+  auto reference = std::make_shared<qcd::Wavefunction>(
+      std::make_unique<qcd::StateVectorContainer>(
+          Eigen::VectorXd(Eigen::VectorXd::Constant(4, 0.5)), determinants,
+          testing::with_active_space(orbitals, reference_active, core), rdm,
+          std::nullopt));
+  auto H_window = HamiltonianConstructorFactory::create()->run(
+      testing::with_active_space(orbitals, {1, 2, 3, 4, 5, 6}, core));
+  auto swpt2 = EffectiveHamiltonianConstructorFactory::create("qdk_swpt2");
+
+  // Folding orbitals 1-4 as doubly occupied leaves 1 alpha and -1 beta
+  // electrons in P = {5}, although the total is a valid zero.
+  EXPECT_THROW(
+      swpt2->run(reference, H_window,
+                 testing::restricted_index_set(norb, std::vector<size_t>{5})),
+      std::invalid_argument);
+  EXPECT_NO_THROW(
+      swpt2->run(reference, H_window,
+                 testing::restricted_index_set(norb, reference_active)));
 }
 
 TEST(SchriefferWolffPT2Test,

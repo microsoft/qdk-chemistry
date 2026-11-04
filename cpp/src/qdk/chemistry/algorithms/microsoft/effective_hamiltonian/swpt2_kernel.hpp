@@ -25,7 +25,6 @@
 #include <cstddef>
 #include <functional>
 #include <limits>
-#include <unordered_set>
 #include <vector>
 
 namespace qdk::chemistry::algorithms::microsoft::swpt2 {
@@ -55,11 +54,12 @@ using TwoBodyBlocks =
 
 /// Generalized Fock matrices from per-spin 1-RDMs D^s,
 /// F^s_pq = h^s_pq + sum_t sum_rs D^t_rs (pq|rs)^st - sum_rs D^s_rs (pr|sq)^ss.
-/// Their diagonals supply the denominator energies.
+/// Their diagonals supply the denominator energies. `spin_free` input has
+/// identical spin blocks, so only the alpha matrix is formed.
 std::array<Eigen::MatrixXd, 2> generalized_fock_matrices(
     const std::array<Eigen::MatrixXd, 2>& one_body,
     const TwoBodyBlocks& two_body,
-    const std::array<Eigen::MatrixXd, 2>& density, int norb);
+    const std::array<Eigen::MatrixXd, 2>& density, int norb, bool spin_free);
 
 /// Block-diagonal orthogonal rotation that diagonalizes each Fock sub-block.
 /// Blocks contain spatial-orbital indices and must be disjoint. Blocks whose
@@ -98,37 +98,17 @@ struct DownfoldResult {
 /// Spin-blocked downfold. The diagonals of the per-spin generalized Fock
 /// matrices `fock` are the orbital energies of the denominators; their
 /// off-diagonals are the one-body couplings of the amplitude diagnostic.
+/// `spin_free` input has identical spin blocks and is evaluated once.
 /// `density` holds the per-spin reference 1-RDMs used to fold terms above
 /// two-body; leave it empty to discard them.
-DownfoldResult downfold(
-    const std::array<Eigen::MatrixXd, 2>& one_body,
-    const TwoBodyBlocks& two_body, const std::array<Eigen::MatrixXd, 2>& fock,
-    const std::vector<int>& active, const std::vector<int>& inactive,
-    const std::vector<int>& virtuals, const RegularizerOptions& regularizer,
-    double core_energy, const std::array<Eigen::MatrixXd, 2>& density = {});
-
-/// Window roles chosen by the folding policy, plus the rounding diagnostics a
-/// caller needs to judge how much the fold perturbed the reference density.
-struct WindowPartition {
-  /// Spatial positions into the window.
-  std::vector<int> active_spatial, inactive_spatial, virtual_spatial;
-  int active_electrons = 0;       ///< window electrons the rounded fold leaves
-  double worst_deviation = 0.0;   ///< largest folded |occupation - rounded|
-  double worst_occupation = 0.0;  ///< occupation attaining `worst_deviation`
-  std::size_t worst_orbital = 0;  ///< global index attaining it
-  /// Rounded folded electron count minus the reference occupation over the
-  /// folded orbitals. Roundings of opposite sign cancel here, so this is the
-  /// monopole of the density error and can grow where `worst_deviation` cannot.
-  double folded_charge_error = 0.0;
-};
-
-/// Keep `kept_global` active and fold every other window orbital by rounding
-/// its reference occupation (`occupation`, by window position) to 2 or 0.
-/// Throws `std::invalid_argument` past `max_folded_occupation_deviation`.
-WindowPartition partition_window(
-    const std::vector<double>& occupation,
-    const std::vector<std::size_t>& window_global,
-    const std::unordered_set<std::size_t>& kept_global, int window_electrons,
-    double max_folded_occupation_deviation);
+DownfoldResult downfold(const std::array<Eigen::MatrixXd, 2>& one_body,
+                        const TwoBodyBlocks& two_body,
+                        const std::array<Eigen::MatrixXd, 2>& fock,
+                        const std::vector<int>& active,
+                        const std::vector<int>& inactive,
+                        const std::vector<int>& virtuals,
+                        const RegularizerOptions& regularizer,
+                        double core_energy, bool spin_free,
+                        const std::array<Eigen::MatrixXd, 2>& density = {});
 
 }  // namespace qdk::chemistry::algorithms::microsoft::swpt2

@@ -163,11 +163,21 @@ std::array<Eigen::MatrixXd, 2> spin_densities(
   return density;
 }
 
+// Spin-free input shares every spin block, so the kernel evaluates it once.
+bool spin_symmetric(const OneBodyCase& inputs,
+                    const std::array<Eigen::MatrixXd, 2>& density) {
+  return inputs.one_body[0] == inputs.one_body[1] &&
+         inputs.spin_energies(0) == inputs.spin_energies(1) &&
+         inputs.same_spin(0) == inputs.integrals &&
+         inputs.same_spin(1) == inputs.integrals && density[0] == density[1];
+}
+
 sw::DownfoldResult run_native(const OneBodyCase& inputs,
                               const sw::RegularizerOptions& regularizer,
                               const Eigen::MatrixXd& reference_density = {},
                               double core_energy = 0.17,
                               const Eigen::MatrixXd& beta_density = {}) {
+  const auto density = spin_densities(reference_density, beta_density);
   return sw::downfold(
       inputs.one_body,
       {std::cref(inputs.same_spin(0)), std::cref(inputs.integrals),
@@ -175,7 +185,7 @@ sw::DownfoldResult run_native(const OneBodyCase& inputs,
       {Eigen::MatrixXd(inputs.spin_energies(0).asDiagonal()),
        Eigen::MatrixXd(inputs.spin_energies(1).asDiagonal())},
       inputs.active, inputs.inactive, inputs.virtuals, regularizer, core_energy,
-      spin_densities(reference_density, beta_density));
+      spin_symmetric(inputs, density), density);
 }
 
 // Integrals and energies are shared by both spins; one-body blocks may differ.
@@ -189,7 +199,8 @@ sw::DownfoldResult shared_integral_downfold(
   return sw::downfold(
       {alpha, beta},
       {std::cref(integrals), std::cref(integrals), std::cref(integrals)},
-      {fock, fock}, active, inactive, virtuals, regularizer, core_energy);
+      {fock, fock}, active, inactive, virtuals, regularizer, core_energy,
+      alpha == beta);
 }
 
 // The generalized Fock matrix of a spin-traced density and spin-free integrals.
@@ -200,7 +211,7 @@ Eigen::MatrixXd spin_free_fock(const Eigen::MatrixXd& one_body,
   return sw::generalized_fock_matrices(
       {one_body, one_body},
       {std::cref(integrals), std::cref(integrals), std::cref(integrals)},
-      {half, half}, norb)[0];
+      {half, half}, norb, true)[0];
 }
 
 struct FockParts {
@@ -518,7 +529,7 @@ Eigen::MatrixXd fock_matrix(const sw::DownfoldResult& result) {
   return fock_parts(inputs, {}, result.scalar).diagonal;
 }
 
-TEST(Swpt2KernelTest, RestoresCallerContextAndReusesPlans) {
+TEST(Swpt2KernelTest, RestoresCallerContextAndReusesEquations) {
   auto caller_context = sequant::set_scoped_default_context(
       {.index_basis_registry_shared_ptr = sequant::mbpt::make_min_sr_spaces(
            sequant::mbpt::SpinConvention::None),
@@ -585,7 +596,7 @@ TEST(Swpt2KernelTest, ThreadCountDoesNotChangeResults) {
               inputs.one_body,
               {std::cref(inputs.same_spin(0)), std::cref(inputs.integrals),
                std::cref(inputs.same_spin(1))},
-              {alpha, beta}, norb),
+              {alpha, beta}, norb, !unrestricted),
           sw::rotate_two_body(inputs.integrals, rotation, rotation.transpose(),
                               norb)};
     };
@@ -630,7 +641,7 @@ TEST(Swpt2KernelTest, DiagnosticsTrackConnectingCouplings) {
     return sw::downfold(
         {one_body, one_body},
         {std::cref(integrals), std::cref(integrals), std::cref(integrals)},
-        {fock, fock}, {1}, {0}, {2, 3}, {}, 0.0);
+        {fock, fock}, {1}, {0}, {2, 3}, {}, 0.0, true);
   };
   const Eigen::MatrixXd diagonal = energies.asDiagonal();
   Eigen::MatrixXd one_body = diagonal, fock = diagonal;
@@ -645,20 +656,6 @@ TEST(Swpt2KernelTest, DiagnosticsTrackConnectingCouplings) {
   const auto pair = run(diagonal, diagonal);
   EXPECT_DOUBLE_EQ(pair.max_amplitude, 0.3 / 4.25);
   EXPECT_DOUBLE_EQ(pair.min_denominator, 4.25);
-}
-
-TEST(Swpt2KernelTest, RejectsMalformedDimensionsAndPartitions) {
-  const auto inputs = make_case({0, 2}, {1}, {});
-  auto malformed = inputs;
-  malformed.one_body[1] = Eigen::MatrixXd::Zero(2, 2);
-  EXPECT_THROW(run_native(malformed, {}), std::invalid_argument);
-  EXPECT_THROW(run_native(inputs, {}, Eigen::MatrixXd::Zero(2, 2)),
-               std::invalid_argument);
-  malformed = inputs;
-  malformed.active = {0, 1};
-  EXPECT_THROW(run_native(malformed, {}), std::invalid_argument);
-  malformed.active = {0, 3};
-  EXPECT_THROW(run_native(malformed, {}), std::invalid_argument);
 }
 
 TEST(Swpt2KernelTest, SpatialOneBodyMatchesFockSpace) {
@@ -1321,7 +1318,7 @@ TEST(Swpt2KernelTest, GeneralizedFockFromDefinition) {
     const auto spin_result = sw::generalized_fock_matrices(
         spin_one_body,
         {std::cref(blocks[0]), std::cref(blocks[1]), std::cref(blocks[2])},
-        spin_density, size);
+        spin_density, size, false);
     const auto chemist = [&](int left, int right, int p, int q, int r, int s) {
       if (left == right) return blocks[2 * left](sw::idx4(p, q, r, s, size));
       return left == 0 ? blocks[1](sw::idx4(p, q, r, s, size))
@@ -1416,61 +1413,6 @@ TEST(Swpt2KernelTest, SecondOrderLevelShifts) {
                   active_energy + 0.04 / (active_energy - external_energy),
                   1e-12);
   }
-}
-
-TEST(Swpt2KernelTest, PartitionWindowRoundsFoldedOccupations) {
-  const std::vector<std::size_t> window{10, 11, 12, 13};
-  const std::unordered_set<std::size_t> kept{11, 12};
-  const auto integer =
-      sw::partition_window({2.0, 1.0, 1.0, 0.0}, window, kept, 4, 0.5);
-  EXPECT_EQ(integer.active_spatial, (std::vector<int>{1, 2}));
-  EXPECT_EQ(integer.inactive_spatial, (std::vector<int>{0}));
-  EXPECT_EQ(integer.virtual_spatial, (std::vector<int>{3}));
-  EXPECT_EQ(integer.active_electrons, 2);
-  EXPECT_DOUBLE_EQ(integer.worst_deviation, 0.0);
-  EXPECT_DOUBLE_EQ(integer.folded_charge_error, 0.0);
-  const auto fractional =
-      sw::partition_window({1.98, 1.0, 1.0, 0.02}, window, kept, 4, 0.5);
-  EXPECT_EQ(fractional.inactive_spatial, (std::vector<int>{0}));
-  EXPECT_EQ(fractional.virtual_spatial, (std::vector<int>{3}));
-  EXPECT_EQ(fractional.active_electrons, 2);
-  EXPECT_NEAR(fractional.worst_deviation, 0.02, 1e-12);
-  EXPECT_EQ(fractional.worst_orbital, 10u);
-  EXPECT_NEAR(fractional.worst_occupation, 1.98, 1e-12);
-  EXPECT_NEAR(fractional.folded_charge_error, 0.0, 1e-12);
-}
-
-TEST(Swpt2KernelTest, PartitionWindowChargeErrorAccumulates) {
-  const auto result =
-      sw::partition_window({1.9, 1.9, 1.9, 1.3}, {0, 1, 2, 3}, {3}, 7, 0.5);
-  EXPECT_EQ(result.inactive_spatial, (std::vector<int>{0, 1, 2}));
-  EXPECT_TRUE(result.virtual_spatial.empty());
-  EXPECT_NEAR(result.worst_deviation, 0.1, 1e-12);
-  EXPECT_NEAR(result.folded_charge_error, 0.3, 1e-12);
-  EXPECT_EQ(result.active_electrons, 1);
-}
-
-TEST(Swpt2KernelTest, PartitionWindowRejectsAmbiguousFolds) {
-  const std::vector<std::size_t> window{0, 1, 2, 3};
-  const std::unordered_set<std::size_t> kept{1, 2};
-  EXPECT_THROW(sw::partition_window({1.0, 1.0, 1.0, 1.0}, window, kept, 4, 0.5),
-               std::invalid_argument);
-  EXPECT_NO_THROW(
-      sw::partition_window({2.0, 1.0, 1.0, 0.0}, window, kept, 4, 0.0));
-  EXPECT_THROW(
-      sw::partition_window({1.98, 1.0, 1.0, 0.02}, window, kept, 4, 0.0),
-      std::invalid_argument);
-  for (double tolerance : {-0.1, 1.0})
-    EXPECT_THROW(
-        sw::partition_window({2.0, 1.0, 1.0, 0.0}, window, kept, 4, tolerance),
-        std::invalid_argument);
-  EXPECT_THROW(sw::partition_window({2.0, 0.0}, {0, 1}, {}, 2, 0.5),
-               std::invalid_argument);
-  EXPECT_THROW(sw::partition_window({2.0, 0.0}, {0, 1, 2}, {0}, 2, 0.5),
-               std::invalid_argument);
-  for (int electrons : {1, 5})
-    EXPECT_THROW(sw::partition_window({2.0, 0.0}, {0, 1}, {1}, electrons, 0.5),
-                 std::invalid_argument);
 }
 
 TEST(Swpt2KernelTest, SemicanonicalPrimitivesAreCovariantAndReversible) {

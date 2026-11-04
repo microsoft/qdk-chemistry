@@ -113,22 +113,18 @@ Eigen::MatrixXd window_density(
 
   const int norb = static_cast<int>(window_global.size());
   Eigen::MatrixXd density = Eigen::MatrixXd::Zero(norb, norb);
-  std::vector<int> active_position(norb, -1);
+  std::vector<int> window_rows, reference_rows;
   for (int i = 0; i < norb; ++i) {
     const auto it = ref_active_pos.find(window_global[i]);
-    if (it != ref_active_pos.end())
-      active_position[i] = it->second;
-    else if (ref_inactive_set.count(window_global[i]))
+    if (it != ref_active_pos.end()) {
+      window_rows.push_back(i);
+      reference_rows.push_back(it->second);
+    } else if (ref_inactive_set.count(window_global[i])) {
       density(i, i) = 1.0;
+    }
   }
-
-  for (int i = 0; i < norb; ++i) {
-    if (active_position[i] < 0) continue;
-    for (int j = 0; j < norb; ++j)
-      if (active_position[j] >= 0)
-        density(i, j) =
-            ref_active_density(active_position[i], active_position[j]);
-  }
+  density(window_rows, window_rows) =
+      ref_active_density(reference_rows, reference_rows);
 
   constexpr double occupation_bound_tolerance = 1e-6;
   for (int i = 0; i < norb; ++i)
@@ -166,18 +162,75 @@ std::shared_ptr<data::Orbitals> relabeled_orbitals(
           p_indices->symmetries(), p_indices->extents(), std::move(inactive)));
 }
 
-/// Square sub-block of `matrix` on the given window positions.
-Eigen::MatrixXd sub_block(const Eigen::MatrixXd& matrix,
-                          const std::vector<int>& positions) {
-  const int n = static_cast<int>(positions.size());
-  Eigen::MatrixXd block(n, n);
-  for (int i = 0; i < n; ++i)
-    for (int j = 0; j < n; ++j)
-      block(i, j) = matrix(positions[i], positions[j]);
-  return block;
+/// Window roles chosen by the folding policy, plus the rounding diagnostics a
+/// caller needs to judge how much the fold perturbed the reference density.
+struct WindowPartition {
+  /// Spatial positions into the window.
+  std::vector<int> active_spatial, inactive_spatial, virtual_spatial;
+  int active_electrons = 0;       ///< window electrons the rounded fold leaves
+  double worst_deviation = 0.0;   ///< largest folded |occupation - rounded|
+  double worst_occupation = 0.0;  ///< occupation attaining `worst_deviation`
+  std::size_t worst_orbital = 0;  ///< global index attaining it
+  /// Rounded folded electron count minus the reference occupation over the
+  /// folded orbitals; roundings of opposite sign cancel here.
+  double folded_charge_error = 0.0;
+};
+
+/// Keep `kept_global` active and fold every other window orbital by rounding
+/// its reference occupation (`occupation`, by window position) to 2 or 0.
+WindowPartition partition_window(
+    const std::vector<double>& occupation,
+    const std::vector<std::size_t>& window_global,
+    const std::unordered_set<std::size_t>& kept_global, int window_electrons,
+    double max_folded_occupation_deviation) {
+  // The setting's bound constraint admits NaN.
+  if (!(max_folded_occupation_deviation >= 0.0 &&
+        max_folded_occupation_deviation < 1.0))
+    throw std::invalid_argument(
+        "SW-PT2: max_folded_occupation_deviation must lie in "
+        "[0, 1); a half-occupied orbital cannot be folded unambiguously.");
+
+  WindowPartition out;
+  const int norb = static_cast<int>(occupation.size());
+  for (int i = 0; i < norb; ++i) {
+    if (kept_global.count(window_global[i])) {
+      out.active_spatial.push_back(i);
+      continue;
+    }
+    const double to_occupied = std::abs(occupation[i] - 2.0);
+    const double to_empty = std::abs(occupation[i]);
+    const double deviation = std::min(to_occupied, to_empty);
+    if (deviation > max_folded_occupation_deviation)
+      throw std::invalid_argument(
+          "SW-PT2: folded external orbital " +
+          std::to_string(window_global[i]) + " has reference occupation " +
+          std::to_string(occupation[i]) +
+          ", which deviates from an integer occupation by more than "
+          "max_folded_occupation_deviation. Keep strongly correlated or "
+          "open-shell orbitals in the active space P (p_indices), or raise "
+          "the setting to accept the rounding.");
+    if (deviation > out.worst_deviation) {
+      out.worst_deviation = deviation;
+      out.worst_occupation = occupation[i];
+      out.worst_orbital = window_global[i];
+    }
+    (to_occupied <= to_empty ? out.inactive_spatial : out.virtual_spatial)
+        .push_back(i);
+  }
+
+  // The active space takes the electrons the rounded fold leaves, which need
+  // not equal the reference occupation of P.
+  const int folded_electrons =
+      2 * static_cast<int>(out.inactive_spatial.size());
+  out.active_electrons = window_electrons - folded_electrons;
+  double folded_occupation = 0.0;
+  for (int i : out.inactive_spatial) folded_occupation += occupation[i];
+  for (int i : out.virtual_spatial) folded_occupation += occupation[i];
+  out.folded_charge_error = folded_electrons - folded_occupation;
+  return out;
 }
 
-void log_fold_rounding(const sw::WindowPartition& roles) {
+void log_fold_rounding(const WindowPartition& roles) {
   QDK_LOGGER().info(
       "SW-PT2 partition: active={}, folded inactive={}, folded virtual={}; "
       "active electrons={}, largest folded occupation deviation={:.3g}, "
@@ -186,58 +239,32 @@ void log_fold_rounding(const sw::WindowPartition& roles) {
       roles.virtual_spatial.size(), roles.active_electrons,
       roles.worst_deviation, roles.folded_charge_error);
 
-  // Roundings of opposite sign cancel, so a correlated pair folded together is
-  // benign; a net charge error is not.
   constexpr double charge_error_warning = 0.01;
-  // The default occupation_threshold of OccupationActiveSpaceSelector: an
-  // orbital that selector would have kept active was folded anyway.
+  // The default occupation_threshold of OccupationActiveSpaceSelector.
   constexpr double deviation_warning = 0.1;
-  if (std::abs(roles.folded_charge_error) <= charge_error_warning &&
-      roles.worst_deviation <= deviation_warning)
-    return;
-  QDK_LOGGER().warn(
-      "SW-PT2: folded orbital {} has fractional reference "
-      "occupation {:.4f} (deviation {:.3g}), and the folded core carries "
-      "{:.3g} electrons more than the reference density. Rounding the "
-      "folded density perturbs the mean field the active space feels at "
-      "first order -- an error the regularizer does not damp. Keeping a "
-      "correlated pair together on the folded side makes its roundings "
-      "cancel.",
-      roles.worst_orbital, roles.worst_occupation, roles.worst_deviation,
-      roles.folded_charge_error);
+  if (std::abs(roles.folded_charge_error) > charge_error_warning ||
+      roles.worst_deviation > deviation_warning)
+    QDK_LOGGER().warn(
+        "SW-PT2: folded orbital {} has reference occupation {:.4f} and the "
+        "folded core is off by {:.3g} electrons; consider adding it to "
+        "p_indices.",
+        roles.worst_orbital, roles.worst_occupation, roles.folded_charge_error);
 }
 
 void warn_on_intruders(const sw::DownfoldResult& down, bool regularized) {
   if (!regularized && down.min_denominator < sw::bare_denominator_floor)
     QDK_LOGGER().warn(
-        "SW-PT2: coupled channels with energy denominators below "
-        "{:.3g} Eh were omitted by the guarded bare pseudoinverse. The "
-        "remaining channels were downfolded, but the result depends on this "
-        "cutoff; consider enlarging the active space or setting "
-        "regularizer_sigma2.",
+        "SW-PT2: channels with denominators below {:.3g} Eh were omitted; "
+        "consider a larger P or setting regularizer_sigma2.",
         sw::bare_denominator_floor);
-
-  // Warn on the raw amplitude: a regularized one would hide the very channels
-  // the regularizer compensates for. 1.0 is a heuristic flag for a large
-  // individual amplitude, not a convergence bound; SW convergence depends on
-  // the perturbation norm and spectral gap.
+  // A heuristic flag on the undamped amplitude, not a convergence bound.
   constexpr double intruder_warn_amplitude = 1.0;
-  if (down.max_amplitude <= intruder_warn_amplitude) return;
-  if (!regularized)
+  if (down.max_amplitude > intruder_warn_amplitude)
     QDK_LOGGER().warn(
-        "SW-PT2: large excitation amplitude {:.3g} (smallest "
-        "energy denominator {:.3g} Eh) -- the unregularized second-order "
-        "result may be unreliable. Consider enlarging the active space, or "
-        "setting regularizer_sigma2.",
-        down.max_amplitude, down.min_denominator);
-  else
-    QDK_LOGGER().warn(
-        "SW-PT2: large excitation amplitude {:.3g} (smallest energy "
-        "denominator {:.3g} Eh) -- a near-degenerate/intruder channel. The "
-        "result relies on sigma^2 denominator regularization; consider "
-        "enlarging the active space so near-degenerate orbitals are not "
-        "split across the active/external boundary.",
-        down.max_amplitude, down.min_denominator);
+        "SW-PT2: large amplitude {:.3g} (smallest denominator {:.3g} Eh); "
+        "consider a larger P{}.",
+        down.max_amplitude, down.min_denominator,
+        regularized ? "" : " or setting regularizer_sigma2");
 }
 
 }  // namespace
@@ -247,31 +274,31 @@ std::shared_ptr<data::Hamiltonian> SchriefferWolffPT2Constructor::_run_impl(
     std::shared_ptr<data::Hamiltonian> hamiltonian,
     std::shared_ptr<const data::SymmetryBlockedIndexSet> p_indices) const {
   QDK_LOG_TRACE_ENTERING();
-  if (!reference || !hamiltonian || !p_indices)
-    throw std::invalid_argument(
-        "SW-PT2: reference, hamiltonian, and p_indices must all "
-        "be non-null.");
+  // Checks a shared MO basis and spin restriction, and P and the reference
+  // active space against the window.
+  _validate_inputs(reference, hamiltonian, p_indices);
   if (!hamiltonian->is_hermitian())
     throw std::invalid_argument("SW-PT2 requires a Hermitian Hamiltonian.");
   auto win_orbitals = hamiltonian->get_orbitals();
   auto ref_orbitals = reference->get_orbitals();
-  // Checks a shared MO basis and spin restriction, and P and the reference
-  // active space against the window.
-  _validate_inputs(reference, hamiltonian, p_indices);
   const bool unrestricted =
       hamiltonian->is_unrestricted() || ref_orbitals->is_unrestricted();
 
-  const std::vector<std::size_t> kept_global =
-      data::spin_channel_indices(p_indices, data::axes::alpha());
+  // The spatial orbitals an index set selects; both spins must agree.
+  const auto spatial = [](const auto& indices, const std::string& what) {
+    auto alpha = data::spin_channel_indices(indices, data::axes::alpha());
+    if (data::spin_channel_indices(indices, data::axes::beta()) != alpha)
+      throw std::invalid_argument("SW-PT2: " + what +
+                                  " must select the same orbitals in both "
+                                  "spin channels.");
+    return alpha;
+  };
+  const auto kept_global = spatial(p_indices, "p_indices");
   if (kept_global.empty())
     throw std::invalid_argument(
         "SW-PT2 requires a non-empty p_indices argument: the "
         "kept space P as a SymmetryBlockedIndexSet of global orbital indices "
         "into the window Hamiltonian's active space W = P u Q.");
-  if (data::spin_channel_indices(p_indices, data::axes::beta()) != kept_global)
-    throw std::invalid_argument(
-        "SW-PT2 requires p_indices to select the same orbitals in "
-        "both spin channels.");
 
   const auto [h_alpha, h_beta] = hamiltonian->get_one_body_integrals();
   std::array<Eigen::MatrixXd, 2> one_body{h_alpha, h_beta};
@@ -289,37 +316,21 @@ std::shared_ptr<data::Hamiltonian> SchriefferWolffPT2Constructor::_run_impl(
   const double e_core = hamiltonian->get_core_energy();
   const int norb = static_cast<int>(h_alpha.rows());
 
-  const auto W_global = data::spin_channel_indices(
-      win_orbitals->active_indices(), data::axes::alpha());
-  if (W_global.size() != static_cast<std::size_t>(norb) ||
-      data::spin_channel_indices(win_orbitals->active_indices(),
-                                 data::axes::beta()) != W_global)
+  const auto W_global = spatial(win_orbitals->active_indices(),
+                                "the window Hamiltonian's active index set");
+  if (W_global.size() != static_cast<std::size_t>(norb))
     throw std::invalid_argument(
-        "SW-PT2: the window Hamiltonian's active index set must "
-        "be spin-independent and match the rank of its integrals.");
-  const auto win_inactive_global = data::spin_channel_indices(
-      win_orbitals->inactive_indices(), data::axes::alpha());
-  if (data::spin_channel_indices(win_orbitals->inactive_indices(),
-                                 data::axes::beta()) != win_inactive_global)
-    throw std::invalid_argument(
-        "SW-PT2: the window Hamiltonian's inactive index set must be "
-        "spin-independent.");
-  const auto ref_active_global = data::spin_channel_indices(
-      ref_orbitals->active_indices(), data::axes::alpha());
-  const auto ref_inactive_global = data::spin_channel_indices(
-      ref_orbitals->inactive_indices(), data::axes::alpha());
-
-  if (data::spin_channel_indices(ref_orbitals->inactive_indices(),
-                                 data::axes::beta()) != ref_inactive_global)
-    throw std::invalid_argument(
-        "SW-PT2 requires all singly occupied orbitals in an "
-        "open-shell reference to belong to the active space; inactive "
-        "orbitals must be doubly occupied.");
-  if (data::spin_channel_indices(ref_orbitals->active_indices(),
-                                 data::axes::beta()) != ref_active_global)
-    throw std::invalid_argument(
-        "SW-PT2 requires the reference active space to select the "
-        "same orbitals in both spin channels.");
+        "SW-PT2: the window Hamiltonian's active index set must match the "
+        "rank of its integrals.");
+  const auto win_inactive_global =
+      spatial(win_orbitals->inactive_indices(),
+              "the window Hamiltonian's inactive index set");
+  const auto ref_inactive_global =
+      spatial(ref_orbitals->inactive_indices(),
+              "the reference inactive space (singly occupied orbitals must "
+              "be active)");
+  const auto ref_active_global =
+      spatial(ref_orbitals->active_indices(), "the reference active space");
 
   const std::unordered_set<std::size_t> ref_inactive_set(
       ref_inactive_global.begin(), ref_inactive_global.end());
@@ -364,7 +375,7 @@ std::shared_ptr<data::Hamiltonian> SchriefferWolffPT2Constructor::_run_impl(
 
   const std::vector<double> occupation(diagonal.data(),
                                        diagonal.data() + diagonal.size());
-  const sw::WindowPartition window_roles = sw::partition_window(
+  const WindowPartition window_roles = partition_window(
       occupation, W_global, kept_set,
       static_cast<int>(window_electrons_integer),
       _settings->get<double>("max_folded_occupation_deviation"));
@@ -405,8 +416,8 @@ std::shared_ptr<data::Hamiltonian> SchriefferWolffPT2Constructor::_run_impl(
 
   // Built from the full 1-RDMs, so a correlated reference's off-diagonal
   // density survives into the denominators.
-  auto fock =
-      sw::generalized_fock_matrices(one_body, two_body_blocks(), density, norb);
+  auto fock = sw::generalized_fock_matrices(one_body, two_body_blocks(),
+                                            density, norb, !unrestricted);
   // The density follows the rotation, since the fold reads it in the
   // semicanonical basis.
   std::array<Eigen::MatrixXd, 2> rotation{
@@ -460,6 +471,7 @@ std::shared_ptr<data::Hamiltonian> SchriefferWolffPT2Constructor::_run_impl(
 
   auto down = sw::downfold(one_body, two_body_blocks(), fock, active_spatial,
                            inactive_spatial, virtual_spatial, reg, e_core,
+                           !unrestricted,
                            fold ? density : std::array<Eigen::MatrixXd, 2>{});
 
   QDK_LOGGER().info(
@@ -475,7 +487,7 @@ std::shared_ptr<data::Hamiltonian> SchriefferWolffPT2Constructor::_run_impl(
     std::array<Eigen::MatrixXd, 2> active_rotation;
     for (int spin = 0; spin < 2; ++spin) {
       active_rotation[spin] =
-          sub_block(rotation[spin], active_spatial).transpose();
+          rotation[spin](active_spatial, active_spatial).transpose();
       down.one_body[spin] =
           sw::rotate_one_body(down.one_body[spin], active_rotation[spin]);
       if (unrestricted)
