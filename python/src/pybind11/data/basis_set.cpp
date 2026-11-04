@@ -433,6 +433,7 @@ Args:
 
 Returns:
     list[Shell]: Vector of shells for the specified atom
+
 Examples:
     >>> atom_shells = basis_set.get_shells_for_atom(0)
     >>> print(f"Atom 0 has {len(atom_shells)} shells")
@@ -506,6 +507,7 @@ Args:
 
 Returns:
     list[Shell]: Vector of ECP shells for the specified atom
+
 Examples:
     >>> ecp_atom_shells = basis_set.get_ecp_shells_for_atom(0)
     >>> print(f"Atom 0 has {len(ecp_atom_shells)} ECP shells")
