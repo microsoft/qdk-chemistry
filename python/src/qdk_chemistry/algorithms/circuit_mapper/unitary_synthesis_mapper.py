@@ -144,7 +144,7 @@ class UnitarySynthesisMapper(CircuitMapper):
     def right_factor(self, unitary: UnitaryRepresentation) -> np.ndarray:
         """Return the right factor ``V`` that ``omit_right_factor`` leaves out of the dense circuit.
 
-        After :meth:`run` on the same matrix and input width, this returns the factor that the
+        After ``run()`` on the same matrix and input width, this returns the factor that the
         synthesis already computed instead of factorizing the matrix again.
 
         Args:
