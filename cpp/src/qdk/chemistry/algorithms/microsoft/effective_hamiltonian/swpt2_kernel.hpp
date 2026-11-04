@@ -4,14 +4,6 @@
 
 // Second-order Schrieffer-Wolff downfolding kernel.
 //
-// H splits into H_BD, block diagonal in the external occupation, and the
-// occupation-changing H_OD. The anti-Hermitian generator S solves
-// [F0, S] = H_OD for a diagonal generalized-Fock F0, exactly with bare
-// denominators and approximately with the sigma^2 regularizer. The kernel
-// evaluates H_eff = H_BD + 1/2 [S, H_OD], projected onto the reference
-// external occupation and truncated to <= 2-body; SeQuant spin-traces the
-// projected commutator into contractions over spatial alpha/beta blocks.
-//
 // Representation: per-spin one-body blocks and chemist aaaa, aabb and bbbb
 // two-body blocks (pq|rs), stored flat in C-order
 // (index = ((p*norb + q)*norb + r)*norb + s).
@@ -130,17 +122,9 @@ struct WindowPartition {
   double folded_charge_error = 0.0;
 };
 
-/// Apply the folding policy to a window: orbitals in `kept_global` become the
-/// active space, and each remaining orbital is folded as inactive or virtual by
-/// rounding its reference occupation to the nearer of 2 or 0. The active space
-/// receives the electrons the folded orbitals do not take, so the total is
-/// preserved, but the rounding perturbs the mean field the active space feels.
-///
-/// `occupation` is indexed by window position, `window_global` maps those
-/// positions to global orbital indices, and `window_electrons` is the integer
-/// electron count of the reference density over the window. Throws
-/// `std::invalid_argument` if a folded orbital deviates from 0 or 2 by more
-/// than `max_folded_occupation_deviation`, which must lie in [0, 1).
+/// Keep `kept_global` active and fold every other window orbital by rounding
+/// its reference occupation (`occupation`, by window position) to 2 or 0.
+/// Throws `std::invalid_argument` past `max_folded_occupation_deviation`.
 WindowPartition partition_window(
     const std::vector<double>& occupation,
     const std::vector<std::size_t>& window_global,

@@ -21,12 +21,9 @@ class SchriefferWolffPT2Settings : public qdk::chemistry::data::Settings {
   SchriefferWolffPT2Settings() {
     set_default(
         "regularizer_sigma2", 1.0,
-        "Sigma of the sigma^2 denominator regularizer, "
-        "1/D -> (1-exp(-sigma*D^2))/D, in Eh^-2. It plays the role of the DSRG "
-        "flow parameter s; for a single-determinant reference, second-order "
-        "energies match DSRG-PT2 at s = sigma/2. Larger values regularize "
-        "less. 0 selects a guarded pseudoinverse that drops coupled channels "
-        "with denominators below 1e-8 Eh and logs a warning.",
+        "Strength sigma of the sigma^2 denominator regularizer "
+        "1/D -> (1-exp(-sigma*D^2))/D, in Eh^-2. Larger values regularize "
+        "less; 0 selects the guarded bare inverse.",
         data::BoundConstraint<double>{0.0, std::numeric_limits<double>::max()});
     set_default("semicanonicalize", true,
                 "Diagonalize each spin's generalized Fock independently within "
@@ -49,45 +46,14 @@ class SchriefferWolffPT2Settings : public qdk::chemistry::data::Settings {
 };
 
 /**
- * @brief Second-order Schrieffer-Wolff (Van Vleck) effective-Hamiltonian
- * downfold with semicanonical generalized-Fock orbital-energy denominators.
+ * @brief Second-order Schrieffer-Wolff downfold of the window's external
+ * orbitals onto the kept space P (`p_indices`).
  *
- * Computes `H_eff = H_BD + 1/2 [S, H_OD]`, emitting <= 2-body, folding the
- * window's external space Q onto its kept space P. S solves
- * `[F0, S] = H_OD` for a diagonal generalized-Fock F0; a regularizer setting
- * replaces the bare inverse denominators to damp intruder-state channels.
- *
- * The commutator also generates three-body terms, which a Hamiltonian cannot
- * hold. `fold_above_two_body` contracts them with the reference 1-RDM and keeps
- * the two-body part. For a determinant in its own orbitals these are the
- * ordinary Wick contractions and only the residual three-body operator is
- * lost; a correlated or spin-averaged open-shell reference additionally loses
- * the two-body and higher density cumulants.
- *
- * Any restricted MO basis qualifies: RHF, ROHF, CAS, localized and natural
- * orbitals. Their spin-traced density is split evenly between the spins, so
- * the result stays spin-free. Unrestricted orbitals use per-spin densities and
- * Fock matrices and give an unrestricted result. The window, `p_indices` and
- * the reference active space must select the same orbitals in both spins, and
- * every singly occupied orbital must lie in the reference active space.
- * Noncanonical orbitals are semicanonicalized within the inactive, active, and
- * virtual blocks. Intruder diagnostics are logged, with a warning for large raw
- * amplitudes.
- *
- * The emitted two-body blocks are only 4-fold symmetric: hermiticity and
- * electron exchange hold as for the input integrals, the bra swap
- * `(pq|rs) = (qp|rs)` does not. Consumers must read the full dense norb^4
- * blocks, not the canonical 8-fold-unique elements.
- *
- * The window W is the input Hamiltonian's own active space, so that Hamiltonian
- * must be built over the whole window; a P-only active-space Hamiltonian has
- * already folded away the couplings this transforms. The reference supplies
- * only the density over W (its active 1-RDMs, with inactive orbitals doubly
- * occupied and the rest empty), never the partition: P comes from `p_indices`
- * alone and need not coincide with the reference active space. Occupations of
- * folded orbitals are rounded, bounded by `max_folded_occupation_deviation`.
- *
- * See `swpt2_kernel.hpp` for the operator and tensor conventions.
+ * Emits H_eff = P (H_BD + 1/2 [S, H_OD]) P truncated to two-body, with
+ * semicanonical generalized-Fock denominators. Restricted input gives a
+ * spin-free result, unrestricted input an unrestricted one. The emitted
+ * two-body blocks are only 4-fold symmetric, so consumers must read the full
+ * dense blocks.
  */
 class SchriefferWolffPT2Constructor
     : public qdk::chemistry::algorithms::EffectiveHamiltonianConstructor {

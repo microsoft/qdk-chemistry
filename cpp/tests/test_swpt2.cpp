@@ -229,23 +229,9 @@ TEST(SchriefferWolffPT2Test, SettingsKnobs) {
                std::invalid_argument);
 }
 
-// End-to-end smoke test: SCF -> window Hamiltonian over W -> CAS reference over
-// P -> swpt2 downfold -> CAS on the emitted effective Hamiltonian. Confirms the
-// full data-layer pipeline runs and produces a sensible, below-HF effective
-// Hamiltonian that actually differs from the bare active-space one.
-//
-// Two things are asserted quantitatively: (1) the data-layer emission+
-// consumption path is faithful -- MACIS on the emitted effective Hamiltonian
-// reproduces an independent full-CI on the *same* integrals to machine
-// precision (so no 8-fold symmetrization / container change is needed); and
-// (2) with regularization on by default (regularizer_sigma2=1.0) the downfold
-// recovers
-// correlation below the bare active-space CAS, whereas an explicitly *bare*
-// (unregularized) run does not -- this particular window splits two
-// near-degenerate virtuals (active LUMO orbital 5, folded external orbital 6)
-// and the resulting small pp-ladder denominator makes bare second-order PT
-// overshoot -- a classic intruder tamed by the flow regularizer, not a bug in
-// the container/solver or the denominators.
+// SCF -> window Hamiltonian over W -> CAS reference over P -> SW-PT2 -> CAS on
+// H_eff. Bare denominators hit an intruder here that the default regularizer
+// damps.
 TEST(SchriefferWolffPT2Test, DownfoldRunsEndToEndWater) {
   auto water = testing::create_water_structure();
   auto scf = ScfSolverFactory::create();
@@ -269,8 +255,7 @@ TEST(SchriefferWolffPT2Test, DownfoldRunsEndToEndWater) {
   auto w_orbitals = testing::with_active_space(orbitals, window, core);
   auto H_window = ham->run(w_orbitals);
 
-  // Every reference-active orbital must be represented in the window. A
-  // missing trailing orbital used to be silently dropped by the index map.
+  // Every reference-active orbital must lie in the window.
   auto incomplete_w_orbitals =
       testing::with_active_space(orbitals, {3, 4, 6}, core);
   auto H_incomplete = ham->run(incomplete_w_orbitals);
@@ -300,9 +285,6 @@ TEST(SchriefferWolffPT2Test, DownfoldRunsEndToEndWater) {
   // only 4-fold symmetric, so the container must hand it the dense block.
   EXPECT_NEAR(E_sw, ground_energy(*H_eff, 2, 2), 1e-9);
 
-  // Bare denominators hit the near-intruder from the near-degenerate virtual
-  // pair split across P and Q (eps_5 = +0.47, eps_6 = +0.59); the default
-  // regularizer is what recovers the correlation.
   auto swpt2_bare = EffectiveHamiltonianConstructorFactory::create("qdk_swpt2");
   swpt2_bare->settings().set("regularizer_sigma2", 0.0);
   auto H_eff_bare = swpt2_bare->run(reference, H_window, P_set);
@@ -371,11 +353,7 @@ TEST(SchriefferWolffPT2Test, ReproducesMp2WhenEveryOccupiedOrbitalIsActive) {
 }
 
 // The window Hamiltonian's own folded core must be exactly the reference core
-// orbitals outside W. This is the precondition that lets the emitted inactive
-// index set be built by sorting two lists without deduplicating them:
-// `Orbitals` already forbids an orbital from being both active and inactive, so
-// the window core lies outside W, and this check pins it to the reference core
-// as well.
+// orbitals outside W.
 TEST(SchriefferWolffPT2Test, RejectsWindowCoreThatIsNotTheReferenceCore) {
   auto water = testing::create_water_structure();
   auto scf = ScfSolverFactory::create();
@@ -567,10 +545,6 @@ TEST(SchriefferWolffPT2Test, CustomActiveSpaceOverridesReference) {
 }
 
 // Folding an orbital whose correlated natural occupation is not exactly 2 or 0.
-// The occupation is rounded to the nearer integer; the total electron count is
-// still exact because the active space receives whatever the folded orbitals do
-// not take. `max_folded_occupation_deviation` bounds how much rounding error is
-// accepted, and setting it to zero restores the strict integer-occupation rule.
 TEST(SchriefferWolffPT2Test, FoldsFractionallyOccupiedExternalOrbital) {
   auto water = testing::create_water_structure();
   auto scf = ScfSolverFactory::create();
@@ -729,9 +703,7 @@ TEST(SchriefferWolffPT2Test,
   EXPECT_TRUE(std::isfinite(E_sw));
 
   // The non-semicanonical path must also handle a correlated (off-diagonal
-  // 1-RDM) reference: its denominators now come from the full-density
-  // generalized Fock rather than a diagonal-occupation Fock that would silently
-  // drop the off-diagonal 1-RDM.
+  // 1-RDM) reference.
   auto swpt2_no_semicanon =
       EffectiveHamiltonianConstructorFactory::create("qdk_swpt2");
   swpt2_no_semicanon->settings().set("semicanonicalize", false);
@@ -982,9 +954,7 @@ TEST(SchriefferWolffPT2Test, AcceptsNaturalOrbitalReference) {
 }
 
 // Localizing strictly inside the folded virtual block exercises a large
-// semicanonical rotation while leaving the reference determinant and P
-// untouched, so the emitted operator must be numerically equivalent to the
-// canonical-basis result.
+// semicanonical rotation.
 TEST(SchriefferWolffPT2Test, AcceptsLocalizedOrbitalReference) {
   auto water = testing::create_water_structure();
   auto scf = ScfSolverFactory::create();

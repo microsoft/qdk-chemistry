@@ -191,25 +191,14 @@ Returns:
   py::class_<microsoft::SchriefferWolffPT2Constructor,
              EffectiveHamiltonianConstructor, py::smart_holder>(
       m, "QdkSchriefferWolffPT2Constructor", R"(
-Second-order Schrieffer-Wolff (Van Vleck) effective-Hamiltonian downfold.
+Second-order Schrieffer-Wolff downfold of the window's external orbitals onto
+the kept space ``P`` (``p_indices``).
 
-Computes ``H_eff = P (H_BD + 1/2 [S, H_OD]) P``, truncated to ``<= 2``-body,
-folding the external orbitals ``Q`` of the window Hamiltonian's active space
-``W`` onto the kept space ``P``. The generator uses semicanonical
-generalized-Fock denominators, damped by ``regularizer_sigma2``. Restricted
-references (RHF, ROHF, CAS, localized or natural orbitals) give a spin-free
-result and unrestricted references an unrestricted one. The factory name is
-``"qdk_swpt2"``.
-
-``p_indices`` is a :class:`~qdk_chemistry.data.symmetry.SymmetryBlockedIndexSet`
-of global orbital indices selecting ``P`` within ``W``; it need not coincide
-with the reference active space. The result's inactive orbitals (the folded
-occupied orbitals and any core outside ``W``) are doubly occupied, so its
-active space holds the reference's electron count minus twice their number.
-
-The emitted two-body blocks are only 4-fold symmetric: the bra swap
-``(pq|rs) == (qp|rs)`` does not hold, so consumers must read the full dense
-``norb**4`` blocks rather than the 8-fold-unique elements.
+Emits ``H_eff = P (H_BD + 1/2 [S, H_OD]) P`` truncated to two-body, with
+semicanonical generalized-Fock denominators damped by ``regularizer_sigma2``.
+Restricted input gives a spin-free result, unrestricted input an unrestricted
+one. The emitted two-body blocks are only 4-fold symmetric, so consumers must
+read the full dense blocks. The factory name is ``"qdk_swpt2"``.
 
 Typical usage:
 
@@ -218,7 +207,6 @@ Typical usage:
     import qdk_chemistry.algorithms as alg
 
     downfolder = alg.create("effective_hamiltonian_constructor", "qdk_swpt2")
-    downfolder.settings().set("regularizer_sigma2", 0.4)
     h_eff = downfolder.run(reference, window_hamiltonian, p_indices)
 
 See Also:

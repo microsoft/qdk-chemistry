@@ -156,13 +156,9 @@ reference's per-spin 1-RDMs, so the orbital energies can differ between spins.
 
 By default, ``semicanonicalize`` diagonalizes each :math:`F^\sigma` within the inactive,
 active, and virtual blocks. Integrals and density are rotated consistently,
-and the emitted integrals are rotated back. A block whose off-diagonal elements
-are negligible is left unrotated: at most :math:`10^{-6}/\max(1,\sigma)\,E_h`
-with the regularizer described below, the level a converged SCF leaves, and at
-most :math:`10^{-10}\,E_h` without it, because bare denominators can amplify the
-neglected elements without bound. Without the regularizer, even a converged SCF
-reference is therefore rotated, an :math:`O(N^5)` integral transformation.
-With this option disabled, the denominators use the diagonals of
+and the emitted integrals are rotated back. Blocks that are already diagonal within a
+tolerance are left unrotated; without the regularizer that tolerance is so tight that even a
+converged SCF reference is rotated. With this option disabled, the denominators use the diagonals of
 :math:`F^\sigma` in the supplied basis.
 
 Near-degenerate channels give a small :math:`\Delta_T` and a large amplitude, which can make the
@@ -173,17 +169,12 @@ bare inverse denominator with
 
    \frac{1}{\Delta_T} \to \frac{1 - e^{-\sigma \Delta_T^2}}{\Delta_T},
 
-the :math:`\sigma^2` regularizer :cite:`Shee2021`, whose :math:`\sigma` (in :math:`E_h^{-2}`)
-plays the role of the DSRG flow parameter :math:`s` in the generator
-:cite:`Evangelista2014`. Because the correction is the half-commutator above,
-second-order energies of a single-determinant reference match DSRG-PT2 at
-:math:`s = \sigma/2`; the default
-:math:`\sigma = 1` corresponds to :math:`s = 0.5`. Larger :math:`\sigma`
+the :math:`\sigma^2` regularizer :cite:`Shee2021`, with :math:`\sigma` in :math:`E_h^{-2}`.
+For a single-determinant reference, second-order energies match DSRG-PT2
+:cite:`Li2015` with flow parameter :math:`s = \sigma/2`. Larger :math:`\sigma`
 regularizes less. Setting it to ``0`` selects a guarded bare pseudoinverse:
 coupled channels with :math:`|\Delta_T| < 10^{-8}\,E_h` are omitted, with a warning.
 This differs from the :math:`\sigma \to 0` limit, which damps all channels to zero.
-Damping or omitting channels makes the generator equation approximate; the
-correction remains the half-commutator above, not a full DSRG expansion.
 
 The damping is not confined to intruders. A channel keeps the fraction
 :math:`1 - e^{-\sigma \Delta_T^2}` of its bare amplitude, so at the default
@@ -192,15 +183,19 @@ approximately 9%, 22%, 63% and 98% of their bare generator amplitudes, respectiv
 Even well-separated channels are damped; increase :math:`\sigma` to approach the
 bare amplitudes.
 
-The kept space :math:`P` is defined by the ``p_indices`` argument. The reference wavefunction
-only supplies the density matrices :math:`\gamma^\sigma`, and is independent of :math:`P`.
-Every orbital in :math:`Q = W \setminus P` is folded, as doubly
-occupied if its spin-traced reference occupation rounds to two and as empty if it rounds to zero. Rounding
-an occupation that is far from 2 or 0 perturbs the mean field the active space feels, so
-``max_folded_occupation_deviation`` bounds how far it may stray before the downfold is
-rejected. A singly occupied orbital therefore cannot be folded and must be kept in :math:`P`.
-The active space keeps whatever electrons the folded orbitals do not take; the downfold is
-rejected if that leaves either spin with fewer than zero or more electrons than active orbitals.
+The kept space :math:`P` comes from ``p_indices`` alone; the reference supplies only
+:math:`\gamma^\sigma`. Any restricted or unrestricted orbital set qualifies, canonical or not,
+such as RHF, ROHF, CAS, localized or natural orbitals. It must share the input Hamiltonian's
+molecular-orbital basis and keep every singly occupied orbital in its active space, and the
+input Hamiltonian's inactive orbitals must be exactly its core orbitals outside :math:`W`. For
+unrestricted orbitals, the input Hamiltonian's active space, ``p_indices`` and the reference
+active space must select the same orbitals in both spins. Every orbital in
+:math:`Q = W \setminus P` is folded as doubly occupied or empty by rounding its spin-traced
+reference occupation to 2 or 0.
+The rounding perturbs the mean field the active space feels, so
+``max_folded_occupation_deviation`` bounds it, and a singly occupied orbital must be kept in
+:math:`P`. The active space keeps the remaining electrons; the downfold is rejected if either
+spin is left with fewer than zero or more electrons than active orbitals.
 
 The commutator :math:`[S, H_{\mathrm{OD}}]` generates three-body terms that the emitted
 two-body operator cannot carry. With ``fold_above_two_body``, reference-1-RDM pair
@@ -209,22 +204,7 @@ This Gaussian approximation recovers ordinary Wick contractions for a determinan
 its own orbitals, closed-shell restricted or unrestricted. It neglects connected higher
 density cumulants for correlated references and spin-averaged open-shell references.
 The residual three-body operator is discarded.
-Folding can improve accuracy but adds cost; it is skipped when the retained space
-contains at most two electrons.
-
-The reference enters only through :math:`\gamma^\sigma`, so what is accepted is a property of the
-input, not of the method that produced it: any restricted or unrestricted orbital set
-works, canonical or not. RHF, ROHF, CAS, localized and natural orbitals all qualify,
-including UHF natural orbitals carried as restricted orbitals with their 1-RDM. Unrestricted
-orbitals, such as UHF, give an unrestricted effective Hamiltonian; the input Hamiltonian's
-active space, ``p_indices`` and the reference active space must then select the same orbital
-indices in both spins, and both spins of a folded index are folded together. Rejected is any
-singly occupied orbital outside the reference active space, which could only be folded on an
-arbitrary rounding.
-The reference and the input Hamiltonian must share the same molecular-orbital basis, and the
-orbitals the Hamiltonian folded into its core energy must be exactly the reference core
-orbitals outside :math:`W`, since otherwise that core energy and :math:`\gamma^\sigma` describe
-different states.
+It is skipped when the retained space contains at most two electrons.
 
 .. warning::
 
@@ -234,21 +214,9 @@ different states.
    does not: the commutator is not an electron-repulsion operator. Consumers must be given
    the full dense :math:`n^4` blocks.
 
-The constructor logs regularization, active electron count, folded-occupation
-deviation, minimum coupled denominator, and maximum raw amplitude.
-The amplitude diagnostic covers the terms that connect :math:`P` and :math:`Q`
-and uses undamped couplings -- the generalized Fock matrix for single
-excitations -- with the denominator floored at
-:math:`10^{-8}\,E_h`. Large occupation or charge-rounding errors and amplitudes
-above one trigger warnings. These are diagnostics, not convergence guarantees.
-
-SeQuant derives the contraction equations on the first downfold with a nonempty
-external space and reuses them within the process. Contraction orders are chosen
-for the inactive, active, and virtual dimensions and rebuilt when they change.
-This adds a setup cost.
-Numerical cost and memory depend on the window, kept space, and density fold.
-Evaluation uses per-spin spatial blocks; memory includes the dense integrals,
-contraction workspace, and cached plans.
+The constructor logs the partition and, over the terms coupling :math:`P` and :math:`Q`, the
+smallest denominator and largest unregularized amplitude; it warns on large occupation
+rounding or amplitudes above one.
 
 .. rubric:: Settings
 

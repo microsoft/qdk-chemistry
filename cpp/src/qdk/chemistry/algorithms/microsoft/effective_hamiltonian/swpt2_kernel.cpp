@@ -36,7 +36,6 @@ inline Eigen::Index n4(int n) {
   return static_cast<Eigen::Index>(n) * n * n * n;
 }
 
-// Smaller loops run serially; starting threads would dominate their cost.
 constexpr Eigen::Index min_parallel_work = Eigen::Index{1} << 16;
 
 // Chemist (pq|rs) with p, q of spin `left` and r, s of spin `right`.
@@ -700,7 +699,6 @@ std::shared_ptr<const std::vector<Plan>> reusable_plans(std::size_t inactive,
   const std::array<std::size_t, 3> extents{std::max<std::size_t>(inactive, 1),
                                            std::max<std::size_t>(active, 1),
                                            std::max<std::size_t>(virtuals, 1)};
-  // Plan sets are large, so only the latest one is kept.
   static std::mutex mutex;
   static std::array<std::size_t, 3> cached_extents{};
   static bool cached_spin_free = false;
@@ -986,16 +984,11 @@ DownfoldResult downfold(
         empty = empty || roles.at(index.space().base_key()[0])->empty();
     });
     if (empty) continue;
-    // Build every operand first, so the concurrent plans only read the cache.
     plan.tree.visit([&](const auto& node) {
       if (node.leaf()) evaluate_leaf(node);
     });
     selected.push_back(&plan);
   }
-  // Concurrent evaluation relies on the SeQuant patch that keeps BTAS off its
-  // process-wide trace-label map. BLAS is pinned to one thread meanwhile, and
-  // values are added in plan order, so the result does not depend on the
-  // thread count.
   std::vector<sq::ResultPtr> plan_values(selected.size());
   std::exception_ptr failure;
   const auto plan_count = static_cast<std::ptrdiff_t>(selected.size());
