@@ -13,6 +13,7 @@ Supported formats and conversions:
 # Copyright (c) Microsoft Corporation. All rights reserved.
 # Licensed under the MIT License. See LICENSE.txt in the project root for license information.
 # --------------------------------------------------------------------------------------------
+import warnings
 from collections.abc import Callable
 from dataclasses import dataclass
 from typing import Any
@@ -263,7 +264,38 @@ class Circuit(DataClass):
         self,
         params: dict[str, Any] | list[Any] | EstimatorParams | None = None,
     ) -> EstimatorResult:
-        """Estimate resources for the quantum circuit.
+        """Estimate resources for the quantum circuit with the older ``qdk.estimator`` resource estimator.
+
+        .. deprecated:: 2.4.0
+            This method uses the older version of the QDK Quantum Resource Estimator (``qdk.estimator``).
+            Use :meth:`get_qre_application` with ``qdk.qre.estimate()`` instead, which requires the
+            ``qre`` extra (``pip install 'qdk-chemistry[qre]'``). See https://aka.ms/qdk.QREv3 for
+            migration guidance.
+
+        Args:
+            params: Resource estimation parameters. Accepts a dict, list, or ``qsharp.estimator.EstimatorParams``.
+
+        Returns:
+            The estimated resources.
+
+        Raises:
+            RuntimeError: If no suitable circuit representation is available for estimation.
+
+        """
+        warnings.warn(
+            "Circuit.estimate() is deprecated and will be removed in a future release; it uses the older "
+            "version of the QDK Quantum Resource Estimator (qdk.estimator). Use Circuit.get_qre_application() "
+            "with qdk.qre.estimate() instead; see https://aka.ms/qdk.QREv3 for migration guidance.",
+            DeprecationWarning,
+            stacklevel=2,
+        )
+        return self._estimate(params)
+
+    def _estimate(
+        self,
+        params: dict[str, Any] | list[Any] | EstimatorParams | None = None,
+    ) -> EstimatorResult:
+        """Run the older ``qdk.estimator`` resource estimator without the deprecation warning of :meth:`estimate`.
 
         Args:
             params: Resource estimation parameters. Accepts a dict, list, or ``qsharp.estimator.EstimatorParams``.
