@@ -659,7 +659,7 @@ def test_sparse_0_2_0_stores_every_eightfold_class_member(tmp_path, fmt):
     np.testing.assert_array_equal(actual.reshape(expected.shape), expected)
 
 
-@pytest.mark.parametrize("partner", [-0.2, 0.7 * (1 + 1e-8)])
+@pytest.mark.parametrize("partner", [-0.2, 0.7 * (1 + 1e-8), float("nan")])
 def test_sparse_inconsistent_eightfold_class_refused(tmp_path, partner):
     """A class whose stored members differ beyond round-off has no unambiguous 0.2.0 meaning."""
     src = tmp_path / "e.hamiltonian.h5"
