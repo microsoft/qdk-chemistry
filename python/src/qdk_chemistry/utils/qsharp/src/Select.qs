@@ -62,7 +62,6 @@ namespace QDKChemistry.Utils.Select {
 
     /// `PauliSelect` by unary iteration (arXiv:1805.03662, Sec. III A): L - 2 Toffolis for L terms
     /// uncontrolled, L - 1 with one control.
-    /// Index states without a term, which PREPARE leaves empty, may apply any term.
     operation UnaryPauliSelect(params : PauliSelectParams, selectRegister : Qubit[], targets : Qubit[]) : Unit is Adj + Ctl {
         body ... {
             Controlled UnaryPauliSelect([], (params, selectRegister, targets));

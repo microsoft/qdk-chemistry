@@ -72,34 +72,31 @@ namespace QDKChemistry.Utils.AliasSampling {
         let targetTotal = barHeight * nCoeffs;
         mutable scaledProbs : Int[] = [];
         mutable scaledTotal = 0;
-        mutable keyed : (Double, Int)[] = [];
+        mutable remainders : Double[] = [];
         for i in 0..nCoeffs - 1 {
             let exact = AbsD(coefficients[i]) / total * IntAsDouble(targetTotal);
             let base = Floor(exact);
             set scaledProbs += [base];
             set scaledTotal += base;
-            // Zero coefficients get a sentinel remainder below any real one, so they sort last.
-            set keyed += [(coefficients[i] != 0.0 ? exact - IntAsDouble(base) | -1.0, i)];
+            // Zero coefficients must never receive weight, so mark them with a
+            // sentinel remainder below any real one so they are never chosen.
+            set remainders += [AbsD(coefficients[i]) > 0.0 ? exact - IntAsDouble(base) | -1.0];
         }
 
         // Distribute leftover units to the largest remainders first, ties by ascending index.
         // Flooring keeps the residual non-negative, so bar heights only increase. Sorting once
         // costs O(L log L); rescanning every remainder per leftover unit would be O(L²).
         let residual = MinI(targetTotal - scaledTotal, nCoeffs);
-        // QIR partial evaluation mishandles a capturing comparator and indexing by sorted
-        // values, so sort (remainder, index) pairs and mark the winners in a separate pass.
-        let byRemainder = Mapped(
-            Snd,
-            Sorted((a, b) -> Fst(a) > Fst(b) or (Fst(a) == Fst(b) and Snd(a) <= Snd(b)), keyed)
+        let finalRemainders = remainders;
+        let byRemainder = Sorted(
+            (i, j) -> finalRemainders[i] > finalRemainders[j] or (finalRemainders[i] == finalRemainders[j] and i <= j),
+            MappedOverRange(i -> i, 0..nCoeffs - 1)
         );
-        mutable gainsUnit = [false, size = nCoeffs];
         for k in 0..residual - 1 {
-            set gainsUnit w/= byRemainder[k] <- true;
-        }
-        for i in 0..nCoeffs - 1 {
-            // Zero coefficients must never gain weight.
-            if gainsUnit[i] and coefficients[i] != 0.0 {
-                set scaledProbs w/= i <- scaledProbs[i] + 1;
+            let bestIdx = byRemainder[k];
+            // Sentinel remainders mark zero coefficients, which must never gain weight.
+            if finalRemainders[bestIdx] >= 0.0 {
+                set scaledProbs w/= bestIdx <- scaledProbs[bestIdx] + 1;
             }
         }
 

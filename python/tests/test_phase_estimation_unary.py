@@ -494,10 +494,7 @@ class TestUnaryQpeEndToEnd:
 
     @pytest.mark.parametrize("num_queries", [6, 8, 11, 23, 63])
     def test_builder_defaults_recover_the_ground_state_energy(self, num_queries):
-        r"""The shipped builder defaults must recover :math:`H = (X + Z)/2` end to end.
-
-        The two most likely outcomes are close, so 200 shots made the result depend on the simulator seed.
-        """
+        r"""The shipped builder defaults must recover :math:`H = (X + Z)/2` end to end."""
         num_bits = num_queries.bit_length()
         assert (num_queries + 1 < 1 << num_bits) == (num_queries != 63), "sweep must mix padded and exact registers"
 
