@@ -2664,7 +2664,7 @@ class TestPyscfPlugin:
 
         eri = pyscf.ao2mo.restore(1, to_scf(1e-13)._eri, 2 * norb)
         np.testing.assert_allclose(eri[:norb, :norb, norb:, norb:], paired, atol=1e-14, rtol=0)
-        with pytest.raises(ValueError, match="pair permutation symmetry"):
+        with pytest.raises(ValueError, match="requires pair two-body permutation symmetry"):
             to_scf(1e-11)
 
     @pytest.mark.parametrize(

@@ -30,6 +30,7 @@ void bind_settings(py::module& m);
 void bind_structure(py::module& m);
 void bind_basis_set(py::module& m);
 void bind_serialization(py::module& m);
+void bind_two_body_symmetry(py::module& m);
 void bind_mc(py::module& m);
 void bind_mcscf(py::module& m);
 void bind_hamiltonian_constructor(py::module& m);
@@ -104,6 +105,7 @@ PYBIND11_MODULE(_core, m) {
   bind_majorana_mapping(
       data);  // Depends on SparsePauliWord from pauli_operator
   bind_serialization(data);
+  bind_two_body_symmetry(data);
 
   bind_localizer(algorithms);
   bind_mc(algorithms);

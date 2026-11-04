@@ -39,10 +39,10 @@ import numpy as np
 import pyscf
 from pyscf import ao2mo, lib
 
+from qdk_chemistry._core.data import _eightfold_symmetrized, _pair_symmetrized
 from qdk_chemistry.constants import FINE_STRUCTURE_CONSTANT
 from qdk_chemistry.data import AOType, BasisSet, Hamiltonian, Orbitals, Shell, Structure
 from qdk_chemistry.data._spin_channels import spin_channel_indices, spin_channel_matrix, spin_channel_vector
-from qdk_chemistry.data._two_body_symmetry import eightfold_average, pair_average
 from qdk_chemistry.data.symmetry import axes
 from qdk_chemistry.utils import Logger
 from qdk_chemistry.utils.enum import CaseInsensitiveStrEnum
@@ -701,9 +701,9 @@ def hamiltonian_to_scf(hamiltonian: Hamiltonian, alpha_occ: np.ndarray, beta_occ
 
     # PySCF keeps one member of each permutation class, so pass the class averages.
     if hamiltonian.is_unrestricted():
-        aaaa = eightfold_average(two_body[0], "PySCF (alpha-alpha block)")
-        aabb = pair_average(two_body[1], "PySCF (alpha-beta block)")
-        bbbb = eightfold_average(two_body[2], "PySCF (beta-beta block)")
+        aaaa = _eightfold_symmetrized(two_body[0], "PySCF (alpha-alpha block)")
+        aabb = _pair_symmetrized(two_body[1], "PySCF (alpha-beta block)")
+        bbbb = _eightfold_symmetrized(two_body[2], "PySCF (beta-beta block)")
         # Alpha orbitals span the first half of the basis and beta orbitals the second; mixed pairs vanish.
         rows, cols = np.tril_indices(norb)
         alpha_pairs = rows * (rows + 1) // 2 + cols
@@ -722,7 +722,7 @@ def hamiltonian_to_scf(hamiltonian: Hamiltonian, alpha_occ: np.ndarray, beta_occ
         mf.mo_occ = (alpha_occ, beta_occ)
     else:
         mf = pyscf.scf.RHF(mol) if np.array_equal(alpha_occ, beta_occ) else pyscf.scf.ROHF(mol)
-        mf._eri = ao2mo.restore(8, eightfold_average(two_body[0], "PySCF"), norb)  # noqa: SLF001
+        mf._eri = ao2mo.restore(8, _eightfold_symmetrized(two_body[0], "PySCF"), norb)  # noqa: SLF001
         core = one_body[0]
         mf.mo_coeff = np.eye(norb)
         mf.mo_occ = alpha_occ + beta_occ
