@@ -4,11 +4,8 @@
 
 #include "basis_library.hpp"
 
-#include <qdk/chemistry/scf/config.h>
-
 #include <algorithm>
 #include <cctype>
-#include <cstdlib>
 #include <filesystem>
 #include <fstream>
 #include <nlohmann/json.hpp>
@@ -39,58 +36,6 @@ std::string lowercase_basis_name(std::string name) {
                  });
   return name;
 }
-
-namespace {
-
-std::filesystem::path unpack_basis_set_archive(std::string& basis_set_name) {
-  std::string normalized_name = normalize_basis_set_name(basis_set_name);
-  std::filesystem::path file_path =
-      qdk::chemistry::scf::QDKChemistryConfig::get_resources_dir() /
-      "compressed" / (normalized_name + ".tar.gz");
-
-  if (!std::filesystem::exists(file_path)) {
-    throw std::invalid_argument("Basis set file does not exist: " +
-                                file_path.string());
-  }
-
-  std::filesystem::path temp_dir =
-      std::filesystem::temp_directory_path() / "qdk" / "chemistry";
-  if (!std::filesystem::exists(temp_dir)) {
-    std::filesystem::create_directories(temp_dir);
-  }
-
-  // GNU tar needs --force-local so "C:/..." is not read as host:path; BSD tar
-  // rejects the flag, so detect support at runtime.
-#ifdef _WIN32
-  static const bool tar_has_force_local =
-      (std::system("tar --force-local --version > nul 2>&1") == 0);
-  const std::string tar_cmd =
-      tar_has_force_local ? "tar --force-local -xzf " : "tar -xzf ";
-#else
-  const std::string tar_cmd = "tar -xzf ";
-#endif
-  auto command = tar_cmd + "\"" + file_path.generic_string() +
-                 "\" --directory \"" + temp_dir.generic_string() + "\"";
-  if (std::system(command.c_str()) != 0) {
-    throw std::runtime_error("command execution failed: " + command);
-  }
-
-  return temp_dir;
-}
-
-std::filesystem::path get_correct_basis_set_file(std::string& basis_set_name) {
-  std::filesystem::path temp_dir = unpack_basis_set_archive(basis_set_name);
-  std::string normalized_name = normalize_basis_set_name(basis_set_name);
-  std::filesystem::path json_file_path =
-      temp_dir / "basis" / (normalized_name + ".json");
-  if (!std::filesystem::exists(json_file_path)) {
-    throw std::invalid_argument("Basis set JSON file does not exist: " +
-                                json_file_path.string());
-  }
-  return json_file_path;
-}
-
-}  // namespace
 
 /**
  * @brief Get basis set shells and ECP information for a given nuclear charge.
