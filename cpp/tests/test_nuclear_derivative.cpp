@@ -6,6 +6,7 @@
 
 #include <cmath>
 #include <memory>
+#include <qdk/chemistry/algorithms/geometry_optimization.hpp>
 #include <qdk/chemistry/algorithms/localization.hpp>
 #include <qdk/chemistry/algorithms/mc.hpp>
 #include <qdk/chemistry/algorithms/nuclear_derivative.hpp>
@@ -185,8 +186,20 @@ TEST(NuclearDerivativeSettingsTest, SettingsHaveUserFacingDescriptions) {
 }
 
 TEST(NuclearDerivativeSettingsTest,
+     GeometryOptimizationDefaultsToAnalyticGradients) {
+  GeometryOptimizerSettings settings;
+  const auto derivative_calculator =
+      settings.get<AlgorithmRef>("derivative_calculator");
+
+  EXPECT_EQ(derivative_calculator.get_algorithm_type(),
+            "nuclear_derivative_calculator");
+  EXPECT_EQ(derivative_calculator.get_algorithm_name(), "qdk");
+}
+
+TEST(NuclearDerivativeSettingsTest,
      FiniteDifferenceSettingsHaveUserFacingDescriptions) {
-  auto calculator = NuclearDerivativeCalculatorFactory::create();
+  auto calculator =
+      NuclearDerivativeCalculatorFactory::create("qdk_finite_difference");
   for (const auto& key :
        {"reuse_seed_active_space", "finite_difference_step"}) {
     EXPECT_TRUE(calculator->settings().has_description(key)) << key;
@@ -194,15 +207,16 @@ TEST(NuclearDerivativeSettingsTest,
   }
 }
 
-TEST(NuclearDerivativeSettingsTest,
-     ImplementationSettingsBelongToFiniteDifferenceOnly) {
-  auto finite_difference = NuclearDerivativeCalculatorFactory::create();
+TEST(NuclearDerivativeSettingsTest, ImplementationSpecificSettingsAreScoped) {
+  auto finite_difference =
+      NuclearDerivativeCalculatorFactory::create("qdk_finite_difference");
   auto analytic = NuclearDerivativeCalculatorFactory::create("qdk");
 
   EXPECT_TRUE(finite_difference->settings().has("reuse_seed_active_space"));
   EXPECT_TRUE(finite_difference->settings().has("finite_difference_step"));
   EXPECT_FALSE(analytic->settings().has("reuse_seed_active_space"));
-  EXPECT_FALSE(analytic->settings().has("finite_difference_step"));
+  EXPECT_TRUE(analytic->settings().has("finite_difference_step"));
+  EXPECT_TRUE(analytic->settings().has_description("finite_difference_step"));
 }
 
 TEST(NuclearDerivativeDataTest, GradientsReferenceStructureAndRoundTripJson) {
@@ -248,7 +262,8 @@ TEST(NuclearDerivativeDataTest, HessianReferencesStructureAndRoundTripsJson) {
 }
 
 TEST(NuclearDerivativeCalculatorTest, FiniteDifferenceRunsRealScfForWater) {
-  auto calculator = NuclearDerivativeCalculatorFactory::create();
+  auto calculator =
+      NuclearDerivativeCalculatorFactory::create("qdk_finite_difference");
   calculator->settings().set("compute_hessian", true);
   calculator->settings().set("finite_difference_step", 1.0e-3);
 
@@ -276,6 +291,31 @@ TEST(NuclearDerivativeCalculatorTest, FiniteDifferenceRunsRealScfForWater) {
   EXPECT_TRUE((*hessian)->get_matrix().isApprox(
       (*hessian)->get_matrix().transpose(), 1.0e-8));
 
+  ASSERT_TRUE(wavefunction.has_value());
+  EXPECT_NE(*wavefunction, nullptr);
+}
+
+TEST(NuclearDerivativeCalculatorTest,
+     QdkAnalyticBuildsHessianFromAnalyticGradients) {
+  auto calculator = NuclearDerivativeCalculatorFactory::create();
+  EXPECT_EQ(calculator->name(), "qdk");
+  calculator->settings().set("compute_hessian", true);
+  calculator->settings().set("finite_difference_step", 1.0e-3);
+
+  auto structure = testing::create_lih_structure();
+  auto [energy, gradients, hessian, wavefunction] =
+      calculator->run(structure, 0, 1, std::string("sto-3g"), 0);
+
+  EXPECT_TRUE(std::isfinite(energy));
+  ASSERT_NE(gradients, nullptr);
+  EXPECT_TRUE(gradients->get_values().allFinite());
+  ASSERT_TRUE(hessian.has_value());
+  ASSERT_NE(*hessian, nullptr);
+  const auto& matrix = (*hessian)->get_matrix();
+  EXPECT_EQ(matrix.rows(), 6);
+  EXPECT_EQ(matrix.cols(), 6);
+  EXPECT_TRUE(matrix.allFinite());
+  EXPECT_TRUE(matrix.isApprox(matrix.transpose(), 1.0e-12));
   ASSERT_TRUE(wavefunction.has_value());
   EXPECT_NE(*wavefunction, nullptr);
 }
@@ -358,7 +398,8 @@ TEST(NuclearDerivativeCalculatorTest,
       testing::with_active_space(wavefunction->get_orbitals(),
                                  std::vector<size_t>{0}, std::vector<size_t>{});
 
-  auto calculator = NuclearDerivativeCalculatorFactory::create();
+  auto calculator =
+      NuclearDerivativeCalculatorFactory::create("qdk_finite_difference");
   calculator->settings().set(
       "energy_calculator",
       AlgorithmRef("multi_configuration_calculator",
@@ -407,7 +448,8 @@ TEST(NuclearDerivativeCalculatorTest,
       testing::with_active_space(wavefunction->get_orbitals(),
                                  std::vector<size_t>{0}, std::vector<size_t>{});
 
-  auto calculator = NuclearDerivativeCalculatorFactory::create();
+  auto calculator =
+      NuclearDerivativeCalculatorFactory::create("qdk_finite_difference");
   calculator->settings().set(
       "energy_calculator",
       AlgorithmRef("multi_configuration_calculator",
