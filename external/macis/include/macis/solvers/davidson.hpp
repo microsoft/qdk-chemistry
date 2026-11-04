@@ -525,9 +525,7 @@ inline double davidson_lane_sum(int64_t len, Term&& term) {
  * lambda.size(), orthonormal columns over the coordinates `index`) equal to
  * Z diag(lambda) Z^T, the new direction on those coordinates is
  * -Z (lambda - lam)^-1 Z^T r instead of the diagonal's -r / (D - lam).
- * Components with |lambda_a - lam| < min_abs_denominator are dropped: a
- * guess that is the block's own lowest eigenvector has lam = lambda_0 at the
- * first iteration.
+ * Components with |lambda_a - lam| < min_abs_denominator are dropped.
  */
 struct DavidsonBlockPreconditioner {
   std::vector<int64_t> index;
@@ -542,15 +540,18 @@ struct DavidsonBlockPreconditioner {
  * Same contract as davidson(), but whenever the search space reaches max_m
  * vectors it is collapsed onto the current and previous Ritz vectors, so the
  * memory footprint stays at (2*max_m + 1) vectors of length N regardless of
- * the iteration count. Length-N work is threaded over a static partition that
- * also places the work arrays on the NUMA domains of their threads.
+ * the iteration count.
+ *
+ * @note Davidson's method (J. Comput. Phys. 17, 87 (1975)), restarted onto the
+ * current and previous Ritz vectors as in Stathopoulos & Saad (Electron. Trans.
+ * Numer. Anal. 7, 163 (1998)). The anchored mode for an inexact op is a form
+ * of iterative refinement (Dongarra, Moler & Wilkinson, SIAM J. Numer. Anal.
+ * 20, 23 (1983)), and re-anchoring on the estimated error follows the residual
+ * replacement of van der Vorst & Ye (SIAM J. Sci. Comput. 22, 835 (2000)).
  *
  * @tparam TC Storage type of the search space and its images except their
- * first vectors (the Ritz vector after a collapse, i.e. the anchor of an
- * inexact op), which are double: float halves the memory traffic and
- * footprint for a single-precision op, whose images carry no more digits.
- * With float the Rayleigh-Ritz step uses the overlaps of the stored (rounded)
- * vectors, so that their rounding does not limit the residual.
+ * first vectors, which are double; float halves the memory of a
+ * single-precision op
  * @tparam Functor Type of the matrix-vector operation functor (on vectors of
  * TC)
  * @tparam ExactFunctor Type of the exact operator (on vectors of double)
@@ -568,27 +569,20 @@ struct DavidsonBlockPreconditioner {
  * @param[out] residual_norm  If not null, the residual norm of the returned
  * Ritz pair as computed from the operator applications
  * @param[in] stagnation_window  If positive, also stop (unconverged) once the
- * residual norm has not halved over this many iterations, e.g. at the
- * resolution limit of an inexact operator. A residual test cannot tell that
- * limit from a plateau of the iteration itself, so with op_error it is only
- * a backstop and should be long.
- * @param[in] exact  Optional exact operator, for an inexact (e.g. reduced
+ * residual norm has not halved over this many iterations
+ * @param[in] exact  Optional exact operator for an inexact (e.g. reduced
  * precision) op: once the residual falls below anchor_tol (or tol, or
- * stagnates) the search space is collapsed onto the Ritz vector, whose image
- * is recomputed with exact; later directions use op again. Their errors
- * then enter the Ritz vector scaled by its (small) change since this
- * anchor. Convergence is only accepted after anchoring.
+ * stagnates), the image of the Ritz vector is recomputed with exact (the
+ * anchor); convergence is only accepted after anchoring
  * @param[in] anchor_tol  Residual norm at which to anchor; infinity anchors
  * the start vector
  * @param[in] block  Optional exact block of the preconditioner
- * @param[in] op_error  With exact: estimated norm of the error of op's image
- * of a unit vector. If positive, the errors of the images are tracked (in
- * quadrature through collapses, zero for an exact image) into an estimate of
- * the error of the residual. The solve then re-anchors in place whenever
- * that estimate exceeds a quarter of the residual (or of tol, below it),
- * accepts convergence only when the residual plus the estimate is below
- * tol, and stops (unconverged) when re-anchoring cannot keep up: two
- * re-anchors in a row within two iterations of the previous one.
+ * @param[in] op_error  With exact: estimated error norm of op's image of a
+ * unit vector. If positive, the solve estimates the resulting error of the
+ * residual, re-anchors whenever it exceeds a quarter of the residual (or of
+ * tol, if larger), accepts convergence only when the residual plus the
+ * estimate is below tol, and stops (unconverged) if re-anchoring cannot keep
+ * up
  * @return Pair containing (number of iterations, converged eigenvalue)
  * @throws std::runtime_error if not converged within max_iter iterations
  * and throw_on_failure is true
@@ -1113,7 +1107,8 @@ auto restarted_davidson(
 
     // Classical Gram-Schmidt: t -= V proj, sums = [V^T t, |t|^2], and a
     // second pass t -= V sums only where the first removed more than about
-    // 30 % of |t| (the DGKS criterion |t'|^2 <= |t|^2 / 2), i.e. where
+    // 30 % of |t| (the criterion |t'|^2 <= |t|^2 / 2 of Daniel, Gragg,
+    // Kaufman & Stewart, Math. Comp. 30, 772 (1976)), i.e. where
     // cancellation can have spoilt orthogonality. A direction inside the
     // search space (possible only for tiny N) is replaced by unit vectors
     // until one is not.

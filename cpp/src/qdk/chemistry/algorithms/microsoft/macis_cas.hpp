@@ -17,29 +17,20 @@ namespace qdk::chemistry::algorithms::microsoft {
  * @class MacisCasSettings
  * @brief Settings class for MACIS CAS calculations.
  *
- * Inherits MCSCF defaults from MacisSettings and adds the spin-flip symmetry
- * restriction of the CI vector and the size of the Davidson search space.
+ * Inherits MCSCF defaults from MacisSettings and adds settings for the
+ * spin-flip symmetry and the Davidson search space.
  */
 class MacisCasSettings : public MacisSettings {
  public:
   MacisCasSettings() {
     set_default<std::string>(
         "spin_flip_symmetry", "none",
-        "Spin-flip symmetry of the CI vector with equal numbers of active "
-        "alpha and beta electrons: 'even' restricts the solution to even "
-        "total spin S (singlet, quintet, ...), 'odd' to odd S (triplet, "
-        "septet, ...), each at about half the cost per iteration and half "
-        "the memory per search-space vector; 'none' finds the lowest state "
-        "of any spin",
+        "Restrict the solution to even or odd total spin",
         data::ListConstraint<std::string>{
             {std::vector<std::string>{"none", "even", "odd"}}});
     set_default<int64_t>(
         "max_subspace", 10,
-        "Maximum number of vectors in the search space of the iterative "
-        "(Davidson) solver before it restarts; each vector adds 8 bytes per "
-        "determinant to the memory (16 in double precision, half as much "
-        "with spin_flip_symmetry), and more vectors can save iterations on "
-        "strongly correlated systems",
+        "Maximum number of vectors in the Davidson search space",
         data::BoundConstraint<int64_t>{2, std::numeric_limits<int64_t>::max()});
   }
   ~MacisCasSettings() override = default;

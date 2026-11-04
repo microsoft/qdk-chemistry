@@ -9,22 +9,22 @@ namespace qdk::chemistry::data {
 
 /**
  * @class CasStateVectorContainer
- * @brief State vector over a complete active space whose determinants are
- *        generated on demand
+ * @brief Complete-active-space state vector that stores only its coefficients
  *
- * The expansion holds every determinant with a given number of alpha and beta
- * electrons in the active orbitals, but only its coefficients are stored.
- * Coefficient @c i belongs to the determinant whose alpha and beta strings have
- * the ranks @c i / N_beta and @c i % N_beta, where @c N_beta is the number of
- * beta strings and strings are ranked in lexicographic order of their sorted
- * occupied orbitals. The determinant list is built on first use and released
- * by @ref clear_caches.
- *
- * The container behaves and serializes as a @ref StateVectorContainer; files it
- * writes load as a StateVectorContainer holding the same expansion.
+ * The expansion covers every determinant with the given numbers of alpha and
+ * beta electrons in the active orbitals; determinants are generated on
+ * demand. Coefficient @c i belongs to the determinant whose alpha and beta
+ * strings have the ranks @c i / N_beta and @c i % N_beta, with strings ranked
+ * in lexicographic order of their occupied orbitals. The container behaves and
+ * serializes as a @ref StateVectorContainer.
  */
 class CasStateVectorContainer final : public StateVectorContainer {
  public:
+  using MatrixVariant = ContainerTypes::MatrixVariant;
+  using VectorVariant = ContainerTypes::VectorVariant;
+  using ScalarVariant = ContainerTypes::ScalarVariant;
+  using DeterminantVector = ContainerTypes::DeterminantVector;
+
   /**
    * @brief Constructs a complete-active-space state vector without reduced
    *        density matrices (RDMs)

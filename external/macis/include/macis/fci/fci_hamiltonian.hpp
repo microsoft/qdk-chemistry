@@ -37,15 +37,10 @@ enum class FCIPrecision { automatic, mixed, double_precision };
  * symmetry of real orbitals; T and V are column-major with leading dimensions
  * LDT and LDV (V(p,q,r,s) = V[p + q*LDV + r*LDV^2 + s*LDV^3]).
  *
- * @note The alpha-beta term is one DGEMM per output alpha string whose inner
- * dimension spans only that string's single excitations, a restriction of the
- * contractions of Knowles & Handy (Chem. Phys. Lett. 111, 315 (1984)) and
- * Olsen et al. (J. Chem. Phys. 89, 2185 (1988)). The same-spin terms use the
- * (n-2)-electron projection of Harrison & Zarrabian (Chem. Phys. Lett. 158,
- * 393 (1989)) within one spin: k-electron strings couple through
- * (k-2)-electron intermediates K, whose strings K + {p, r} form dense blocks
- * of the antisymmetrized pair integrals (the one-body part is folded in using
- * the electron count).
+ * @note Implements the direct CI of Knowles & Handy (Chem. Phys. Lett. 111,
+ * 315 (1984)) and Olsen et al. (J. Chem. Phys. 89, 2185 (1988)), with the
+ * same-spin terms through the (n-2)-electron projection of Harrison &
+ * Zarrabian (Chem. Phys. Lett. 158, 393 (1989)).
  */
 class FCIHamiltonian {
  public:
@@ -88,10 +83,6 @@ class FCIHamiltonian {
   /**
    * @brief Single-precision S = alpha * H * C + beta * S, same contract as
    * the double-precision overload (integrals rounded to float).
-   *
-   * Relative accuracy is that of float arithmetic (about 1e-6); the
-   * mixed-precision ground-state solver uses it for correction vectors and
-   * checks its result in double precision.
    */
   void sigma(const float* C, float* S, float alpha = 1.0f, float beta = 0.0f,
              int spin_flip = 0) const;
@@ -173,48 +164,26 @@ class FCIHamiltonian {
 /**
  * @brief Lowest eigenpair of a direct FCI Hamiltonian (restarted Davidson).
  *
- * The solve runs on at most omp_get_max_threads() threads, fewer for small
- * spaces: one team sized for the work of a sigma, which keeps them from
- * paying for more threads than their work can use.
+ * The solve uses at most omp_get_max_threads() threads, fewer for small
+ * spaces.
  *
  * @param[in] H            FCI Hamiltonian
  * @param[in] max_iter     Maximum number of Davidson iterations
  * @param[in] res_tol      Convergence tolerance on the residual norm
- * @param[in,out] C        Used as the initial guess (projected onto the
- *                         spin-flip sector) when it has H.size() elements
- *                         and is non-zero there, otherwise the lowest
- *                         eigenvector of H within the (up to) 400
- *                         determinants (or sector functions) of lowest
- *                         diagonal energy is; the normalized eigenvector on
- *                         output
+ * @param[in,out] C        Initial guess if it has H.size() elements and is
+ *                         non-zero (projected onto the spin-flip sector),
+ *                         otherwise a guess is generated; the normalized
+ *                         eigenvector on output
  * @param[in] spin_flip    Sector of FCIHamiltonian::sigma: 0 for no
  *                         restriction, +1 (-1) for the lowest state of even
  *                         (odd) total spin
- * @param[in] max_subspace Davidson search-space dimension (>= 2). Memory per
- *                         determinant is 8 * (2 * max_subspace + 3) bytes in
- *                         double precision and 8 * max_subspace + 28 in
- *                         mixed precision (single-precision corrections); in
- *                         a spin-flip sector, whose vectors have about half
- *                         as many coordinates, 8 * max_subspace + 28 and
- *                         4 * max_subspace + 30.
- *                         Hydrogen chains took as many iterations with 3 to
- *                         16 vectors, but strongly correlated systems need
- *                         fewer with more: [2Fe-2S] (30e, 20o) took 135
- *                         iterations with 3, 115 with 6 and 100 with 12
- * @param[in] precision    Precision of the Hamiltonian applications:
- *                         FCIPrecision::mixed applies H in single precision
- *                         where that cannot affect the result (a single-
- *                         precision phase down to a residual of about 1e-4,
- *                         then an in-place anchor: a double-precision sigma
- *                         of the Ritz vector, while later correction vectors
- *                         keep single precision, their sigma errors entering
- *                         scaled by their small coefficients) and accepts the
- *                         result only on its double-precision residual
- *                         (res_tol), so the contract matches
- *                         FCIPrecision::double_precision. The default
- *                         FCIPrecision::automatic is mixed for spaces of at
- *                         least 2^21 determinants, where it was measured
- *                         faster, and double precision below.
+ * @param[in] max_subspace Davidson search-space dimension (>= 2); more
+ *                         vectors can save iterations at the cost of memory
+ * @param[in] precision    FCIPrecision::mixed applies H in single precision
+ *                         where that cannot affect the result; either way
+ *                         the result meets res_tol in double precision.
+ *                         FCIPrecision::automatic uses mixed precision for
+ *                         large spaces
  * @return Lowest eigenvalue
  * @throws std::invalid_argument for an invalid or empty spin-flip sector
  * @throws std::runtime_error if Davidson does not converge
@@ -229,9 +198,7 @@ double fci_ground_state(const FCIHamiltonian& H, size_t max_iter,
  *
  * Same as the std::vector overload, with the eigenvector written to the
  * H.size() elements at C. Unless `guess` is true their initial contents are
- * ignored, so C can be uninitialized memory: the solver writes every
- * element with the threads that later process it, without the serial
- * zero-fill of a std::vector (0.4 s for 1.7e8 determinants).
+ * ignored, so C can be uninitialized memory.
  *
  * @param[in] guess  Whether C holds the initial guess (then used as by the
  *                   std::vector overload; a zero guess is ignored)

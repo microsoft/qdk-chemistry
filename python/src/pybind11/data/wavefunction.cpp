@@ -1374,13 +1374,10 @@ Examples:
   py::class_<CasStateVectorContainer, StateVectorContainer, py::smart_holder>(
       data, "CasStateVectorContainer",
       R"(
-State vector over a complete active space whose determinants are generated on demand.
+Complete-active-space state vector that stores only its coefficients.
 
-The expansion holds every determinant with the given numbers of alpha and beta
-electrons in the active orbitals, but only its coefficients are stored:
-``get_active_determinants()`` builds the determinant list on first use, and
-``clear_caches()`` releases it. The container behaves and serializes as a
-:class:`StateVectorContainer`.
+Determinants are generated on demand. The container behaves and serializes as
+a :class:`StateVectorContainer`.
 )");
 
   // Bind AmplitudeType enum

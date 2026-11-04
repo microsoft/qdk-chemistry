@@ -150,16 +150,12 @@ MACIS CAS
 
 .. rubric:: Factory name: ``"macis_cas"`` (default)
 
-The :term:`MACIS` (Many-body Adaptive Configuration Interaction Solver) :term:`CAS` implementation provides a reference solver to compute the exact energy within the active space.
-It uses a direct, string-driven full :term:`CI` algorithm :cite:`Knowles1984,Olsen1988,Harrison1989`: the Hamiltonian is applied to the :term:`CI` vector from the one- and two-electron integrals and is never stored, so memory is dominated by a small number of vectors with one entry per determinant rather than by the Hamiltonian.
-The returned wavefunction likewise stores only the :term:`CI` coefficients, in a :class:`~qdk_chemistry.data.CasStateVectorContainer`, and generates its determinants when they are first requested.
-The number of determinants, and with it time and memory, still grows combinatorially with the size of the active space, so this solver suits small to moderately large active spaces; for larger ones, consider :ref:`MACIS ASCI <macis-asci>`.
+The :term:`MACIS` (Many-body Adaptive Configuration Interaction Solver) :cite:`Williams-Young2023` :term:`CAS` implementation provides a reference solver to compute the exact energy within the active space.
+It uses a direct full :term:`CI` algorithm :cite:`Knowles1984,Olsen1988,Harrison1989` that never builds the Hamiltonian matrix, which makes it suitable for large active spaces.
+Large calculations run in mixed precision: the Hamiltonian is applied in single precision, and the result is refined until its double-precision residual meets ``ci_residual_tolerance`` :cite:`Dongarra1983,vanderVorst2000`.
+The resulting wavefunction stores only the :term:`CI` coefficients (:class:`~qdk_chemistry.data.CasStateVectorContainer`).
 
-This implementation uses the common settings described above, plus the following MACIS-specific settings. For small determinant spaces (at or below ``iterative_solver_dimension_cutoff``), dense diagonalization is used; otherwise the iterative Davidson solver is employed.
-For larger spaces the Davidson solver applies the Hamiltonian in single precision wherever that cannot change the result, and accepts the final eigenpair only once its residual, computed in double precision, meets ``ci_residual_tolerance``, so the results match a double-precision calculation to that tolerance.
-
-With equal numbers of active alpha and beta electrons, the :term:`CI` coefficients of a state with total spin :math:`S` form a matrix over alpha and beta strings that is symmetric for even :math:`S` and antisymmetric for odd :math:`S`.
-The ``spin_flip_symmetry`` setting restricts the calculation to one of these two sectors, which roughly halves the cost of each iteration and the memory of each search-space vector, and can target, for example, the lowest triplet when the lowest state overall is a singlet.
+This implementation uses the common settings described above, plus the following MACIS-specific settings. For small determinant spaces (at or below ``iterative_solver_dimension_cutoff``), dense diagonalization is used; otherwise the iterative Davidson solver :cite:`Davidson1975` is employed.
 
 .. list-table::
    :header-rows: 1
@@ -169,18 +165,14 @@ The ``spin_flip_symmetry`` setting restricts the calculation to one of these two
      - Type
      - Default
      - Description
-   * - ``ci_matel_tol``
-     - float
-     - ``~2.2e-16`` (machine epsilon)
-     - Hamiltonian matrix element sparsification threshold shared by the MACIS calculators; ``macis_cas`` accepts it for compatibility but does not use it, because it never builds the :term:`CI` Hamiltonian
    * - ``spin_flip_symmetry``
      - string
      - ``"none"``
-     - ``"even"`` restricts the solution to even total spin (singlet, quintet, ...), ``"odd"`` to odd total spin (triplet, septet, ...); requires equal numbers of active alpha and beta electrons. ``"none"`` finds the lowest state of any spin
+     - Restrict the solution to even (``"even"``: singlet, quintet, ...) or odd (``"odd"``: triplet, septet, ...) total spin, which roughly halves the cost; requires equal numbers of active alpha and beta electrons
    * - ``max_subspace``
      - int
      - ``10``
-     - Maximum number of vectors in the search space of the iterative (Davidson) solver before it restarts (at least 2). Each vector adds 8 bytes per determinant to the memory (16 in double precision, half as much with ``spin_flip_symmetry``); more vectors can save iterations on strongly correlated systems
+     - Maximum number of vectors in the Davidson search space; larger values can reduce the number of iterations at the cost of memory
 
 .. _macis-asci:
 
@@ -230,6 +222,11 @@ In addition to the common settings, :term:`MACIS` :term:`ASCI` supports the foll
      - Type
      - Default
      - Description
+
+   * - ``ci_matel_tol``
+     - float
+     - ``~2.2e-16`` (machine epsilon)
+     - Hamiltonian matrix element sparsification threshold for building the CI Hamiltonian
 
    * - ``ntdets_max``
      - int
