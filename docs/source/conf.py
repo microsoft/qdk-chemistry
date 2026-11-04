@@ -224,6 +224,12 @@ nitpick_ignore_regex = [
     (r"py:class", r"qdk_chemistry._core.data.DataClass"),
     (r"py:class", r"qdk_chemistry._core\.data\.PauliOperatorExpression"),
     (r"py:class", r"qdk_chemistry._core\.data\.MajoranaMapping"),
+    # Bound C++ structs used only in annotations of private helpers.
+    (
+        r"py:class",
+        r"^(qdk_chemistry\._core\.utils\.unitary_synthesis\.)?"
+        r"(GivensDecomposition|DenseIsometrySynthesis|SparseIsometrySynthesis)$",
+    ),
     (r"py:class", r"_CoreMajoranaMapping"),
     (r"py:class", r"^TaperingSpecification$"),
     (r"py:class", r"qdk_chemistry\.data\.tapering\.TaperingSpecification"),

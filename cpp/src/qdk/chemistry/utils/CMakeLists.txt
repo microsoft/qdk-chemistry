@@ -6,6 +6,9 @@ target_sources(chemistry PRIVATE
     orbital_rotation.cpp
     golden_section.cpp
     logger.cpp
+    matrix_decomposition.cpp
+    unitary_synthesis.cpp
+    sparse_unitary_synthesis.cpp
 )
 
 if(WIN32)
