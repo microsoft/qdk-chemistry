@@ -88,7 +88,7 @@ if they are not Hermitian.
       py::arg("integrals"), py::arg("consumer"));
 
   data.def(
-      "_eightfold_symmetrized",
+      "_required_eightfold_symmetrized",
       [](const Integrals& integrals, const std::string& consumer) {
         return required_symmetrized(integrals, consumer, "8-fold",
                                     detail::eightfold_comparison,
@@ -101,7 +101,7 @@ Average of integrals over their 8-fold permutation classes. Raises
       py::arg("integrals"), py::arg("consumer"));
 
   data.def(
-      "_pair_symmetrized",
+      "_required_pair_symmetrized",
       [](const Integrals& integrals, const std::string& consumer) {
         return required_symmetrized(integrals, consumer, "pair",
                                     detail::pair_comparison,

@@ -39,7 +39,7 @@ import numpy as np
 import pyscf
 from pyscf import ao2mo, lib
 
-from qdk_chemistry._core.data import _eightfold_symmetrized, _pair_symmetrized
+from qdk_chemistry._core.data import _is_approx, _required_eightfold_symmetrized, _required_pair_symmetrized
 from qdk_chemistry.constants import FINE_STRUCTURE_CONSTANT
 from qdk_chemistry.data import AOType, BasisSet, Hamiltonian, Orbitals, Shell, Structure
 from qdk_chemistry.data._spin_channels import spin_channel_indices, spin_channel_matrix, spin_channel_vector
@@ -646,13 +646,19 @@ def hamiltonian_to_scf(hamiltonian: Hamiltonian, alpha_occ: np.ndarray, beta_occ
     Note:
         Restricted Hamiltonians give an RHF reference for closed-shell occupations and an ROHF reference otherwise.
         Unrestricted Hamiltonians give a UHF reference in a spin-blocked basis of twice the size, whose alpha and beta
-        orbitals span separate halves, so that each spin block keeps its own integrals.
+        orbitals span separate halves, so that each spin block keeps its own integrals. As those orbitals do not
+        overlap, overlap-based quantities such as ``spin_square()`` are not meaningful for it.
+
+        The reference has no AO basis, so PySCF methods that recompute integrals from one, such as AO-direct or
+        out-of-core CCSD and density fitting, are unavailable.
 
         PySCF stores one value per 8-fold permutation class of the integrals, and per pair class
         (pq|rs) = (qp|rs) = (pq|sr) of the alpha-beta block. The integrals must have that symmetry to ``isApprox``
-        precision and are passed as class averages; others, such as downfolded integrals, are rejected.
+        precision and are passed as class averages; others, such as downfolded integrals, are rejected. The one-body
+        integrals must be finite and symmetric to the same precision.
 
-        All represented MOs must be active, with no inactive orbitals.
+        All represented MOs must be active, with no inactive orbitals, and the occupied orbitals of each spin must
+        precede its virtual orbitals, as PySCF's post-HF methods assume.
 
         For an interface using electron count and multiplicity, see
         :func:`hamiltonian_to_scf_from_n_electrons_and_multiplicity`.
@@ -684,6 +690,9 @@ def hamiltonian_to_scf(hamiltonian: Hamiltonian, alpha_occ: np.ndarray, beta_occ
         for occ in (alpha_occ, beta_occ)
     ):
         raise ValueError("Occupations must contain one value of 0 or 1 per molecular orbital and spin.")
+    # PySCF's CC and MP2 take the first nelec_alpha (nelec_beta) orbitals of each spin as occupied.
+    if any(np.any(occ[: int(np.sum(occ))] != 1) for occ in (alpha_occ, beta_occ)):
+        raise ValueError("Occupied orbitals must precede the virtual orbitals of each spin.")
 
     active = [spin_channel_indices(orbitals.active_indices(), spin) for spin in (axes.alpha(), axes.beta())]
     if any(indices != list(range(norb)) for indices in active) or any(
@@ -692,6 +701,8 @@ def hamiltonian_to_scf(hamiltonian: Hamiltonian, alpha_occ: np.ndarray, beta_occ
         raise ValueError("Active space is not supported.")
 
     one_body = hamiltonian.get_one_body_integrals()
+    if not all(np.all(np.isfinite(h1)) and _is_approx(h1.ravel(), h1.T.ravel()) for h1 in one_body):
+        raise ValueError("One-body integrals must be finite and symmetric.")
     two_body = [np.reshape(eri, (norb,) * 4) for eri in hamiltonian.get_two_body_integrals()]
     mol = pyscf.gto.M()
     mol.nelectron = int(np.sum(alpha_occ) + np.sum(beta_occ))
@@ -701,28 +712,30 @@ def hamiltonian_to_scf(hamiltonian: Hamiltonian, alpha_occ: np.ndarray, beta_occ
 
     # PySCF keeps one member of each permutation class, so pass the class averages.
     if hamiltonian.is_unrestricted():
-        aaaa = _eightfold_symmetrized(two_body[0], "PySCF (alpha-alpha block)")
-        aabb = _pair_symmetrized(two_body[1], "PySCF (alpha-beta block)")
-        bbbb = _eightfold_symmetrized(two_body[2], "PySCF (beta-beta block)")
+        aaaa = _required_eightfold_symmetrized(two_body[0], "PySCF (alpha-alpha block)")
+        aabb = _required_pair_symmetrized(two_body[1], "PySCF (alpha-beta block)")
+        bbbb = _required_eightfold_symmetrized(two_body[2], "PySCF (beta-beta block)")
         # Alpha orbitals span the first half of the basis and beta orbitals the second; mixed pairs vanish.
+        # Alpha pairs lead the 8-fold packing; each beta pair's row holds its alpha-beta and beta-beta entries.
+        npair = norb * (norb + 1) // 2
         rows, cols = np.tril_indices(norb)
-        alpha_pairs = rows * (rows + 1) // 2 + cols
         beta_pairs = (rows + norb) * (rows + norb + 1) // 2 + cols + norb
-        mixed = ao2mo.restore(4, aabb, norb)
-        eri = np.zeros((norb * (2 * norb + 1),) * 2)
-        eri[np.ix_(alpha_pairs, alpha_pairs)] = ao2mo.restore(4, aaaa, norb)
-        eri[np.ix_(beta_pairs, beta_pairs)] = ao2mo.restore(4, bbbb, norb)
-        eri[np.ix_(alpha_pairs, beta_pairs)] = mixed
-        eri[np.ix_(beta_pairs, alpha_pairs)] = mixed.T
+        starts = beta_pairs * (beta_pairs + 1) // 2
+        total_pairs = norb * (2 * norb + 1)
+        eri = np.zeros(total_pairs * (total_pairs + 1) // 2)
+        eri[: npair * (npair + 1) // 2] = ao2mo.restore(8, aaaa, norb)
+        eri[starts[:, None] + np.arange(npair)] = ao2mo.restore(4, aabb, norb).T
+        lower = np.tril_indices(npair)
+        eri[starts[lower[0]] + beta_pairs[lower[1]]] = ao2mo.restore(4, bbbb, norb)[lower]
         mf = pyscf.scf.UHF(mol)
-        mf._eri = ao2mo.restore(8, eri, 2 * norb)  # noqa: SLF001
+        mf._eri = eri  # noqa: SLF001
         zero = np.zeros((norb, norb))
         core = np.block([[one_body[0], zero], [zero, one_body[1]]])
         mf.mo_coeff = (np.vstack((np.eye(norb), zero)), np.vstack((zero, np.eye(norb))))
         mf.mo_occ = (alpha_occ, beta_occ)
     else:
         mf = pyscf.scf.RHF(mol) if np.array_equal(alpha_occ, beta_occ) else pyscf.scf.ROHF(mol)
-        mf._eri = ao2mo.restore(8, _eightfold_symmetrized(two_body[0], "PySCF"), norb)  # noqa: SLF001
+        mf._eri = ao2mo.restore(8, _required_eightfold_symmetrized(two_body[0], "PySCF"), norb)  # noqa: SLF001
         core = one_body[0]
         mf.mo_coeff = np.eye(norb)
         mf.mo_occ = alpha_occ + beta_occ

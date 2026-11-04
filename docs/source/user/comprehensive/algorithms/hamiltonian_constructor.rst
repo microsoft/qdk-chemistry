@@ -18,6 +18,8 @@ rather than recomputing integrals from its :class:`~qdk_chemistry.data.Orbitals`
 Molecular and model orbitals with equal integrals therefore give equal PySCF references.
 PySCF stores one value per 8-fold permutation class of the two-electron integrals (per pair class for the alpha-beta block),
 so integrals without that symmetry, such as downfolded ones, are rejected.
+Active-space effective Hamiltonians are not supported by this conversion.
+The PySCF reference has no AO basis, so PySCF methods that need one, such as density fitting, do not apply to it.
 
 Using the HamiltonianConstructor
 ---------------------------------

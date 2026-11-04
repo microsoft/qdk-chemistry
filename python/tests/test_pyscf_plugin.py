@@ -2586,6 +2586,10 @@ class TestPyscfPlugin:
                     with pytest.raises(ValueError, match="0 or 1"):
                         hamiltonian_to_scf(reference, alpha, beta)
 
+        for reference in (h_model, h_unrestricted_model):
+            with pytest.raises(ValueError, match="Occupied orbitals must precede"):
+                hamiltonian_to_scf(reference, np.array([1.0, 0.0, 0.0, 0.0]), np.array([0.0, 1.0, 0.0, 0.0]))
+
     @pytest.mark.parametrize("defect", ["fourfold", "non-finite"])
     def test_hamiltonian_to_scf_rejects_model_two_body_without_eightfold_symmetry(self, defect: str) -> None:
         """PySCF reads one member per 8-fold class, so other model tensors would give wrong energies."""
@@ -2607,6 +2611,19 @@ class TestPyscfPlugin:
         )
         occupation = np.array([1.0, 0.0, 0.0])
         with pytest.raises(ValueError, match="8-fold" if defect == "fourfold" else "non-finite"):
+            hamiltonian_to_scf(hamiltonian, occupation, occupation)
+
+    @pytest.mark.parametrize("defect", ["asymmetric", "non-finite"])
+    def test_hamiltonian_to_scf_rejects_invalid_one_body_integrals(self, defect: str) -> None:
+        """PySCF takes the core Hamiltonian as a finite symmetric matrix."""
+        one_body = np.diag([-1.0, -0.5, 0.5])
+        one_body[0, 1] = np.nan if defect == "non-finite" else 0.2
+        orbitals = data.ModelOrbitals(3, SymmetryProduct([axes.spin(1, True)]))
+        hamiltonian = data.Hamiltonian(
+            data.CanonicalFourCenterHamiltonianContainer(one_body, np.zeros(3**4), orbitals, 0.0, np.eye(3))
+        )
+        occupation = np.array([1.0, 0.0, 0.0])
+        with pytest.raises(ValueError, match="One-body integrals must be finite and symmetric"):
             hamiltonian_to_scf(hamiltonian, occupation, occupation)
 
     def test_hamiltonian_to_scf_passes_model_two_body_class_averages(self) -> None:
@@ -2697,6 +2714,28 @@ class TestPyscfPlugin:
         calculator = algorithms.create("dynamical_correlation_calculator", "pyscf_coupled_cluster", conv_tol=1e-10)
         energy, _, _ = calculator.run(Ansatz(data.Hamiltonian(container), reference))
         assert np.isclose(energy, exact, rtol=0.0, atol=ci_energy_tolerance)
+
+    def test_pyscf_coupled_cluster_integral_settings(self) -> None:
+        """AO-direct CCSD needs an AO basis, which the reference lacks; disk I/O for DIIS and intermediates works."""
+        one_body = np.array([[-1.0, -0.15], [-0.15, 0.2]])
+        two_body = np.zeros((2,) * 4)
+        two_body[0, 0, 0, 0] = two_body[1, 1, 1, 1] = 0.4
+        orbitals = data.ModelOrbitals(2, SymmetryProduct([axes.spin(1, True)]))
+        hamiltonian = data.Hamiltonian(
+            data.CanonicalFourCenterHamiltonianContainer(one_body, two_body.ravel(), orbitals, 0.0, np.eye(2))
+        )
+        reference = data.Wavefunction(
+            data.StateVectorContainer(data.Configuration.from_spin_half_string("20"), orbitals)
+        )
+        ansatz = Ansatz(hamiltonian, reference)
+
+        def run(**settings):
+            calculator = algorithms.create("dynamical_correlation_calculator", "pyscf_coupled_cluster", **settings)
+            return calculator.run(ansatz)[0]
+
+        with pytest.raises(ValueError, match="AO-direct"):
+            run(direct=True)
+        assert np.isclose(run(incore_complete=False), run(), rtol=0.0, atol=ci_energy_tolerance)
 
 
 class TestQDKChemistryPySCFBasisConversion:
