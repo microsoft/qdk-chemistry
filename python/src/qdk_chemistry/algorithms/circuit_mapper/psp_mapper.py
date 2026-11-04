@@ -24,18 +24,11 @@ from .base import CircuitMapper
 __all__: list[str] = ["PSPMapper", "PSPMapperSettings"]
 
 #: SELECT constructions available through the ``select_method`` setting.
-SELECT_METHODS = ("multi_controlled", "unary_iteration")
-
-#: Q# ``state_prep`` algorithms that can serve as PREPARE.
-PREPARE_METHODS = ("alias_sampling", "dense_pure_state", "sparse_isometry", "qrom")
-
-#: PREPAREs whose measurement-based ``Adjoint Std.TableLookup.Select`` the Q# compiler cannot
-#: yet lower to QIR, so the block encoding fails ``Circuit.get_qir()`` and ``Circuit.to_json()``.
-_TABLE_LOOKUP_PREPARES = frozenset({"alias_sampling", "qrom"})
+_SELECT_METHODS = ("multi_controlled", "unary_iteration")
 
 _PREPARE_DESCRIPTION = (
-    "Algorithm for the PREPARE oracle, one of 'alias_sampling' (default: Toffolis only, no rotations), "
-    "'dense_pure_state' (exact amplitudes, one rotation per amplitude), 'sparse_isometry' (dense "
+    "Algorithm for the PREPARE oracle, one of 'dense_pure_state' (default: exact amplitudes, one "
+    "rotation per amplitude), 'alias_sampling' (Toffolis only, no rotations), 'sparse_isometry' (dense "
     "preparation on the qubits the nonzero amplitudes span), or 'qrom' (QROM-loaded rotations). "
     "A PREPARE that rotates through a phase gradient (e.g. 'qrom') uses one shared register its "
     "caller prepares."
@@ -47,7 +40,7 @@ class PSPMapperSettings(Settings):
 
     Attributes:
         prepare: Algorithm reference for the PREPARE oracle state preparation. One of
-            ``"alias_sampling"`` (default), ``"dense_pure_state"``, ``"sparse_isometry"``, or ``"qrom"``.
+            ``"dense_pure_state"`` (default), ``"alias_sampling"``, ``"sparse_isometry"``, or ``"qrom"``.
         select_method: ``"unary_iteration"`` (default, :cite:`Babbush2018`) or ``"multi_controlled"``.
 
     """
@@ -58,7 +51,7 @@ class PSPMapperSettings(Settings):
         self._set_default(
             "prepare",
             "algorithm_ref",
-            AlgorithmRef("state_prep", "alias_sampling"),
+            AlgorithmRef("state_prep", "dense_pure_state"),
             _PREPARE_DESCRIPTION,
         )
         self._set_default(
@@ -66,7 +59,7 @@ class PSPMapperSettings(Settings):
             "string",
             "unary_iteration",
             "SELECT construction: 'multi_controlled' or 'unary_iteration'.",
-            list(SELECT_METHODS),
+            list(_SELECT_METHODS),
         )
 
 
@@ -76,7 +69,7 @@ class PSPMapper(CircuitMapper):
     Composes a block encoding from:
 
     1. **PREPARE** — amplitude-loading into the ancilla register, resolved via
-       the ``prepare`` setting.  Defaults to alias sampling.
+       the ``prepare`` setting.  Defaults to ``DensePureStatePreparation``.
     2. **SELECT** — Pauli SELECT oracle applied on the system register,
        constructed directly from the block-encoding container's SELECT data.
 
@@ -180,9 +173,6 @@ class PSPMapper(CircuitMapper):
     def build_prep_ops(self, container: UnitaryContainer) -> tuple[Any, int, int, int]:
         """Return the PREPARE oracle and the widths of the ancilla it acts on.
 
-        A PREPARE that can rotate through a caller-owned phase gradient is configured to, so
-        PREPARE and its adjoint share one register its caller prepares once.
-
         Args:
             container: The container held by the unitary representation.
 
@@ -200,7 +190,9 @@ class PSPMapper(CircuitMapper):
             return QSHARP_UTILS.PrepSelPrep.NoOpPrepare, 0, 0, 0
 
         prepare_algorithm = self._create_nested("prepare")
-        if prepare_algorithm.name() in _TABLE_LOOKUP_PREPARES:
+        # The Q# compiler cannot yet lower these PREPAREs' measurement-based
+        # ``Adjoint Std.TableLookup.Select`` to QIR.
+        if prepare_algorithm.name() in ("alias_sampling", "qrom"):
             warnings.warn(
                 f"PREPARE '{prepare_algorithm.name()}' uncomputes its table lookup by measurement, which the "
                 "Q# compiler cannot lower to QIR yet: Circuit.get_qir() and Circuit.to_json() fail on this "

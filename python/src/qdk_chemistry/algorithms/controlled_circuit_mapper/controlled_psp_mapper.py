@@ -5,7 +5,7 @@
 # Licensed under the MIT License. See LICENSE.txt in the project root for license information.
 # --------------------------------------------------------------------------------------------
 
-from qdk_chemistry.algorithms.circuit_mapper.psp_mapper import _PREPARE_DESCRIPTION, SELECT_METHODS, PSPMapper
+from qdk_chemistry.algorithms.circuit_mapper.psp_mapper import _PREPARE_DESCRIPTION, _SELECT_METHODS, PSPMapper
 from qdk_chemistry.data import AlgorithmRef
 from qdk_chemistry.data.circuit import Circuit, CircuitMetadata, QsharpFactoryData
 from qdk_chemistry.data.unitary_representation.base import UnitaryRepresentation
@@ -21,7 +21,7 @@ class ControlledPSPMapperSettings(ControlledCircuitMapperSettings):
 
     Attributes:
         prepare: Algorithm reference for the PREPARE oracle state preparation. One of
-            ``"alias_sampling"`` (default), ``"dense_pure_state"``, ``"sparse_isometry"``, or ``"qrom"``.
+            ``"dense_pure_state"`` (default), ``"alias_sampling"``, ``"sparse_isometry"``, or ``"qrom"``.
         select_method: ``"unary_iteration"`` (default) or ``"multi_controlled"``.
 
     """
@@ -32,7 +32,7 @@ class ControlledPSPMapperSettings(ControlledCircuitMapperSettings):
         self._set_default(
             "prepare",
             "algorithm_ref",
-            AlgorithmRef("state_prep", "alias_sampling"),
+            AlgorithmRef("state_prep", "dense_pure_state"),
             _PREPARE_DESCRIPTION,
         )
         self._set_default(
@@ -40,7 +40,7 @@ class ControlledPSPMapperSettings(ControlledCircuitMapperSettings):
             "string",
             "unary_iteration",
             "SELECT construction: 'multi_controlled' or 'unary_iteration'.",
-            list(SELECT_METHODS),
+            list(_SELECT_METHODS),
         )
 
 

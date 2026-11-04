@@ -470,10 +470,10 @@ The walk operator has eigenvalues :math:`e^{\pm i \arccos(E_k/\lambda)}` where :
       :end-before: # end-cell-run-lcu
 
 The :class:`~qdk_chemistry.algorithms.circuit_mapper.psp_mapper.PSPMapper` defaults to
-alias-sampling PREPARE and unary-iteration SELECT :cite:`Babbush2018`. To configure PREPARE,
-pass an :class:`~qdk_chemistry.data.AlgorithmRef`; ``select_method="multi_controlled"`` selects
-the multi-controlled SELECT. An alias or QROM PREPARE does not yet support ``get_qir()`` or
-``to_json()``; use ``dense_pure_state`` when QIR export is needed:
+``dense_pure_state`` PREPARE and unary-iteration SELECT :cite:`Babbush2018`. To configure PREPARE,
+for example alias sampling, which uses Toffolis but no rotations, pass an
+:class:`~qdk_chemistry.data.AlgorithmRef`. For the available PREPARE methods, see
+:doc:`StatePreparation <state_preparation>`:
 
 .. tab:: Python API -- alias sampling PREPARE
 

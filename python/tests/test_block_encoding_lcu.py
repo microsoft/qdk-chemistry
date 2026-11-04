@@ -388,10 +388,10 @@ class TestPSPMapperSelectMethod:
     _COEFFICIENTS = np.array([0.25, -0.5, 0.1, -0.3, 0.2])
 
     def test_defaults(self):
-        """Defaults are unary_iteration SELECT and alias-sampling PREPARE; unknown methods are rejected."""
+        """Defaults are unary_iteration SELECT and dense PREPARE; unknown methods are rejected."""
         settings = registry.create("circuit_mapper", "prepare_select_prepare").settings()
         assert settings.get("select_method") == "unary_iteration"
-        assert settings.get("prepare").algorithm_name == "alias_sampling"
+        assert settings.get("prepare").algorithm_name == "dense_pure_state"
         with pytest.raises(ValueError, match="select_method"):
             registry.create("circuit_mapper", "prepare_select_prepare", select_method="sparse")
 
