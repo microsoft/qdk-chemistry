@@ -179,8 +179,9 @@ def test_native_factory_preserves_python_algorithm_and_settings():
         settings_ref = weakref.ref(solver.settings())
         gc.collect()
         assert isinstance(solver, CustomSolver)
-        assert isinstance(settings_ref(), CustomSettings)
-        settings_ref().set("energy", 2.5)
+        settings = settings_ref()
+        assert isinstance(settings, CustomSettings)
+        settings.set("energy", 2.5)
         structure = Structure(np.zeros((1, 3)), ["H"])
         assert solver.run(structure, 0, 2, "sto-3g") == (2.5, None)
 
