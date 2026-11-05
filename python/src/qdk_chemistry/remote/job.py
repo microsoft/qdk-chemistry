@@ -18,7 +18,7 @@ import os
 import pathlib
 import tempfile
 import time
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
@@ -131,7 +131,7 @@ class Job:
         self.backend_state = backend_state
         self.algorithm_info = algorithm_info or {}
         self.status = status
-        self.submitted_at = submitted_at or datetime.now(timezone.utc).isoformat()
+        self.submitted_at = submitted_at or datetime.now(UTC).isoformat()
         self.file_path: pathlib.Path | None = pathlib.Path(file_path) if file_path else None
         self.run_hash: str | None = run_hash
         self.input_hashes: dict[str, str] | None = input_hashes
