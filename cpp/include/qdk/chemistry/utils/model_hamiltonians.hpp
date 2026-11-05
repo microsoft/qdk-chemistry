@@ -289,16 +289,17 @@ _build_ppp_integrals(const qdk::chemistry::data::LatticeGraph& lattice,
     for (int j = 0; j < n; j++) {
       if (i == j) continue;
       double V_ij = V(i, j);
+      // n_i n_j = n_j n_i, so only V_ij + V_ji enters the operator.
+      const double V_symmetric = 0.5 * (V_ij + V(j, i));
+      if (V_symmetric != 0.0) h2[{i, i, j, j}] += V_symmetric;
       if (V_ij == 0.0) continue;
 
-      // two-body: (ii|jj) = V_ij for both orderings
-      h2[{i, i, j, j}] += V_ij;
-
-      // one-body correction: -1/2 sum_{j!=i} V_ij z_j applied to h_ii
+      // One-body correction; over both orderings h_ii receives
+      // -sum_{j!=i} V^S_ij z_j, with V^S = (V + V^T) / 2.
       h1_dense(i, i) -= 0.5 * V_ij * z(j);
       h1_dense(j, j) -= 0.5 * V_ij * z(i);
 
-      // scalar offset: 1/2 sum_{i!=j} V_ij z_i z_j = sum_{i<j} V_ij z_i z_j
+      // Scalar offset: 1/2 sum_{i!=j} V_ij z_i z_j = sum_{i<j} V^S_ij z_i z_j.
       energy_offset += 0.5 * V_ij * z(i) * z(j);
     }
   }
@@ -368,7 +369,8 @@ inline qdk::chemistry::data::Hamiltonian create_hubbard_hamiltonian(
  * @param epsilon_in  On-site orbital energies. Scalar or VectorXd of size n.
  * @param t_in  Hopping integrals. Scalar or n x n MatrixXd.
  * @param U_in  On-site Coulomb repulsion. Scalar or VectorXd of size n.
- * @param V_in  Intersite Coulomb interaction matrix. Scalar or n x n MatrixXd.
+ * @param V_in  Intersite Coulomb interaction matrix. Scalar or n x n MatrixXd;
+ *              only its symmetric part (V + V^T)/2 enters the Hamiltonian.
  * @param z_in  Effective core charges. Scalar or VectorXd of size n.
  * @return Hamiltonian for the PPP model.
  */

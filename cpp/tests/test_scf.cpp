@@ -4,15 +4,18 @@
 
 #include <gtest/gtest.h>
 #include <qdk/chemistry/scf/scf/scf_solver.h>
+#include <qdk/chemistry/scf/util/int1e.h>
 #include <spdlog/sinks/ostream_sink.h>
 
 #include <algorithm>
+#include <array>
 #include <cmath>
 #include <filesystem>
 #include <memory>
 #include <qdk/chemistry/algorithms/hamiltonian.hpp>
 #include <qdk/chemistry/algorithms/scf.hpp>
 #include <qdk/chemistry/algorithms/stability.hpp>
+#include <qdk/chemistry/constants.hpp>
 #include <qdk/chemistry/data/ansatz.hpp>
 #include <qdk/chemistry/data/basis_set.hpp>
 #include <qdk/chemistry/data/wavefunction_containers/state_vector.hpp>
@@ -22,6 +25,8 @@
 
 #include "../src/qdk/chemistry/algorithms/microsoft/utils.hpp"
 #include "qdk/chemistry/algorithms/microsoft/scf.hpp"
+#include "qdk/chemistry/algorithms/microsoft/scf/src/scf/scf_impl.h"
+#include "qdk/chemistry/algorithms/microsoft/scf/src/scf_algorithm/asahf.h"
 #include "ut_common.hpp"
 
 using namespace qdk::chemistry::data;
@@ -70,6 +75,49 @@ class MissingCanonicalAliasSCF : public TestSCF {
 
   std::vector<std::string> aliases() const override { return {"other_name"}; }
 };
+
+class OrthogonalizationSCF : public qdk::chemistry::scf::SCFImpl {
+ public:
+  using SCFImpl::compute_orthogonalization_matrix_;
+  using SCFImpl::SCFImpl;
+};
+
+TEST_F(ScfTest, OverlapOrthogonalizationDiscardsRoundoffAndZeroEigenvalues) {
+  namespace qcs = qdk::chemistry::scf;
+  auto molecule = qdk::chemistry::utils::microsoft::convert_to_molecule(
+      *testing::create_water_structure(), 0, 1);
+  qcs::SCFConfig config{};
+  config.basis = "sto-3g";
+  for (double threshold : {-1.0, 0.0, 1e-6}) {
+    config.lindep_threshold = threshold;
+    OrthogonalizationSCF solver(molecule, config, true);
+    for (double smallest : {-1e-16, 0.0}) {
+      qcs::RowMajorMatrix overlap = qcs::RowMajorMatrix::Identity(7, 7);
+      overlap(0, 0) = smallest;
+      qcs::RowMajorMatrix transform;
+      ASSERT_NO_THROW(
+          solver.compute_orthogonalization_matrix_(overlap, &transform));
+      ASSERT_EQ(transform.cols(), 6);
+      EXPECT_TRUE(transform.allFinite());
+      EXPECT_TRUE((transform.transpose() * overlap * transform)
+                      .isApprox(qcs::RowMajorMatrix::Identity(6, 6), 1e-12));
+    }
+  }
+}
+
+TEST_F(ScfTest, OverlapOrthogonalizationRejectsIndefiniteOverlap) {
+  namespace qcs = qdk::chemistry::scf;
+  auto molecule = qdk::chemistry::utils::microsoft::convert_to_molecule(
+      *testing::create_water_structure(), 0, 1);
+  qcs::SCFConfig config{};
+  config.basis = "sto-3g";
+  OrthogonalizationSCF solver(molecule, config, true);
+  qcs::RowMajorMatrix overlap = qcs::RowMajorMatrix::Identity(7, 7);
+  overlap(0, 0) = -1e-4;
+  qcs::RowMajorMatrix transform;
+  EXPECT_THROW(solver.compute_orthogonalization_matrix_(overlap, &transform),
+               std::runtime_error);
+}
 
 TEST_F(ScfTest, Factory) {
   auto available_solvers = ScfSolverFactory::available();
@@ -389,21 +437,23 @@ TEST_F(ScfTest, X2COHROHFReference) {
 }
 
 namespace {
+struct LoggerGuard {
+  std::shared_ptr<spdlog::logger> logger;
+  std::vector<spdlog::sink_ptr> sinks;
+  qdk::chemistry::utils::LogLevel level;
+  ~LoggerGuard() {
+    logger->sinks() = std::move(sinks);
+    qdk::chemistry::utils::Logger::set_global_level(level);
+  }
+};
+
 void expect_x2c_gdm_matches_diis(std::shared_ptr<Structure> structure,
                                  int multiplicity) {
   using qdk::chemistry::utils::Logger;
   using qdk::chemistry::utils::LogLevel;
   std::ostringstream messages;
   auto logger = Logger::get();
-  struct LoggerGuard {
-    std::shared_ptr<spdlog::logger> logger;
-    std::vector<spdlog::sink_ptr> sinks;
-    LogLevel level;
-    ~LoggerGuard() {
-      logger->sinks() = std::move(sinks);
-      Logger::set_global_level(level);
-    }
-  } guard{logger, logger->sinks(), Logger::get_global_level()};
+  LoggerGuard guard{logger, logger->sinks(), Logger::get_global_level()};
   logger->sinks().push_back(
       std::make_shared<spdlog::sinks::ostream_sink_mt>(messages));
   Logger::set_global_level(LogLevel::info);
@@ -433,6 +483,49 @@ void expect_x2c_gdm_matches_diis(std::shared_ptr<Structure> structure,
     }
   }
 }
+
+void expect_rohf_gdm_empty_subspace(std::shared_ptr<Structure> structure,
+                                    int multiplicity, const std::string& basis,
+                                    const std::array<size_t, 3>& orbital_counts,
+                                    double reference_energy) {
+  using qdk::chemistry::utils::Logger;
+  using qdk::chemistry::utils::LogLevel;
+  std::ostringstream messages;
+  auto logger = Logger::get();
+  LoggerGuard guard{logger, logger->sinks(), Logger::get_global_level()};
+  logger->sinks().push_back(
+      std::make_shared<spdlog::sinks::ostream_sink_mt>(messages));
+  Logger::set_global_level(LogLevel::info);
+
+  auto solver = ScfSolverFactory::create("qdk");
+  solver->settings().set("method", "hf");
+  solver->settings().set("scf_type", "restricted");
+  solver->settings().set("eri_method", "incore");
+  solver->settings().set("enable_gdm", true);
+  solver->settings().set("gdm_max_diis_iteration", 2);
+  solver->settings().set("convergence_threshold", 1e-9);
+  auto [energy, wavefunction] = solver->run(structure, 0, multiplicity, basis);
+  const auto orbitals = wavefunction->get_orbitals();
+  const auto [n_alpha, n_beta] = wavefunction->get_total_num_electrons();
+  const auto n_mo = orbitals->get_num_molecular_orbitals();
+
+  EXPECT_NE(messages.str().find("Switching from DIIS to GDM"),
+            std::string::npos);
+  EXPECT_TRUE(orbitals->is_restricted());
+  EXPECT_EQ(n_beta, orbital_counts[0]);
+  EXPECT_EQ(n_alpha - n_beta, orbital_counts[1]);
+  EXPECT_EQ(n_mo - n_alpha, orbital_counts[2]);
+  EXPECT_TRUE(std::isfinite(energy));
+  // Independent PySCF ROHF references at the same geometries and spin.
+  EXPECT_NEAR(energy, reference_energy, testing::scf_energy_tolerance);
+
+  const auto& coefficients =
+      orbitals->coefficients()->block({axes::alpha(), axes::alpha()});
+  EXPECT_TRUE(coefficients.allFinite());
+  EXPECT_TRUE(
+      (coefficients.transpose() * orbitals->get_overlap_matrix() * coefficients)
+          .isApprox(Eigen::MatrixXd::Identity(n_mo, n_mo), 1e-10));
+}
 }  // namespace
 
 TEST_F(ScfTest, X2COHROHFGdmMatchesDiis) {
@@ -441,6 +534,22 @@ TEST_F(ScfTest, X2COHROHFGdmMatchesDiis) {
 
 TEST_F(ScfTest, X2CWaterRHFGdmMatchesDiis) {
   expect_x2c_gdm_matches_diis(testing::create_water_structure(), 1);
+}
+
+TEST_F(ScfTest, H2TripletROHFGdmZeroClosed) {
+  auto structure = std::make_shared<Structure>(
+      std::vector<Eigen::Vector3d>{{0.0, 0.0, 0.0}, {0.0, 0.0, 1.4}},
+      std::vector<std::string>{"H", "H"});
+  expect_rohf_gdm_empty_subspace(structure, 3, "6-31g", {0, 2, 2},
+                                 -0.7559669868614357);
+}
+
+TEST_F(ScfTest, HeHDoubletROHFGdmZeroVirtual) {
+  auto structure = std::make_shared<Structure>(
+      std::vector<Eigen::Vector3d>{{0.0, 0.0, 0.0}, {0.0, 0.0, 1.5}},
+      std::vector<std::string>{"He", "H"});
+  expect_rohf_gdm_empty_subspace(structure, 2, "sto-3g", {1, 1, 0},
+                                 -3.0333242753488783);
 }
 
 TEST_F(ScfTest, X2CRejectsEcp) {
@@ -967,6 +1076,25 @@ TEST_F(ScfTest, OxygenTripletInitialGuessRestart) {
 
   // Should get the same energy (within tight tolerance)
   EXPECT_NEAR(energy_o2_first, energy_o2_second, testing::scf_energy_tolerance);
+}
+
+TEST_F(ScfTest, AgHDef2SvpAtomicGuessWithEcp) {
+  namespace qcs = qdk::chemistry::scf;
+  auto molecule = qdk::chemistry::utils::microsoft::convert_to_molecule(
+      *testing::create_agh_structure(), 0, 1);
+  auto basis = qcs::BasisSet::from_database_json(
+      molecule, "def2-svp", qcs::BasisMode::RAW, true, false);
+  const auto nao = basis->num_atomic_orbitals;
+  qcs::RowMajorMatrix density = qcs::RowMajorMatrix::Zero(nao, nao);
+  qcs::get_atom_guess(*basis, *molecule, density);
+
+  qcs::RowMajorMatrix overlap = qcs::RowMajorMatrix::Zero(nao, nao);
+  qcs::OneBodyIntegral integrals(basis.get(), molecule.get(),
+                                 qcs::mpi_default_input());
+  integrals.overlap_integral(overlap.data());
+  EXPECT_TRUE(density.allFinite());
+  EXPECT_NEAR((density * overlap).trace(), 20.0,
+              testing::numerical_zero_tolerance);
 }
 
 TEST_F(ScfTest, AgHDef2SvpWithEcp) {
@@ -1596,4 +1724,44 @@ TEST_F(ScfTest, HydrogenIon_CCPVDZ_SCF) {
   scf_solver->settings().set("enable_gdm", true);
   auto [E_HF, wfn_HF] = scf_solver->run(h_ion, 1, 1, "cc-pvdz");
   EXPECT_NEAR(E_HF, 0.0, testing::scf_energy_tolerance);
+}
+
+TEST_F(ScfTest, C4H_ROHF_LinearlyDependentAO) {
+  using qdk::chemistry::utils::Logger;
+  using qdk::chemistry::utils::LogLevel;
+  std::ostringstream messages;
+  auto logger = Logger::get();
+  LoggerGuard guard{logger, logger->sinks(), Logger::get_global_level()};
+  logger->sinks().push_back(
+      std::make_shared<spdlog::sinks::ostream_sink_mt>(messages));
+  Logger::set_global_level(LogLevel::info);
+
+  std::vector<Eigen::Vector3d> coordinates = {{0.0, 0.0, -1.06},
+                                              {0.0, 0.0, 0.0},
+                                              {0.0, 0.0, 1.30},
+                                              {0.0, 0.0, 2.60},
+                                              {0.0, 0.0, 3.90}};
+  for (auto& coordinate : coordinates) {
+    coordinate *= qdk::chemistry::constants::angstrom_to_bohr;
+  }
+  auto structure = std::make_shared<Structure>(
+      coordinates, std::vector<std::string>{"H", "C", "C", "C", "C"});
+  auto scf_solver = ScfSolverFactory::create("qdk");
+  scf_solver->settings().set("method", "hf");
+  scf_solver->settings().set("scf_type", "restricted");
+  scf_solver->settings().set("nthreads", 1);
+  scf_solver->settings().set("enable_gdm", true);
+  scf_solver->settings().set("gdm_max_diis_iteration", 5);
+  auto [energy, wavefunction] =
+      scf_solver->run(structure, 0, 2, "d-aug-cc-pvdz");
+  const auto orbitals = wavefunction->get_orbitals();
+
+  EXPECT_NE(messages.str().find("Switching from DIIS to GDM"),
+            std::string::npos)
+      << "The linearly dependent ROHF regression must exercise GDM.";
+  EXPECT_TRUE(orbitals->is_restricted());
+  EXPECT_EQ(orbitals->get_num_atomic_orbitals(), 141);
+  EXPECT_EQ(orbitals->get_num_molecular_orbitals(), 139);
+  // PySCF ROHF reference with the same 1e-6 overlap cutoff.
+  EXPECT_NEAR(energy, -151.81510534420579, testing::scf_energy_tolerance);
 }
