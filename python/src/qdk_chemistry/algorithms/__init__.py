@@ -27,7 +27,10 @@ from qdk_chemistry.algorithms.circuit_executor.base import CircuitExecutor
 from qdk_chemistry.algorithms.controlled_circuit_mapper.base import ControlledCircuitMapper
 from qdk_chemistry.algorithms.double_factorization import DoubleFactorization
 from qdk_chemistry.algorithms.dynamical_correlation_calculator import DynamicalCorrelationCalculator, QdkMP2Calculator
-from qdk_chemistry.algorithms.effective_hamiltonian_constructor import EffectiveHamiltonianConstructor
+from qdk_chemistry.algorithms.effective_hamiltonian_constructor import (
+    EffectiveHamiltonianConstructor,
+    QdkSchriefferWolffPT2Constructor,
+)
 from qdk_chemistry.algorithms.expectation_estimator.expectation_estimator import ExpectationEstimator
 from qdk_chemistry.algorithms.expectation_estimator.qdk import QdkExpectationEstimator
 from qdk_chemistry.algorithms.geometry_optimization import GeometryOptimizer, GeometryOptimizerSettings
@@ -116,6 +119,7 @@ __all__ = [
     "QdkPopulationAnalyzer",
     "QdkQubitMapper",
     "QdkScfSolver",
+    "QdkSchriefferWolffPT2Constructor",
     "QdkStabilityChecker",
     "QdkStabilizedScfSolver",
     "QdkVVHVLocalizer",

@@ -84,8 +84,183 @@ See :doc:`Settings <settings>` for a general treatment of algorithm settings in 
 Available implementations
 -------------------------
 
-QDK/Chemistry currently provides the :class:`~qdk_chemistry.algorithms.EffectiveHamiltonianConstructor` interface but no concrete implementation or default factory choice.
-Creation, configuration, and execution examples will be added with the first concrete implementation.
+QDK/Chemistry's :class:`~qdk_chemistry.algorithms.EffectiveHamiltonianConstructor` provides a unified interface to downfolding methods.
+You can discover available implementations programmatically:
+
+.. tab:: Python API
+
+   .. literalinclude:: ../../../_static/examples/python/effective_hamiltonian_constructor.py
+      :language: python
+      :start-after: # start-cell-list-implementations
+      :end-before: # end-cell-list-implementations
+
+.. tab:: C++ API
+
+   .. literalinclude:: ../../../_static/examples/cpp/effective_hamiltonian_constructor.cpp
+      :language: cpp
+      :start-after: // start-cell-list-implementations
+      :end-before: // end-cell-list-implementations
+
+QDK SW-PT2
+~~~~~~~~~~
+
+.. rubric:: Factory name: ``"qdk_swpt2"``
+
+This is the default implementation returned by ``create("effective_hamiltonian_constructor")``.
+
+Second-order Schrieffer-Wolff (Van Vleck) downfolding :cite:`Schrieffer1966,Bravyi2011` with
+diagonal generalized-Fock energy denominators.
+Splitting :math:`H` into a part
+:math:`H_{\mathrm{BD}}` that is block diagonal in the occupation of :math:`Q` and an
+occupation-changing remainder :math:`H_{\mathrm{OD}} = \sum_T c_T\,\hat{T}`, the effective
+Hamiltonian is :math:`\hat P e^{S} H e^{-S} \hat P` through second order,
+
+.. math::
+
+   H_{\mathrm{eff}} = \hat P\left(H_{\mathrm{BD}} + \tfrac{1}{2}[S, V]\right)\hat P,
+   \qquad
+   S = \sum_{T} \frac{g_T\,c_T}{\Delta_T}\,\hat{T},
+   \qquad
+   V = \sum_{T} (2 - g_T)\,c_T\,\hat{T},
+
+with the denominators
+
+.. math::
+
+   \Delta_T = \sum_{\mathrm{creations}} \varepsilon_{p\sigma}
+            - \sum_{\mathrm{annihilations}} \varepsilon_{p\sigma}
+
+and a damping factor :math:`g_T` described below. Without damping, :math:`g_T = 1`, so
+:math:`V = H_{\mathrm{OD}}` and :math:`S` solves :math:`[F_0, S] = H_{\mathrm{OD}}`, where
+:math:`F_0`, the diagonal part of the reference's generalized Fock operator, approximates
+:math:`H_{\mathrm{BD}}`. The orbital energies
+:math:`\varepsilon_{p\sigma}` of spin :math:`\sigma` are the diagonal elements of the
+generalized Fock matrices:
+
+.. math::
+
+   \varepsilon_{p\sigma} = F^\sigma_{pp},\qquad F^\sigma_{pq} = h^\sigma_{pq}
+          + \sum_{\tau}\sum_{rs} \gamma^\tau_{rs}(pq|rs)^{\sigma\tau}
+          - \sum_{rs} \gamma^\sigma_{rs}(pr|sq)^{\sigma\sigma}.
+
+:math:`\gamma^\sigma` is the reference's 1-RDM of spin :math:`\sigma` over :math:`W`.
+For restricted orbitals, the spin-traced 1-RDM :math:`\gamma` is split evenly,
+:math:`\gamma^\alpha = \gamma^\beta = \gamma/2`. This spin-averaged construction
+preserves spin symmetry and uses common orbital energies,
+:math:`\varepsilon_{p\alpha} = \varepsilon_{p\beta}`. Unrestricted orbitals use the
+reference's per-spin 1-RDMs, so the orbital energies can differ between spins.
+
+By default, ``semicanonicalize`` diagonalizes each :math:`F^\sigma` within the inactive,
+active, and virtual blocks. Integrals and density are rotated consistently,
+and the emitted integrals are rotated back. Blocks that are already diagonal within a
+tolerance are left unrotated; without the regularizer that tolerance is so tight that even a
+converged SCF reference is rotated. With this option disabled, the denominators use the diagonals of
+:math:`F^\sigma` in the supplied basis.
+
+Near-degenerate channels have a small :math:`\Delta_T` and a large amplitude, which can make the
+perturbative expansion unreliable. ``regularizer_flow`` sets the damping
+
+.. math::
+
+   g_T = 1 - e^{-s \Delta_T^2},
+
+where :math:`s` is the flow parameter of the driven similarity renormalization group
+(DSRG) :cite:`Evangelista2014`, in :math:`E_h^{-2}`. Each channel then contributes
+:math:`|c_T|^2 (1 - e^{-2 s \Delta_T^2})/\Delta_T` to the second-order energy instead of
+:math:`|c_T|^2/\Delta_T`. Larger :math:`s` regularizes less. The damping is not confined to
+intruders: at the default :math:`s = 0.5\,E_h^{-2}`, channels with denominators of 0.3, 0.5, 1.0
+and 2.0 :math:`E_h` keep approximately 9%, 22%, 63% and 98% of their energy.
+Setting ``regularizer_flow`` to ``0`` turns the damping off (:math:`g_T = 1`), unlike the
+:math:`s \to 0` limit, which damps every channel away. Channels with
+:math:`|\Delta_T| < 10^{-8}\,E_h` always get :math:`g_T = 0`; without the regularizer a warning
+is logged.
+
+For a closed-shell restricted or an unrestricted Hartree-Fock reference, :math:`H_{\mathrm{eff}}`
+is the second-order Hamiltonian of DSRG-PT2 :cite:`Li2015,Li2017`, up to the three-body
+treatment below.
+
+The kept space :math:`P` comes from ``p_indices`` alone; the reference supplies only
+:math:`\gamma^\sigma`. Any restricted or unrestricted orbital set qualifies, canonical or not,
+such as RHF, ROHF, CAS, localized or natural orbitals. It must share the input Hamiltonian's
+molecular-orbital basis and keep every singly occupied orbital in its active space, and the
+input Hamiltonian's inactive orbitals must be exactly its core orbitals outside :math:`W`. For
+unrestricted orbitals, the input Hamiltonian's active space, ``p_indices`` and the reference
+active space must select the same orbitals in both spins. Every orbital in
+:math:`Q = W \setminus P` is folded as doubly occupied or empty by rounding its spin-traced
+reference occupation to 2 or 0.
+The rounding perturbs the mean field the active space feels, so
+``max_folded_occupation_deviation`` bounds it, and a singly occupied orbital must be kept in
+:math:`P`. The active space keeps the remaining electrons; the downfold is rejected if either
+spin is left with fewer than zero or more electrons than active orbitals.
+
+The commutator generates three-body terms that the emitted two-body operator cannot carry.
+Reference-1-RDM pair contractions reduce these to lower-rank terms :cite:`Kutzelnigg1997`.
+This Gaussian approximation recovers ordinary Wick contractions for a determinant in
+its own orbitals, closed-shell restricted or unrestricted. It neglects connected higher
+density cumulants for correlated references and spin-averaged open-shell references.
+The residual three-body operator is discarded.
+When the retained space contains at most two electrons, the three-body terms have no matrix
+elements there and are dropped without folding.
+
+The emitted two-body integrals are 4-fold rather than 8-fold symmetric,
+:math:`(pq|rs) = (qp|sr) = (rs|pq)`: the commutator is not an electron-repulsion operator, so the
+bra swap :math:`(pq|rs) = (qp|rs)` does not hold.
+
+The constructor logs the partition and, over the terms coupling :math:`P` and :math:`Q`, the
+smallest denominator and largest unregularized amplitude; it warns on large occupation
+rounding or amplitudes above one.
+
+.. rubric:: Settings
+
+.. list-table::
+   :header-rows: 1
+   :widths: 25 25 50
+
+   * - Setting
+     - Type
+     - Description
+   * - ``regularizer_flow``
+     - float
+     - Flow parameter :math:`s` of the DSRG regularizer, in
+       :math:`E_h^{-2}`; ``0`` selects the bare inverse. Default: 0.5
+   * - ``semicanonicalize``
+     - bool
+     - Diagonalize each spin's generalized Fock matrix blockwise before forming
+       denominators. Default: true
+   * - ``max_folded_occupation_deviation``
+     - float
+     - Largest deviation from an integer reference occupation allowed for a folded
+       orbital, in :math:`[0,1)`. Default: 0.5
+
+.. tab:: Python API
+
+   .. literalinclude:: ../../../_static/examples/python/effective_hamiltonian_constructor.py
+      :language: python
+      :start-after: # start-cell-configure
+      :end-before: # end-cell-configure
+
+.. tab:: C++ API
+
+   .. literalinclude:: ../../../_static/examples/cpp/effective_hamiltonian_constructor.cpp
+      :language: cpp
+      :start-after: // start-cell-configure
+      :end-before: // end-cell-configure
+
+.. rubric:: Example
+
+.. tab:: Python API
+
+   .. literalinclude:: ../../../_static/examples/python/effective_hamiltonian_constructor.py
+      :language: python
+      :start-after: # start-cell-downfold
+      :end-before: # end-cell-downfold
+
+.. tab:: C++ API
+
+   .. literalinclude:: ../../../_static/examples/cpp/effective_hamiltonian_constructor.cpp
+      :language: cpp
+      :start-after: // start-cell-downfold
+      :end-before: // end-cell-downfold
 
 Related classes
 ---------------
