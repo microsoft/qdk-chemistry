@@ -103,14 +103,13 @@ class TestEffectiveHamiltonianConstructor:
         """Denominator/regularization settings expose their defaults and are settable."""
         constructor = algorithms.create(_TYPE, "qdk_swpt2")
         settings = constructor.settings()
-        # sigma^2 regularization is on by default at the constructor layer
-        assert settings.get("regularizer_sigma2") == pytest.approx(1.0)
+        # the regularizer is on by default at the constructor layer
+        assert settings.get("regularizer_flow") == pytest.approx(0.5)
         assert settings.get("semicanonicalize") is True
-        assert settings.get("fold_above_two_body") is True
         assert settings.get("max_folded_occupation_deviation") == pytest.approx(0.5)
 
-        settings.set("regularizer_sigma2", 0.4)
-        assert constructor.settings().get("regularizer_sigma2") == pytest.approx(0.4)
+        settings.set("regularizer_flow", 0.2)
+        assert constructor.settings().get("regularizer_flow") == pytest.approx(0.2)
 
     def test_full_window_spanning_reference_core(self):
         """Downfold a full-orbital window (the natural ``ham.run(orbitals)`` path).
@@ -192,9 +191,9 @@ class TestEffectiveHamiltonianConstructor:
         np.testing.assert_allclose(loaded.get_two_body_integrals()[0], h_eff.get_two_body_integrals()[0], atol=1e-12)
 
     def test_rejects_non_finite_regularizer(self, water_window):
-        """A non-finite sigma must fail loudly rather than silently selecting the bare path."""
+        """A non-finite flow parameter must fail loudly rather than silently selecting the bare path."""
         case = water_window
         downfolder = algorithms.create(_TYPE, "qdk_swpt2")
-        downfolder.settings().set("regularizer_sigma2", float("nan"))
+        downfolder.settings().set("regularizer_flow", float("nan"))
         with pytest.raises((ValueError, RuntimeError)):
             downfolder.run(case.reference, case.hamiltonian, case.kept_space)

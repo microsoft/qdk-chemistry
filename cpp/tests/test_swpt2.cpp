@@ -215,12 +215,12 @@ TEST(SchriefferWolffPT2Test, FactoryRegistration) {
 TEST(SchriefferWolffPT2Test, SettingsKnobs) {
   auto ctor = EffectiveHamiltonianConstructorFactory::create("qdk_swpt2");
   auto& settings = ctor->settings();
-  // denominator knobs: sigma^2 regularization is on by default at this layer
-  EXPECT_DOUBLE_EQ(settings.get<double>("regularizer_sigma2"), 1.0);
+  // denominator knobs: the regularizer is on by default at this layer
+  EXPECT_DOUBLE_EQ(settings.get<double>("regularizer_flow"), 0.5);
   EXPECT_TRUE(settings.get<bool>("semicanonicalize"));
   EXPECT_DOUBLE_EQ(settings.get<double>("max_folded_occupation_deviation"),
                    0.5);
-  EXPECT_ANY_THROW(settings.set("regularizer_sigma2", -1.0));
+  EXPECT_ANY_THROW(settings.set("regularizer_flow", -1.0));
 
   auto invalid = EffectiveHamiltonianConstructorFactory::create("qdk_swpt2");
   EXPECT_THROW(invalid->run(nullptr, nullptr,
@@ -286,7 +286,7 @@ TEST(SchriefferWolffPT2Test, DownfoldRunsEndToEndWater) {
   EXPECT_NEAR(E_sw, ground_energy(*H_eff, 2, 2), 1e-9);
 
   auto swpt2_bare = EffectiveHamiltonianConstructorFactory::create("qdk_swpt2");
-  swpt2_bare->settings().set("regularizer_sigma2", 0.0);
+  swpt2_bare->settings().set("regularizer_flow", 0.0);
   auto H_eff_bare = swpt2_bare->run(reference, H_window, P_set);
   auto cas_bare = MultiConfigurationCalculatorFactory::create("macis_cas");
   auto [E_sw_bare, wfn_bare] = cas_bare->run(H_eff_bare, 2, 2);
@@ -326,7 +326,7 @@ TEST(SchriefferWolffPT2Test, ReproducesMp2WhenEveryOccupiedOrbitalIsActive) {
   auto ham = HamiltonianConstructorFactory::create();
   auto H_window = ham->run(testing::with_active_space(orbitals, window, {}));
   auto swpt2 = EffectiveHamiltonianConstructorFactory::create("qdk_swpt2");
-  swpt2->settings().set("regularizer_sigma2", 0.0);  // bare MP denominators
+  swpt2->settings().set("regularizer_flow", 0.0);  // bare MP denominators
   auto H_eff = swpt2->run(reference, H_window,
                           testing::restricted_index_set(norb, occupied));
   ASSERT_NE(H_eff, nullptr);
@@ -342,14 +342,6 @@ TEST(SchriefferWolffPT2Test, ReproducesMp2WhenEveryOccupiedOrbitalIsActive) {
 
   EXPECT_LT(E_mp2, E_hf - 1e-3) << "the correlation being matched is not noise";
   EXPECT_NEAR(E_downfold, E_mp2, 1e-9);
-
-  // Without the fold, the rank-3 terms move the energy by several Hartree.
-  auto unfolded = EffectiveHamiltonianConstructorFactory::create("qdk_swpt2");
-  unfolded->settings().set("regularizer_sigma2", 0.0);
-  unfolded->settings().set("fold_above_two_body", false);
-  auto H_unfolded = unfolded->run(
-      reference, H_window, testing::restricted_index_set(norb, occupied));
-  EXPECT_GT(std::abs(ground_energy(*H_unfolded, n_alpha, n_beta) - E_mp2), 1.0);
 }
 
 // The window Hamiltonian's own folded core must be exactly the reference core
@@ -804,7 +796,7 @@ TEST(SchriefferWolffPT2Test, ReproducesUmp2ForUnrestrictedDoublet) {
           const std::shared_ptr<qcd::Hamiltonian>& window) {
         auto swpt2 =
             EffectiveHamiltonianConstructorFactory::create("qdk_swpt2");
-        swpt2->settings().set("regularizer_sigma2", 0.0);  // MP denominators
+        swpt2->settings().set("regularizer_flow", 0.0);  // MP denominators
         const auto H_eff =
             swpt2->run(reference, window,
                        testing::unrestricted_index_set(norb, kept, kept));

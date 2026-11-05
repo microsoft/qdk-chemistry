@@ -194,11 +194,13 @@ Returns:
 Second-order Schrieffer-Wolff downfold of the window's external orbitals onto
 the kept space ``P`` (``p_indices``).
 
-Emits ``H_eff = P (H_BD + 1/2 [S, H_OD]) P`` truncated to two-body, with
-semicanonical generalized-Fock denominators damped by ``regularizer_sigma2``.
-Restricted input gives a spin-free result, unrestricted input an unrestricted
-one. The emitted two-body blocks are only 4-fold symmetric, so consumers must
-read the full dense blocks. The factory name is ``"qdk_swpt2"``.
+Emits ``P exp(S) H exp(-S) P`` through second order, truncated to two-body, for
+a generator ``S`` regularized by ``regularizer_flow``, with semicanonical
+generalized-Fock denominators; three-body terms are folded with the reference
+1-RDM. Restricted input gives a spin-free result, unrestricted input an
+unrestricted one. The emitted two-body blocks are only 4-fold symmetric, so
+consumers must read the full dense blocks. The factory name is
+``"qdk_swpt2"``.
 
 Typical usage:
 
@@ -217,7 +219,7 @@ See Also:
       .def(py::init<>(), R"(
 Default constructor.
 
-Initializes a Schrieffer-Wolff PT2 downfold with sigma^2 regularization enabled
-by default. Set ``regularizer_sigma2`` to 0 for unregularized second-order PT.
+Initializes a Schrieffer-Wolff PT2 downfold with the regularizer enabled by
+default. Set ``regularizer_flow`` to 0 for unregularized second-order PT.
 )");
 }

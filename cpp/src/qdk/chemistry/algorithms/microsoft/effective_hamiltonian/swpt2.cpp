@@ -183,12 +183,10 @@ WindowPartition partition_window(
     const std::vector<std::size_t>& window_global,
     const std::unordered_set<std::size_t>& kept_global, int window_electrons,
     double max_folded_occupation_deviation) {
-  // The setting's bound constraint admits NaN.
-  if (!(max_folded_occupation_deviation >= 0.0 &&
-        max_folded_occupation_deviation < 1.0))
+  // The setting's bound constraint admits NaN, which no deviation exceeds.
+  if (!std::isfinite(max_folded_occupation_deviation))
     throw std::invalid_argument(
-        "SW-PT2: max_folded_occupation_deviation must lie in "
-        "[0, 1); a half-occupied orbital cannot be folded unambiguously.");
+        "SW-PT2: max_folded_occupation_deviation must be finite.");
 
   WindowPartition out;
   const int norb = static_cast<int>(occupation.size());
@@ -252,11 +250,11 @@ void log_fold_rounding(const WindowPartition& roles) {
 }
 
 void warn_on_intruders(const sw::DownfoldResult& down, bool regularized) {
-  if (!regularized && down.min_denominator < sw::bare_denominator_floor)
+  if (!regularized && down.min_denominator < sw::denominator_floor)
     QDK_LOGGER().warn(
-        "SW-PT2: channels with denominators below {:.3g} Eh were omitted; "
-        "consider a larger P or setting regularizer_sigma2.",
-        sw::bare_denominator_floor);
+        "SW-PT2: channels with denominators below {:.3g} Eh were left out of "
+        "the generator; consider a larger P or setting regularizer_flow.",
+        sw::denominator_floor);
   // A heuristic flag on the undamped amplitude, not a convergence bound.
   constexpr double intruder_warn_amplitude = 1.0;
   if (down.max_amplitude > intruder_warn_amplitude)
@@ -264,7 +262,7 @@ void warn_on_intruders(const sw::DownfoldResult& down, bool regularized) {
         "SW-PT2: large amplitude {:.3g} (smallest denominator {:.3g} Eh); "
         "consider a larger P{}.",
         down.max_amplitude, down.min_denominator,
-        regularized ? "" : " or setting regularizer_sigma2");
+        regularized ? "" : " or setting regularizer_flow");
 }
 
 }  // namespace
@@ -407,12 +405,12 @@ std::shared_ptr<data::Hamiltonian> SchriefferWolffPT2Constructor::_run_impl(
   log_fold_rounding(window_roles);
 
   sw::RegularizerOptions reg;
-  reg.sigma2 = _settings->get<double>("regularizer_sigma2");
+  reg.flow = _settings->get<double>("regularizer_flow");
   // The bound constraint admits NaN, which would then read as "not positive"
   // and silently select the bare path instead of the requested regularizer.
-  if (!std::isfinite(reg.sigma2))
-    throw std::invalid_argument("SW-PT2: regularizer_sigma2 must be finite.");
-  const bool regularized = reg.sigma2 > 0.0;
+  if (!std::isfinite(reg.flow))
+    throw std::invalid_argument("SW-PT2: regularizer_flow must be finite.");
+  const bool regularized = reg.flow > 0.0;
 
   // Built from the full 1-RDMs, so a correlated reference's off-diagonal
   // density survives into the denominators.
@@ -426,11 +424,12 @@ std::shared_ptr<data::Hamiltonian> SchriefferWolffPT2Constructor::_run_impl(
   bool semicanonical_applied = false;
   if (_settings->get<bool>("semicanonicalize")) {
     // Leaving a block unrotated neglects its off-diagonal Fock elements e,
-    // which shifts H_eff by about e * V^2 * max|dr/dD| for the inverse
-    // denominator r(D): at most sigma with the regularizer, unbounded without
-    // it. A converged SCF leaves e near its orbital-gradient threshold.
+    // which shifts H_eff by about e * V^2 * max|dr/dD| for the second-order
+    // factor r(D) = (1 - exp(-2s*D^2))/D: at most 2s with the regularizer,
+    // unbounded without it. A converged SCF leaves e near its orbital-gradient
+    // threshold.
     const double semicanonical_tolerance =
-        regularized ? 1e-6 / std::max(1.0, reg.sigma2) : 1e-10;
+        regularized ? 1e-6 / std::max(1.0, 2.0 * reg.flow) : 1e-10;
     for (int spin = 0; spin < (unrestricted ? 2 : 1); ++spin)
       rotation[spin] = sw::semicanonical_rotation(
           fock[spin], {inactive_spatial, active_spatial, virtual_spatial},
@@ -461,13 +460,7 @@ std::shared_ptr<data::Hamiltonian> SchriefferWolffPT2Constructor::_run_impl(
 
   // A three-body operator has no matrix elements below three active
   // electrons, so there the fold would only add reference-specific terms.
-  const bool fold_pays = window_roles.active_electrons > 2;
-  const bool fold_requested = _settings->get<bool>("fold_above_two_body");
-  const bool fold = fold_requested && fold_pays;
-  const char* fold_description =
-      fold             ? "Gaussian 1-RDM fold"
-      : fold_requested ? "not folded (kept space holds at most two electrons)"
-                       : "discarded (fold_above_two_body is off)";
+  const bool fold = window_roles.active_electrons > 2;
 
   auto down = sw::downfold(one_body, two_body_blocks(), fock, active_spatial,
                            inactive_spatial, virtual_spatial, reg, e_core,
@@ -475,11 +468,11 @@ std::shared_ptr<data::Hamiltonian> SchriefferWolffPT2Constructor::_run_impl(
                            fold ? density : std::array<Eigen::MatrixXd, 2>{});
 
   QDK_LOGGER().info(
-      "SW-PT2 downfold complete: regularization={}, minimum denominator={:.3g} "
-      "Eh, maximum raw amplitude={:.3g}, semicanonical rotation applied={}, "
-      "above two-body={}",
-      regularized ? "sigma^2" : "none", down.min_denominator,
-      down.max_amplitude, semicanonical_applied, fold_description);
+      "SW-PT2 downfold complete: regularizer_flow={}, minimum denominator="
+      "{:.3g} Eh, maximum raw amplitude={:.3g}, semicanonical rotation "
+      "applied={}, three-body terms folded={}",
+      reg.flow, down.min_denominator, down.max_amplitude, semicanonical_applied,
+      fold);
   warn_on_intruders(down, regularized);
 
   if (semicanonical_applied) {

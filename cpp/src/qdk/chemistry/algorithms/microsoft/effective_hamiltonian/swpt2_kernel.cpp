@@ -46,15 +46,18 @@ double chemist(const TwoBodyBlocks& two_body, int left, int right, int p, int q,
 }
 }  // namespace
 
-double regularized_inverse(double delta, const RegularizerOptions& reg) {
-  if (reg.sigma2 > 0.0) {
-    if (delta == 0.0) return 0.0;  // the damped inverse vanishes in the limit
-    // expm1 rather than 1-exp: the difference cancels catastrophically for
-    // small sigma*delta^2, which is exactly where the regularizer works.
-    return -std::expm1(-reg.sigma2 * delta * delta) / delta;
-  }
-  if (std::abs(delta) < bare_denominator_floor) return 0.0;
-  return 1.0 / delta;
+// The second-order unitary expansion [S, H_OD] + [S, [S, F0]]/2 equals
+// [S, V]/2 with each channel's coupling scaled by 2 - g, so its energy carries
+// g (2 - g) = 1 - exp(-2s*D^2).
+ChannelFactors channel_factors(double delta, const RegularizerOptions& reg) {
+  // A channel left out of S keeps its whole coupling: [S, F0] has no part to
+  // cancel it. The floor also bounds amplitudes at very large s.
+  if (std::abs(delta) < denominator_floor) return {0.0, 2.0};
+  if (reg.flow == 0.0) return {1.0 / delta, 1.0};
+  // expm1 rather than 1-exp: the difference cancels catastrophically for
+  // small s*delta^2, which is exactly where the regularizer works.
+  const double kept = -std::expm1(-reg.flow * delta * delta);
+  return {kept / delta, 2.0 - kept};
 }
 
 std::array<Eigen::MatrixXd, 2> generalized_fock_matrices(
@@ -137,8 +140,7 @@ Eigen::MatrixXd semicanonical_rotation(
     off_diagonal.diagonal().setZero();
     if (off_diagonal.cwiseAbs().maxCoeff() <= tolerance) continue;
 
-    Eigen::SelfAdjointEigenSolver<Eigen::MatrixXd> solver(
-        0.5 * (sub + sub.transpose()).eval());
+    Eigen::SelfAdjointEigenSolver<Eigen::MatrixXd> solver(sub);
     if (solver.info() != Eigen::Success)
       throw std::runtime_error(
           "semicanonical_rotation: Fock block diagonalization failed");
@@ -489,7 +491,7 @@ Equations derive() {
   EquationSums sums;
   const std::array roles{off_diagonal_blocks(1), off_diagonal_blocks(2)};
 
-  // Form 1/2 (S H_OD - H_OD S). Only pairs with no net inactive/virtual
+  // Form 1/2 (S V - V S). Only pairs with no net inactive/virtual
   // occupation change can survive projection onto P.
   for (const int rank_s : {1, 2})
     for (const int rank_v : {1, 2})
@@ -548,7 +550,7 @@ const Equations& reusable_equations() {
 
 std::vector<Plan> build_plans(const Equations& equations,
                               const std::array<std::size_t, 3>& extents,
-                              bool spin_free) {
+                              bool spin_free, bool fold) {
   auto context = sq::set_scoped_default_context(
       {.index_basis_registry_shared_ptr = equations.spaces,
        .vacuum = sq::Vacuum::SingleProduct});
@@ -558,6 +560,7 @@ std::vector<Plan> build_plans(const Equations& equations,
   };
   std::vector<Plan> plans;
   for (const auto& term : equations.terms) {
+    if (term.folded && !fold) continue;
     // Spin-free input needs only the alpha one-body and aabb outputs.
     if (spin_free && term.spin_case != (term.rank == 2 ? 1 : 0)) continue;
     auto result = term.result;
@@ -579,7 +582,7 @@ constexpr double negligible_coupling = 1e-12;
 
 // Raw (undamped) amplitude, with the denominator floored at the bare cutoff.
 double raw_amplitude(double coupling, double delta) {
-  return std::abs(coupling) / std::max(std::abs(delta), bare_denominator_floor);
+  return std::abs(coupling) / std::max(std::abs(delta), denominator_floor);
 }
 
 // Inputs shared by the steps of one downfold call.
@@ -607,50 +610,53 @@ struct Inputs {
                             double fourth) {
     return (first + second) - (third + fourth);
   }
-  double inverse_two_body(double first, double second, double third,
-                          double fourth) const {
-    return regularized_inverse(denominator(first, second, third, fourth),
-                               regularizer);
+  ChannelFactors two_body_factors(double first, double second, double third,
+                                  double fourth) const {
+    return channel_factors(denominator(first, second, third, fourth),
+                           regularizer);
   }
 };
 
 struct OneBodyOperators {
-  std::array<Eigen::MatrixXd, 2> normal_ordered, generator;
+  std::array<Eigen::MatrixXd, 2> normal_ordered, generator, coupling;
 };
 
 // Normal order against the filled inactive space, not the density used for
-// the generalized Fock. Each generator trace must be regularized separately.
+// the generalized Fock. Each inactive trace keeps the denominator of the
+// two-body term it comes from, so the floor drops the same channels here as
+// in the two-body operator.
 OneBodyOperators one_body_operators(
     const Inputs& in, const std::array<Eigen::MatrixXd, 2>& one_body) {
-  OneBodyOperators out{one_body, one_body};
+  OneBodyOperators out{one_body, one_body, one_body};
   const int norb = in.norb;
   for (int spin = 0; spin < 2; ++spin) {
     const auto& eps = in.energies[spin];
 #pragma omp parallel for schedule(static) if (n4(norb) >= min_parallel_work)
     for (int row = 0; row < norb; ++row)
       for (int col = 0; col < norb; ++col) {
-        out.generator[spin](row, col) *=
-            regularized_inverse(eps(row) - eps(col), in.regularizer);
+        const auto bare = channel_factors(eps(row) - eps(col), in.regularizer);
+        out.generator[spin](row, col) *= bare.inverse;
+        out.coupling[spin](row, col) *= bare.dressing;
         for (const int occupied : in.inactive) {
           // Coulomb with both spins of the occupied orbital, exchange with one.
-          double trace = 0.0, generator_trace = 0.0;
+          double trace = 0.0, generator_trace = 0.0, coupling_trace = 0.0;
+          const auto add = [&](double integral, const ChannelFactors& factors) {
+            trace += integral;
+            generator_trace += integral * factors.inverse;
+            coupling_trace += integral * factors.dressing;
+          };
           for (int other = 0; other < 2; ++other) {
-            const double coulomb =
-                in.integral(spin, other, row, col, occupied, occupied);
-            trace += coulomb;
-            generator_trace +=
-                coulomb *
-                in.inverse_two_body(eps(row), in.energies[other](occupied),
-                                    in.energies[other](occupied), eps(col));
+            const double occupied_energy = in.energies[other](occupied);
+            add(in.integral(spin, other, row, col, occupied, occupied),
+                in.two_body_factors(eps(row), occupied_energy, occupied_energy,
+                                    eps(col)));
           }
-          const double exchange =
-              in.integral(spin, spin, row, occupied, occupied, col);
-          trace -= exchange;
-          generator_trace -=
-              exchange * in.inverse_two_body(eps(row), eps(occupied),
-                                             eps(occupied), eps(col));
+          add(-in.integral(spin, spin, row, occupied, occupied, col),
+              in.two_body_factors(eps(row), eps(occupied), eps(occupied),
+                                  eps(col)));
           out.normal_ordered[spin](row, col) += trace;
           out.generator[spin](row, col) += generator_trace;
+          out.coupling[spin](row, col) += coupling_trace;
         }
       }
   }
@@ -727,14 +733,11 @@ void track_single_couplings(
     }
 }
 
-// Plans whose operands touch an empty role, and folded plans without a
-// density, contribute nothing.
+// Plans whose operands touch an empty role contribute nothing.
 std::vector<const Plan*> select_plans(const std::vector<Plan>& plans,
                                       const Inputs& in) {
-  const bool fold = in.density[0].size() != 0;
   std::vector<const Plan*> selected;
   for (const auto& plan : plans) {
-    if (plan.folded && !fold) continue;
     bool empty = false;
     plan.tree.visit([&](const auto& node) {
       if (!node.leaf() || !node->is_tensor()) return;
@@ -761,8 +764,8 @@ OperandKey operand_key(const sq::Tensor& tensor, bool spin_free) {
   return key;
 }
 
-// The numerical operand of one leaf: an integral, generator or density block.
-// Generator two-body operands also record the diagnostics of their raw
+// The numerical operand of one leaf: a generator, dressed coupling or density
+// block. Generator two-body operands also record the diagnostics of their raw
 // couplings; a spin-free operand stands for both the same-spin channel, which
 // subtracts exchange, and the opposite-spin one.
 sq::ResultPtr build_operand(const Inputs& in, const OneBodyOperators& operators,
@@ -780,7 +783,7 @@ sq::ResultPtr build_operand(const Inputs& in, const OneBodyOperators& operators,
   // Two-body slots (0, 2) and (1, 3) belong to the same particle.
   const int spin = spins[0], partner = is_one_body ? spin : spins[1];
   const auto& one_body_block =
-      (is_generator ? operators.generator : operators.normal_ordered)[spin];
+      (is_generator ? operators.generator : operators.coupling)[spin];
   const auto& eps = in.energies[spin];
   const auto& partner_eps = in.energies[partner];
   const bool same_spin = in.spin_free || spin == partner;
@@ -789,8 +792,10 @@ sq::ResultPtr build_operand(const Inputs& in, const OneBodyOperators& operators,
   double max_amplitude = result.max_amplitude;
   Tensor values{btas::Range{extents}};
   const auto size = static_cast<std::ptrdiff_t>(values.size());
+  // Each element costs tens of nanoseconds, so operands parallelize well
+  // below the general work threshold.
 #pragma omp parallel for schedule(static) reduction(min : min_denominator) \
-    reduction(max : max_amplitude) if (size >= min_parallel_work)
+    reduction(max : max_amplitude) if (size >= 4096)
   for (std::ptrdiff_t ordinal = 0; ordinal < size; ++ordinal) {
     // BTAS tensors are row-major.
     std::array<int, 4> orbital{};
@@ -808,12 +813,12 @@ sq::ResultPtr build_operand(const Inputs& in, const OneBodyOperators& operators,
       // Symbolic (bra, ket) slots map to chemist (pq|rs) order.
       const double direct = in.integral(spin, partner, orbital[0], orbital[2],
                                         orbital[1], orbital[3]);
-      value = direct;
+      const double delta =
+          Inputs::denominator(eps(orbital[0]), partner_eps(orbital[1]),
+                              eps(orbital[2]), partner_eps(orbital[3]));
+      const auto factors = channel_factors(delta, in.regularizer);
+      value = direct * (is_generator ? factors.inverse : factors.dressing);
       if (is_generator) {
-        const double delta =
-            Inputs::denominator(eps(orbital[0]), partner_eps(orbital[1]),
-                                eps(orbital[2]), partner_eps(orbital[3]));
-        value *= regularized_inverse(delta, in.regularizer);
         const auto record = [&](double coupling) {
           if (std::abs(coupling) <= negligible_coupling) return;
           min_denominator = std::min(min_denominator, std::abs(delta));
@@ -933,7 +938,8 @@ DownfoldResult downfold(const std::array<Eigen::MatrixXd, 2>& one_body,
                   static_cast<int>(fock[0].rows()),
                   {fock[0].diagonal(), fock[1].diagonal()}};
   const auto operators = one_body_operators(in, one_body);
-  // Start with P H_BD P; the contraction plans add 1/2 P [S, H_OD] P.
+  // Start with P H_BD P; the contraction plans add 1/2 P [S, V] P with the
+  // dressed coupling V.
   auto result =
       block_diagonal_part(in, one_body, operators.normal_ordered, core_energy);
   if (!inactive.empty() || !virtuals.empty()) {
@@ -943,9 +949,10 @@ DownfoldResult downfold(const std::array<Eigen::MatrixXd, 2>& one_body,
     const auto extent = [](const std::vector<int>& orbitals) {
       return std::max<std::size_t>(orbitals.size(), 1);
     };
-    const auto plans = build_plans(
-        reusable_equations(),
-        {extent(inactive), extent(active), extent(virtuals)}, spin_free);
+    const auto plans =
+        build_plans(reusable_equations(),
+                    {extent(inactive), extent(active), extent(virtuals)},
+                    spin_free, density[0].size() != 0);
     const auto selected = select_plans(plans, in);
     const auto operands = build_operands(selected, in, operators, result);
     const auto values = evaluate_plans(selected, operands, in);

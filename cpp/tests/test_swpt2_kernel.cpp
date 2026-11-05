@@ -59,7 +59,7 @@ OneBodyCase make_case(std::vector<int> active, std::vector<int> inactive,
   for (int orbital = 0; orbital < norb; ++orbital)
     inputs.energies(orbital) = -1.5 + 0.31 * orbital;
   if (degenerate && norb > 1)
-    inputs.energies(1) = inputs.energies(0) + 0.5 * sw::bare_denominator_floor;
+    inputs.energies(1) = inputs.energies(0) + 0.5 * sw::denominator_floor;
   for (int spin = 0; spin < 2; ++spin) {
     inputs.one_body[spin].resize(norb, norb);
     for (int row = 0; row < norb; ++row)
@@ -215,7 +215,8 @@ Eigen::MatrixXd spin_free_fock(const Eigen::MatrixXd& one_body,
 }
 
 struct FockParts {
-  Eigen::MatrixXd diagonal, off_diagonal, generator;
+  // `coupling` is the off-diagonal part that enters [G, coupling]/2.
+  Eigen::MatrixXd diagonal, off_diagonal, generator, coupling;
 };
 
 template <typename Scalar, typename Emit>
@@ -265,6 +266,7 @@ FockParts fock_parts(const OneBodyCase& inputs,
   FockParts result{
       core_energy * Eigen::MatrixXd::Identity(dimension, dimension),
       Eigen::MatrixXd::Zero(dimension, dimension),
+      Eigen::MatrixXd::Zero(dimension, dimension),
       Eigen::MatrixXd::Zero(dimension, dimension)};
   std::vector<char> roles(norb, 'u');
   for (const int orbital : inputs.inactive) roles[orbital] = 'i';
@@ -287,16 +289,20 @@ FockParts fock_parts(const OneBodyCase& inputs,
       removed += inputs.spin_energies(index % 2)(index / 2);
     delta -= removed;
     const double inverse =
-        regularizer.sigma2 == 0.0
-            ? (std::abs(delta) < 1e-8 ? 0.0 : 1.0 / delta)
-            : (delta == 0.0
-                   ? 0.0
-                   : -std::expm1(-regularizer.sigma2 * delta * delta) / delta);
+        std::abs(delta) < 1e-8 ? 0.0
+        : regularizer.flow == 0.0
+            ? 1.0 / delta
+            : -std::expm1(-regularizer.flow * delta * delta) / delta;
+    // [G, F0] scales each generator term by -delta, so the second-order
+    // unitary expansion [G, V] + [G, [G, F0]]/2 is [G, W]/2 with
+    // W = 2 V - delta G term by term.
+    const double weight = 2.0 - delta * inverse;
     visit_matrix_elements(coupling, creators, annihilators, dimension,
                           [&](int bra, int ket, double value) {
                             if (off_diagonal) {
                               result.off_diagonal(bra, ket) += value;
                               result.generator(bra, ket) += value * inverse;
+                              result.coupling(bra, ket) += value * weight;
                             } else
                               result.diagonal(bra, ket) += value;
                           });
@@ -360,8 +366,8 @@ sw::DownfoldResult project_fock_reference(
         const unsigned full_bra = embed(bra), full_ket = embed(ket);
         projected(bra, ket) = parts.diagonal(full_bra, full_ket) +
                               0.5 * (parts.generator.row(full_bra).dot(
-                                         parts.off_diagonal.col(full_ket)) -
-                                     parts.off_diagonal.row(full_bra).dot(
+                                         parts.coupling.col(full_ket)) -
+                                     parts.coupling.row(full_bra).dot(
                                          parts.generator.col(full_ket)));
       }
   Matrix lower = projected(0, 0) * Matrix::Identity(dimension, dimension);
@@ -549,7 +555,7 @@ TEST(Swpt2KernelTest, RestoresCallerContextAndReusesEquations) {
       one_body, one_body, integrals, energies, {0}, {}, {1}, regularizer, 0.4);
   EXPECT_EQ(sequant::get_default_context(), original_context);
   EXPECT_NEAR(first.one_body[0](0, 0),
-              -0.5 + 0.01 * sw::regularized_inverse(-2.5, regularizer), 1e-14);
+              -0.5 + 0.01 * -std::expm1(-2 * 0.8 * 2.5 * 2.5) / -2.5, 1e-14);
   auto alternate_context = sequant::set_scoped_default_context(
       {.index_basis_registry_shared_ptr = sequant::mbpt::make_min_mr_spaces(
            sequant::mbpt::SpinConvention::Legacy),
@@ -663,8 +669,8 @@ TEST(Swpt2KernelTest, SpatialOneBodyMatchesFockSpace) {
        {make_case({0, 3}, {2}, {1, 4}), make_case({0, 2}, {}, {1}),
         make_case({0, 2}, {1}, {}), make_case({0, 1}, {}, {}),
         make_case({0, 3}, {2}, {1, 4}, true)}) {
-    for (const double sigma : {0.0, 0.8}) {
-      const sw::RegularizerOptions regularizer{sigma};
+    for (const double flow : {0.0, 0.8}) {
+      const sw::RegularizerOptions regularizer{flow};
       compare(run_native(inputs, regularizer),
               fock_reference(inputs, regularizer));
     }
@@ -684,8 +690,8 @@ TEST(Swpt2KernelTest, BareCutoffMatchesRawDoubleExcitations) {
   inputs.energies << 0.2, -1.0, -0.5, -1.0, -0.5;
   for (const double fraction : {0.125, 0.25, 0.5, 0.75, 0.875})
     for (const int step : {-2, -1, 0, 1, 2}) {
-      inputs.energies(3) = -1.0 + fraction * sw::bare_denominator_floor;
-      inputs.energies(4) = -0.5 + (1.0 - fraction) * sw::bare_denominator_floor;
+      inputs.energies(3) = -1.0 + fraction * sw::denominator_floor;
+      inputs.energies(4) = -0.5 + (1.0 - fraction) * sw::denominator_floor;
       for (int offset = 0; offset < std::abs(step); ++offset)
         inputs.energies(4) =
             std::nextafter(inputs.energies(4), step < 0 ? -1.0 : 0.0);
@@ -706,14 +712,14 @@ TEST(Swpt2KernelTest, BareCutoffPreservesExternalTrace) {
                               inputs.norb())) = 0.001;
   for (const double spectator : {-2.0, -10.0, -100.0})
     for (const int step : {-2, -1, 0, 1, 2}) {
-      inputs.energies << -0.5, spectator, -0.5 + sw::bare_denominator_floor;
+      inputs.energies << -0.5, spectator, -0.5 + sw::denominator_floor;
       for (int offset = 0; offset < std::abs(step); ++offset)
         inputs.energies(2) =
             std::nextafter(inputs.energies(2), step < 0 ? -1.0 : 0.0);
       SCOPED_TRACE("spectator=" + std::to_string(spectator) +
                    " ulp_step=" + std::to_string(step));
-      for (const double sigma : {0.0, 0.8}) {
-        const sw::RegularizerOptions regularizer{sigma};
+      for (const double flow : {0.0, 0.8}) {
+        const sw::RegularizerOptions regularizer{flow};
         compare(run_native(inputs, regularizer),
                 fock_reference(inputs, regularizer));
       }
@@ -730,15 +736,15 @@ TEST(Swpt2KernelTest, CutoffBoundaryPreservesAllOperatorRanks) {
           populate_two_body(inputs);
           inputs.one_body[1] = inputs.one_body[0];
           inputs.energies << -0.5, spectator, 0.25,
-              -0.5 + sign * sw::bare_denominator_floor, 1.6;
+              -0.5 + sign * sw::denominator_floor, 1.6;
           inputs.energies.array() += energy_offset;
           if (step != 0)
             inputs.energies(3) = std::nextafter(
                 inputs.energies(3),
                 step < 0 ? -std::numeric_limits<double>::infinity()
                          : std::numeric_limits<double>::infinity());
-          for (const double sigma : {0.0, 0.8}) {
-            const sw::RegularizerOptions regularizer{sigma};
+          for (const double flow : {0.0, 0.8}) {
+            const sw::RegularizerOptions regularizer{flow};
             const auto parts = fock_parts(inputs, regularizer);
             for (const bool folded : {false, true}) {
               ++cases;
@@ -747,7 +753,7 @@ TEST(Swpt2KernelTest, CutoffBoundaryPreservesAllOperatorRanks) {
                            " spectator=" + std::to_string(spectator) +
                            " ulp_step=" + std::to_string(step) +
                            " folded=" + std::to_string(folded) +
-                           " sigma=" + std::to_string(sigma));
+                           " flow=" + std::to_string(flow));
               const auto density =
                   folded ? make_density(inputs, 3) : Eigen::MatrixXd{};
               compare(run_native(inputs, regularizer, density),
@@ -765,9 +771,9 @@ TEST(Swpt2KernelTest, ZeroCouplingsKeepOnlyTheBaseline) {
     inputs.one_body[spin].diagonal() = (0.3 + 0.1 * spin) * inputs.energies;
   }
   for (const bool folded : {false, true})
-    for (const double sigma : {0.0, 0.8}) {
+    for (const double flow : {0.0, 0.8}) {
       const auto density = folded ? make_density(inputs, 3) : Eigen::MatrixXd{};
-      const sw::RegularizerOptions regularizer{sigma};
+      const sw::RegularizerOptions regularizer{flow};
       const auto actual = run_native(inputs, regularizer, density);
       compare(actual, fock_reference(inputs, regularizer, density));
       EXPECT_TRUE(std::isinf(actual.min_denominator));
@@ -803,8 +809,8 @@ TEST(Swpt2KernelTest, ArbitraryOrbitalRelabelingIsCovariant) {
     }
   }
   for (const bool folded : {false, true})
-    for (const double sigma : {0.0, 0.8}) {
-      const sw::RegularizerOptions regularizer{sigma};
+    for (const double flow : {0.0, 0.8}) {
+      const sw::RegularizerOptions regularizer{flow};
       const auto original =
           run_native(inputs, regularizer, folded ? density : Eigen::MatrixXd{});
       const auto actual = run_native(
@@ -837,14 +843,14 @@ TEST(Swpt2KernelTest, DensityFoldMatchesFockSpace) {
         make_case({0, 1, 2}, {}, {}), make_case({0, 2}, {1}, {3}, true)}) {
     populate_two_body(inputs);
     inputs.one_body[1] = inputs.one_body[0];
-    for (const double sigma : {0.0, 0.8}) {
-      const sw::RegularizerOptions regularizer{sigma};
+    for (const double flow : {0.0, 0.8}) {
+      const sw::RegularizerOptions regularizer{flow};
       const auto parts = fock_parts(inputs, regularizer);
       const auto discarded = run_native(inputs, regularizer);
       compare(discarded, project_fock_reference(inputs, parts));
       for (int kind = 0; kind < 5; ++kind) {
         SCOPED_TRACE("case=" + std::to_string(cases++) + " density=" +
-                     std::to_string(kind) + " sigma=" + std::to_string(sigma));
+                     std::to_string(kind) + " flow=" + std::to_string(flow));
         const auto density = make_density(inputs, kind);
         const auto actual = run_native(inputs, regularizer, density);
         compare(actual, project_fock_reference(inputs, parts, density));
@@ -866,14 +872,13 @@ TEST(Swpt2KernelTest, MultipleExternalOrbitalsMatchFockSpace) {
     populate_two_body(inputs);
     inputs.one_body[1] = inputs.one_body[0];
     for (const bool folded : {false, true})
-      for (const double sigma : {0.0, 0.8}) {
+      for (const double flow : {0.0, 0.8}) {
         SCOPED_TRACE("case=" + std::to_string(cases++) +
-                     " norb=" + std::to_string(inputs.norb()) +
-                     " fold=" + std::to_string(folded) +
-                     " sigma=" + std::to_string(sigma));
+                     " norb=" + std::to_string(inputs.norb()) + " fold=" +
+                     std::to_string(folded) + " flow=" + std::to_string(flow));
         const auto density =
             folded ? make_density(inputs, 3) : Eigen::MatrixXd{};
-        const sw::RegularizerOptions regularizer{sigma};
+        const sw::RegularizerOptions regularizer{flow};
         compare(run_native(inputs, regularizer, density),
                 fock_reference(inputs, regularizer, density));
       }
@@ -891,11 +896,10 @@ TEST(Swpt2KernelTest, UnrestrictedBlocksMatchFockSpace) {
     const Eigen::MatrixXd alpha = 0.5 * make_density(inputs, 2);
     const Eigen::MatrixXd beta = 0.5 * make_density(inputs, 3);
     for (const bool folded : {false, true})
-      for (const double sigma : {0.0, 0.8}) {
-        SCOPED_TRACE("case=" + std::to_string(cases++) +
-                     " fold=" + std::to_string(folded) +
-                     " sigma=" + std::to_string(sigma));
-        const sw::RegularizerOptions regularizer{sigma};
+      for (const double flow : {0.0, 0.8}) {
+        SCOPED_TRACE("case=" + std::to_string(cases++) + " fold=" +
+                     std::to_string(folded) + " flow=" + std::to_string(flow));
+        const sw::RegularizerOptions regularizer{flow};
         const Eigen::MatrixXd density = folded ? alpha : Eigen::MatrixXd{};
         const Eigen::MatrixXd beta_density = folded ? beta : Eigen::MatrixXd{};
         const auto actual =
@@ -950,13 +954,37 @@ TEST(Swpt2KernelTest, IndependentFockSpace) {
         full |= ((compact >> (2 * axis)) & 3u) << (2 * inputs.active[axis]);
       return full;
     };
-    for (const double sigma : {0.0, 0.8}) {
-      const sw::RegularizerOptions regularizer{sigma};
+    for (const double flow : {0.0, 0.8}) {
+      const sw::RegularizerOptions regularizer{flow};
       const auto parts = fock_parts(inputs, regularizer);
       const Eigen::MatrixXd exact =
-          parts.diagonal + 0.5 * (parts.generator * parts.off_diagonal -
-                                  parts.off_diagonal * parts.generator);
+          parts.diagonal + 0.5 * (parts.generator * parts.coupling -
+                                  parts.coupling * parts.generator);
       EXPECT_LT((exact - exact.transpose()).cwiseAbs().maxCoeff(), 1e-12);
+      // The unitary expansion with the F0 matrix itself.
+      Eigen::VectorXd f0 = Eigen::VectorXd::Zero(exact.rows());
+      for (Eigen::Index state = 0; state < f0.size(); ++state)
+        for (int bit = 0; bit < 2 * inputs.norb(); ++bit)
+          if ((state >> bit) & 1)
+            f0(state) += inputs.spin_energies(bit % 2)(bit / 2);
+      const Eigen::MatrixXd f0_commutator =
+          parts.generator * f0.asDiagonal() - f0.asDiagonal() * parts.generator;
+      const Eigen::MatrixXd expansion = parts.diagonal +
+                                        parts.generator * parts.off_diagonal -
+                                        parts.off_diagonal * parts.generator +
+                                        0.5 * (parts.generator * f0_commutator -
+                                               f0_commutator * parts.generator);
+      EXPECT_LT((expansion - exact).cwiseAbs().maxCoeff(), 1e-12);
+      // 1/2 [G, V] with the generator at twice the flow has the same
+      // determinant energies but different couplings.
+      const auto plain_parts = fock_parts(inputs, {2 * flow});
+      const Eigen::MatrixXd plain =
+          plain_parts.diagonal +
+          0.5 * (plain_parts.generator * plain_parts.off_diagonal -
+                 plain_parts.off_diagonal * plain_parts.generator);
+      EXPECT_LT((plain.diagonal() - exact.diagonal()).cwiseAbs().maxCoeff(),
+                1e-12);
+      if (flow > 0.0) EXPECT_GT((plain - exact).cwiseAbs().maxCoeff(), 1e-6);
       const auto matrix = fock_matrix(run_native(inputs, regularizer));
       double error = 0.0, correction = 0.0, truncation_signal = 0.0;
       for (unsigned bra = 0; bra < static_cast<unsigned>(matrix.rows()); ++bra)
@@ -1005,7 +1033,9 @@ TEST(Swpt2KernelTest, ClosedShellMp2Limit) {
     return inputs.integrals(
         sw::idx4(first, second, third, fourth, inputs.norb()));
   };
-  double hf_energy = 0.17, mp2 = 0.0;
+  double hf_energy = 0.17;
+  // Closed-shell MP2 pairs: |V|^2 numerator and denominator D.
+  std::vector<std::pair<double, double>> pairs;
   for (const int occupied : inputs.active) {
     hf_energy += 2 * inputs.one_body[0](occupied, occupied);
     for (const int other : inputs.active) {
@@ -1014,13 +1044,23 @@ TEST(Swpt2KernelTest, ClosedShellMp2Limit) {
       for (const int empty : inputs.virtuals)
         for (const int second_empty : inputs.virtuals) {
           const double direct = integral(occupied, empty, other, second_empty);
-          mp2 += direct *
-                 (2 * direct - integral(occupied, second_empty, other, empty)) /
-                 (inputs.energies(occupied) + inputs.energies(other) -
+          pairs.emplace_back(
+              direct *
+                  (2 * direct - integral(occupied, second_empty, other, empty)),
+              inputs.energies(occupied) + inputs.energies(other) -
                   inputs.energies(empty) - inputs.energies(second_empty));
         }
     }
   }
+  // Each pair carries 1 - exp(-2s*D^2), sigma^2-MP2 at sigma = 2s; 0 is the
+  // bare limit.
+  const auto mp2 = [&](double flow) {
+    double energy = 0.0;
+    for (const auto& [numerator, delta] : pairs)
+      energy += numerator / delta *
+                (flow == 0.0 ? 1.0 : -std::expm1(-2.0 * flow * delta * delta));
+    return energy;
+  };
   const auto expectation = [&](const sw::DownfoldResult& result) {
     double value =
         result.scalar + result.one_body[0].trace() + result.one_body[1].trace();
@@ -1032,10 +1072,17 @@ TEST(Swpt2KernelTest, ClosedShellMp2Limit) {
             result.two_body(sw::idx4(first, second, second, first, count));
     return value;
   };
-  const double actual = expectation(run_native(inputs, {}, density));
-  EXPECT_LT(mp2, -1e-4);
-  EXPECT_NEAR(actual, hf_energy + mp2, 1e-11);
-  EXPECT_GT(std::abs(expectation(run_native(inputs, {})) - actual), 1e-6);
+  EXPECT_LT(mp2(0.0), -1e-4);
+  for (const double flow : {0.0, 0.05, 0.5}) {
+    const double actual = expectation(run_native(inputs, {flow}, density));
+    EXPECT_NEAR(actual, hf_energy + mp2(flow), 1e-11) << flow;
+    // Taking s for sigma^2-MP2's sigma would halve the flow.
+    if (flow > 0.0)
+      EXPECT_GT(std::abs(actual - hf_energy - mp2(0.5 * flow)), 1e-6);
+  }
+  EXPECT_GT(std::abs(expectation(run_native(inputs, {})) -
+                     expectation(run_native(inputs, {}, density))),
+            1e-6);
 }
 
 TEST(Swpt2KernelTest, VirtualExternalSpaceConvergesAsCouplingShrinks) {
@@ -1180,7 +1227,7 @@ TEST(Swpt2KernelTest, SemicanonicalCovariance) {
   for (const int orbital : inputs.inactive) density(orbital, orbital) = 2.0;
   const auto run = [&](const Eigen::MatrixXd& one_body,
                        const Eigen::VectorXd& integrals,
-                       const Eigen::MatrixXd& reference_density, double sigma) {
+                       const Eigen::MatrixXd& reference_density, double flow) {
     const auto fock =
         spin_free_fock(one_body, integrals, reference_density, inputs.norb());
     const auto rotation = sw::semicanonical_rotation(
@@ -1194,7 +1241,7 @@ TEST(Swpt2KernelTest, SemicanonicalCovariance) {
     const auto rotated_density =
         sw::rotate_one_body(reference_density, rotation);
     auto result =
-        run_native(prepared, sw::RegularizerOptions{sigma}, rotated_density);
+        run_native(prepared, sw::RegularizerOptions{flow}, rotated_density);
     const Eigen::MatrixXd active_rotation = rotation.block(2, 2, 2, 2);
     for (auto& block : result.one_body)
       block = sw::rotate_one_body(block, active_rotation.transpose());
@@ -1212,13 +1259,13 @@ TEST(Swpt2KernelTest, SemicanonicalCovariance) {
     basis(first, first + 1) = -std::sin(angle);
     basis(first + 1, first) = std::sin(angle);
   }
-  for (const double sigma : {0.0, 0.8}) {
+  for (const double flow : {0.0, 0.8}) {
     const auto original =
-        run(inputs.one_body[0], inputs.integrals, density, sigma);
+        run(inputs.one_body[0], inputs.integrals, density, flow);
     auto rotated =
         run(sw::rotate_one_body(inputs.one_body[0], basis),
             sw::rotate_two_body(inputs.integrals, basis, inputs.norb()),
-            sw::rotate_one_body(density, basis), sigma);
+            sw::rotate_one_body(density, basis), flow);
     const Eigen::MatrixXd active_basis = basis.block(2, 2, 2, 2);
     for (auto& block : rotated.one_body)
       block = sw::rotate_one_body(block, active_basis.transpose());
@@ -1245,26 +1292,40 @@ TEST(Swpt2KernelTest, SemicanonicalCovariance) {
   }
 }
 
-TEST(Swpt2KernelTest, BareInverseUsesGuardedPseudoinverse) {
+TEST(Swpt2KernelTest, ChannelFactorsUseDenominatorFloor) {
+  const auto expect = [](double delta, const sw::RegularizerOptions& reg,
+                         double inverse, double dressing) {
+    const auto factors = sw::channel_factors(delta, reg);
+    EXPECT_NEAR(factors.inverse, inverse, 1e-14 * std::abs(inverse)) << delta;
+    EXPECT_DOUBLE_EQ(factors.dressing, dressing) << delta;
+  };
+  // A channel left out of S keeps its whole coupling in the commutator.
+  for (const double flow : {0.0, 1.0, 1e300}) {
+    const sw::RegularizerOptions reg{flow};
+    expect(0.0, reg, 0.0, 2.0);
+    expect(0.5e-8, reg, 0.0, 2.0);
+  }
   const sw::RegularizerOptions bare;
-  EXPECT_DOUBLE_EQ(sw::regularized_inverse(2.0, bare), 0.5);
-  EXPECT_DOUBLE_EQ(sw::regularized_inverse(0.5e-8, bare), 0.0);
-  EXPECT_DOUBLE_EQ(sw::regularized_inverse(sw::bare_denominator_floor, bare),
-                   1e8);
-  const sw::RegularizerOptions damped{1.0};
-  EXPECT_DOUBLE_EQ(sw::regularized_inverse(0.0, damped), 0.0);
-  EXPECT_NEAR(sw::regularized_inverse(1e-10, damped), 1e-10, 1e-24);
+  expect(2.0, bare, 0.5, 1.0);
+  expect(sw::denominator_floor, bare, 1e8, 1.0);
+  // Very large flows stay bounded by the floor rather than amplifying
+  // channels degenerate to rounding.
+  expect(sw::denominator_floor, sw::RegularizerOptions{1e300}, 1e8, 1.0);
 }
 
-TEST(Swpt2KernelTest, RegularizedInverseSurvivesDenominatorCancellation) {
-  for (double sigma2 : {1.0, 1e6})
-    for (double delta = 1e-9; delta < 10.0; delta *= 1.3) {
-      const long double expected =
-          -std::expm1l(-static_cast<long double>(sigma2) * delta * delta) /
-          delta;
-      EXPECT_NEAR(
-          sw::regularized_inverse(delta, sw::RegularizerOptions{sigma2}),
-          static_cast<double>(expected), 1e-13 * std::abs(expected));
+TEST(Swpt2KernelTest, ChannelFactorsSurviveDenominatorCancellation) {
+  for (double flow : {1.0, 1e6})
+    for (double delta = sw::denominator_floor; delta < 10.0; delta *= 1.3) {
+      const long double exponent =
+          static_cast<long double>(flow) * delta * delta;
+      const long double inverse = -std::expm1l(-exponent) / delta;
+      const long double energy = -std::expm1l(-2.0L * exponent);
+      const auto factors =
+          sw::channel_factors(delta, sw::RegularizerOptions{flow});
+      EXPECT_NEAR(factors.inverse, static_cast<double>(inverse),
+                  1e-13 * std::abs(inverse));
+      EXPECT_NEAR(factors.inverse * factors.dressing * delta,
+                  static_cast<double>(energy), 1e-13 * energy);
     }
 }
 
