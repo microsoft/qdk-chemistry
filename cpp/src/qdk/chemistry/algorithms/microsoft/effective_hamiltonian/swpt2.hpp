@@ -48,8 +48,8 @@ class SchriefferWolffPT2Settings : public qdk::chemistry::data::Settings {
  * a generator S regularized by `regularizer_flow`, with semicanonical
  * generalized-Fock denominators; three-body terms are folded with the
  * reference 1-RDM. Restricted input gives a spin-free result, unrestricted
- * input an unrestricted one. The emitted two-body blocks are only 4-fold
- * symmetric, so consumers must read the full dense blocks.
+ * input an unrestricted one. The emitted two-body integrals are 4-fold, not
+ * 8-fold, symmetric.
  */
 class SchriefferWolffPT2Constructor
     : public qdk::chemistry::algorithms::EffectiveHamiltonianConstructor {

@@ -202,13 +202,9 @@ The residual three-body operator is discarded.
 When the retained space contains at most two electrons, the three-body terms have no matrix
 elements there and are dropped without folding.
 
-.. warning::
-
-   The emitted two-body blocks are only **4-fold** symmetric. Hermiticity
-   :math:`(pq|rs) = (qp|sr)` and electron exchange :math:`(pq|rs) = (rs|pq)` hold as for the
-   input integrals, but the bra swap :math:`(pq|rs) = (qp|rs)` of a genuine Coulomb integral
-   does not: the commutator is not an electron-repulsion operator. Consumers must be given
-   the full dense :math:`n^4` blocks.
+The emitted two-body integrals are 4-fold rather than 8-fold symmetric,
+:math:`(pq|rs) = (qp|sr) = (rs|pq)`: the commutator is not an electron-repulsion operator, so the
+bra swap :math:`(pq|rs) = (qp|rs)` does not hold.
 
 The constructor logs the partition and, over the terms coupling :math:`P` and :math:`Q`, the
 smallest denominator and largest unregularized amplitude; it warns on large occupation

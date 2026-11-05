@@ -198,9 +198,8 @@ Emits ``P exp(S) H exp(-S) P`` through second order, truncated to two-body, for
 a generator ``S`` regularized by ``regularizer_flow``, with semicanonical
 generalized-Fock denominators; three-body terms are folded with the reference
 1-RDM. Restricted input gives a spin-free result, unrestricted input an
-unrestricted one. The emitted two-body blocks are only 4-fold symmetric, so
-consumers must read the full dense blocks. The factory name is
-``"qdk_swpt2"``.
+unrestricted one. The emitted two-body integrals are 4-fold, not 8-fold,
+symmetric. The factory name is ``"qdk_swpt2"``.
 
 Typical usage:
 
