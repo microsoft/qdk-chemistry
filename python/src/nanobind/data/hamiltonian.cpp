@@ -831,9 +831,9 @@ Examples:
                 1) < 0) {
           throw nb::python_error();
         }
-        new (self) SparseHamiltonianContainer(
-            std::move(one_body_integrals), std::move(two_body_integrals),
-            core_energy, type);
+        new (self) SparseHamiltonianContainer(std::move(one_body_integrals),
+                                              std::move(two_body_integrals),
+                                              core_energy, type);
       },
       R"(
 Construct from sparse one-body integrals and a sparse two-body map.

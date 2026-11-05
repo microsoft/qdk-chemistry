@@ -42,7 +42,7 @@ simplest option when you need PySCF.
 > **NOTE:** Commands below are given for Linux/macOS (`bash`) and Windows (PowerShell). Where the
 > Linux/macOS commands use `python3`, use `python` on Windows.
 
-CPython 3.12 and newer share a `cp312-abi3` wheel per platform. Python 3.10 and 3.11 use version-specific wheels.
+CPython 3.12 and newer share a `cp312-abi3` wheel per platform. Python 3.11 uses a version-specific wheel.
 
 ### Step 1: Create a virtual environment
 
@@ -208,7 +208,7 @@ After the initial build, restart VS Code and reopen in the container to ensure t
 
 ### Step 4: Develop
 
-The dev container installs the Python package in editable mode, so changes to pure Python files are available immediately. After changing pybind11 sources, rebuild the Python package:
+The dev container installs the Python package in editable mode, so changes to pure Python files are available immediately. After changing nanobind sources, rebuild the Python package:
 
 ```bash
 python -m pip install --no-build-isolation --check-build-dependencies --no-deps \
