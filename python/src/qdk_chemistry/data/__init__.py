@@ -10,6 +10,9 @@ Exposed classes are:
 - :class:`AmplitudeType`: Enumeration of amplitude expansion types (MP2, CCSD, Unspecified).
 - :class:`Ansatz`: Quantum chemical ansatz combining a Hamiltonian and wavefunction for energy calculations.
 - :class:`AOType`: Enumeration of basis set types (STO-3G, 6-31G, etc.).
+- :class:`AuxiliaryBasis`: Secondary basis supplied to algorithms that require one, such as density fitting.
+- :class:`AuxiliaryBasisCollection`: Role-tagged collection of auxiliary bases for algorithm inputs.
+- :class:`AuxiliaryBasisRole`: Algorithm-facing purpose served by an auxiliary basis.
 - :class:`BasisSet`: Gaussian basis set definitions for quantum calculations.
 - :class:`BondFlavorDefinition`: Mapping from one shell-axis class to an opaque semantic flavor ID.
 - :class:`CanonicalFourCenterHamiltonianContainer`: Container for four-center two-electron integrals in canonical form.
@@ -81,6 +84,9 @@ from qdk_chemistry._core.data import (
     AmplitudeType,
     Ansatz,
     AOType,
+    AuxiliaryBasis,
+    AuxiliaryBasisCollection,
+    AuxiliaryBasisRole,
     BasisSet,
     BondFlavorDefinition,
     CanonicalFourCenterHamiltonianContainer,
@@ -121,6 +127,7 @@ from qdk_chemistry._core.data import (
     WavefunctionContainer,
     WavefunctionType,
     get_current_ciaaw_version,
+    with_auxiliary_basis,
 )
 from qdk_chemistry.data.base import DataClass
 from qdk_chemistry.data.circuit import Circuit
@@ -158,6 +165,9 @@ __all__ = [
     "AmplitudeContainer",
     "AmplitudeType",
     "Ansatz",
+    "AuxiliaryBasis",
+    "AuxiliaryBasisCollection",
+    "AuxiliaryBasisRole",
     "BasisSet",
     "BondFlavorDefinition",
     "CanonicalFourCenterHamiltonianContainer",
@@ -228,6 +238,7 @@ __all__ = [
     "get_current_ciaaw_version",
     "get_dataclass_type",
     "register_dataclass",
+    "with_auxiliary_basis",
 ]
 
 
