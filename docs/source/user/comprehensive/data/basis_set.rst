@@ -237,27 +237,27 @@ JSON representation of a :class:`~qdk_chemistry.data.BasisSet` has the following
          "atom_index": 0,
          "shells": [
            {
-                   "coefficients": [0.1543289673, 0.5353281423, 0.4446345422],
+             "coefficients": [0.1543289673, 0.5353281423, 0.4446345422],
              "exponents": [3.425250914, 0.6239137298, 0.168855404],
-                   "orbital_type": "s"
-                },
+             "orbital_type": "s"
+           },
            {
-                   "coefficients": [0.1559162750, 0.6076837186],
-                   "exponents": [0.7868272350, 0.1881288540],
-                   "orbital_type": "p"
+             "coefficients": [0.1559162750, 0.6076837186],
+             "exponents": [0.7868272350, 0.1881288540],
+             "orbital_type": "p"
            }
          ]
-          },
-          {
-             "atom_index": 1,
-             "shells": ["..."]
+       },
+       {
+         "atom_index": 1,
+         "shells": ["..."]
        }
      ],
-       "basis_type": "spherical",
-       "name": "6-31G",
-       "num_atoms": 2,
-       "num_basis_functions": 9,
-       "num_shells": 3
+     "basis_type": "spherical",
+     "name": "6-31G",
+     "num_atoms": 2,
+     "num_basis_functions": 9,
+     "num_shells": 3
    }
 
 HDF5 format
