@@ -36,6 +36,7 @@ inline Eigen::Index n4(int n) {
 }
 
 constexpr Eigen::Index min_parallel_work = Eigen::Index{1} << 16;
+constexpr Eigen::Index min_parallel_operand_size = Eigen::Index{1} << 12;
 
 // Chemist (pq|rs) with p, q of spin `left` and r, s of spin `right`.
 double chemist(const TwoBodyBlocks& two_body, int left, int right, int p, int q,
@@ -792,10 +793,8 @@ sq::ResultPtr build_operand(const Inputs& in, const OneBodyOperators& operators,
   double max_amplitude = result.max_amplitude;
   Tensor values{btas::Range{extents}};
   const auto size = static_cast<std::ptrdiff_t>(values.size());
-  // Each element costs tens of nanoseconds, so operands parallelize well
-  // below the general work threshold.
 #pragma omp parallel for schedule(static) reduction(min : min_denominator) \
-    reduction(max : max_amplitude) if (size >= 4096)
+    reduction(max : max_amplitude) if (size >= min_parallel_operand_size)
   for (std::ptrdiff_t ordinal = 0; ordinal < size; ++ordinal) {
     // BTAS tensors are row-major.
     std::array<int, 4> orbital{};
@@ -854,8 +853,6 @@ Operands build_operands(const std::vector<const Plan*>& selected,
   return operands;
 }
 
-// Plans run concurrently with BLAS pinned to one thread, reading the
-// prebuilt operands.
 std::vector<sq::ResultPtr> evaluate_plans(
     const std::vector<const Plan*>& selected, const Operands& operands,
     const Inputs& in) {
