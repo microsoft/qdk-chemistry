@@ -311,7 +311,7 @@ def _rewrite_internal_module_path(text: str) -> str:
             rewritten = rewritten.replace(old, new)
     # Nanobind's dtype/shape/order metadata is not valid Python type syntax.
     # Keep ndarray itself so Sphinx can parse enclosing tuples and unions.
-    return re.sub(r"\b(numpy\.ndarray)\[[^\[\]]*\]", r"\1", rewritten)
+    return re.sub(r"\b(numpy\.ndarray)\[\w+=[^\[\]]*\]", r"\1", rewritten)
 
 
 def normalize_autodoc_signature(
