@@ -57,6 +57,7 @@ void bind_syev_solver(py::module& m);
 void bind_lattice_geometry(py::module& m);
 void bind_lattice_graph(py::module& m);
 void bind_model_hamiltonians(py::module& m);
+void bind_unitary_synthesis(py::module& m);
 void bind_cube_generator(py::module& m);
 
 PYBIND11_MODULE(_core, m) {
@@ -130,6 +131,7 @@ PYBIND11_MODULE(_core, m) {
   bind_orbital_rotation(utils);
   bind_model_hamiltonians(utils);
   bind_logger(utils);
+  bind_unitary_synthesis(utils);
   bind_cube_generator(utils);
 
   // Bind constants and config at the top level

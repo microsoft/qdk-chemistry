@@ -124,6 +124,10 @@ void bind_mps_wavefunction(py::module& data) {
            "Store supplied sites and optional real/complex RDM arrays. RDMs "
            "use active-orbital order. ")
       .def_property_readonly("sites", &MPSContainer::sites)
+      .def_static("validate_sites", &MPSContainer::validate_sites,
+                  py::arg("sites"),
+                  "Validate open boundaries, scalar types, and adjacent bond "
+                  "symmetries, extents, and sector orders without orbitals.")
       .def_property_readonly("orbitals", &MPSContainer::get_orbitals)
       .def("has_total_num_particles", &MPSContainer::has_total_num_particles)
       .def("has_active_num_particles", &MPSContainer::has_active_num_particles)
