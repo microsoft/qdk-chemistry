@@ -4,6 +4,12 @@ PYTHON_VERSION=${1:-3.11}
 MAC_BUILD=${2:-OFF}
 export MAC_BUILD
 
+PYTHON_TEST_WORKERS=${PYTHON_TEST_WORKERS:-1}
+if ! [[ "$PYTHON_TEST_WORKERS" =~ ^[1-9][0-9]*$ ]]; then
+    echo "ERROR: PYTHON_TEST_WORKERS must be a positive integer." >&2
+    exit 1
+fi
+
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
 
@@ -164,4 +170,18 @@ fi
 
 # Run pytest suite
 echo '=== Running pytest suite ==='
-python3 -m pytest -v ./tests
+export OMP_NUM_THREADS=1
+export OPENBLAS_NUM_THREADS=1
+export MKL_NUM_THREADS=1
+export BLIS_NUM_THREADS=1
+export VECLIB_MAXIMUM_THREADS=1
+PYTHON_TEST_WORKERS=$(python3 -c "import os; print(min(int('$PYTHON_TEST_WORKERS'), os.cpu_count() or 1))")
+echo "Pytest workers: $PYTHON_TEST_WORKERS; native thread limits: 1"
+python3 -c "import numpy; import scipy.linalg; import qdk_chemistry; numpy.show_runtime()"
+
+XDIST_ARGS=()
+if [ "$PYTHON_TEST_WORKERS" -gt 1 ]; then
+    XDIST_ARGS=(-n "$PYTHON_TEST_WORKERS" --dist=loadscope)
+fi
+mkdir -p "$PYTHON_DIR/test-results"
+python3 -m pytest "${XDIST_ARGS[@]}" --junitxml="$PYTHON_DIR/test-results/pytest_report.xml" -v ./tests
