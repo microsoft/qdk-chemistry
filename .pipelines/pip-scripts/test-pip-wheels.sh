@@ -133,14 +133,15 @@ python3 -m pip install "${WHEEL[0]}[test]"
 # because it is not resolvable from any index. See:
 #   https://github.com/microsoft/component-detection/blob/main/docs/detectors/pip.md
 #   https://github.com/microsoft/component-detection/issues/243
-mkdir -p "$PYTHON_DIR/build/test-manifest"
+TEST_MANIFEST_DIR="$PYTHON_DIR/build/test-manifest/python$PYTHON_VERSION"
+mkdir -p "$TEST_MANIFEST_DIR"
 echo "------------------ Installed Python packages (testenv) ------------------"
 python3 -m pip list --format=freeze --exclude qdk_chemistry \
-    | tee "$PYTHON_DIR/build/test-manifest/requirements.txt"
+    | tee "$TEST_MANIFEST_DIR/requirements.txt"
 echo "-------------------------------------------------------------------------"
 python3 -m pip install --dry-run --ignore-installed --quiet \
-    --report "$PYTHON_DIR/build/test-manifest/component-detection-pip-report.json" \
-    -r "$PYTHON_DIR/build/test-manifest/requirements.txt"
+    --report "$TEST_MANIFEST_DIR/component-detection-pip-report.json" \
+    -r "$TEST_MANIFEST_DIR/requirements.txt"
 
 # Disable telemetry during testing
 export QSHARP_PYTHON_TELEMETRY=false

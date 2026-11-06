@@ -27,6 +27,7 @@ steps:
     displayName: Use Python ${{ parameters.pythonVersion }} (arm64)
     env:
       QDK_PYTHON_VERSION: ${{ parameters.pythonVersion }}
+    condition: ${{ parameters.condition }}
 
 - pwsh: |
     $ErrorActionPreference = 'Stop'
@@ -36,7 +37,7 @@ steps:
       -SrcDir "$(System.DefaultWorkingDirectory)" `
       -PythonVersion "$env:QDK_PYTHON_VERSION" `
       -PythonEnv $pythonEnv `
-      -Triplet '$(VCPKG_TRIPLET)' `
+      -Triplet '${{ parameters.arch }}-windows-static-md' `
       -RunSlowTests "$env:QDK_RUN_SLOW_TESTS"
   displayName: Audit and test wheel (Windows, Python ${{ parameters.pythonVersion }})
   condition: ${{ parameters.condition }}

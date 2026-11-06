@@ -36,7 +36,7 @@ qdk-chemistry/
 ├── examples/           # Example scripts showing usage and language interoperability
 ├── external/           # External libraries and scripts
 └── python/             # Python bindings
-    ├── src/            # pybind11 wrapper and python code
+    ├── src/            # nanobind wrapper and python code
     └── tests/          # Python unit tests
 ```
 

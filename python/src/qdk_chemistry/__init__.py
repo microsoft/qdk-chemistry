@@ -293,9 +293,12 @@ def _generate_stubs_on_first_import() -> None:
                 [
                     sys.executable,
                     "-m",
-                    "pybind11_stubgen",
+                    "nanobind.stubgen",
+                    "-m",
                     "_core",
-                    "-o",
+                    "-r",
+                    "-P",
+                    "-O",
                     ".",
                 ],
                 check=False,
@@ -319,7 +322,7 @@ def _generate_stubs_on_first_import() -> None:
                     _update_stub_references(stub_file)
 
         except (subprocess.TimeoutExpired, FileNotFoundError):
-            pass  # pybind11-stubgen not available, skip
+            pass  # nanobind stub generator not available, skip
 
     # Generate registry overloads (deferred until algorithms module is imported)
     # This is done in qdk_chemistry.algorithms.__init__.py to avoid circular imports
