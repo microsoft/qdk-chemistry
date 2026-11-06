@@ -103,7 +103,7 @@ if ($LASTEXITCODE -ne 0) { throw "Native runtime inspection failed ($LASTEXITCOD
 
 $xdistArgs = @()
 if ($TestWorkers -gt 1) {
-    $xdistArgs = @('-n', $TestWorkers, '--dist=loadscope')
+    $xdistArgs = @('-n', $TestWorkers, '--dist=worksteal')
 }
 New-Item -ItemType Directory -Force -Path "$pythonDir\test-results" | Out-Null
 Push-Location $pythonDir
