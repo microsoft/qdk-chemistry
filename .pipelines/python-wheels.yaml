@@ -357,6 +357,7 @@ extends:
           - task: PublishTestResults@2
             displayName: Publish Python test results
             condition: succeededOrFailed()
+            continueOnError: true
             inputs:
               testResultsFormat: JUnit
               testResultsFiles: $(System.DefaultWorkingDirectory)/python/test-results/pytest_report.xml
