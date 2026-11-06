@@ -42,6 +42,7 @@ def docs_conf(monkeypatch):
             "tuple[float, numpy.ndarray[dtype=float64, shape=(*), order='C', writable=False]]",
             "tuple[float, numpy.ndarray]",
         ),
+        ("numpy.ndarray[Any, Any]", "numpy.ndarray[Any, Any]"),
         ("list[tuple[int, str]] | None", "list[tuple[int, str]] | None"),
     ],
 )
