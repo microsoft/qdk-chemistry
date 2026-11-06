@@ -8,11 +8,11 @@
 import numpy as np
 import pytest
 
-from qdk_chemistry.data import ModelOrbitals, MPSContainer, MPSSite, Wavefunction
+from qdk_chemistry.data import Configuration, ModelOrbitals, MPSContainer, MPSSite, Wavefunction
 from qdk_chemistry.data import symmetry as sym
 
 
-def make_site(values):
+def make_site(values, physical_basis=()):
     """Wrap an array as one trivial-symmetry block."""
     left, physical, right = values.shape
     product, label = sym.SymmetryProduct([]), sym.SymmetryLabel([])
@@ -22,7 +22,7 @@ def make_site(values):
         [{label: left}, {label: physical}, {label: right}],
         [((label,) * 3, values.reshape(left * physical, right))],
     )
-    return MPSSite(tensor, [label], [label], [label])
+    return MPSSite(tensor, [label], [label], [label], list(physical_basis))
 
 
 @pytest.fixture
@@ -62,6 +62,13 @@ def test_construction_and_accessors(site_data):
     for site, values in zip(container.sites, site_data, strict=True):
         assert site.shape == values.shape
         np.testing.assert_array_equal(site.to_dense().reshape(site.shape), values)
+
+
+def test_explicit_physical_basis_order(site_data):
+    """An explicit physical basis is kept in the given, non-default order."""
+    basis = [Configuration.from_spin_half_string(state) for state in ["2", "d", "u", "0"]]
+    site = make_site(site_data[0], basis)
+    assert site.physical_basis == basis
 
 
 @pytest.mark.parametrize("complex_values", [False, True])

@@ -455,6 +455,10 @@ TEST_F(MPSContainerTest, RejectsInvalidStructure) {
   auto json = make_container()->to_json();
   json["version"] = "9.0.0";
   EXPECT_THROW(MPSContainer::from_json(json), std::runtime_error);
+  auto numeric_type = make_container()->to_json();
+  numeric_type["container_type"] = 1;
+  EXPECT_THROW(WavefunctionContainer::from_json(numeric_type),
+               std::runtime_error);
 }
 
 TEST_F(MPSContainerTest, EqualSpinCountsDoNotImplyClosedShellRdms) {

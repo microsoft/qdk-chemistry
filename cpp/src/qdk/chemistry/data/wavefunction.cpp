@@ -998,11 +998,11 @@ std::unique_ptr<WavefunctionContainer> WavefunctionContainer::from_json(
     const nlohmann::json& j) {
   QDK_LOG_TRACE_ENTERING();
 
-  if (j.value("container_type", std::string{}) == "mps") {
-    return MPSContainer::from_json(j);
-  }
-
   try {
+    if (j.value("container_type", std::string{}) == "mps") {
+      return MPSContainer::from_json(j);
+    }
+
     // Check version first
     if (!j.contains("version")) {
       throw std::runtime_error("Invalid JSON: missing version field");
