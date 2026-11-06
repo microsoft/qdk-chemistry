@@ -5,6 +5,9 @@ parameters:
 - name: runSlowTests
   type: boolean
   default: true
+- name: testWorkers
+  type: number
+  default: 1
 - name: condition
   type: string
   default: succeeded()
@@ -37,10 +40,12 @@ steps:
       -PythonVersion "$env:QDK_PYTHON_VERSION" `
       -PythonEnv $pythonEnv `
       -Triplet '$(VCPKG_TRIPLET)' `
+      -TestWorkers "$env:PYTHON_TEST_WORKERS" `
       -RunSlowTests "$env:QDK_RUN_SLOW_TESTS"
   displayName: Audit and test wheel (Windows, Python ${{ parameters.pythonVersion }})
   condition: ${{ parameters.condition }}
   env:
     QDK_PYTHON_VERSION: ${{ parameters.pythonVersion }}
     QDK_RUN_SLOW_TESTS: ${{ parameters.runSlowTests }}
+    PYTHON_TEST_WORKERS: ${{ parameters.testWorkers }}
     SYSTEM_ACCESSTOKEN: $(System.AccessToken)
