@@ -34,6 +34,31 @@ namespace QDKChemistry.Utils.UnaryIteration {
         }
     }
 
+    /// `UnaryIterationWithControl` under the controls `ctls`.
+    operation ControlledUnaryIterationWithControl(
+        ctls : Qubit[],
+        address : Qubit[],
+        numActions : Int,
+        action : ((Int, Qubit) => Unit is Adj),
+    ) : Unit is Adj {
+        let numControls = Length(ctls);
+        if numControls == 0 {
+            UnaryIterationWithControl(address, numActions, action);
+        } elif numControls == 1 {
+            SinglyControlledUnaryIterationWithControl(ctls[0], address, numActions, 0, action);
+        } else {
+            use anc = Qubit[numControls - 1];
+            within {
+                AND(ctls[0], ctls[1], anc[0]);
+                for i in 2..numControls - 1 {
+                    AND(anc[i - 2], ctls[i], anc[i - 1]);
+                }
+            } apply {
+                SinglyControlledUnaryIterationWithControl(anc[numControls - 2], address, numActions, 0, action);
+            }
+        }
+    }
+
     /// Applies one action per address value recursively.
     operation UnaryIterationWithControl(
         address : Qubit[],
@@ -89,33 +114,99 @@ namespace QDKChemistry.Utils.UnaryIteration {
             $"address register is too small, requires at least {n} qubits",
         );
 
-        if numActions == 1 {
-            action(actionOffset, ctl);
-        } else {
-            use helper = Qubit();
-
-            let (most, tail) = MostAndTail(address[...n - 1]);
-
-            within {
-                X(tail);
-            } apply {
-                AND(ctl, tail, helper);
+        // Walks the leaves of the Fig. 7 tree of arXiv:1805.03662 in order. Between leaves the
+        // right-going nodes below the branch point are uncomputed, the branch node toggled, and
+        // the next leaf's left-going nodes computed. Each step builds only the next leaf's
+        // O(log L) path: the branch is its deepest right turn, and below it the previous leaf
+        // ran down the right edge of a full subtree, whose address bits count down to 0.
+        // `action` is never passed recursively, which QIR generation cannot resolve.
+        use helpers = Qubit[n];
+        for leaf in 0..numActions - 1 {
+            let path = UnaryIterationPath(numActions, leaf);
+            if leaf == 0 {
+                for depth in 0..Length(path) - 1 {
+                    ComputeUnaryNode(ctl, helpers, address, depth, Fst(path[depth]));
+                }
+            } else {
+                let branch = UnaryIterationBranchDepth(path);
+                let branchBit = Fst(path[branch]);
+                for depth in branch + branchBit..-1..branch + 1 {
+                    UncomputeUnaryNode(ctl, helpers, address, depth, branchBit - (depth - branch));
+                }
+                CNOT(UnaryNodeControl(ctl, helpers, branch), helpers[branch]);
+                for depth in branch + 1..Length(path) - 1 {
+                    ComputeUnaryNode(ctl, helpers, address, depth, Fst(path[depth]));
+                }
             }
-
-            SinglyControlledUnaryIterationWithControl(helper, most, 2^(n - 1), actionOffset, action);
-
-            CNOT(ctl, helper);
-
-            SinglyControlledUnaryIterationWithControl(
-                helper,
-                most,
-                numActions - 2^(n - 1),
-                actionOffset + 2^(n - 1),
-                action,
-            );
-
-            Adjoint AND(ctl, tail, helper);
+            action(actionOffset + leaf, UnaryNodeControl(ctl, helpers, Length(path)));
         }
+        let last = UnaryIterationPath(numActions, numActions - 1);
+        for depth in Length(last) - 1..-1..0 {
+            UncomputeUnaryNode(ctl, helpers, address, depth, Fst(last[depth]));
+        }
+    }
+
+    /// Qubit controlling the tree node at `depth`: the caller's control at the root, otherwise
+    /// the helper of its parent.
+    internal function UnaryNodeControl(ctl : Qubit, helpers : Qubit[], depth : Int) : Qubit {
+        depth == 0 ? ctl | helpers[depth - 1]
+    }
+
+    /// Sets the helper of the node at `depth` for its left branch (address bit `bit` is 0).
+    internal operation ComputeUnaryNode(ctl : Qubit, helpers : Qubit[], address : Qubit[], depth : Int, bit : Int) : Unit is Adj {
+        within {
+            X(address[bit]);
+        } apply {
+            ExactAnd(UnaryNodeControl(ctl, helpers, depth), address[bit], helpers[depth]);
+        }
+    }
+
+    /// Clears the helper of the node at `depth` after its right branch (address bit `bit` is 1).
+    internal operation UncomputeUnaryNode(ctl : Qubit, helpers : Qubit[], address : Qubit[], depth : Int, bit : Int) : Unit is Adj {
+        Adjoint ExactAnd(UnaryNodeControl(ctl, helpers, depth), address[bit], helpers[depth]);
+    }
+
+    /// Root-to-leaf path of `leaf` in the unary iteration tree over `numActions` leaves, as
+    /// (address bit, goes right) per internal node.
+    internal function UnaryIterationPath(numActions : Int, leaf : Int) : (Int, Bool)[] {
+        mutable path = [];
+        mutable remaining = numActions;
+        mutable index = leaf;
+        while remaining > 1 {
+            let n = AddressQubits(remaining);
+            let half = 1 <<< (n - 1);
+            let goesRight = index >= half;
+            set path += [(n - 1, goesRight)];
+            if goesRight {
+                set remaining -= half;
+                set index -= half;
+            } else {
+                set remaining = half;
+            }
+        }
+        path
+    }
+
+    /// Depth where the path of a leaf other than the first splits from its predecessor's: its
+    /// deepest right turn, since below it the path only turns left.
+    internal function UnaryIterationBranchDepth(path : (Int, Bool)[]) : Int {
+        mutable depth = Length(path) - 1;
+        while not Snd(path[depth]) {
+            set depth -= 1;
+        }
+        depth
+    }
+
+    /// `AND`, uncomputed by measurement.
+    @Config(Adaptive)
+    internal operation ExactAnd(control1 : Qubit, control2 : Qubit, target : Qubit) : Unit is Adj {
+        AND(control1, control2, target);
+    }
+
+    /// Without measurement `AND` is a relative-phase Toffoli, which the iteration's CNOT breaks.
+    @Config(not Adaptive)
+    internal operation ExactAnd(control1 : Qubit, control2 : Qubit, target : Qubit) : Unit is Adj {
+        CCNOT(control1, control2, target);
     }
 
     /// Number of address qubits needed to enumerate `numActions` values, i.e.

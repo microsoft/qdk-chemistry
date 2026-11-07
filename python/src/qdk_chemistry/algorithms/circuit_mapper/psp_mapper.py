@@ -5,12 +5,14 @@
 # Licensed under the MIT License. See LICENSE.txt in the project root for license information.
 # --------------------------------------------------------------------------------------------
 
+import warnings
+from contextlib import suppress
 from typing import Any
 
 from qdk import qsharp
 
-from qdk_chemistry.data import AlgorithmRef, Settings
-from qdk_chemistry.data.circuit import Circuit, QsharpFactoryData
+from qdk_chemistry.data import AlgorithmRef, SettingNotFound, Settings
+from qdk_chemistry.data.circuit import Circuit, CircuitMetadata, QsharpFactoryData
 from qdk_chemistry.data.unitary_representation.base import UnitaryRepresentation
 from qdk_chemistry.data.unitary_representation.containers.base import UnitaryContainer
 from qdk_chemistry.data.unitary_representation.containers.block_encoding import LCUContainer
@@ -21,13 +23,25 @@ from .base import CircuitMapper
 
 __all__: list[str] = ["PSPMapper", "PSPMapperSettings"]
 
+#: SELECT constructions available through the ``select_method`` setting.
+_SELECT_METHODS = ("multi_controlled", "unary_iteration")
+
+_PREPARE_DESCRIPTION = (
+    "Algorithm for the PREPARE oracle, one of 'dense_pure_state' (default: exact amplitudes, one "
+    "rotation per amplitude), 'alias_sampling' (Toffolis only, no rotations), 'sparse_isometry' (dense "
+    "preparation on the qubits the nonzero amplitudes span), or 'qrom' (QROM-loaded rotations). "
+    "A PREPARE that rotates through a phase gradient (e.g. 'qrom') uses one shared register its "
+    "caller prepares."
+)
+
 
 class PSPMapperSettings(Settings):
     """Settings for the PSPMapper.
 
     Attributes:
-        prepare: Algorithm reference for the PREPARE oracle state preparation.
-            Defaults to ``DensePureStatePreparation``.
+        prepare: Algorithm reference for the PREPARE oracle state preparation. One of
+            ``"dense_pure_state"`` (default), ``"alias_sampling"``, ``"sparse_isometry"``, or ``"qrom"``.
+        select_method: ``"unary_iteration"`` (default, :cite:`Babbush2018`) or ``"multi_controlled"``.
 
     """
 
@@ -38,7 +52,14 @@ class PSPMapperSettings(Settings):
             "prepare",
             "algorithm_ref",
             AlgorithmRef("state_prep", "dense_pure_state"),
-            "Algorithm for the PREPARE oracle. ",
+            _PREPARE_DESCRIPTION,
+        )
+        self._set_default(
+            "select_method",
+            "string",
+            "unary_iteration",
+            "SELECT construction: 'multi_controlled' or 'unary_iteration'.",
+            list(_SELECT_METHODS),
         )
 
 
@@ -64,6 +85,12 @@ class PSPMapper(CircuitMapper):
     .. math::
 
         W = (2|0\rangle\langle 0| - I) \cdot B[H]
+
+    Note:
+        With an alias or QROM PREPARE, ``Circuit.get_qir()`` and ``Circuit.to_json()`` currently
+        fail inside the Q# compiler (its measurement-based ``Adjoint Std.TableLookup.Select``);
+        ``estimate()`` and simulation work. Building such a block encoding emits a ``UserWarning``.
+        Use ``dense_pure_state`` when QIR export is needed.
 
     """
 
@@ -139,58 +166,68 @@ class PSPMapper(CircuitMapper):
         select_params = QSHARP_UTILS.Select.PauliSelectParams(
             pauliTerms=pauli_terms, signs=[int(s) for s in select.phases], controlStates=control_states
         )
+        if self._settings.get("select_method") == "unary_iteration":
+            return QSHARP_UTILS.Select.MakeUnarySelectOp(select_params), select.num_target_qubits
         return QSHARP_UTILS.Select.MakeSelectOp(select_params), select.num_target_qubits
 
-    def build_prep_ops(self, container: UnitaryContainer) -> tuple[Any, int, int]:
+    def build_prep_ops(self, container: UnitaryContainer) -> tuple[Any, int, int, int]:
         """Return the PREPARE oracle and the widths of the ancilla it acts on.
 
         Args:
             container: The container held by the unitary representation.
 
         Returns:
-            The Q# PREPARE callable, the index width SELECT controls on, and the block
-            ancilla width.
+            The Q# PREPARE callable, the index width SELECT controls on, the block ancilla
+            width the walk reflects about, and the phase gradient width after it.
 
         Raises:
             ValueError: If the PREPARE circuit carries no Q# operation, does not declare the
-                width it acts on, declares one too narrow for the index SELECT controls on, or
-                expects shared ancilla this mapper does not supply.
+                width it acts on, or declares one too narrow for the index SELECT controls on.
 
         """
         lcu, _ = self.resolve_lcu(container)
         if lcu.prepare is None:
-            return QSHARP_UTILS.PrepSelPrep.NoOpPrepare, 0, 0
+            return QSHARP_UTILS.PrepSelPrep.NoOpPrepare, 0, 0, 0
 
         prepare_algorithm = self._create_nested("prepare")
+        # The Q# compiler cannot yet lower these PREPAREs' measurement-based
+        # ``Adjoint Std.TableLookup.Select`` to QIR.
+        if prepare_algorithm.name() in ("alias_sampling", "qrom"):
+            warnings.warn(
+                f"PREPARE '{prepare_algorithm.name()}' uncomputes its table lookup by measurement, which the "
+                "Q# compiler cannot lower to QIR yet: Circuit.get_qir() and Circuit.to_json() fail on this "
+                "block encoding, while estimate() and simulation work. Use "
+                "prepare=AlgorithmRef('state_prep', 'dense_pure_state') when QIR export is needed.",
+                UserWarning,
+                stacklevel=2,
+            )
+        with suppress(SettingNotFound):
+            prepare_algorithm.settings().set("allocate_phase_gradient", False)
         prepare_circuit = prepare_algorithm.run(lcu.prepare)
         prepare_op = prepare_circuit._qsharp_op  # noqa: SLF001
         if prepare_op is None:
             raise ValueError("The PREPARE circuit has no Q# operation to embed in the block encoding.")
 
-        num_block_ancillas = prepare_circuit.num_qubits
+        num_prepare_qubits = prepare_circuit.num_qubits
         num_select_qubits = lcu.num_prepare_ancillas
-        if num_block_ancillas is None:
+        if num_prepare_qubits is None:
             raise ValueError(
                 f"State preparation '{prepare_algorithm.name()}' does not declare num_qubits, so the "
                 "block ancilla register cannot be sized."
             )
+        num_gradient_qubits = prepare_circuit.metadata.num_phase_gradient_ancillas
+        num_block_ancillas = num_prepare_qubits - num_gradient_qubits
         if num_block_ancillas <= 0:
             raise ValueError(
-                f"State preparation '{prepare_algorithm.name()}' declares num_qubits={num_block_ancillas}, "
-                "but a PREPARE oracle must act on at least one qubit."
-            )
-        if prepare_circuit.metadata.num_phase_gradient_ancillas:
-            raise ValueError(
-                f"PREPARE oracle '{prepare_algorithm.name()}' requests "
-                f"{prepare_circuit.metadata.num_phase_gradient_ancillas} phase gradient ancilla, which "
-                "PSPMapper does not supply. Choose a state preparation that owns all the qubits it acts on."
+                f"State preparation '{prepare_algorithm.name()}' declares num_qubits={num_prepare_qubits}, "
+                "but a PREPARE oracle must act on at least one qubit besides its phase gradient."
             )
         if num_block_ancillas < num_select_qubits:
             raise ValueError(
                 f"The PREPARE circuit acts on {num_block_ancillas} qubits, but the LCU decomposition indexes "
                 f"{num_select_qubits} of them. SELECT would control on qubits PREPARE does not own."
             )
-        return prepare_op, num_select_qubits, num_block_ancillas
+        return prepare_op, num_select_qubits, num_block_ancillas, num_gradient_qubits
 
     def _run_impl(self, unitary: UnitaryRepresentation) -> Circuit:
         r"""Construct the block-encoding circuit on the flat ``[system | ancilla]`` register.
@@ -201,13 +238,15 @@ class PSPMapper(CircuitMapper):
                 :class:`LCUWalkContainer` (quantum walk).
 
         Returns:
-            Circuit: A quantum circuit implementing the block encoding.
+            Circuit: A quantum circuit implementing the block encoding on
+            ``[system | block ancilla | phase gradient]``, declaring the phase gradient its
+            caller must prepare.
 
         """
         container = unitary.get_container()
         _, use_quantum_walk = self.resolve_lcu(container)
         select_op, num_system_qubits = self.build_select_ops(container)
-        prepare_op, num_select_qubits, num_block_ancillas = self.build_prep_ops(container)
+        prepare_op, num_select_qubits, num_block_ancillas, num_gradient_qubits = self.build_prep_ops(container)
 
         qsharp_op = QSHARP_UTILS.PrepSelPrep.MakePrepSelPrepOp(
             prepare_op, select_op, num_system_qubits, num_select_qubits
@@ -231,6 +270,7 @@ class PSPMapper(CircuitMapper):
                 "numSystemQubits": num_system_qubits,
                 "numSelectQubits": num_select_qubits,
                 "numBlockAncillaQubits": num_block_ancillas,
+                "numPhaseGradientQubits": num_gradient_qubits,
                 "power": container.power,
                 "useWalk": use_quantum_walk,
             },
@@ -239,5 +279,6 @@ class PSPMapper(CircuitMapper):
         return Circuit(
             qsharp_factory=qsharp_factory,
             qsharp_op=qsharp_op,
-            num_qubits=num_system_qubits + num_block_ancillas,
+            num_qubits=num_system_qubits + num_block_ancillas + num_gradient_qubits,
+            metadata=CircuitMetadata(num_phase_gradient_ancillas=num_gradient_qubits),
         )
