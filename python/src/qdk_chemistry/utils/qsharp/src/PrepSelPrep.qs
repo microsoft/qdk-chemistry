@@ -167,7 +167,7 @@ namespace QDKChemistry.Utils.PrepSelPrep {
     }
 
     /// Circuit entry point: allocates `[system | block ancilla | phase gradient]`, prepares the
-    /// gradient once, and applies the block encoding `power` times.
+    /// gradient once, applies the block encoding `power` times, and returns the gradient to |0⟩.
     operation MakePrepSelPrepCircuit(
         prepareOp : Qubit[] => Unit is Adj + Ctl,
         selectOp : (Qubit[], Qubit[]) => Unit is Adj + Ctl,
@@ -193,6 +193,9 @@ namespace QDKChemistry.Utils.PrepSelPrep {
                 }
                 EndEstimateCaching();
             }
+        }
+        if numPhaseGradientQubits > 0 {
+            Adjoint PreparePhaseGradientState(register[numSystemQubits + numBlockAncillaQubits...]);
         }
     }
 
@@ -227,6 +230,9 @@ namespace QDKChemistry.Utils.PrepSelPrep {
                 }
                 EndEstimateCaching();
             }
+        }
+        if numPhaseGradientQubits > 0 {
+            Adjoint PreparePhaseGradientState(register[numSystemQubits + numBlockAncillaQubits...]);
         }
     }
 }

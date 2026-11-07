@@ -116,9 +116,10 @@ namespace QDKChemistry.Utils.UnaryIteration {
 
         // Walks the leaves of the Fig. 7 tree of arXiv:1805.03662 in order. Between leaves the
         // right-going nodes below the branch point are uncomputed, the branch node toggled, and
-        // the next leaf's left-going nodes computed. Each step holds two O(log L) paths, never
-        // the whole schedule, and `action` is never passed recursively, which QIR generation
-        // cannot resolve.
+        // the next leaf's left-going nodes computed. Each step builds only the next leaf's
+        // O(log L) path: the branch is its deepest right turn, and below it the previous leaf
+        // ran down the right edge of a full subtree, whose address bits count down to 0.
+        // `action` is never passed recursively, which QIR generation cannot resolve.
         use helpers = Qubit[n];
         for leaf in 0..numActions - 1 {
             let path = UnaryIterationPath(numActions, leaf);
@@ -127,10 +128,10 @@ namespace QDKChemistry.Utils.UnaryIteration {
                     ComputeUnaryNode(ctl, helpers, address, depth, Fst(path[depth]));
                 }
             } else {
-                let previous = UnaryIterationPath(numActions, leaf - 1);
-                let branch = UnaryIterationBranchDepth(previous, path);
-                for depth in Length(previous) - 1..-1..branch + 1 {
-                    UncomputeUnaryNode(ctl, helpers, address, depth, Fst(previous[depth]));
+                let branch = UnaryIterationBranchDepth(path);
+                let branchBit = Fst(path[branch]);
+                for depth in branch + branchBit..-1..branch + 1 {
+                    UncomputeUnaryNode(ctl, helpers, address, depth, branchBit - (depth - branch));
                 }
                 CNOT(UnaryNodeControl(ctl, helpers, branch), helpers[branch]);
                 for depth in branch + 1..Length(path) - 1 {
@@ -186,12 +187,12 @@ namespace QDKChemistry.Utils.UnaryIteration {
         path
     }
 
-    /// Depth of the node where the paths of consecutive leaves split: `previous` goes left there
-    /// and `next` goes right.
-    internal function UnaryIterationBranchDepth(previous : (Int, Bool)[], next : (Int, Bool)[]) : Int {
-        mutable depth = 0;
-        while Snd(previous[depth]) == Snd(next[depth]) {
-            set depth += 1;
+    /// Depth where the path of a leaf other than the first splits from its predecessor's: its
+    /// deepest right turn, since below it the path only turns left.
+    internal function UnaryIterationBranchDepth(path : (Int, Bool)[]) : Int {
+        mutable depth = Length(path) - 1;
+        while not Snd(path[depth]) {
+            set depth -= 1;
         }
         depth
     }
