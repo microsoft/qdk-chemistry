@@ -80,11 +80,11 @@ parameters:
 - name: testWorkers
   type: object
   default:
-    linux_x86_64: 24
-    linux_aarch64: 8
+    linux_x86_64: 48
+    linux_aarch64: 16
     macos_arm64: 3
-    windows_x86_64: 24
-    windows_aarch64: 8
+    windows_x86_64: 48
+    windows_aarch64: 16
   displayName: Pytest workers per platform
 
 variables:
