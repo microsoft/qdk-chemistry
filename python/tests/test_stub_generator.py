@@ -13,14 +13,23 @@ import pytest
 from qdk_chemistry.utils._stubgen import run_stub_generator
 
 
+def test_nanobind_generator_writes_stubs(tmp_path):
+    """The installed nanobind generator accepts the helper's arguments."""
+    target = tmp_path / "package with spaces"
+    target.mkdir()
+    (target / "_core.py").write_text("def identity(value: int) -> int:\n    return value\n")
+
+    run_stub_generator(target)
+
+    assert "def identity(value: int) -> int:" in (target / "_core.pyi").read_text()
+
+
 def test_target_directory_cannot_shadow_generator(tmp_path, monkeypatch):
     """The installed generator remains authoritative while the target stays importable."""
     target = tmp_path / "package with spaces"
     target.mkdir()
     marker = tmp_path / "shadowed"
-    (target / "nanobind.py").write_text(
-        f"from pathlib import Path\nPath({str(marker)!r}).write_text('shadowed')\n"
-    )
+    (target / "nanobind.py").write_text(f"from pathlib import Path\nPath({str(marker)!r}).write_text('shadowed')\n")
     (target / "_core.py").write_text("value = 'extension target'\n")
     installed = tmp_path / "installed"
     installed.mkdir()
