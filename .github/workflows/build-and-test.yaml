@@ -634,7 +634,7 @@ jobs:
         compiler: [msvc, clang-cl]
     env:
       VCPKG_TRIPLET: x64-windows-static-md
-      QDK_UARCH: x86-64-v3
+      QDK_UARCH: ${{ matrix.compiler == 'msvc' && 'AVX2' || 'x86-64-v3' }}
       CTEST_WORKERS: '12'
       OMP_NUM_THREADS: '4'
       PYTHON_TEST_WORKERS: '8'
