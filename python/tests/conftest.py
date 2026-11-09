@@ -97,9 +97,8 @@ def isolate_worker_temporary_directory(tmp_path_factory):
 
 
 def pytest_collection_modifyitems(items):
-    """Run enabled slow tests first to reduce the tail of parallel runs; otherwise skip them."""
+    """Skip slow-marked tests unless QDK_CHEMISTRY_RUN_SLOW_TESTS is set."""
     if _RUN_SLOW_TESTS:
-        items.sort(key=lambda item: "slow" not in item.keywords)
         return
 
     skip_slow = pytest.mark.skip(reason="Slow test. Set QDK_CHEMISTRY_RUN_SLOW_TESTS=1 to enable.")
