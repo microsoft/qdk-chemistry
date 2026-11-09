@@ -84,7 +84,7 @@ parameters:
     linux_aarch64: 16
     macos_arm64: 3
     windows_x86_64: 48
-    windows_aarch64: 16
+    windows_aarch64: 8
   displayName: Pytest workers per platform
 
 variables:
