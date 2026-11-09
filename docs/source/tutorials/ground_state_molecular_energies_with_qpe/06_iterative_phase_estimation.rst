@@ -47,11 +47,16 @@ An :term:`IQPE` calculation requires four kinds of information:
 :ref:`Numerical and sampling controls <tutorial-iqpe-numerical-controls>`
    An evolution time, number of phase bits, shots per bit, and number of complete runs.
 
-The previous chapters supplied the qubit Hamiltonian and trial state for the selected molecular problem.
-They also recorded the core energy needed to reconstruct the molecular total and the classical :term:`CASCI` reference used to validate the final estimate; those two quantities are bookkeeping and validation data rather than inputs to the phase-estimation circuit.
+Previous chapters supplied the qubit Hamiltonian and trial state for the selected molecular problem.
+Those chapters also recorded two classical quantities with distinct roles: the core energy :math:`E_{\mathrm{core}}` and the selected-space :term:`CASCI` total energy :math:`E_{\mathrm{CASCI}}`.
+The corresponding active-space reference is :math:`E_{\mathrm{ref}}=E_{\mathrm{CASCI}}-E_{\mathrm{core}}`.
+The mapping workflow independently obtains this active-space energy by diagonalizing the qubit Hamiltonian in the same fixed-electron-number sector.
+When the IQPE problem is prepared, that mapped active-space reference energy configures the evolution time.
+After phase estimation, adding the core energy reconstructs the selected-space total energy.
+The selected-space CASCI total energy then validates that reconstructed total.
 
-The compute register stores the encoded active-space wavefunction.
-This chapter adds one readout ancilla, a qubit used to extract phase information without representing another spin orbital.
+During IQPE, the compute register stores the encoded active-space wavefunction.
+One additional readout ancilla extracts phase information without representing another spin orbital.
 The `quantum phase estimation overview <https://en.wikipedia.org/wiki/Quantum_phase_estimation_algorithm>`_ provides an optional refresher on the basic controlled-unitary circuit model.
 
 .. _tutorial-energy-to-phase-encoding:
@@ -426,7 +431,7 @@ Negating that angle and dividing by the evolution time maps the measured phase t
 
    E_{\mathrm{active}}^{\mathrm{IQPE}}=\frac{-\alpha}{t}.
 
-This estimates an eigenvalue of the qubit Hamiltonian, not yet the selected-space molecular total.
+This estimates an eigenvalue of the qubit Hamiltonian, not yet the selected-space total energy.
 Finite phase resolution, sampling, and product-formula time evolution all contribute error.
 As :doc:`Mapping the problem to qubits <04_putting_the_problem_on_qubits>` explains, the mapper does not include the core energy in the qubit Hamiltonian.
 The core energy contains the nuclear repulsion and the constant contribution from frozen inactive orbitals.
@@ -464,14 +469,16 @@ With the Python environment from :doc:`Before you begin <00_before_you_begin>` a
    python tutorial_run_iqpe.py
 
 The script prints its settings before simulation and reports progress for every complete run, including the seed, bitstring, total energy, error, and elapsed time.
-A successful run completes all twenty runs and prints the complete-run bitstring counts, most frequent bitstring, component energies, reconstructed total, reference energy, and signed error.
+A successful run completes all twenty runs and prints ``Complete-run bitstring counts`` and the ``Modal bitstring`` selected for energy reconstruction.
+The remaining summary lines report ``Modal active-space energy``, ``Core energy``, ``Modal total energy``, ``CASCI algorithmic reference``, ``Modal energy error``, and ``Total IQPE runtime``.
 
-.. admonition:: What bitstring distribution and energy estimate did the script produce?
+.. admonition:: How should you interpret the repeated-run output?
    :class: quiz-question
    :collapsible: closed
 
-   The bitstring ``010000`` appeared 19 times and ``001111`` appeared once, so ``010000`` was the most frequent result.
-   It produced an active-space energy of :math:`-9.652276065987\ E_{\mathrm{h}}` and a reconstructed total of :math:`-108.770051792909\ E_{\mathrm{h}}` after adding the core energy.
+   The printed ``Complete-run bitstring counts`` show the sampled distribution.
+   A separate ``Modal bitstring`` line identifies the unique most frequent result used for energy reconstruction.
+   Read ``Modal active-space energy``, ``Modal total energy``, and ``Modal energy error`` from the current output rather than expecting one exact sampled distribution.
 
 .. admonition:: Does the result meet the teaching target, and what does that establish?
    :class: quiz-question

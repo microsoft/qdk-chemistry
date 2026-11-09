@@ -54,7 +54,9 @@ struct pmc_helper {
             .size();
 
     const auto& [T_a, T_b] = hamiltonian.get_one_body_integrals();
-    const auto& [V_aaaa, V_aabb, V_bbbb] = hamiltonian.get_two_body_integrals();
+    Eigen::VectorXd V_storage;
+    const auto& V_aaaa =
+        macis_two_body_integrals(hamiltonian, "MacisPmc", V_storage);
 
     // Check that the orbitals are consistent with the Hamiltonian
     if (!configurations.empty()) {

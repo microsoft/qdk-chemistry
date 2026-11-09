@@ -55,6 +55,25 @@ macis::MCSCFSettings get_mcscf_settings_(const data::Settings& settings_);
  */
 macis::ASCISettings get_asci_settings_(const data::Settings& settings_);
 
+/**
+ * @brief Two-body integrals as MACIS reads them.
+ *
+ * MACIS assumes (pq|rs) = (rs|pq) = (qp|sr), so other tensors are replaced by
+ * their average over these positions, with a warning if they are not
+ * Hermitian.
+ *
+ * @param hamiltonian Restricted Hamiltonian.
+ * @param solver Solver name used in messages.
+ * @param storage Holds the average if one is needed.
+ * @return The stored tensor if it has this symmetry, otherwise @p storage.
+ * @throws std::runtime_error if the Hamiltonian is not Hermitian.
+ * @throws std::invalid_argument if its two-body integrals contain a non-finite
+ *         value.
+ */
+const Eigen::VectorXd& macis_two_body_integrals(
+    const data::Hamiltonian& hamiltonian, const std::string& solver,
+    Eigen::VectorXd& storage);
+
 /** @brief Dispatch calculation to an implementation specialized by wavefunction
  * bitset size.
  *

@@ -7,6 +7,9 @@
 #include "mp2.hpp"
 
 #include <Eigen/Dense>
+#include <algorithm>
+#include <array>
+#include <cmath>
 #include <cstddef>
 #include <optional>
 #include <qdk/chemistry/data/hamiltonian.hpp>
@@ -15,9 +18,103 @@
 #include <qdk/chemistry/data/wavefunction_containers/amplitude_container.hpp>
 #include <qdk/chemistry/utils/logger.hpp>
 #include <stdexcept>
+#include <string>
 #include <tuple>
 
+#include "../../data/two_body_symmetry.hpp"
+
 namespace qdk::chemistry::algorithms::microsoft {
+
+namespace {
+
+// MP2 reads (ia|jb) and (ib|ja) and assumes each block equals its average
+// over (ia|jb), (jb|ia), (ai|bj), (bj|ai) there ((ia|jb), (ai|bj) for an
+// unrestricted alpha-beta block).  Returns `tensor` if it does, otherwise
+// `storage`, a copy averaged there.
+const Eigen::VectorXd& mp2_block(const Eigen::VectorXd& tensor, std::size_t n,
+                                 std::size_t n_occ_i, std::size_t n_occ_j,
+                                 bool fourfold, const std::string& consumer,
+                                 bool warn, Eigen::VectorXd& storage) {
+  auto index = [n](std::size_t p, std::size_t q, std::size_t r, std::size_t s) {
+    return static_cast<Eigen::Index>(((p * n + q) * n + r) * n + s);
+  };
+  auto for_each_read = [&](const auto& visit) {
+    for (std::size_t i = 0; i < std::min(n_occ_i, n); ++i)
+      for (std::size_t a = n_occ_i; a < n; ++a)
+        for (std::size_t j = 0; j < std::min(n_occ_j, n); ++j)
+          for (std::size_t b = n_occ_j; b < n; ++b) visit(i, a, j, b);
+  };
+  bool finite = true;
+  bool symmetric = true;
+  for_each_read(
+      [&](std::size_t i, std::size_t a, std::size_t j, std::size_t b) {
+        const double value = tensor[index(i, a, j, b)];
+        const double conjugate = tensor[index(a, i, b, j)];
+        finite = finite && std::isfinite(value) && std::isfinite(conjugate);
+        symmetric = symmetric && value == conjugate &&
+                    (!fourfold || value == tensor[index(j, b, i, a)]);
+      });
+  if (!finite) {
+    throw std::invalid_argument(
+        consumer + ": the two-body integrals contain a non-finite value.");
+  }
+  if (symmetric) return tensor;
+
+  storage = tensor;
+  data::detail::TwoBodyComparison change;
+  for_each_read(
+      [&](std::size_t i, std::size_t a, std::size_t j, std::size_t b) {
+        const double value = tensor[index(i, a, j, b)];
+        const double conjugate = tensor[index(a, i, b, j)];
+        if (!fourfold) {
+          const double average = 0.5 * (value + conjugate);
+          storage[index(i, a, j, b)] = average;
+          change.add(value, average);
+          return;
+        }
+        // The operator depends only on the bra-ket average.
+        const double direct = value + tensor[index(j, b, i, a)];
+        const double reversed = conjugate + tensor[index(b, j, a, i)];
+        const double average = 0.25 * (direct + reversed);
+        storage[index(i, a, j, b)] = average;
+        change.add(0.5 * direct, average);
+      });
+  if (warn) {
+    data::detail::warn_if_not_hermitian(change, consumer,
+                                        fourfold
+                                            ? data::detail::fourfold_partners
+                                            : data::detail::reversal_partners);
+  }
+  return storage;
+}
+
+// The two-body blocks as MP2 reads them.
+std::tuple<const Eigen::VectorXd&, const Eigen::VectorXd&,
+           const Eigen::VectorXd&>
+mp2_two_body_integrals(const data::Hamiltonian& hamiltonian,
+                       std::size_t n_alpha, std::size_t n_beta,
+                       bool unrestricted, bool warn,
+                       std::array<Eigen::VectorXd, 3>& storage) {
+  if (!hamiltonian.is_hermitian()) {
+    throw std::runtime_error(
+        "MP2 does not support non-Hermitian Hamiltonians.");
+  }
+  const auto& [aaaa, aabb, bbbb] = hamiltonian.get_two_body_integrals();
+  const auto n = static_cast<std::size_t>(
+      std::get<0>(hamiltonian.get_one_body_integrals()).rows());
+  if (!unrestricted) {
+    return {mp2_block(aaaa, n, n_alpha, n_alpha, true, "MP2", warn, storage[0]),
+            aabb, bbbb};
+  }
+  return {mp2_block(aaaa, n, n_alpha, n_alpha, true, "MP2 (alpha-alpha block)",
+                    warn, storage[0]),
+          mp2_block(aabb, n, n_alpha, n_beta, false, "MP2 (alpha-beta block)",
+                    warn, storage[1]),
+          mp2_block(bbbb, n, n_beta, n_beta, true, "MP2 (beta-beta block)",
+                    warn, storage[2])};
+}
+
+}  // namespace
 
 MP2Calculator::MP2Calculator() = default;
 
@@ -42,7 +139,6 @@ DynamicalCorrelationResult MP2Calculator::_run_impl(
 
   // Determine whether to use restricted or unrestricted MP2
   bool use_unrestricted = hamiltonian->is_unrestricted() || (n_alpha != n_beta);
-
   if (use_unrestricted) {
     E_corr = calculate_unrestricted_mp2_energy(hamiltonian, orbitals, n_alpha,
                                                n_beta);
@@ -119,8 +215,10 @@ std::unique_ptr<data::AmplitudeContainer> MP2Calculator::compute_amplitudes(
   const size_t stride_i =
       active_space_size * active_space_size * active_space_size;
 
-  const auto& [moeri_aaaa, moeri_aabb, moeri_bbbb] =
-      ham->get_two_body_integrals();
+  // The energy calculation already warned.
+  std::array<Eigen::VectorXd, 3> storage;
+  const auto& [moeri_aaaa, moeri_aabb, moeri_bbbb] = mp2_two_body_integrals(
+      *ham, n_alpha, n_beta, use_unrestricted, false, storage);
 
   using VV = data::ContainerTypes::VectorVariant;
   if (use_unrestricted) {
@@ -221,7 +319,9 @@ double MP2Calculator::calculate_restricted_mp2_energy(
   const size_t n_vir = active_space_size - n_occ;
 
   // Get two-electron integrals
-  const auto& [moeri, moeri_aabb, moeri_bbbb] = ham->get_two_body_integrals();
+  std::array<Eigen::VectorXd, 3> storage;
+  const auto& [moeri, moeri_aabb, moeri_bbbb] =
+      mp2_two_body_integrals(*ham, n_occ, n_occ, false, true, storage);
 
   double E_MP2 = 0.0;
 
@@ -301,8 +401,9 @@ double MP2Calculator::calculate_unrestricted_mp2_energy(
   const size_t n_vir_alpha = active_space_size - n_alpha;
   const size_t n_vir_beta = active_space_size - n_beta;
 
+  std::array<Eigen::VectorXd, 3> storage;
   const auto& [moeri_aaaa, moeri_aabb, moeri_bbbb] =
-      ham->get_two_body_integrals();
+      mp2_two_body_integrals(*ham, n_alpha, n_beta, true, true, storage);
 
   double E_MP2_AA = 0.0, E_MP2_BB = 0.0, E_MP2_AB = 0.0;
 
