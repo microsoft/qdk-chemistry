@@ -44,7 +44,7 @@ parameters:
   - name: windows_x86_64
     os: windows
     arch: x86_64
-    march: x86-64-v3
+    march: AVX2
     imageName: windows-2025-1espt
   - name: windows_aarch64
     os: windows

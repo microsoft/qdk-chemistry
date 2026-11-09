@@ -11,7 +11,7 @@
 param(
     [Parameter(Mandatory)] [string]$SrcDir,
     [Parameter(Mandatory)] [string]$ClPath,
-    [string]$March          = 'x86-64-v3',
+    [string]$March          = 'AVX2',
     [string]$BuildType      = 'Release',
     [string]$BuildTesting   = 'OFF',
     [string]$EnableCoverage = 'OFF',
