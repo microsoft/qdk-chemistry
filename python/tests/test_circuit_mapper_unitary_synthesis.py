@@ -21,7 +21,7 @@ from qdk_chemistry._core.utils.unitary_synthesis import (
 )
 from qdk_chemistry.algorithms import available, create
 from qdk_chemistry.algorithms.circuit_mapper import UnitarySynthesisMapper
-from qdk_chemistry.data import RealUnitaryContainer, UnitaryRepresentation
+from qdk_chemistry.data import UnitaryMatrixContainer, UnitaryRepresentation
 from qdk_chemistry.data.unitary_representation.containers.pauli_product_formula import (
     ExponentiatedPauliTerm,
     PauliProductFormulaContainer,
@@ -46,7 +46,7 @@ def _bit_reversal(num_qubits: int) -> np.ndarray:
 
 def _representation(matrix) -> UnitaryRepresentation:
     """Wrap a matrix in a unitary representation."""
-    return UnitaryRepresentation(RealUnitaryContainer(matrix))
+    return UnitaryRepresentation(UnitaryMatrixContainer(matrix))
 
 
 def _block_sparse(block_sizes: list[int], seed: int) -> sparse.csc_array:
@@ -274,6 +274,16 @@ class TestBlockSparse:
         circuit = create("circuit_mapper", "unitary_synthesis", method="block_sparse").run(_representation(matrix))
         _assert_realizes(circuit, matrix, seed=8)
 
+    @pytest.mark.parametrize("num_input_qubits", [1, 3, 4])
+    def test_explicit_input_register(self, num_input_qubits):
+        """Any input register that holds the columns works, including one that adds more than two qubits."""
+        matrix = _block_sparse([4, 4, 3, 2, 1, 1, 1], seed=6)[:, :2]
+        mapper = create("circuit_mapper", "unitary_synthesis", method="block_sparse", num_input_qubits=num_input_qubits)
+        circuit = mapper.run(_representation(matrix))
+        assert circuit._qsharp_factory.parameter["numInputQubits"] == num_input_qubits
+        assert circuit._qsharp_factory.parameter["numAddedQubits"] == 4 - num_input_qubits
+        _assert_realizes(circuit, matrix.toarray(), seed=num_input_qubits)
+
     def test_signed_permutation_needs_no_rotations(self):
         """One-by-one blocks leave only the permutations and the signs."""
         matrix = sparse.csc_array(np.diag([1.0, -1.0, 1.0, -1.0])[[2, 0, 3, 1]])
@@ -343,34 +353,56 @@ class TestErrors:
     """Unsupported inputs and inconsistent settings raise ``ValueError``."""
 
     def test_rejects_other_containers(self):
-        """Only real unitary containers can be synthesized."""
+        """Only unitary matrix containers can be synthesized."""
         representation = UnitaryRepresentation(
             PauliProductFormulaContainer([ExponentiatedPauliTerm({0: "X"}, 0.1)], 1, 1)
         )
         mapper = create("circuit_mapper", "unitary_synthesis")
-        with pytest.raises(ValueError, match="real_unitary"):
+        with pytest.raises(ValueError, match="unitary_matrix"):
             mapper.run(representation)
-        with pytest.raises(ValueError, match="real_unitary"):
+        with pytest.raises(ValueError, match="unitary_matrix"):
+            mapper.right_factor(representation)
+
+    @pytest.mark.parametrize("method", ["dense", "block_sparse"])
+    def test_rejects_complex(self, method):
+        """The container accepts complex unitaries, but the current methods synthesize only real ones."""
+        representation = _representation(np.diag([1.0, 1j]))
+        mapper = create("circuit_mapper", "unitary_synthesis", method=method)
+        with pytest.raises(ValueError, match=f"'{method}' method requires a real matrix"):
+            mapper.run(representation)
+        with pytest.raises(ValueError, match="requires a real matrix"):
             mapper.right_factor(representation)
 
     def test_block_sparse_has_no_right_factor(self):
-        """``omit_right_factor`` and ``right_factor`` are specific to the dense method."""
+        """``omit_right_factor`` and ``right_factor`` need a method with a right factor."""
         representation = _representation(np.eye(4))
         mapper = create("circuit_mapper", "unitary_synthesis", method="block_sparse", omit_right_factor=True)
-        with pytest.raises(ValueError, match="only to the dense method"):
+        with pytest.raises(ValueError, match="not supported by the 'block_sparse' method"):
             mapper.run(representation)
-        with pytest.raises(ValueError, match="Only the dense method"):
+        with pytest.raises(ValueError, match="'block_sparse' method has no right factor"):
             mapper.right_factor(representation)
 
     @pytest.mark.parametrize(
-        ("num_qubits", "num_columns", "num_input_qubits"),
-        [(3, 5, 2), (4, 2, 1), (2, 2, 3)],
-        ids=["too-few-for-columns", "too-many-added", "wider-than-register"],
+        ("method", "num_qubits", "num_columns", "num_input_qubits"),
+        [
+            ("dense", 3, 5, 2),
+            ("dense", 4, 2, 1),
+            ("dense", 2, 2, 3),
+            ("block_sparse", 3, 5, 2),
+            ("block_sparse", 2, 2, 3),
+        ],
+        ids=[
+            "dense-too-few-for-columns",
+            "dense-too-many-added",
+            "dense-wider-than-register",
+            "block-sparse-too-few-for-columns",
+            "block-sparse-wider-than-register",
+        ],
     )
-    def test_invalid_input_register(self, num_qubits, num_columns, num_input_qubits):
-        """The input register must hold the columns, add at most two qubits and fit the register."""
+    def test_invalid_input_register(self, method, num_qubits, num_columns, num_input_qubits):
+        """The input register must hold the columns and fit the register; the dense method adds at most two qubits."""
         representation = _representation(np.eye(1 << num_qubits)[:, :num_columns])
-        mapper = create("circuit_mapper", "unitary_synthesis", num_input_qubits=num_input_qubits)
+        mapper = create("circuit_mapper", "unitary_synthesis", method=method, num_input_qubits=num_input_qubits)
         with pytest.raises(ValueError, match="num_input_qubits"):
             mapper.run(representation)
 

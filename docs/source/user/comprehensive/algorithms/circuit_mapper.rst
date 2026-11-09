@@ -298,18 +298,20 @@ Unitary synthesis mapper
 .. rubric:: Algorithm type: ``"circuit_mapper"``, factory name: ``"unitary_synthesis"``
 
 :class:`~qdk_chemistry.algorithms.circuit_mapper.UnitarySynthesisMapper` is an *uncontrolled* circuit mapper.
-It compiles an explicit real matrix into a Q# operation.
-Its input is a :class:`~qdk_chemistry.data.UnitaryRepresentation` holding a :class:`~qdk_chemistry.data.RealUnitaryContainer`, a dense or sparse real matrix :math:`M` with :math:`2^n` rows and :math:`m` orthonormal columns.
-A square :math:`M` is an orthogonal unitary; otherwise :math:`M` is an isometry, and the circuit realizes an orthogonal :math:`U` whose first :math:`m` columns equal :math:`M`.
+It compiles an explicit matrix into a Q# operation.
+Its input is a :class:`~qdk_chemistry.data.UnitaryRepresentation` holding a :class:`~qdk_chemistry.data.UnitaryMatrixContainer`, a dense or sparse matrix :math:`M` with :math:`2^n` rows and :math:`m` orthonormal columns.
+A square :math:`M` is a unitary; otherwise :math:`M` is an isometry, and the circuit realizes a unitary :math:`U` whose first :math:`m` columns equal :math:`M`.
 
 Entry ``M[r, c]`` is :math:`\langle r|U|c\rangle` for little-endian basis states: bit :math:`k` of an index is qubit :math:`k` of the register.
-The container rejects complex entries, non-orthonormal columns, and row counts that are not powers of two.
+The container accepts real or complex entries and rejects non-orthonormal columns and row counts that are not powers of two.
+The low ``num_input_qubits`` qubits of the register form the input register, which must hold the :math:`m` columns; the remaining qubits start in :math:`|0\rangle`.
 
 .. rubric:: Methods
 
+Both current methods synthesize real matrices and reject complex ones.
+
 ``"dense"`` (default)
-   Isometry synthesis by cosine-sine decompositions :cite:`Rupprecht2026`.
-   The low ``num_input_qubits`` qubits form the input register, and the remaining one or two qubits start in :math:`|0\rangle`.
+   Isometry synthesis by cosine-sine decompositions :cite:`Rupprecht2026`, which adds at most two qubits to the input register.
    The first decomposition leaves a right factor :math:`V` that acts on the input register.
    With ``omit_right_factor`` the circuit leaves :math:`V` out and realizes :math:`M V^{\mathsf T}` on its first :math:`m` columns.
    :meth:`~qdk_chemistry.algorithms.circuit_mapper.UnitarySynthesisMapper.right_factor` returns that :math:`V`, so a caller can absorb it into a preceding operation.
@@ -346,7 +348,7 @@ The decompositions adapt the reference implementation of :cite:`Rupprecht2026Zen
      - Whether the dense method leaves the right factor :math:`V` out of the circuit. Default is False. Not allowed with ``"block_sparse"``.
    * - ``num_input_qubits``
      - int
-     - Input register width of the dense method. It must hold the :math:`m` columns and leave at most two added qubits. -1 (default) selects the smallest such register.
+     - Input register width. It must hold the :math:`m` columns, and the dense method adds at most two qubits. -1 (default) selects the smallest allowed register.
 
 .. rubric:: Usage
 

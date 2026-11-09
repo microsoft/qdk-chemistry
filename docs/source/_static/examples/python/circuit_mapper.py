@@ -104,13 +104,13 @@ print("Controlled evolution circuit generated via the CSWAP sandwich")
 # start-cell-unitary-synthesis
 import numpy as np
 from qdk_chemistry.algorithms import create
-from qdk_chemistry.data import RealUnitaryContainer, UnitaryRepresentation
+from qdk_chemistry.data import UnitaryMatrixContainer, UnitaryRepresentation
 from scipy.stats import ortho_group
 
 # 1. A real 8x3 isometry: three orthonormal columns on three qubits. Column c is the
 #    image of the little-endian basis state |c>.
 isometry = ortho_group.rvs(8, random_state=7)[:, :3]
-unitary = UnitaryRepresentation(RealUnitaryContainer(isometry))
+unitary = UnitaryRepresentation(UnitaryMatrixContainer(isometry))
 
 # 2. Synthesize it with cosine-sine decompositions.
 mapper = create("circuit_mapper", "unitary_synthesis", rotation_bit_precision=12)
