@@ -181,7 +181,7 @@ python3 -c "import numpy; import scipy.linalg; import qdk_chemistry; numpy.show_
 
 XDIST_ARGS=()
 if [ "$PYTHON_TEST_WORKERS" -gt 1 ]; then
-    XDIST_ARGS=(-n "$PYTHON_TEST_WORKERS" --dist=worksteal)
+    XDIST_ARGS=(-n "$PYTHON_TEST_WORKERS" --dist=load --maxschedchunk=1)
 fi
 mkdir -p "$PYTHON_DIR/test-results"
 python3 -m pytest "${XDIST_ARGS[@]}" --junitxml="$PYTHON_DIR/test-results/pytest_report.xml" -v ./tests
