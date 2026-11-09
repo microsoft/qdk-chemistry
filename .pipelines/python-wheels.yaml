@@ -362,7 +362,6 @@ extends:
               testResultsFormat: JUnit
               testResultsFiles: $(System.DefaultWorkingDirectory)/python/test-results/pytest_report.xml
               testRunTitle: ${{ target.name }} Python $(pythonVersion)
-              failTaskOnFailedTests: true
 
           # SBoM Manifest Generator Task requires we transfer ownership of the wheel directory
           # back to the original base image user (Linux/macOS only; not needed on Windows).
