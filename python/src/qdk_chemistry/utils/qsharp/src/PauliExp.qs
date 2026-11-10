@@ -67,13 +67,6 @@ namespace QDKChemistry.Utils.PauliExp {
     }
 
     /// Uncontrolled entry point for `RepPauliExp`.
-    ///
-    /// Declared without functors on purpose. Callables built by partially applying an
-    /// `Adj + Ctl` operation cannot be resolved by the Q# defunctionalizer once they are
-    /// stored in a plain `Qubit[] => Unit` slot (such as the arguments of
-    /// `CircuitComposition.ApplySequential` or `MeasurementBasis.MakeMeasurementCircuit`),
-    /// which makes lowering those compositions to QIR fail. Forwarding through a plain
-    /// operation keeps the composed circuits statically resolvable.
     operation ApplyRepPauliExp(params : RepPauliExpParams, systems : Qubit[]) : Unit is Adj {
         RepPauliExp(params, systems);
     }
