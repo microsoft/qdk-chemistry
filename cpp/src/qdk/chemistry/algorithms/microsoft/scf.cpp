@@ -334,6 +334,11 @@ ScfCalculationResult ScfSolver::_run_with_options(
   }
 #endif
 
+  // Failed calculations must not leave a cached integrator for another basis.
+  struct GauXCCacheCleanup {
+    ~GauXCCacheCleanup() { qcs::util::GAUXCRegistry::clear(); }
+  } gauxc_cache_cleanup;
+
   // Create SCF solver based on method and basis set type
   std::shared_ptr<qcs::SCF> scf;
   if (method == "hf") {
@@ -484,8 +489,6 @@ ScfCalculationResult ScfSolver::_run_with_options(
 #ifdef _OPENMP
   if (old_max_threads != 1) omp_set_num_threads(old_max_threads);
 #endif
-  qcs::util::GAUXCRegistry::clear();
-
   // Handle Return
   if (!context.result.converged) {
     throw std::runtime_error("SCF did not converge");
