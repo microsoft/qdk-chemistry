@@ -379,6 +379,11 @@ void MPSContainer::_validate() const {
     if (site->is_complex() != _sites.front()->is_complex()) {
       throw std::invalid_argument("MPS sites must use one scalar type.");
     }
+    if (site->physical_basis().front().bits_per_mode() !=
+        _sites.front()->physical_basis().front().bits_per_mode()) {
+      throw std::invalid_argument(
+          "MPS sites must use one configuration encoding.");
+    }
   }
   const ConfigurationSet mode_space(std::vector<Configuration>{}, _orbitals,
                                     Wavefunction::DEFAULT_SECTOR);
@@ -452,7 +457,8 @@ MPSContainer::total_num_particles() const {
         n_alpha + inactive_alpha.size(),
         n_beta + spin_channel_indices(inactive, axes::beta()).size());
   }
-  // Without a spin axis, an inactive mode holds one particle per encoding bit.
+  // All sites share one encoding. Without a spin axis, an inactive mode holds
+  // one particle per encoding bit.
   const std::size_t bits =
       _sites.front()->physical_basis().front().bits_per_mode();
   return _make_particle_count(

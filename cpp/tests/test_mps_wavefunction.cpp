@@ -529,7 +529,7 @@ TEST_F(MPSContainerTest, ParticleCountsFollowTheOrbitals) {
   EXPECT_EQ(spin.get_active_num_electrons(), Electrons(1, 1));
   EXPECT_EQ(spin.get_total_num_electrons(), Electrons(2, 2));
   // Without a spin axis an inactive mode holds two particles on spin-half
-  // sites and one on binary sites.
+  // sites and one on binary sites, so a chain must not mix the two.
   auto spin_free = [](std::vector<std::uint32_t> indices) {
     return std::make_shared<const SymmetryBlockedIndexSet>(
         std::make_shared<const SymmetryProduct>(SymmetryProduct::trivial()),
@@ -545,4 +545,7 @@ TEST_F(MPSContainerTest, ParticleCountsFollowTheOrbitals) {
       {make_site(random_matrix(2, 3), 2), make_site(random_matrix(6, 1), 2)},
       core, counts);
   EXPECT_EQ(binary.total_num_particles()->value(SymmetryLabel{}), 3u);
+  EXPECT_THROW(
+      MPSContainer({make_site(random_matrix(2, 3), 2), sites[1]}, core, counts),
+      std::invalid_argument);
 }

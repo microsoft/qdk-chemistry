@@ -143,9 +143,9 @@ class MPSContainer : public WavefunctionContainer {
    * @param two_rdm_bbbb Optional flattened beta-beta-beta-beta 2-RDM block.
    * RDMs use the same conventions and real/complex storage as
    * StateVectorContainer. They are supplied data, not computed from the sites.
-   * @throws std::invalid_argument for null sites/basis, incompatible bonds or
-   * scalar types, particle counts not blocked like the orbitals, or invalid
-   * site counts, permutations or center indices.
+   * @throws std::invalid_argument for null sites/basis, incompatible bonds,
+   * scalar types or encodings, particle counts not blocked like the orbitals,
+   * or invalid site counts, permutations or center indices.
    */
   MPSContainer(
       std::vector<SitePtr> sites, std::shared_ptr<Orbitals> orbitals,
