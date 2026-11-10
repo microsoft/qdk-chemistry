@@ -15,6 +15,7 @@
 #include <qdk/chemistry/data/hamiltonian_containers/canonical_four_center.hpp>
 #include <qdk/chemistry/utils/logger.hpp>
 
+#include "../../data/two_body_symmetry.hpp"
 #include "util/one_body.h"
 #include "utils.hpp"
 
@@ -225,6 +226,8 @@ std::shared_ptr<data::Hamiltonian> detail::construct_canonical_hamiltonian(
     moeri_aaaa.resize(moeri_size);
     moeri_c.compute(num_atomic_orbitals, nactive, Ca_active_rm.data(),
                     moeri_aaaa.data());
+    // Impose the symmetry of real-orbital integrals exactly.
+    data::detail::eightfold_symmetrize(moeri_aaaa.data(), nactive);
   } else {
     // Unrestricted case - allocate and compute all three types of integrals
     moeri_aaaa.resize(moeri_size);
@@ -257,6 +260,10 @@ std::shared_ptr<data::Hamiltonian> detail::construct_canonical_hamiltonian(
                     Cb_active_rm.data(),  // 3rd quarter: beta
                     Cb_active_rm.data(),  // 4th quarter: beta
                     moeri_bbbb.data());
+
+    data::detail::eightfold_symmetrize(moeri_aaaa.data(), nactive);
+    data::detail::pair_symmetrize(moeri_aabb.data(), nactive);
+    data::detail::eightfold_symmetrize(moeri_bbbb.data(), nactive);
   }
 
   // Get inactive space indices for both alpha and beta

@@ -222,5 +222,12 @@ def _cholesky_to_new_json(old: dict) -> dict:
 
 # The Hamiltonian envelope version is unchanged; the chain is keyed on the
 # container's serialization version (the legacy cholesky/sparse/four-center
-# containers all serialized version 0.1.0).
-STEPS = {OLD_CONTAINER_VERSION: (CONTAINER_VERSION, to_new_json)}
+# containers all serialized version 0.1.0). The sparse container has since
+# moved on alone, so its keys name the container type too.
+STEPS = {
+    OLD_CONTAINER_VERSION: (CONTAINER_VERSION, to_new_json),
+    **{
+        _sparse.step_key(version): (_sparse.step_key(_sparse.CONTAINER_VERSION), to_new_json)
+        for version in _sparse.EIGHTFOLD_VERSIONS
+    },
+}
