@@ -4,14 +4,8 @@ block()
     find_package(Boost CONFIG REQUIRED)
     set(Boost_FETCH_IF_MISSING OFF)
 
-    # These first declarations win over SeQuant's, which exclude them from install.
+    # Declared first, so this cgmanifest revision wins over SeQuant's own pin.
     include(FetchContent)
-    FetchContent_Declare(RangeV3
-        GIT_REPOSITORY https://github.com/ericniebler/range-v3.git
-        GIT_TAG        0.12.0
-        SYSTEM
-        FIND_PACKAGE_ARGS NAMES range-v3
-    )
     FetchContent_Declare(BTAS
         GIT_REPOSITORY https://github.com/BTAS/btas.git
         GIT_TAG        5b435cfdd3cb423f5a40229572c38f6700ba0456
@@ -30,9 +24,11 @@ block()
         GIT_REPOSITORY https://github.com/wavefunction91/linalg-cmake-modules.git
         GIT_TAG        222364df5e7639f371bf2f37ceb0f476301101a1
     )
-    # SeQuant would otherwise take an installed BTAS over the pinned one; a preinstalled SeQuant needs its own.
+    # SeQuant would otherwise use installed copies, even this build's own; a preinstalled SeQuant needs its own.
     if(QDK_ALLOW_DEPENDENCY_FETCH)
-        set(CMAKE_DISABLE_FIND_PACKAGE_BTAS ON)
+        foreach(_pkg IN ITEMS BTAS range-v3 libperm polymorphic_variant)
+            set(CMAKE_DISABLE_FIND_PACKAGE_${_pkg} ON)
+        endforeach()
     endif()
 
     # Concurrent evaluation otherwise races on SeQuant's trace-label map, even with tracing off.
