@@ -5,6 +5,7 @@
 namespace QDKChemistry.Utils.ControlledPauliExp {
 
     import QDKChemistry.Utils.HammingWeightPhasing.HammingWeightPhase;
+    import QDKChemistry.Utils.PauliExp.PauliExp;
     import QDKChemistry.Utils.PauliExp.RepPauliExp;
     import QDKChemistry.Utils.PauliExp.RepPauliExpParams;
     import Std.Arrays.IndexOf;
@@ -14,8 +15,11 @@ namespace QDKChemistry.Utils.ControlledPauliExp {
     import Std.Arrays.Subarray;
     import Std.Canon.MapPauliAxis;
     import Std.Math.Max;
+    import Std.ResourceEstimation.BeginEstimateCaching;
+    import Std.ResourceEstimation.EndEstimateCaching;
     import Std.ResourceEstimation.IsResourceEstimating;
     import Std.ResourceEstimation.RepeatEstimates;
+    import Std.ResourceEstimation.SingleVariant;
 
     /// Returns the summed coefficient of the identity terms in `first..last`.
     function LayerIdentityPhase(params : RepPauliExpParams, first : Int, last : Int) : Double {
@@ -151,6 +155,12 @@ namespace QDKChemistry.Utils.ControlledPauliExp {
     /// This is a named operation rather than a closure so that callables produced by
     /// `MakeRepControlledPauliExpOp` stay resolvable by the Q# defunctionalizer, which
     /// runs when a caller such as `HadamardTest` is lowered to QIR.
+    ///
+    /// During resource estimation a plain call costs its prefix, step and suffix once and reuses
+    /// them for later calls with the same terms, coefficients and layers, such as the phase qubits
+    /// of phase estimation with the `repeat` power strategy; adjoint and further controlled calls
+    /// are costed in full, and reused parts do not advance per-qubit depth, so `rotationDepth`
+    /// can differ from a full trace.
     /// # Parameters
     /// - `params`: The sparse repeated Pauli evolution parameters.
     /// - `layerOffsets`: Declared disjoint-layer boundaries; empty means term-by-term evolution.
@@ -159,6 +169,73 @@ namespace QDKChemistry.Utils.ControlledPauliExp {
     /// - `control`: The control qubit.
     /// - `systems`: The system qubits the evolution acts on.
     operation RepControlledPauliExp(
+        params : RepPauliExpParams,
+        layerOffsets : Int[],
+        useHammingWeightPhasing : Bool,
+        maxBatchSize : Int,
+        control : Qubit,
+        systems : Qubit[]
+    ) : Unit is Adj + Ctl {
+        body ... {
+            if not IsResourceEstimating() {
+                UncachedRepControlledPauliExp(params, layerOffsets, useHammingWeightPhasing, maxBatchSize, control, systems);
+            } elif Length(layerOffsets) == 0 {
+                let suffixStart = Length(params.pauliCoefficients) - params.numSuffixTerms;
+                let prefix = 0..params.numPrefixTerms - 1;
+                let step = params.numPrefixTerms..suffixStart - 1;
+                let suffix = suffixStart..Length(params.pauliCoefficients) - 1;
+                let key = $"{params.pauliOps}-{params.pauliIndices}-{params.pauliCoefficients}-{params.numPrefixTerms}-{params.numSuffixTerms}-{Length(systems)}";
+                if BeginEstimateCaching($"ControlledPauliExpPrefix-{key}", SingleVariant()) {
+                    Controlled PauliExp([control], (params.pauliIndices[prefix], params.pauliOps[prefix], params.pauliCoefficients[prefix], systems));
+                    EndEstimateCaching();
+                }
+                within {
+                    RepeatEstimates(params.repetitions);
+                } apply {
+                    if BeginEstimateCaching($"ControlledPauliExpStep-{key}", SingleVariant()) {
+                        Controlled PauliExp([control], (params.pauliIndices[step], params.pauliOps[step], params.pauliCoefficients[step], systems));
+                        EndEstimateCaching();
+                    }
+                }
+                if BeginEstimateCaching($"ControlledPauliExpSuffix-{key}", SingleVariant()) {
+                    Controlled PauliExp([control], (params.pauliIndices[suffix], params.pauliOps[suffix], params.pauliCoefficients[suffix], systems));
+                    EndEstimateCaching();
+                }
+            } else {
+                let first = IndexOf(offset -> offset == params.numPrefixTerms, layerOffsets);
+                let last = IndexOf(offset -> offset == Length(params.pauliCoefficients) - params.numSuffixTerms, layerOffsets);
+                let key = $"{params.pauliOps}-{params.pauliIndices}-{params.pauliCoefficients}-{layerOffsets}-{first}-{last}-{useHammingWeightPhasing}-{maxBatchSize}-{Length(systems)}";
+                if BeginEstimateCaching($"ControlledPauliLayersPrefix-{key}", SingleVariant()) {
+                    ControlledPauliLayers(params, layerOffsets[0..first], useHammingWeightPhasing, maxBatchSize, control, systems);
+                    EndEstimateCaching();
+                }
+                within {
+                    RepeatEstimates(params.repetitions);
+                } apply {
+                    if BeginEstimateCaching($"ControlledPauliLayersStep-{key}", SingleVariant()) {
+                        ControlledPauliLayers(params, layerOffsets[first..last], useHammingWeightPhasing, maxBatchSize, control, systems);
+                        EndEstimateCaching();
+                    }
+                }
+                if BeginEstimateCaching($"ControlledPauliLayersSuffix-{key}", SingleVariant()) {
+                    ControlledPauliLayers(params, layerOffsets[last...], useHammingWeightPhasing, maxBatchSize, control, systems);
+                    EndEstimateCaching();
+                }
+            }
+        }
+        adjoint ... {
+            Adjoint UncachedRepControlledPauliExp(params, layerOffsets, useHammingWeightPhasing, maxBatchSize, control, systems);
+        }
+        controlled (controls, ...) {
+            Controlled UncachedRepControlledPauliExp(controls, (params, layerOffsets, useHammingWeightPhasing, maxBatchSize, control, systems));
+        }
+        controlled adjoint (controls, ...) {
+            Controlled Adjoint UncachedRepControlledPauliExp(controls, (params, layerOffsets, useHammingWeightPhasing, maxBatchSize, control, systems));
+        }
+    }
+
+    /// Applies `RepControlledPauliExp` without estimate caching.
+    internal operation UncachedRepControlledPauliExp(
         params : RepPauliExpParams,
         layerOffsets : Int[],
         useHammingWeightPhasing : Bool,
