@@ -486,3 +486,28 @@ class TestScfSolver:
         # Test that invalid history size limit throws a ValueError (std::invalid_argument in C++)
         with pytest.raises(ValueError, match="GDM history size limit must be at least"):
             scf_solver.run(oxygen, 0, 1, "cc-pvdz")  # singlet state
+
+    @pytest.mark.parametrize(
+        ("setting", "value", "error"),
+        [
+            ("energy_thresh_diis_switch", -2e-4, ValueError),
+            ("gdm_bfgs_history_size_limit", 0, ValueError),
+            ("max_iterations", 1, RuntimeError),
+        ],
+    )
+    def test_dft_after_failed_scf(self, setting, value, error):
+        """A failed calculation must not contaminate DFT on a different molecule and basis."""
+        failed_solver = algorithms.create("scf_solver", "qdk")
+        failed_solver.settings().set("method", "pbe")
+        failed_solver.settings().set(setting, value)
+        with pytest.raises(error):
+            failed_solver.run(create_oxygen_structure(), 0, 1, "cc-pvdz")
+
+        nitrogen = Structure(
+            ["N", "N"],
+            np.array([[0.0, 0.0, 0.0], [0.0, 0.0, 1.2 * ANGSTROM_TO_BOHR]]),
+        )
+        solver = algorithms.create("scf_solver", "qdk")
+        solver.settings().set("method", "pbe")
+        energy, _ = solver.run(nitrogen, 0, 1, "def2-svp")
+        assert energy == pytest.approx(-109.30399851151739, abs=scf_energy_tolerance, rel=0)
