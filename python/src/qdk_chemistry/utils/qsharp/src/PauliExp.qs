@@ -74,12 +74,12 @@ namespace QDKChemistry.Utils.PauliExp {
     /// `CircuitComposition.ApplySequential` or `MeasurementBasis.MakeMeasurementCircuit`),
     /// which makes lowering those compositions to QIR fail. Forwarding through a plain
     /// operation keeps the composed circuits statically resolvable.
-    operation ApplyRepPauliExp(params : RepPauliExpParams, systems : Qubit[]) : Unit {
+    operation ApplyRepPauliExp(params : RepPauliExpParams, systems : Qubit[]) : Unit is Adj {
         RepPauliExp(params, systems);
     }
 
     /// Returns a composable callable for repeated sparse evolution.
-    function MakeRepPauliExpOp(params : RepPauliExpParams) : Qubit[] => Unit {
+    function MakeRepPauliExpOp(params : RepPauliExpParams) : Qubit[] => Unit is Adj {
         ApplyRepPauliExp(params, _)
     }
 }
