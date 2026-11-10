@@ -41,7 +41,7 @@ def test_construction_and_accessors(site_data):
         MPSContainer(
             sites,
             orbitals,
-            total_num_particles=counts,
+            active_num_particles=counts,
             orthogonality_center=1,
             site_to_orbital_order=[1, 0],
         )
@@ -50,25 +50,25 @@ def test_construction_and_accessors(site_data):
     container = wavefunction.get_container()
     del wavefunction
     assert isinstance(container, MPSContainer)
-    assert container.num_sites == 2
-    assert container.max_bond_dimension == 3
+    assert container.num_sites() == 2
+    assert container.max_bond_dimension() == 3
     assert not container.is_complex()
-    assert container.orthogonality_center == 1
-    assert container.site_to_orbital_order == [1, 0]
+    assert container.orthogonality_center() == 1
+    assert container.site_to_orbital_order() == [1, 0]
     assert container.total_num_particles().value(sym.SymmetryLabel([])) == 2
-    assert not container.has_active_num_particles()
+    assert container.active_num_particles().value(sym.SymmetryLabel([])) == 2
     with pytest.raises(RuntimeError, match="Active particle-count is not set"):
-        container.active_num_particles()
-    for site, values in zip(container.sites, site_data, strict=True):
-        assert site.shape == values.shape
-        np.testing.assert_array_equal(site.to_dense().reshape(site.shape), values)
+        MPSContainer(sites, orbitals).total_num_particles()
+    for site, values in zip(container.sites(), site_data, strict=True):
+        assert site.shape() == values.shape
+        np.testing.assert_array_equal(site.to_dense().reshape(site.shape()), values)
 
 
 def test_explicit_physical_basis_order(site_data):
     """An explicit physical basis is kept in the given, non-default order."""
     basis = [Configuration.from_spin_half_string(state) for state in ["2", "d", "u", "0"]]
     site = make_site(site_data[0], basis)
-    assert site.physical_basis == basis
+    assert site.physical_basis() == basis
 
 
 @pytest.mark.parametrize("complex_values", [False, True])
@@ -87,9 +87,9 @@ def test_serialization(site_data, complex_values, tmp_path):
         assert wavefunction.content_hash() == original.content_hash()
         container = wavefunction.get_container()
         assert container.is_complex() is complex_values
-        for site, values in zip(container.sites, site_data, strict=True):
+        for site, values in zip(container.sites(), site_data, strict=True):
             assert site.to_dense().dtype == values.dtype
-            np.testing.assert_array_equal(site.to_dense().reshape(site.shape), values)
+            np.testing.assert_array_equal(site.to_dense().reshape(site.shape()), values)
 
 
 @pytest.mark.parametrize("dimension", [2, 4])
@@ -101,11 +101,11 @@ def test_numpy_input_and_output_copies(dimension):
     values[:] = 0
     exported = site.to_dense()
     assert exported.shape == (2 * dimension, 3)
-    np.testing.assert_array_equal(exported.reshape(site.shape), expected)
+    np.testing.assert_array_equal(exported.reshape(site.shape()), expected)
     exported[:] = 1
-    block = site.tensor.block((sym.SymmetryLabel([]),) * 3)
+    block = site.tensor().block((sym.SymmetryLabel([]),) * 3)
     block[:] = 2
-    np.testing.assert_array_equal(site.to_dense().reshape(site.shape), expected)
+    np.testing.assert_array_equal(site.to_dense().reshape(site.shape()), expected)
 
 
 @pytest.mark.parametrize("complex_values", [False, True])

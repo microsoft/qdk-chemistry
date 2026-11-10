@@ -9,7 +9,6 @@
 
 #include <complex>
 #include <memory>
-#include <nlohmann/json.hpp>
 #include <optional>
 #include <qdk/chemistry/data/symmetry/symmetry.hpp>
 #include <qdk/chemistry/data/wavefunction_containers/mps_wavefunction.hpp>
@@ -56,7 +55,7 @@ void bind_mps_wavefunction(py::module& data) {
            py::arg("left_sector_order"), py::arg("physical_sector_order"),
            py::arg("right_sector_order"),
            py::arg("physical_basis") = std::vector<Configuration>{})
-      .def_property_readonly(
+      .def(
           "tensor",
           [](const MPSSite& site) {
             return std::visit(
@@ -66,29 +65,25 @@ void bind_mps_wavefunction(py::module& data) {
                 site.tensor());
           },
           "A copy of the bound real or complex rank-3 symmetry-blocked tensor.")
-      .def_property_readonly("sector_orders", &MPSSite::sector_orders)
-      .def_property_readonly("left_sector_order", &MPSSite::left_sector_order)
-      .def_property_readonly("physical_sector_order",
-                             &MPSSite::physical_sector_order)
-      .def_property_readonly("right_sector_order", &MPSSite::right_sector_order)
-      .def_property_readonly("physical_basis", &MPSSite::physical_basis,
-                             "One-mode configurations in physical-index order.")
-      .def_property_readonly("physical_dimension", &MPSSite::physical_dimension)
-      .def_property_readonly("left_bond_dimension",
-                             &MPSSite::left_bond_dimension)
-      .def_property_readonly("right_bond_dimension",
-                             &MPSSite::right_bond_dimension)
-      .def_property_readonly("is_complex", &MPSSite::is_complex)
-      .def_property_readonly("shape",
-                             [](const MPSSite& site) {
-                               return py::make_tuple(
-                                   site.left_bond_dimension(),
+      .def("sector_orders", &MPSSite::sector_orders)
+      .def("left_sector_order", &MPSSite::left_sector_order)
+      .def("physical_sector_order", &MPSSite::physical_sector_order)
+      .def("right_sector_order", &MPSSite::right_sector_order)
+      .def("physical_basis", &MPSSite::physical_basis,
+           "One-mode configurations in physical-index order.")
+      .def("physical_dimension", &MPSSite::physical_dimension)
+      .def("left_bond_dimension", &MPSSite::left_bond_dimension)
+      .def("right_bond_dimension", &MPSSite::right_bond_dimension)
+      .def("is_complex", &MPSSite::is_complex)
+      .def("shape",
+           [](const MPSSite& site) {
+             return py::make_tuple(site.left_bond_dimension(),
                                    site.physical_dimension(),
                                    site.right_bond_dimension());
-                             })
+           })
       .def("to_dense", &MPSSite::to_dense,
            "Return a packed matrix of shape (left * physical, right). "
-           "Use site.to_dense().reshape(site.shape) for three-dimensional "
+           "Use site.to_dense().reshape(site.shape()) for three-dimensional "
            "indexing.");
 
   py::class_<MPSContainer, WavefunctionContainer, py::smart_holder>(
@@ -100,7 +95,6 @@ void bind_mps_wavefunction(py::module& data) {
       .def(py::init<std::vector<MPSContainer::SitePtr>,
                     std::shared_ptr<Orbitals>,
                     std::shared_ptr<const MPSContainer::ParticleCount>,
-                    std::shared_ptr<const MPSContainer::ParticleCount>,
                     std::optional<std::size_t>, std::vector<std::size_t>,
                     const std::optional<ContainerTypes::MatrixVariant>&,
                     const std::optional<ContainerTypes::MatrixVariant>&,
@@ -110,7 +104,6 @@ void bind_mps_wavefunction(py::module& data) {
                     const std::optional<ContainerTypes::VectorVariant>&,
                     const std::optional<ContainerTypes::VectorVariant>&>(),
            py::arg("sites"), py::arg("orbitals"),
-           py::arg("total_num_particles") = nullptr,
            py::arg("active_num_particles") = nullptr,
            py::arg("orthogonality_center") = std::nullopt,
            py::arg("site_to_orbital_order") = std::vector<std::size_t>{},
@@ -123,28 +116,12 @@ void bind_mps_wavefunction(py::module& data) {
            py::arg("two_rdm_bbbb") = std::nullopt,
            "Store supplied sites and optional real/complex RDM arrays. RDMs "
            "use active-orbital order. ")
-      .def_property_readonly("sites", &MPSContainer::sites)
-      .def_property_readonly("orbitals", &MPSContainer::get_orbitals)
-      .def("has_total_num_particles", &MPSContainer::has_total_num_particles)
+      .def("sites", &MPSContainer::sites)
       .def("has_active_num_particles", &MPSContainer::has_active_num_particles)
-      .def_property_readonly("orthogonality_center",
-                             &MPSContainer::orthogonality_center,
-                             "Asserted canonical center, or None if unknown.")
-      .def_property_readonly("site_to_orbital_order",
-                             &MPSContainer::site_to_orbital_order,
-                             "Permutation of active-mode slots, not full "
-                             "orbital indices.")
-      .def_property_readonly("num_sites", &MPSContainer::num_sites)
-      .def_property_readonly("max_bond_dimension",
-                             &MPSContainer::max_bond_dimension)
-      .def(
-          "to_json",
-          [](const MPSContainer& self) { return self.to_json().dump(); },
-          "Serialize all metadata and tensors without normalization.")
-      .def_static(
-          "from_json",
-          [](const std::string& json) {
-            return MPSContainer::from_json(nlohmann::json::parse(json));
-          },
-          py::arg("json"), "Restore a versioned MPS container JSON string.");
+      .def("orthogonality_center", &MPSContainer::orthogonality_center,
+           "Asserted canonical center, or None if unknown.")
+      .def("site_to_orbital_order", &MPSContainer::site_to_orbital_order,
+           "Permutation of active-mode slots, not full orbital indices.")
+      .def("num_sites", &MPSContainer::num_sites)
+      .def("max_bond_dimension", &MPSContainer::max_bond_dimension);
 }

@@ -9,6 +9,7 @@
 #include <limits>
 #include <numeric>
 #include <qdk/chemistry/data/configuration_set.hpp>
+#include <qdk/chemistry/data/symmetry/spin_channel_indices.hpp>
 #include <qdk/chemistry/data/wavefunction_containers/mps_wavefunction.hpp>
 #include <stdexcept>
 #include <type_traits>
@@ -71,13 +72,13 @@ std::vector<Configuration> default_physical_basis(std::size_t dimension) {
     }
   } else {
     throw std::invalid_argument(
-        "MPS sites outside dimension two or four require a physical basis.");
+        "MPS sites have at most four physical states; dimensions one and three "
+        "require a physical basis.");
   }
   return basis;
 }
 
-// Binary states carry no spin projection, so only their particle number is
-// compared with the label.
+// Binary states are spinless, so labels with a spin axis never describe them.
 bool label_describes_state(const SymmetryLabel& label,
                            const Configuration& state) {
   for (const auto& [axis, value] : label.values()) {
@@ -94,6 +95,8 @@ bool label_describes_state(const SymmetryLabel& label,
           if (!value->equals(SpinValue(two_ms))) {
             return false;
           }
+        } else {
+          return false;
         }
         break;
     }
@@ -192,7 +195,6 @@ std::unique_ptr<MPSContainer> mps_from_metadata(
   };
   return std::make_unique<MPSContainer>(
       std::move(sites), std::move(orbitals),
-      read_counts(json.at("total_num_particles")),
       read_counts(json.at("active_num_particles")), center, std::move(order));
 }
 
@@ -339,7 +341,6 @@ MPSSite::DenseMatrixVariant MPSSite::to_dense() const {
 
 MPSContainer::MPSContainer(
     std::vector<SitePtr> sites, std::shared_ptr<Orbitals> orbitals,
-    std::shared_ptr<const ParticleCount> total_num_particles,
     std::shared_ptr<const ParticleCount> active_num_particles,
     std::optional<std::size_t> orthogonality_center,
     std::vector<std::size_t> site_to_orbital_order,
@@ -355,7 +356,6 @@ MPSContainer::MPSContainer(
                             two_rdm_bbbb),
       _sites(std::move(sites)),
       _orbitals(std::move(orbitals)),
-      _total_num_particles(std::move(total_num_particles)),
       _active_num_particles(std::move(active_num_particles)),
       _orthogonality_center(orthogonality_center),
       _site_to_orbital_order(std::move(site_to_orbital_order)) {
@@ -384,6 +384,14 @@ void MPSContainer::_validate() const {
                                     Wavefunction::DEFAULT_SECTOR);
   if (mode_space.num_modes() != num_sites()) {
     throw std::invalid_argument("MPS must contain one site per active mode.");
+  }
+  const auto blocked_count = _make_particle_count(0, 0);
+  if (_active_num_particles &&
+      (*_active_num_particles->symmetries()[0] !=
+           *blocked_count->symmetries()[0] ||
+       _active_num_particles->num_blocks() != blocked_count->num_blocks())) {
+    throw std::invalid_argument(
+        "MPS particle counts must be blocked like the orbitals.");
   }
   if (_orthogonality_center && *_orthogonality_center >= num_sites()) {
     throw std::invalid_argument(
@@ -435,10 +443,20 @@ bool MPSContainer::_is_restricted_closed_shell() const { return false; }
 
 std::shared_ptr<const MPSContainer::ParticleCount>
 MPSContainer::total_num_particles() const {
-  if (!_total_num_particles) {
-    throw std::runtime_error("Total particle-count is not set.");
+  const auto active = active_num_particles();
+  const auto inactive = _orbitals->inactive_indices();
+  const auto inactive_alpha = spin_channel_indices(inactive, axes::alpha());
+  if (_orbitals->symmetries()->has_axis(AxisName::Spin)) {
+    const auto [n_alpha, n_beta] = _read_spin_count(*active);
+    return _make_particle_count(
+        n_alpha + inactive_alpha.size(),
+        n_beta + spin_channel_indices(inactive, axes::beta()).size());
   }
-  return _total_num_particles;
+  // Without a spin axis, an inactive mode holds one particle per encoding bit.
+  const std::size_t bits =
+      _sites.front()->physical_basis().front().bits_per_mode();
+  return _make_particle_count(
+      active->value(SymmetryLabel{}) + bits * inactive_alpha.size(), 0);
 }
 
 std::shared_ptr<const MPSContainer::ParticleCount>
@@ -491,9 +509,6 @@ nlohmann::json MPSContainer::_metadata_to_json() const {
   json["version"] = SERIALIZATION_VERSION;
   json["container_type"] = get_container_type();
   json["scalar"] = is_complex() ? "complex" : "real";
-  json["total_num_particles"] = _total_num_particles
-                                    ? _total_num_particles->to_json()
-                                    : nlohmann::json(nullptr);
   json["active_num_particles"] = _active_num_particles
                                      ? _active_num_particles->to_json()
                                      : nlohmann::json(nullptr);
@@ -625,7 +640,6 @@ void MPSContainer::hash_update(qdk::chemistry::utils::HashContext& ctx) const {
   WavefunctionContainer::hash_update(ctx);
   hash_value(ctx, get_container_type());
   hash_value(ctx, _orbitals->content_hash());
-  hash_value(ctx, _total_num_particles);
   hash_value(ctx, _active_num_particles);
   hash_value(ctx, _orthogonality_center);
   hash_value(ctx, _site_to_orbital_order);

@@ -999,10 +999,6 @@ std::unique_ptr<WavefunctionContainer> WavefunctionContainer::from_json(
   QDK_LOG_TRACE_ENTERING();
 
   try {
-    if (j.value("container_type", std::string{}) == "mps") {
-      return MPSContainer::from_json(j);
-    }
-
     // Check version first
     if (!j.contains("version")) {
       throw std::runtime_error("Invalid JSON: missing version field");
@@ -1912,14 +1908,6 @@ std::unique_ptr<WavefunctionContainer> WavefunctionContainer::from_hdf5(
   QDK_LOG_TRACE_ENTERING();
 
   try {
-    if (group.attrExists("container_type")) {
-      H5::StrType type(H5::PredType::C_S1, H5T_VARIABLE);
-      std::string name;
-      group.openAttribute("container_type").read(type, name);
-      if (name == "mps") {
-        return MPSContainer::from_hdf5(group);
-      }
-    }
     // Check version first
     H5::StrType string_type(H5::PredType::C_S1, H5T_VARIABLE);
     H5::Attribute version_attr = group.openAttribute("version");
@@ -2100,7 +2088,7 @@ std::string Wavefunction::get_summary() const {
                 : "unspecified")
         << "\n";
     oss << "  Total particles: "
-        << (mps.has_total_num_particles()
+        << (mps.has_active_num_particles()
                 ? mps.total_num_particles()->get_summary()
                 : "unavailable")
         << "\n";
