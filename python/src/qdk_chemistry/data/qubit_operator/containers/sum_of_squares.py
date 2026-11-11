@@ -19,7 +19,6 @@ from qdk_chemistry.data.qubit_operator.containers.base import QubitOperatorConta
 from qdk_chemistry.utils.serialization import (
     complex_array_from_json,
     complex_array_to_json,
-    real_array_from_json,
     real_array_to_json,
 )
 
@@ -68,8 +67,9 @@ class RotatedPaulis:
     @classmethod
     def from_json(cls, data: dict[str, Any]) -> RotatedPaulis:
         """Create a block from a JSON dictionary."""
+        angles = data["angles"]
         return cls(
-            real_array_from_json(data["angles"]),
+            np.asarray(angles["values"], dtype=float).reshape(angles["shape"]),
             complex_array_from_json(data["coeffs"]),
             tuple(data["paulis"]),
         )

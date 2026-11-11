@@ -15,6 +15,7 @@ from __future__ import annotations
 
 import json
 from dataclasses import asdict, dataclass
+from math import isfinite
 from typing import TYPE_CHECKING, Any
 
 import numpy as np
@@ -133,9 +134,12 @@ class SOSSASelect:
     @classmethod
     def from_json(cls, data: dict[str, Any]) -> SOSSASelect:
         """Load from a JSON dictionary."""
+        one_body_angles = np.array(data["one_body_rotation_angles"], dtype=float)
         return cls(
-            one_body_rotation_angles=np.array(data["one_body_rotation_angles"], dtype=float),
-            two_body_rotation_angles=np.array(data["two_body_rotation_angles"], dtype=float),
+            one_body_rotation_angles=one_body_angles,
+            two_body_rotation_angles=np.array(data["two_body_rotation_angles"], dtype=float).reshape(
+                len(data["two_body_rotation_angles"]), one_body_angles.shape[1]
+            ),
         )
 
     def to_hdf5(self, group: h5py.Group) -> None:
@@ -166,12 +170,20 @@ class SOSSABlockEncodingContainer(BlockEncodingContainer):
     the caller, which owns :math:`\mathrm{Ref}_{a,B}`. Here
     :math:`U = \text{OuterPREP} \cdot \text{within\{InnerPREP\} apply\{SELECT\}}`.
 
-    Supported by the ``qdk_unary`` phase estimation builder only, which interleaves the
+    Supported by the ``qdk_unary`` phase estimation builder, which interleaves the
     reflection into its own query schedule so it can omit one and realize a signed walk
-    power. Iterative and standard QPE drive a pre-composed walk through a
-    ``controlled_circuit_mapper``, and none of the registered ones accepts this container.
+    power, and by the ``qdk_standard`` builder through the ``sossa``
+    ``controlled_circuit_mapper``, which completes the walk and controls its powers.
 
-    :meth:`eigenvalue_from_phase` still decodes the phase of that completed walk, whose
+    .. note::
+
+        A system eigenstate is an equal mix of the walk eigenvectors at :math:`\pm\phi`.
+        Standard QPE returns :math:`\phi` or :math:`1 - \phi`, which decode to the same
+        energy. Iterative QPE re-prepares that mix for every sample, so its phase feedback
+        corrects one branch and mis-corrects the other; iterative builders reject this
+        container.
+
+    :meth:`eigenvalue_from_phase` decodes the phase of the completed walk, whose
     spectrum is :math:`e^{\pm i \arccos(E_k/\Lambda - 1)}`.
 
     """
@@ -195,7 +207,7 @@ class SOSSABlockEncodingContainer(BlockEncodingContainer):
         select: SOSSASelect,
         metadata: SumOfSquaresMetadata,
         layout: SOSSARegisterLayout,
-        normalization: float = 0.0,
+        normalization: float,
         power: int = 1,
         lambda_eff: float | None = None,
     ) -> None:
@@ -214,10 +226,13 @@ class SOSSABlockEncodingContainer(BlockEncodingContainer):
                 builder was given no reference energy to derive it from. See :attr:`lambda_eff`.
 
         Raises:
+            ValueError: If normalization is not positive and finite.
             ValueError: If the layout reserves free-rider bits that ``inner_prepare`` does not
                 supply a matching table for.
 
         """
+        if not isfinite(normalization) or normalization <= 0.0:
+            raise ValueError(f"SOSSA block encoding requires a positive finite normalization, got {normalization}.")
         num_free_rider_bits = layout.num_free_rider_bits
         free_rider_data = inner_prepare.free_rider_data
         if num_free_rider_bits > 0:

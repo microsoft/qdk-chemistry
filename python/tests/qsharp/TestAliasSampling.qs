@@ -36,12 +36,12 @@ namespace QDKChemistry.TestUtils.AliasSamplingTests {
             ConditionalAliasSamplingPrepare(
                 coefficients,
                 bitsPrecision,
+                numSwapBits,
                 conditionalReg,
                 indexReg,
                 uniformReg,
                 flagQubit,
-                qromOut,
-                numSwapBits
+                qromOut
             );
         }
     }
@@ -71,12 +71,12 @@ namespace QDKChemistry.TestUtils.AliasSamplingTests {
                 ConditionalAliasSamplingPrepare(
                     coefficients,
                     bitsPrecision,
+                    numSwapBits,
                     conditionalReg,
                     indexReg,
                     uniformReg,
                     flagQubit,
-                    qromOut,
-                    numSwapBits
+                    qromOut
                 );
             } apply {
                 Z(indexReg[0]);
@@ -111,13 +111,14 @@ namespace QDKChemistry.TestUtils.AliasSamplingTests {
                 coefficients,
                 freeRiderData,
                 bitsPrecision,
+                0,
                 conditionalReg,
                 indexReg,
                 uniformReg,
                 flagQubit,
                 qromOut,
                 freeRiderReg,
-                0
+                []
             );
         }
     }

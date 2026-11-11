@@ -25,8 +25,8 @@ class ControlledPauliSequenceMapperSettings(ControlledCircuitMapperSettings):
             through Hamming-weight registers. Pays off only when layers hold many equal angles.
             Defaults to ``False``.
         max_hamming_weight_phasing_batch_size: Largest batch phased through one register, or ``-1``
-            (default) for no cap. A smaller cap needs fewer scratch qubits but more rotations; use
-            at least 8, as smaller batches save too few rotations. Ignored when phasing is off.
+            (default) for no cap. A smaller cap needs fewer scratch qubits, and a cap one below a
+            power of two, such as 7 or 15, saves a place value per batch. Ignored when phasing is off.
 
     """
 
@@ -45,8 +45,8 @@ class ControlledPauliSequenceMapperSettings(ControlledCircuitMapperSettings):
             "int",
             -1,
             "Largest batch phased through one register, or -1 for no cap. A smaller cap needs fewer "
-            "scratch qubits but more rotations; use at least 8, as smaller batches save too few "
-            "rotations. Ignored when phasing is off.",
+            "scratch qubits, and a cap one below a power of two, such as 7 or 15, saves a place value "
+            "per batch. Ignored when phasing is off.",
         )
 
 
@@ -173,4 +173,8 @@ class ControlledPauliSequenceMapper(ControlledCircuitMapper):
             evo_params, layer_offsets, use_hamming_weight_phasing, max_batch_size
         )
 
-        return Circuit(qsharp_factory=qsharp_factory, qsharp_op=controlled_unitary_op)
+        return Circuit(
+            qsharp_factory=qsharp_factory,
+            qsharp_op=controlled_unitary_op,
+            num_qubits=1 + unitary_container.num_qubits,
+        )

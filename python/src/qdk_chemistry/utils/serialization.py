@@ -16,13 +16,6 @@ def real_array_to_json(values: np.ndarray) -> dict[str, Any]:
     return {"values": array.tolist(), "shape": list(array.shape)}
 
 
-def real_array_from_json(data: Any) -> np.ndarray:
-    """Rebuild an array written by ``real_array_to_json`` or an older bare list."""
-    if isinstance(data, dict):
-        return np.asarray(data["values"], dtype=float).reshape(data["shape"])
-    return np.asarray(data, dtype=float)
-
-
 def complex_array_to_json(values: np.ndarray) -> dict[str, Any]:
     """Serialize an array as split real/imaginary lists with its shape and dtype."""
     array = np.asarray(values)

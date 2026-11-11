@@ -201,6 +201,18 @@ SCF Convergence Algorithms in QDK
 Achieving stable :term:`SCF` convergence is a non-trivial problem in computational chemistry.
 QDK/Chemistry implements two complementary algorithms that can be used independently or in combination.
 
+.. rubric:: Linearly dependent basis functions
+
+The native solver removes overlap eigenvectors below its linear-dependence threshold.
+Consequently, the number of molecular orbitals can be smaller than the number of atomic orbitals.
+Both :term:`DIIS` and the :term:`GDM` phase of the hybrid optimize within this retained space.
+Calculations fail explicitly if the retained space cannot accommodate the electron occupations.
+The atomic initial guess also uses the retained shell dimensions.
+
+For restricted open-shell Hartree-Fock, the effective MO Fock matrix is lifted back to an AO-shaped matrix using the coefficient matrix's thin-QR pseudoinverse.
+This reproduces the effective operator within the retained MO space; it does not reconstruct discarded AO components.
+Empty closed, open, or virtual orbital subspaces are allowed; :term:`GDM` continues to optimize rotations between the remaining nonempty subspaces.
+
 .. rubric:: Direct Inversion in the Iterative Subspace (DIIS)
 
 :term:`DIIS` is an extrapolation technique that accelerates :term:`SCF` convergence by constructing an optimal linear combination of previous Fock matrices :cite:`Pulay1982`.
@@ -211,6 +223,7 @@ However, it can fail for challenging cases such as open-shell systems or molecul
 
 When :term:`DIIS` encounters difficulties, the :term:`GDM` algorithm provides a robust alternative :cite:`VanVoorhis2002`.
 Rather than extrapolating Fock matrices, :term:`GDM` directly minimizes the energy with respect to orbital rotation parameters using a quasi-Newton optimization approach.
+The native solver runs :term:`GDM` only after at least one :term:`DIIS` update, which supplies the initial orbitals, energy, and energy change.
 
 The key insight of :term:`GDM` is to parameterize orbital changes through unitary rotations, which converts the constrained optimization problem of determining the energy-minimizing set of orthonormal orbitals into an unconstrained optimization over exponentials :cite:`Higham2005` of anti-Hermitian matrices.
 This allows the use of standard nonlinear optimization techniques while preserving orbital orthonormality.
@@ -289,7 +302,7 @@ This hybrid approach combines the speed of :term:`DIIS` for typical systems with
    * - ``relativity``
      - string
      - ``""``
-     - Relativistic treatment: ``""`` for nonrelativistic integrals, ``"sf-x2c"`` for spin-free X2C with basis decontraction and exact recontraction, or ``"sf-x2c-contracted"`` for spin-free X2C in the supplied contracted basis. Both X2C options use the one-electron approximation, leaving :term:`ERIs <ERI>` unchanged and excluding spin-orbit coupling. They require spherical all-electron basis sets (no ECPs or Cartesian AOs); analytic nuclear gradients and polarizabilities are unavailable. Use the same value for downstream :doc:`Hamiltonian construction <hamiltonian_constructor>`, PySCF :doc:`stability analysis <stability_checker>`, and :doc:`MCSCF <mcscf>` because :doc:`Orbitals <../data/orbitals>` do not retain the relativistic treatment.
+     - Relativistic treatment: ``""`` for nonrelativistic integrals, ``"sf-x2c"`` for spin-free X2C with basis decontraction and exact recontraction, or ``"sf-x2c-contracted"`` for spin-free X2C in the supplied contracted basis. Both X2C options use the one-electron approximation, leaving :term:`ERIs <ERI>` unchanged and excluding spin-orbit coupling. They require spherical all-electron basis sets (no ECPs or Cartesian AOs); analytic nuclear gradients and polarizabilities are unavailable.
    * - ``fock_reset_steps``
      - int
      - ``1073741824``

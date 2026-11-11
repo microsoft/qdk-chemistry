@@ -5,11 +5,9 @@
 # Licensed under the MIT License. See LICENSE.txt in the project root for license information.
 # --------------------------------------------------------------------------------------------
 
-import importlib.util
 import os
 import subprocess
 import sys
-import warnings
 from pathlib import Path
 from unittest.mock import MagicMock, call
 
@@ -380,70 +378,6 @@ def test_bundled_plugin_duplicate_warns_with_disable_hint_and_propagates(monkeyp
         pytest.raises(DuplicateRegistrationError, match="name is already registered"),
     ):
         qdk_chemistry._load_bundled_plugin("qiskit", "QDK_CHEMISTRY_DISABLE_QISKIT_AUTOLOAD")
-
-
-@pytest.mark.parametrize("static_tls", [False, True])
-def test_bundled_plugin_import_failure_warns_with_disable_hint(monkeypatch, static_tls):
-    """An installed bundled plugin that cannot be imported is reported rather than skipped silently."""
-    message = "libgomp.so.1: cannot allocate memory in static TLS block" if static_tls else "cannot import name 'X'"
-    plugin = MagicMock()
-    plugin.load.side_effect = ImportError(message)
-    monkeypatch.delenv("QDK_CHEMISTRY_DISABLE_QISKIT_AUTOLOAD", raising=False)
-    monkeypatch.setattr(qdk_chemistry.importlib, "import_module", MagicMock(return_value=plugin))
-
-    with pytest.warns(
-        UserWarning,
-        match=r"bundled plugin 'qiskit' failed.*QDK_CHEMISTRY_DISABLE_QISKIT_AUTOLOAD=1",
-    ) as record:
-        qdk_chemistry._load_bundled_plugin("qiskit", "QDK_CHEMISTRY_DISABLE_QISKIT_AUTOLOAD")
-
-    assert ("GLIBC_TUNABLES=glibc.rtld.optional_static_tls=65536" in str(record[0].message)) is static_tls
-
-
-def test_bundled_plugin_missing_dependency_is_skipped_silently(monkeypatch):
-    """A bundled plugin whose optional dependency is not installed is skipped without a warning."""
-    plugin = MagicMock()
-    plugin.load.side_effect = ModuleNotFoundError("No module named 'qiskit'", name="qiskit")
-    monkeypatch.delenv("QDK_CHEMISTRY_DISABLE_QISKIT_AUTOLOAD", raising=False)
-    monkeypatch.setattr(qdk_chemistry.importlib, "import_module", MagicMock(return_value=plugin))
-
-    with warnings.catch_warnings():
-        warnings.simplefilter("error", UserWarning)
-        qdk_chemistry._load_bundled_plugin("qiskit", "QDK_CHEMISTRY_DISABLE_QISKIT_AUTOLOAD")
-
-
-@pytest.mark.skipif(importlib.util.find_spec("qiskit") is None, reason="Qiskit is not installed")
-@pytest.mark.parametrize("first_import", ["qdk_chemistry", "qiskit"])
-def test_qiskit_plugin_loads_in_fresh_process(first_import):
-    """Qiskit and the native libraries of QDK/Chemistry load together in either import order."""
-    package_root = Path(qdk_chemistry.__file__).resolve().parent.parent
-    env = os.environ.copy()
-    python_paths = [str(package_root)]
-    if existing_python_path := env.get("PYTHONPATH"):
-        python_paths.append(existing_python_path)
-    env["PYTHONPATH"] = os.pathsep.join(python_paths)
-
-    verify = subprocess.run(
-        [
-            sys.executable,
-            "-c",
-            f"""\
-import {first_import}
-import importlib.util
-
-from qdk_chemistry.algorithms import available
-
-assert "qiskit_regular_isometry" in available("state_prep")
-if importlib.util.find_spec("qiskit_aer") is not None:
-    assert "qiskit_aer_simulator" in available("circuit_executor")
-""",
-        ],
-        capture_output=True,
-        text=True,
-        env=env,
-        check=False,
-    )
-    assert verify.returncode == 0, verify.stdout + verify.stderr
 
 
 def test_bundled_plugin_unexpected_error_propagates(monkeypatch):

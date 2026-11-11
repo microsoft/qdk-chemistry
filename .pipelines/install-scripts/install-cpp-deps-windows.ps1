@@ -147,14 +147,15 @@ function Get-ManifestUrl([string]$ManifestPath, [string]$Name) {
     return $reg.component.other.downloadUrl
 }
 
-function Get-ManifestHash([string]$ManifestPath, [string]$Name) {
+# The SHA-256 lives in `sha256` because CG accepts only SHA-1 in `hash`.
+function Get-ManifestSha256([string]$ManifestPath, [string]$Name) {
     $data = Get-Content $ManifestPath -Raw | ConvertFrom-Json
     $reg  = $data.registrations |
             Where-Object { $_.component.type -eq 'other' -and
                            $_.component.other.name -eq $Name } |
             Select-Object -First 1
     if (-not $reg) { throw "No '$Name' entry in $ManifestPath" }
-    return $reg.component.other.hash
+    return $reg.component.other.sha256
 }
 
 $cppManifest  = "$SrcDir\cpp\manifest\qdk-chemistry\cgmanifest.json"
@@ -290,13 +291,13 @@ function Get-ShallowCheckout([string]$RepoUrl, [string]$Commit, [string]$Dest) {
     if ($LASTEXITCODE -ne 0) { throw "git checkout failed for $RepoUrl @ $Commit" }
 }
 
-# Download an "other" type cgmanifest component and verify its SHA-256 against the declared `hash`, so a
+# Download an "other" type cgmanifest component and verify it against the declared `sha256`, so a
 # compromised or silently-changed upstream release asset is caught before it's extracted and built. Mirrors
 # .pipelines/install-scripts/common.sh's download_and_verify for Linux/macOS.
 function Get-DownloadAndVerify([string]$ManifestPath, [string]$Name, [string]$Dest) {
     $url  = Get-ManifestUrl  $ManifestPath $Name
-    $hash = Get-ManifestHash $ManifestPath $Name
-    if (-not $hash) { throw "No hash declared for '$Name' in $ManifestPath -- cannot verify the download" }
+    $hash = Get-ManifestSha256 $ManifestPath $Name
+    if (-not $hash) { throw "No sha256 declared for '$Name' in $ManifestPath -- cannot verify the download" }
 
     Invoke-WebRequest $url -OutFile $Dest
     $actual = (Get-FileHash $Dest -Algorithm SHA256).Hash

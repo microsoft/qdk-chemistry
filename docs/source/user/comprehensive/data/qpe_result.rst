@@ -93,6 +93,9 @@ The :class:`~qdk_chemistry.data.QpeResult` stores the following information:
    * - ``bitstring_msb_first``
      - str | None
      - Binary string representation of the measured phase (e.g., ``"0110110010"``).
+   * - ``bitstring_counts``
+     - dict[str, int] | None
+     - Measured histogram populated by standard and unary QPE. These are the original measurement bitstrings, not canonicalized energy branches; absent when no histogram was supplied.
    * - ``metadata``
      - dict | None
      - Caller-defined metadata for provenance tracking (e.g., molecule name, basis set, reference energy).

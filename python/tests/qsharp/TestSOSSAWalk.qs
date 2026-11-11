@@ -11,21 +11,24 @@ namespace QDKChemistry.TestUtils.SOSSAWalkTests {
     import Std.Math.MaxI;
     import Std.Measurement.MeasureEachZ;
     import QDKChemistry.Utils.PhaseGradient.PreparePhaseGradientState;
+    import QDKChemistry.Utils.SelectSwapDirty.SelectSwapDirtyBorrowedQubits;
     import QDKChemistry.Utils.SOSSAWalk.ControlledSelectWithUnlookup;
+    import QDKChemistry.Utils.SOSSAWalk.LoadRotationWord;
     import QDKChemistry.Utils.SOSSAWalk.SelectImpl;
     import QDKChemistry.Utils.SOSSAWalk.SelectParams;
     import QDKChemistry.Utils.SOSSAWalk.ShouldLoadFreeRiderSeparately;
     import QDKChemistry.Utils.UnaryIteration.AddressQubits;
 
+    /// Lends the inner PREPARE nothing, so this exercises the clean lookup.
     function TestMakeOuterInnerPrepOp(
         outerOp : (Qubit[]) => Unit is Adj + Ctl,
-        innerOp : (Qubit[], Qubit[]) => Unit is Adj,
+        innerOp : (Qubit[], Qubit[], Qubit[]) => Unit is Adj,
         nOuter : Int,
     ) : Qubit[] => Unit {
         (qs) => {
             let outerReg = qs[0..nOuter - 1];
             outerOp(outerReg);
-            innerOp(outerReg, qs[nOuter...]);
+            innerOp(outerReg, qs[nOuter...], []);
         }
     }
 
@@ -97,29 +100,61 @@ namespace QDKChemistry.TestUtils.SOSSAWalkTests {
         innerCoefficients : Double[][],
         freeRiderData : Bool[][],
         coefficientBitPrecision : Int,
+        maxSwapBits : Int,
+        availableDirty : Int,
     ) : Bool {
-        ShouldLoadFreeRiderSeparately(innerCoefficients, freeRiderData, coefficientBitPrecision)
+        ShouldLoadFreeRiderSeparately(
+            innerCoefficients,
+            freeRiderData,
+            coefficientBitPrecision,
+            maxSwapBits,
+            availableDirty
+        )
     }
 
+    /// The borrowed register is conjugated too, so a dirty pass that disturbs it fails here.
     operation TestBranchedRotationWordRoundTrip(
         sfData : Bool[][],
         dqData : Bool[][],
         numSFAddressQubits : Int,
         numDQAddressQubits : Int,
+        borrowDirty : Bool,
+        sfSwapBits : Int,
+        dqSwapBits : Int,
     ) : Bool {
         use isSF = Qubit();
         use sfAddress = Qubit[numSFAddressQubits];
         use dqAddress = Qubit[numDQAddressQubits];
         use target = Qubit[Length(sfData[0])];
+        // Only a dirty load borrows; the clean paths allocate their own scratch internally.
+        let numDirty = if borrowDirty {
+            MaxI(
+                SelectSwapDirtyBorrowedQubits(sfSwapBits, Length(sfData[0])),
+                SelectSwapDirtyBorrowedQubits(dqSwapBits, Length(dqData[0]))
+            )
+        } else {
+            0
+        };
+        use dirty = Qubit[numDirty];
         let addressReg = [isSF] + sfAddress + dqAddress;
+        let conjugated = addressReg + dirty;
 
-        ApplyToEachCA(H, addressReg);
-        ControlledSelectWithUnlookup(sfData, sfAddress, dqData, dqAddress, isSF, target);
-        Adjoint ControlledSelectWithUnlookup(sfData, sfAddress, dqData, dqAddress, isSF, target);
-        ApplyToEachCA(H, addressReg);
+        ApplyToEachCA(H, conjugated);
+        ControlledSelectWithUnlookup(sfData, dqData, sfSwapBits, dqSwapBits, sfAddress, dqAddress, isSF, dirty, target);
+        Adjoint ControlledSelectWithUnlookup(sfData, dqData, sfSwapBits, dqSwapBits, sfAddress, dqAddress, isSF, dirty, target);
+        ApplyToEachCA(H, conjugated);
 
-        let results = MeasureEachZ(addressReg + target);
-        ResetAll(addressReg + target);
+        let results = MeasureEachZ(conjugated + target);
+        ResetAll(conjugated + target);
         All(result -> result == Zero, results)
+    }
+
+    /// Traces one clean `LoadRotationWord`, so `SelectSwapForwardCost` can be checked against it.
+    operation TestLoadRotationWordResourceProbe(data : Bool[][], numSwapBits : Int) : Unit {
+        use isSF = Qubit();
+        use address = Qubit[AddressQubits(Length(data))];
+        use target = Qubit[Length(data[0])];
+        LoadRotationWord(data, numSwapBits, address, isSF, [], target);
+        ResetAll(target);
     }
 }

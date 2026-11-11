@@ -178,7 +178,12 @@ Unary-iteration Phase Estimation Circuit Builder
 
 Constructs one flat chain of :math:`p` qubitized walk queries, using unary iteration over the phase register to select which interleaved reflection is omitted and so realize :math:`W^{2a-p}` from a single chain :cite:`Babbush2018` :cite:`Lee2021`.
 The phase register is sized to :math:`\lceil \log_2(p+1) \rceil` and ``num_bits`` is ignored.
-Requires a qubitized walk, so ``unitary_builder`` must be an LCU builder with ``quantum_walk=True`` (its default here).
+The input is either an LCU walk built with ``quantum_walk=True`` (the default
+here) or a :ref:`SOSSA block encoding <sossa-builder>`.
+For SOSSA, select both ``unitary_builder="sossa"`` and
+``circuit_mapper="sossa"`` through their nested algorithm references.
+The builder supplies the outer reflections; a controlled SOSSA mapper is
+not required.
 
 **Additional settings:**
 
@@ -191,10 +196,21 @@ Requires a qubitized walk, so ``unitary_builder`` must be an LCU builder with ``
      - Description
    * - ``num_queries``
      - int
-     - Number of walk queries :math:`p`. For a target energy error :math:`\epsilon`, the Heisenberg-limited setting is :math:`p = \lceil \pi \lambda / (2\epsilon) \rceil` with :math:`\lambda` the block-encoding 1-norm. Need not be a power of two.
+     - Positive number of walk queries :math:`p`, set explicitly by the caller. Need not be a power of two. See :ref:`sossa-query-guidance` for LCU and SOSSA precision guidance and its assumptions.
    * - ``circuit_mapper``
      - AlgorithmRef
-     - Mapper producing the uncontrolled block encoding. It must lay the register out as ``[system | ancilla]``. Default: ``"prepare_select_prepare"``.
+     - Mapper producing the uncontrolled block encoding on ``[system | zero ancillas | shared gradient]``. Default: ``"prepare_select_prepare"``.
+   * - ``compute_capacity``
+     - int
+     - Positive logical-qubit capacity for memory/compute placement, or ``-1`` to leave the placement model disabled. Default: ``-1``.
+
+The mapper's declared width includes its caller-supplied work register,
+not just the index dimensions stored in the unitary description.
+Compatible shared gradients are initialized once around the query schedule
+and are not part of the reflected zero register.
+
+For memory/compute placement, see the `QDK resource-estimation documentation
+<https://learn.microsoft.com/en-us/azure/quantum/qre-custom-applications>`_.
 
 Circuit Composition Details
 ----------------------------
@@ -222,6 +238,16 @@ To accomplish this, the :class:`~qdk_chemistry.algorithms.phase_estimation.circu
    Default: :class:`~qdk_chemistry.data.AlgorithmRef` to ``"controlled_circuit_mapper"`` with method ``"pauli_sequence"``
 
    The controlled circuit mapper (see :class:`~qdk_chemistry.algorithms.ControlledCircuitMapper`) converts the :class:`~qdk_chemistry.data.UnitaryRepresentation` into a controlled circuit, i.e., it synthesizes :math:`C\text{-}U` as an executable :class:`~qdk_chemistry.data.Circuit`.
+
+For standard and iterative QPE, custom controlled mappers should declare
+``Circuit.num_qubits`` including the control, system, and caller-supplied
+working qubits. Internally allocated scratch is excluded.
+All powers sharing one circuit must agree on the system and work-register
+widths. Omitting the width is deprecated: QPE emits ``DeprecationWarning``
+and retains the previous allocation based on the unitary's structural width.
+That fallback cannot infer additional workspace introduced by the mapper.
+An explicitly undersized width or a request for shared phase-gradient
+ancillas remains an error.
 
 Related Classes
 ---------------

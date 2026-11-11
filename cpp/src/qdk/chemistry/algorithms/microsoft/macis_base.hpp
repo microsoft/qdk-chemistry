@@ -55,6 +55,25 @@ macis::MCSCFSettings get_mcscf_settings_(const data::Settings& settings_);
  */
 macis::ASCISettings get_asci_settings_(const data::Settings& settings_);
 
+/**
+ * @brief Two-body integrals as MACIS reads them.
+ *
+ * MACIS assumes (pq|rs) = (rs|pq) = (qp|sr), so other tensors are replaced by
+ * their average over these positions, with a warning if they are not
+ * Hermitian.
+ *
+ * @param hamiltonian Restricted Hamiltonian.
+ * @param solver Solver name used in messages.
+ * @param storage Holds the average if one is needed.
+ * @return The stored tensor if it has this symmetry, otherwise @p storage.
+ * @throws std::runtime_error if the Hamiltonian is not Hermitian.
+ * @throws std::invalid_argument if its two-body integrals contain a non-finite
+ *         value.
+ */
+const Eigen::VectorXd& macis_two_body_integrals(
+    const data::Hamiltonian& hamiltonian, const std::string& solver,
+    Eigen::VectorXd& storage);
+
 /** @brief Dispatch calculation to an implementation specialized by wavefunction
  * bitset size.
  *
@@ -65,6 +84,8 @@ macis::ASCISettings get_asci_settings_(const data::Settings& settings_);
  *  - `norb < 64`  -> `N = 128`
  *  - `norb < 128` -> `N = 256`
  *  - `norb < 256` -> `N = 512`
+ *  - `norb < 320` -> `N = 640`
+ *  - `norb < 384` -> `N = 768`
  *  - `norb < 512` -> `N = 1024`
  *  - `norb < 1024` -> `N = 2048`
  *  - `norb <= 2048` -> `N = 4096`
@@ -87,6 +108,12 @@ auto dispatch_by_norb(size_t norb, Args&&... args) {
     return Func::template impl<256>(std::forward<Args>(args)...);
   } else if (norb < 256) {
     return Func::template impl<512>(std::forward<Args>(args)...);
+  } else if (norb < 320) {
+    // 64-bit words per spin string from here: the wider powers of two cost
+    // memory and time per determinant
+    return Func::template impl<640>(std::forward<Args>(args)...);
+  } else if (norb < 384) {
+    return Func::template impl<768>(std::forward<Args>(args)...);
   } else if (norb < 512) {
     return Func::template impl<1024>(std::forward<Args>(args)...);
   } else if (norb < 1024) {

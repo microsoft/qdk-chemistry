@@ -92,18 +92,18 @@ class TestAliasSamplingStatePreparation:
             [[bool((17 * outer + 5 * inner + bit) % 7 < 3) for bit in range(21)] for inner in range(16)]
             for outer in range(90)
         ]
-        num_swap_bits = select_swap.ComputeOptimalLambda2D(90, 16, 21, True)
-        assert num_swap_bits == 3, f"expected three swap bits, got {num_swap_bits}"
+        num_swap_bits = select_swap.ComputeOptimalLambda2D(90, 16, 21, True, -1)
+        assert num_swap_bits == 2, f"expected two swap bits, got {num_swap_bits}"
         expected_lookup_counts = {
             "forward": (
                 (True, False),
                 {
-                    "numQubits": 283,
-                    "cczCount": 408,
+                    "numQubits": 199,
+                    "cczCount": 504,
                     "ccixCount": 0,
                     "tCount": 0,
                     "rotationCount": 0,
-                    "measurementCount": 429,
+                    "measurementCount": 525,
                 },
             ),
             "adjoint": (
@@ -120,12 +120,12 @@ class TestAliasSamplingStatePreparation:
             "round_trip": (
                 (True, True),
                 {
-                    "numQubits": 283,
-                    "cczCount": 491,
+                    "numQubits": 199,
+                    "cczCount": 587,
                     "ccixCount": 0,
                     "tCount": 0,
                     "rotationCount": 0,
-                    "measurementCount": 533,
+                    "measurementCount": 629,
                 },
             ),
         }
@@ -139,6 +139,52 @@ class TestAliasSamplingStatePreparation:
             )
             actual = {name: counts[name] for name in expected}
             assert actual == expected, f"conditional alias lookup {direction}: {actual} != {expected}"
+
+    def test_the_swap_width_rule_declines_a_widening_that_does_not_pay(self, qsharp_test_context, qsharp_test_utils):
+        """The rule may reject cheaper Toffolis when the scratch widening is too large.
+
+        Pinning both widths shows the declined width is genuinely cheaper but wider.
+        """
+        context = qsharp_test_context
+        select_swap = context.code.QDKChemistry.Utils.SelectSwap
+        lookup_data = [
+            [[bool((17 * outer + 5 * inner + bit) % 7 < 3) for bit in range(21)] for inner in range(16)]
+            for outer in range(90)
+        ]
+
+        chosen, declined = 2, 3
+        assert select_swap.ComputeOptimalLambda2D(90, 16, 21, True, -1) == chosen
+        assert select_swap.SelectSwapCost2D(declined, 90, 16, 21, True) < select_swap.SelectSwapCost2D(
+            chosen, 90, 16, 21, True
+        ), "the declined width has to be the Toffoli-cheaper one, or there is nothing being traded"
+
+        counts = {
+            width: context.logical_counts(
+                qsharp_test_utils.SelectSwapTests.TestSelectSwap2DResourceProbe, lookup_data, width, True, True, True
+            )
+            for width in (chosen, declined)
+        }
+        assert counts[chosen]["numQubits"] < counts[declined]["numQubits"], (
+            f"the narrower network must free scratch: {counts[chosen]['numQubits']} vs {counts[declined]['numQubits']}"
+        )
+        assert counts[chosen]["cczCount"] > counts[declined]["cczCount"], (
+            f"and must cost Toffolis for it: {counts[chosen]['cczCount']} vs {counts[declined]['cczCount']}"
+        )
+
+        # Guard the tolerance itself: the Toffoli premium must stay small next to the width it buys.
+        width_saved = (counts[declined]["numQubits"] - counts[chosen]["numQubits"]) / counts[declined]["numQubits"]
+        toffoli_premium = (counts[chosen]["cczCount"] - counts[declined]["cczCount"]) / counts[declined]["cczCount"]
+        assert toffoli_premium < width_saved, (
+            f"the rule's Toffoli premium has to be small next to the width it buys, or the "
+            f"tolerance is mis-set: {toffoli_premium:.1%} Toffolis for {width_saved:.1%} width"
+        )
+
+        # Thin margin (~19.6% vs 20%), pinned so lowering the tolerance fails here with a reason.
+        assert 0.19 < toffoli_premium < 0.20, (
+            f"the declined width is a near-miss at this shape ({toffoli_premium:.2%} premium "
+            f"against a 20% tolerance); if this moved, the tolerance or the cost model changed "
+            f"and the resident width almost certainly moved with it"
+        )
 
     def test_negative_coefficients_rejected(self):
         """Alias sampling is a PREPARE oracle over magnitudes and cannot carry a sign."""
@@ -361,13 +407,18 @@ class TestConditionalAliasSampling:
     @pytest.mark.parametrize("num_swap_bits", [0, -1, 1])
     @pytest.mark.parametrize("condition_value", [0, 1])
     def test_marginal_probs(self, qsharp_test_context, qsharp_test_utils, condition_value, num_swap_bits):
-        """Verify conditional marginal probs for no-swap, optimal, and select-swap loads."""
-        n_cond, n_coeffs = 2, 4
+        """Verify conditional marginal probs for no-swap, selector-chosen, and capped swap loads."""
+        n_cond, n_coeffs = 32, 8
         rng = np.random.default_rng(seed=789 + condition_value)
         coefficients = rng.uniform(-1.0, 1.0, size=(n_cond, n_coeffs)).tolist()
-        bits_precision = 6
+        bits_precision = 3
         n_index_bits = math.ceil(math.log2(n_coeffs))
         n_cond_bits = math.ceil(math.log2(n_cond))
+        # The selector must build width num_swap_bits for each case, so the cases cover 0, 1 and 2.
+        select_swap = qsharp_test_context.code.QDKChemistry.Utils.SelectSwap
+        expected_width = {0: 0, -1: 2, 1: 1}[num_swap_bits]
+        word_bits = bits_precision + n_index_bits + 2
+        assert select_swap.ComputeOptimalLambda2D(n_cond, n_coeffs, word_bits, True, num_swap_bits) == expected_width
 
         full_sv = _run_conditional_alias_and_dump(
             qsharp_test_context, qsharp_test_utils, coefficients, bits_precision, condition_value, num_swap_bits

@@ -1,0 +1,249 @@
+.. _release-v2.3.0:
+
+==========================
+What's New in Version 2.3
+==========================
+
+Version 2.3 adds factorized Hamiltonian workflows, sum-of-squares spectral
+amplification, lattice-model circuit construction, scalar-relativistic
+electronic structure, and Azure Quantum execution.
+See :ref:`v2-3-compatibility` for data migration and integration changes.
+
+.. contents:: On this page
+   :local:
+   :depth: 1
+
+
+Factorized Hamiltonians and SOSSA
+=================================
+
+``hamiltonian_factorization`` / ``double_factorization`` diagonalizes the
+supplied restricted molecular-orbital Cholesky vectors in a
+:class:`~qdk_chemistry.data.CholeskyHamiltonianContainer` :cite:`vonBurg2021`:
+
+.. literalinclude:: ../_static/examples/python/release_notes_v2_3.py
+   :language: python
+   :start-after: # start-cell-factorization
+   :end-before: # end-cell-factorization
+
+Double factorization produces a
+:class:`~qdk_chemistry.data.DFTHCHamiltonianContainer`, which supports both
+DF and general DFTHC representations.
+See :doc:`../user/comprehensive/algorithms/hamiltonian_factorization`.
+
+``qubit_mapper`` / ``sum_of_squares`` maps these factors to a
+:class:`~qdk_chemistry.data.QubitOperator` backed by
+:class:`~qdk_chemistry.data.qubit_operator.containers.sum_of_squares.SumOfSquaresContainer`.
+``hamiltonian_unitary_builder`` / ``sossa`` then constructs the numerical
+description of a sum-of-squares spectral-amplification (SOSSA) block encoding
+:cite:`Low2025`:
+
+.. literalinclude:: ../_static/examples/python/release_notes_v2_3.py
+   :language: python
+   :start-after: # start-cell-sossa
+   :end-before: # end-cell-sossa
+
+The supported circuit path uses canonical, untapered, blocked Jordan-Wigner
+ordering and unary phase estimation. Custom Jordan-Wigner tables and mode
+permutations are not recognized or lowered.
+
+The SOSSA mapper emits the block encoding. Unary QPE supplies the reflections
+that form the walk and realizes signed walk powers from a single query chain.
+This can reduce walk-query counts at fixed phase precision relative to
+standard QPE.
+
+SOSSA includes the core energy in its scalar shift. Its decoded energies are
+**total energies**; do not add ``get_core_energy()`` again.
+
+Electronic trial-state preparation is separate from block-encoding PREPARE.
+This example uses :doc:`sparse-isometry state preparation <../user/comprehensive/algorithms/state_preparation>`
+and builds a unary-QPE circuit to estimate its logical resources:
+
+.. literalinclude:: ../_static/examples/python/release_notes_v2_3.py
+   :language: python
+   :start-after: # start-cell-unary-sossa
+   :end-before: # end-cell-unary-sossa
+
+The example derives its query count from a :math:`1\,\mathrm{m}E_h`
+phase-estimation energy target and uses that count in the circuit.
+The CASCI reference supplies the local energy sensitivity ``lambda_eff``
+used in the query estimate.
+See :ref:`sossa-query-guidance` for the local query estimate and the other
+contributions to total error.
+
+The `SOSSA resource-estimation notebook
+<https://github.com/microsoft/qdk-chemistry/blob/main/examples/sossa_qre.ipynb>`_
+also demonstrates simulation from a stored DFTHC Hamiltonian and resource
+estimation using synthetic factors.
+
+
+State Preparation and Circuit Composition
+=========================================
+
+``state_prep`` / ``alias_sampling`` provides coherent alias sampling
+:cite:`Babbush2018`, while ``state_prep`` / ``qrom`` uses QROM-loaded rotations
+and a phase-gradient register.
+Alias sampling leaves its index entangled with working qubits and is a
+block-encoding PREPARE oracle, not a general electronic trial-state loader.
+
+QROM preparation can own its gradient internally or declare a caller-owned
+gradient through :class:`~qdk_chemistry.data.circuit.CircuitMetadata`.
+SOSSA shares compatible phase-gradient registers and rejects incompatible
+shared widths.
+
+Standard and iterative LCU QPE now allocate the full callable register
+declared by the controlled mapper, including alias-sampling working qubits.
+This also applies to combined adaptive IQPE.
+The structural width of a :class:`~qdk_chemistry.data.UnitaryRepresentation`
+is not a substitute for its mapped circuit's requirements.
+See :doc:`../user/comprehensive/algorithms/state_preparation` and
+:doc:`../user/comprehensive/algorithms/qpe_circuit_builder`.
+
+
+Lattice Models and Product Formulas
+===================================
+
+:class:`~qdk_chemistry.data.LatticeGeometry` stores lattice vectors and site
+positions for distance-based neighbor-shell construction.
+:meth:`~qdk_chemistry.data.LatticeGraph.from_geometry` converts these shells
+into labeled graphs with optional bond flavors. This supports farther-neighbor
+and bond-dependent interactions, including extended Kitaev models.
+The examples also include Ising, Heisenberg, and Hubbard resource-estimation workflows.
+See :doc:`../user/comprehensive/model_hamiltonians`.
+
+:meth:`~qdk_chemistry.data.QubitOperator.from_sparse_terms` stores only
+nonidentity Pauli factors rather than full-width labels.
+Spin-model Hamiltonian builders produce this representation with
+``sparse_terms=True``. Sparse-native arithmetic, grouping, Trotter construction,
+and serialization operate on these factors; full-width Pauli labels are
+generated when requested.
+
+Trotter product formulas can fuse matching group boundaries to reduce
+circuit gate counts.
+
+Trotter construction preserves layers from a
+:class:`~qdk_chemistry.data.LayeredPartition`. The controlled
+``pauli_sequence`` mapper interleaves each layer's controlled rotations,
+which can reduce rotation depth without extra ancillas.
+``vacuum_annihilating`` grouping returns a
+:class:`~qdk_chemistry.data.QubitOperator` carrying a
+:class:`~qdk_chemistry.data.LayeredPartition`. Controlled Pauli-sequence
+mappers can also opt into Hamming-weight phasing of equal-angle rotations.
+
+``hamiltonian_unitary_builder`` / ``hubbard_plaquette`` and its controlled
+mapper construct plaquette-based Fermi-Hubbard evolution :cite:`Campbell2022`.
+The builder accepts a
+:class:`~qdk_chemistry.data.FermiHubbardModelHamiltonianDescription`
+directly, without first materializing a Pauli operator.
+Unitary builders and QPE now accept the common
+:class:`~qdk_chemistry.data.HamiltonianDescription` interface;
+individual implementations retain their own input requirements.
+Static inputs to driven evolution can be represented by
+:class:`~qdk_chemistry.data.DrivenQubitHamiltonian` with no drive terms.
+
+Standard QPE adds ``phase_state="sine"`` alongside the existing uniform
+phase-register state. The sine window can reduce phase-estimation
+uncertainty relative to uniform preparation :cite:`Babbush2018`.
+See :doc:`../user/comprehensive/algorithms/hamiltonian_unitary_builder` and
+:doc:`../user/comprehensive/algorithms/qpe_circuit_builder`.
+
+
+Electronic Structure
+====================
+
+Native :doc:`SCF <../user/comprehensive/algorithms/scf_solver>` and
+:doc:`Hamiltonian construction <../user/comprehensive/algorithms/hamiltonian_constructor>`
+support spin-free one-electron exact-two-component (X2C) Hamiltonians.
+Set ``relativity="sf-x2c"`` for decontraction and recontraction, or
+``"sf-x2c-contracted"`` to use the supplied contracted basis.
+
+These are scalar-relativistic, one-electron treatments: two-electron
+integrals are unchanged and spin-orbit coupling is not included.
+They require spherical, all-electron basis sets (:term:`ECPs <ECP>` and
+Cartesian :term:`AOs <AO>` are not supported).
+
+This release also corrects local ECP handling in integral evaluation and
+PySCF basis conversion, and fixes BLAS thread handling around GauXC
+operations.
+The ``qdk`` Hamiltonian constructor adds ``eri_use_atomics``.
+With ``eri_method="direct"``, it accumulates the ERI transformation into
+one shared buffer using atomic updates instead of per-thread private buffers.
+
+
+Azure Quantum and Results
+=========================
+
+The ``azure-quantum`` extra enables
+``circuit_executor`` / ``azure_quantum_backend``:
+
+.. code-block:: bash
+
+   pip install 'qdk-chemistry[azure-quantum]'
+
+Circuits can now be submitted to Azure Quantum targets through the
+:class:`~qdk_chemistry.algorithms.CircuitExecutor` interface, extending
+execution beyond local simulators.
+The backend submits :term:`QIR` and returns measurement counts and job metadata.
+Optional attachments can be retained locally.
+See :doc:`../user/comprehensive/algorithms/circuit_executor` for authentication,
+target configuration, and supported workflows.
+
+Standard and unary QPE results now retain the measured bitstring histogram
+in ``bitstring_counts`` on :class:`~qdk_chemistry.data.QpeResult`.
+This lets users inspect the distribution across phase bins, including competing peaks.
+The histogram preserves measurement bitstrings; phase canonicalization and
+energy-branch selection remain separate.
+See :doc:`../user/comprehensive/data/qpe_result`.
+
+
+.. _v2-3-compatibility:
+
+Compatibility and Packaging
+===========================
+
+Product-formula containers now use serialization schema ``0.3.0``.
+Use :doc:`the migration tool <../user/migrating-data-files>` for older
+product formulas and lattice graphs.
+Migration preserves the stored scale, but cannot recover missing power or
+composition history: rebuild legacy powered or composed formulas before
+phase-to-energy inversion when their scale did not record total evolution
+time.
+
+Stored unitary powers are now respected during phase inversion.
+For a powered quantum walk, ``eigenvalue_from_phase`` raises when the phase
+has multiple possible energies; ``eigenvalue_branches_from_phase`` returns
+the candidates. SOSSA phase inversion remains restricted to unit power.
+
+Custom controlled circuit mappers used by QPE should declare
+``Circuit.num_qubits``, including the control and all caller-supplied work
+qubits. Internally allocated scratch is excluded.
+Omitting this width is deprecated: QPE emits ``DeprecationWarning`` and
+retains the previous allocation based on the unitary representation.
+This fallback cannot account for additional workspace introduced by a mapper.
+Shared phase-gradient ancillas must not be advertised to standard or
+iterative QPE, which do not initialize them.
+
+SOSSA JSON loading preserves empty SELECT array shapes. Direct construction
+and loading reject non-positive or non-finite block-encoding normalization.
+
+For stored ECP bases, migration records the local channel explicitly.
+Re-import old PySCF ECPs that have no local term rather than inferring that
+channel from an older file. Recompute cached results affected by corrected
+ECP integrals or phase decoding.
+
+The minimum supported QDK version increases from ``1.31.0`` in QDK Chemistry
+2.2.1 to ``1.33.1``.
+
+Wheels cover Linux x86-64 and Arm64, macOS Arm64, and Windows x86-64 and
+Arm64. Python 3.10 through 3.14 is covered by the release matrix, except that
+Windows Arm64 starts at Python 3.11.
+Optional dependencies remain platform-dependent: PySCF is unavailable on
+native Windows; MCP, Azure Quantum, and the Qiskit stack are excluded where
+Windows Arm64 wheels are unavailable; OpenFermion requires Python below
+3.14; Qiskit Aer is omitted on Linux Arm64 with Python 3.14.
+See the `installation instructions
+<https://github.com/microsoft/qdk-chemistry/blob/main/INSTALL.md>`_.
+
+Q# test helpers no longer ship in the installed utility project.
+CI adds Linux Arm64 and ExaChem integration coverage; this does not introduce
+new ExaChem algorithms into the release.

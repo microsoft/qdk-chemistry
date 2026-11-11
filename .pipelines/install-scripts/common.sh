@@ -63,9 +63,10 @@ for reg in data['registrations']:
 "
 }
 
-# Resolve the declared SHA-256 (`hash`) for an "other" (non-git) type component from cgmanifest.json, by
-# component name. Not every "other" entry declares one; callers must check for empty.
-get_hash() {
+# Resolve the declared SHA-256 for an "other" (non-git) type component from cgmanifest.json, by component
+# name. It lives in `sha256` because CG accepts only SHA-1 in `hash`. Not every "other" entry declares one;
+# callers must check for empty.
+get_sha256() {
     local manifest="$1" name="$2"
     python3 -c "
 import json
@@ -74,7 +75,7 @@ with open('$manifest') as f:
 for reg in data['registrations']:
     comp = reg['component']
     if comp['type'] == 'other' and comp['other'].get('name') == '$name':
-        print(comp['other'].get('hash', ''))
+        print(comp['other'].get('sha256', ''))
         break
 "
 }
@@ -94,7 +95,7 @@ for reg in data['registrations']:
 "
 }
 
-# Download an "other" type cgmanifest component and verify its SHA-256 against the declared `hash`, so a
+# Download an "other" type cgmanifest component and verify it against the declared `sha256`, so a
 # compromised or silently-changed upstream release asset is caught before it's extracted and built. Fails
 # loudly if the component has no downloadUrl or no declared hash. Downloads into the current directory (or
 # $3 if given) and prints the downloaded file's path on success, for capture via command substitution.
@@ -108,9 +109,9 @@ download_and_verify() {
         return 1
     fi
 
-    hash="$(get_hash "$manifest" "$name")"
+    hash="$(get_sha256 "$manifest" "$name")"
     if [[ -z "$hash" ]]; then
-        echo "ERROR: no hash declared for '$name' in $manifest -- cannot verify the download" >&2
+        echo "ERROR: no sha256 declared for '$name' in $manifest -- cannot verify the download" >&2
         return 1
     fi
 

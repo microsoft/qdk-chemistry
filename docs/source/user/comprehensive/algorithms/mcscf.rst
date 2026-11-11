@@ -149,7 +149,7 @@ Key features of the PySCF implementation:
    * - ``relativity``
      - string
      - ``""``
-     - Nonrelativistic (``""``), spin-free X2C with decontraction (``"sf-x2c"``), or X2C in the supplied contracted basis (``"sf-x2c-contracted"``). X2C requires spherical all-electron AOs and uses QDK physical constants; the two-electron operator is unchanged. Match the generating :doc:`SCF solver <scf_solver>`; :doc:`Orbitals <../data/orbitals>` do not carry the operator.
+     - Nonrelativistic (``""``), spin-free X2C with decontraction (``"sf-x2c"``), or X2C in the supplied contracted basis (``"sf-x2c-contracted"``). X2C requires spherical all-electron AOs and uses QDK physical constants; the two-electron operator is unchanged.
 
 Related classes
 ---------------

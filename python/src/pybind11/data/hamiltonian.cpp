@@ -82,6 +82,17 @@ Values:
       .value("Hermitian", HamiltonianType::Hermitian)
       .value("NonHermitian", HamiltonianType::NonHermitian);
 
+  py::enum_<TwoBodyPermutationGroup>(data, "TwoBodyPermutationGroup", R"(
+Index permutations that a two-body symmetry representative stands for, in
+chemist notation (pq|rs).
+
+Values:
+    FourFold: (pq|rs) = (rs|pq) = (qp|sr) = (sr|qp)
+    EightFold: additionally (pq|rs) = (qp|rs) = (pq|sr)
+)")
+      .value("FourFold", TwoBodyPermutationGroup::FourFold)
+      .value("EightFold", TwoBodyPermutationGroup::EightFold);
+
   // SpinChannel enumeration
   py::enum_<SpinChannel>(data, "SpinChannel", R"(
 Enumeration for different spin channels in unrestricted calculations.
@@ -115,6 +126,11 @@ for quantum chemistry calculations. It contains:
 
 Derived classes implement specific storage formats for two-electron integrals
 (e.g., canonical 4-center, density-fitted, etc.).
+
+Two-electron integrals are real, in chemist notation (pq|rs), with the
+beta-alpha block (pq|rs)_ba = (rs|pq)_ab. Restricted integrals and the
+same-spin blocks of a Hermitian Hamiltonian are expected to be 4-fold,
+(pq|rs) = (rs|pq) = (qp|sr); the alpha-beta block only (pq|rs) = (qp|sr).
 
 Note:
     This class cannot be instantiated directly. Use a derived class like
@@ -538,6 +554,12 @@ Args:
     filename (str): Path to FCIDUMP file to create/overwrite
     nalpha (int): Number of alpha electrons
     nbeta (int): Number of beta electrons
+
+Raises:
+    RuntimeError: If I/O error occurs, the Hamiltonian is unrestricted, or its
+        two-body integrals are not 8-fold symmetric.
+    ValueError: If the active space has differing alpha and beta sizes, or a
+        two-body integral is not finite.
 )",
       py::arg("filename"), py::arg("nalpha"), py::arg("nbeta"));
 
@@ -761,6 +783,12 @@ Args:
     filename (str): Path to FCIDUMP file to create/overwrite
     nalpha (int): Number of alpha electrons
     nbeta (int): Number of beta electrons
+
+Raises:
+    RuntimeError: If I/O error occurs, the Hamiltonian is unrestricted, or its
+        two-body integrals are not 8-fold symmetric.
+    ValueError: If the active space has differing alpha and beta sizes, or a
+        two-body integral is not finite.
 )",
       py::arg("filename"), py::arg("nalpha"), py::arg("nbeta"));
 
@@ -773,7 +801,10 @@ Hamiltonian container for lattice model Hamiltonians (Hückel, Hubbard, PPP, etc
 with sparse internal storage.
 
 Stores one-body integrals as a sparse matrix and two-body integrals as a
-sparse dictionary of (p, q, r, s) index tuples.
+sparse dictionary of (p, q, r, s) index tuples. Two-body entries are literal:
+positions that are not stored are zero. Use
+:meth:`expand_symmetry_representatives` to build such a dictionary from
+symmetry representatives.
 
 Internally uses ``ModelOrbitals`` so that the full ``HamiltonianContainer``
 interface (``get_one_body_integrals``, ``get_orbitals``, etc.) works.
@@ -789,10 +820,29 @@ Examples:
 )");
 
   // -- Sparse + two-body constructor --
-  sparse_container.def(py::init<Eigen::SparseMatrix<double>,
-                                SparseHamiltonianContainer::TwoBodyMap, double,
-                                HamiltonianType>(),
-                       R"(
+  sparse_container.def(
+      py::init([](Eigen::SparseMatrix<double> one_body_integrals,
+                  SparseHamiltonianContainer::TwoBodyMap two_body_integrals,
+                  double core_energy, HamiltonianType type) {
+        if (type == HamiltonianType::Hermitian &&
+            SparseHamiltonianContainer::uses_eightfold_shorthand(
+                two_body_integrals) &&
+            PyErr_WarnEx(
+                PyExc_DeprecationWarning,
+                "Sparse two-body entries that are the only stored member of a "
+                "larger 8-fold permutation class are expanded over that "
+                "class. This shorthand is deprecated: store every class "
+                "member, or call "
+                "SparseHamiltonianContainer.expand_symmetry_representatives "
+                "with TwoBodyPermutationGroup.EightFold.",
+                1) < 0) {
+          throw py::error_already_set();
+        }
+        return std::make_unique<SparseHamiltonianContainer>(
+            std::move(one_body_integrals), std::move(two_body_integrals),
+            core_energy, type);
+      }),
+      R"(
 Construct from sparse one-body integrals and a sparse two-body map.
 
 Args:
@@ -801,11 +851,16 @@ Args:
         integral map from (p, q, r, s) index tuples to values.
     core_energy (float, optional): Scalar energy offset. Defaults to 0.0.
     type (HamiltonianType, optional): Hamiltonian type. Defaults to Hermitian.
+
+Warns:
+    DeprecationWarning: If, in a Hermitian Hamiltonian, a nonzero entry is the
+        only stored member of a larger 8-fold permutation class; such an entry
+        is expanded over its class; :meth:`expand_symmetry_representatives`
+        builds every member. Other entries are read literally.
 )",
-                       py::arg("one_body_integrals"),
-                       py::arg("two_body_integrals"),
-                       py::arg("core_energy") = 0.0,
-                       py::arg("type") = HamiltonianType::Hermitian);
+      py::arg("one_body_integrals"), py::arg("two_body_integrals"),
+      py::arg("core_energy") = 0.0,
+      py::arg("type") = HamiltonianType::Hermitian);
 
   // -- Sparse one-body only --
   sparse_container.def(
@@ -832,6 +887,9 @@ Args:
     two_body_integrals (numpy.ndarray): Dense two-body integrals [n^4].
     core_energy (float, optional): Scalar energy offset. Defaults to 0.0.
     type (HamiltonianType, optional): Hamiltonian type. Defaults to Hermitian.
+
+Raises:
+    ValueError: If one_body_integrals is not square or two_body_integrals does not have n^4 elements.
 )",
                        py::arg("one_body_integrals"),
                        py::arg("two_body_integrals"),
@@ -976,14 +1034,51 @@ Returns:
 
   sparse_container.def(
       "to_fcidump_file", &SparseHamiltonianContainer::to_fcidump_file, R"(
-Save the Hamiltonian to an FCIDUMP file.
+Save the Hamiltonian to an FCIDUMP file, with one record per 8-fold permutation
+class.
 
 Args:
     filename (str): Path to the output file.
     nalpha (int): Number of alpha electrons.
     nbeta (int): Number of beta electrons.
+
+Raises:
+    RuntimeError: If I/O error occurs, the Hamiltonian is unrestricted, or its
+        two-body integrals are not 8-fold symmetric.
+    ValueError: If a two-body integral is not finite.
 )",
       py::arg("filename"), py::arg("nalpha"), py::arg("nbeta"));
+
+  sparse_container.def_static(
+      "expand_symmetry_representatives",
+      &SparseHamiltonianContainer::expand_symmetry_representatives, R"(
+Expand symmetry representatives into literal two-body entries.
+
+Assigns each representative's value to every distinct position of its orbit
+under ``group``. The result can be passed to the constructor.
+
+Args:
+    representatives (dict[tuple[int,int,int,int], float]): Representative
+        entries; values are final, not additive contributions.
+    group (TwoBodyPermutationGroup): Permutation group the representatives
+        stand for.
+
+Returns:
+    dict[tuple[int,int,int,int], float]: Literal two-body entries.
+
+Raises:
+    ValueError: If an index is negative, a value is not finite, or two
+        representatives assign different values to one position.
+
+Examples:
+    >>> from qdk_chemistry.data import SparseHamiltonianContainer, TwoBodyPermutationGroup
+    >>> entries = SparseHamiltonianContainer.expand_symmetry_representatives(
+    ...     {(0, 0, 1, 1): 0.5}, TwoBodyPermutationGroup.EightFold
+    ... )
+    >>> sorted(entries)
+    [(0, 0, 1, 1), (1, 1, 0, 0)]
+)",
+      py::arg("representatives"), py::arg("group"));
 
   // ============================================================================
   // DFTHCHamiltonianContainer - double-factorized tensor hypercontraction
@@ -1570,7 +1665,10 @@ Args:
     nbeta (int): Number of beta electrons
 
 Raises:
-    RuntimeError: If I/O error occurs
+    RuntimeError: If I/O error occurs, the Hamiltonian is unrestricted, or its
+        two-body integrals are not 8-fold symmetric.
+    ValueError: If the active space has differing alpha and beta sizes, or a
+        two-body integral is not finite.
 
 Examples:
     >>> hamiltonian.to_fcidump_file("water.fcidump", 5, 5)
