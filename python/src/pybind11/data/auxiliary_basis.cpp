@@ -333,7 +333,8 @@ Returns:
     AuxiliaryBasis: New instance loaded from JSON
 
 Raises:
-    RuntimeError: If the JSON is malformed or contains invalid auxiliary basis data
+    RuntimeError: If the JSON is malformed or a required field is missing
+    ValueError: If the JSON contains invalid auxiliary basis data
 )",
           py::arg("json"))
       .def("to_file", auxiliary_basis_to_file,
@@ -390,8 +391,8 @@ Returns:
     AuxiliaryBasis: New instance loaded from file
 
 Raises:
-    ValueError: If the filename does not follow the naming convention
-    RuntimeError: If the file cannot be read or contains invalid data
+    ValueError: If the filename does not follow the naming convention or the data is invalid
+    RuntimeError: If the file cannot be read
 )",
                   py::arg("filename"))
       .def("to_hdf5_file", auxiliary_basis_to_hdf5_file,
@@ -417,8 +418,8 @@ Returns:
     AuxiliaryBasis: New instance loaded from file
 
 Raises:
-    ValueError: If the filename does not follow the naming convention
-    RuntimeError: If the file cannot be read or contains invalid data
+    ValueError: If the filename does not follow the naming convention or the data is invalid
+    RuntimeError: If the file cannot be read
 )",
                   py::arg("filename"))
       .def("__repr__",
@@ -672,8 +673,7 @@ Raises:
 Load a collection from an HDF5 file.
 
 Args:
-    filename (str | pathlib.Path): Source path ending in
-    ``.auxiliary_basis_collection.h5``
+    filename (str | pathlib.Path): Source path ending in ``.auxiliary_basis_collection.h5``
 
 Returns:
     AuxiliaryBasisCollection: Deserialized collection

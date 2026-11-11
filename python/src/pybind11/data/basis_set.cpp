@@ -275,8 +275,7 @@ Examples:
     >>> print(f"Basis set for {structure.get_num_atoms()} atoms")
 )",
                 py::arg("name"), py::arg("structure"),
-                py::arg("atomic_orbital_type") = AOType::Spherical,
-                py::keep_alive<1, 2>());
+                py::arg("atomic_orbital_type") = AOType::Spherical);
 
   basis_set.def(
       py::init<const std::string&, const std::vector<Shell>&, AOType>(),

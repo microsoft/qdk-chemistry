@@ -100,7 +100,7 @@ The library supports three methods for loading basis sets:
 .. seealso::
    For a complete list of available basis sets, see the :doc:`Supported Basis Sets <../basis_functionals>` documentation.
 
-Primary and auxiliary bases are independent values constructed against the same molecular structure. Group auxiliary bases in an :class:`~qdk_chemistry.data.AuxiliaryBasisCollection`, keyed by role. The collection is an independent data model for future algorithm inputs and is not stored on the primary basis or wavefunction. Current algorithms do not consume it; computational integration such as density fitting is outside this feature:
+Primary and auxiliary bases are independent values; build both against the same molecular structure. Group auxiliary bases in an :class:`~qdk_chemistry.data.AuxiliaryBasisCollection`, keyed by role. The collection is intended for algorithms that explicitly accept auxiliary-basis inputs; it is not stored on the primary basis or wavefunction and does not itself enable density fitting:
 
 .. tab:: C++ API
 
@@ -275,7 +275,7 @@ HDF5 representation of a :class:`~qdk_chemistry.data.BasisSet` has the following
       │   ├── num_primitives  # Dataset: uint32, 1D Array of number of primitives per orbital
       │   └── orbital_types   # Dataset: int32, 1D Array of orbital type per orbital
       └── metadata/           # Group
-         └── name            # Attribute: string value of the basis set name
+          └── name            # Attribute: string value of the basis set name
 
 .. tab:: Python API
 

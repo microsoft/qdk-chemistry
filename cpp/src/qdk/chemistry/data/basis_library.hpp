@@ -64,15 +64,6 @@ size_t count_shells(const ShellsPerAtom& shells_per_atom);
 size_t count_orbitals(const ShellsPerAtom& shells_per_atom,
                       AOType atomic_orbital_type = AOType::Spherical);
 
-/**
- * @brief Normalize a basis set name for filesystem usage.
- * Replaces '*' with "_st_", '/' with "_sl_", and '+' with "_pl_".
- */
-std::string normalize_basis_set_name(const std::string& name);
-
-/** @brief Inverse of @ref normalize_basis_set_name. */
-std::string denormalize_basis_set_name(const std::string& normalized);
-
 /** @brief Lowercase a basis set name for case-insensitive library lookup. */
 std::string lowercase_basis_name(std::string name);
 
