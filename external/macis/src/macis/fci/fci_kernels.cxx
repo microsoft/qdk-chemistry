@@ -26,13 +26,40 @@
 
 namespace macis {
 
+#if MACIS_FCI_X86_SIMD
+namespace {
+// Read directly: __builtin_cpu_supports needs a runtime library (libgcc or
+// compiler-rt) that clang-cl does not link
+void cpuid(unsigned leaf, unsigned (&r)[4]) {
+  __asm__ __volatile__("cpuid"
+                       : "=a"(r[0]), "=b"(r[1]), "=c"(r[2]), "=d"(r[3])
+                       : "a"(leaf), "c"(0u));
+}
+unsigned xcr0() {
+  unsigned lo, hi;
+  __asm__ __volatile__("xgetbv" : "=a"(lo), "=d"(hi) : "c"(0u));
+  return lo;
+}
+}  // namespace
+#endif
+
 FCISimd fci_simd_supported() {
 #if MACIS_FCI_X86_SIMD
   static const FCISimd level = [] {
-    __builtin_cpu_init();
-    if (__builtin_cpu_supports("avx512f")) return FCISimd::avx512;
-    if (__builtin_cpu_supports("avx2") and __builtin_cpu_supports("fma"))
-      return FCISimd::avx2;
+    unsigned r[4];
+    cpuid(0, r);
+    if (r[0] < 7) return FCISimd::generic;
+    cpuid(1, r);
+    const bool fma = r[2] >> 12 & 1, osxsave = r[2] >> 27 & 1,
+               avx = r[2] >> 28 & 1;
+    if (not osxsave or not avx) return FCISimd::generic;
+    // The OS must save the YMM state (XCR0 bits 1-2) for AVX, and also the
+    // opmask and ZMM state (bits 5-7) for AVX-512
+    const unsigned os = xcr0();
+    cpuid(7, r);
+    const bool avx2 = r[1] >> 5 & 1, avx512f = r[1] >> 16 & 1;
+    if ((os & 0xe6) == 0xe6 and avx512f) return FCISimd::avx512;
+    if ((os & 0x6) == 0x6 and avx2 and fma) return FCISimd::avx2;
     return FCISimd::generic;
   }();
   return level;
