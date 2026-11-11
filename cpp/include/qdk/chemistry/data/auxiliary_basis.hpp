@@ -381,7 +381,7 @@ class AuxiliaryBasisCollection
    * @param filename Destination filename with an
    *        @c .auxiliary_basis_collection.h5 suffix
    * @throws std::invalid_argument if the filename suffix is invalid
-   * @throws H5::Exception if the file cannot be written
+   * @throws std::runtime_error if the file cannot be written
    */
   void to_hdf5_file(const std::string& filename) const override;
 
@@ -431,7 +431,7 @@ class AuxiliaryBasisCollection
    *        @c .auxiliary_basis_collection.h5 suffix
    * @return Deserialized auxiliary-basis collection
    * @throws std::invalid_argument if the filename suffix is invalid
-   * @throws H5::Exception if the file or collection group cannot be read
+   * @throws std::runtime_error if the file or collection group cannot be read
    */
   static std::shared_ptr<AuxiliaryBasisCollection> from_hdf5_file(
       const std::string& filename);

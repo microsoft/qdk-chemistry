@@ -184,6 +184,9 @@ struct Shell {
   /**
    * @brief Serialize this shell.
    * @param include_radial_powers Whether to include ECP radial powers
+   * @return JSON object with @c orbital_type, @c exponents, and
+   *         @c coefficients; @c rpowers is added only when
+   *         @p include_radial_powers is true and the shell has radial powers
    */
   nlohmann::json to_json(bool include_radial_powers = false) const;
 
@@ -192,6 +195,12 @@ struct Shell {
    * @param json Serialized shell data
    * @param atom_index Index of the atom on which the shell is centered
    * @param allow_radial_powers Whether ECP radial powers are permitted
+   * @return Deserialized shell centered on @p atom_index
+   * @throws std::invalid_argument if @c rpowers is present but
+   *         @p allow_radial_powers is false, the orbital type is unknown, or
+   *         the primitive-array lengths are inconsistent
+   * @throws nlohmann::json::exception if a required field is missing or has
+   *         the wrong type
    */
   static Shell from_json(const nlohmann::json& json, size_t atom_index,
                          bool allow_radial_powers = false);

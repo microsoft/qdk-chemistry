@@ -335,9 +335,15 @@ std::shared_ptr<AuxiliaryBasis> AuxiliaryBasis::from_hdf5(H5::Group& group) {
 void AuxiliaryBasis::to_hdf5_file(const std::string& filename) const {
   std::string validated = DataTypeFilename::validate_write_suffix(
       filename, DATACLASS_TO_SNAKE_CASE(AuxiliaryBasis));
-  H5::H5File file(validated, H5F_ACC_TRUNC);
-  H5::Group group = file.createGroup("/auxiliary_basis");
-  to_hdf5(group);
+  try {
+    H5::H5File file(validated, H5F_ACC_TRUNC);
+    H5::Group group = file.createGroup("/auxiliary_basis");
+    to_hdf5(group);
+  } catch (const H5::Exception& e) {
+    throw std::runtime_error(
+        "Unable to write AuxiliaryBasis HDF5 file '" + validated +
+        "'. HDF5 error: " + std::string(e.getCDetailMsg()));
+  }
 }
 
 std::shared_ptr<AuxiliaryBasis> AuxiliaryBasis::from_hdf5_file(
@@ -347,9 +353,24 @@ std::shared_ptr<AuxiliaryBasis> AuxiliaryBasis::from_hdf5_file(
   }
   std::string validated = DataTypeFilename::validate_read_suffix(
       filename, DATACLASS_TO_SNAKE_CASE(AuxiliaryBasis));
-  H5::H5File file(validated, H5F_ACC_RDONLY);
-  H5::Group group = file.openGroup("/auxiliary_basis");
-  return from_hdf5(group);
+  H5::H5File file;
+  try {
+    file.openFile(validated, H5F_ACC_RDONLY);
+  } catch (const H5::Exception& e) {
+    throw std::runtime_error(
+        "Unable to open AuxiliaryBasis HDF5 file '" + validated +
+        "'. Please check that the file exists, is a valid HDF5 file, and you "
+        "have read permissions. HDF5 error: " +
+        std::string(e.getCDetailMsg()));
+  }
+  try {
+    H5::Group group = file.openGroup("/auxiliary_basis");
+    return from_hdf5(group);
+  } catch (const H5::Exception& e) {
+    throw std::runtime_error(
+        "Unable to read AuxiliaryBasis data from HDF5 file '" + validated +
+        "'. HDF5 error: " + std::string(e.getCDetailMsg()));
+  }
 }
 
 std::shared_ptr<AuxiliaryBasis> AuxiliaryBasis::from_file(
@@ -523,9 +544,15 @@ std::shared_ptr<AuxiliaryBasisCollection> AuxiliaryBasisCollection::from_hdf5(
 void AuxiliaryBasisCollection::to_hdf5_file(const std::string& filename) const {
   std::string validated = DataTypeFilename::validate_write_suffix(
       filename, DATACLASS_TO_SNAKE_CASE(AuxiliaryBasisCollection));
-  H5::H5File file(validated, H5F_ACC_TRUNC);
-  H5::Group group = file.createGroup("/auxiliary_basis_collection");
-  to_hdf5(group);
+  try {
+    H5::H5File file(validated, H5F_ACC_TRUNC);
+    H5::Group group = file.createGroup("/auxiliary_basis_collection");
+    to_hdf5(group);
+  } catch (const H5::Exception& e) {
+    throw std::runtime_error(
+        "Unable to write AuxiliaryBasisCollection HDF5 file '" + validated +
+        "'. HDF5 error: " + std::string(e.getCDetailMsg()));
+  }
 }
 
 std::shared_ptr<AuxiliaryBasisCollection>
@@ -535,9 +562,24 @@ AuxiliaryBasisCollection::from_hdf5_file(const std::string& filename) {
   }
   std::string validated = DataTypeFilename::validate_read_suffix(
       filename, DATACLASS_TO_SNAKE_CASE(AuxiliaryBasisCollection));
-  H5::H5File file(validated, H5F_ACC_RDONLY);
-  H5::Group group = file.openGroup("/auxiliary_basis_collection");
-  return from_hdf5(group);
+  H5::H5File file;
+  try {
+    file.openFile(validated, H5F_ACC_RDONLY);
+  } catch (const H5::Exception& e) {
+    throw std::runtime_error(
+        "Unable to open AuxiliaryBasisCollection HDF5 file '" + validated +
+        "'. Please check that the file exists, is a valid HDF5 file, and you "
+        "have read permissions. HDF5 error: " +
+        std::string(e.getCDetailMsg()));
+  }
+  try {
+    H5::Group group = file.openGroup("/auxiliary_basis_collection");
+    return from_hdf5(group);
+  } catch (const H5::Exception& e) {
+    throw std::runtime_error(
+        "Unable to read AuxiliaryBasisCollection data from HDF5 file '" +
+        validated + "'. HDF5 error: " + std::string(e.getCDetailMsg()));
+  }
 }
 
 std::shared_ptr<AuxiliaryBasisCollection> AuxiliaryBasisCollection::from_file(
