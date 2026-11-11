@@ -42,10 +42,11 @@ namespace {
 using spin_string_t = std::bitset<64>;
 using wfn_type = macis::wfn_t<64>;
 
-// Random real integrals with the 8-fold permutational symmetry of (pq|rs) and
-// a symmetric one-body matrix; column-major with leading dimension norb.
+// Random real integrals with the 8-fold permutational symmetry of (pq|rs), or
+// only (pq|rs) = (rs|pq) = (qp|sr) if not eightfold, and a symmetric one-body
+// matrix; column-major with leading dimension norb.
 void random_integrals(size_t norb, std::mt19937& gen, std::vector<double>& T,
-                      std::vector<double>& V) {
+                      std::vector<double>& V, bool eightfold = true) {
   std::uniform_real_distribution<double> dist(-1.0, 1.0);
   const size_t n2 = norb * norb;
   T.assign(n2, 0.0);
@@ -57,6 +58,23 @@ void random_integrals(size_t norb, std::mt19937& gen, std::vector<double>& T,
   auto v = [&](size_t p, size_t q, size_t r, size_t s) -> double& {
     return V[p + q * norb + r * n2 + s * n2 * norb];
   };
+  if (not eightfold) {
+    std::vector<bool> drawn(n2 * n2, false);
+    for (size_t s = 0; s < norb; ++s)
+      for (size_t r = 0; r < norb; ++r)
+        for (size_t q = 0; q < norb; ++q)
+          for (size_t p = 0; p < norb; ++p) {
+            if (drawn[p + q * norb + r * n2 + s * n2 * norb]) continue;
+            const double x = dist(gen);
+            for (auto [a, b, c, d] :
+                 {std::array{p, q, r, s}, std::array{r, s, p, q},
+                  std::array{q, p, s, r}, std::array{s, r, q, p}}) {
+              v(a, b, c, d) = x;
+              drawn[a + b * norb + c * n2 + d * n2 * norb] = true;
+            }
+          }
+    return;
+  }
   for (size_t p = 0; p < norb; ++p)
     for (size_t q = 0; q <= p; ++q)
       for (size_t r = 0; r < norb; ++r)
@@ -409,6 +427,94 @@ TEST_CASE("FCI Spin Flip") {
     S.resize(H2.size());
     REQUIRE_THROWS_AS(H2.sigma(C.data(), S.data(), 1.0, 0.0, 2),
                       std::invalid_argument);
+  }
+}
+
+TEST_CASE("FCI Fourfold Integrals") {
+  ROOT_ONLY(MPI_COMM_WORLD);
+  for (auto name : {"ci_solver", "davidson"})
+    if (!spdlog::get(name)) spdlog::null_logger_mt(name);
+
+  // Without (pq|rs) = (qp|rs) the alpha-beta term has a part antisymmetric
+  // in p, q and in r, s
+  const std::vector<std::array<size_t, 3>> cases = {
+      {2, 1, 1}, {3, 2, 1}, {4, 2, 2}, {5, 2, 3}, {6, 3, 3}, {7, 2, 5}};
+  std::mt19937 gen(706);
+  std::uniform_real_distribution<double> dist(-1.0, 1.0);
+  for (auto [norb, na, nb] : cases) {
+    DYNAMIC_SECTION("norb = " << norb << " nalpha = " << na
+                              << " nbeta = " << nb) {
+      std::vector<double> T, V;
+      random_integrals(norb, gen, T, V, false);
+      macis::FCIHamiltonian H(norb, na, nb, T.data(), norb, V.data(), norb);
+      macis::DoubleLoopHamiltonianGenerator<wfn_type> ham_gen(
+          macis::matrix_span<double>(T.data(), norb, norb),
+          macis::rank4_span<double>(V.data(), norb, norb, norb, norb));
+      auto dets = macis::generate_hilbert_space<wfn_type>(norb, na, nb);
+      const size_t ndet = dets.size();
+      auto H_ref = macis::make_csr_hamiltonian<int64_t>(
+          dets.begin(), dets.end(), ham_gen, 0.0);
+
+      std::vector<double> x(ndet), sigma(ndet), sigma_ref(ndet);
+      for (auto& xi : x) xi = dist(gen);
+      sparsexx::spblas::gespmbv(1, 1.0, H_ref, x.data(), ndet, 0.0,
+                                sigma_ref.data(), ndet);
+      for (int level = 0; level <= int(macis::fci_simd_supported()); ++level) {
+        H.set_simd(macis::FCISimd(level));
+        H.sigma(x.data(), sigma.data());
+        for (size_t i = 0; i < ndet; ++i)
+          REQUIRE_THAT(sigma[i],
+                       Catch::Matchers::WithinAbs(sigma_ref[i], 1e-10));
+        std::vector<float> xf(x.begin(), x.end()), sf(ndet);
+        H.sigma(xf.data(), sf.data());
+        REQUIRE(relative_error(sf, sigma_ref) < 1e-5);
+      }
+
+      if (na == nb) {
+        const size_t ns = H.alpha_strings().size();
+        for (int eta : {1, -1}) {
+          std::vector<double> C(ndet), S(ndet), ref(ndet);
+          for (size_t i = 0; i < ns; ++i)
+            for (size_t j = 0; j <= i; ++j) {
+              const double c = i == j and eta < 0 ? 0.0 : dist(gen);
+              C[i * ns + j] = c;
+              C[j * ns + i] = eta * c;
+            }
+          sparsexx::spblas::gespmbv(1, 1.0, H_ref, C.data(), ndet, 0.0,
+                                    ref.data(), ndet);
+          H.sigma(C.data(), S.data(), 1.0, 0.0, eta);
+          for (size_t i = 0; i < ndet; ++i)
+            REQUIRE_THAT(S[i], Catch::Matchers::WithinAbs(ref[i], 1e-10));
+        }
+      }
+
+      std::vector<double> D(ndet);
+      H.diagonal(D.data());
+      std::vector<size_t> all(ndet);
+      std::iota(all.begin(), all.end(), size_t(0));
+      std::vector<double> H_sub(ndet * ndet);
+      H.submatrix(all, H_sub.data());
+      for (size_t j = 0; j < ndet; ++j) {
+        REQUIRE_THAT(D[j],
+                     Catch::Matchers::WithinAbs(
+                         ham_gen.matrix_element(dets[j], dets[j]), 1e-11));
+        for (size_t i = 0; i < ndet; ++i)
+          REQUIRE_THAT(H_sub[i + j * ndet],
+                       Catch::Matchers::WithinAbs(
+                           ham_gen.matrix_element(dets[i], dets[j]), 1e-11));
+      }
+
+      std::vector<double> evals(ndet);
+      lapack::syev(lapack::Job::NoVec, lapack::Uplo::Lower, ndet, H_sub.data(),
+                   ndet, evals.data());
+      for (auto precision : {macis::FCIPrecision::double_precision,
+                             macis::FCIPrecision::mixed}) {
+        std::vector<double> C;
+        const double E =
+            macis::fci_ground_state(H, 200, 1e-8, C, 0, 10, precision);
+        REQUIRE_THAT(E, Catch::Matchers::WithinAbs(evals[0], 1e-10));
+      }
+    }
   }
 }
 

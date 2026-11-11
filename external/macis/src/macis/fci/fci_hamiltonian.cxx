@@ -88,6 +88,11 @@ constexpr size_t mixed_precision_min_size = size_t(1) << 21;
 // for 2.9e6, on Cascade Lake with 64 threads)
 constexpr size_t block_preconditioner_min_size = size_t(1) << 23;
 
+// Antisymmetric part of the integrals (see the constructor) at or below this
+// fraction of the largest integral is taken for rounding, e.g. of an integral
+// transformation, and dropped rather than given its own pass of sigma
+constexpr double antisymmetric_cutoff = 1e-12;
+
 #ifdef MACIS_FCI_PROFILE
 // Development builds only: per-pass sigma timings on stderr
 inline double profile_clock() {
@@ -263,14 +268,36 @@ FCIHamiltonian::FCIHamiltonian(size_t norb, size_t nalpha, size_t nbeta,
     return V[p + q * LDV + r * LDV2 + s * LDV3];
   };
 
+  // (pq|rs) = (rs|pq) = (qp|sr) is the sum of a part symmetric in p, q and
+  // in r, s, applied through packed pairs, and a part antisymmetric in both
+  // (zero for real orbitals), applied by antisymmetric_pass unless it is
+  // only rounding
+  const size_t npa = norb * (norb - 1) / 2;
+  std::vector<double> anti(npa * npa);
+  double vmax = 0.0, amax = 0.0;
   vpair_.resize(npair_ * npair_);
   for (size_t p = 0; p < norb; ++p)
     for (size_t q = 0; q <= p; ++q)
       for (size_t r = 0; r < norb; ++r)
-        for (size_t s = 0; s <= r; ++s)
+        for (size_t s = 0; s <= r; ++s) {
+          const double direct = v(p, q, r, s) + v(q, p, s, r);
+          const double crossed = v(q, p, r, s) + v(p, q, s, r);
           vpair_[fci_pair_index(p, q) * npair_ + fci_pair_index(r, s)] =
-              v(p, q, r, s);
+              0.25 * (direct + crossed);
+          vmax = std::max(
+              {vmax, std::abs(v(p, q, r, s)), std::abs(v(q, p, r, s))});
+          if (p > q and r > s) {
+            const double a = 0.25 * (direct - crossed);
+            anti[distinct_pair_index(q, p) * npa + distinct_pair_index(s, r)] =
+                a;
+            amax = std::max(amax, std::abs(a));
+          }
+        }
   vpair_f_.assign(vpair_.begin(), vpair_.end());
+  if (amax > antisymmetric_cutoff * vmax) {
+    vanti_ = std::move(anti);
+    vanti_f_.assign(vanti_.begin(), vanti_.end());
+  }
 
   coulomb_.resize(norb * norb);
   for (size_t p = 0; p < norb; ++p)
@@ -729,6 +756,7 @@ void FCIHamiltonian::sigma_impl(const T* C, T* S, T alpha, T beta,
     }
 #endif
   }
+  antisymmetric_pass<T>(C, S, alpha, spin_flip);
 #ifdef MACIS_FCI_PROFILE
   MACIS_FCI_TIC(prof_t1);
 #endif
@@ -908,6 +936,82 @@ void FCIHamiltonian::same_spin_pass(bool alpha_strings, const T* C, T* S,
   }
 }
 
+template <typename T>
+void FCIHamiltonian::antisymmetric_pass(const T* C, T* S, T alpha,
+                                        int spin_flip) const {
+  const auto& sa = *alpha_;
+  const auto& sb = *beta_;
+  const size_t nexc_a = sa.num_excitations();
+  const size_t nexc_b = sb.num_excitations();
+  if (vanti_.empty() or nexc_a == 0 or nexc_b == 0) return;
+  const size_t na = sa.size();
+  const size_t nb = sb.size();
+  const size_t npa = norb_ * (norb_ - 1) / 2;
+  const T* vanti;
+  if constexpr (std::is_same_v<T, float>)
+    vanti = vanti_f_.data();
+  else
+    vanti = vanti_.data();
+
+  // For E_{create,destroy}|J> = sign |I>: the row of vanti_ and the value of
+  // <I|A_pq|J>, A_pq = E_pq - E_qp (p > q); <J|A_pq|I> is its negative
+  auto oriented = [](const FCIStringSpace::Excitation& ex) {
+    return ex.create > ex.destroy
+               ? std::pair{distinct_pair_index(ex.destroy, ex.create),
+                           T(ex.sign)}
+               : std::pair{distinct_pair_index(ex.create, ex.destroy),
+                           T(-ex.sign)};
+  };
+
+  // S(Ia, Ib) += alpha sum vanti(pq, rs) <Ia|A_pq|Ja> <Ib|A_rs|Jb> C(Ja, Jb)
+  // (L instead of C in a sector): per row Ia and block of Jb, Z(rs, Jb) =
+  // sum over the excitations Ja of Ia of W(rs, Ja) C(Ja, Jb), scattered
+  // through the excitations of each Jb
+  const size_t block = std::min<size_t>(nb, 256);
+  const double flops = 2.0 * double(na) * nexc_a * (npa + nexc_b) * nb;
+#pragma omp parallel num_threads(threads_for(flops))
+  {
+    [[maybe_unused]] FlushDenormals<T> flush;
+    std::vector<T> W(nexc_a * npa), X(nexc_a * block), Z(npa * block);
+#pragma omp for schedule(dynamic)
+    for (size_t ia = 0; ia < na; ++ia) {
+      const auto* exa = sa.excitations(ia);
+      for (size_t e = 0; e < nexc_a; ++e) {
+        const auto [row, value] = oriented(exa[e]);
+        const T f = -alpha * value;
+        const T* v = vanti + row * npa;
+        for (size_t rs = 0; rs < npa; ++rs) W[e * npa + rs] = f * v[rs];
+      }
+      T* s = S + ia * nb;
+      for (size_t b0 = 0; b0 < nb; b0 += block) {
+        const size_t bl = std::min(block, nb - b0);
+        for (size_t e = 0; e < nexc_a; ++e) {
+          const size_t ja = exa[e].target;
+          const T* c = C + ja * nb + b0;
+          T* x = X.data() + e * bl;
+          for (size_t j = 0; j < bl; ++j) {
+            const size_t jb = b0 + j;
+            x[j] = spin_flip == 0 or jb < ja ? c[j]
+                   : jb == ja                ? T(0.5) * c[j]
+                                             : T(0);
+          }
+        }
+        blas::gemm(blas::Layout::ColMajor, blas::Op::NoTrans, blas::Op::Trans,
+                   npa, bl, nexc_a, T(1), W.data(), npa, X.data(), bl, T(0),
+                   Z.data(), npa);
+        for (size_t j = 0; j < bl; ++j) {
+          const auto* exb = sb.excitations(b0 + j);
+          const T* z = Z.data() + j * npa;
+          for (size_t f = 0; f < nexc_b; ++f) {
+            const auto [row, value] = oriented(exb[f]);
+            s[exb[f].target] += value * z[row];
+          }
+        }
+      }
+    }
+  }
+}
+
 void FCIHamiltonian::operator_action(size_t m, double alpha, const double* V,
                                      size_t LDV, double beta, double* AV,
                                      size_t LDAV) const {
@@ -918,19 +1022,23 @@ void FCIHamiltonian::submatrix(const std::vector<size_t>& dets,
                                double* H_sub) const {
   const size_t nb = beta_->size();
   const size_t nd = dets.size();
+  const size_t npa = norb_ * (norb_ - 1) / 2;
 
   // Nonzero <I|E_pq|J> of one spin as (pair(p,q), value): all occupied
-  // diagonal pairs when I == J, the single excitation linking I and J if any
+  // diagonal pairs when I == J, the single excitation linking I and J if any.
+  // Returns <I|E_pq - E_qp|J> (p > q) as (row of vanti_, value), value 0 if
+  // there is no such excitation
   auto transition = [](const FCIStringSpace& space, size_t I, size_t J,
                        std::vector<std::pair<size_t, double>>& t) {
     t.clear();
+    std::pair<size_t, double> anti{0, 0.0};
     const uint32_t* oi = space.occupied(I);
     const uint32_t* oj = space.occupied(J);
     const size_t ne = space.nelec();
     if (I == J) {
       for (size_t a = 0; a < ne; ++a)
         t.emplace_back(fci_pair_index(oi[a], oi[a]), 1.0);
-      return;
+      return anti;
     }
     // p in I \ J is created, q in J \ I is annihilated
     size_t ndiff = 0, p = 0, q = 0;
@@ -945,11 +1053,14 @@ void FCIHamiltonian::submatrix(const std::vector<size_t>& dets,
         ++b;
       }
     }
-    if (ndiff != 1) return;
+    if (ndiff != 1) return anti;
     size_t nbetween = 0;
     for (size_t b = 0; b < ne; ++b)
       if (oj[b] > std::min(p, q) and oj[b] < std::max(p, q)) ++nbetween;
-    t.emplace_back(fci_pair_index(p, q), nbetween % 2 ? -1.0 : 1.0);
+    const double x = nbetween % 2 ? -1.0 : 1.0;
+    t.emplace_back(fci_pair_index(p, q), x);
+    return p > q ? std::pair{distinct_pair_index(q, p), x}
+                 : std::pair{distinct_pair_index(p, q), -x};
   };
 
   // H is symmetric: each element of the lower triangle is mirrored
@@ -964,11 +1075,14 @@ void FCIHamiltonian::submatrix(const std::vector<size_t>& dets,
         double h = 0.0;
         if (ib == jb) h += same_spin_element(*h_alpha_, *alpha_, ia, ja);
         if (ia == ja) h += same_spin_element(*h_beta_, *beta_, ib, jb);
-        transition(*alpha_, ia, ja, ta);
+        const auto anti_a = transition(*alpha_, ia, ja, ta);
         if (not ta.empty()) {
-          transition(*beta_, ib, jb, tb);
+          const auto anti_b = transition(*beta_, ib, jb, tb);
           for (auto [pq, xa] : ta)
             for (auto [rs, xb] : tb) h += xa * xb * vpair_[pq * npair_ + rs];
+          if (not vanti_.empty())
+            h += anti_a.second * anti_b.second *
+                 vanti_[anti_a.first * npa + anti_b.first];
         }
         H_sub[i + j * nd] = H_sub[j + i * nd] = h;
       }

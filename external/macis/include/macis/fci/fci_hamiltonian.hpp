@@ -33,9 +33,10 @@ enum class FCIPrecision { automatic, mixed, double_precision };
  * C[Ia * Nb + Ib], with Ia/Ib addressed by FCIStringSpace; this matches the
  * determinant order of generate_hilbert_space.
  *
- * Integrals use chemists' notation and must have the 8-fold permutational
- * symmetry of real orbitals; T and V are column-major with leading dimensions
- * LDT and LDV (V(p,q,r,s) = V[p + q*LDV + r*LDV^2 + s*LDV^3]).
+ * Integrals use chemists' notation and must have the symmetry (pq|rs) =
+ * (rs|pq) = (qp|sr) of a real Hermitian Hamiltonian (real orbitals add
+ * (pq|rs) = (qp|rs)); T is symmetric. T and V are column-major with leading
+ * dimensions LDT and LDV (V(p,q,r,s) = V[p + q*LDV + r*LDV^2 + s*LDV^3]).
  *
  * @note Implements the direct CI of Knowles & Handy (Chem. Phys. Lett. 111,
  * 315 (1984)) and Olsen et al. (J. Chem. Phys. 89, 2185 (1988)), with the
@@ -140,12 +141,25 @@ class FCIHamiltonian {
   void same_spin_pass(bool alpha_strings, const T* C, T* S, T alpha,
                       Scratch& scratch) const;
 
+  /// S += alpha * (alpha-beta term of the integrals antisymmetric in p, q
+  /// and in r, s) applied to C, or in a sector to the lower triangle of C as
+  /// in sigma_impl; does nothing if there are none
+  template <typename T>
+  void antisymmetric_pass(const T* C, T* S, T alpha, int spin_flip) const;
+
   size_t norb_;
   size_t npair_;
   std::shared_ptr<const FCIStringSpace> alpha_;
   std::shared_ptr<const FCIStringSpace> beta_;
-  std::vector<double> vpair_;    ///< npair x npair, (pq|rs) by packed pairs
-  std::vector<float> vpair_f_;   ///< vpair_ rounded to float
+  /// npair x npair, the part of (pq|rs) symmetric in p, q and in r, s by
+  /// packed pairs
+  std::vector<double> vpair_;
+  std::vector<float> vpair_f_;  ///< vpair_ rounded to float
+  /// The part antisymmetric in p, q and in r, s, npa x npa with npa =
+  /// norb(norb-1)/2 and row p(p-1)/2 + q for p > q; empty if it vanishes,
+  /// as for real orbitals
+  std::vector<double> vanti_;
+  std::vector<float> vanti_f_;   ///< vanti_ rounded to float
   std::vector<double> coulomb_;  ///< norb x norb, (pp|qq)
   std::shared_ptr<const SameSpinOperator> h_alpha_;
   std::shared_ptr<const SameSpinOperator> h_beta_;
