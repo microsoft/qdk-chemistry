@@ -30,9 +30,9 @@ class ControlledHubbardPlaquetteMapperSettings(ControlledCircuitMapperSettings):
             Ignored when ``use_hamming_weight_phasing`` is ``False``.
             Defaults to ``-1``.
         hamming_weight_phasing_method: How each Hamming weight is phased: ``"catalyst"`` adds it into
-            a catalyst, a generalized phase gradient the evolution prepares once for the interaction
-            layers and once for the hopping layers, and ``"rz_ladder"`` synthesizes each of its place
-            values as its own ``Rz``.
+            a catalyst, a generalized phase gradient the evolution prepares once for each distinct angle
+            of the interaction layers and of the hopping layers, and ``"rz_ladder"`` synthesizes each of
+            its place values as its own ``Rz``.
             Ignored when ``use_hamming_weight_phasing`` is ``False``.
             Defaults to ``"catalyst"``.
 
@@ -62,7 +62,7 @@ class ControlledHubbardPlaquetteMapperSettings(ControlledCircuitMapperSettings):
             "string",
             "catalyst",
             "How each Hamming weight is phased. 'catalyst' adds it into a generalized phase gradient "
-            "the evolution prepares once for the interaction layers and once for the hopping layers, "
+            "the evolution prepares once for each distinct angle of the interaction and hopping layers, "
             "trading the place-value rotations of every tower for one rotation and Toffolis. "
             "'rz_ladder' synthesizes each place value as its own Rz, which needs no catalyst. "
             "Ignored when use_hamming_weight_phasing is False.",
@@ -122,6 +122,7 @@ class ControlledHubbardPlaquetteMapper(ControlledCircuitMapper):
             height=container.height,
             interactionAngle=container.interaction_angle,
             hoppingAngle=container.hopping_angle,
+            trotterOrder=container.order,
             repetitions=container.step_reps,
             useHammingWeightPhasing=use_hamming_weight_phasing,
             maxBatchSize=max_batch_size,
