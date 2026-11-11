@@ -1416,9 +1416,9 @@ TEST_F(HamiltonianTest, SparseContainerTwoBodyElementAccess) {
   EXPECT_DOUBLE_EQ(h.get_two_body_element(0, 0, 0, 1), 2.0);
   EXPECT_DOUBLE_EQ(h.get_two_body_element(1, 1, 1, 1), 4.0);
   EXPECT_DOUBLE_EQ(h.get_two_body_element(0, 1, 1, 0), 5.0);
-  // Non-stored entries return 0
-  EXPECT_DOUBLE_EQ(h.get_two_body_element(1, 0, 0, 0), 0.0);
-  EXPECT_DOUBLE_EQ(h.get_two_body_element(0, 1, 0, 1), 0.0);
+  // Positions outside every stored 8-fold class return 0
+  EXPECT_DOUBLE_EQ(h.get_two_body_element(0, 0, 1, 1), 0.0);
+  EXPECT_DOUBLE_EQ(h.get_two_body_element(1, 1, 0, 1), 0.0);
 }
 
 TEST_F(HamiltonianTest, SparseContainerSparseAccessors) {
@@ -2109,6 +2109,254 @@ TEST_F(HamiltonianTest, FCIDUMPSerialization) {
       "      1.5000000000000000e+00    0    0    0    0";
 
   EXPECT_TRUE(fcidump_content == reference_fcidump_contents);
+
+  // A sparse twin stores every permutation but writes the same records.
+  const std::string sparse_filename = "test.sparse.hamiltonian.fcidump";
+  Hamiltonian(std::make_unique<SparseHamiltonianContainer>(one_body, two_body,
+                                                           core_energy))
+      .to_fcidump_file(sparse_filename, 1, 1);
+  {
+    std::ifstream sparse_file(sparse_filename);
+    std::stringstream sparse_buffer;
+    sparse_buffer << sparse_file.rdbuf();
+    EXPECT_EQ(sparse_buffer.str(), reference_fcidump_contents + "\n");
+  }
+  std::filesystem::remove(sparse_filename);
+}
+
+TEST_F(HamiltonianTest, FCIDUMPRejectsFourFoldTwoBodySymmetry) {
+  Eigen::VectorXd fourfold_two_body = Eigen::VectorXd::Zero(16);
+  auto idx = [](size_t p, size_t q, size_t r, size_t s) {
+    return ((p * 2 + q) * 2 + r) * 2 + s;
+  };
+  fourfold_two_body(idx(0, 1, 0, 1)) = 0.7;
+  fourfold_two_body(idx(1, 0, 1, 0)) = 0.7;
+  fourfold_two_body(idx(1, 0, 0, 1)) = -0.2;
+  fourfold_two_body(idx(0, 1, 1, 0)) = -0.2;
+
+  Hamiltonian h(std::make_unique<CanonicalFourCenterHamiltonianContainer>(
+      one_body, fourfold_two_body, orbitals, core_energy, inactive_fock));
+
+  const std::string filename = "test.hamiltonian.fcidump";
+  {
+    std::ofstream file(filename);
+    file << "existing content";
+  }
+
+  try {
+    h.to_fcidump_file(filename, 1, 1);
+    FAIL() << "Expected four-fold-symmetric FCIDUMP export to be rejected";
+  } catch (const std::runtime_error& error) {
+    EXPECT_NE(std::string(error.what()).find("8-fold"), std::string::npos);
+  }
+
+  std::ifstream file(filename);
+  std::stringstream buffer;
+  buffer << file.rdbuf();
+  EXPECT_EQ(buffer.str(), "existing content");
+}
+
+TEST_F(HamiltonianTest, SparseContainerFCIDUMPRequiresEightfoldClasses) {
+  Eigen::SparseMatrix<double> sparse_one_body(2, 2);
+  sparse_one_body.insert(0, 0) = 1.0;
+  sparse_one_body.insert(1, 1) = 1.0;
+  sparse_one_body.makeCompressed();
+  const std::string filename = "test.sparse.hamiltonian.fcidump";
+  std::filesystem::remove(filename);
+
+  // A complete fourfold suborbit, with (10|01) and (01|10) absent and so
+  // zero.  A reader that reconstructs all eight permutations would fill in
+  // those zeros with 0.7.
+  Hamiltonian fourfold(std::make_unique<SparseHamiltonianContainer>(
+      sparse_one_body,
+      SparseHamiltonianContainer::TwoBodyMap{{{0, 1, 0, 1}, 0.7},
+                                             {{1, 0, 1, 0}, 0.7}},
+      core_energy));
+  EXPECT_THROW(fourfold.to_fcidump_file(filename, 1, 1), std::runtime_error);
+  EXPECT_FALSE(std::filesystem::exists(filename));
+
+  // The deprecated shorthand is expanded over its 8-fold class at
+  // construction.
+  Hamiltonian legacy(std::make_unique<SparseHamiltonianContainer>(
+      sparse_one_body,
+      SparseHamiltonianContainer::TwoBodyMap{{{0, 1, 0, 1}, 0.7}},
+      core_energy));
+  EXPECT_NO_THROW(legacy.to_fcidump_file(filename, 1, 1));
+  EXPECT_TRUE(std::filesystem::exists(filename));
+  std::filesystem::remove(filename);
+}
+
+TEST_F(HamiltonianTest, FCIDUMPWritesEightfoldClassAverages) {
+  // Each record holds its 8-fold class average; a 4-fold part beyond isApprox
+  // precision is rejected.
+  auto idx = [](size_t p, size_t q, size_t r, size_t s) {
+    return ((p * 2 + q) * 2 + r) * 2 + s;
+  };
+  Eigen::SparseMatrix<double> sparse_one_body(2, 2);
+  sparse_one_body.insert(0, 0) = 1.0;
+  sparse_one_body.makeCompressed();
+  auto hamiltonians = [&](double offset) {
+    const double high = 0.75 + offset;
+    const double low = 0.75 - offset;
+    Eigen::VectorXd dense = Eigen::VectorXd::Zero(16);
+    dense(idx(0, 1, 0, 1)) = dense(idx(1, 0, 1, 0)) = high;
+    dense(idx(0, 1, 1, 0)) = dense(idx(1, 0, 0, 1)) = low;
+    const SparseHamiltonianContainer::TwoBodyMap sparse{{{0, 1, 0, 1}, high},
+                                                        {{1, 0, 1, 0}, high},
+                                                        {{0, 1, 1, 0}, low},
+                                                        {{1, 0, 0, 1}, low}};
+    return std::vector<Hamiltonian>{
+        Hamiltonian(std::make_unique<CanonicalFourCenterHamiltonianContainer>(
+            one_body, dense, orbitals, core_energy, inactive_fock)),
+        Hamiltonian(std::make_unique<SparseHamiltonianContainer>(
+            sparse_one_body, sparse, core_energy))};
+  };
+
+  const std::string filename = "test.average.hamiltonian.fcidump";
+  // Exactly representable, so the average prints exactly; the relative
+  // difference is 3.0e-13.
+  for (const auto& h : hamiltonians(std::ldexp(1.0, -42))) {
+    h.to_fcidump_file(filename, 1, 1);
+    std::ifstream file(filename);
+    std::stringstream buffer;
+    buffer << file.rdbuf();
+    EXPECT_NE(buffer.str().find("7.5000000000000000e-01    1    2    1    2"),
+              std::string::npos)
+        << buffer.str();
+  }
+  std::filesystem::remove(filename);
+  // A relative difference of 4.9e-12.
+  for (const auto& h : hamiltonians(std::ldexp(1.0, -38))) {
+    EXPECT_THROW(h.to_fcidump_file(filename, 1, 1), std::runtime_error);
+  }
+  EXPECT_FALSE(std::filesystem::exists(filename));
+}
+
+TEST_F(HamiltonianTest, FCIDUMPRejectsNonFiniteTwoBodyIntegrals) {
+  const std::string filename = "test.nonfinite.hamiltonian.fcidump";
+  Eigen::VectorXd dense = two_body;
+  dense(0) = std::numeric_limits<double>::quiet_NaN();
+  EXPECT_THROW(
+      Hamiltonian(std::make_unique<CanonicalFourCenterHamiltonianContainer>(
+                      one_body, dense, orbitals, core_energy, inactive_fock))
+          .to_fcidump_file(filename, 1, 1),
+      std::invalid_argument);
+
+  Eigen::SparseMatrix<double> sparse_one_body(2, 2);
+  sparse_one_body.insert(0, 0) = 1.0;
+  sparse_one_body.makeCompressed();
+  EXPECT_THROW(Hamiltonian(std::make_unique<SparseHamiltonianContainer>(
+                               sparse_one_body,
+                               SparseHamiltonianContainer::TwoBodyMap{
+                                   {{0, 0, 0, 0},
+                                    std::numeric_limits<double>::infinity()}},
+                               core_energy))
+                   .to_fcidump_file(filename, 1, 1),
+               std::invalid_argument);
+  EXPECT_FALSE(std::filesystem::exists(filename));
+}
+
+TEST(SparseHamiltonianContainerTest, NonHermitianMapsStayLiteral) {
+  // The 8-fold shorthand assumes 8-fold symmetry, so a non-Hermitian map is
+  // never expanded.
+  const Eigen::SparseMatrix<double> one_body(2, 2);
+  const SparseHamiltonianContainer::TwoBodyMap lone{{{0, 1, 0, 1}, 0.5}};
+  EXPECT_EQ(SparseHamiltonianContainer(one_body, lone, 0.0,
+                                       HamiltonianType::NonHermitian)
+                .sparse_two_body_integrals(),
+            lone);
+  EXPECT_EQ(SparseHamiltonianContainer(one_body, lone)
+                .sparse_two_body_integrals()
+                .size(),
+            4u);
+}
+
+TEST(SparseHamiltonianContainerTest, ConstructorExpandsEightfoldShorthand) {
+  using Map = SparseHamiltonianContainer::TwoBodyMap;
+  const Eigen::SparseMatrix<double> one_body(3, 3);
+  // A lone (01|02) stands for its class; a complete fourfold suborbit and a
+  // one-member class are literal.
+  const Map literal{
+      {{0, 1, 0, 1}, 0.7}, {{1, 0, 1, 0}, 0.7}, {{2, 2, 2, 2}, 0.3}};
+  Map stored = literal;
+  stored[{0, 1, 0, 2}] = 0.5;
+  Map expected = SparseHamiltonianContainer::expand_symmetry_representatives(
+      {{{0, 1, 0, 2}, 0.5}}, TwoBodyPermutationGroup::EightFold);
+  expected.insert(literal.begin(), literal.end());
+  EXPECT_EQ(
+      SparseHamiltonianContainer(one_body, stored).sparse_two_body_integrals(),
+      expected);
+
+  // Loading reads entries literally, such as a lone one from dense input.
+  Eigen::VectorXd dense = Eigen::VectorXd::Zero(81);
+  dense(((0 * 3 + 1) * 3 + 0) * 3 + 2) = 0.5;
+  const std::string filename = "test.literal.hamiltonian.h5";
+  Hamiltonian(std::make_unique<SparseHamiltonianContainer>(
+                  Eigen::MatrixXd::Zero(3, 3), dense))
+      .to_hdf5_file(filename);
+  const auto loaded = Hamiltonian::from_hdf5_file(filename);
+  std::filesystem::remove(filename);
+  EXPECT_EQ(loaded->get_container<SparseHamiltonianContainer>()
+                .sparse_two_body_integrals(),
+            (Map{{{0, 1, 0, 2}, 0.5}}));
+}
+
+TEST(SparseHamiltonianContainerTest, ExpandsSymmetryRepresentatives) {
+  using Map = SparseHamiltonianContainer::TwoBodyMap;
+  const auto expand =
+      &SparseHamiltonianContainer::expand_symmetry_representatives;
+
+  const Map eightfold =
+      expand({{{0, 1, 0, 2}, 0.5}}, TwoBodyPermutationGroup::EightFold);
+  EXPECT_EQ(eightfold, (Map{{{0, 1, 0, 2}, 0.5},
+                            {{0, 2, 0, 1}, 0.5},
+                            {{1, 0, 2, 0}, 0.5},
+                            {{2, 0, 1, 0}, 0.5},
+                            {{1, 0, 0, 2}, 0.5},
+                            {{0, 2, 1, 0}, 0.5},
+                            {{0, 1, 2, 0}, 0.5},
+                            {{2, 0, 0, 1}, 0.5}}));
+
+  const Map fourfold = expand({{{0, 1, 0, 2}, 0.5}, {{1, 0, 0, 2}, -0.25}},
+                              TwoBodyPermutationGroup::FourFold);
+  EXPECT_EQ(fourfold, (Map{{{0, 1, 0, 2}, 0.5},
+                           {{0, 2, 0, 1}, 0.5},
+                           {{1, 0, 2, 0}, 0.5},
+                           {{2, 0, 1, 0}, 0.5},
+                           {{1, 0, 0, 2}, -0.25},
+                           {{0, 2, 1, 0}, -0.25},
+                           {{0, 1, 2, 0}, -0.25},
+                           {{2, 0, 0, 1}, -0.25}}));
+
+  EXPECT_EQ(expand({{{0, 0, 1, 1}, 0.5}, {{1, 1, 0, 0}, 0.5}},
+                   TwoBodyPermutationGroup::EightFold),
+            (Map{{{0, 0, 1, 1}, 0.5}, {{1, 1, 0, 0}, 0.5}}));
+  EXPECT_EQ(expand({{{2, 2, 2, 2}, 0.5}}, TwoBodyPermutationGroup::EightFold),
+            (Map{{{2, 2, 2, 2}, 0.5}}));
+
+  EXPECT_TRUE(SparseHamiltonianContainer::uses_eightfold_shorthand(
+      {{{0, 1, 0, 2}, 0.5}}));
+  EXPECT_FALSE(SparseHamiltonianContainer::uses_eightfold_shorthand(eightfold));
+  EXPECT_FALSE(SparseHamiltonianContainer::uses_eightfold_shorthand(
+      {{{2, 2, 2, 2}, 0.5}, {{0, 1, 0, 2}, 0.0}}));
+}
+
+TEST(SparseHamiltonianContainerTest, ExpandSymmetryRepresentativesValidates) {
+  const auto expand =
+      &SparseHamiltonianContainer::expand_symmetry_representatives;
+  EXPECT_THROW(expand({{{0, 1, 0, 1}, 0.7}, {{1, 0, 1, 0}, 0.6}},
+                      TwoBodyPermutationGroup::FourFold),
+               std::invalid_argument);
+  EXPECT_THROW(expand({{{0, 1, 0, 1}, 0.7}, {{0, 1, 1, 0}, 0.6}},
+                      TwoBodyPermutationGroup::EightFold),
+               std::invalid_argument);
+  EXPECT_THROW(
+      expand({{{-1, 0, 0, 0}, 0.7}}, TwoBodyPermutationGroup::EightFold),
+      std::invalid_argument);
+  EXPECT_THROW(
+      expand({{{0, 0, 0, 0}, std::numeric_limits<double>::quiet_NaN()}},
+             TwoBodyPermutationGroup::EightFold),
+      std::invalid_argument);
 }
 
 TEST_F(HamiltonianTest, FCIDUMPSerializationUnrestrictedThrowsError) {
@@ -2374,12 +2622,13 @@ TEST_F(HamiltonianTest, IntegralSymmetriesEnergiesO2Singlet) {
   const auto& [restricted_aaaa, restricted_aabb, restricted_bbbb] =
       rhf_hamiltonian->get_two_body_integrals();
 
-  // Elementwise comparison for restricted aaaa == unrestricted aabb integrals
+  // Elementwise comparison for restricted aaaa == unrestricted aabb integrals,
+  // which are averaged over different permutations.
   EXPECT_EQ(restricted_aaaa.size(), aabb_integrals.size())
       << "Restricted aaaa and unrestricted aabb integral sizes should match";
   for (int i = 0; i < restricted_aaaa.size(); ++i) {
     double diff = std::abs(restricted_aaaa[i] - aabb_integrals[i]);
-    EXPECT_LT(diff, std::numeric_limits<double>::epsilon())
+    EXPECT_LT(diff, testing::integral_tolerance)
         << "Integrals should be identical. "
            ". Difference: "
         << diff;
@@ -3734,5 +3983,80 @@ TEST_F(HamiltonianConstructorTest, X2CTwoBodyAndCoreEnergyUnchanged) {
     auto [eri_x2c, a2, b2] = h_x2c->get_two_body_integrals();
     EXPECT_NEAR((eri_x2c - eri_nr).norm(), 0.0, 1e-12);
     EXPECT_DOUBLE_EQ(h_nr->get_core_energy(), h_x2c->get_core_energy());
+  }
+}
+
+TEST_F(HamiltonianConstructorTest, BuildersImposeRealOrbitalSymmetryExactly) {
+  // An alpha-beta block lacks only the bra-ket swap.
+  auto expect_symmetric = [](const Eigen::VectorXd& tensor, bool same_spin) {
+    const auto n = static_cast<size_t>(
+        std::llround(std::sqrt(std::sqrt(static_cast<double>(tensor.size())))));
+    auto at = [&tensor, n](size_t p, size_t q, size_t r, size_t s) {
+      return tensor(((p * n + q) * n + r) * n + s);
+    };
+    size_t violations = 0;
+    for (size_t p = 0; p < n; ++p)
+      for (size_t q = 0; q < n; ++q)
+        for (size_t r = 0; r < n; ++r)
+          for (size_t s = 0; s < n; ++s) {
+            const double value = at(p, q, r, s);
+            if (value != at(q, p, r, s) || value != at(p, q, s, r) ||
+                (same_spin && value != at(r, s, p, q)))
+              ++violations;
+          }
+    EXPECT_EQ(violations, 0u);
+  };
+  auto expect_pair_symmetric = [](const Eigen::MatrixXd& factors) {
+    const auto n = static_cast<Eigen::Index>(
+        std::llround(std::sqrt(static_cast<double>(factors.rows()))));
+    Eigen::Index violations = 0;
+    for (Eigen::Index aux = 0; aux < factors.cols(); ++aux)
+      for (Eigen::Index p = 0; p < n; ++p)
+        for (Eigen::Index q = 0; q < n; ++q)
+          if (factors(p * n + q, aux) != factors(q * n + p, aux)) ++violations;
+    EXPECT_EQ(violations, 0);
+  };
+
+  {
+    auto [energy, hamiltonian] = run_restricted_o2("qdk");
+    expect_symmetric(std::get<0>(hamiltonian->get_two_body_integrals()), true);
+  }
+  {
+    auto [energy, hamiltonian] = run_unrestricted_o2("qdk");
+    const auto& [aaaa, aabb, bbbb] = hamiltonian->get_two_body_integrals();
+    expect_symmetric(aaaa, true);
+    expect_symmetric(aabb, false);
+    expect_symmetric(bbbb, true);
+  }
+  {
+    auto [energy, hamiltonian] = run_unrestricted_o2("qdk_cholesky");
+    const auto [alpha, beta] =
+        hamiltonian->get_container<CholeskyHamiltonianContainer>()
+            .get_three_center_integrals();
+    expect_pair_symmetric(alpha);
+    expect_pair_symmetric(beta);
+  }
+  {
+    // The container keeps that symmetry in the integrals it reconstructs
+    // from pair-symmetric factors; plain BLAS loses it bitwise at n = 13.
+    constexpr Eigen::Index n = 13;
+    auto factors = [](unsigned seed) {
+      std::srand(seed);
+      Eigen::MatrixXd random = Eigen::MatrixXd::Random(n * n, 40);
+      for (Eigen::Index p = 0; p < n; ++p)
+        for (Eigen::Index q = 0; q < p; ++q)
+          random.row(q * n + p) = random.row(p * n + q);
+      return random;
+    };
+    const Eigen::MatrixXd one_body = Eigen::MatrixXd::Identity(n, n);
+    const Eigen::MatrixXd no_fock = Eigen::MatrixXd::Zero(0, 0);
+    Hamiltonian hamiltonian(std::make_unique<CholeskyHamiltonianContainer>(
+        one_body, one_body, factors(1), factors(2),
+        std::make_shared<ModelOrbitals>(n, model_spin_symmetry(false)), 0.0,
+        no_fock, no_fock));
+    const auto& [aaaa, aabb, bbbb] = hamiltonian.get_two_body_integrals();
+    expect_symmetric(aaaa, true);
+    expect_symmetric(aabb, false);
+    expect_symmetric(bbbb, true);
   }
 }

@@ -19,7 +19,6 @@ import pytest
 import qdk_chemistry.algorithms as alg
 from qdk_chemistry.data import AOType, BasisSet, Element, OrbitalType, Shell, Structure
 from qdk_chemistry.data._type_name import class_data_type_name
-from qdk_chemistry.utils import Logger
 
 from .reference_tolerances import float_comparison_absolute_tolerance, float_comparison_relative_tolerance
 
@@ -1307,15 +1306,6 @@ def test_basis_set_ecp_shells_serialization():
         loaded_shell = loaded_basis.get_ecp_shell(0)
         assert loaded_shell.has_radial_powers()
         assert np.array_equal(loaded_shell.rpowers, [0, 2])
-
-
-@pytest.fixture
-def warn_logger():
-    """Temporarily set logger to warn level, restoring on teardown."""
-    prev_level = Logger.get_global_level()
-    Logger.set_global_level("warn")
-    yield
-    Logger.set_global_level(prev_level)
 
 
 def _ecp_shell_data(basis):
