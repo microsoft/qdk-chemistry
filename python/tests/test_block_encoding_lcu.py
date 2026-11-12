@@ -7,6 +7,7 @@
 
 import math
 import tempfile
+import warnings
 from pathlib import Path
 
 import h5py
@@ -64,6 +65,21 @@ def _block_encoding_action(circuit, num_system_qubits: int, system_amplitudes: n
         circuit._qsharp_op, circuit.num_qubits, initial_state, context=get_qsharp_context()
     )
     return np.array([statevector[_reverse_bits(index, num_system_qubits) * stride] for index in range(dimension)])
+
+
+def _assert_block_encodes(circuit, hamiltonian: QubitOperator, coefficients: np.ndarray, atol: float) -> None:
+    r"""Check :math:`\langle 0|_\mathrm{anc} B[H] |0\rangle_\mathrm{anc} = H/\lambda` up to a global sign."""
+    num_system_qubits = hamiltonian.num_qubits
+    dimension = 2**num_system_qubits
+    expected_block = hamiltonian.to_matrix() / np.sum(np.abs(coefficients))
+    for system_state in [*np.eye(dimension), np.full(dimension, 1.0 / math.sqrt(dimension))]:
+        actual = _block_encoding_action(circuit, num_system_qubits, system_state)
+        expected = expected_block @ system_state
+        assert np.abs(actual.imag).max() <= atol, f"unexpected phase in {actual}"
+        sign = 1.0 if np.vdot(actual, expected).real >= 0.0 else -1.0
+        assert np.allclose(sign * actual, expected, rtol=0.0, atol=atol), (
+            f"block encoding failed on {system_state}: got {sign * actual}, expected {expected}"
+        )
 
 
 class TestLCUBuilder:
@@ -323,21 +339,7 @@ class TestLCUBuilder:
             prepare=AlgorithmRef("state_prep", "alias_sampling", bits_precision=bits_precision),
         ).run(LCUBuilder().run(hamiltonian))
 
-        num_system_qubits = hamiltonian.num_qubits
-        dimension = 2**num_system_qubits
-        expected_block = hamiltonian.to_matrix() / np.sum(np.abs(coefficients))
-        alias_tolerance = 2.0**-bits_precision
-
-        inputs = [*np.eye(dimension), np.full(dimension, 1.0 / math.sqrt(dimension))]
-        for system_state in inputs:
-            actual = _block_encoding_action(circuit, num_system_qubits, system_state)
-            expected = expected_block @ system_state
-
-            assert np.abs(actual.imag).max() < alias_tolerance, f"unexpected phase in {actual}"
-            sign = 1.0 if np.vdot(actual, expected).real >= 0.0 else -1.0
-            assert np.allclose(sign * actual, expected, rtol=0.0, atol=alias_tolerance), (
-                f"block encoding failed on {system_state}: got {sign * actual}, expected {expected}"
-            )
+        _assert_block_encodes(circuit, hamiltonian, coefficients, atol=2.0**-bits_precision)
 
 
 class TestPSPMapperPrepareGuards:
@@ -349,19 +351,75 @@ class TestPSPMapperPrepareGuards:
         hamiltonian = QubitOperator(pauli_strings=["XX", "ZZ", "XZ"], coefficients=np.array([0.25, 0.5, 0.1]))
         return LCUBuilder().run(hamiltonian)
 
-    def test_rejects_a_prepare_that_wants_a_phase_gradient(self):
-        """QROM state prep declares shared ancilla this mapper never allocates.
+    @pytest.mark.parametrize("allocate_phase_gradient", [True, False])
+    def test_qrom_prepare_uses_an_outside_phase_gradient(self, allocate_phase_gradient: bool):
+        """QROM PREPARE always rotates through a gradient the caller prepares, declared at the tail."""
+        prepare = AlgorithmRef(
+            "state_prep", "qrom", rotation_bit_precision=4, allocate_phase_gradient=allocate_phase_gradient
+        )
+        circuit = registry.create("circuit_mapper", "prepare_select_prepare", prepare=prepare).run(self._unitary())
 
-        Only when it is asked to share one: left to its default the callable allocates and
-        prepares its own gradient internally, declares none, and embeds fine.
-        """
+        assert circuit.metadata.num_phase_gradient_ancillas == 4
+        assert circuit.num_qubits == 2 + 2 + 4
+
+    @pytest.mark.parametrize(
+        ("prepare", "warns"), [("alias_sampling", True), ("qrom", True), ("dense_pure_state", False)]
+    )
+    def test_table_lookup_prepare_warns_about_qir_export(self, prepare: str, warns: bool):
+        """A table-lookup PREPARE warns that the block encoding cannot be exported to QIR yet."""
         mapper = registry.create(
+            "circuit_mapper", "prepare_select_prepare", prepare=AlgorithmRef("state_prep", prepare)
+        )
+        with warnings.catch_warnings(record=True) as caught:
+            warnings.simplefilter("always")
+            mapper.run(self._unitary())
+
+        qir_warnings = [w for w in caught if "QIR" in str(w.message)]
+        assert len(qir_warnings) == int(warns)
+        if warns:
+            assert issubclass(qir_warnings[0].category, UserWarning)
+            assert prepare in str(qir_warnings[0].message)
+
+
+class TestPSPMapperSelectMethod:
+    """Tests for the ``select_method`` setting."""
+
+    _PAULIS = ("XX", "ZZ", "XZ", "YY", "ZI")
+    _COEFFICIENTS = np.array([0.25, -0.5, 0.1, -0.3, 0.2])
+
+    def test_defaults(self):
+        """Defaults are unary_iteration SELECT and dense PREPARE; unknown methods are rejected."""
+        settings = registry.create("circuit_mapper", "prepare_select_prepare").settings()
+        assert settings.get("select_method") == "unary_iteration"
+        assert settings.get("prepare").algorithm_name == "dense_pure_state"
+        with pytest.raises(ValueError, match="select_method"):
+            registry.create("circuit_mapper", "prepare_select_prepare", select_method="sparse")
+
+    @pytest.mark.parametrize("num_terms", [1, 2, 3, 5])
+    def test_unary_select_block_encodes_the_hamiltonian(self, num_terms: int):
+        """The unary SELECT block-encodes H exactly."""
+        coefficients = self._COEFFICIENTS[:num_terms]
+        hamiltonian = QubitOperator(pauli_strings=list(self._PAULIS[:num_terms]), coefficients=coefficients)
+        circuit = registry.create(
             "circuit_mapper",
             "prepare_select_prepare",
-            prepare=AlgorithmRef("state_prep", "qrom", rotation_bit_precision=4, allocate_phase_gradient=False),
-        )
-        with pytest.raises(ValueError, match="phase gradient ancilla"):
-            mapper.run(self._unitary())
+            select_method="unary_iteration",
+            prepare=AlgorithmRef("state_prep", "dense_pure_state"),
+        ).run(LCUBuilder().run(hamiltonian))
+        _assert_block_encodes(circuit, hamiltonian, coefficients, atol=1e-10)
+
+    def test_unary_select_with_alias_sampling_block_encodes_the_hamiltonian(self):
+        """Unary SELECT with alias sampling block-encodes H within its precision."""
+        bits_precision = 4
+        coefficients = self._COEFFICIENTS[:3]
+        hamiltonian = QubitOperator(pauli_strings=list(self._PAULIS[:3]), coefficients=coefficients)
+        circuit = registry.create(
+            "circuit_mapper",
+            "prepare_select_prepare",
+            select_method="unary_iteration",
+            prepare=AlgorithmRef("state_prep", "alias_sampling", bits_precision=bits_precision),
+        ).run(LCUBuilder().run(hamiltonian))
+        _assert_block_encodes(circuit, hamiltonian, coefficients, atol=2.0**-bits_precision)
 
 
 class TestLCUContainer:

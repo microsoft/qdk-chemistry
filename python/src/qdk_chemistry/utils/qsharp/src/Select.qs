@@ -8,10 +8,15 @@
 /// PREPARE-SELECT stitching lives in ``QDKChemistry.Utils.PrepSelPrep``.
 namespace QDKChemistry.Utils.Select {
 
+    import Std.Arrays.Fold;
     import Std.Canon.ApplyControlledOnInt;
     import Std.Canon.ApplyPauli;
     import Std.Core.Length;
+    import Std.Core.Repeated;
+    import Std.Diagnostics.Fact;
+    import Std.Math.MaxI;
     import Std.Math.PI;
+    import QDKChemistry.Utils.UnaryIteration.ControlledUnaryIterationWithControl;
 
     /// Parameters for the Pauli-based SELECT oracle.
     struct PauliSelectParams {
@@ -55,9 +60,52 @@ namespace QDKChemistry.Utils.Select {
         }
     }
 
+    /// `PauliSelect` by unary iteration (arXiv:1805.03662, Sec. III A): L - 2 Toffolis for L terms
+    /// uncontrolled, L - 1 with one control.
+    operation UnaryPauliSelect(params : PauliSelectParams, selectRegister : Qubit[], targets : Qubit[]) : Unit is Adj + Ctl {
+        body ... {
+            Controlled UnaryPauliSelect([], (params, selectRegister, targets));
+        }
+        adjoint self;
+        controlled (ctls, ...) {
+            let termAt = TermTable(params.controlStates);
+            ControlledUnaryIterationWithControl(ctls, selectRegister, Length(termAt), (index, ctl) => {
+                ApplySignedPauliTerm(params, termAt[index], ctl, targets);
+            });
+        }
+        controlled adjoint self;
+    }
+
+    /// Term index per control state, -1 where none exists.
+    internal function TermTable(controlStates : Int[]) : Int[] {
+        Fact(Length(controlStates) > 0, "SELECT needs at least one term.");
+        mutable termAt = Repeated(-1, Fold(MaxI, 0, controlStates) + 1);
+        for i in 0..Length(controlStates) - 1 {
+            Fact(controlStates[i] >= 0, "SELECT control states must be nonnegative.");
+            Fact(termAt[controlStates[i]] < 0, "SELECT control states must be distinct.");
+            set termAt w/= controlStates[i] <- i;
+        }
+        termAt
+    }
+
+    /// Applies `sign · P` for `term` when `ctl` is |1⟩; a negative `term` applies nothing.
+    internal operation ApplySignedPauliTerm(params : PauliSelectParams, term : Int, ctl : Qubit, targets : Qubit[]) : Unit is Adj {
+        if term >= 0 {
+            Controlled ApplyPauli([ctl], (params.pauliTerms[term], targets));
+            if params.signs[term] < 0 {
+                Z(ctl);
+            }
+        }
+    }
+
     /// Creates a SELECT callable from parameters.
     function MakeSelectOp(params : PauliSelectParams) : (Qubit[], Qubit[]) => Unit is Adj + Ctl {
         PauliSelect(params, _, _)
+    }
+
+    /// Creates a unary-iteration SELECT callable from parameters.
+    function MakeUnarySelectOp(params : PauliSelectParams) : (Qubit[], Qubit[]) => Unit is Adj + Ctl {
+        UnaryPauliSelect(params, _, _)
     }
 
     /// Creates a circuit for the SELECT oracle by allocating qubits and applying the operation.
@@ -65,5 +113,12 @@ namespace QDKChemistry.Utils.Select {
         use selectRegister = Qubit[numSelectQubits];
         use targets = Qubit[numTargetQubits];
         PauliSelect(params, selectRegister, targets);
+    }
+
+    /// Creates a circuit for the unary-iteration SELECT oracle.
+    operation MakeUnarySelectCircuit(params : PauliSelectParams, numSelectQubits : Int, numTargetQubits : Int) : Unit {
+        use selectRegister = Qubit[numSelectQubits];
+        use targets = Qubit[numTargetQubits];
+        UnaryPauliSelect(params, selectRegister, targets);
     }
 }
