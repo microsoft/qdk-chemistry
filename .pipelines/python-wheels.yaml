@@ -49,7 +49,7 @@ parameters:
   - name: windows_aarch64
     os: windows
     arch: aarch64
-    march: armv8-a
+    march: armv8.0
     imageName: windows-2025-arm64-1espt
   displayName: Target platforms
 - name: pythonVersions
