@@ -253,8 +253,8 @@ class SparseIsometryStatePreparation(StatePreparation):
 
         Examples:
             >>> prep = create("state_prep", "sparse_isometry")
-            >>> full = prep.run(wavefunction).estimate_logical_count()
-            >>> dense = prep.create_dense(wavefunction).estimate_logical_count()
+            >>> full = prep.run(wavefunction).estimate_logical_counts()
+            >>> dense = prep.create_dense(wavefunction).estimate_logical_counts()
             >>> isometry_t_count = full["tCount"] - dense["tCount"]
 
         """

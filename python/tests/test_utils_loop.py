@@ -13,35 +13,29 @@ from qdk.qsharp import QSharpError, Result
 
 from qdk_chemistry.utils.qsharp import create_qsharp_context
 
-_VARIANTS = {"LoopA": 0, "LoopCA": 1}
 
-
-@pytest.mark.parametrize("variant", _VARIANTS.values(), ids=_VARIANTS.keys())
 @pytest.mark.parametrize(
     ("num_iterations", "num_warmup_iterations", "expected"),
     [(0, 3, 0), (5, 0, 0), (5, 2, 7), (5, 9, 10), (1_000_000, 2, 1_999_997)],
 )
-def test_logical_counts(qsharp_test_context, variant, num_iterations, num_warmup_iterations, expected):
+def test_logical_counts(qsharp_test_context, num_iterations, num_warmup_iterations, expected):
     """Count warm-up iterations exactly and fold the remaining cost without unrolling."""
     counts = qsharp_test_context.logical_counts(
         qsharp_test_context.code.QDKChemistry.TestUtils.LoopTests.TestLoopTCount,
         num_iterations,
         num_warmup_iterations,
-        variant,
     )
     assert counts.get("tCount", 0) == expected
 
 
-@pytest.mark.parametrize("variant", _VARIANTS.values(), ids=_VARIANTS.keys())
 @pytest.mark.parametrize(("num_iterations", "num_warmup_iterations"), [(-1, 0), (3, -1)])
-def test_negative_arguments_are_rejected(qsharp_test_context, variant, num_iterations, num_warmup_iterations):
+def test_negative_arguments_are_rejected(qsharp_test_context, num_iterations, num_warmup_iterations):
     """Reject negative iteration or warm-up counts."""
     with pytest.raises(QSharpError, match="must be non-negative"):
         qsharp_test_context.logical_counts(
             qsharp_test_context.code.QDKChemistry.TestUtils.LoopTests.TestLoopTCount,
             num_iterations,
             num_warmup_iterations,
-            variant,
         )
 
 
@@ -56,13 +50,12 @@ def test_a_captured_operation_is_applied_every_iteration(qsharp_test_utils, num_
 
 @pytest.mark.parametrize("profile", [TargetProfile.Base, TargetProfile.Adaptive_RIF])
 def test_loops_compile_to_qir(profile):
-    """Both variants must simulate every iteration and compile captured callbacks to QIR."""
+    """Controlled loops simulate every iteration and compile captured callbacks to QIR."""
     context = create_qsharp_context(profile)
     context.eval((Path(__file__).parent / "qsharp" / "TestLoop.qs").read_text(encoding="utf-8"))
     loop = context.code.QDKChemistry.TestUtils.LoopTests
-    for variant in _VARIANTS.values():
-        assert loop.TestLoopVisitsEveryIteration(3, 5, variant) == [Result.One] * 3
-        assert "__quantum__qis__x__body" in str(context.compile(loop.TestLoopVisitsEveryIteration, 3, 1, variant))
+    assert loop.TestLoopVisitsEveryIteration(3, 5) == [Result.One] * 3
+    assert "__quantum__qis__x__body" in str(context.compile(loop.TestLoopVisitsEveryIteration, 3, 1))
     assert "__quantum__qis__x__body" in str(
         context.compile(loop.TestLoopAppliesCapturedOp, loop.TestMakeFlipAllOp(), 2, 3, 1)
     )

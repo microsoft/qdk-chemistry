@@ -1,0 +1,5 @@
+,declaredNumQubits,numQubits,cczCount
+default,12,17,19
+alias_sampling,38,48,84
+qrom,22,42,159
+multi_controlled,12,16,802

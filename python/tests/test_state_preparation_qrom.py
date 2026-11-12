@@ -88,18 +88,6 @@ class TestQROMStatePreparation:
         assert circuit.num_qubits == 6
         assert circuit.metadata.num_phase_gradient_ancillas == 4
 
-    def test_resource_counts(self):
-        """Pin the logical resource counts so a costing regression is visible."""
-        prep = QROMStatePreparation(rotation_bit_precision=4)
-        circuit = prep.run(create_dense_wavefunction([0.5, 0.3, 0.7, 0.1]))
-
-        lc = circuit.estimate_logical_count()
-        assert lc["numQubits"] == 14
-        assert lc["cczCount"] == 6
-        assert lc["tCount"] == 18
-        assert lc["rotationCount"] == 18
-        assert lc["measurementCount"] == 10
-
     @pytest.mark.parametrize("num_coefficients", range(3, 10, 3))
     def test_fidelity_random(self, num_coefficients):
         """Verify QROM state prep fidelity with random amplitudes."""

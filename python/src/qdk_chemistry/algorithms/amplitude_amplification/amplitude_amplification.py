@@ -92,7 +92,7 @@ class AmplitudeAmplification(Algorithm):
         num_qubits = state_prep_oracle.num_qubits
         if num_qubits is None:
             try:
-                num_qubits = state_prep_oracle.estimate_logical_count()["numQubits"]
+                num_qubits = state_prep_oracle.estimate_logical_counts()["numQubits"]
             except Exception as error:
                 raise RuntimeError(
                     "Could not read the register width from a resource estimate of the state prep oracle."

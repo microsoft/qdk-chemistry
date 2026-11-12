@@ -7,10 +7,11 @@ namespace QDKChemistry.Utils.UnaryPhaseEstimation {
     import Std.Arrays.Reversed;
     import Std.Canon.ApplyQFT;
     import Std.Diagnostics.Fact;
+    import Std.Math.MinI;
     import Std.ResourceEstimation.EnableMemoryComputeArchitecture;
     import Std.ResourceEstimation.IsResourceEstimating;
     import Std.ResourceEstimation.LeastRecentlyUsed;
-    import QDKChemistry.Utils.Loop.LoopA;
+    import Std.ResourceEstimation.RepeatEstimates;
     import QDKChemistry.Utils.UnaryIteration.AddressQubits;
     import QDKChemistry.Utils.UnaryIteration.UnaryIterationWithControl;
 
@@ -59,9 +60,6 @@ namespace QDKChemistry.Utils.UnaryPhaseEstimation {
     ///
     /// `phaseReg` must be supported on `0..numQueries`; addresses past that alias valid slots
     /// (see `UnaryIterationWithControl`) and realize a wrong walk power.
-    ///
-    /// Under resource estimation one representative slot is repeated `numQueries` times, and the
-    /// first two of those repetitions are counted exactly (see `Loop.LoopA`).
     internal operation ApplySignedPowerSchedule(
         applyBlockEncoding : (Qubit[] => Unit is Adj),
         applyReflection : (Qubit[] => Unit is Adj + Ctl),
@@ -73,11 +71,17 @@ namespace QDKChemistry.Utils.UnaryPhaseEstimation {
         if IsResourceEstimating() {
             UnaryIterationWithControl(phaseReg, numQueries + 1, (slot, selected) => {
                 if slot == 0 {
-                    LoopA(
-                        numQueries,
-                        2,
-                        _ => ApplySignedPowerSlot(applyBlockEncoding, applyReflection, true, selected, allQubits)
-                    );
+                    let numExact = MinI(numQueries, 2);
+                    for _ in 1..numExact {
+                        ApplySignedPowerSlot(applyBlockEncoding, applyReflection, true, selected, allQubits);
+                    }
+                    if numQueries > numExact {
+                        within {
+                            RepeatEstimates(numQueries - numExact);
+                        } apply {
+                            ApplySignedPowerSlot(applyBlockEncoding, applyReflection, true, selected, allQubits);
+                        }
+                    }
                 } elif slot == numQueries {
                     ApplySignedPowerSlot(applyBlockEncoding, applyReflection, false, selected, allQubits);
                 }
@@ -102,9 +106,7 @@ namespace QDKChemistry.Utils.UnaryPhaseEstimation {
     /// schedule and whoever consumes them leaves them in that state. Set `statePrepUsesShared` or
     /// `blockEncodingUsesShared` for the component that expects them appended to its register.
     /// Set `computeCapacity` to a positive logical-qubit capacity to enable least-recently-used
-    /// memory placement, or to -1 to keep all logical qubits in compute. Under resource
-    /// estimation the first two walk queries are counted exactly before one is
-    /// repeated, so the placement can reach its steady state first.
+    /// memory placement, or to -1 to keep all logical qubits in compute.
     operation MakeUnaryQPECircuit(
         statePrep : Qubit[] => Unit,
         applyBlockEncoding : (Qubit[] => Unit is Adj),

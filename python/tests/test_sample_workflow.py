@@ -24,7 +24,6 @@ import pytest
 
 from qdk_chemistry.plugins.qiskit import QDK_CHEMISTRY_HAS_QISKIT
 
-from .test_hubbard_plaquette_trotter import _assert_counts_match_the_pins
 from .test_sample_workflow_utils import (
     _HAS_JUPYTER_KERNEL,
     _execute_notebook,
@@ -133,11 +132,9 @@ def test_qpe_stretched_n2():
     reason="qdk.qre not available",
 )
 def test_estimation_hubbard_2d():
-    """Test the 2D Fermi-Hubbard resource-estimation notebook and hold its logical counts to the pins.
+    """Run the Hubbard notebook and compare its counts with the independently built benchmark."""
+    from .test_resource_regression import _hubbard_benchmark_counts  # noqa: PLC0415
 
-    ``test_hubbard_plaquette_trotter.py`` checks the same pins against its own construction on every
-    run, so this test catches the notebook drifting away from that construction.
-    """
     notebook_path = EXAMPLES_DIR / "resource_estimation" / "estimation_hubbard_2d.ipynb"
     assert notebook_path.exists(), f"Notebook not found: {notebook_path}"
     executed = _execute_notebook(notebook_path, skip_visualizations=True)
@@ -149,7 +146,14 @@ def test_estimation_hubbard_2d():
     )
     (counts_cell,) = (cell for cell in code_cells if cell.source.rstrip().endswith("\ncounts"))
     (result,) = (output for output in counts_cell.outputs if output.output_type == "execute_result")
-    _assert_counts_match_the_pins(ast.literal_eval(result.data["text/plain"]), size)
+    counts = ast.literal_eval(result.data["text/plain"])
+    expected = _hubbard_benchmark_counts(size)
+    for key in ("numQubits", "rotationCount", "rotationDepth", "tCount", "cczCount", "ccixCount", "measurementCount"):
+        assert counts.get(key, 0) == (
+            pytest.approx(expected.get(key, 0), rel=1e-4, abs=16)
+            if key.startswith("rotation")
+            else expected.get(key, 0)
+        )
 
 
 @_requires_notebook_deps

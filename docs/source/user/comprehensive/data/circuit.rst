@@ -180,16 +180,13 @@ Each method returns the circuit in the requested format, converting from whateve
    * - :meth:`~qdk_chemistry.data.Circuit.get_qre_application`
      - Returns a ``qdk.qre`` application (Q#, OpenQASM, or :term:`QIR`) to pass to ``qdk.qre.estimate()``. Requires the ``qre`` extra.
    * - :meth:`~qdk_chemistry.data.Circuit.estimate`
-     - Returns QRE v3 physical estimates, defaulting to Majorana at error rate ``1e-6`` with ThreeAux and RoundBasedFactory.
-   * - :meth:`~qdk_chemistry.data.Circuit.estimate_logical_count`
+     - Returns logical counts and QRE v3 physical estimates, defaulting to Majorana at error rate ``1e-6`` with ThreeAux and RoundBasedFactory.
+   * - :meth:`~qdk_chemistry.data.Circuit.estimate_logical_counts`
      - Returns logical gate counts for Q# factory or OpenQASM circuits.
 
-Q# factory circuits use the logical-counts backend by default. Pass
-``use_trace_backend=True`` to opt into tracing; the two backends can produce
-different resource estimates.
-
 ``estimate()`` accepts QRE v3 architecture, ISA, trace, and error-budget options
-and returns an estimation table rather than a legacy estimator dictionary.
+and returns ``logical_counts`` and a ``physical_estimates`` QRE table.
+Logical counts are unavailable for QIR-only circuits.
 
 Example: Convert state preparation circuits to different formats
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

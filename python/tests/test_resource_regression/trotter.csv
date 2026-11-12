@@ -1,0 +1,4 @@
+,numQubits,tCount,rotationCount,rotationDepth,cczCount,ccixCount,measurementCount,counts_min_qubits,counts_min_qubits_runtime_ns,counts_fastest_qubits,counts_fastest_runtime_ns,trace_min_qubits,trace_min_qubits_runtime_ns,trace_fastest_qubits,trace_fastest_runtime_ns
+ethylene_4e4o,16,21,94158,88764,0,0,8,13065,60909804000,28585,15227451000,13065,60738732000,28585,15184683000
+f2_10e6o,20,21,195138,176994,0,0,8,18834,117415749000,53774,30429531000,18834,117409479000,53774,30427911000
+h2_dfthc,12,21,13578,11754,0,0,8,11455,7260156000,32495,1411697000,11455,7254396000,32495,1410577000

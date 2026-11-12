@@ -38,7 +38,15 @@ except ImportError:
     from qsharp._native import Circuit as QdkCircuitType
     from qsharp._qsharp import QirInputData
 
-__all__: list[str] = ["CircuitMetadata", "QsharpFactoryData"]
+__all__: list[str] = ["CircuitEstimateResult", "CircuitMetadata", "QsharpFactoryData"]
+
+
+@dataclass(frozen=True)
+class CircuitEstimateResult:
+    """Logical counts and QRE v3 physical estimates, with no logical counts for QIR-only circuits."""
+
+    logical_counts: dict[str, int] | None
+    physical_estimates: "EstimationTable"
 
 
 @dataclass(frozen=True)
@@ -285,7 +293,7 @@ class Circuit(DataClass):
         composition: "ErrorComposition | None" = None,
         name: str | None = None,
         use_trace_backend: bool = False,
-    ) -> "EstimationTable":
+    ) -> CircuitEstimateResult:
         """Estimate physical resources with QRE v3.
 
         Args:
@@ -300,7 +308,7 @@ class Circuit(DataClass):
             use_trace_backend: Opt into tracing instead of the default logical-counts backend.
 
         Returns:
-            A QRE v3 table of Pareto-optimal physical estimates.
+            Logical counts and a QRE v3 table of physical estimates; logical counts are ``None`` for QIR-only input.
 
         Raises:
             RuntimeError: If QRE is unavailable or the circuit has no supported representation.
@@ -310,7 +318,7 @@ class Circuit(DataClass):
         from qdk.qre import ErrorComposition, estimate  # noqa: PLC0415
         from qdk.qre.models import Majorana, RoundBasedFactory, ThreeAux  # noqa: PLC0415
 
-        return estimate(
+        physical_estimates = estimate(
             application,
             architecture if architecture is not None else Majorana(error_rate=1e-6),
             isa_query if isa_query is not None else ThreeAux.q() * RoundBasedFactory.q(),
@@ -321,8 +329,12 @@ class Circuit(DataClass):
             composition=composition if composition is not None else ErrorComposition.UnionBound,
             name=name,
         )
+        logical_counts = (
+            self.estimate_logical_counts() if self._qsharp_factory is not None or self.qasm is not None else None
+        )
+        return CircuitEstimateResult(logical_counts=logical_counts, physical_estimates=physical_estimates)
 
-    def estimate_logical_count(self) -> dict[str, int]:
+    def estimate_logical_counts(self) -> dict[str, int]:
         """Estimate logical gate counts for a Q# factory or OpenQASM circuit."""
         if self._qsharp_factory is not None:
             context = getattr(self._qsharp_factory.program, "_qdk_context", qsharp)

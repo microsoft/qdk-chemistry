@@ -541,11 +541,12 @@ class TestCircuitEstimate:
             Majorana(error_rate=1e-6),
             ThreeAux.q() * RoundBasedFactory.q(),
         )
-        assert result
-        assert [(entry.qubits, entry.runtime) for entry in result] == [
+        assert result.physical_estimates
+        assert [(entry.qubits, entry.runtime) for entry in result.physical_estimates] == [
             (entry.qubits, entry.runtime) for entry in expected
         ]
-        assert circuit.estimate_logical_count()["numQubits"] == 2
+        assert result.logical_counts == circuit.estimate_logical_counts()
+        assert result.logical_counts["numQubits"] == 2
 
     def test_estimate_from_qasm(self):
         """Custom QRE v3 queries and error options match direct estimation of OpenQASM."""
@@ -565,9 +566,10 @@ class TestCircuitEstimate:
         }
         result = circuit.estimate(architecture, isa_query, trace_query, **options)
         expected = estimate(circuit.get_qre_application(), architecture, isa_query, trace_query, **options)
-        assert result
-        assert result.as_frame().equals(expected.as_frame())
-        counts = circuit.estimate_logical_count()
+        assert result.physical_estimates
+        assert result.physical_estimates.as_frame().equals(expected.as_frame())
+        counts = circuit.estimate_logical_counts()
+        assert result.logical_counts == counts
         assert counts["numQubits"] == 2
         assert counts["tCount"] == 1
 
@@ -577,7 +579,7 @@ class TestCircuitEstimate:
         monkeypatch.setattr(circuit_module.Logger, "info", messages.append)
 
         circuit = Circuit(qasm=self._QASM_WITH_T, num_qubits=5)
-        result = circuit.estimate_logical_count()
+        result = circuit.estimate_logical_counts()
 
         assert result["numQubits"] == 2
         assert circuit.num_qubits == 5
@@ -591,10 +593,11 @@ class TestCircuitEstimate:
         )
         circuit = Circuit(qir=qir)
         result = circuit.estimate()
-        assert result
-        assert all(entry.qubits > 0 and entry.runtime > 0 for entry in result)
+        assert result.physical_estimates
+        assert all(entry.qubits > 0 and entry.runtime > 0 for entry in result.physical_estimates)
+        assert result.logical_counts is None
         with pytest.raises(RuntimeError, match="Cannot estimate logical counts"):
-            circuit.estimate_logical_count()
+            circuit.estimate_logical_counts()
 
 
 class TestGetQreApplication:
