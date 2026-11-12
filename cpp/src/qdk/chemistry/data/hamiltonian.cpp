@@ -357,7 +357,7 @@ void HamiltonianContainer::to_fcidump_file(const std::string& filename,
   if (const auto comparison =
           detail::eightfold_comparison(eri_aaaa.data(), num_molecular_orbitals);
       !comparison.approx()) {
-    throw detail::not_eightfold_error("FCIDUMP export", comparison);
+    throw detail::not_symmetric_error("FCIDUMP export", "8-fold", comparison);
   }
 
   std::ofstream file(filename);

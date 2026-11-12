@@ -19,10 +19,10 @@ from qiskit_nature.second_q.mappers import (
     ParityMapper,
 )
 
+from qdk_chemistry._core.data import _fourfold_symmetrized, _reversal_symmetrized
 from qdk_chemistry.algorithms.qubit_mapper import QubitMapper, QubitMapperSettings
 from qdk_chemistry.data import Hamiltonian, QubitOperator
 from qdk_chemistry.data._spin_channels import spin_channel_indices
-from qdk_chemistry.data._two_body_symmetry import fourfold_average, reversal_average
 from qdk_chemistry.data.enums.fermion_mode_order import FermionModeOrder
 from qdk_chemistry.data.symmetry import axes
 from qdk_chemistry.utils import Logger
@@ -154,16 +154,19 @@ class QiskitQubitMapper(QubitMapper):
         if is_restricted:
             electronic_hamiltonian = ElectronicEnergy.from_raw_integrals(
                 h1_a=h1_a,
-                h2_aa=fourfold_average(h2_aa.reshape(shape), consumer).transpose(0, 2, 3, 1),
+                h2_aa=_fourfold_symmetrized(h2_aa.reshape(shape), consumer).transpose(0, 2, 3, 1),
                 auto_index_order=False,
             )
         else:
+            h2_aa = _fourfold_symmetrized(h2_aa.reshape(shape), f"{consumer} (alpha-alpha block)")
+            h2_bb = _fourfold_symmetrized(h2_bb.reshape(shape), f"{consumer} (beta-beta block)")
+            h2_ab = _reversal_symmetrized(h2_ab.reshape(shape), f"{consumer} (alpha-beta block)")
             electronic_hamiltonian = ElectronicEnergy.from_raw_integrals(
                 h1_a=h1_a,
-                h2_aa=fourfold_average(h2_aa.reshape(shape), f"{consumer} (alpha-alpha block)").transpose(0, 2, 3, 1),
+                h2_aa=h2_aa.transpose(0, 2, 3, 1),
                 h1_b=h1_b,
-                h2_bb=fourfold_average(h2_bb.reshape(shape), f"{consumer} (beta-beta block)").transpose(0, 2, 3, 1),
-                h2_ba=reversal_average(h2_ab.reshape(shape), f"{consumer} (alpha-beta block)").transpose(2, 0, 1, 3),
+                h2_bb=h2_bb.transpose(0, 2, 3, 1),
+                h2_ba=h2_ab.transpose(2, 0, 1, 3),
                 auto_index_order=False,
             )
 

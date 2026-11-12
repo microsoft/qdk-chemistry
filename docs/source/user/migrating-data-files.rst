@@ -93,8 +93,9 @@ registered make the following changes:
   The C++ ``majorana_map_hamiltonian_sparse`` reads its entries the same way.
   Four-center and Cholesky integrals saved by earlier versions keep the
   round-off of their transformation, which in diffuse bases breaks their
-  permutation symmetry visibly: consumers then warn, and FCIDUMP export
-  refuses them until the Hamiltonian is rebuilt from its orbitals.
+  permutation symmetry visibly: consumers then warn, and FCIDUMP export and
+  :func:`~qdk_chemistry.plugins.pyscf.conversion.hamiltonian_to_scf` refuse
+  them until the Hamiltonian is rebuilt from its orbitals.
 - :class:`~qdk_chemistry.data.Wavefunction` — the single-determinant,
   complete-active-space, and selected-CI containers upgrade to the
   state-vector container; the MP2 and coupled-cluster containers upgrade to the
