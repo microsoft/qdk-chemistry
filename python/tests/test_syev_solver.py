@@ -74,6 +74,18 @@ def test_syev_solver_heisenberg_model():
         )
 
 
+@pytest.mark.parametrize("dtype", [np.float32, np.float64, ">f8", np.longdouble])
+def test_syev_solver_real_array_coercion(dtype):
+    """Real input arrays are converted without changing their values or storage."""
+    matrix = np.array([[2.0, -1.0], [-1.0, 3.0]], dtype=dtype)
+    original = matrix.copy()
+
+    eigenvalues, eigenvectors = syev_solver(matrix)
+
+    np.testing.assert_array_equal(matrix, original)
+    np.testing.assert_allclose(eigenvectors @ np.diag(eigenvalues) @ eigenvectors.T, original)
+
+
 def test_syev_solver_invalid_input():
     """Test syev_solver with invalid input."""
     with pytest.raises(ValueError, match="Input matrix must be square"):

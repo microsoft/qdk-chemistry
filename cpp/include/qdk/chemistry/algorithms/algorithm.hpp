@@ -54,6 +54,8 @@ template <typename Derived, typename ReturnType, typename... Args>
 class Algorithm {
  public:
   Algorithm() = default;
+  Algorithm(const Algorithm&) = delete;
+  Algorithm& operator=(const Algorithm&) = delete;
   virtual ~Algorithm() = default;
 
   /**

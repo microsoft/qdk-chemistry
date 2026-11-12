@@ -19,6 +19,7 @@ downstream users are not broken immediately.
 import typing
 import warnings
 from collections.abc import Callable
+from types import GenericAlias, new_class
 
 import numpy as np
 import pytest
@@ -68,8 +69,11 @@ class TestQubitHamiltonianDeprecation:
             (lambda operator: int | operator, "int | QubitHamiltonian"),
             (lambda operator: operator | None, "typing.Optional[QubitHamiltonian]"),
             (lambda operator: int | operator, "typing.Union[int, QubitHamiltonian]"),
-            (lambda operator: list[operator], "list[QubitHamiltonian]"),
-            (lambda operator: dict[str, list[operator | None]], "dict[str, list[QubitHamiltonian | None]]"),
+            (lambda operator: GenericAlias(list, operator), "list[QubitHamiltonian]"),
+            (
+                lambda operator: GenericAlias(dict, (str, GenericAlias(list, operator | None))),
+                "dict[str, list[QubitHamiltonian | None]]",
+            ),
             (lambda operator: type[operator], "type[QubitHamiltonian]"),
             (lambda operator: typing.Annotated[operator, "operator"], "typing.Annotated[QubitHamiltonian, 'operator']"),
             (lambda operator: Callable[[operator], operator], "Callable[[QubitHamiltonian], QubitHamiltonian]"),
@@ -90,13 +94,10 @@ class TestQubitHamiltonianDeprecation:
 
     def test_qubit_hamiltonian_supports_inheritance(self, qubit_hamiltonian):
         """Subclassing the resolved alias preserves operator behavior."""
-
-        class DerivedOperator(qubit_hamiltonian):
-            pass
-
-        operator = DerivedOperator(["ZZ"], np.array([1.0]))
+        derived_operator = new_class("DerivedOperator", (qubit_hamiltonian,))
+        operator = derived_operator(["ZZ"], np.array([1.0]))
         assert isinstance(operator, QubitOperator)
-        assert issubclass(DerivedOperator, qubit_hamiltonian)
+        assert issubclass(derived_operator, qubit_hamiltonian)
 
     def test_qubit_hamiltonian_classmethod(self, qubit_hamiltonian):
         """Deserialization through the old name uses the current class."""

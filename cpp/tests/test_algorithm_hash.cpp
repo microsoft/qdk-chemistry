@@ -6,6 +6,7 @@
 
 #include <memory>
 #include <string>
+#include <type_traits>
 #include <utility>
 #include <vector>
 
@@ -51,6 +52,9 @@ class TestAlgorithm
 }  // namespace qdk::chemistry::tests::test_support
 
 namespace test_support = qdk::chemistry::tests::test_support;
+
+static_assert(!std::is_copy_constructible_v<test_support::TestAlgorithm>);
+static_assert(!std::is_copy_assignable_v<test_support::TestAlgorithm>);
 
 TEST(AlgorithmHashTest, SameRunInputsProduceSameHash) {
   test_support::TestAlgorithm first;

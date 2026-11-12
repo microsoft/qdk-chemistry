@@ -24,7 +24,8 @@ struct array_like_eigen_caster {
       make_caster<Array> array;
       if (!array.from_python(source, flags, cleanup)) {
         if (!(flags & cast_flags::convert) || source.is_none()) return false;
-        object converted = module_::import_("numpy").attr("asarray")(source);
+        object converted = module_::import_("numpy").attr("asarray")(
+            source, dtype_traits<Scalar>::name.text);
         const auto dimensions = cast<size_t>(converted.attr("ndim"));
         if constexpr (Matrix::IsVectorAtCompileTime) {
           if (dimensions == 2) {

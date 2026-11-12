@@ -29,12 +29,13 @@ inline sparse_csr from_scipy_csr(const nb::object& py_csr) {
     throw std::invalid_argument("CSR matrix cannot be None");
   }
 
+  auto asarray = nb::module_::import_("numpy").attr("asarray");
   auto data = nb::cast<nb::ndarray<nb::numpy, const double, nb::c_contig>>(
-      py_csr.attr("data"), true);
+      asarray(py_csr.attr("data"), "float64"), true);
   auto indices = nb::cast<nb::ndarray<nb::numpy, const int64_t, nb::c_contig>>(
-      py_csr.attr("indices"), true);
+      asarray(py_csr.attr("indices"), "int64"), true);
   auto indptr = nb::cast<nb::ndarray<nb::numpy, const int64_t, nb::c_contig>>(
-      py_csr.attr("indptr"), true);
+      asarray(py_csr.attr("indptr"), "int64"), true);
   auto shape = nb::cast<std::pair<int64_t, int64_t>>(py_csr.attr("shape"));
   int64_t n_rows = shape.first;
   int64_t n_cols = shape.second;

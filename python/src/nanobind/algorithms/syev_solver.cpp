@@ -77,4 +77,14 @@ void bind_syev_solver(nb::module_& m) {
                 If LAPACK fails to compute the eigenvalues.
         )",
         nb::arg("matrix"));
+  m.def(
+      "syev_solver",
+      [](const nb::object& matrix) {
+        auto converted = nb::module_::import_("numpy").attr("asarray")(
+            matrix, "float64", nb::arg("order") = "F");
+        return dense_matrix_solver(
+            nb::cast<nb::ndarray<nb::numpy, const double, nb::f_contig>>(
+                converted));
+      },
+      nb::arg("matrix"));
 }
