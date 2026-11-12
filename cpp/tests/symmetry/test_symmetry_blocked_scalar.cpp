@@ -12,6 +12,7 @@
 #include <qdk/chemistry/data/symmetry/symmetry.hpp>
 #include <qdk/chemistry/data/symmetry/symmetry_blocked_scalar.hpp>
 #include <stdexcept>
+#include <type_traits>
 #include <utility>
 
 using namespace qdk::chemistry::data;
@@ -77,6 +78,33 @@ TEST(SymmetryBlockedScalarTest, TrivialHoldsAggregate) {
   EXPECT_EQ(scalar.num_blocks(), 1u);
   // The single block resolves via the trivial (empty) label.
   EXPECT_EQ(scalar.value(SymmetryLabel{}), 8u);
+}
+
+TEST(SymmetryBlockedScalarTest, ParticleNumberBlocksArePublicAndIndependent) {
+  auto sym = std::make_shared<const SymmetryProduct>(
+      SymmetryProduct({axes::particle_number(2)}));
+  const SymmetryLabel zero({axes::particle_number_value(0)});
+  const SymmetryLabel two({axes::particle_number_value(2)});
+  SBS::BlockMap blocks;
+  blocks[{zero}] = std::make_shared<const std::size_t>(1);
+  blocks[{two}] = std::make_shared<const std::size_t>(3);
+  const SBS scalar({sym}, blocks);
+
+  static_assert(
+      std::is_same_v<decltype(scalar.blocks()), const SBS::BlockMap&>);
+  EXPECT_EQ(scalar.blocks().size(), 2u);
+  EXPECT_EQ(scalar.blocks().at({zero}), blocks.at({zero}));
+  EXPECT_NE(scalar.blocks().at({zero}), scalar.blocks().at({two}));
+  std::size_t total = 0;
+  for (const auto& [labels, block] : scalar.blocks()) {
+    EXPECT_EQ(block, scalar.block_ptr(labels));
+    total += *block;
+  }
+  EXPECT_EQ(total, 4u);
+
+  const auto restored = SBS::from_json(scalar.to_json());
+  EXPECT_EQ(restored->value(zero), 1u);
+  EXPECT_EQ(restored->value(two), 3u);
 }
 
 TEST(SymmetryBlockedScalarTest, MissingBlockThrows) {

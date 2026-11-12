@@ -18,7 +18,7 @@ import os
 import pathlib
 import tempfile
 import time
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
@@ -59,8 +59,8 @@ class Job:
         job_id:         Short unique identifier for this job.
         backend:        Registered backend name (e.g. ``"local"``).
         backend_config: Dict of configuration that was passed to the backend
-                        constructor (pool, gpus, host, …).  Stored so the
-                        backend can be re-created from scratch.
+                        constructor (pool, gpus, host, …). Restored jobs retain
+                        it as metadata, not as connection authority.
         backend_state:  Opaque dict written by the backend during *submit*.
                         Contains whatever the backend needs to poll / cancel /
                         fetch (operation IDs, remote paths, PIDs, …).
@@ -131,7 +131,7 @@ class Job:
         self.backend_state = backend_state
         self.algorithm_info = algorithm_info or {}
         self.status = status
-        self.submitted_at = submitted_at or datetime.now(timezone.utc).isoformat()
+        self.submitted_at = submitted_at or datetime.now(UTC).isoformat()
         self.file_path: pathlib.Path | None = pathlib.Path(file_path) if file_path else None
         self.run_hash: str | None = run_hash
         self.input_hashes: dict[str, str] | None = input_hashes
@@ -139,6 +139,7 @@ class Job:
         self.output_is_tuple: bool | None = output_is_tuple
         self.owner: dict[str, str | None] | None = owner
         self._active_backend: RemoteBackend | None = None
+        self._restored_from_disk = False
 
     # ── Serialisation ────────────────────────────────────────────────────
 
@@ -209,6 +210,12 @@ class Job:
     def load(cls, path: str | pathlib.Path) -> Job:
         """Reconstruct a ``Job`` from a previously saved file.
 
+        Connections use current runtime configuration, not saved backend
+        parameters. For custom connections, use :meth:`attach_backend`.
+        The caller is responsible for trusting that configuration or backend:
+        it selects authenticated request destinations, and its trustworthiness
+        is not verified.
+
         Args:
             path: Path to a ``*.job.json`` file.
 
@@ -223,7 +230,7 @@ class Job:
             raise ValueError(f"Unsupported job file version {version} (max supported {_JOB_FILE_VERSION})")
         if "status" not in data:
             raise ValueError("Job file is missing required field 'status'")
-        return cls(
+        job = cls(
             job_id=data["job_id"],
             backend=data["backend"],
             backend_config=data.get("backend_config", {}),
@@ -238,6 +245,8 @@ class Job:
             output_is_tuple=data.get("output_is_tuple"),
             owner=data.get("owner"),
         )
+        job._restored_from_disk = True
+        return job
 
     @classmethod
     def discover(cls, directory: str | pathlib.Path) -> list[Job]:
@@ -279,7 +288,11 @@ class Job:
 
         from qdk_chemistry.remote.backends import get_backend  # noqa: PLC0415
 
-        backend = get_backend(self.backend, **self.backend_config)
+        if self._restored_from_disk:
+            logger.info("Restoring backend %s using runtime connection configuration", self.backend)
+            backend = get_backend(self.backend)
+        else:
+            backend = get_backend(self.backend, **self.backend_config)
         backend.connect()
         return backend, True
 
