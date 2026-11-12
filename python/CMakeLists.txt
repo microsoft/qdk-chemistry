@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 3.15)
+cmake_minimum_required(VERSION 3.28)
 
 # Read version from VERSION file at repo root
 set(_VERSION_FILE "${CMAKE_CURRENT_SOURCE_DIR}/../VERSION")
@@ -69,11 +69,9 @@ include( FetchContent )
 FetchContent_Declare( linalg-cmake-modules
   GIT_REPOSITORY https://github.com/wavefunction91/linalg-cmake-modules.git
   GIT_TAG        main
+  SOURCE_SUBDIR  cmake
 )
-FetchContent_GetProperties( linalg-cmake-modules )
-if( NOT linalg-cmake-modules_POPULATED )
-  FetchContent_Populate( linalg-cmake-modules )
-endif()
+FetchContent_MakeAvailable( linalg-cmake-modules )
 
 # list( APPEND CMAKE_MODULE_PATH ${linalg-cmake-modules_SOURCE_DIR} )
 
