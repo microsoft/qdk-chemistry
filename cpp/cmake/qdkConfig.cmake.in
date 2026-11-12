@@ -34,6 +34,14 @@ endif()
 
 if(QDK_CHEMISTRY_ENABLE_GPU)
   find_dependency(CUDAToolkit REQUIRED)
+  # qdk::chemistry links the non-namespaced `cutensor` target found at build time.
+  if(NOT TARGET cutensor)
+    add_library(cutensor SHARED IMPORTED)
+    set_target_properties(cutensor PROPERTIES
+      IMPORTED_LOCATION "@CUTENSOR_LIBRARIES@"
+      INTERFACE_INCLUDE_DIRECTORIES "@CUTENSOR_INCLUDE_DIRECTORY@"
+    )
+  endif()
 endif()
 if(QDK_CHEMISTRY_ENABLE_HGP)
   find_dependency(HGP REQUIRED)

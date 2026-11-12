@@ -80,6 +80,13 @@ option(QDK_ALLOW_DEPENDENCY_FETCH "Allow fetching of dependencies"     ON)
 option(QDK_CHEMISTRY_ENABLE_MPI "Enable MPI Bindings for QDK Chemistry"  OFF)
 option(QDK_EMBED_RESOURCE_LOCATION "Point to embedded (permanent) resource location" ON)
 
+# Enable CUDA before dependencies are added so their targets can device-link.
+if(QDK_CHEMISTRY_ENABLE_GPU)
+    enable_language(CUDA)
+    # Dependencies get -fPIC through their C/C++ flags only, not on CUDA objects.
+    set(CMAKE_POSITION_INDEPENDENT_CODE ON)
+endif()
+
 # Enable OpenMP by default, except on Apple platforms with AppleClang and on
 # Windows (OpenMP + MSVC/clang-cl is not currently supported).
 cmake_dependent_option(QDK_ENABLE_OPENMP
@@ -222,11 +229,6 @@ block()
         set_property(DIRECTORY "${sequant_SOURCE_DIR}/tests" PROPERTY EXCLUDE_FROM_ALL ON)
     endif()
 endblock()
-
-# Enable CUDA for GPU bindings in QDK Chemistry
-if(QDK_CHEMISTRY_ENABLE_GPU)
-    enable_language(CUDA)
-endif()
 
 # Create library
 add_library(chemistry)
