@@ -213,7 +213,7 @@ jobs:
           ${{ env.EXACHEM_INSTALL_PREFIX }}
         key: >-
           cpp-deps-${{ runner.os }}-${{ matrix.uarch }}-
-          ${{ hashFiles('cpp/manifest/qdk-chemistry/cgmanifest.json', 'external/macis/manifest/cgmanifest.json', '.pipelines/install-scripts/common.sh', '.pipelines/install-scripts/install-cpp-deps.sh', '.pipelines/install-scripts/install-blaspp.sh', '.pipelines/install-scripts/install-lapackpp.sh', '.pipelines/install-scripts/exachem/**') }}
+          ${{ hashFiles('cpp/manifest/qdk-chemistry/cgmanifest.json', 'external/macis/manifest/cgmanifest.json', '.pipelines/install-scripts/common.sh', '.pipelines/install-scripts/install-cpp-deps.sh', '.pipelines/install-scripts/install-blaspp.sh', '.pipelines/install-scripts/install-lapackpp.sh', '.pipelines/install-scripts/install-sequant.sh', '.pipelines/install-scripts/exachem/**', 'cpp/cmake/patches/**', 'cpp/cmake/sequant.cmake', 'cpp/cmake/sequant/**') }}
 
     - name: Add C++ deps prefix to CMake search path
       run: |
@@ -268,6 +268,10 @@ jobs:
             bash ${{ github.workspace }}/.pipelines/install-scripts/exachem/install-exachem.sh
         fi
 
+        CMAKE_BUILD_PARALLEL_LEVEL="$jobs" \
+          bash ${{ github.workspace }}/.pipelines/install-scripts/install-sequant.sh \
+          "${{ env.CPP_DEPS_PREFIX }}" "$MARCH"
+
     - name: Save C++ dependencies and ExaChem cache
       if: steps.cache-cpp-deps.outputs.cache-hit != 'true'
       uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
@@ -277,7 +281,7 @@ jobs:
           ${{ env.EXACHEM_INSTALL_PREFIX }}
         key: >-
           cpp-deps-${{ runner.os }}-${{ matrix.uarch }}-
-          ${{ hashFiles('cpp/manifest/qdk-chemistry/cgmanifest.json', 'external/macis/manifest/cgmanifest.json', '.pipelines/install-scripts/common.sh', '.pipelines/install-scripts/install-cpp-deps.sh', '.pipelines/install-scripts/install-blaspp.sh', '.pipelines/install-scripts/install-lapackpp.sh', '.pipelines/install-scripts/exachem/**') }}
+          ${{ hashFiles('cpp/manifest/qdk-chemistry/cgmanifest.json', 'external/macis/manifest/cgmanifest.json', '.pipelines/install-scripts/common.sh', '.pipelines/install-scripts/install-cpp-deps.sh', '.pipelines/install-scripts/install-blaspp.sh', '.pipelines/install-scripts/install-lapackpp.sh', '.pipelines/install-scripts/install-sequant.sh', '.pipelines/install-scripts/exachem/**', 'cpp/cmake/patches/**', 'cpp/cmake/sequant.cmake', 'cpp/cmake/sequant/**') }}
 
     - name: Configure C++ CMake build
       run: |
