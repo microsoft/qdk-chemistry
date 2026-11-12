@@ -1,11 +1,4 @@
-"""Resource-estimation regression for Trotter, LCU, and SOSSA phase estimation.
-
-Each case builds the phase-estimation circuit of a Hamiltonian in ``test_data`` and pins
-its logical counts together with the cheapest point of a ``qdk.qre`` estimate. The
-estimate is configured as in the QDK ``samples/qre/dollar_cost.ipynb`` sample and priced
-with that sample's ``example_cost_spec.json``. A changed value is a resource regression,
-or an improvement, to review and re-pin.
-"""
+"""Regress logical counts and dollar-cost estimates against pytest-regressions baselines."""
 
 # --------------------------------------------------------------------------------------------
 # Copyright (c) Microsoft Corporation. All rights reserved.
@@ -64,145 +57,6 @@ _PINNED_LOGICAL_COUNT_KEYS = (
     "ccixCount",
     "measurementCount",
 )
-
-#: Pinned logical counts and the cheapest estimate (physical qubits, runtime in ns, USD).
-_PINNED: dict[tuple[str, str], dict] = {
-    ("ethylene_4e4o", "trotter"): {
-        "logical_counts": {
-            "numQubits": 16,
-            "tCount": 21,
-            "rotationCount": 94158,
-            "rotationDepth": 86979,
-            "cczCount": 0,
-            "ccixCount": 0,
-            "measurementCount": 8,
-        },
-        "qubits": 28585,
-        "runtime_ns": 14938281000,
-        "usd": 2.9,
-    },
-    ("ethylene_4e4o", "lcu"): {
-        "logical_counts": {
-            "numQubits": 38,
-            "tCount": 21,
-            "rotationCount": 130250,
-            "rotationDepth": 129966,
-            "cczCount": 2558421,
-            "ccixCount": 0,
-            "measurementCount": 2054,
-        },
-        "qubits": 70035,
-        "runtime_ns": 91322784000,
-        "usd": 41.72,
-    },
-    ("ethylene_4e4o", "sossa"): {
-        "logical_counts": {
-            "numQubits": 54,
-            "tCount": 51021,
-            "rotationCount": 401570,
-            "rotationDepth": 397970,
-            "cczCount": 3220402,
-            "ccixCount": 0,
-            "measurementCount": 72180,
-        },
-        "qubits": 72450,
-        "runtime_ns": 163308393000,
-        "usd": 77.11,
-    },
-    ("f2_10e6o", "trotter"): {
-        "logical_counts": {
-            "numQubits": 20,
-            "tCount": 21,
-            "rotationCount": 195138,
-            "rotationDepth": 178779,
-            "cczCount": 0,
-            "ccixCount": 0,
-            "measurementCount": 8,
-        },
-        "qubits": 30034,
-        "runtime_ns": 33936723000,
-        "usd": 6.89,
-    },
-    ("f2_10e6o", "lcu"): {
-        "logical_counts": {
-            "numQubits": 44,
-            "tCount": 21,
-            "rotationCount": 260810,
-            "rotationDepth": 260528,
-            "cczCount": 7982017,
-            "ccixCount": 0,
-            "measurementCount": 2310,
-        },
-        "qubits": 71108,
-        "runtime_ns": 320751464000,
-        "usd": 148.72,
-    },
-    ("f2_10e6o", "sossa"): {
-        "logical_counts": {
-            "numQubits": 67,
-            "tCount": 69381,
-            "rotationCount": 1554170,
-            "rotationDepth": 1545470,
-            "cczCount": 14221613,
-            "ccixCount": 0,
-            "measurementCount": 129046,
-        },
-        "qubits": 80179,
-        "runtime_ns": 828595196000,
-        "usd": 431.84,
-    },
-    ("h2_dfthc", "trotter"): {
-        "logical_counts": {
-            "numQubits": 12,
-            "tCount": 21,
-            "rotationCount": 13578,
-            "rotationDepth": 11499,
-            "cczCount": 0,
-            "ccixCount": 0,
-            "measurementCount": 8,
-        },
-        "qubits": 32495,
-        "runtime_ns": 1383137000,
-        "usd": 0.3,
-    },
-    ("h2_dfthc", "lcu"): {
-        "logical_counts": {
-            "numQubits": 28,
-            "tCount": 21,
-            "rotationCount": 16010,
-            "rotationDepth": 15726,
-            "cczCount": 126993,
-            "ccixCount": 0,
-            "measurementCount": 1286,
-        },
-        "qubits": 34872,
-        "runtime_ns": 5849208000,
-        "usd": 1.37,
-    },
-    ("h2_dfthc", "sossa"): {
-        "logical_counts": {
-            "numQubits": 35,
-            "tCount": 8181,
-            "rotationCount": 28250,
-            "rotationDepth": 28220,
-            "cczCount": 108889,
-            "ccixCount": 0,
-            "measurementCount": 11487,
-        },
-        "qubits": 35508,
-        "runtime_ns": 7688925000,
-        "usd": 1.83,
-    },
-}
-
-#: Cheapest trace-backend point of the Trotter circuits. LCU and SOSSA uncompute with
-#: measurements, whose outcomes the trace backend draws at random, so their trace-backend
-#: estimates vary between runs and are not pinned.
-_PINNED_TRACE_BACKEND_TROTTER: dict[str, dict] = {
-    "ethylene_4e4o": {"qubits": 28585, "runtime_ns": 14936661000, "usd": 2.9},
-    "f2_10e6o": {"qubits": 30034, "runtime_ns": 33934923000, "usd": 6.89},
-    "h2_dfthc": {"qubits": 32495, "runtime_ns": 1382017000, "usd": 0.3},
-}
 
 
 def _hartree_fock_state_prep(num_orbitals: int, num_alpha: int, num_beta: int) -> Circuit:
@@ -292,47 +146,46 @@ _CASES = [
 
 
 @pytest.mark.parametrize(("hamiltonian_name", "algorithm"), _CASES)
-def test_logical_counts(hamiltonian_name, algorithm):
+def test_logical_counts(hamiltonian_name, algorithm, data_regression):
     """The circuit's logical counts must match the pinned values."""
-    pinned = _PINNED[(hamiltonian_name, algorithm)]
-
-    assert _logical_counts(_circuit(hamiltonian_name, algorithm)) == pinned["logical_counts"]
+    data_regression.check(
+        _logical_counts(_circuit(hamiltonian_name, algorithm)),
+        basename=f"logical_counts_{hamiltonian_name}_{algorithm}",
+    )
 
 
 @pytest.mark.parametrize(("hamiltonian_name", "algorithm"), _CASES)
-def test_physical_estimate_and_dollar_cost(hamiltonian_name, algorithm):
-    """The cheapest point's physical qubits, runtime, and USD cost must match the pinned values.
-
-    The estimate runs on the logical-counts backend, which seeds the random measurement
-    outcomes it branches on, so every run gives the same estimate.
-    """
-    pinned = _PINNED[(hamiltonian_name, algorithm)]
+def test_physical_estimate_and_dollar_cost(hamiltonian_name, algorithm, num_regression):
+    """The seeded counts backend must reproduce the cheapest point's qubits, runtime, and USD cost."""
     application = _circuit(hamiltonian_name, algorithm).get_qre_application(use_trace_backend=False)
 
     cheapest = _cheapest_estimate(application)
 
-    assert cheapest["qubits"] == pinned["qubits"]
-    assert cheapest["runtime_ns"] == pinned["runtime_ns"]
-    assert cheapest["usd"] == pytest.approx(pinned["usd"])
+    num_regression.check(
+        cheapest,
+        basename=f"physical_estimate_and_dollar_cost_{hamiltonian_name}_{algorithm}",
+        default_tolerance={"atol": 0, "rtol": 0},
+        tolerances={"usd": {"atol": 1e-12, "rtol": 1e-6}},
+    )
 
 
 @pytest.mark.parametrize(("hamiltonian_name", "algorithm"), _CASES)
-def test_the_default_trace_backend_estimates_the_circuit(hamiltonian_name, algorithm):
-    """The default ``get_qre_application`` traces every circuit on its logical qubits.
-
-    Only the Trotter estimates are pinned; see ``_PINNED_TRACE_BACKEND_TROTTER``.
-    """
-    application = _circuit(hamiltonian_name, algorithm).get_qre_application()
+def test_the_default_trace_backend_estimates_the_circuit(hamiltonian_name, algorithm, num_regression):
+    """Trace every circuit on its logical qubits, pinning only the reproducible Trotter estimates."""
+    circuit = _circuit(hamiltonian_name, algorithm)
+    application = circuit.get_qre_application()
 
     trace = application.get_trace()
     cheapest = _cheapest_estimate(application)
 
-    assert trace.compute_qubits == _PINNED[(hamiltonian_name, algorithm)]["logical_counts"]["numQubits"]
+    assert trace.compute_qubits == _logical_counts(circuit)["numQubits"]
     if algorithm == "trotter":
-        pinned = _PINNED_TRACE_BACKEND_TROTTER[hamiltonian_name]
-        assert cheapest["qubits"] == pinned["qubits"]
-        assert cheapest["runtime_ns"] == pinned["runtime_ns"]
-        assert cheapest["usd"] == pytest.approx(pinned["usd"])
+        num_regression.check(
+            cheapest,
+            basename=f"default_trace_backend_{hamiltonian_name}",
+            default_tolerance={"atol": 0, "rtol": 0},
+            tolerances={"usd": {"atol": 1e-12, "rtol": 1e-6}},
+        )
 
 
 @pytest.mark.xfail(

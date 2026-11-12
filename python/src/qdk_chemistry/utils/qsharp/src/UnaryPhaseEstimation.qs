@@ -6,10 +6,7 @@ namespace QDKChemistry.Utils.UnaryPhaseEstimation {
 
     import Std.Arrays.Reversed;
     import Std.Canon.ApplyQFT;
-    import Std.Canon.ApplyToEach;
-    import Std.Canon.ApplyXorInPlace;
     import Std.Diagnostics.Fact;
-    import Std.Math.AbsI;
     import Std.ResourceEstimation.EnableMemoryComputeArchitecture;
     import Std.ResourceEstimation.IsResourceEstimating;
     import Std.ResourceEstimation.LeastRecentlyUsed;
@@ -64,12 +61,11 @@ namespace QDKChemistry.Utils.UnaryPhaseEstimation {
     /// (see `UnaryIterationWithControl`) and realize a wrong walk power.
     ///
     /// Under resource estimation one representative slot is repeated `numQueries` times, and the
-    /// first `numWarmupQueries` of those repetitions are counted exactly (see `Loop.Loop`).
+    /// first two of those repetitions are counted exactly (see `Loop.Loop`).
     internal operation ApplySignedPowerSchedule(
         applyBlockEncoding : (Qubit[] => Unit is Adj),
         applyReflection : (Qubit[] => Unit is Adj + Ctl),
         numQueries : Int,
-        numWarmupQueries : Int,
         phaseReg : Qubit[],
         allQubits : Qubit[],
     ) : Unit is Adj {
@@ -79,7 +75,7 @@ namespace QDKChemistry.Utils.UnaryPhaseEstimation {
                 if slot == 0 {
                     LoopA(
                         numQueries,
-                        numWarmupQueries,
+                        2,
                         _ => ApplySignedPowerSlot(applyBlockEncoding, applyReflection, true, selected, allQubits)
                     );
                 } elif slot == numQueries {
@@ -107,7 +103,7 @@ namespace QDKChemistry.Utils.UnaryPhaseEstimation {
     /// `blockEncodingUsesShared` for the component that expects them appended to its register.
     /// Set `computeCapacity` to a positive logical-qubit capacity to enable least-recently-used
     /// memory placement, or to -1 to keep all logical qubits in compute. Under resource
-    /// estimation the first `numWarmupQueries` walk queries are counted exactly before one is
+    /// estimation the first two walk queries are counted exactly before one is
     /// repeated, so the placement can reach its steady state first.
     operation MakeUnaryQPECircuit(
         statePrep : Qubit[] => Unit,
@@ -122,7 +118,6 @@ namespace QDKChemistry.Utils.UnaryPhaseEstimation {
         statePrepUsesShared : Bool,
         blockEncodingUsesShared : Bool,
         computeCapacity : Int,
-        numWarmupQueries : Int,
     ) : Result[] {
         Fact(numSystemQubits > 0, "numSystemQubits must be positive");
         Fact(numAncillas >= 0, "numAncillas must be non-negative");
@@ -132,7 +127,6 @@ namespace QDKChemistry.Utils.UnaryPhaseEstimation {
             "consuming shared ancilla requires a non-empty shared register"
         );
         Fact(computeCapacity == -1 or computeCapacity > 0, "computeCapacity must be -1 or positive");
-        Fact(numWarmupQueries >= 0, "numWarmupQueries must be non-negative");
         let numPhaseQubits = PhaseRegisterSize(numQueries);
 
         if computeCapacity > 0 {
@@ -161,7 +155,6 @@ namespace QDKChemistry.Utils.UnaryPhaseEstimation {
                 blockEncoding,
                 applyReflection,
                 numQueries,
-                numWarmupQueries,
                 Reversed(phaseQubits),
                 allTargets
             );
@@ -176,90 +169,5 @@ namespace QDKChemistry.Utils.UnaryPhaseEstimation {
 
         ResetAll(qs[numPhaseQubits...]);
         return results;
-    }
-
-    /// Checks the generic schedule against the explicit walk power.
-    internal function MakeTestSignedPowerScheduleAgainstWalkOp(
-        applyBlockEncoding : (Qubit[] => Unit is Adj),
-        applyReflection : (Qubit[] => Unit is Adj + Ctl),
-        numQueries : Int,
-        addressValue : Int,
-        systemAngle : Double,
-    ) : (Qubit[] => Unit) {
-        return qs => {
-            let numAddressQubits = AddressQubits(numQueries + 1);
-            let address = qs[0..numAddressQubits - 1];
-            let targets = qs[numAddressQubits...];
-
-            ApplyXorInPlace(addressValue, address);
-            Ry(systemAngle, targets[0]);
-
-            ApplySignedPowerSchedule(applyBlockEncoding, applyReflection, numQueries, 0, address, targets);
-
-            let walk = (register) => {
-                applyBlockEncoding(register);
-                applyReflection(register);
-            };
-            let power = numQueries - 2 * addressValue;
-            for _ in 1..AbsI(power) {
-                if power > 0 {
-                    Adjoint walk(targets);
-                } else {
-                    walk(targets);
-                }
-            }
-
-            ApplyXorInPlace(addressValue, address);
-        };
-    }
-
-    /// Compares the estimator-specialized schedule with its literal implementation.
-    internal operation TestSignedPowerScheduleResources(
-        numQueries : Int,
-        numWarmupQueries : Int,
-        useOptimizedSchedule : Bool
-    ) : Unit {
-        let numAddressQubits = AddressQubits(numQueries + 1);
-        use qs = Qubit[numAddressQubits + 1];
-        let address = qs[0..numAddressQubits - 1];
-        let targets = qs[numAddressQubits...];
-        let applyBlockEncoding = (register) => T(register[0]);
-        let applyReflection = (register) => Z(register[0]);
-
-        if useOptimizedSchedule {
-            ApplySignedPowerSchedule(applyBlockEncoding, applyReflection, numQueries, numWarmupQueries, address, targets);
-        } else {
-            ApplySignedPowerScheduleDirect(applyBlockEncoding, applyReflection, numQueries, address, targets);
-        }
-
-        ResetAll(qs);
-    }
-
-    /// Runs `MakeUnaryQPECircuit` on a synthetic one-qubit walk with an exact eigenphase.
-    internal operation TestUnaryQpeSyntheticWalk(numQueries : Int, theta : Double, systemAngle : Double) : Result[] {
-        Fact(
-            2^PhaseRegisterSize(numQueries) == numQueries + 1,
-            "numQueries must be one less than a power of two",
-        );
-
-        return MakeUnaryQPECircuit(
-            (systems) => Ry(systemAngle, systems[0]),
-            (qubits) => {
-                Rz(-theta, qubits[0]);
-                X(qubits[0]);
-                Rz(theta, qubits[0]);
-            },
-            (qubits) => X(qubits[0]),
-            ApplyToEach(H, _),
-            QDKChemistry.Utils.PrepSelPrep.NoOpPrepare,
-            numQueries,
-            1,
-            0,
-            0,
-            false,
-            false,
-            -1,
-            0
-        );
     }
 }

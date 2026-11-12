@@ -19,9 +19,9 @@ from qdk_chemistry.utils.qsharp import QSHARP_UTILS, get_qsharp_context
 from .test_helpers import create_dense_wavefunction, create_sparse_wavefunction
 
 
-def _dump_op(op, num_qubits: int) -> np.ndarray:
-    """Dump an operation in the shared Q# context."""
-    return np.array(dump_operation_on_state(op, num_qubits, context=get_qsharp_context()))
+def _dump_op(context, op, num_qubits: int) -> np.ndarray:
+    """Dump an operation in the Q# context that resolved it."""
+    return np.array(dump_operation_on_state(op, num_qubits, context=context))
 
 
 def _run_qrom_state_prep_and_dump(amplitudes: list[float], num_qubits: int, bits: int = 10) -> np.ndarray:
@@ -36,7 +36,7 @@ def _run_qrom_state_prep_and_dump(amplitudes: list[float], num_qubits: int, bits
         QSHARP_UTILS.PhaseGradient.PreparePhaseGradientState,
         bits,
     )
-    sv = _dump_op(op, num_qubits + bits)
+    sv = _dump_op(get_qsharp_context(), op, num_qubits + bits)
     return sv.reshape(2**num_qubits, 2**bits)[:, 0]
 
 
@@ -231,10 +231,10 @@ class TestRyViaPhaseGradient:
             (7, 4),
         ],
     )
-    def test_rotation_amplitudes(self, x, n):
+    def test_rotation_amplitudes(self, qsharp_test_context, qsharp_test_utils, x, n):
         """Ry(θ)|0⟩ = cos(θ/2)|0⟩ + sin(θ/2)|1⟩ with θ = 4πx/2^n."""
-        op = QSHARP_UTILS.PhaseGradient.MakeTestRyOp(x, n)
-        sv = _dump_op(op, 1 + 2 * n)
+        op = qsharp_test_utils.PhaseGradientTests.MakeTestRyOp(x, n)
+        sv = _dump_op(qsharp_test_context, op, 1 + 2 * n)
         a0, a1 = _target_amps(sv, x, n)
 
         theta = 4.0 * math.pi * x / (1 << n)
@@ -244,10 +244,10 @@ class TestRyViaPhaseGradient:
         np.testing.assert_allclose(a1.imag, 0.0, atol=1e-6)
 
     @pytest.mark.parametrize(("x", "n"), [(1, 4), (5, 5), (3, 4)])
-    def test_adjoint_roundtrip(self, x, n):
+    def test_adjoint_roundtrip(self, qsharp_test_context, qsharp_test_utils, x, n):
         """Ry followed by Adjoint Ry returns target to |+⟩."""
-        op = QSHARP_UTILS.PhaseGradient.MakeTestRyRoundtripOp(x, n)
-        sv = _dump_op(op, 1 + 2 * n)
+        op = qsharp_test_utils.PhaseGradientTests.MakeTestRyRoundtripOp(x, n)
+        sv = _dump_op(qsharp_test_context, op, 1 + 2 * n)
         a0, a1 = _target_amps(sv, x, n)
 
         np.testing.assert_allclose(abs(a0), 1 / math.sqrt(2), atol=1e-8)
@@ -259,10 +259,10 @@ class TestRzViaPhaseGradient:
     """Tests for the RzViaPhaseGradient operation."""
 
     @pytest.mark.parametrize(("x", "n"), [(1, 4), (2, 4), (3, 4), (1, 5), (5, 5)])
-    def test_polarity(self, x, n):
+    def test_polarity(self, qsharp_test_context, qsharp_test_utils, x, n):
         """Rz(θ) = diag(e^{-iθ/2}, e^{+iθ/2}) with θ = +4πx/2^n."""
-        op = QSHARP_UTILS.PhaseGradient.MakeTestRzOnPlusOp(x, n)
-        sv = _dump_op(op, 1 + 2 * n)
+        op = qsharp_test_utils.PhaseGradientTests.MakeTestRzOnPlusOp(x, n)
+        sv = _dump_op(qsharp_test_context, op, 1 + 2 * n)
         a0, a1 = _target_amps(sv, x, n)
 
         theta = 4.0 * math.pi * x / (1 << n)

@@ -79,6 +79,7 @@ dev = [
   "pre-commit",
   "pytest",
   "pytest-env",
+  "pytest-regressions",
   "ruff"
 ]
 docs = [

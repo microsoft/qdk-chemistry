@@ -6,6 +6,7 @@
 # --------------------------------------------------------------------------------------------
 
 import math
+from pathlib import Path
 
 import numpy as np
 import pytest
@@ -376,7 +377,7 @@ class TestSOSSAMapper:
         assert circuit._qsharp_op is not None
         assert circuit._qsharp_factory is not None
 
-    def test_free_rider_placement_costs_inner_prepare_pairs_consistently(self):
+    def test_free_rider_placement_costs_inner_prepare_pairs_consistently(self, qsharp_test_utils):
         """One block applies two inner PREPARE pairs against a single free-rider pair."""
         coefficients = [[1.0, 1.0, 1.0, 1.0] for _ in range(6)]
         free_rider_data = [[False, True] for _ in range(6)]
@@ -385,7 +386,7 @@ class TestSOSSAMapper:
         # 2:1 pair ratio splitting costs 2*25 + 5 = 55 against 2*27 = 54, so the word stays
         # inline; at 4:1 it was 4*25 + 5 = 105 against 4*27 = 108 and was split out. Both
         # clear by a margin, so the case does not rest on a tie-break.
-        load_separately = QSHARP_UTILS.SOSSAWalk.TestShouldLoadFreeRiderSeparately(
+        load_separately = qsharp_test_utils.SOSSAWalkTests.TestShouldLoadFreeRiderSeparately(
             coefficients,
             free_rider_data,
             1,
@@ -404,6 +405,7 @@ class TestSOSSAMapper:
     )
     def test_branched_angle_word_erasure_restores_the_address_register(
         self,
+        qsharp_test_utils,
         sf_rows: int,
         sf_address_qubits: int,
         dq_rows: int,
@@ -417,7 +419,7 @@ class TestSOSSAMapper:
         # The erasure measures, so a mismatched row only shows up for the outcomes whose
         # parity it changes; repeat to keep the check from passing by luck.
         for _ in range(8):
-            assert QSHARP_UTILS.SOSSAWalk.TestBranchedRotationWordRoundTrip(
+            assert qsharp_test_utils.SOSSAWalkTests.TestBranchedRotationWordRoundTrip(
                 sf_data,
                 dq_data,
                 sf_address_qubits,
@@ -567,7 +569,8 @@ class TestSelectFullFidelity:
         select_data: dict, xo_value: int = 0, b_value: int = 0, use_phase_gradient: bool = False
     ) -> np.ndarray:
         ctx = create_qsharp_context()
-        ctx.code.QDKChemistry.Utils.SOSSAWalk.TestSelectDQ(select_data, xo_value, b_value, use_phase_gradient)
+        ctx.eval((Path(__file__).parent / "qsharp" / "TestSOSSAWalk.qs").read_text(encoding="utf-8"))
+        ctx.code.QDKChemistry.TestUtils.SOSSAWalkTests.TestSelectDQ(select_data, xo_value, b_value, use_phase_gradient)
         return np.array(ctx.dump_machine().as_dense_state())
 
     @pytest.mark.parametrize("num_free_rider_bits", [0, 1])

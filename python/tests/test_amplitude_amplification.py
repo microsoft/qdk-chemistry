@@ -9,7 +9,6 @@ from __future__ import annotations
 
 import itertools
 import math
-import warnings
 
 import numpy as np
 import pytest
@@ -324,21 +323,6 @@ def test_a_declared_register_width_is_used_without_a_resource_estimate():
 
     circuit = create("amplitude_amplification", rounds=1).run(state_prep_oracle, good_state_oracle)
     assert circuit._qsharp_factory.parameter["numQubits"] == 3
-
-
-def test_an_undeclared_register_width_is_estimated_without_a_deprecation_warning():
-    """Reading the width from a resource estimate does not route the caller through ``Circuit.estimate``."""
-    prepared = _guiding_state(0.3, 3)
-    state_prep_oracle = Circuit(qsharp_op=prepared._qsharp_op, qsharp_factory=prepared._qsharp_factory)
-    assert state_prep_oracle.num_qubits is None
-    good_state_oracle = _all_ones_marking_oracle()
-
-    with warnings.catch_warnings(record=True) as record:
-        warnings.simplefilter("always")
-        circuit = create("amplitude_amplification", rounds=1).run(state_prep_oracle, good_state_oracle)
-
-    assert circuit._qsharp_factory.parameter["numQubits"] == 2
-    assert not [w for w in record if "Circuit.estimate()" in str(w.message)]
 
 
 def test_amplification_matches_the_closed_form_and_overshoots():

@@ -55,13 +55,9 @@ def _dumped_address_index(address_value: int, num_address_qubits: int) -> int:
     return int(format(address_value, f"0{num_address_qubits}b")[::-1], 2)
 
 
-def _dump_op(op, num_qubits: int) -> np.ndarray:
-    """Simulate ``op`` on the all-zero state and return the resulting statevector.
-
-    The context has to be the one the operation was resolved from, otherwise the helper
-    that ``dump_operation_on_state`` evaluates cannot bind the callable.
-    """
-    return np.array(dump_operation_on_state(op, num_qubits, context=get_qsharp_context()))
+def _dump_op(context, op, num_qubits: int) -> np.ndarray:
+    """Simulate ``op`` on the all-zero state using the context that resolved it."""
+    return np.array(dump_operation_on_state(op, num_qubits, context=context))
 
 
 def _decode(counts: dict[str, int], num_bits: int, *, resolve_positive_branch: bool = False):
@@ -75,16 +71,16 @@ class TestUnaryIterationQsharp:
     """Statevector checks of the unary-iteration primitives against exact references."""
 
     @pytest.mark.parametrize("num_actions", [2, 3, 5, 6, 7, 9, 10, 13])
-    def test_classical_action_index_matches_every_address(self, num_actions: int) -> None:
+    def test_classical_action_index_matches_every_address(self, qsharp_test_utils, num_actions: int) -> None:
         """The unlookup mirror must include the circuit's routing of padded addresses."""
-        assert QSHARP_UTILS.UnaryIteration.TestUnaryIterationActionIndex(num_actions)
+        assert qsharp_test_utils.UnaryIterationTests.TestUnaryIterationActionIndex(num_actions)
 
     @pytest.mark.parametrize("num_actions", [2, 4, 8])
-    def test_superposed_address_stays_coherent(self, num_actions):
+    def test_superposed_address_stays_coherent(self, qsharp_test_context, qsharp_test_utils, num_actions):
         """A superposed address must produce sum_a |a>|onehot(a)> with no ancilla residue."""
         num_address_qubits = _address_qubits(num_actions)
-        op = QSHARP_UTILS.UnaryIteration.MakeTestUnaryIterationSuperposedAddressOp(num_actions)
-        state = _dump_op(op, num_address_qubits + num_actions)
+        op = qsharp_test_utils.UnaryIterationTests.MakeTestUnaryIterationSuperposedAddressOp(num_actions)
+        state = _dump_op(qsharp_test_context, op, num_address_qubits + num_actions)
 
         expected = np.zeros(1 << (num_address_qubits + num_actions), dtype=complex)
         for address_value in range(num_actions):
@@ -100,11 +96,11 @@ class TestUnaryIterationQsharp:
             (7, [True, False, False, False, False, True, True]),
         ],
     )
-    def test_exposed_control_is_an_equality_predicate(self, num_actions, data):
+    def test_exposed_control_is_an_equality_predicate(self, qsharp_test_context, qsharp_test_utils, num_actions, data):
         """Phasing the exposed control must imprint exactly the flagged sign pattern."""
         num_address_qubits = _address_qubits(num_actions)
-        op = QSHARP_UTILS.UnaryIteration.MakeTestUnaryIterationControlPhasesOp(num_actions, data)
-        state = _dump_op(op, num_address_qubits)
+        op = qsharp_test_utils.UnaryIterationTests.MakeTestUnaryIterationControlPhasesOp(num_actions, data)
+        state = _dump_op(qsharp_test_context, op, num_address_qubits)
 
         # Addresses at or above num_actions are outside the iteration's promise: the last
         # leaf fires on its control alone, so they alias onto a neighbouring action.
@@ -117,15 +113,14 @@ class TestUnaryIterationQsharp:
 class TestBlockEncodingAgnosticSchedule:
     """The signed-power schedule must work for any self-inverse block encoding."""
 
-    @pytest.mark.parametrize("num_warmup_queries", [0, 1, 3])
-    @pytest.mark.parametrize("num_queries", [1, 2, 3, 5, 7])
-    def test_resource_optimization_preserves_logical_counts(self, num_queries, num_warmup_queries):
+    @pytest.mark.parametrize("num_queries", [1, 2, 3, 5, 7, 100])
+    def test_resource_optimization_preserves_logical_counts(self, qsharp_test_context, qsharp_test_utils, num_queries):
         """Repeating one representative slot must match the literal schedule's costs."""
-        operation = QSHARP_UTILS.UnaryPhaseEstimation.TestSignedPowerScheduleResources
-        context = get_qsharp_context()
+        operation = qsharp_test_utils.UnaryPhaseEstimationTests.TestSignedPowerScheduleResources
+        context = qsharp_test_context
 
-        optimized = context.logical_counts(operation, num_queries, num_warmup_queries, True)
-        direct = context.logical_counts(operation, num_queries, num_warmup_queries, False)
+        optimized = context.logical_counts(operation, num_queries, True)
+        direct = context.logical_counts(operation, num_queries, False)
 
         assert optimized == direct
 
@@ -133,14 +128,20 @@ class TestBlockEncodingAgnosticSchedule:
         ("num_queries", "address_value"),
         [(p, t) for p in (1, 2, 3, 5) for t in range(p + 1)],
     )
-    def test_psp_schedule_matches_the_explicit_walk_power(self, num_queries, address_value):
+    def test_psp_schedule_matches_the_explicit_walk_power(
+        self, qsharp_test_context, qsharp_test_utils, num_queries, address_value
+    ):
         """A PREPARE-SELECT-PREPARE walk must obey the same ``W^(p - 2t)`` contract."""
-        psp = QSHARP_UTILS.PrepSelPrep
-        op = QSHARP_UTILS.UnaryPhaseEstimation.MakeTestSignedPowerScheduleAgainstWalkOp(
-            psp.MakeTestBlockEncodingOp(0.7), psp.MakeAncillaReflectionOp(1, 1), num_queries, address_value, 0.9
+        psp = qsharp_test_context.code.QDKChemistry.Utils.PrepSelPrep
+        op = qsharp_test_utils.UnaryPhaseEstimationTests.MakeTestSignedPowerScheduleAgainstWalkOp(
+            qsharp_test_utils.PrepSelPrepTests.MakeTestBlockEncodingOp(0.7),
+            psp.MakeAncillaReflectionOp(1, 1),
+            num_queries,
+            address_value,
+            0.9,
         )
         num_address_qubits = _address_qubits(num_queries + 1)
-        state = _dump_op(op, num_address_qubits + 2)
+        state = _dump_op(qsharp_test_context, op, num_address_qubits + 2)
 
         expected = np.zeros(1 << (num_address_qubits + 2), dtype=complex)
         expected[0] = np.cos(0.45)  # system |0>, ancilla |0>
@@ -148,13 +149,17 @@ class TestBlockEncodingAgnosticSchedule:
         np.testing.assert_allclose(state, expected, atol=1e-10)
 
     @pytest.mark.parametrize("theta", [0.0, 1.3, np.pi / 2])
-    def test_psp_schedule_holds_for_every_encoded_eigenvalue(self, theta):
+    def test_psp_schedule_holds_for_every_encoded_eigenvalue(self, qsharp_test_context, qsharp_test_utils, theta):
         """The contract must not depend on what the block encoding encodes."""
-        psp = QSHARP_UTILS.PrepSelPrep
-        op = QSHARP_UTILS.UnaryPhaseEstimation.MakeTestSignedPowerScheduleAgainstWalkOp(
-            psp.MakeTestBlockEncodingOp(theta), psp.MakeAncillaReflectionOp(1, 1), 3, 1, 0.9
+        psp = qsharp_test_context.code.QDKChemistry.Utils.PrepSelPrep
+        op = qsharp_test_utils.UnaryPhaseEstimationTests.MakeTestSignedPowerScheduleAgainstWalkOp(
+            qsharp_test_utils.PrepSelPrepTests.MakeTestBlockEncodingOp(theta),
+            psp.MakeAncillaReflectionOp(1, 1),
+            3,
+            1,
+            0.9,
         )
-        state = _dump_op(op, 4)
+        state = _dump_op(qsharp_test_context, op, 4)
 
         expected = np.zeros(1 << 4, dtype=complex)
         expected[0] = np.cos(0.45)
@@ -402,38 +407,40 @@ class TestUnaryQpeEndToEnd:
     """End-to-end checks of ``MakeUnaryQPECircuit`` on a walk with an exact eigenphase."""
 
     @staticmethod
-    def _measure(num_queries: int, k: int, system_angle: float) -> int:
+    def _measure(qsharp_test_utils, num_queries: int, k: int, system_angle: float) -> int:
         """Run the synthetic-walk QPE circuit from ``Ry(system_angle)|0>`` and decode the phase register."""
         num_states = num_queries + 1
         theta = -np.pi * k / num_states
-        results = QSHARP_UTILS.UnaryPhaseEstimation.TestUnaryQpeSyntheticWalk(num_queries, theta, system_angle)
+        results = qsharp_test_utils.UnaryPhaseEstimationTests.TestUnaryQpeSyntheticWalk(
+            num_queries, theta, system_angle
+        )
         return int("".join("1" if str(bit) == "One" else "0" for bit in reversed(results)), 2)
 
     @pytest.mark.parametrize(
         ("num_queries", "k", "system_state"),
         [(m, k, s) for m in (3, 7) for k in range(m + 1) for s in (0, 1)],
     )
-    def test_measured_bin_is_twice_the_walk_phase(self, num_queries, k, system_state):
+    def test_measured_bin_is_twice_the_walk_phase(self, qsharp_test_utils, num_queries, k, system_state):
         """The measured register must read exactly ``2*phi*N``."""
         num_states = num_queries + 1
         expected = (-k) % num_states if system_state == 1 else k
-        assert self._measure(num_queries, k, system_state * np.pi) == expected
+        assert self._measure(qsharp_test_utils, num_queries, k, system_state * np.pi) == expected
 
     @pytest.mark.parametrize("system_angle", [np.pi / 2, 2 * np.pi / 3])
-    def test_superposed_input_splits_across_both_eigenphase_bins(self, system_angle):
+    def test_superposed_input_splits_across_both_eigenphase_bins(self, qsharp_test_utils, system_angle):
         """A non-eigenstate must land in the two eigenphase bins with the overlap weights."""
         num_queries, k, shots = 7, 3, 256
         num_states = num_queries + 1
         ground_bin, excited_bin = k, (-k) % num_states
 
-        measured = np.array([self._measure(num_queries, k, system_angle) for _ in range(shots)])
+        measured = np.array([self._measure(qsharp_test_utils, num_queries, k, system_angle) for _ in range(shots)])
 
         assert set(np.unique(measured).tolist()) == {ground_bin, excited_bin}
         assert np.mean(measured == excited_bin) == pytest.approx(np.sin(system_angle / 2) ** 2, abs=0.12)
 
     @pytest.mark.parametrize("resolve_positive_branch", [True, False])
     @pytest.mark.parametrize("k", [1, 2, 3])
-    def test_decoder_recovers_the_walk_phase(self, k, resolve_positive_branch):
+    def test_decoder_recovers_the_walk_phase(self, qsharp_test_utils, k, resolve_positive_branch):
         """The measured bin, run through the decoder, returns the walk phase.
 
         The two eigenvectors carry conjugate phases ``+-phi`` and land in
@@ -447,7 +454,7 @@ class TestUnaryQpeEndToEnd:
         walk_phase = k / (2 * num_states)
         expected_phase = walk_phase if resolve_positive_branch else 0.5 - walk_phase
         for system_state in (0, 1):
-            measured_bin = self._measure(num_queries, k, system_state * np.pi)
+            measured_bin = self._measure(qsharp_test_utils, num_queries, k, system_state * np.pi)
             counts = {format(measured_bin, f"0{num_bits}b"): 1}
             result = _decode(counts, num_bits, resolve_positive_branch=resolve_positive_branch)
             assert result.canonical_phase_fraction == pytest.approx(expected_phase)
@@ -549,55 +556,17 @@ def test_the_builder_passes_compute_capacity_to_qsharp(compute_capacity):
     assert circuit._qsharp_factory.parameter["computeCapacity"] == compute_capacity
 
 
-@pytest.mark.parametrize("num_warmup_queries", [0, 1, 3])
-def test_the_builder_passes_num_warmup_queries_to_qsharp(num_warmup_queries):
-    """The Python setting must reach the Q# factory unchanged."""
-    circuit = _run_builder(QdkUnaryQpeCircuitBuilder(num_queries=3, num_warmup_queries=num_warmup_queries))[0]
-
-    assert circuit._qsharp_factory.parameter["numWarmupQueries"] == num_warmup_queries
-
-
-def test_the_builder_rejects_negative_num_warmup_queries():
-    """A negative warm-up count has no meaning and must fail before reaching Q#."""
-    with pytest.raises(ValueError, match="num_warmup_queries must be non-negative"):
-        _run_builder(QdkUnaryQpeCircuitBuilder(num_queries=3, num_warmup_queries=-1))
-
-
-@pytest.mark.parametrize("num_warmup_queries", [1, 3])
-def test_warmup_queries_do_not_change_counts_without_memory_placement(num_warmup_queries):
-    """Without memory placement every query costs the same, so warm-up is resource neutral."""
-    baseline = _logical_counts(QdkUnaryQpeCircuitBuilder(num_queries=3, num_warmup_queries=0))
-    warmed = _logical_counts(QdkUnaryQpeCircuitBuilder(num_queries=3, num_warmup_queries=num_warmup_queries))
-
-    assert warmed == baseline
-
-
 @pytest.mark.parametrize("compute_capacity", [4, 6])
-def test_one_warmup_query_matches_the_unrolled_memory_traffic(compute_capacity):
-    """Repeating the cold first query multiplies its memory faults; one warm-up query avoids that.
+def test_two_warmup_queries_match_the_unrolled_memory_traffic(qsharp_test_context, qsharp_test_utils, compute_capacity):
+    """Two warm-up queries must preserve the fully unrolled schedule's memory traffic."""
+    context = qsharp_test_context
+    operation = qsharp_test_utils.UnaryPhaseEstimationTests.TestSignedPowerScheduleMemoryTraffic
+    optimized = context.logical_counts(operation, 100, compute_capacity, True)
+    unrolled = context.logical_counts(operation, 100, compute_capacity, False)
 
-    Warming up every query unrolls the schedule, which is the exact count to compare against.
-    """
-    num_queries = 100
-
-    def memory_traffic(num_warmup_queries: int) -> tuple[int, int]:
-        counts = _logical_counts(
-            QdkUnaryQpeCircuitBuilder(
-                num_queries=num_queries, compute_capacity=compute_capacity, num_warmup_queries=num_warmup_queries
-            )
-        )
-        return counts["readFromMemoryCount"], counts["writeToMemoryCount"]
-
-    unrolled = memory_traffic(num_queries)
-
-    assert memory_traffic(1) == unrolled
-    assert memory_traffic(0)[0] > unrolled[0]
-
-
-def _logical_counts(builder: QdkUnaryQpeCircuitBuilder) -> dict:
-    """Logical counts of the circuit ``builder`` produces for ``H = (X + Z)/2``."""
-    factory = _run_builder(builder)[0]._qsharp_factory
-    return get_qsharp_context().logical_counts(factory.program, *factory.parameter.values())
+    assert optimized["readFromMemoryCount"] > 0
+    assert optimized["writeToMemoryCount"] > 0
+    assert optimized == unrolled
 
 
 @pytest.mark.skipif(not _HAS_QRE, reason="qdk.qre not available")
