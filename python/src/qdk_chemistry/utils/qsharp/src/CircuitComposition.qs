@@ -47,16 +47,16 @@ namespace QDKChemistry.Utils.CircuitComposition {
 
     /// Applies two operations sequentially on the same system register.
     operation ApplySequential(
-        first : Qubit[] => Unit,
-        second : Qubit[] => Unit,
+        first : Qubit[] => Unit is Adj,
+        second : Qubit[] => Unit is Adj,
         systems : Qubit[]
-    ) : Unit {
+    ) : Unit is Adj {
         first(systems);
         second(systems);
     }
 
     /// Returns a composed operation that applies ``first`` and then ``second``.
-    function MakeSequentialOp(first : Qubit[] => Unit, second : Qubit[] => Unit) : Qubit[] => Unit {
+    function MakeSequentialOp(first : Qubit[] => Unit is Adj, second : Qubit[] => Unit is Adj) : Qubit[] => Unit is Adj {
         ApplySequential(first, second, _)
     }
 
@@ -92,13 +92,12 @@ namespace QDKChemistry.Utils.CircuitComposition {
 
     /// Creates a circuit for sequentially applying two operations on the same target qubits.
     operation MakeSequentialCircuit(
-        first : Qubit[] => Unit,
-        second : Qubit[] => Unit,
+        first : Qubit[] => Unit is Adj,
+        second : Qubit[] => Unit is Adj,
         targets : Int[]
-    ) : Unit {
+    ) : Unit is Adj {
         if (Length(targets) == 0) {
             // No target indices: do nothing.
-            return ();
         } else {
             // Allocate enough qubits so that all indices in 'targets' are valid.
             let maxTarget = MaxInt(targets);
