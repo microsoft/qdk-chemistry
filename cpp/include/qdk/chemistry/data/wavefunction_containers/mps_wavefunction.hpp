@@ -26,6 +26,14 @@ namespace qdk::chemistry::data {
  * sector labels must match the particle number, and for spin-half states the
  * spin projection, of the basis states they contain. Binary states are
  * spinless, so their labels must not have a spin axis.
+ *
+ * Spin-half states denote |0> = |vac>, |u> = a_alpha^dagger|vac>,
+ * |d> = a_beta^dagger|vac> and |2> = a_alpha^dagger a_beta^dagger|vac>; binary
+ * states denote the vacuum and one occupied spinless mode. Contracting the
+ * sites gives amplitudes in the product basis whose creation operators are
+ * written left to right in chain order, alpha before beta within a site. An
+ * explicit physical basis may reorder or restrict these states without
+ * changing their phases.
  */
 class MPSSite {
  public:
@@ -109,6 +117,12 @@ class MPSSite {
  * Each site describes its own local basis. Particle counts, the orthogonality
  * center, and supplied RDMs are optional. The site-to-orbital order defaults to
  * identity. RDM indices use active-orbital order, not MPS chain order.
+ *
+ * site_to_orbital_order[s] is the active-orbital slot of chain site s. It is
+ * stored without changing tensor entries or their phases; get_coefficient()
+ * applies the fermionic sign relating the chain-ordered product basis to
+ * determinants, whose creation operators are ordered with all alpha modes
+ * before all beta modes, each in ascending orbital order.
  */
 class MPSContainer : public WavefunctionContainer {
  public:
@@ -221,6 +235,24 @@ class MPSContainer : public WavefunctionContainer {
    * @throws std::runtime_error Always.
    */
   ScalarVariant overlap(const WavefunctionContainer& other) const override;
+  /**
+   * @brief Amplitude of an active-space determinant, contracted from the sites.
+   *
+   * Each chain site s reads the local state of orbital slot
+   * site_to_orbital_order[s]. The chain is contracted in
+   * O(num_sites * D^2), and the result is multiplied by the parity of the
+   * permutation that sorts the chain-ordered creation operators into
+   * determinant order (see the class description). Spinless modes follow the
+   * same rule, so binary sites are fermionic; a non-fermionic qubit chain
+   * agrees with this amplitude only for the identity site order. The stored
+   * scale and phase are preserved.
+   * @param det Active-space configuration in the sites' physical encoding.
+   * @return Real or complex amplitude; zero if a local state lies outside a
+   * site's physical basis or a mode beyond the active sites is occupied.
+   * @throws std::invalid_argument if the encoding differs from a site's
+   * physical basis or @p det has fewer modes than the chain has sites.
+   */
+  ScalarVariant get_coefficient(const Configuration& det) const override;
   /** @brief Unsupported MPS norm; throws std::runtime_error. */
   double norm() const override;
   /** @brief Unsupported total orbital occupations; throws std::runtime_error.

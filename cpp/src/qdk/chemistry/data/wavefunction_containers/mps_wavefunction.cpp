@@ -198,6 +198,56 @@ std::unique_ptr<MPSContainer> mps_from_metadata(
       read_counts(json.at("active_num_particles")), center, std::move(order));
 }
 
+/**
+ * @brief Contract the chain for one physical index per site.
+ * @param sites Sites in chain order, all storing @p Scalar.
+ * @param physical Flattened physical index selected on each site.
+ * @return Product-basis amplitude of the selected local states.
+ */
+template <typename Scalar>
+Scalar contract_amplitude(const std::vector<MPSContainer::SitePtr>& sites,
+                          const std::vector<std::size_t>& physical) {
+  using Vector = Eigen::Matrix<Scalar, Eigen::Dynamic, 1>;
+  Vector left = Vector::Ones(1);
+  for (std::size_t s = 0; s < sites.size(); ++s) {
+    const auto& site = *sites[s];
+    const auto& tensor =
+        std::get<SymmetryBlockedTensor<3, Scalar>>(site.tensor());
+    // Locate the physical sector and the index within it.
+    const SymmetryLabel* sector = nullptr;
+    std::size_t local = physical[s];
+    for (const auto& label : site.physical_sector_order()) {
+      const auto extent = tensor.extents()[1].at(label);
+      if (local < extent) {
+        sector = &label;
+        break;
+      }
+      local -= extent;
+    }
+    const auto physical_extent = tensor.extents()[1].at(*sector);
+    const auto left_offsets =
+        sector_offsets(tensor.extents()[0], site.left_sector_order());
+    const auto right_offsets =
+        sector_offsets(tensor.extents()[2], site.right_sector_order());
+    Vector right =
+        Vector::Zero(static_cast<Eigen::Index>(site.right_bond_dimension()));
+    for (const auto& [labels, block] : tensor.blocks()) {
+      if (!(labels[1] == *sector)) continue;
+      const auto left_offset = left_offsets.at(labels[0]);
+      const auto right_offset =
+          static_cast<Eigen::Index>(right_offsets.at(labels[2]));
+      for (std::size_t l = 0; l < tensor.extents()[0].at(labels[0]); ++l) {
+        right.segment(right_offset, block->cols()) +=
+            left(static_cast<Eigen::Index>(left_offset + l)) *
+            block->row(static_cast<Eigen::Index>(l * physical_extent + local))
+                .transpose();
+      }
+    }
+    left = std::move(right);
+  }
+  return left(0);
+}
+
 }  // namespace
 
 MPSSite::MPSSite(TensorPtr tensor, SectorOrders sector_orders,
@@ -477,6 +527,62 @@ MPSContainer::ScalarVariant MPSContainer::overlap(
     const WavefunctionContainer&) const {
   throw std::runtime_error(
       "overlap() is not implemented for MPS wavefunctions.");
+}
+
+MPSContainer::ScalarVariant MPSContainer::get_coefficient(
+    const Configuration& det) const {
+  if (det.capacity() < num_sites()) {
+    throw std::invalid_argument(
+        "Configuration has fewer modes than the MPS has sites.");
+  }
+  const auto bits = det.bits_per_mode();
+  // Creation operators in chain order, labeled by determinant mode: slot o is
+  // mode o for alpha or spinless states and num_sites() + o for beta.
+  std::vector<std::size_t> created;
+  std::vector<std::size_t> physical(num_sites());
+  bool in_basis = true;
+  for (std::size_t s = 0; s < num_sites(); ++s) {
+    const auto& basis = _sites[s]->physical_basis();
+    if (basis.front().bits_per_mode() != bits) {
+      throw std::invalid_argument(
+          "Configuration encoding differs from the MPS physical basis.");
+    }
+    const auto orbital = _site_to_orbital_order[s];
+    const auto state = det.get_mode_state(orbital);
+    const auto match =
+        std::ranges::find_if(basis, [state](const Configuration& local) {
+          return local.get_mode_state(0) == state;
+        });
+    if (match == basis.end()) {
+      in_basis = false;
+      continue;
+    }
+    physical[s] = static_cast<std::size_t>(match - basis.begin());
+    if (bits == 1) {
+      if (state != 0) created.push_back(orbital);
+    } else {
+      if (match->has_alpha_electron(0)) created.push_back(orbital);
+      if (match->has_beta_electron(0)) created.push_back(num_sites() + orbital);
+    }
+  }
+  for (std::size_t mode = num_sites(); mode < det.capacity(); ++mode) {
+    if (det.get_mode_state(mode) != 0) in_basis = false;
+  }
+  if (!in_basis) {
+    return is_complex() ? ScalarVariant(std::complex<double>(0.0, 0.0))
+                        : ScalarVariant(0.0);
+  }
+  std::size_t inversions = 0;
+  for (std::size_t i = 0; i < created.size(); ++i) {
+    for (std::size_t j = i + 1; j < created.size(); ++j) {
+      if (created[i] > created[j]) ++inversions;
+    }
+  }
+  const double sign = inversions % 2 == 0 ? 1.0 : -1.0;
+  if (is_complex()) {
+    return sign * contract_amplitude<std::complex<double>>(_sites, physical);
+  }
+  return sign * contract_amplitude<double>(_sites, physical);
 }
 
 double MPSContainer::norm() const {

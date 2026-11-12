@@ -8,6 +8,7 @@
 #include <array>
 #include <complex>
 #include <limits>
+#include <map>
 #include <memory>
 #include <qdk/chemistry/data/wavefunction_containers/mps_wavefunction.hpp>
 #include <qdk/chemistry/data/wavefunction_containers/state_vector.hpp>
@@ -15,6 +16,7 @@
 #include <stdexcept>
 #include <string>
 #include <type_traits>
+#include <utility>
 #include <vector>
 
 #include "ut_common.hpp"
@@ -548,4 +550,183 @@ TEST_F(MPSContainerTest, ParticleCountsFollowTheOrbitals) {
   EXPECT_THROW(
       MPSContainer({make_site(random_matrix(2, 3), 2), sites[1]}, core, counts),
       std::invalid_argument);
+}
+
+namespace {
+
+/// Spin-half configuration from blocked occupation bits written
+/// alpha_0 ... alpha_{n-1} beta_0 ... beta_{n-1}.
+Configuration from_blocked_bits(const std::string& bits) {
+  const auto n = bits.size() / 2;
+  std::string states;
+  for (std::size_t orbital = 0; orbital < n; ++orbital) {
+    const bool alpha = bits[orbital] == '1';
+    const bool beta = bits[n + orbital] == '1';
+    states += alpha ? (beta ? '2' : 'u') : (beta ? 'd' : '0');
+  }
+  return Configuration::from_spin_half_string(states);
+}
+
+/// Sites of (|2u0> + i|u02> - |udu> - i|02u>)/2 in chain order. Each bond
+/// channel carries one product state, so no decomposition enters the fixture.
+std::vector<MPSContainer::SitePtr> signed_reference_sites() {
+  using Complex = std::complex<double>;
+  const std::array<std::string, 4> states{"2u0", "u02", "udu", "02u"};
+  const std::array<Complex, 4> coefficients{
+      Complex(0.5, 0.0), Complex(0.0, 0.5), Complex(-0.5, 0.0),
+      Complex(0.0, -0.5)};
+  const std::string order = "0ud2";
+  Eigen::MatrixXcd first = Eigen::MatrixXcd::Zero(4, 4);
+  Eigen::MatrixXcd middle = Eigen::MatrixXcd::Zero(16, 4);
+  Eigen::MatrixXcd last = Eigen::MatrixXcd::Zero(16, 1);
+  for (std::size_t bond = 0; bond < states.size(); ++bond) {
+    const auto b = static_cast<Eigen::Index>(bond);
+    auto local = [&](std::size_t site) {
+      return static_cast<Eigen::Index>(order.find(states[bond][site]));
+    };
+    first(local(0), b) = coefficients[bond];
+    middle(b * 4 + local(1), b) = 1.0;
+    last(b * 4 + local(2), 0) = 1.0;
+  }
+  return {make_site(first), make_site(middle), make_site(last)};
+}
+
+}  // namespace
+
+TEST(MPSConventionTest, SignedReferenceAmplitudes) {
+  using Complex = std::complex<double>;
+  // Hand-enumerated rather than computed: |2u0> creates a0 b0 a1 in identity
+  // order (one exchange to reach a0 a1 b0) but a2 b2 a0 for order [2,0,1]
+  // (two exchanges). Bits are alpha_0 alpha_1 alpha_2 beta_0 beta_1 beta_2.
+  const std::vector<
+      std::pair<std::vector<std::size_t>, std::map<std::string, Complex>>>
+      cases{{{0, 1, 2},
+             {{"110100", {-0.5, 0.0}},
+              {"101001", {0.0, 0.5}},
+              {"101010", {0.5, 0.0}},
+              {"011010", {0.0, 0.5}}}},
+            {{2, 0, 1},
+             {{"101001", {0.5, 0.0}},
+              {"011010", {0.0, -0.5}},
+              {"011100", {-0.5, 0.0}},
+              {"110100", {0.0, 0.5}}}}};
+  for (const auto& [order, expected] : cases) {
+    const MPSContainer original(signed_reference_sites(),
+                                std::make_shared<ModelOrbitals>(3), nullptr,
+                                std::nullopt, order);
+    const std::shared_ptr<const MPSContainer> restored =
+        MPSContainer::from_json(original.to_json());
+    for (const auto* container : {&original, restored.get()}) {
+      for (unsigned mask = 0; mask < 64; ++mask) {
+        std::string bits(6, '0');
+        for (std::size_t i = 0; i < bits.size(); ++i) {
+          if ((mask >> i) & 1u) bits[i] = '1';
+        }
+        const auto found = expected.find(bits);
+        const Complex reference =
+            found == expected.end() ? Complex{} : found->second;
+        const auto actual = std::get<Complex>(
+            container->get_coefficient(from_blocked_bits(bits)));
+        EXPECT_NEAR(std::abs(actual - reference), 0.0, testing::wf_tolerance)
+            << bits;
+      }
+    }
+  }
+}
+
+TEST_F(MPSContainerTest, CoefficientsContractBlockedSitesInBasisOrder) {
+  using SBT = SymmetryBlockedTensor<3>;
+  auto symmetry = std::make_shared<const SymmetryProduct>(
+      SymmetryProduct({axes::particle_number(4)}));
+  const SymmetryLabel zero({axes::particle_number_value(0)});
+  const SymmetryLabel one({axes::particle_number_value(1)});
+  const SymmetryLabel two({axes::particle_number_value(2)});
+  // Physical index order (2,u,d,0) groups the sectors as two, one, zero.
+  const std::string states = "2ud0";
+  std::vector<Configuration> basis;
+  for (const char state : states) {
+    basis.push_back(Configuration::from_spin_half_string(std::string{state}));
+  }
+  const std::vector<SymmetryLabel> physical_order{two, one, zero};
+  SBT::ExtentsArray first_extents, second_extents;
+  first_extents[0] = {{zero, 1}};
+  first_extents[1] = {{two, 1}, {one, 2}, {zero, 1}};
+  first_extents[2] = {{one, 2}, {two, 1}};
+  second_extents[0] = first_extents[2];
+  second_extents[1] = first_extents[1];
+  second_extents[2] = {{two, 1}};
+  auto first = std::make_shared<const MPSSite>(
+      std::make_shared<const MPSSite::TensorVariant>(SBT(
+          {symmetry, symmetry, symmetry}, first_extents,
+          {{{zero, one, one},
+            std::make_shared<const Eigen::MatrixXd>(random_matrix(2, 2))},
+           {{zero, two, two},
+            std::make_shared<const Eigen::MatrixXd>(random_matrix(1, 1))}})),
+      MPSSite::SectorOrders{{{zero}, physical_order, {two, one}}}, basis);
+  auto second = std::make_shared<const MPSSite>(
+      std::make_shared<const MPSSite::TensorVariant>(SBT(
+          {symmetry, symmetry, symmetry}, second_extents,
+          {{{one, one, two},
+            std::make_shared<const Eigen::MatrixXd>(random_matrix(4, 1))},
+           {{two, zero, two},
+            std::make_shared<const Eigen::MatrixXd>(random_matrix(1, 1))}})),
+      MPSSite::SectorOrders{{{two, one}, physical_order, {two}}}, basis);
+  const MPSContainer container({first, second}, orbitals);
+  const auto left = std::get<Eigen::MatrixXd>(first->to_dense());
+  const auto right = std::get<Eigen::MatrixXd>(second->to_dense());
+  std::size_t nonzero = 0;
+  for (Eigen::Index p0 = 0; p0 < 4; ++p0) {
+    for (Eigen::Index p1 = 0; p1 < 4; ++p1) {
+      double expected = 0.0;
+      for (Eigen::Index bond = 0; bond < 3; ++bond) {
+        expected += left(p0, bond) * right(bond * 4 + p1, 0);
+      }
+      // Chain order creates a0 b0 a1 b1, so one exchange is needed exactly
+      // when site 0 holds a beta electron and site 1 an alpha electron.
+      const char s0 = states[static_cast<std::size_t>(p0)];
+      const char s1 = states[static_cast<std::size_t>(p1)];
+      if ((s0 == 'd' || s0 == '2') && (s1 == 'u' || s1 == '2')) {
+        expected = -expected;
+      }
+      if (expected != 0.0) ++nonzero;
+      const auto det =
+          Configuration::from_spin_half_string(std::string{s0, s1});
+      EXPECT_NEAR(std::get<double>(container.get_coefficient(det)), expected,
+                  testing::wf_tolerance)
+          << s0 << s1;
+    }
+  }
+  EXPECT_EQ(nonzero, 5u);
+}
+
+TEST_F(MPSContainerTest, SpinlessCoefficientsCarryPermutationSign) {
+  const Eigen::MatrixXd first = random_matrix(2, 2);
+  const Eigen::MatrixXd second = random_matrix(4, 1);
+  // Chain site 0 holds orbital 1, so |11> in chain order is a1^ a0^ |vac>.
+  const MPSContainer container({make_site(first, 2), make_site(second, 2)},
+                               orbitals, nullptr, std::nullopt, {1, 0});
+  for (Eigen::Index orbital0 = 0; orbital0 < 2; ++orbital0) {
+    for (Eigen::Index orbital1 = 0; orbital1 < 2; ++orbital1) {
+      const Eigen::Index p0 = orbital1, p1 = orbital0;
+      double expected = 0.0;
+      for (Eigen::Index bond = 0; bond < 2; ++bond) {
+        expected += first(p0, bond) * second(bond * 2 + p1, 0);
+      }
+      if (orbital0 == 1 && orbital1 == 1) expected = -expected;
+      const auto det = Configuration::from_bitstring(std::to_string(orbital0) +
+                                                     std::to_string(orbital1));
+      EXPECT_NEAR(std::get<double>(container.get_coefficient(det)), expected,
+                  testing::wf_tolerance);
+    }
+  }
+}
+
+TEST_F(MPSContainerTest, CoefficientRejectsMismatchedConfigurations) {
+  const auto container = make_container();
+  EXPECT_THROW(container->get_coefficient(Configuration::from_bitstring("10")),
+               std::invalid_argument);
+  // A mode outside the active sites lies outside the represented space.
+  EXPECT_EQ(std::get<double>(container->get_coefficient(
+                Configuration::from_spin_half_string("u0u"))),
+            0.0);
 }
