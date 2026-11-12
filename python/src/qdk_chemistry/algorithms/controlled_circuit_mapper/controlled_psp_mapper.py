@@ -122,7 +122,7 @@ class ControlledPSPMapper(ControlledCircuitMapper):
             step_op = QSHARP_UTILS.PrepSelPrep.MakeWalkOp(step_op, reflection_op)
 
         controlled_op = QSHARP_UTILS.CircuitComposition.MakeControlledOp(step_op)
-        repeated_op = QSHARP_UTILS.CircuitComposition.MakeRepeatedOp(controlled_op, container.power, 0)
+        repeated_op = QSHARP_UTILS.CircuitComposition.MakeRepeatedOp(controlled_op, container.power)
 
         qsharp_factory = QsharpFactoryData(
             program=QSHARP_UTILS.PrepSelPrep.MakeControlledPrepSelPrepCircuit,

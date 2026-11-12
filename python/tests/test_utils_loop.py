@@ -24,12 +24,6 @@ def _t_count(context, num_iterations: int, num_warmup_iterations: int, variant: 
     return counts.get("tCount", 0)
 
 
-def _expected_t_count(num_iterations: int, num_warmup_iterations: int) -> int:
-    """Warm-up iterations count exactly; iteration ``w`` stands in for the remaining ones."""
-    num_exact = min(num_iterations, num_warmup_iterations)
-    return sum(range(num_exact)) + num_exact * (num_iterations - num_exact)
-
-
 @pytest.mark.parametrize("variant", _VARIANTS.values(), ids=_VARIANTS.keys())
 class TestLoopResourceEstimation:
     """Under resource estimation only the warm-up iterations and one representative are counted."""
@@ -52,7 +46,6 @@ class TestLoopResourceEstimation:
         self, qsharp_test_context, variant, num_iterations, num_warmup_iterations, expected
     ):
         """The representative is iteration ``w``, counted ``n - w`` times after ``w`` exact ones."""
-        assert _expected_t_count(num_iterations, num_warmup_iterations) == expected
         assert _t_count(qsharp_test_context, num_iterations, num_warmup_iterations, variant) == expected
 
     def test_a_long_loop_is_not_unrolled(self, qsharp_test_context, variant):

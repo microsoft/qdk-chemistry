@@ -33,9 +33,6 @@ except ImportError:
 
 _TEST_DATA = Path(__file__).resolve().parent / "test_data"
 
-#: The default cost specification of the QDK ``dollar_cost`` sample.
-_COST_SPEC = _TEST_DATA / "example_cost_spec.json"
-
 #: Hamiltonian file and alpha/beta electron counts of each active space.
 _HAMILTONIANS = {
     "ethylene_4e4o": ("ethylene_4e4o_2det.hamiltonian.json", 2, 2),
@@ -43,27 +40,7 @@ _HAMILTONIANS = {
     "h2_dfthc": ("h2_dfthc_r2_b2_c1.hamiltonian.json", 1, 1),
 }
 
-#: Standard QPE phase bits for Trotter; 2^8 - 1 controlled steps match the unary query count.
-_NUM_PHASE_BITS = 8
 _NUM_QUERIES = 255
-_TROTTER_TIME = 1.0
-
-_PINNED_LOGICAL_COUNT_KEYS = (
-    "numQubits",
-    "tCount",
-    "rotationCount",
-    "rotationDepth",
-    "cczCount",
-    "ccixCount",
-    "measurementCount",
-)
-
-
-def _hartree_fock_state_prep(num_orbitals: int, num_alpha: int, num_beta: int) -> Circuit:
-    """Prepare the canonical Hartree-Fock determinant of the active space."""
-    configuration = Configuration.canonical_hf_configuration(num_alpha, num_beta, num_orbitals)
-    wavefunction = Wavefunction(StateVectorContainer(configuration, ModelOrbitals(num_orbitals)))
-    return create("state_prep", "sparse_isometry").run(wavefunction)
 
 
 @cache
@@ -73,15 +50,17 @@ def _circuit(hamiltonian_name: str, algorithm: str) -> Circuit:
     hamiltonian = Hamiltonian.from_json_file(_TEST_DATA / filename)
     num_orbitals = hamiltonian.get_one_body_integrals()[0].shape[0]
     mapping = MajoranaMapping.jordan_wigner(2 * num_orbitals)
-    state_preparation = _hartree_fock_state_prep(num_orbitals, num_alpha, num_beta)
+    configuration = Configuration.canonical_hf_configuration(num_alpha, num_beta, num_orbitals)
+    wavefunction = Wavefunction(StateVectorContainer(configuration, ModelOrbitals(num_orbitals)))
+    state_preparation = create("state_prep", "sparse_isometry").run(wavefunction)
 
     if algorithm == "trotter":
         operator = create("qubit_mapper", "qdk").run(hamiltonian, mapping)
         builder = create(
             "qpe_circuit_builder",
             "qdk_standard",
-            num_bits=_NUM_PHASE_BITS,
-            unitary_builder=AlgorithmRef("hamiltonian_unitary_builder", "trotter", time=_TROTTER_TIME),
+            num_bits=8,  # 2^8 - 1 controlled steps match the unary query count.
+            unitary_builder=AlgorithmRef("hamiltonian_unitary_builder", "trotter", time=1.0),
             controlled_circuit_mapper=AlgorithmRef("controlled_circuit_mapper", "pauli_sequence"),
         )
     elif algorithm == "lcu":
@@ -113,7 +92,18 @@ def _logical_counts(circuit: Circuit) -> dict[str, int]:
     """Return the pinned subset of the circuit's logical counts."""
     factory = circuit._qsharp_factory
     counts = get_qsharp_context().logical_counts(factory.program, *factory.parameter.values())
-    return {key: counts.get(key, 0) for key in _PINNED_LOGICAL_COUNT_KEYS}
+    return {
+        key: counts.get(key, 0)
+        for key in (
+            "numQubits",
+            "tCount",
+            "rotationCount",
+            "rotationDepth",
+            "cczCount",
+            "ccixCount",
+            "measurementCount",
+        )
+    }
 
 
 def _cheapest_estimate(application) -> dict[str, float]:
@@ -125,7 +115,7 @@ def _cheapest_estimate(application) -> dict[str, float]:
         trace_query=PSSPC.q() * LatticeSurgery.q(slow_down_factor=[1.0, 1.5, 2.0, 3.0, 4.0]),
         max_error=0.01,
     )
-    cost_model = DollarCostModelFromSpec(str(_COST_SPEC))
+    cost_model = DollarCostModelFromSpec(str(_TEST_DATA / "example_cost_spec.json"))
     entries = [
         {
             "qubits": entry.qubits,

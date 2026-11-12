@@ -217,7 +217,7 @@ class PSPMapper(CircuitMapper):
             qsharp_op = QSHARP_UTILS.PrepSelPrep.MakeWalkOp(qsharp_op, reflection_op)
 
         if container.power != 1:
-            qsharp_op = QSHARP_UTILS.CircuitComposition.MakeRepeatedOp(qsharp_op, container.power, 0)
+            qsharp_op = QSHARP_UTILS.CircuitComposition.MakeRepeatedOp(qsharp_op, container.power)
 
         qsharp_factory = QsharpFactoryData(
             program=QSHARP_UTILS.PrepSelPrep.MakePrepSelPrepCircuit,

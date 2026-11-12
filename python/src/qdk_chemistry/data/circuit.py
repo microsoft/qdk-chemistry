@@ -264,13 +264,11 @@ class Circuit(DataClass):
         self,
         params: dict[str, Any] | list[Any] | EstimatorParams | None = None,
     ) -> EstimatorResult:
-        """Estimate resources for the quantum circuit with the older ``qdk.estimator`` resource estimator.
+        """Estimate resources with the deprecated ``qdk.estimator`` backend.
 
         .. deprecated:: 2.4.0
-            This method uses the older version of the QDK Quantum Resource Estimator (``qdk.estimator``).
-            Use :meth:`get_qre_application` with ``qdk.qre.estimate()`` instead, which requires the
-            ``qre`` extra (``pip install 'qdk-chemistry[qre]'``). See https://aka.ms/qdk.QREv3 for
-            migration guidance.
+            Use :meth:`get_qre_application` with ``qdk.qre.estimate()`` and the ``qre`` extra instead;
+            see https://aka.ms/qdk.QREv3 for migration guidance.
 
         Args:
             params: Resource estimation parameters. Accepts a dict, list, or ``qsharp.estimator.EstimatorParams``.
@@ -295,18 +293,7 @@ class Circuit(DataClass):
         self,
         params: dict[str, Any] | list[Any] | EstimatorParams | None = None,
     ) -> EstimatorResult:
-        """Run the older ``qdk.estimator`` resource estimator without the deprecation warning of :meth:`estimate`.
-
-        Args:
-            params: Resource estimation parameters. Accepts a dict, list, or ``qsharp.estimator.EstimatorParams``.
-
-        Returns:
-            The estimated resources.
-
-        Raises:
-            RuntimeError: If no suitable circuit representation is available for estimation.
-
-        """
+        """Run the legacy estimator for internal callers without the public deprecation warning."""
         if self._qsharp_factory is not None:
             context = getattr(self._qsharp_factory.program, "_qdk_context", qsharp)
             logical_counts = context.logical_counts(

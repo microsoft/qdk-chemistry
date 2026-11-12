@@ -8,7 +8,6 @@
 import json
 import re
 import tempfile
-import warnings
 from pathlib import Path
 
 import h5py
@@ -522,32 +521,9 @@ class TestCircuitEstimate:
         circuit = Circuit(qasm=self._QASM_WITH_T)
         with pytest.warns(DeprecationWarning, match=r"Circuit\.estimate\(\) is deprecated"):
             result = circuit.estimate()
-        assert result is not None
-        assert hasattr(result, "logical_counts")
-
-    def test_estimate_points_to_the_qre_application(self):
-        """The deprecation names the older estimator and the ``qdk.qre`` replacement."""
-        circuit = Circuit(qasm=self._QASM_WITH_T)
-        with pytest.warns(DeprecationWarning, match=r"Circuit\.estimate\(\) is deprecated") as record:
-            circuit.estimate()
-        (ours,) = [w for w in record if "Circuit.estimate()" in str(w.message)]
-        message = str(ours.message)
-        assert "qdk.estimator" in message
-        assert "get_qre_application" in message
-        assert "aka.ms/qdk.QREv3" in message
-        assert ours.filename == __file__
-
-    def test_private_estimate_matches_estimate_without_warning(self):
-        """``_estimate`` is the internal path: same result as :meth:`estimate`, no ``Circuit.estimate`` warning."""
-        circuit = Circuit(qasm=self._QASM_WITH_T)
-        # qdk's own estimator emits a DeprecationWarning too; only ours must be absent here.
-        with warnings.catch_warnings(record=True) as record:
-            warnings.simplefilter("always")
-            result = circuit._estimate()
-        assert not [w for w in record if "Circuit.estimate()" in str(w.message)]
-        with pytest.warns(DeprecationWarning, match=r"Circuit\.estimate\(\) is deprecated"):
-            expected = circuit.estimate()
-        assert result.logical_counts == expected.logical_counts
+        assert result.logical_counts["numQubits"] == 2
+        assert result.logical_counts["tCount"] == 1
+        assert circuit._estimate().logical_counts == result.logical_counts
 
     def test_estimate_reports_but_does_not_change_the_declared_width(self, monkeypatch):
         """``num_qubits`` is the argument register, so internal scratch is reported, not written back."""

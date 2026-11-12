@@ -162,10 +162,7 @@ namespace QDKChemistry.Utils.PrepSelPrep {
         }
     }
 
-    /// # Summary
-    /// Applies the block encoding, followed by the walk reflection when `useWalk`, `power`
-    /// times through `QDKChemistry.Utils.Loop.LoopCA` without warm-up iterations, so under
-    /// resource estimation one application is repeated symbolically.
+    /// Applies the block encoding and optional walk reflection `power` times without estimate warm-up.
     operation ApplyPrepSelPrepPower(
         prepareOp : Qubit[] => Unit is Adj + Ctl,
         selectOp : (Qubit[], Qubit[]) => Unit is Adj + Ctl,
@@ -179,24 +176,13 @@ namespace QDKChemistry.Utils.PrepSelPrep {
         LoopCA(
             power,
             0,
-            _ => ApplyPrepSelPrepOnce(prepareOp, selectOp, systems, prepareRegister, numSelectQubits, blockAncilla, useWalk)
+            _ => {
+                PrepSelPrep(prepareOp, selectOp, systems, prepareRegister, numSelectQubits);
+                if useWalk {
+                    Reflect(blockAncilla);
+                }
+            }
         );
-    }
-
-    /// Applies the block encoding once, followed by the walk reflection when `useWalk`.
-    internal operation ApplyPrepSelPrepOnce(
-        prepareOp : Qubit[] => Unit is Adj + Ctl,
-        selectOp : (Qubit[], Qubit[]) => Unit is Adj + Ctl,
-        systems : Qubit[],
-        prepareRegister : Qubit[],
-        numSelectQubits : Int,
-        blockAncilla : Qubit[],
-        useWalk : Bool,
-    ) : Unit is Adj + Ctl {
-        PrepSelPrep(prepareOp, selectOp, systems, prepareRegister, numSelectQubits);
-        if useWalk {
-            Reflect(blockAncilla);
-        }
     }
 
     /// Circuit entry point: allocates the register and applies the block encoding `power` times.

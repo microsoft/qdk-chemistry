@@ -12,28 +12,21 @@ namespace QDKChemistry.Utils.CircuitComposition {
         Controlled op
     }
 
-    /// Applies `op` to `target` `power` times.
-    ///
-    /// Under resource estimation the first `numWarmupIterations` applications are counted
-    /// exactly and the next one is repeated for the rest; see `QDKChemistry.Utils.Loop.LoopCA`.
+    /// Applies `op` to `target` `power` times, repeating its estimated cost without warm-up.
     operation ApplyRepeated<'T>(
         op : 'T => Unit is Adj + Ctl,
         power : Int,
-        numWarmupIterations : Int,
         target : 'T
     ) : Unit is Adj + Ctl {
-        LoopCA(power, numWarmupIterations, _ => op(target));
+        LoopCA(power, 0, _ => op(target));
     }
 
     /// Returns an operation applying `op` `power` times.
-    /// Parameters:
-    /// - `numWarmupIterations`: Leading applications counted exactly under resource estimation
     function MakeRepeatedOp<'T>(
         op : 'T => Unit is Adj + Ctl,
-        power : Int,
-        numWarmupIterations : Int
+        power : Int
     ) : ('T => Unit is Adj + Ctl) {
-        ApplyRepeated(op, power, numWarmupIterations, _)
+        ApplyRepeated(op, power, _)
     }
 
     /// Adapts a control-register operation to the single-control-qubit shape phase estimation takes.
