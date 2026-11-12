@@ -8,9 +8,14 @@ namespace QDKChemistry.Utils.HubbardPlaquette {
     import QDKChemistry.Utils.HammingWeightPhasing.HammingWeightBatchSize;
     import QDKChemistry.Utils.HammingWeightPhasing.HammingWeightPhase;
     import QDKChemistry.Utils.HammingWeightPhasing.PrepareCatalyst;
+    import Std.Arrays.Any;
+    import Std.Arrays.Chunks;
+    import Std.Arrays.Filtered;
     import Std.Arrays.Flattened;
     import Std.Arrays.Mapped;
+    import Std.Arrays.MappedOverRange;
     import Std.Arrays.Subarray;
+    import Std.Arrays.Zipped;
     import Std.Convert.IntAsDouble;
     import Std.Diagnostics.Fact;
     import Std.Math.BitSizeI;
@@ -29,6 +34,8 @@ namespace QDKChemistry.Utils.HubbardPlaquette {
         interactionAngle : Double,
         /// Twice the hopping amplitude times the step duration.
         hoppingAngle : Double,
+        /// Trotter order of each step, a positive even integer.
+        trotterOrder : Int,
         /// Number of repetitions of the body.
         repetitions : Int,
         /// Whether to phase each tower of equal-angle rotations through a Hamming-weight register.
@@ -346,38 +353,92 @@ namespace QDKChemistry.Utils.HubbardPlaquette {
         }
     }
 
-    /// One PIG body, I^(1/2) G I^(1/2), followed by the given pink layer, on modes in `order`.
-    /// The gold layer phases through the `hopping` catalyst and the pink layer through
-    /// `pinkCatalyst`, each prepared for its angle by the caller.
-    internal operation PlaquetteStepWithPinkAngle(
+    /// # Summary
+    /// The fractions of a step taken by the second-order steps of Suzuki's formula
+    /// S_{2k}(s) = S_{2k-2}(u s)^2 S_{2k-2}((1 - 4u) s) S_{2k-2}(u s)^2, u = 1 / (4 - 4^{1/(2k-1)}).
+    ///
+    /// # Input
+    /// ## order
+    /// The Trotter order, a positive even integer.
+    ///
+    /// # Output
+    /// The fraction of each second-order step, in order of application.
+    function SuzukiStageFractions(order : Int) : Double[] {
+        Fact(order >= 2 and order % 2 == 0, "The Trotter order must be a positive even integer.");
+        mutable fractions = [1.0];
+        for k in 2..order / 2 {
+            let u = 1.0 / (4.0 - 4.0 ^ (1.0 / IntAsDouble(2 * k - 1)));
+            mutable composed = [];
+            for factor in [u, u, 1.0 - 4.0 * u, u, u] {
+                set composed += Mapped(fraction -> factor * fraction, fractions);
+            }
+            set fractions = composed;
+        }
+        return fractions;
+    }
+
+    /// The distinct entries of `fractions`, in order of first appearance.
+    internal function DistinctFractions(fractions : Double[]) : Double[] {
+        mutable distinct = [];
+        for fraction in fractions {
+            if not Any(seen -> seen == fraction, distinct) {
+                set distinct += [fraction];
+            }
+        }
+        return distinct;
+    }
+
+    /// The catalyst registered for `fraction`, or an empty register if there is none.
+    internal function CatalystFor(fraction : Double, catalysts : (Double, Qubit[])[]) : Qubit[] {
+        for (catalystFraction, catalyst) in catalysts {
+            if catalystFraction == fraction {
+                return catalyst;
+            }
+        }
+        return [];
+    }
+
+    /// One Trotter step on modes in `order`: each stage I^(1/2) G I^(1/2) followed by its pink layer.
+    internal operation PlaquetteStep(
         params : HubbardPlaquetteParams,
-        pinkAngle : Double,
+        stageFractions : Double[],
+        pinkFractions : Double[],
         order : Int[],
         systems : Qubit[],
-        interaction : Qubit[],
-        hopping : Qubit[],
-        pinkCatalyst : Qubit[]
+        interactionCatalysts : (Double, Qubit[])[],
+        hoppingCatalysts : (Double, Qubit[])[]
     ) : Unit is Adj + Ctl {
         let sites = params.width * params.height;
         let pink = PlaquetteSection(params.width, params.height, true);
         let gold = PlaquetteSection(params.width, params.height, false);
         let useHwp = params.useHammingWeightPhasing;
         let cap = params.maxBatchSize;
-        InteractionLayer(params.interactionAngle / 2.0, sites, systems, useHwp, cap, interaction);
-        HoppingLayer(params.hoppingAngle, gold, order, systems, useHwp, cap, hopping);
-        InteractionLayer(params.interactionAngle / 2.0, sites, systems, useHwp, cap, interaction);
-        HoppingLayer(pinkAngle, pink, order, systems, useHwp, cap, pinkCatalyst);
-    }
-
-    /// One interior second-order Trotter body, I^(1/2) G I^(1/2) P, on modes in `order`.
-    internal operation PlaquetteStep(
-        params : HubbardPlaquetteParams,
-        order : Int[],
-        systems : Qubit[],
-        interaction : Qubit[],
-        hopping : Qubit[]
-    ) : Unit is Adj + Ctl {
-        PlaquetteStepWithPinkAngle(params, params.hoppingAngle, order, systems, interaction, hopping, hopping);
+        for stage in 0..Length(stageFractions) - 1 {
+            let fraction = stageFractions[stage];
+            let pinkFraction = pinkFractions[stage];
+            let halfInteraction = fraction * params.interactionAngle / 2.0;
+            let interaction = CatalystFor(fraction, interactionCatalysts);
+            InteractionLayer(halfInteraction, sites, systems, useHwp, cap, interaction);
+            HoppingLayer(
+                fraction * params.hoppingAngle,
+                gold,
+                order,
+                systems,
+                useHwp,
+                cap,
+                CatalystFor(fraction, hoppingCatalysts)
+            );
+            InteractionLayer(halfInteraction, sites, systems, useHwp, cap, interaction);
+            HoppingLayer(
+                pinkFraction * params.hoppingAngle,
+                pink,
+                order,
+                systems,
+                useHwp,
+                cap,
+                CatalystFor(pinkFraction, hoppingCatalysts)
+            );
+        }
     }
 
     /// # Summary
@@ -387,14 +448,15 @@ namespace QDKChemistry.Utils.HubbardPlaquette {
     /// Each step is `pink(s/2) I(s/2) gold(s) I(s/2) pink(s/2)`, so the half-angle pink layers of
     /// neighbouring steps merge, leaving one half-angle pink boundary at each end. This is the "PIG"
     /// ordering of Eqs. (16a)-(16b) in :cite:`Apel2026`, which merges the more expensive hopping
-    /// layers, not Eq. (D2) of :cite:`Campbell2022`, which puts the interaction outermost.
+    /// layers, not Eq. (D2) of :cite:`Campbell2022`, which puts the interaction outermost. Higher
+    /// orders compose these steps by `SuzukiStageFractions`.
     ///
     /// The modes are routed into pink order at the start and back at the end, so only the gold
     /// layers route. Both orders keep the spin-up modes ahead of their spin-down partners, so the
     /// on-site pairs stay one register half apart.
     ///
-    /// With a catalyst, one is prepared for the interaction layers and one for the hopping layers.
-    /// Dropping the hopping catalyst's first qubit doubles its angle for the full-angle layers. The
+    /// With a catalyst, one is prepared for each distinct interaction and hopping angle. Dropping the
+    /// half-angle hopping catalyst's first qubit doubles its angle for the full-angle layers. The
     /// towers' constant phases are applied as one rotation at the end, since under control they
     /// would shift the energy.
     ///
@@ -413,64 +475,105 @@ namespace QDKChemistry.Utils.HubbardPlaquette {
             let gold = PlaquetteSection(params.width, params.height, false);
             let cap = params.maxBatchSize;
             let catalyzed = params.useHammingWeightPhasing and params.useCatalyst;
-            // Each catalyst holds a qubit per place value of its largest weight; the hopping one
-            // holds one more if a full-angle layer runs, the qubit dropped to double its angle.
+            let stageFractions = SuzukiStageFractions(params.trotterOrder);
+            let first = stageFractions[0];
+            let half = 0.5 * first;
+            let merged = MappedOverRange(
+                stage -> 0.5 * (stageFractions[stage] + stageFractions[stage + 1]),
+                0..Length(stageFractions) - 2
+            );
+            // Each catalyst holds a qubit per place value of its largest weight; the half-angle hopping
+            // one holds one more if a full-angle layer runs, the qubit dropped to double its angle.
             let interactionPlaces = catalyzed and params.interactionAngle != 0.0
                 ? BitSizeI(HammingWeightBatchSize(sites, cap)) | 0;
-            let fullAngleHopping = Length(gold) > 0 or params.repetitions > 1;
             let hoppingPlaces = catalyzed and params.hoppingAngle != 0.0
-                ? BitSizeI(HammingWeightBatchSize(2 * MaxInt([Length(pink), Length(gold)]), cap))
-                + (fullAngleHopping ? 1 | 0)
-                | 0;
-            use interaction = Qubit[interactionPlaces];
-            use hopping = Qubit[hoppingPlaces];
-            let doubled = hoppingPlaces > 0 ? hopping[1...] | [];
+                ? BitSizeI(HammingWeightBatchSize(2 * MaxInt([Length(pink), Length(gold)]), cap)) | 0;
+            let interactionFractions = interactionPlaces > 0 ? DistinctFractions(stageFractions) | [];
+            let fullHoppingFractions = hoppingPlaces > 0
+                ? DistinctFractions(
+                    (Length(gold) > 0 ? stageFractions | []) + merged + (params.repetitions > 1 ? [first] | [])
+                )
+                | [];
+            let otherHoppingFractions = Filtered(fraction -> fraction != first, fullHoppingFractions);
+            let fullFirst = Length(otherHoppingFractions) < Length(fullHoppingFractions);
+            use interaction = Qubit[Length(interactionFractions) * interactionPlaces];
+            use firstHopping = Qubit[hoppingPlaces > 0 ? hoppingPlaces + (fullFirst ? 1 | 0) | 0];
+            use otherHopping = Qubit[Length(otherHoppingFractions) * hoppingPlaces];
+            let interactionCatalysts = interactionPlaces > 0
+                ? Zipped(interactionFractions, Chunks(interactionPlaces, interaction)) | [];
+            let otherHoppingCatalysts = hoppingPlaces > 0
+                ? Zipped(otherHoppingFractions, Chunks(hoppingPlaces, otherHopping)) | [];
+            let doubledFirst = fullFirst ? [(first, firstHopping[1...])] | [];
+            let hoppingCatalysts = hoppingPlaces > 0
+                ? [(half, firstHopping)] + doubledFirst + otherHoppingCatalysts
+                | [];
             let identity = IdentityOrder(Length(systems));
             // A hopping-free model has no plaquette to keep local, so it skips the routing.
             let order = params.hoppingAngle != 0.0 ? TilingOrder(pink, Length(systems)) | identity;
             within {
-                PrepareCatalyst(params.interactionAngle / 2.0, interaction);
-                PrepareCatalyst(-params.hoppingAngle / 4.0, hopping);
+                for (fraction, catalyst) in interactionCatalysts {
+                    PrepareCatalyst(fraction * params.interactionAngle / 2.0, catalyst);
+                }
+                PrepareCatalyst(-half * params.hoppingAngle / 2.0, firstHopping);
+                for (fraction, catalyst) in otherHoppingCatalysts {
+                    PrepareCatalyst(-fraction * params.hoppingAngle / 2.0, catalyst);
+                }
                 RouteModes(identity, order, systems);
             } apply {
                 HoppingLayer(
-                    params.hoppingAngle / 2.0,
+                    half * params.hoppingAngle,
                     pink,
                     order,
                     systems,
                     params.useHammingWeightPhasing,
                     cap,
-                    hopping
+                    CatalystFor(half, hoppingCatalysts)
                 );
 
                 if params.repetitions > 1 {
+                    let interiorPink = merged + [first];
                     if IsResourceEstimating() {
                         within {
                             RepeatEstimates(params.repetitions - 1);
                         } apply {
-                            PlaquetteStep(params, order, systems, interaction, doubled);
+                            PlaquetteStep(
+                                params,
+                                stageFractions,
+                                interiorPink,
+                                order,
+                                systems,
+                                interactionCatalysts,
+                                hoppingCatalysts
+                            );
                         }
                     } else {
                         for _ in 1..params.repetitions - 1 {
-                            PlaquetteStep(params, order, systems, interaction, doubled);
+                            PlaquetteStep(
+                                params,
+                                stageFractions,
+                                interiorPink,
+                                order,
+                                systems,
+                                interactionCatalysts,
+                                hoppingCatalysts
+                            );
                         }
                     }
                 }
 
-                PlaquetteStepWithPinkAngle(
+                PlaquetteStep(
                     params,
-                    params.hoppingAngle / 2.0,
+                    stageFractions,
+                    merged + [half],
                     order,
                     systems,
-                    interaction,
-                    doubled,
-                    hopping
+                    interactionCatalysts,
+                    hoppingCatalysts
                 );
             }
             if catalyzed {
-                // Every interaction tower left out e^{-i·(interactionAngle/2)·sites} and every
-                // hopping tower e^{i·kappa·plaquettes}, which sum to these per step; `R(PauliI, g)`
-                // is e^{-ig/2}.
+                // The constant phases every tower left out sum to these per step; `R(PauliI, g)` is
+                // e^{-ig/2}.
                 let perStep = params.interactionAngle * IntAsDouble(sites)
                     - params.hoppingAngle * IntAsDouble(Length(pink) + Length(gold));
                 if perStep != 0.0 {

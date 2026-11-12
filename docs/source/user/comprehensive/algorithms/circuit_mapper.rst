@@ -288,7 +288,7 @@ Each layer of the plaquette step is a tower of same-angle :math:`R_z` rotations,
      - Largest tower of same-angle rotations phased through one Hamming-weight register. A smaller cap needs fewer scratch qubits, and a cap one below a power of two, such as 7 or 15, saves a place value per batch. Ignored when ``use_hamming_weight_phasing`` is False. When set to -1 (default), there is no cap.
    * - ``hamming_weight_phasing_method``
      - str
-     - How each Hamming weight is phased: ``"catalyst"`` (default) adds it into a catalyst, a generalized phase gradient prepared once for the interaction layers and once for the hopping layers, and ``"rz_ladder"`` synthesizes each place value as its own :math:`R_z`. Ignored when ``use_hamming_weight_phasing`` is False.
+     - How each Hamming weight is phased: ``"catalyst"`` (default) adds it into a catalyst, a generalized phase gradient prepared once for each distinct angle of the interaction and hopping layers, and ``"rz_ladder"`` synthesizes each place value as its own :math:`R_z`. Ignored when ``use_hamming_weight_phasing`` is False.
 
 Related classes
 ---------------

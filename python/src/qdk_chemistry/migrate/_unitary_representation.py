@@ -1,4 +1,4 @@
-"""Migrate Pauli product formulas written before prefix and suffix term segments existed."""
+"""Migrate Pauli product formulas and Hubbard plaquette evolutions written against older schemas."""
 
 # --------------------------------------------------------------------------------------------
 # Copyright (c) Microsoft Corporation. All rights reserved.
@@ -7,6 +7,7 @@
 
 from __future__ import annotations
 
+import json
 import warnings
 
 import h5py
@@ -15,22 +16,37 @@ from . import _io
 
 OLD_VERSION = "0.2.0"
 PRODUCT_FORMULA_VERSION = "0.3.0"
+PLAQUETTE_OLD_VERSION = "0.1.0"
+PLAQUETTE_VERSION = "0.2.0"
 
 _PRODUCT_FORMULA = "pauli_product_formula"
+_PLAQUETTE = "hubbard_plaquette"
+
+
+def plaquette_step_key(version: str) -> str:
+    """Key of ``version`` in ``STEPS``; the plaquette container versions on its own."""
+    return f"{_PLAQUETTE} {version}"
 
 
 def from_json_doc(doc: dict) -> dict:
-    """Normalize a parsed legacy product formula into an old-doc."""
-    _require_product_formula(doc.get("container_type"))
+    """Normalize a parsed legacy product formula or plaquette evolution into an old-doc."""
+    container_type = doc.get("container_type")
+    _require_migratable(container_type)
     old = dict(doc)
     old["_source_version"] = str(old.pop("version", None))
+    if container_type == _PLAQUETTE:
+        old["_step_key"] = plaquette_step_key(old["_source_version"])
     return old
 
 
 def from_hdf5_file(path) -> dict:
-    """Read a legacy product-formula HDF5 file into an old-doc."""
+    """Read a legacy product-formula or plaquette HDF5 file into an old-doc."""
     with h5py.File(path, "r") as handle:
-        _require_product_formula(_io.read_attr(handle, "container_type"))
+        container_type = _io.read_attr(handle, "container_type")
+        _require_migratable(container_type)
+        if container_type == _PLAQUETTE:
+            # A plaquette evolution stores its JSON document as one payload attribute.
+            return from_json_doc(json.loads(_io.read_attr(handle, "payload")))
         terms = handle["step_terms"]
         return {
             "_source_version": str(_io.read_attr(handle, "version")),
@@ -58,6 +74,13 @@ def to_new_json(old: dict) -> dict:
     return new
 
 
+def plaquette_to_new_json(old: dict) -> dict:
+    """Add ``order``, which was always 2 before it was stored."""
+    new = {key: value for key, value in old.items() if key not in ("_source_version", "_step_key")}
+    new.update(order=2, version=PLAQUETTE_VERSION)
+    return new
+
+
 def _read_term(group: h5py.Group) -> dict:
     """Read one exponentiated Pauli term from the legacy HDF5 layout."""
     pauli_term = group["pauli_term"]
@@ -67,13 +90,16 @@ def _read_term(group: h5py.Group) -> dict:
     }
 
 
-def _require_product_formula(container_type) -> None:
+def _require_migratable(container_type) -> None:
     """Reject unitary containers whose serialization schema did not change."""
-    if container_type != _PRODUCT_FORMULA:
+    if container_type not in (_PRODUCT_FORMULA, _PLAQUETTE):
         raise ValueError(
-            f"Only {_PRODUCT_FORMULA} containers have a migration step; "
+            f"Only {_PRODUCT_FORMULA} and {_PLAQUETTE} containers have migration steps; "
             f"{container_type!r} files load without conversion."
         )
 
 
-STEPS = {OLD_VERSION: (PRODUCT_FORMULA_VERSION, to_new_json)}
+STEPS = {
+    OLD_VERSION: (PRODUCT_FORMULA_VERSION, to_new_json),
+    plaquette_step_key(PLAQUETTE_OLD_VERSION): (plaquette_step_key(PLAQUETTE_VERSION), plaquette_to_new_json),
+}

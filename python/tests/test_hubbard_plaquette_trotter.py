@@ -19,6 +19,9 @@ from qdk_chemistry.algorithms.hamiltonian_unitary_builder.time_evolution.hubbard
     HubbardPlaquetteTrotter,
     _plaquette_product_formula,
 )
+from qdk_chemistry.algorithms.hamiltonian_unitary_builder.time_evolution.hubbard_plaquette_trotter_error import (
+    hubbard_plaquette_commutator_bound,
+)
 from qdk_chemistry.algorithms.state_preparation import identity_state_prep
 from qdk_chemistry.data import (
     AlgorithmRef,
@@ -97,6 +100,7 @@ def _params(
     hopping_angle: float,
     repetitions: int,
     *,
+    order: int = 2,
     use_hwp: bool = True,
     cap: int = -1,
     catalyzed: bool = True,
@@ -104,8 +108,17 @@ def _params(
     """Return a Q# ``HubbardPlaquetteParams``; ``catalyzed`` false selects the ``Rz`` ladder."""
     return (
         f"{_PLAQUETTE}.HubbardPlaquetteParams({width}, {height}, {float(interaction_angle)}, "
-        f"{float(hopping_angle)}, {repetitions}, {str(use_hwp).lower()}, {cap}, {str(catalyzed).lower()})"
+        f"{float(hopping_angle)}, {order}, {repetitions}, {str(use_hwp).lower()}, {cap}, {str(catalyzed).lower()})"
     )
+
+
+def _suzuki_fractions(order: int) -> list[float]:
+    """Return the second-order step fractions of Suzuki's order-``order`` formula, independently of Q#."""
+    fractions = [1.0]
+    for k in range(2, order // 2 + 1):
+        u = 1.0 / (4.0 - 4.0 ** (1.0 / (2 * k - 1)))
+        fractions = [factor * fraction for factor in (u, u, 1.0 - 4.0 * u, u, u) for fraction in fractions]
+    return fractions
 
 
 def _evolution(params: str, *, controlled: bool = False) -> str:
@@ -225,13 +238,21 @@ class TestPhaseEstimationAccuracy:
     """QPE over the plaquette evolution recovers the exact 2x2 ground energy."""
 
     @pytest.mark.parametrize(
-        ("method", "power_strategy", "t", "u", "num_divisions", "energy", "mapper"),
+        ("method", "power_strategy", "t", "u", "num_divisions", "energy", "mapper", "order"),
         [
             pytest.param(
-                "qdk_iterative", "repeat", 1.0, 0.0, 1, -8.0, "hubbard_plaquette", id="iterative-hopping-only"
+                "qdk_iterative", "repeat", 1.0, 0.0, 1, -8.0, "hubbard_plaquette", 2, id="iterative-hopping-only"
             ),
             pytest.param(
-                "qdk_iterative", "repeat", 0.5, 2.0, 4, -4.8284271247, "hubbard_plaquette", id="iterative-weak-coupling"
+                "qdk_iterative",
+                "repeat",
+                0.5,
+                2.0,
+                4,
+                -4.8284271247,
+                "hubbard_plaquette",
+                2,
+                id="iterative-weak-coupling",
             ),
             pytest.param(
                 "qdk_iterative",
@@ -241,17 +262,37 @@ class TestPhaseEstimationAccuracy:
                 8,
                 -9.6568542495,
                 "hubbard_plaquette",
+                2,
                 id="iterative-strong-coupling",
             ),
             pytest.param(
-                "qdk_standard", "rescale", 1.0, 4.0, 8, -9.6568542495, "hubbard_plaquette", id="standard-rescaled"
+                "qdk_standard", "rescale", 1.0, 4.0, 8, -9.6568542495, "hubbard_plaquette", 2, id="standard-rescaled"
             ),
             pytest.param(
-                "qdk_iterative", "repeat", 1.0, 4.0, 2, -9.6568542495, "pauli_sequence", id="iterative-product-formula"
+                "qdk_iterative",
+                "repeat",
+                1.0,
+                4.0,
+                2,
+                -9.6568542495,
+                "pauli_sequence",
+                2,
+                id="iterative-product-formula",
+            ),
+            pytest.param(
+                "qdk_iterative",
+                "repeat",
+                1.0,
+                4.0,
+                2,
+                -9.6568542495,
+                "hubbard_plaquette",
+                4,
+                id="iterative-fourth-order",
             ),
         ],
     )
-    def test_recovers_the_ground_energy(self, method, power_strategy, t, u, num_divisions, energy, mapper):
+    def test_recovers_the_ground_energy(self, method, power_strategy, t, u, num_divisions, energy, mapper, order):
         num_bits = 4
         values, vectors = np.linalg.eigh(_reference_hamiltonian(_model(2, t=t, u=u)))
         assert values[0] == pytest.approx(energy, abs=1e-9)
@@ -267,7 +308,7 @@ class TestPhaseEstimationAccuracy:
         unitary_builder = AlgorithmRef(
             "hamiltonian_unitary_builder",
             "hubbard_plaquette",
-            order=2,
+            order=order,
             # The ground phase is exactly 1/16, so every bit is deterministic.
             time=2 * np.pi / (2**num_bits * abs(energy)),
             num_divisions=num_divisions,
@@ -337,7 +378,8 @@ class TestPlaquetteCircuit:
                 routed[position], routed[position + 1] = routed[position + 1], routed[position]
             assert routed == target
 
-    def test_gold_layer_evolution_is_exact(self):
+    @pytest.mark.parametrize("order", [2, 4])
+    def test_gold_layer_evolution_is_exact(self, order):
         """At 4x2 the routed gold layer is nonempty, and the evolution is the exact PIG product of its pieces.
 
         The towers take the ``Rz`` ladder, since the catalysts would multiply the simulated support.
@@ -359,16 +401,24 @@ class TestPlaquetteCircuit:
         )
         pairs = ["I" * s + "Z" + "I" * (sites - 1) + "Z" + "I" * (sites - s - 1) for s in range(sites)]
         interaction = pauli_to_sparse_matrix(pairs, np.full(sites, 0.25 * u))
-        body = [(interaction, 0.5), (gold, 1.0), (interaction, 0.5)]
-        layers = [(pink, 0.5), *([*body, (pink, 1.0)] * (reps - 1)), *body, (pink, 0.5)]
+        layers = [
+            (hamiltonian, fraction * share)
+            for _ in range(reps)
+            for fraction in _suzuki_fractions(order)
+            for hamiltonian, share in ((pink, 0.5), (interaction, 0.5), (gold, 1.0), (interaction, 0.5), (pink, 0.5))
+        ]
 
         state = random_state(2 * sites, seed=13, support=32)
         expected = state.astype(complex)
         for hamiltonian, fraction in layers:
             expected = scipy.sparse.linalg.expm_multiply(-1j * fraction * step * hamiltonian, expected)
-        params = _params(width, height, 0.25 * u * step, 2 * t * step, reps, catalyzed=False)
+        params = _params(width, height, 0.25 * u * step, 2 * t * step, reps, order=order, catalyzed=False)
         actual = apply_operation(_evolution(params), state)
         assert np.allclose(actual, expected, atol=1e-8)
+        # The product errs from the exact evolution by no more than the commutator bound.
+        exact = scipy.sparse.linalg.expm_multiply(-1j * time * (pink + interaction + gold), state)
+        bound = hubbard_plaquette_commutator_bound(width, height, order, t, u)
+        assert np.linalg.norm(expected - exact) <= reps * bound * step ** (order + 1)
 
     def test_hamming_weight_phasing_matches_plain_rotations(self):
         """At 4x2, phasing every tower under control, whole or in short batches, matches plain rotations."""
@@ -413,6 +463,32 @@ class TestPlaquetteCircuit:
         for actual in phased:
             assert np.allclose(actual, plain, atol=1e-10)
 
+    @pytest.mark.parametrize(
+        ("width", "height", "cap", "state", "atol"),
+        [
+            (2, 2, 3, random_state(9, seed=5), 1e-10),
+            # The simulator truncates amplitudes below about 1e-10, which perturbs the 4x2 result by about 1e-8.
+            pytest.param(
+                4, 2, 1, np.kron([0.0, 1.0], random_state(16, seed=11, support=1)), 1e-6, marks=pytest.mark.slow
+            ),
+        ],
+        ids=["2x2", "4x2"],
+    )
+    def test_fourth_order_catalysts_match_plain_rotations(self, width, height, cap, state, atol):
+        """At order 4, catalyzed phasing under control matches plain rotations."""
+        plain, *phased = (
+            apply_operation(
+                _evolution(
+                    _params(width, height, 0.3, 0.4, 2, order=4, use_hwp=use_hwp, cap=cap, catalyzed=catalyzed),
+                    controlled=True,
+                ),
+                state,
+            )
+            for use_hwp, catalyzed in ((False, False), (True, True), (True, False))
+        )
+        for actual in phased:
+            assert np.allclose(actual, plain, atol=atol)
+
     @pytest.mark.parametrize(("t", "u"), [(1.0, 0.0), (0.0, 4.0)])
     def test_single_term_evolution_is_exact(self, t, u):
         """With only hopping or only interaction the 2x2 step has no Trotter error, so it is exp(-iHt)."""
@@ -430,10 +506,10 @@ class TestPauliProductFormulaOutput:
     """The product formula output spells the plaquette circuit out for the Pauli-sequence mappers."""
 
     @pytest.mark.parametrize(
-        ("width", "interaction_angle", "hopping_angle", "reps"),
-        [(4, 0.3, 0.4, 1), (4, 0.3, 0.4, 3), (4, 0.3, 0.0, 2), (2, 0.0, 0.4, 2)],
+        ("width", "interaction_angle", "hopping_angle", "reps", "order"),
+        [(4, 0.3, 0.4, 1, 2), (4, 0.3, 0.4, 3, 2), (4, 0.3, 0.0, 2, 2), (2, 0.0, 0.4, 2, 2), (4, 0.3, 0.4, 2, 4)],
     )
-    def test_matches_the_plaquette_circuit(self, width, interaction_angle, hopping_angle, reps):
+    def test_matches_the_plaquette_circuit(self, width, interaction_angle, hopping_angle, reps, order):
         """Pauli exponentials in place of every fswap, butterfly and phase reproduce ``RepPlaquetteExp`` exactly.
 
         The builder rejects 4x2, whose routed gold layer is nonempty, so this calls the generator directly.
@@ -441,6 +517,7 @@ class TestPauliProductFormulaOutput:
         formula = _plaquette_product_formula(
             width,
             2,
+            order,
             interaction_angle=interaction_angle,
             hopping_angle=hopping_angle,
             phase=0.0,
@@ -448,7 +525,7 @@ class TestPauliProductFormulaOutput:
             scale=1.0,
         )
         circuit = create("circuit_mapper", "pauli_sequence").run(UnitaryRepresentation(container=formula))
-        params = _params(width, 2, interaction_angle, hopping_angle, reps, catalyzed=False)
+        params = _params(width, 2, interaction_angle, hopping_angle, reps, order=order, catalyzed=False)
         state = random_state(4 * width, seed=13, support=32)
         expected = apply_operation(_evolution(params), state)
         assert np.allclose(apply_operation(circuit._qsharp_op, state), expected, atol=1e-8)
@@ -615,6 +692,29 @@ class TestStepCountAndShift:
         assert container.eigenvalue_from_phase(phase) == pytest.approx(energy + 16.0)
 
 
+class TestCommutatorBound:
+    """The commutator bound on the plaquette Trotter error."""
+
+    @pytest.mark.parametrize("order", [2, 4])
+    def test_bound_holds_for_a_single_step(self, order):
+        """One 2x2 step of each order errs from the exact evolution by no more than ``W s^(order + 1)``."""
+        t, u = 1.0, 4.0
+        model = _model(2, t=t, u=u)
+        hamiltonian = _reference_hamiltonian(model)
+        pairs = ["I" * s + "Z" + "I" * 3 + "Z" + "I" * (3 - s) for s in range(4)]
+        interaction = pauli_to_dense_matrix(pairs, [0.25 * u] * 4)
+        # The 2x2 gold tiling is empty, so the pink one holds every hopping term.
+        pink = hamiltonian - interaction
+        bound = hubbard_plaquette_commutator_bound(2, 2, order, 2 * t, u)
+        for step in (0.1, 0.2, 0.4):
+            formula = np.eye(len(hamiltonian), dtype=complex)
+            for fraction in _suzuki_fractions(order):
+                for part, share in ((pink, 0.5), (interaction, 0.5), (interaction, 0.5), (pink, 0.5)):
+                    formula = scipy.linalg.expm(-1j * fraction * share * step * part) @ formula
+            error = np.linalg.norm(formula - scipy.linalg.expm(-1j * step * hamiltonian), 2)
+            assert error <= bound * step ** (order + 1)
+
+
 _BODY = {"width": 4, "height": 4, "interaction_angle": 0.1, "hopping_angle": 0.2, "step_reps": 1}
 
 
@@ -623,7 +723,7 @@ class TestContainerAndValidation:
 
     def test_serialization_round_trip(self, tmp_path):
         """A step survives JSON and HDF5 round trips."""
-        step = HubbardPlaquetteTrotter(order=2, time=0.1, num_divisions=2).run(_model(4, u=8.0))
+        step = HubbardPlaquetteTrotter(order=4, time=0.1, num_divisions=2).run(_model(4, u=8.0))
         with h5py.File(tmp_path / "step.h5", "w") as file:
             step.to_hdf5(file.create_group("step"))
         with h5py.File(tmp_path / "step.h5", "r") as file:
@@ -631,11 +731,18 @@ class TestContainerAndValidation:
         expected = step.get_container().to_json()
         from_json = UnitaryRepresentation.from_json(step.to_json()).get_container()
         assert from_json.to_json() == restored.to_json() == expected
+        assert restored.order == 4
 
     @pytest.mark.parametrize(
         ("build", "error", "match"),
         [
-            pytest.param(lambda: HubbardPlaquetteTrotter(order=4), ValueError, "order 2 only", id="order"),
+            pytest.param(lambda: HubbardPlaquetteTrotter(order=3), ValueError, "positive even orders", id="order"),
+            pytest.param(
+                lambda: HubbardPlaquetteTrotter(order=6, time=0.05, target_accuracy=0.01).run(_model(4)),
+                ValueError,
+                "only up to order 4",
+                id="sixth-order-target-accuracy",
+            ),
             pytest.param(
                 lambda: HubbardPlaquetteTrotter(order=2, time=0.05).run(_model(4, periodic=False)),
                 ValueError,
@@ -694,6 +801,12 @@ class TestContainerAndValidation:
                 ValueError,
                 "step_reps must be a positive integer",
                 id="container-zero-reps",
+            ),
+            pytest.param(
+                lambda: HubbardPlaquetteContainer(**{**_BODY, "order": 3}),
+                ValueError,
+                "order must be a positive even integer",
+                id="container-odd-order",
             ),
             pytest.param(
                 lambda: HubbardPlaquetteContainer.from_json(

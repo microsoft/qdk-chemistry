@@ -22,10 +22,11 @@ __all__ = ["HubbardPlaquetteContainer"]
 
 
 class HubbardPlaquetteContainer(UnitaryContainer):
-    r"""Container for second-order plaquette Trotter step for the 2D Fermi-Hubbard model.
+    r"""Container for a plaquette Trotter step for the 2D Fermi-Hubbard model.
 
     The step is :math:`P^{1/2}\,(I^{1/2} G I^{1/2} P)^r\,P^{-1/2}`, where :math:`I` is the
     on-site interaction and :math:`P`, :math:`G` are the pink and gold hopping tilings.
+    Higher even orders compose it by Suzuki's recursion :cite:`Suzuki1992`.
     Each tiling is a set of vertex-disjoint four-cycles, so Q# applies every plaquette of a
     tiling in parallel: a basis change, a tower of equal-angle rotations, and the inverse
     basis change. Each tower is phased through a Hamming-weight register :cite:`Kan2025`,
@@ -55,15 +56,16 @@ class HubbardPlaquetteContainer(UnitaryContainer):
         hopping_angle: :math:`\kappa = 2 t \delta`, shared by both tilings.
         step_reps: Number of repetitions of the body.
         scale: Total evolution time represented, the per-step duration times ``step_reps``.
+        order: Trotter order of each step, a positive even integer.
 
     Raises:
-        TypeError: If ``width``, ``height``, or ``step_reps`` is not an integer.
-        ValueError: If ``step_reps`` is not positive, or the plaquettes cannot tile a ``width`` x ``height``
-            lattice; see :meth:`validate_shape`.
+        TypeError: If ``width``, ``height``, ``step_reps``, or ``order`` is not an integer.
+        ValueError: If ``step_reps`` is not positive, ``order`` is not a positive even integer, or the plaquettes
+            cannot tile a ``width`` x ``height`` lattice; see :meth:`validate_shape`.
 
     """
 
-    _serialization_version = "0.1.0"
+    _serialization_version = "0.2.0"
 
     @staticmethod
     def data_type_name() -> str:
@@ -84,14 +86,17 @@ class HubbardPlaquetteContainer(UnitaryContainer):
         hopping_angle: float = 0.0,
         step_reps: int = 1,
         scale: float = 1.0,
+        order: int = 2,
     ) -> None:
         """Initialize the container."""
-        for name, value in (("width", width), ("height", height), ("step_reps", step_reps)):
+        for name, value in (("width", width), ("height", height), ("step_reps", step_reps), ("order", order)):
             # bool is an int subclass, but True as a count is always a mistake.
             if isinstance(value, bool) or not isinstance(value, int | np.integer):
                 raise TypeError(f"{name} must be an integer, got {type(value).__name__}.")
         if step_reps <= 0:
             raise ValueError(f"step_reps must be a positive integer, got {step_reps}.")
+        if order <= 0 or order % 2:
+            raise ValueError(f"order must be a positive even integer, got {order}.")
         self.width = int(width)
         self.height = int(height)
         self.validate_shape(self.width, self.height)
@@ -100,6 +105,7 @@ class HubbardPlaquetteContainer(UnitaryContainer):
         self.hopping_angle = float(hopping_angle)
         self.step_reps = int(step_reps)
         self.scale = float(scale)
+        self.order = int(order)
         super().__init__()
 
     @staticmethod
@@ -185,6 +191,7 @@ class HubbardPlaquetteContainer(UnitaryContainer):
                 "hopping_angle": self.hopping_angle,
                 "step_reps": self.step_reps,
                 "scale": self.scale,
+                "order": self.order,
             }
         )
 
@@ -214,6 +221,7 @@ class HubbardPlaquetteContainer(UnitaryContainer):
             float(json_data["hopping_angle"]),
             json_data["step_reps"],
             float(json_data["scale"]),
+            json_data["order"],
         )
 
     @classmethod
@@ -234,7 +242,7 @@ class HubbardPlaquetteContainer(UnitaryContainer):
         """Return a human-readable summary of the container."""
         return (
             f"Hubbard plaquette evolution ({self.width}x{self.height} lattice, "
-            f"{self.num_qubits} qubits, {self.step_reps} repetitions): "
+            f"{self.num_qubits} qubits, order {self.order}, {self.step_reps} repetitions): "
             f"interaction angle: {self.interaction_angle}, constant shift: {self.constant_shift}, "
             f"hopping angle: {self.hopping_angle}"
         )
