@@ -14,6 +14,7 @@ from __future__ import annotations
 
 import json
 import pathlib
+import warnings
 
 import h5py
 import numpy as np
@@ -35,7 +36,9 @@ from qdk_chemistry.data import (
 )
 from qdk_chemistry.data._spin_channels import spin_channel_matrix, spin_channel_vector
 from qdk_chemistry.data.symmetry import axes
-from qdk_chemistry.migrate import _orbitals, _wavefunction
+from qdk_chemistry.migrate import _orbitals, _sbt, _wavefunction
+
+from .helpers import eightfold_orbit
 
 RNG = np.random.default_rng(20240101)
 
@@ -240,10 +243,10 @@ def test_lattice_graph(tmp_path, source_format, output_format):
 # --------------------------------------------------------------------------- #
 # Pauli product formula
 # --------------------------------------------------------------------------- #
-def _write_old_product_formula(path, source_format):
+def _write_old_product_formula(path, source_format, step_reps=3):
     """Write twelve terms in the 0.2.0 layout, so HDF5 term indices reach two digits."""
     step_terms = [{"pauli_term": {str(i % 3): "XYZ"[i % 3]}, "angle": 0.1 * (i + 1)} for i in range(12)]
-    header = {"version": "0.2.0", "container_type": "pauli_product_formula", "step_reps": 3, "num_qubits": 3}
+    header = {"version": "0.2.0", "container_type": "pauli_product_formula", "step_reps": step_reps, "num_qubits": 3}
     if source_format == "json":
         path.write_text(json.dumps({**header, "step_terms": step_terms, "scale": 1.7}))
     else:
@@ -258,26 +261,35 @@ def _write_old_product_formula(path, source_format):
 
 
 @pytest.mark.parametrize("type_token", ["unitary_representation", "pauli_product_formula_container"])
+@pytest.mark.parametrize("step_reps", [1, 3])
 @pytest.mark.parametrize(
     ("source_format", "output_format"),
     [("json", "json"), ("json", "hdf5"), ("hdf5", "json"), ("hdf5", "hdf5")],
 )
-def test_pauli_product_formula(tmp_path, type_token, source_format, output_format):
+def test_pauli_product_formula(tmp_path, type_token, source_format, output_format, step_reps):
     src = tmp_path / f"old.{type_token}.{'json' if source_format == 'json' else 'h5'}"
     dst = tmp_path / f"new.{type_token}.{'json' if output_format == 'json' else 'h5'}"
-    step_terms = _write_old_product_formula(src, source_format)
+    step_terms = _write_old_product_formula(src, source_format, step_reps)
     data_class = UnitaryRepresentation if type_token == "unitary_representation" else PauliProductFormulaContainer
     with pytest.raises(RuntimeError, match=r"qdk_chemistry\.migrate"):
         data_class.from_file(src, source_format)
 
-    migrate.convert_file(src, dst)
+    with warnings.catch_warnings(record=True) as emitted:
+        warnings.simplefilter("always")
+        migrate.convert_file(src, dst)
+    assert len(emitted) == int(step_reps > 1)
+    if emitted:
+        assert emitted[0].category is UserWarning
+        assert "scale is preserved unchanged" in str(emitted[0].message)
+        assert "Rebuild" in str(emitted[0].message)
+
     restored = data_class.from_file(dst, output_format)
     formula = restored.get_container() if type_token == "unitary_representation" else restored
     assert formula.to_json() == {
         "version": "0.3.0",
         "container_type": "pauli_product_formula",
         "step_terms": step_terms,
-        "step_reps": 3,
+        "step_reps": step_reps,
         "num_qubits": 3,
         "scale": 1.7,
         "prefix_terms": [],
@@ -552,10 +564,15 @@ def test_sparse(tmp_path, fmt):
     flat = np.asarray(aaaa).reshape(norb, norb, norb, norb)
     assert abs(flat[0, 0, 1, 1] - 0.7) < 1e-12
     assert abs(flat[0, 1, 1, 0] - 0.3) < 1e-12
+    # Legacy entries stand for their whole 8-fold class.
+    assert abs(flat[1, 1, 0, 0] - 0.7) < 1e-12
+    assert abs(flat[1, 0, 1, 0] - 0.3) < 1e-12
 
 
-def _write_v1_sparse_hdf5(path, norb, one_body, two_body, *, norb_on_one_body=True, norb_in_metadata=False):
-    """Write a v1 sparse-container HDF5 file, controlling where num_orbitals lives."""
+def _write_v1_sparse_hdf5(
+    path, norb, one_body, two_body, *, norb_on_one_body=True, norb_in_metadata=False, version="0.1.0"
+):
+    """Write a v1 sparse-container HDF5 file, whose layout 0.2.0 kept, controlling where num_orbitals lives."""
 
     def pack(a, b):
         return np.array([a, b], dtype=np.uint32).view(np.float64)[0]
@@ -565,7 +582,7 @@ def _write_v1_sparse_hdf5(path, norb, one_body, two_body, *, norb_on_one_body=Tr
     with h5py.File(path, "w") as handle:
         handle.attrs["version"] = "0.1.0"
         group = handle.create_group("container")
-        group.attrs["version"] = "0.1.0"
+        group.attrs["version"] = version
         group.attrs["container_type"] = "sparse"
         metadata = group.create_group("metadata")
         metadata.attrs["core_energy"] = 2.5
@@ -607,6 +624,98 @@ def test_sparse_missing_num_orbitals_raises(tmp_path):
     _write_v1_sparse_hdf5(src, 3, [[0, 1, 1.0]], [[0, 0, 1, 1, 0.7]], norb_on_one_body=False, norb_in_metadata=False)
     with pytest.raises(migrate.MigrationError, match="num_orbitals"):
         migrate.convert_file(src, tmp_path / "e_new.hamiltonian.h5")
+
+
+@pytest.mark.parametrize("fmt", ["json", "hdf5"])
+def test_sparse_0_2_0_stores_every_eightfold_class_member(tmp_path, fmt):
+    """Version 0.2.0 read each entry, including partial classes, as its whole 8-fold class."""
+    norb = 3
+    two_body = [[0, 1, 0, 2, 0.5], [0, 0, 1, 1, 0.7], [2, 2, 2, 2, 0.3], [1, 2, 1, 2, -0.1], [2, 1, 1, 2, -0.1]]
+    suffix = "json" if fmt == "json" else "h5"
+    src = tmp_path / f"e.hamiltonian.{suffix}"
+    if fmt == "json":
+        container = {
+            "version": "0.2.0",
+            "container_type": "sparse",
+            "core_energy": 2.5,
+            "type": "Hermitian",
+            "is_restricted": True,
+            "num_orbitals": norb,
+            "has_one_body_integrals": True,
+            "one_body_integrals_alpha_sparse": [[0, 0, 1.0]],
+            "two_body_integrals": _sbt.sparse_rank4_dict(two_body, norb),
+        }
+        src.write_text(json.dumps({"version": "0.1.0", "container": container}))
+    else:
+        _write_v1_sparse_hdf5(src, norb, [[0, 0, 1.0]], two_body, version="0.2.0")
+
+    dst = tmp_path / f"e_new.hamiltonian.{suffix}"
+    migrate.convert_file(src, dst)
+    expected = np.zeros((norb,) * 4)
+    for *indices, value in two_body:
+        for member in eightfold_orbit(tuple(indices)):
+            expected[member] = value
+    actual = np.asarray(Hamiltonian.from_file(str(dst), fmt).get_two_body_integrals()[0])
+    np.testing.assert_array_equal(actual.reshape(expected.shape), expected)
+
+
+@pytest.mark.parametrize("partner", [-0.2, 0.7 * (1 + 1e-8)])
+def test_sparse_inconsistent_eightfold_class_refused(tmp_path, partner):
+    """A class whose stored members differ beyond round-off has no unambiguous 0.2.0 meaning."""
+    src = tmp_path / "e.hamiltonian.h5"
+    two_body = [[0, 1, 0, 1, 0.7], [1, 0, 1, 0, 0.7], [0, 1, 1, 0, partner]]
+    _write_v1_sparse_hdf5(src, 2, [[0, 0, 1.0]], two_body, version="0.2.0")
+    with pytest.raises(migrate.MigrationError, match="cannot be migrated unambiguously"):
+        migrate.convert_file(src, tmp_path / "e_new.hamiltonian.h5")
+
+
+def test_sparse_eightfold_class_round_off_migrated(tmp_path):
+    """Round-off between class members migrates to the value 0.2.0 mapped."""
+    src = tmp_path / "e.hamiltonian.h5"
+    dst = tmp_path / "e_new.hamiltonian.h5"
+    two_body = [[0, 1, 0, 1, 0.7], [0, 1, 1, 0, np.nextafter(0.7, 1.0)]]
+    _write_v1_sparse_hdf5(src, 2, [[0, 0, 1.0]], two_body, version="0.2.0")
+    migrate.convert_file(src, dst)
+    actual = np.asarray(Hamiltonian.from_file(str(dst), "hdf5").get_two_body_integrals()[0]).reshape((2,) * 4)
+    assert actual[0, 1, 1, 0] == 0.7
+
+
+def test_sparse_0_2_0_non_hermitian_entries_stay_literal(tmp_path):
+    """The 8-fold reading applied only to Hermitian integrals, so non-Hermitian entries migrate as stored."""
+    norb = 3
+    two_body = [[0, 1, 0, 1, 0.7], [1, 0, 1, 0, 0.6], [0, 1, 0, 2, 0.5]]
+    container = {
+        "version": "0.2.0",
+        "container_type": "sparse",
+        "core_energy": 2.5,
+        "type": "NonHermitian",
+        "is_restricted": True,
+        "num_orbitals": norb,
+        "has_one_body_integrals": True,
+        "one_body_integrals_alpha_sparse": [[0, 0, 1.0]],
+        "two_body_integrals": _sbt.sparse_rank4_dict(two_body, norb),
+    }
+    src = tmp_path / "e.hamiltonian.json"
+    src.write_text(json.dumps({"version": "0.1.0", "container": container}))
+    dst = tmp_path / "e_new.hamiltonian.json"
+    migrate.convert_file(src, dst)
+    expected = np.zeros((norb,) * 4)
+    for *indices, value in two_body:
+        expected[tuple(indices)] = value
+    actual = np.asarray(Hamiltonian.from_file(str(dst), "json").get_two_body_integrals()[0])
+    np.testing.assert_array_equal(actual.reshape(expected.shape), expected)
+
+
+@pytest.mark.parametrize("fmt", ["json", "hdf5"])
+def test_current_sparse_reports_its_serialization_version(tmp_path, fmt):
+    """An already-current sparse file is refused with its own version, not the internal step key."""
+    suffix = "json" if fmt == "json" else "h5"
+    src = tmp_path / f"e.hamiltonian.{suffix}"
+    _write_v1_sparse_hdf5(tmp_path / "old.hamiltonian.h5", 2, [[0, 0, 1.0]], [[0, 0, 0, 0, 0.5]], version="0.2.0")
+    migrate.convert_file(tmp_path / "old.hamiltonian.h5", src)
+    with pytest.raises(migrate.MigrationError, match=r"version '0\.3\.0'") as error:
+        migrate.convert_file(src, tmp_path / f"e_new.hamiltonian.{suffix}")
+    assert "sparse 0.3.0" not in str(error.value)
 
 
 # --------------------------------------------------------------------------- #

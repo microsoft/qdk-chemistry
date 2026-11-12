@@ -7,6 +7,8 @@
 
 from __future__ import annotations
 
+import warnings
+
 import h5py
 
 from . import _io
@@ -43,6 +45,14 @@ def from_hdf5_file(path) -> dict:
 
 def to_new_json(old: dict) -> dict:
     """Add empty prefix and suffix term segments; the repeated body is unchanged."""
+    if old["step_reps"] > 1:
+        warnings.warn(
+            "Legacy product-formula scale is preserved unchanged, but may not represent the total evolution time. "
+            "The saved repetition count does not distinguish divisions from power. Rebuild powered repeat-strategy "
+            "or multi-step composed formulas before using phase-to-energy inversion.",
+            UserWarning,
+            stacklevel=2,
+        )
     new = {key: value for key, value in old.items() if key != "_source_version"}
     new.update(prefix_terms=[], suffix_terms=[], version=PRODUCT_FORMULA_VERSION)
     return new

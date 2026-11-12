@@ -6,10 +6,7 @@ PYTHON_VERSION=${2:-3.11}
 BUILD_TYPE=${3:-Release}
 BUILD_TESTING=${4:-ON}
 ENABLE_COVERAGE=${5:-OFF}
-HDF5_VERSION=${6:-1.13.0}
-BLIS_VERSION=${7:-2.0}
-LIBFLAME_VERSION=${8:-5.2.0}
-MAC_BUILD=${9:-OFF}
+MAC_BUILD=${6:-OFF}
 
 # Default to a non-release build unless explicitly overridden (to keep +local on dev builds).
 export QDK_CHEMISTRY_RELEASE_BUILD="${QDK_CHEMISTRY_RELEASE_BUILD:-0}"
@@ -18,10 +15,9 @@ export CFLAGS="-fPIC -Os"
 if [ "$MAC_BUILD" == "OFF" ]; then # Build/install Linux dependencies
     export DEBIAN_FRONTEND=noninteractive
 
-    # CFSClean3: redirect Ubuntu apt endpoints to the Azure-internal mirror.
+    # Redirect Ubuntu apt endpoints to the Azure-internal mirror.
     # Note: azure.archive.ubuntu.com only carries amd64/i386. Non-x86 architectures
-    # (e.g. arm64) live under ubuntu-ports and must go to azure.ports.ubuntu.com,
-    # otherwise apt gets a 404 for binary-<arch>/Packages and exits with code 100.
+    # (e.g. arm64) live under ubuntu-ports and must go to azure.ports.ubuntu.com
     _cfs_apt_redirect() {
         sed -i \
             -e 's|https\?://archive.ubuntu.com/ubuntu|http://azure.archive.ubuntu.com/ubuntu|g' \
@@ -83,10 +79,10 @@ if [ "$MAC_BUILD" == "OFF" ]; then # Build/install Linux dependencies
     # We use BLIS/libflame as the BLAS/LAPACK vendors to prevent symbol collisions
     # with qiskit's shared OpenBLAS
     echo "Downloading and installing BLIS..."
-    bash .pipelines/install-scripts/install-blis.sh /usr/local ${MARCH} ${BLIS_VERSION} "${CFLAGS}"
+    bash .pipelines/install-scripts/install-blis.sh /usr/local "${MARCH}" "${CFLAGS}"
 
     echo "Downloading and installing libflame..."
-    bash .pipelines/install-scripts/install-libflame.sh /usr/local ${MARCH} ${LIBFLAME_VERSION} "${CFLAGS}"
+    bash .pipelines/install-scripts/install-libflame.sh /usr/local "${MARCH}" "${CFLAGS}"
 
 elif [ "$MAC_BUILD" == "ON" ]; then
     # --- Apple Silicon Rosetta self-heal -----------------------------------------
@@ -120,7 +116,7 @@ elif [ "$MAC_BUILD" == "ON" ]; then
 fi
 
 echo "Installing HDF5..."
-bash .pipelines/install-scripts/install-hdf5.sh /usr/local ${BUILD_TYPE} ${PWD} "${CFLAGS}" ${MAC_BUILD} ${HDF5_VERSION}
+bash .pipelines/install-scripts/install-hdf5.sh /usr/local "${BUILD_TYPE}" "${PWD}" "${CFLAGS}" "${MAC_BUILD}"
 
 # Bootstrap Anaconda's `conda` and create the build env. See header of the
 # sourced script for full rationale (CFSClean / ms-ensureconda platform gaps /
@@ -171,12 +167,12 @@ if [ "$MAC_BUILD" == "OFF" ]; then
     export CMAKE_BUILD_PARALLEL_LEVEL=$(nproc)
     python3 -m build --wheel \
         -C build-dir="build/{wheel_tag}" \
-        -C cmake.define.QDK_UARCH=${MARCH} \
+        -C cmake.define.QDK_UARCH="${MARCH}" \
         -C cmake.define.BUILD_SHARED_LIBS=OFF \
         -C cmake.define.QDK_CHEMISTRY_ENABLE_MPI=OFF \
         -C cmake.define.QDK_ENABLE_OPENMP=OFF \
-        -C cmake.define.QDK_CHEMISTRY_ENABLE_COVERAGE=${ENABLE_COVERAGE} \
-        -C cmake.define.BUILD_TESTING=${BUILD_TESTING} \
+        -C cmake.define.QDK_CHEMISTRY_ENABLE_COVERAGE="${ENABLE_COVERAGE}" \
+        -C cmake.define.BUILD_TESTING="${BUILD_TESTING}" \
         -C cmake.define.CMAKE_C_FLAGS="${CMAKE_C_FLAGS}" \
         -C cmake.define.CMAKE_CXX_FLAGS="${CMAKE_CXX_FLAGS}"
 
@@ -232,8 +228,8 @@ elif [ "$MAC_BUILD" == "ON" ]; then
         -C cmake.define.BUILD_SHARED_LIBS=OFF \
         -C cmake.define.QDK_CHEMISTRY_ENABLE_MPI=OFF \
         -C cmake.define.QDK_ENABLE_OPENMP=OFF \
-        -C cmake.define.QDK_CHEMISTRY_ENABLE_COVERAGE=${ENABLE_COVERAGE} \
-        -C cmake.define.BUILD_TESTING=${BUILD_TESTING} \
+        -C cmake.define.QDK_CHEMISTRY_ENABLE_COVERAGE="${ENABLE_COVERAGE}" \
+        -C cmake.define.BUILD_TESTING="${BUILD_TESTING}" \
         -C cmake.define.CMAKE_C_FLAGS="${CMAKE_C_FLAGS}" \
         -C cmake.define.CMAKE_CXX_FLAGS="${CMAKE_CXX_FLAGS}" \
         -C cmake.define.CMAKE_PREFIX_PATH="/opt/homebrew"

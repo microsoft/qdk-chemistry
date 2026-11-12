@@ -14,7 +14,7 @@ from qdk.test_utils import dump_operation_on_state
 from qdk_chemistry.algorithms.state_preparation.alias_sampling import AliasSamplingStatePreparation
 from qdk_chemistry.utils.qsharp import QSHARP_UTILS, get_qsharp_context
 
-from .test_helpers import create_dense_wavefunction, create_sparse_wavefunction
+from .helpers import create_dense_wavefunction, create_sparse_wavefunction
 
 
 def _run_alias_sampling_and_dump(
@@ -92,18 +92,18 @@ class TestAliasSamplingStatePreparation:
             [[bool((17 * outer + 5 * inner + bit) % 7 < 3) for bit in range(21)] for inner in range(16)]
             for outer in range(90)
         ]
-        num_swap_bits = select_swap.ComputeOptimalLambda2D(90, 16, 21, True)
-        assert num_swap_bits == 3, f"expected three swap bits, got {num_swap_bits}"
+        num_swap_bits = select_swap.ComputeOptimalLambda2D(90, 16, 21, True, -1)
+        assert num_swap_bits == 2, f"expected two swap bits, got {num_swap_bits}"
         expected_lookup_counts = {
             "forward": (
                 (True, False),
                 {
-                    "numQubits": 283,
-                    "cczCount": 408,
+                    "numQubits": 199,
+                    "cczCount": 504,
                     "ccixCount": 0,
                     "tCount": 0,
                     "rotationCount": 0,
-                    "measurementCount": 429,
+                    "measurementCount": 525,
                 },
             ),
             "adjoint": (
@@ -120,12 +120,12 @@ class TestAliasSamplingStatePreparation:
             "round_trip": (
                 (True, True),
                 {
-                    "numQubits": 283,
-                    "cczCount": 491,
+                    "numQubits": 199,
+                    "cczCount": 587,
                     "ccixCount": 0,
                     "tCount": 0,
                     "rotationCount": 0,
-                    "measurementCount": 533,
+                    "measurementCount": 629,
                 },
             ),
         }
@@ -139,6 +139,52 @@ class TestAliasSamplingStatePreparation:
             )
             actual = {name: counts[name] for name in expected}
             assert actual == expected, f"conditional alias lookup {direction}: {actual} != {expected}"
+
+    def test_the_swap_width_rule_declines_a_widening_that_does_not_pay(self, qsharp_test_context, qsharp_test_utils):
+        """The rule may reject cheaper Toffolis when the scratch widening is too large.
+
+        Pinning both widths shows the declined width is genuinely cheaper but wider.
+        """
+        context = qsharp_test_context
+        select_swap = context.code.QDKChemistry.Utils.SelectSwap
+        lookup_data = [
+            [[bool((17 * outer + 5 * inner + bit) % 7 < 3) for bit in range(21)] for inner in range(16)]
+            for outer in range(90)
+        ]
+
+        chosen, declined = 2, 3
+        assert select_swap.ComputeOptimalLambda2D(90, 16, 21, True, -1) == chosen
+        assert select_swap.SelectSwapCost2D(declined, 90, 16, 21, True) < select_swap.SelectSwapCost2D(
+            chosen, 90, 16, 21, True
+        ), "the declined width has to be the Toffoli-cheaper one, or there is nothing being traded"
+
+        counts = {
+            width: context.logical_counts(
+                qsharp_test_utils.SelectSwapTests.TestSelectSwap2DResourceProbe, lookup_data, width, True, True, True
+            )
+            for width in (chosen, declined)
+        }
+        assert counts[chosen]["numQubits"] < counts[declined]["numQubits"], (
+            f"the narrower network must free scratch: {counts[chosen]['numQubits']} vs {counts[declined]['numQubits']}"
+        )
+        assert counts[chosen]["cczCount"] > counts[declined]["cczCount"], (
+            f"and must cost Toffolis for it: {counts[chosen]['cczCount']} vs {counts[declined]['cczCount']}"
+        )
+
+        # Guard the tolerance itself: the Toffoli premium must stay small next to the width it buys.
+        width_saved = (counts[declined]["numQubits"] - counts[chosen]["numQubits"]) / counts[declined]["numQubits"]
+        toffoli_premium = (counts[chosen]["cczCount"] - counts[declined]["cczCount"]) / counts[declined]["cczCount"]
+        assert toffoli_premium < width_saved, (
+            f"the rule's Toffoli premium has to be small next to the width it buys, or the "
+            f"tolerance is mis-set: {toffoli_premium:.1%} Toffolis for {width_saved:.1%} width"
+        )
+
+        # Thin margin (~19.6% vs 20%), pinned so lowering the tolerance fails here with a reason.
+        assert 0.19 < toffoli_premium < 0.20, (
+            f"the declined width is a near-miss at this shape ({toffoli_premium:.2%} premium "
+            f"against a 20% tolerance); if this moved, the tolerance or the cost model changed "
+            f"and the resident width almost certainly moved with it"
+        )
 
     def test_negative_coefficients_rejected(self):
         """Alias sampling is a PREPARE oracle over magnitudes and cannot carry a sign."""
@@ -235,6 +281,7 @@ class TestAliasSamplingStatePreparation:
 
 def _run_conditional_alias_fr_and_dump(
     context,
+    test_utils,
     coefficients: list[list[float]],
     free_rider_data: list[list[bool]],
     bits_precision: int,
@@ -248,7 +295,7 @@ def _run_conditional_alias_fr_and_dump(
     n_free_rider_bits = len(free_rider_data[0]) if free_rider_data else 0
     n_qrom_output = bits_precision + n_index_bits + 2
     total_qubits = n_cond_bits + n_index_bits + bits_precision + 1 + n_qrom_output + n_free_rider_bits
-    op = context.code.QDKChemistry.TestUtils.AliasSamplingTests.MakeConditionalAliasSamplingPrepWithFreeRiderOp(
+    op = test_utils.AliasSamplingTests.TestMakeConditionalAliasSamplingPrepWithFreeRiderOp(
         coefficients, free_rider_data, bits_precision, condition_value
     )
     return np.array(dump_operation_on_state(op, total_qubits, context=context))
@@ -282,7 +329,7 @@ class TestConditionalAliasSamplingWithFreeRider:
     """Tests for conditional alias sampling with free-rider data."""
 
     @pytest.mark.parametrize("condition_value", [0, 1])
-    def test_free_rider_register_holds_the_loaded_bits(self, qsharp_test_context, condition_value):
+    def test_free_rider_register_holds_the_loaded_bits(self, qsharp_test_context, qsharp_test_utils, condition_value):
         """The free rider depends only on the condition, so it comes out definite, not sampled."""
         n_cond, n_coeffs, n_fr_bits = 2, 4, 3
         rng = np.random.default_rng(seed=456 + condition_value)
@@ -290,7 +337,7 @@ class TestConditionalAliasSamplingWithFreeRider:
         free_rider_data = [[bool(rng.integers(0, 2)) for _ in range(n_fr_bits)] for _ in range(n_cond)]
 
         full_sv = _run_conditional_alias_fr_and_dump(
-            qsharp_test_context, coefficients, free_rider_data, 6, condition_value
+            qsharp_test_context, qsharp_test_utils, coefficients, free_rider_data, 6, condition_value
         )
 
         # The free rider occupies the last qubits, so its bits are the low field of the basis
@@ -303,6 +350,7 @@ class TestConditionalAliasSamplingWithFreeRider:
 
 def _run_conditional_alias_and_dump(
     context,
+    test_utils,
     coefficients: list[list[float]],
     bits_precision: int,
     condition_value: int,
@@ -315,7 +363,7 @@ def _run_conditional_alias_and_dump(
     n_cond_bits = math.ceil(math.log2(n_cond))
     n_qrom_output = bits_precision + n_index_bits + 2
     total_qubits = n_cond_bits + n_index_bits + bits_precision + 1 + n_qrom_output
-    op = context.code.QDKChemistry.TestUtils.AliasSamplingTests.MakeConditionalAliasSamplingPrepOp(
+    op = test_utils.AliasSamplingTests.TestMakeConditionalAliasSamplingPrepOp(
         coefficients, bits_precision, condition_value, num_swap_bits
     )
     return np.array(dump_operation_on_state(op, total_qubits, context=context))
@@ -339,7 +387,7 @@ class TestConditionalAliasSampling:
         n_index_bits = 2
         n_qrom_output = bits_precision + n_index_bits + 2
         total_qubits = n_cond_bits + n_index_bits + bits_precision + 1 + n_qrom_output
-        op = qsharp_test_utils.AliasSamplingTests.MakeConditionalAliasSamplingPhaseTestOp(
+        op = qsharp_test_utils.AliasSamplingTests.TestMakeConditionalAliasSamplingPhaseOp(
             coefficients, bits_precision, condition_value, 0
         )
 
@@ -358,17 +406,22 @@ class TestConditionalAliasSampling:
 
     @pytest.mark.parametrize("num_swap_bits", [0, -1, 1])
     @pytest.mark.parametrize("condition_value", [0, 1])
-    def test_marginal_probs(self, qsharp_test_context, condition_value, num_swap_bits):
-        """Verify conditional marginal probs for no-swap, optimal, and select-swap loads."""
-        n_cond, n_coeffs = 2, 4
+    def test_marginal_probs(self, qsharp_test_context, qsharp_test_utils, condition_value, num_swap_bits):
+        """Verify conditional marginal probs for no-swap, selector-chosen, and capped swap loads."""
+        n_cond, n_coeffs = 32, 8
         rng = np.random.default_rng(seed=789 + condition_value)
         coefficients = rng.uniform(-1.0, 1.0, size=(n_cond, n_coeffs)).tolist()
-        bits_precision = 6
+        bits_precision = 3
         n_index_bits = math.ceil(math.log2(n_coeffs))
         n_cond_bits = math.ceil(math.log2(n_cond))
+        # The selector must build width num_swap_bits for each case, so the cases cover 0, 1 and 2.
+        select_swap = qsharp_test_context.code.QDKChemistry.Utils.SelectSwap
+        expected_width = {0: 0, -1: 2, 1: 1}[num_swap_bits]
+        word_bits = bits_precision + n_index_bits + 2
+        assert select_swap.ComputeOptimalLambda2D(n_cond, n_coeffs, word_bits, True, num_swap_bits) == expected_width
 
         full_sv = _run_conditional_alias_and_dump(
-            qsharp_test_context, coefficients, bits_precision, condition_value, num_swap_bits
+            qsharp_test_context, qsharp_test_utils, coefficients, bits_precision, condition_value, num_swap_bits
         )
         marginal_probs = _compute_conditional_marginal_probs(full_sv, n_cond_bits, n_index_bits, condition_value)
 

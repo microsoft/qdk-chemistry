@@ -3,7 +3,6 @@
 // license information.
 
 namespace QDKChemistry.TestUtils.AliasSamplingTests {
-
     import Std.Canon.ApplyXorInPlace;
     import Std.Convert.IntAsDouble;
     import Std.Core.Length;
@@ -12,8 +11,7 @@ namespace QDKChemistry.TestUtils.AliasSamplingTests {
     import QDKChemistry.Utils.AliasSampling.ConditionalAliasSamplingPrepare;
     import QDKChemistry.Utils.AliasSampling.ConditionalAliasSamplingPrepareWithFreeRider;
 
-    /// Test wrapper: conditional alias sampling on `[condition | index | uniform | flag | qrom]`.
-    function MakeConditionalAliasSamplingPrepOp(
+    function TestMakeConditionalAliasSamplingPrepOp(
         coefficients : Double[][],
         bitsPrecision : Int,
         conditionValue : Int,
@@ -26,6 +24,7 @@ namespace QDKChemistry.TestUtils.AliasSamplingTests {
             let nCondBits = Ceiling(Lg(IntAsDouble(nCond)));
             let nQromOutput = bitsPrecision + nIndexBits + 2;
 
+            // Layout: [condition | index | uniform | flag | qrom].
             let conditionalReg = qs[0..nCondBits - 1];
             let indexReg = qs[nCondBits..nCondBits + nIndexBits - 1];
             let uniformReg = qs[nCondBits + nIndexBits..nCondBits + nIndexBits + bitsPrecision - 1];
@@ -37,19 +36,17 @@ namespace QDKChemistry.TestUtils.AliasSamplingTests {
             ConditionalAliasSamplingPrepare(
                 coefficients,
                 bitsPrecision,
+                numSwapBits,
                 conditionalReg,
                 indexReg,
                 uniformReg,
                 flagQubit,
-                qromOut,
-                numSwapBits
+                qromOut
             );
         }
     }
 
-    /// Test wrapper: prepare conditional alias sampling, apply an index phase,
-    /// and unprepare to exercise the adjoint on a non-power-of-two table.
-    function MakeConditionalAliasSamplingPhaseTestOp(
+    function TestMakeConditionalAliasSamplingPhaseOp(
         coefficients : Double[][],
         bitsPrecision : Int,
         conditionValue : Int,
@@ -74,12 +71,12 @@ namespace QDKChemistry.TestUtils.AliasSamplingTests {
                 ConditionalAliasSamplingPrepare(
                     coefficients,
                     bitsPrecision,
+                    numSwapBits,
                     conditionalReg,
                     indexReg,
                     uniformReg,
                     flagQubit,
-                    qromOut,
-                    numSwapBits
+                    qromOut
                 );
             } apply {
                 Z(indexReg[0]);
@@ -87,8 +84,7 @@ namespace QDKChemistry.TestUtils.AliasSamplingTests {
         }
     }
 
-    /// Test wrapper: conditional alias sampling with free-rider data.
-    function MakeConditionalAliasSamplingPrepWithFreeRiderOp(
+    function TestMakeConditionalAliasSamplingPrepWithFreeRiderOp(
         coefficients : Double[][],
         freeRiderData : Bool[][],
         bitsPrecision : Int,
@@ -115,13 +111,14 @@ namespace QDKChemistry.TestUtils.AliasSamplingTests {
                 coefficients,
                 freeRiderData,
                 bitsPrecision,
+                0,
                 conditionalReg,
                 indexReg,
                 uniformReg,
                 flagQubit,
                 qromOut,
                 freeRiderReg,
-                0
+                []
             );
         }
     }

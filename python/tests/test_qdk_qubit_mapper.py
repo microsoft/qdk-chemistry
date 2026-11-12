@@ -14,17 +14,24 @@ from qdk_chemistry.algorithms import QubitMapper, available, create
 from qdk_chemistry.data import (
     CanonicalFourCenterHamiltonianContainer,
     Hamiltonian,
+    HamiltonianType,
     MajoranaMapping,
     Orbitals,
     QubitOperator,
+    SparseHamiltonianContainer,
+    Symmetries,
 )
 from qdk_chemistry.plugins.qiskit import QDK_CHEMISTRY_HAS_QISKIT_NATURE
 
-from .test_helpers import (
+from .helpers import (
+    create_dense_test_hamiltonian,
+    create_non_hermitian_mixed_block_hamiltonian,
     create_nontrivial_test_hamiltonian,
     create_test_basis_set,
     create_test_hamiltonian,
     create_test_orbitals,
+    fermionic_reference_matrix,
+    fourfold_average,
 )
 
 _PAULI_ID_TO_CHAR = {0: "I", 1: "X", 2: "Y", 3: "Z"}
@@ -89,6 +96,42 @@ class TestQdkQubitMapper:
         assert len(result.pauli_strings) > 0
         assert len(result.coefficients) == len(result.pauli_strings)
         assert result.coefficients.dtype == complex
+
+    @pytest.mark.usefixtures("warn_logger")
+    @pytest.mark.parametrize(
+        ("entries", "changes_operator"),
+        [
+            ({(0, 0, 1, 1): 0.4, (1, 1, 0, 0): 0.9}, False),
+            ({(0, 1, 0, 0): 0.25, (0, 0, 0, 1): 0.25, (1, 0, 0, 0): -0.25, (0, 0, 1, 0): -0.25}, True),
+        ],
+        ids=["exchange", "hermiticity"],
+    )
+    def test_restricted_maps_hermitian_part(self, entries: dict, changes_operator: bool, capfd) -> None:
+        """Restricted tensors map to their fourfold average, warning only if they are not Hermitian.
+
+        Declared non-Hermitian, they map literally.
+        """
+        two_body = np.zeros((2,) * 4)
+        for indices, value in entries.items():
+            two_body[indices] = value
+        one_body = np.array([[1.0, 0.3], [0.3, 0.5]])
+        mapping = MajoranaMapping.jordan_wigner(num_modes=4)
+        capfd.readouterr()
+        operator = create("qubit_mapper", "qdk").run(create_dense_test_hamiltonian(one_body, two_body), mapping)
+        assert ("Hermitian part" in capfd.readouterr().out) == changes_operator
+        hermitian_part = fourfold_average(two_body)
+        expected = fermionic_reference_matrix(one_body, one_body, hermitian_part, hermitian_part, hermitian_part)
+        np.testing.assert_allclose(operator.to_matrix(), expected, atol=1e-12, rtol=0)
+
+        literal = create("qubit_mapper", "qdk").run(
+            create_dense_test_hamiltonian(one_body, two_body, hamiltonian_type=HamiltonianType.NonHermitian),
+            mapping,
+        )
+        # Both cross-spin orderings of restricted integrals see their bra-ket average.
+        bra_ket_average = (two_body + two_body.transpose(2, 3, 0, 1)) / 2
+        reference = fermionic_reference_matrix(one_body, one_body, two_body, bra_ket_average, two_body)
+        np.testing.assert_allclose(literal.to_matrix(), reference, atol=1e-12, rtol=0)
+        assert np.allclose(reference, reference.conj().T) != changes_operator
 
     def test_number_operator(self) -> None:
         """Test JW transform of number operator: a†a = (I - Z) / 2."""
@@ -807,6 +850,96 @@ class TestUnrestrictedHamiltonians:
 
         np.testing.assert_allclose(eigs["jordan_wigner"], eigs["bravyi_kitaev"], atol=1e-10)
         np.testing.assert_allclose(eigs["jordan_wigner"], eigs["parity"], atol=1e-10)
+
+
+class TestFourFoldReference:
+    """Fourfold, non-eightfold integrals against an independent occupation-basis matrix."""
+
+    def test_jordan_wigner_full_matrix(self, fourfold_hamiltonian) -> None:
+        """Jordan-Wigner reproduces the reference matrix."""
+        hamiltonian, reference = fourfold_hamiltonian
+        mapping = MajoranaMapping.jordan_wigner(2 * hamiltonian.get_one_body_integrals()[0].shape[0])
+        operator = create("qubit_mapper", "qdk").run(hamiltonian, mapping)
+
+        assert operator.num_qubits == mapping.num_modes
+        np.testing.assert_allclose(operator.to_matrix(), reference, atol=1e-11, rtol=0)
+
+    def test_tapered_sector_spectrum(self, fourfold_hamiltonian) -> None:
+        """A tapered operator reproduces the reference spectrum of its parity sector."""
+        hamiltonian, reference = fourfold_hamiltonian
+        num_orbitals = hamiltonian.get_one_body_integrals()[0].shape[0]
+        mapping = MajoranaMapping.parity(2 * num_orbitals, Symmetries(n_alpha=1, n_beta=1))
+        operator = create("qubit_mapper", "qdk").run(hamiltonian, mapping)
+        alpha_mask = (1 << num_orbitals) - 1
+        sector = [
+            state
+            for state in range(len(reference))
+            if (state & alpha_mask).bit_count() % 2 == 1 and (state >> num_orbitals).bit_count() % 2 == 1
+        ]
+
+        assert operator.num_qubits == 2 * num_orbitals - 2
+        assert operator.encoding == mapping.name
+        np.testing.assert_allclose(
+            np.linalg.eigvalsh(operator.to_matrix()),
+            np.linalg.eigvalsh(reference[np.ix_(sector, sector)]),
+            atol=1e-11,
+            rtol=0,
+        )
+
+    def test_non_hermitian_mixed_block_maps_literally(self) -> None:
+        """A non-Hermitian alpha-beta block maps to its literal operator."""
+        hamiltonian, reference = create_non_hermitian_mixed_block_hamiltonian()
+        assert not np.allclose(reference, reference.conj().T)
+        operator = create("qubit_mapper", "qdk").run(hamiltonian, MajoranaMapping.jordan_wigner(6))
+        np.testing.assert_allclose(operator.to_matrix(), reference, atol=1e-11, rtol=0)
+
+    @pytest.mark.parametrize("storage", ["dense", "sparse"])
+    def test_small_fourfold_part_is_mapped(self, storage: str) -> None:
+        """A small fourfold, non-eightfold part is mapped, not dropped as round-off."""
+        random = np.random.default_rng(706)
+        fourfold = fourfold_average(random.normal(size=(3,) * 4))
+        exchanged = fourfold.transpose(1, 0, 2, 3)
+        tensor = (fourfold + exchanged) / 2 + 5e-6 * (fourfold - exchanged) / 2
+        one_body = np.diag([0.5, -0.2, 0.1])
+        if storage == "sparse":
+            entries = {tuple(indices): tensor[tuple(indices)] for indices in np.argwhere(tensor)}
+            hamiltonian = Hamiltonian(SparseHamiltonianContainer(one_body, entries, 0.0))
+        else:
+            hamiltonian = create_dense_test_hamiltonian(one_body, tensor)
+        reference = fermionic_reference_matrix(one_body, one_body, tensor, tensor, tensor)
+        operator = create("qubit_mapper", "qdk").run(hamiltonian, MajoranaMapping.jordan_wigner(6))
+        np.testing.assert_allclose(operator.to_matrix(), reference, atol=1e-11, rtol=0)
+
+    @pytest.mark.parametrize("storage", ["restricted", "unrestricted", "sparse"])
+    def test_integral_screen_acts_on_pair_combinations(self, storage: str) -> None:
+        """The screen acts on ((pq|rs) ± (pq|sr)) / 2, so near-equal partners on either side of it agree."""
+        tensor = np.zeros((2,) * 4)
+        tensor[0, 0, 0, 0] = 1.0
+        tensor[0, 1, 0, 1] = tensor[1, 0, 1, 0] = 0.2
+        tensor[0, 1, 1, 0] = tensor[1, 0, 0, 1] = 0.1
+        one_body = np.zeros((2, 2))
+        mapper = create("qubit_mapper", "qdk", integral_threshold=0.1)
+
+        def mapped(two_body):
+            if storage == "sparse":
+                entries = {tuple(indices): two_body[tuple(indices)] for indices in np.argwhere(two_body)}
+                hamiltonian = Hamiltonian(SparseHamiltonianContainer(one_body, entries, 0.0))
+            elif storage == "restricted":
+                hamiltonian = create_dense_test_hamiltonian(one_body, two_body)
+            else:
+                hamiltonian = create_dense_test_hamiltonian(one_body, two_body, one_body, two_body, two_body)
+            return mapper.run(hamiltonian, MajoranaMapping.jordan_wigner(4)).to_matrix()
+
+        swapped = tensor.transpose(0, 1, 3, 2)
+        screened = sum(
+            np.where(np.abs(part) < 0.1, 0.0, part) for part in ((tensor + swapped) / 2, (tensor - swapped) / 2)
+        )
+        reference = fermionic_reference_matrix(one_body, one_body, screened, screened, screened)
+        np.testing.assert_allclose(mapped(tensor), reference, atol=1e-11, rtol=0)
+        nudged = tensor.copy()
+        nudged[0, 1, 1, 0] -= 1e-10
+        nudged[1, 0, 0, 1] += 1e-10
+        np.testing.assert_allclose(mapped(nudged), reference, atol=1e-9, rtol=0)
 
 
 class TestQdkQubitMapperRealHamiltonians:

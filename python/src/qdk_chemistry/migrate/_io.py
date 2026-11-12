@@ -41,14 +41,16 @@ def migrate_doc(steps: dict, read_doc: dict, label: str) -> dict:
     """Upgrade ``read_doc`` to the current serialization version by following ``steps``.
 
     ``steps`` maps a serialization version to a ``(next_version, transform)`` pair.
-    The chain is walked from the document's own ``_source_version`` until no further
-    step applies. A version with no registered step is rejected rather than silently
-    reinterpreted, so an already-current (or otherwise unsupported) file fails fast.
+    The chain is walked from the document's ``_step_key``, or its own ``_source_version``
+    when it has none, until no further step applies. A version with no registered step
+    is rejected rather than silently reinterpreted, so an already-current (or otherwise
+    unsupported) file fails fast.
     """
-    version = read_doc["_source_version"]
+    version = read_doc.get("_step_key", read_doc["_source_version"])
     if version not in steps:
         raise ValueError(
-            f"No migration step is registered for the {label} serialization version {version!r}. "
+            f"No migration step is registered for the {label} serialization version "
+            f"{read_doc['_source_version']!r}. "
             "The file may already be at the current serialization version, or a new step must be "
             "added to its qdk_chemistry.migrate STEPS table."
         )

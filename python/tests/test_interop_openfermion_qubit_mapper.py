@@ -13,12 +13,13 @@ from unittest.mock import Mock
 import numpy as np
 import pytest
 
-from .reference_tolerances import (
-    float_comparison_absolute_tolerance,
-)
-from .test_helpers import (
+from .helpers import (
+    create_non_hermitian_mixed_block_hamiltonian,
     create_nontrivial_test_hamiltonian,
     create_test_basis_set,
+)
+from .reference_tolerances import (
+    float_comparison_absolute_tolerance,
 )
 
 OPENFERMION_AVAILABLE = importlib.util.find_spec("openfermion") is not None
@@ -30,6 +31,7 @@ if OPENFERMION_AVAILABLE:
     from qdk_chemistry.data import (
         CanonicalFourCenterHamiltonianContainer,
         Hamiltonian,
+        HamiltonianType,
         MajoranaMapping,
         Orbitals,
         QubitOperator,
@@ -495,3 +497,35 @@ def test_scbk_cross_backend():
     eigs_qdk = sorted(np.linalg.eigvalsh(mat_qdk))
     eigs_of = sorted(np.linalg.eigvalsh(mat_of))
     np.testing.assert_allclose(eigs_qdk, eigs_of, atol=1e-10)
+
+
+# -------------------------------------------------------------------------------------
+# Fourfold (non-eightfold) integrals
+# -------------------------------------------------------------------------------------
+
+
+def test_openfermion_fourfold_jordan_wigner_full_matrix(fourfold_hamiltonian):
+    """Jordan-Wigner reproduces the independent reference matrix."""
+    hamiltonian, reference = fourfold_hamiltonian
+    mapping = MajoranaMapping.jordan_wigner(_num_spin_orbitals(hamiltonian))
+    operator = create("qubit_mapper", "openfermion").run(hamiltonian, mapping)
+
+    assert operator.num_qubits == mapping.num_modes
+    np.testing.assert_allclose(operator.to_matrix(), reference, atol=1e-11, rtol=0)
+
+
+def test_openfermion_non_hermitian_mixed_block_maps_literally():
+    """A non-Hermitian alpha-beta block maps to its literal operator."""
+    hamiltonian, reference = create_non_hermitian_mixed_block_hamiltonian()
+    operator = create("qubit_mapper", "openfermion").run(hamiltonian, MajoranaMapping.jordan_wigner(6))
+    np.testing.assert_allclose(operator.to_matrix(), reference, atol=1e-11, rtol=0)
+
+
+def test_openfermion_maps_hermitian_part_like_native():
+    """A Hermitian Hamiltonian maps to the Hermitian part of its integrals, as natively."""
+    hamiltonian, reference = create_non_hermitian_mixed_block_hamiltonian(HamiltonianType.Hermitian)
+    mapping = MajoranaMapping.jordan_wigner(6)
+    openfermion = create("qubit_mapper", "openfermion").run(hamiltonian, mapping).to_matrix()
+    np.testing.assert_allclose(openfermion, (reference + reference.conj().T) / 2, atol=1e-11, rtol=0)
+    native = create("qubit_mapper", "qdk").run(hamiltonian, mapping)
+    np.testing.assert_allclose(openfermion, native.to_matrix(), atol=1e-11, rtol=0)

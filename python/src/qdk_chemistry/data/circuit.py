@@ -133,6 +133,7 @@ class Circuit(DataClass):
         Logger.trace_entering()
         self.qasm = qasm
         self.qir = qir
+        self._qir_requires_opt_in = qir is not None
         self.qsharp = qsharp
         self._qsharp_factory = qsharp_factory
         self._qsharp_op = qsharp_op
@@ -157,6 +158,11 @@ class Circuit(DataClass):
 
         # Make instance immutable after construction (handled by base class)
         super().__init__()
+
+    @property
+    def has_external_qir(self) -> bool:
+        """Whether QIR was supplied directly rather than compiled by this circuit."""
+        return self._qir_requires_opt_in
 
     def _has_qir(self) -> bool:
         """Check if the Circuit has a QIR representation.
@@ -225,12 +231,18 @@ class Circuit(DataClass):
 
         raise RuntimeError("The QIR representation of the quantum circuit is not set.")
 
-    def get_qsharp_circuit(self, prune_classical_qubits: bool = False) -> QdkCircuitType:
+    def get_qsharp_circuit(
+        self,
+        prune_classical_qubits: bool = False,
+        generation_method: qsharp.CircuitGenerationMethod | None = None,
+    ) -> QdkCircuitType:
         """Parse a Circuit object into a Q# circuit object.
 
         Args:
-            prune_classical_qubits: If True, classical qubits are removed from the circuit. Only applicable
-                when converting from Q# factory data.
+            prune_classical_qubits: If True, classical qubits are removed from the circuit.
+                Only applicable when converting from Q# factory data.
+            generation_method: How the circuit is generated (e.g. ``Static`` to trace without simulating).
+                Only applicable when converting from Q# factory data.
 
         Returns:
             QdkCircuitType: A Q# Circuit object.
@@ -254,6 +266,7 @@ class Circuit(DataClass):
                 self._qsharp_factory.program,
                 *self._qsharp_factory.parameter.values(),
                 prune_classical_qubits=prune_classical_qubits,
+                generation_method=generation_method,
             )
         if self.qasm:
             return openqasm_circuit(self.qasm)

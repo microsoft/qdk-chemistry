@@ -1,12 +1,35 @@
+# --- Step 1: Resolve MACIS_UARCH ---
+# Check environment variable first, then CMake variable
+if(NOT DEFINED MACIS_UARCH AND DEFINED ENV{MACIS_UARCH})
+  set(MACIS_UARCH $ENV{MACIS_UARCH})
+endif()
+
 if(DEFINED MACIS_UARCH)
   message(STATUS "Using user-defined uarch: ${MACIS_UARCH}")
 else()
-  message(WARNING "MACIS_UARCH not defined. This may degrade performance")
-  set(MACIS_UARCH_USED "NONE" CACHE STRING "User-defined microarchitecture for optimization")
-  return()
+  # CMake regexes are case sensitive, and the spelling of the processor name is
+  # platform specific: Windows reports AMD64 and ARM64, Linux x86_64 and
+  # aarch64. Normalise before matching so every spelling is recognised.
+  string(TOLOWER "${CMAKE_SYSTEM_PROCESSOR}" _macis_system_processor)
+
+  # Auto-detect based on the target platform
+  if(CMAKE_CXX_COMPILER_ID STREQUAL "MSVC")
+    # Native MSVC cl has no generic baseline /arch: flag; leave MACIS_UARCH unset.
+    message(STATUS "Native MSVC: use compiler default ISA.")
+    return()
+  elseif(_macis_system_processor MATCHES "x86_64|amd64")
+    set(MACIS_UARCH "x86-64" CACHE STRING "Target microarchitecture")
+    message(STATUS "Auto-detected x86_64 architecture, using: ${MACIS_UARCH}")
+  elseif(_macis_system_processor MATCHES "aarch64|arm64")
+    set(MACIS_UARCH "armv8-a" CACHE STRING "Target microarchitecture")
+    message(STATUS "Auto-detected ARM64 architecture, using: ${MACIS_UARCH}")
+  else()
+    message(WARNING "Unknown architecture ${CMAKE_SYSTEM_PROCESSOR}. MACIS_UARCH not set. This may degrade performance")
+    return()
+  endif()
 endif()
 
-# Set MACIS_UARCH_FLAGS based on compiler and uarch
+# --- Step 2: Set MACIS_UARCH_FLAGS based on compiler and uarch ---
 set(MACIS_UARCH_USED ${MACIS_UARCH} CACHE STRING "Target microarchitecture for optimization")
 if(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang|AppleClang")
   set(MACIS_UARCH_FLAGS "-march=${MACIS_UARCH}" CACHE STRING "Compiler flags for target microarchitecture")
@@ -18,7 +41,7 @@ else()
   set(MACIS_UARCH_USED "NONE" CACHE STRING "Target microarchitecture for optimization")
 endif()
 
-# Validate the flags
+# --- Step 3: Validate the flags ---
 if(MACIS_UARCH_FLAGS)
   message(STATUS "Testing MACIS_UARCH_FLAGS: ${MACIS_UARCH_FLAGS}")
   include(CheckCXXCompilerFlag)

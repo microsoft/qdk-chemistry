@@ -20,6 +20,7 @@ add_executable( macis_test
   fock_matrices.cxx
   mcscf.cxx
   asci.cxx
+  asci_execution.cxx
   dist_quickselect.cxx
 )
 target_link_libraries( macis_test PUBLIC macis Catch2::Catch2 )

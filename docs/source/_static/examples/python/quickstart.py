@@ -5,6 +5,8 @@
 # Licensed under the MIT License. See LICENSE.txt in the project root for license information.
 # --------------------------------------------------------------------------------------------
 
+# docs-example: slow
+
 ################################################################################
 # docs:xyz ../data/para_benzyne.structure.xyz
 # start-cell-structure

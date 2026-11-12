@@ -20,13 +20,25 @@
 namespace qdk::chemistry::data {
 
 /**
+ * @enum TwoBodyPermutationGroup
+ * @brief Index permutations that a two-body symmetry representative stands
+ * for, in chemist notation (pq|rs).
+ */
+enum class TwoBodyPermutationGroup {
+  FourFold,   ///< (pq|rs) = (rs|pq) = (qp|sr) = (sr|qp)
+  EightFold,  ///< additionally (pq|rs) = (qp|rs) = (pq|sr)
+};
+
+/**
  * @class SparseHamiltonianContainer
  * @brief Hamiltonian container for lattice model Hamiltonians (Hückel,
  * Hubbard, PPP, etc.) with sparse internal storage.
  *
  * Stores one-body integrals as a sparse matrix and two-body integrals as a
- * sparse map of (p,q,r,s) indices. Provides lazy materialization of dense
- * two-body integrals for the base class interface.
+ * sparse map of (p,q,r,s) indices. Two-body entries are literal: positions
+ * that are not stored are zero. Use @ref expand_symmetry_representatives to
+ * build such a map from symmetry representatives. Provides lazy
+ * materialization of dense two-body integrals for the base class interface.
  *
  * Uses ModelOrbitals internally so that the full HamiltonianContainer base
  * class interface works.
@@ -46,6 +58,10 @@ class SparseHamiltonianContainer : public HamiltonianContainer {
 
   /**
    * @brief Construct from sparse one-body integrals and sparse two-body map.
+   *
+   * Deprecated: for a Hermitian Hamiltonian, a nonzero entry that is the only
+   * stored member of a larger 8-fold permutation class is expanded over that
+   * class (see @ref uses_eightfold_shorthand); others are read literally.
    *
    * @param one_body_integrals Sparse one-body integral matrix [n x n]
    * @param two_body_integrals Sparse two-body integral map
@@ -75,6 +91,8 @@ class SparseHamiltonianContainer : public HamiltonianContainer {
    * @param two_body_integrals Dense two-body integrals [n^4]
    * @param core_energy Scalar energy offset (default 0.0)
    * @param type Hamiltonian type (default Hermitian)
+   * @throws std::invalid_argument if one_body_integrals is not square or
+   *         two_body_integrals does not have n^4 elements
    */
   SparseHamiltonianContainer(const Eigen::MatrixXd& one_body_integrals,
                              const Eigen::VectorXd& two_body_integrals,
@@ -104,6 +122,8 @@ class SparseHamiltonianContainer : public HamiltonianContainer {
    *        @c nullptr to indicate no two-body integrals).
    * @param core_energy Scalar energy offset.
    * @param type Hamiltonian type.
+   * @throws std::invalid_argument if one_body_integrals is not square or a
+   *         two-body extent differs from its orbital count
    */
   SparseHamiltonianContainer(
       Eigen::SparseMatrix<double> one_body_integrals,
@@ -189,6 +209,11 @@ class SparseHamiltonianContainer : public HamiltonianContainer {
    * @brief Deserialize Hamiltonian data from HDF5 group
    * @param group HDF5 group to read data from
    * @return Unique pointer to Hamiltonian loaded from group
+   * @throws std::invalid_argument if the stored orbital count, the shape or
+   *         element type of an integral dataset, or an index is invalid, or a
+   *         metadata attribute is not scalar
+   * @throws std::runtime_error if required data is missing or cannot be read,
+   *         or the serialization version is unsupported
    */
   static std::unique_ptr<SparseHamiltonianContainer> from_hdf5(
       H5::Group& group);
@@ -197,6 +222,10 @@ class SparseHamiltonianContainer : public HamiltonianContainer {
    * @brief Load Hamiltonian from JSON
    * @param j JSON object containing Hamiltonian data
    * @return Unique pointer to Hamiltonian loaded from JSON
+   * @throws std::invalid_argument if the stored orbital count, the one-body
+   *         triplets, an index, or a two-body extent is invalid
+   * @throws std::runtime_error if required data is missing or has the wrong
+   *         JSON type, or the serialization version is unsupported
    */
   static std::unique_ptr<SparseHamiltonianContainer> from_json(
       const nlohmann::json& j);
@@ -207,11 +236,43 @@ class SparseHamiltonianContainer : public HamiltonianContainer {
    * @param filename Path to FCIDUMP file to create/overwrite
    * @param nalpha Number of alpha electrons
    * @param nbeta Number of beta electrons
-   * @throws std::runtime_error if the Hamiltonian is unrestricted or the file
-   *         cannot be opened
+   * @throws std::runtime_error if the Hamiltonian is unrestricted, its
+   *         two-body integrals are not 8-fold symmetric, or the file cannot
+   *         be opened.
+   * @throws std::invalid_argument if a two-body integral is not finite.
    */
   void to_fcidump_file(const std::string& filename, size_t nalpha,
                        size_t nbeta) const override;
+
+  /**
+   * @brief Expand symmetry representatives into literal two-body entries.
+   *
+   * Assigns each representative's value to every distinct position of its
+   * orbit under @p group. The result can be passed to the constructor.
+   *
+   * @param representatives Representative entries; values are final, not
+   *        additive contributions.
+   * @param group Permutation group the representatives stand for.
+   * @return Literal two-body map.
+   * @throws std::invalid_argument if an index is negative, a value is not
+   *         finite, or two representatives assign different values to one
+   *         position.
+   */
+  static TwoBodyMap expand_symmetry_representatives(
+      const TwoBodyMap& representatives, TwoBodyPermutationGroup group);
+
+  /**
+   * @brief Whether a two-body map uses the deprecated 8-fold shorthand.
+   *
+   * In that shorthand, a nonzero entry that is the only stored member of a
+   * larger 8-fold permutation class stands for the whole class. The
+   * TwoBodyMap constructor expands such entries for Hermitian
+   * Hamiltonians.
+   *
+   * @param two_body_integrals Sparse two-body map.
+   * @return True if any entry relies on the shorthand.
+   */
+  static bool uses_eightfold_shorthand(const TwoBodyMap& two_body_integrals);
 
   /**
    * @brief Direct access to the sparse one-body integral matrix.
@@ -243,7 +304,7 @@ class SparseHamiltonianContainer : public HamiltonianContainer {
  private:
   void hash_update(qdk::chemistry::utils::HashContext& ctx) const override;
   /// Serialization version
-  static constexpr const char* SERIALIZATION_VERSION = "0.2.0";
+  static constexpr const char* SERIALIZATION_VERSION = "0.3.0";
 
   /// Sparse storage of one-body integrals
   Eigen::SparseMatrix<double> _one_body_sparse;

@@ -2,46 +2,47 @@
 // Licensed under the MIT License. See LICENSE.txt in the project root for
 // license information.
 
+/// Test-only drivers for `QDKChemistry.Utils.UnaryIteration`.
+///
+/// The Python test layer evaluates this file into a throwaway context (see the
+/// `qsharp_test_context` fixture in `tests/conftest.py`); it is never part of the
+/// shipped `qdk_chemistry.utils.qsharp` project.
 namespace QDKChemistry.TestUtils.UnaryIterationTests {
 
-    import Std.Arrays.Mapped;
     import Std.Canon.ApplyToEach;
     import Std.Canon.ApplyXorInPlace;
-    import Std.Convert.ResultAsBool;
     import Std.Diagnostics.Fact;
-    import Std.Measurement.MResetEachZ;
-    import QDKChemistry.Utils.UnaryIteration.UnaryIteration;
-    import QDKChemistry.Utils.UnaryIteration.UnaryIterationWithControl;
     import QDKChemistry.Utils.UnaryIteration.AddressQubits;
+    import QDKChemistry.Utils.UnaryIteration.UnaryIteration;
     import QDKChemistry.Utils.UnaryIteration.UnaryIterationActionIndex;
+    import QDKChemistry.Utils.UnaryIteration.UnaryIterationWithControl;
 
-    /// Checks the classical action-index mirror against the circuit on every address state.
-    operation TestUnaryIterationActionIndex(numActions : Int) : Bool {
-        let numAddressQubits = AddressQubits(numActions);
-        let numAddressStates = 1 <<< numAddressQubits;
-        use address = Qubit[numAddressQubits];
-        use flags = Qubit[numActions];
-        mutable allCorrect = true;
+    /// The action the classical routing assigns to `addressValue`, unused states included.
+    function TestUnaryIterationActionIndex(numActions : Int, addressValue : Int) : Int {
+        UnaryIterationActionIndex(numActions, addressValue)
+    }
 
-        for addressValue in 0..numAddressStates - 1 {
+    /// Flips `flags[index]` for every action that `UnaryIteration` fires on `address`.
+    function TestMakeFlagActionsOp(numActions : Int) : (Qubit[], Qubit[]) => Unit {
+        (address, flags) => UnaryIteration(address, numActions, index => X(flags[index]))
+    }
+
+    /// Flips `flags[index]` for the single selected address.
+    function TestMakeOneHotOp(numActions : Int, addressValue : Int) : (Qubit[] => Unit) {
+        return qs => {
+            let numAddressQubits = AddressQubits(numActions);
+            let address = qs[0..numAddressQubits - 1];
+            let flags = qs[numAddressQubits...];
             ApplyXorInPlace(addressValue, address);
-            UnaryIteration(address, numActions, index => X(flags[index]));
+            UnaryIteration(address, numActions, (index) => {
+                X(flags[index]);
+            });
             ApplyXorInPlace(addressValue, address);
-
-            let actual = Mapped(ResultAsBool, MResetEachZ(flags));
-            let expectedIndex = UnaryIterationActionIndex(numActions, addressValue);
-            for index in 0..numActions - 1 {
-                if actual[index] != (index == expectedIndex) {
-                    set allCorrect = false;
-                }
-            }
-        }
-
-        allCorrect
+        };
     }
 
     /// Runs the one-hot iteration on a uniform superposition of every address.
-    function MakeTestUnaryIterationSuperposedAddressOp(numActions : Int) : (Qubit[] => Unit) {
+    function TestMakeSuperposedAddressOp(numActions : Int) : (Qubit[] => Unit) {
         return qs => {
             let numAddressQubits = AddressQubits(numActions);
             Fact(2^numAddressQubits == numActions, "numActions must be a power of two");
@@ -55,7 +56,7 @@ namespace QDKChemistry.TestUtils.UnaryIterationTests {
     }
 
     /// Applies `Z` to the exposed unary control for every index flagged in `data`.
-    function MakeTestUnaryIterationControlPhasesOp(numActions : Int, data : Bool[]) : (Qubit[] => Unit) {
+    function TestMakeControlPhasesOp(numActions : Int, data : Bool[]) : (Qubit[] => Unit) {
         return address => {
             ApplyToEach(H, address);
             UnaryIterationWithControl(address, numActions, (index, control) => {

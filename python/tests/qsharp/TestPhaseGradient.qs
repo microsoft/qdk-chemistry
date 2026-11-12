@@ -3,14 +3,12 @@
 // license information.
 
 namespace QDKChemistry.TestUtils.PhaseGradientTests {
-
     import Std.Canon.ApplyXorInPlace;
     import QDKChemistry.Utils.PhaseGradient.PreparePhaseGradientState;
-    import QDKChemistry.Utils.PhaseGradient.RzViaPhaseGradient;
     import QDKChemistry.Utils.PhaseGradient.RyViaPhaseGradient;
+    import QDKChemistry.Utils.PhaseGradient.RzViaPhaseGradient;
 
-    /// Test wrapper: Ry via phase gradient on `[target | angle | gradient]`.
-    function MakeTestRyOp(angleValue : Int, nBits : Int) : Qubit[] => Unit {
+    function TestMakeRyOp(angleValue : Int, nBits : Int) : Qubit[] => Unit {
         (qs) => {
             let angle = qs[1..nBits];
             let pg = qs[nBits + 1..2 * nBits];
@@ -23,8 +21,7 @@ namespace QDKChemistry.TestUtils.PhaseGradientTests {
         }
     }
 
-    /// Test wrapper: Rz via phase gradient on `[target | angle | gradient]`.
-    function MakeTestRzOnPlusOp(angleValue : Int, nBits : Int) : Qubit[] => Unit {
+    function TestMakeRzOnPlusOp(angleValue : Int, nBits : Int) : Qubit[] => Unit {
         (qs) => {
             let angle = qs[1..nBits];
             let pg = qs[nBits + 1..2 * nBits];
@@ -38,8 +35,7 @@ namespace QDKChemistry.TestUtils.PhaseGradientTests {
         }
     }
 
-    /// Test wrapper: Ry round-trip on `[target | angle | gradient]`.
-    function MakeTestRyRoundtripOp(angleValue : Int, nBits : Int) : Qubit[] => Unit {
+    function TestMakeRyRoundtripOp(angleValue : Int, nBits : Int) : Qubit[] => Unit {
         (qs) => {
             let angle = qs[1..nBits];
             let pg = qs[nBits + 1..2 * nBits];

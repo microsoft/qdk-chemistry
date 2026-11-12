@@ -23,7 +23,7 @@
 namespace qdk::chemistry::algorithms::microsoft {
 
 /**
- * @brief Helper struct for CASCI calculation dispatch
+ * @brief Helper struct for ASCI calculation dispatch
  */
 struct asci_helper {
   /// Maximum total electron count for which the residue arrays algorithm is
@@ -33,7 +33,7 @@ struct asci_helper {
   using return_type = std::pair<double, data::Wavefunction>;
 
   /**
-   * @brief Template implementation of CASCI calculation
+   * @brief Template implementation of ASCI calculation
    * @tparam N Number of bits for wavefunction representation
    * @param hamiltonian Hamiltonian object containing molecular integrals
    * @param settings_ Settings object storing asci specific settings
@@ -68,7 +68,9 @@ struct asci_helper {
     const size_t num_molecular_orbitals = active_indices.size();
 
     const auto& [T_a, T_b] = hamiltonian.get_one_body_integrals();
-    const auto& [V_aaaa, V_aabb, V_bbbb] = hamiltonian.get_two_body_integrals();
+    Eigen::VectorXd V_storage;
+    const auto& V_aaaa =
+        macis_two_body_integrals(hamiltonian, "MacisAsci", V_storage);
 
     // get settings
     macis::MCSCFSettings mcscf_settings = get_mcscf_settings_(settings_);

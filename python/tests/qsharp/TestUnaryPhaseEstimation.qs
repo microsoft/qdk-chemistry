@@ -2,6 +2,13 @@
 // Licensed under the MIT License. See LICENSE.txt in the project root for
 // license information.
 
+/// Test-only drivers for `QDKChemistry.Utils.UnaryPhaseEstimation`.
+///
+/// The Python test layer evaluates this file into a throwaway context (see the
+/// `qsharp_test_context` fixture in `tests/conftest.py`); it is never part of the
+/// shipped `qdk_chemistry.utils.qsharp` project. Evaluating it onto that project —
+/// rather than compiling it as a dependent Q# package — is what keeps the
+/// `internal` `ApplySignedPowerSchedule` reachable from here.
 namespace QDKChemistry.TestUtils.UnaryPhaseEstimationTests {
 
     import Std.Canon.ApplyToEach;
@@ -12,14 +19,14 @@ namespace QDKChemistry.TestUtils.UnaryPhaseEstimationTests {
     import Std.ResourceEstimation.LeastRecentlyUsed;
     import QDKChemistry.Utils.UnaryIteration.AddressQubits;
     import QDKChemistry.Utils.UnaryIteration.UnaryIterationWithControl;
-    import QDKChemistry.Utils.UnaryPhaseEstimation.PhaseRegisterSize;
-    import QDKChemistry.Utils.UnaryPhaseEstimation.ApplySignedPowerSlot;
-    import QDKChemistry.Utils.UnaryPhaseEstimation.ApplySignedPowerScheduleDirect;
     import QDKChemistry.Utils.UnaryPhaseEstimation.ApplySignedPowerSchedule;
+    import QDKChemistry.Utils.UnaryPhaseEstimation.ApplySignedPowerScheduleDirect;
+    import QDKChemistry.Utils.UnaryPhaseEstimation.ApplySignedPowerSlot;
     import QDKChemistry.Utils.UnaryPhaseEstimation.MakeUnaryQPECircuit;
+    import QDKChemistry.Utils.UnaryPhaseEstimation.PhaseRegisterSize;
 
     /// Checks the generic schedule against the explicit walk power.
-    function MakeTestSignedPowerScheduleAgainstWalkOp(
+    function TestMakeSignedPowerScheduleAgainstWalkOp(
         applyBlockEncoding : (Qubit[] => Unit is Adj),
         applyReflection : (Qubit[] => Unit is Adj + Ctl),
         numQueries : Int,
@@ -53,11 +60,7 @@ namespace QDKChemistry.TestUtils.UnaryPhaseEstimationTests {
         };
     }
 
-    /// Compares the estimator-specialized schedule with its literal implementation.
-    operation TestSignedPowerScheduleResources(
-        numQueries : Int,
-        useOptimizedSchedule : Bool
-    ) : Unit {
+    operation TestSignedPowerScheduleResources(numQueries : Int, useOptimizedSchedule : Bool) : Unit {
         let numAddressQubits = AddressQubits(numQueries + 1);
         use qs = Qubit[numAddressQubits + 1];
         let address = qs[0..numAddressQubits - 1];
@@ -106,7 +109,7 @@ namespace QDKChemistry.TestUtils.UnaryPhaseEstimationTests {
     }
 
     /// Runs `MakeUnaryQPECircuit` on a synthetic one-qubit walk with an exact eigenphase.
-    operation TestUnaryQpeSyntheticWalk(numQueries : Int, theta : Double, systemAngle : Double) : Result[] {
+    operation TestRunSyntheticWalkQpe(numQueries : Int, theta : Double, systemAngle : Double) : Result[] {
         Fact(
             2^PhaseRegisterSize(numQueries) == numQueries + 1,
             "numQueries must be one less than a power of two",

@@ -5,6 +5,7 @@
 #include "utils.hpp"
 
 #include <qdk/chemistry/scf/config.h>
+
 #ifdef QDK_CHEMISTRY_ENABLE_MPI
 #include <mpi.h>
 #endif
@@ -313,6 +314,7 @@ std::shared_ptr<qcs::BasisSet> convert_basis_set_from_qdk(
   if (internal_basis_set->mode == qcs::BasisMode::RAW && normalize) {
     _norm_psi4_mode(internal_basis_set->shells);
     internal_basis_set->mode = qcs::BasisMode::PSI4;
+    internal_basis_set->refresh_shell_pairs();
   }
 
   return internal_basis_set;
@@ -509,6 +511,48 @@ size_t binomial_coefficient(size_t n, size_t k) {
     result = (result * (n - (k - i))) / i;
   }
   return result;
+}
+
+namespace {
+
+// Settings validation and parsing share this vocabulary.
+struct RelativityLabel {
+  const char* label;
+  qcs::Relativity relativity;
+};
+
+constexpr RelativityLabel kRelativityLabels[] = {
+    {"", qcs::Relativity::None},
+    {"sf-x2c", qcs::Relativity::SFX2C},
+    {"sf-x2c-contracted", qcs::Relativity::SFX2CContracted},
+};
+
+}  // namespace
+
+const std::vector<std::string>& relativity_labels() {
+  static const std::vector<std::string> labels = [] {
+    std::vector<std::string> result;
+    for (const auto& entry : kRelativityLabels) {
+      result.emplace_back(entry.label);
+    }
+    return result;
+  }();
+  return labels;
+}
+
+qcs::Relativity parse_relativity(const std::string& label) {
+  for (const auto& entry : kRelativityLabels) {
+    if (label == entry.label) {
+      return entry.relativity;
+    }
+  }
+  std::string supported;
+  for (const auto& entry : kRelativityLabels) {
+    supported +=
+        (supported.empty() ? "'" : ", '") + std::string(entry.label) + "'";
+  }
+  throw std::invalid_argument("Unsupported relativistic treatment '" + label +
+                              "'. Supported: " + supported);
 }
 
 }  // namespace qdk::chemistry::utils::microsoft

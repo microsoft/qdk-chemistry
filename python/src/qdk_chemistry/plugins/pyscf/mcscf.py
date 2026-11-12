@@ -63,7 +63,7 @@ from qdk_chemistry.data import (
 )
 from qdk_chemistry.data._spin_channels import spin_channel_indices
 from qdk_chemistry.data.symmetry import axes, spin_index_set
-from qdk_chemistry.plugins.pyscf.conversion import SCFType, orbitals_to_scf
+from qdk_chemistry.plugins.pyscf.conversion import SCFType, _apply_relativity, orbitals_to_scf
 from qdk_chemistry.utils import Logger
 
 __all__ = ["PyscfMcscfCalculator", "PyscfMcscfSettings"]
@@ -275,6 +275,13 @@ class PyscfMcscfSettings(Settings):
         Logger.trace_entering()
         super().__init__()
         self._set_default("max_cycle_macro", "int", 50)
+        self._set_default(
+            "relativity",
+            "string",
+            "",
+            "One-body operator used when reconstructing the mean field from orbitals.",
+            ["", "sf-x2c", "sf-x2c-contracted"],
+        )
         self._set_default("verbose", "int", 0)
         self._set_default(
             "multi_configuration_calculator",
@@ -367,6 +374,7 @@ class PyscfMcscfCalculator(MultiConfigurationScf):
 
         # get pyscf scf object
         pyscf_scf = orbitals_to_scf(orbitals, occ_alpha=alpha_occ, occ_beta=beta_occ, scf_type=SCFType.RESTRICTED)
+        pyscf_scf = _apply_relativity(pyscf_scf, self._settings.get("relativity"))
 
         # Create CASSCF object
         pyscf_mcscf = mcscf.CASSCF(pyscf_scf, n_active_orbitals, n_active_electrons)

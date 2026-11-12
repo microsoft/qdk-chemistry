@@ -11,7 +11,7 @@
 #include <qdk/chemistry/data/hamiltonian.hpp>
 #include <qdk/chemistry/data/hamiltonian_containers/canonical_four_center.hpp>
 #include <qdk/chemistry/data/hamiltonian_containers/cholesky.hpp>
-#include <qdk/chemistry/data/hamiltonian_containers/factorized.hpp>
+#include <qdk/chemistry/data/hamiltonian_containers/dfthc.hpp>
 #include <qdk/chemistry/data/hamiltonian_containers/sparse.hpp>
 #include <qdk/chemistry/data/orbitals.hpp>
 #include <qdk/chemistry/data/symmetry/spin_channel_indices.hpp>
@@ -23,6 +23,7 @@
 #include "hdf5_error_handling.hpp"
 #include "hdf5_serialization.hpp"
 #include "json_serialization.hpp"
+#include "two_body_symmetry.hpp"
 
 namespace qdk::chemistry::data {
 
@@ -318,11 +319,6 @@ void HamiltonianContainer::to_fcidump_file(const std::string& filename,
         "FCIDUMP format is not supported for unrestricted Hamiltonians.");
   }
 
-  std::ofstream file(filename);
-  if (!file.is_open()) {
-    throw std::runtime_error("Cannot open file for writing: " + filename);
-  }
-
   size_t num_molecular_orbitals;
   if (has_orbitals()) {
     if (_orbitals->has_active_space()) {
@@ -352,6 +348,23 @@ void HamiltonianContainer::to_fcidump_file(const std::string& filename,
       num_molecular_orbitals2 * num_molecular_orbitals;
   const double print_thresh = std::numeric_limits<double>::epsilon();
 
+  // Ordinary FCIDUMP readers reconstruct the eight permutations of every
+  // two-electron record, so each record holds the average over its class.
+  auto [eri_aaaa, eri_aabb, eri_bbbb] = get_two_body_integrals();
+  detail::require_finite_two_body(
+      eri_aaaa.data(), num_molecular_orbitals3 * num_molecular_orbitals,
+      "FCIDUMP export");
+  if (const auto comparison =
+          detail::eightfold_comparison(eri_aaaa.data(), num_molecular_orbitals);
+      !comparison.approx()) {
+    throw detail::not_eightfold_error("FCIDUMP export", comparison);
+  }
+
+  std::ofstream file(filename);
+  if (!file.is_open()) {
+    throw std::runtime_error("Cannot open file for writing: " + filename);
+  }
+
   // C1 symmetry
   std::string orb_string;
   for (size_t i = 0; i < num_molecular_orbitals - 1; ++i) {
@@ -380,13 +393,13 @@ void HamiltonianContainer::to_fcidump_file(const std::string& filename,
     file << std::setw(4) << l;
   };
 
-  // Get the two-electron integrals via the virtual accessor
-  auto [eri_aaaa, eri_aabb, eri_bbbb] = get_two_body_integrals();
-
+  auto eri_at = [&](const detail::TwoBodyKey& key) {
+    return eri_aaaa(key[0] * num_molecular_orbitals3 +
+                    key[1] * num_molecular_orbitals2 +
+                    key[2] * num_molecular_orbitals + key[3]);
+  };
   auto write_eri = [&](size_t i, size_t j, size_t k, size_t l) {
-    auto eri =
-        eri_aaaa(i * num_molecular_orbitals3 + j * num_molecular_orbitals2 +
-                 k * num_molecular_orbitals + l);
+    const double eri = detail::eightfold_average({i, j, k, l}, eri_at);
 
     formatted_line(i + 1, j + 1, k + 1, l + 1, eri);
     file << "\n";
@@ -521,8 +534,8 @@ std::unique_ptr<HamiltonianContainer> HamiltonianContainer::from_json(
   if (container_type == "sparse") {
     return SparseHamiltonianContainer::from_json(j);
   }
-  if (container_type == "factorized") {
-    return FactorizedHamiltonianContainer::from_json(j);
+  if (container_type == "dfthc") {
+    return DFTHCHamiltonianContainer::from_json(j);
   }
   throw std::runtime_error("Unknown container type: " + container_type);
 }
@@ -552,8 +565,8 @@ std::unique_ptr<HamiltonianContainer> HamiltonianContainer::from_hdf5(
     if (container_type == "sparse") {
       return SparseHamiltonianContainer::from_hdf5(group);
     }
-    if (container_type == "factorized") {
-      return FactorizedHamiltonianContainer::from_hdf5(group);
+    if (container_type == "dfthc") {
+      return DFTHCHamiltonianContainer::from_hdf5(group);
     }
     throw std::runtime_error("Unknown container type: " + container_type);
 

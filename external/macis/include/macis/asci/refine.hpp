@@ -17,9 +17,8 @@ namespace macis {
  * @brief Perform ASCI (Adaptive Sampling Configuration Interaction)
  * wavefunction refinement phase
  *
- * This function implements the refinement phase of the ASCI algorithm, where
- * the size of the wave function is kept fixed while iteratively improving
- * the configurations and CI coefficients and energy until convergence.
+ * Reselects the determinant space and rediagonalizes until energy convergence.
+ * Union stabilization can enlarge the space and extend the iteration budget.
  *
  * @tparam N Size of the wavefunction bitset representation
  * @tparam index_t Integer type for indexing operations (default: int32_t)
@@ -33,10 +32,12 @@ namespace macis {
  * @param[in] ham_gen Hamiltonian generator containing integrals and methods
  * @param[in] norb Number of molecular orbitals
  * @param[in] comm MPI communicator for parallel execution (MPI builds only)
+ * @param[in,out] execution Optional borrowed numerical executor; null selects
+ * CPU
  *
  * @return Tuple containing:
  *   - Final refined energy
- *   - Unchanged wavefunction determinants
+ *   - Refined determinants (union stabilization can enlarge the space)
  *   - Refined CI coefficients
  *
  * @see asci_iter, asci_grow
@@ -45,7 +46,8 @@ template <size_t N, typename index_t = int32_t>
 auto asci_refine(ASCISettings asci_settings, MCSCFSettings mcscf_settings,
                  double E0, std::vector<wfn_t<N>> wfn, std::vector<double> X,
                  HamiltonianGenerator<wfn_t<N>>& ham_gen,
-                 size_t norb MACIS_MPI_CODE(, MPI_Comm comm)) {
+                 size_t norb MACIS_MPI_CODE(, MPI_Comm comm),
+                 ASCIExecutionContext<N>* execution = nullptr) {
   auto logger = spdlog::get("asci_refine");
 #ifdef MACIS_ENABLE_MPI
   auto world_rank = comm_rank(comm);
@@ -87,7 +89,7 @@ auto asci_refine(ASCISettings asci_settings, MCSCFSettings mcscf_settings,
     double E;
     std::tie(E, wfn, X) = asci_iter<N, index_t>(
         asci_settings, mcscf_settings, ndets, E0, std::move(wfn), std::move(X),
-        ham_gen, norb, &h_cache MACIS_MPI_CODE(, comm));
+        ham_gen, norb, &h_cache MACIS_MPI_CODE(, comm), execution);
 
     // Check if wavefunction size changed
     if (wfn.size() != ndets) {
@@ -160,11 +162,19 @@ auto asci_refine(ASCISettings asci_settings, MCSCFSettings mcscf_settings,
             "in MPI builds. Union-stabilization cannot "
             "proceed with h_cache under MPI.");
 #endif
-        double E_union = selected_ci_diag<index_t>(
-            union_wfn.begin(), union_wfn.end(), ham_gen,
-            mcscf_settings.ci_matel_tol, mcscf_settings.ci_max_subspace,
-            mcscf_settings.ci_res_tol, X_union, &h_cache,
-            asci_settings.min_patch_overlap MACIS_MPI_CODE(, comm));
+        double E_union;
+        if (execution) {
+          ASCIExecutionGuard<N> execution_guard(execution);
+          execution->start_diagonalization(union_wfn.begin(), union_wfn.end(),
+                                           ham_gen, mcscf_settings);
+          E_union = execution->finish_diagonalization(X_union);
+        } else {
+          E_union = selected_ci_diag<index_t>(
+              union_wfn.begin(), union_wfn.end(), ham_gen,
+              mcscf_settings.ci_matel_tol, mcscf_settings.ci_max_subspace,
+              mcscf_settings.ci_res_tol, X_union, &h_cache,
+              asci_settings.min_patch_overlap MACIS_MPI_CODE(, comm));
+        }
 
         // In MPI builds, X_union is the local portion — gather it.
 #ifdef MACIS_ENABLE_MPI

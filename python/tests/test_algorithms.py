@@ -45,7 +45,7 @@ from qdk_chemistry.data.symmetry import (
     spin_index_set,
 )
 
-from .test_helpers import create_test_basis_set, create_test_hamiltonian, create_test_orbitals, create_test_wavefunction
+from .helpers import create_test_basis_set, create_test_hamiltonian, create_test_orbitals, create_test_wavefunction
 
 
 class MockLocalizationPy(OrbitalLocalizer):

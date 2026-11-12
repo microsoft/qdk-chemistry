@@ -41,7 +41,7 @@ from qdk_chemistry.algorithms.state_preparation.sparse_isometry import (
 from qdk_chemistry.data import AlgorithmRef, Circuit, Configuration, StateVectorContainer, Wavefunction
 from qdk_chemistry.plugins.qiskit import QDK_CHEMISTRY_HAS_QISKIT
 
-from .test_helpers import create_test_orbitals
+from .helpers import create_test_orbitals
 
 
 @pytest.mark.skipif(not QDK_CHEMISTRY_HAS_QISKIT, reason="Qiskit dependencies not available")

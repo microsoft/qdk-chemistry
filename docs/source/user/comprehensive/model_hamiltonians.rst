@@ -157,6 +157,17 @@ The Hubbard model naturally extends to 2D lattices for studying strongly correla
       :start-after: // start-cell-create-hubbard-2d
       :end-before: // end-cell-create-hubbard-2d
 
+In Python, a :class:`~qdk_chemistry.data.FermiHubbardModelHamiltonianDescription` holds the same model as a :doc:`LatticeGeometry <data/lattice_geometry>` and its parameters, without building the integrals.
+It is a :class:`~qdk_chemistry.data.ModelHamiltonianDescription`, so it can be serialized and handed to algorithms that take a :class:`~qdk_chemistry.data.HamiltonianDescription`.
+Its ``materialize()`` method calls ``create_hubbard_hamiltonian`` on the nearest-neighbor bonds of the lattice:
+
+.. tab:: Python API
+
+   .. literalinclude:: ../../_static/examples/python/model_hamiltonians.py
+      :language: python
+      :start-after: # start-cell-hubbard-description
+      :end-before: # end-cell-hubbard-description
+
 .. _model-ppp:
 
 Pariser-Parr-Pople (PPP) model
@@ -326,6 +337,7 @@ Kitaev-Heisenberg-Gamma model
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
 The flavored :func:`~qdk_chemistry.utils.model_hamiltonians.create_kitaev_hamiltonian` builder assigns an exchange matrix to each selected physical lattice connection.
+Its nearest-neighbor bond Hamiltonian is the generic honeycomb-iridate model of Rau, Lee, and Kee, with the :math:`\Gamma'` term of Rau and Kee. :footcite:p:`Rau2014,RauKee2014`
 For selected shells :math:`m\in\mathcal M`, let :math:`X_m`, :math:`Y_m`, and :math:`Z_m` denote the three flavored bond-axis classes and :math:`N_m=X_m\cup Y_m\cup Z_m`.
 For uniform couplings within each shell and unit connection weights, the extended model is
 
@@ -351,12 +363,14 @@ The off-diagonal :math:`\Gamma_\gamma` and :math:`\Gamma'_\gamma` interactions a
 
 Here :math:`S_i^\mu=\sigma_i^\mu/2` is a spin-1/2 operator.
 The returned :class:`~qdk_chemistry.data.QubitOperator` is expressed in Pauli matrices, so every two-body exchange coefficient is divided by four and every magnetic-field coefficient is divided by two.
+The Heisenberg and Ising builders take Pauli coefficients instead, so ``create_kitaev_hamiltonian(graph, 0, 0, 0, j=J)`` equals :func:`~qdk_chemistry.utils.model_hamiltonians.create_heisenberg_hamiltonian` with ``jx = jy = jz = J / 4``.
 A mapping ``{m: coupling}`` uses already-selected connections in shell :math:`m`, multiplied by their weights; it does not select new graph edges.
 A scalar or array exchange parameter is the same as ``{1: value}``, and Gamma and Gamma-prime parameters always use weighted shell-1 connections.
 The shared ``gamma`` and ``gamma_prime`` arguments provide isotropic defaults; ``gamma_x``, ``gamma_y``, ``gamma_z`` and their primed counterparts override individual flavors.
 
 The builder interprets :class:`~qdk_chemistry.utils.model_hamiltonians.KitaevBondFlavor` values X, Y, and Z as flavor IDs 0, 1, and 2.
 Pass :func:`~qdk_chemistry.utils.model_hamiltonians.kitaev_honeycomb_bond_flavors` to :meth:`~qdk_chemistry.data.LatticeGraph.from_geometry` for the standard honeycomb axes of shells 1, 2, and 3.
+A second-neighbor bond takes the flavor of the nearest-neighbor bond perpendicular to it, and a third-neighbor bond that of the parallel nearest-neighbor bond.
 Other geometries or shells require suitable explicit flavors.
 Each active edge's :class:`~qdk_chemistry.data.EdgeLabel` must have one of the three integer IDs; partially labeled or invalid active edges are rejected rather than silently replaced.
 
@@ -409,6 +423,8 @@ Passing :math:`C=D` expresses both exchange and field terms directly in the crys
       :language: python
       :start-after: # start-cell-create-kitaev
       :end-before: # end-cell-create-kitaev
+
+.. footbibliography::
 
 .. _model-term-partition:
 

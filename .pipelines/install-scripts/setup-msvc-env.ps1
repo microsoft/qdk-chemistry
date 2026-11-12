@@ -136,18 +136,24 @@ if ($env:GITHUB_ENV) {
     Write-Host "##vso[task.setvariable variable=VCPKG_TRIPLET]$triplet"
 }
 
-# Bootstrap vcpkg if not pre-installed.
+# Pin the tooling as well as the ports, rather than using the agent image's revision.
+$vcpkgRegistry = (Get-Content "$PSScriptRoot\..\..\vcpkg-configuration.json" -Raw | ConvertFrom-Json).'default-registry'
+if (-not $vcpkgRegistry.baseline) { throw "No vcpkg baseline in vcpkg-configuration.json" }
 $vcpkgRoot = if ($env:VCPKG_INSTALLATION_ROOT) { $env:VCPKG_INSTALLATION_ROOT } else { 'C:\vcpkg' }
-if (Test-Path "$vcpkgRoot\vcpkg.exe") {
-    Write-Host "vcpkg already available at $vcpkgRoot"
-} else {
-    Write-Host "vcpkg not found — bootstrapping into $vcpkgRoot"
-    git clone --depth 1 https://github.com/microsoft/vcpkg.git $vcpkgRoot
-    & "$vcpkgRoot\bootstrap-vcpkg.bat" -disableMetrics
-    if ($LASTEXITCODE -ne 0) { throw "vcpkg bootstrap failed ($LASTEXITCODE)" }
-    if ($env:GITHUB_ENV) { "VCPKG_INSTALLATION_ROOT=$vcpkgRoot" >> $env:GITHUB_ENV }
-    else                  { Write-Host "##vso[task.setvariable variable=VCPKG_INSTALLATION_ROOT]$vcpkgRoot" }
+if (-not (Test-Path "$vcpkgRoot\.git")) {
+    Write-Host "Cloning vcpkg into $vcpkgRoot"
+    git clone --depth 1 --no-checkout $vcpkgRegistry.repository $vcpkgRoot
+    if ($LASTEXITCODE -ne 0) { throw "vcpkg clone failed ($LASTEXITCODE)" }
 }
+Write-Host "Using vcpkg baseline $($vcpkgRegistry.baseline)"
+git -C $vcpkgRoot fetch --depth 1 $vcpkgRegistry.repository $vcpkgRegistry.baseline
+if ($LASTEXITCODE -ne 0) { throw "vcpkg fetch failed ($LASTEXITCODE)" }
+git -C $vcpkgRoot checkout --detach $vcpkgRegistry.baseline
+if ($LASTEXITCODE -ne 0) { throw "vcpkg checkout failed ($LASTEXITCODE)" }
+& "$vcpkgRoot\bootstrap-vcpkg.bat" -disableMetrics
+if ($LASTEXITCODE -ne 0) { throw "vcpkg bootstrap failed ($LASTEXITCODE)" }
+if ($env:GITHUB_ENV) { "VCPKG_INSTALLATION_ROOT=$vcpkgRoot" >> $env:GITHUB_ENV }
+else                  { Write-Host "##vso[task.setvariable variable=VCPKG_INSTALLATION_ROOT]$vcpkgRoot" }
 # Override VCPKG_ROOT: vcvarsall may set it to VS's bundled copy.
 if ($env:GITHUB_ENV) { "VCPKG_ROOT=$vcpkgRoot" >> $env:GITHUB_ENV }
 else                  { Write-Host "##vso[task.setvariable variable=VCPKG_ROOT]$vcpkgRoot" }

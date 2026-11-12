@@ -34,7 +34,7 @@ from qdk_chemistry.data.unitary_representation.containers.sossa import (
     SOSSASelect,
 )
 
-from .test_helpers import create_random_factorized_hamiltonian, factorized_hamiltonian_to_sossa_operator
+from .helpers import create_random_factorized_hamiltonian, factorized_hamiltonian_to_sossa_operator
 
 
 def _make_sossa_unitary_representation(*, power: int = 1, lambda_eff: float | None = None):
@@ -183,6 +183,25 @@ def _sossa_operator_with_one_body(
 class TestSOSSABlockEncodingContainer:
     """Tests for the SOSSA container serialization."""
 
+    @pytest.mark.parametrize("power", [1, 2])
+    @pytest.mark.parametrize("file_format", ["json", "hdf5"])
+    def test_serialized_phase_inversion(self, tmp_path, power, file_format):
+        """Powered SOSSA inverses must not silently return the power-one energy."""
+        unitary = _make_sossa_unitary_representation(power=power)
+        filename = str(tmp_path / f"walk.unitary_representation.{file_format}")
+        unitary.to_file(filename, file_format)
+        container = UnitaryRepresentation.from_file(filename, file_format).get_container()
+
+        if power == 1:
+            expected = container.normalization + container.metadata.energy_shift
+            assert container.eigenvalue_from_phase(0.25) == pytest.approx(expected)
+            assert container.eigenvalue_branches_from_phase(0.25) == pytest.approx((expected,))
+        else:
+            with pytest.raises(ValueError, match="power=1"):
+                container.eigenvalue_from_phase(0.25)
+            with pytest.raises(ValueError, match="power=1"):
+                container.eigenvalue_branches_from_phase(0.25)
+
     def test_json_roundtrip(self):
         """Test JSON serialization/deserialization round-trip and wrapper dispatch."""
         result = _make_sossa_unitary_representation(power=3, lambda_eff=0.75)
@@ -229,6 +248,77 @@ class TestSOSSABlockEncodingContainer:
 
         assert container.layout == expected_layout
         assert container.num_qubits == 9
+
+    @pytest.mark.parametrize("num_orbitals", [1, 3])
+    @pytest.mark.parametrize("num_ranks", [0, 2])
+    def test_empty_select_angles_roundtrip(self, tmp_path: Path, num_orbitals: int, num_ranks: int) -> None:
+        """N=1 and absent spin-free sectors retain their SELECT array dimensions."""
+        operator = QubitOperator(
+            container=SumOfSquaresContainer(
+                RotatedPaulis(
+                    np.zeros((num_orbitals, num_orbitals - 1)),
+                    np.tile([0.2, 0.2j], (num_orbitals, 1)),
+                    ("X", "Y"),
+                ),
+                RotatedPaulis(np.zeros((num_ranks, num_orbitals - 1)), np.full((num_ranks, 2), 0.3), ("Z",)),
+                "jordan-wigner",
+                "blocked",
+                SumOfSquaresMetadata(num_orbitals, num_ranks, 1, 1, num_orbitals, -1.5),
+            )
+        )
+        unitary = SOSSABuilder().run(operator)
+        for file_format in ("json", "h5"):
+            path = tmp_path / f"empty.unitary_representation.{file_format}"
+            unitary.to_file(path, file_format)
+            restored = UnitaryRepresentation.from_file(path, file_format)
+            expected = unitary.get_container().select
+            actual = restored.get_container().select
+            np.testing.assert_array_equal(
+                actual.one_body_rotation_angles, expected.one_body_rotation_angles, strict=True
+            )
+            np.testing.assert_array_equal(
+                actual.two_body_rotation_angles, expected.two_body_rotation_angles, strict=True
+            )
+
+    def test_normalization_is_required(self) -> None:
+        """Omitting normalization fails at the constructor signature rather than using an invalid default."""
+        container = _make_sossa_unitary_representation().get_container()
+        with pytest.raises(TypeError, match="normalization"):
+            SOSSABlockEncodingContainer(  # type: ignore[call-arg]
+                outer_prepare=container.outer_prepare,
+                inner_prepare=container.inner_prepare,
+                select=container.select,
+                metadata=container.metadata,
+                layout=container.layout,
+            )
+
+    @pytest.mark.parametrize("normalization", [0.0, -1.0, float("nan"), float("inf")])
+    def test_invalid_normalization_is_rejected_on_construction_and_load(
+        self, tmp_path: Path, normalization: float
+    ) -> None:
+        """Construction and both readers reject a non-positive or non-finite normalization."""
+        container = _make_sossa_unitary_representation().get_container()
+        with pytest.raises(ValueError, match="positive finite normalization"):
+            SOSSABlockEncodingContainer(
+                outer_prepare=container.outer_prepare,
+                inner_prepare=container.inner_prepare,
+                select=container.select,
+                metadata=container.metadata,
+                layout=container.layout,
+                normalization=normalization,
+            )
+        data = container.to_json()
+        data["normalization"] = normalization
+        with pytest.raises(ValueError, match="positive finite normalization"):
+            UnitaryRepresentation.from_json(data)
+        with h5py.File(tmp_path / "invalid.h5", "w") as handle:
+            container.to_hdf5(handle)
+            handle.attrs["normalization"] = normalization
+        with (
+            h5py.File(tmp_path / "invalid.h5", "r") as handle,
+            pytest.raises(ValueError, match="positive finite normalization"),
+        ):
+            UnitaryRepresentation.from_hdf5(handle)
 
     def test_a_layout_reserving_free_rider_bits_requires_a_matching_table(self):
         """SELECT reads those bits whether or not anything wrote them.

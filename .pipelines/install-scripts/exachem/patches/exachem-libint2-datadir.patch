@@ -1,0 +1,52 @@
+# exachem-libint2-datadir.patch
+# Keep ExaChem's basis-file check compatible with Libint2 2.13.1 and aligned with its runtime lookup:
+# use LIBINT_DATADIR for the compiled default, honor LIBINT_DATA_PATH when set, and accept either a
+# directory containing basis/ or the basis directory itself, as Libint does.
+# Drop the DATADIR rename when the ExaChem pin includes it; retain the rest.
+# Apply with: git -C <exachem-src> apply exachem-libint2-datadir.patch
+diff --git a/exachem/common/ec_basis.cpp b/exachem/common/ec_basis.cpp
+index ba76deb..57a21d5 100644
+--- a/exachem/common/ec_basis.cpp
++++ b/exachem/common/ec_basis.cpp
+@@ -7,9 +7,21 @@
+  */
+ 
+ #include "exachem/common/ec_basis.hpp"
++#include <cstdlib>
+ #include <unordered_set>
+ namespace fs = std::filesystem;
+ 
++namespace {
++// Resolve the basis directory exactly as libint2::BasisSet does, so this pre-flight check reads the
++// same files as the actual shell construction: the LIBINT_DATA_PATH env var if set, else the
++// compiled-in LIBINT_DATADIR, then <path>/basis if that exists, else <path> itself.
++std::string basis_data_dir() {
++  const char* env        = std::getenv("LIBINT_DATA_PATH");
++  const std::string root = env ? env : LIBINT_DATADIR;
++  return fs::is_directory(root + "/basis") ? root + "/basis" : root;
++}
++} // namespace
++
+ // ca_symbol represents each unique atom symbol in the geometry
+ void ECBasis::parse_ecp_basis_file(ExecutionContext& exc, std::string ca_symbol,
+                                    std::vector<Atom>& atoms, std::vector<ECAtom>& ec_atoms,
+@@ -173,8 +185,8 @@ void print_basis_info(const std::vector<libint2::Atom>& atoms, const std::vector
+ 
+ void check_basis_file(ExecutionContext& exc, bool single_basis, const ECAtom& ecatom,
+                       bool ecp_check = false) {
+-  auto basis_set_file = std::string(DATADIR) + "/basis/" + ecatom.basis + ".g94";
+-  if(ecp_check) basis_set_file = std::string(DATADIR) + "/basis/" + ecatom.ecp_basis + ".ecp";
++  auto basis_set_file = basis_data_dir() + "/" + ecatom.basis + ".g94";
++  if(ecp_check) basis_set_file = basis_data_dir() + "/" + ecatom.ecp_basis + ".ecp";
+   int basis_file_exists = 0;
+   if(exc.pg().rank() == 0) basis_file_exists = std::filesystem::exists(basis_set_file);
+   exc.pg().broadcast(&basis_file_exists, 0);
+@@ -197,7 +209,7 @@ void ECBasis::parse_ecps(ExecutionContext& exc, std::vector<lib_atom>& atoms,
+     // There is no global ecp basis specification for all atoms.
+     // single_basis=false, ecp=true
+     check_basis_file(exc, false, ecatom, true);
+-    auto ecp_basis_file = std::string(DATADIR) + "/basis/" + ecatom.ecp_basis + ".ecp";
++    auto ecp_basis_file = basis_data_dir() + "/" + ecatom.ecp_basis + ".ecp";
+     if(exc.pg().rank() == 0) std::cout << "Parsing ECP block in " << ecp_basis_file << std::endl;
+     parse_ecp_basis_file(exc, esymbol, atoms, ec_atoms, ecp_basis_file);
+   }

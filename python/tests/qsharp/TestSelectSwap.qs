@@ -3,7 +3,6 @@
 // license information.
 
 namespace QDKChemistry.TestUtils.SelectSwapTests {
-
     import Std.Arrays.All;
     import Std.Arrays.Mapped;
     import Std.Arrays.Zipped;
@@ -12,54 +11,33 @@ namespace QDKChemistry.TestUtils.SelectSwapTests {
     import Std.Canon.ApplyXorInPlace;
     import Std.Convert.IntAsDouble;
     import Std.Convert.ResultAsBool;
+    import Std.Core.Length;
     import Std.Math.Ceiling;
     import Std.Math.Lg;
     import Std.Measurement.MResetEachZ;
     import Std.StatePreparation.PrepareUniformSuperposition;
     import Std.TableLookup.Select;
-    import QDKChemistry.Utils.UnaryIteration.UnaryIteration;
     import QDKChemistry.Utils.SelectSwap.PadToAddressSpace;
     import QDKChemistry.Utils.SelectSwap.SelectSwap;
     import QDKChemistry.Utils.SelectSwap.SelectSwap2D;
+    import QDKChemistry.Utils.SelectSwap.SelectSwapAliased;
+    import QDKChemistry.Utils.SelectSwap.SelectSwapClean;
+    import QDKChemistry.Utils.UnaryIteration.UnaryIteration;
 
-    /// 1D SelectSwap correctness: set address to |addr⟩, apply SelectSwap in within/apply,
-    /// CNOT result to persistent copy register, then verify copy matches expected data.
-    operation TestSelectSwap1DCorrectness(
+    /// Loads `data[address]` into `output`, copies it into `copy`, then erases `output`.
+    function TestMakeSelectSwap1DCopyOp(
         data : Bool[][],
         numSwapBits : Int
-    ) : Bool {
-        let nData = Length(data);
-        let m = Length(data[0]);
-        let nAddr = Ceiling(Lg(IntAsDouble(nData)));
-
-        use address = Qubit[nAddr];
-        use output = Qubit[m];
-        use copy = Qubit[m];
-
-        mutable allCorrect = true;
-
-        for addr in 0..nData - 1 {
-            ApplyXorInPlace(addr, address);
-
+    ) : (Qubit[], Qubit[], Qubit[]) => Unit {
+        (address, output, copy) => {
             within {
                 SelectSwap(numSwapBits, data, address, output);
             } apply {
                 ApplyToEachCA(CNOT, Zipped(output, copy));
             }
-
-            ApplyXorInPlace(addr, address);
-
-            let actual = Mapped(ResultAsBool, MResetEachZ(copy));
-            if actual != data[addr] {
-                Message($"FAIL: addr={addr}, actual={actual}, expected={data[addr]}");
-                set allCorrect = false;
-            }
         }
-
-        allCorrect
     }
 
-    /// Cross-checks the select-swap path against the plain-select path as *phase* oracles.
     operation TestSelectSwap1DPhaseAgreement(data : Bool[][], numSwapBits : Int) : Bool {
         let m = Length(data[0]);
         let nAddr = Ceiling(Lg(IntAsDouble(Length(data))));
@@ -86,56 +64,115 @@ namespace QDKChemistry.TestUtils.SelectSwapTests {
 
         Adjoint ApplyToEachA(H, address);
 
-        All(r -> r == Zero, MResetEachZ(address))
+        All(result -> result == Zero, MResetEachZ(address))
     }
 
-    /// `SelectSwap2D` loads the addressed word into a one-word target, at every split.
-    operation TestSelectSwap2DCorrectness(
-        data : Bool[][][],
-        numSwapBits : Int,
-        outerAddressAlwaysValid : Bool
-    ) : Bool {
-        let nOuter = Length(data);
-        let nInner = Length(data[0]);
-        let m = Length(data[0][0]);
-        let nOuterAddr = Ceiling(Lg(IntAsDouble(nOuter)));
-        let nInnerAddr = Ceiling(Lg(IntAsDouble(nInner)));
-
-        use outerAddr = Qubit[nOuterAddr];
-        use innerAddr = Qubit[nInnerAddr];
-        use target = Qubit[m];
-        use copy = Qubit[m];
+    /// Checks `SelectSwapAliased` against a bare `Select` by value on every address, including
+    /// the surplus ones where zero-padding and aliasing differ.
+    operation TestSelectSwapAliasedMatchesSelect1D(data : Bool[][], numSwapBits : Int) : Bool {
+        let m = Length(data[0]);
+        let nAddr = Ceiling(Lg(IntAsDouble(Length(data))));
 
         mutable allCorrect = true;
+        for addr in 0..2^nAddr - 1 {
+            use address = Qubit[nAddr];
+            use swapped = Qubit[m];
+            use plain = Qubit[m];
 
-        for i in 0..nOuter - 1 {
-            for j in 0..nInner - 1 {
-                ApplyXorInPlace(i, outerAddr);
-                ApplyXorInPlace(j, innerAddr);
+            ApplyXorInPlace(addr, address);
+            SelectSwapAliased(numSwapBits, data, address, swapped);
+            Select(data, address, plain);
+            ApplyXorInPlace(addr, address);
 
-                // The `within` uncompute is the measurement erasure, so this also checks that
-                // the erasure returns `target` to |0> and not merely that the load was right.
-                within {
-                    SelectSwap2D(data, outerAddr, innerAddr, numSwapBits, outerAddressAlwaysValid, target);
-                } apply {
-                    ApplyToEachCA(CNOT, Zipped(target, copy));
-                }
-
-                ApplyXorInPlace(i, outerAddr);
-                ApplyXorInPlace(j, innerAddr);
-
-                let actual = Mapped(ResultAsBool, MResetEachZ(copy));
-                if actual != data[i][j] {
-                    Message($"FAIL: (i={i},j={j}), actual={actual}, expected={data[i][j]}");
-                    set allCorrect = false;
-                }
+            let swappedWord = Mapped(ResultAsBool, MResetEachZ(swapped));
+            let plainWord = Mapped(ResultAsBool, MResetEachZ(plain));
+            if swappedWord != plainWord {
+                Message($"FAIL: addr={addr}, select-swap={swappedWord}, select={plainWord}");
+                set allCorrect = false;
+            }
+            if not All(r -> r == Zero, MResetEachZ(address)) {
+                Message($"FAIL: addr={addr} left the address register disturbed");
+                set allCorrect = false;
             }
         }
 
         allCorrect
     }
 
-    /// Phase-oracle agreement between `SelectSwap2D` and unary iteration.
+    /// `SelectSwapClean` must match a zero-padded `Select` as a phase oracle through its erasure.
+    operation TestSelectSwapCleanPhaseAgreement(
+        data : Bool[][],
+        numSwapBits : Int,
+        useControl : Bool
+    ) : Bool {
+        let m = Length(data[0]);
+        let nAddr = Ceiling(Lg(IntAsDouble(Length(data))));
+        let padded = PadToAddressSpace(data, nAddr);
+
+        use control = Qubit();
+        use address = Qubit[nAddr];
+        use cleanOutput = Qubit[m];
+        use referenceOutput = Qubit[m];
+        within {
+            H(control);
+            ApplyToEachA(H, address);
+        } apply {
+            within {
+                if useControl {
+                    Controlled SelectSwapClean([control], (numSwapBits, data, address, cleanOutput));
+                } else {
+                    SelectSwapClean(numSwapBits, data, address, cleanOutput);
+                }
+            } apply {
+                ApplyToEachA(Z, cleanOutput);
+            }
+            within {
+                if useControl {
+                    Controlled Select([control], (padded, address, referenceOutput));
+                } else {
+                    Select(padded, address, referenceOutput);
+                }
+            } apply {
+                ApplyToEachA(Z, referenceOutput);
+            }
+        }
+
+        All(r -> r == Zero, MResetEachZ([control] + address + cleanOutput + referenceOutput))
+    }
+
+    /// Traces `SelectSwapClean` in one or both directions for a costing regression.
+    operation TestSelectSwapCleanResourceProbe(
+        data : Bool[][],
+        numSwapBits : Int,
+        applyForward : Bool,
+        applyAdjoint : Bool
+    ) : Unit {
+        use address = Qubit[Ceiling(Lg(IntAsDouble(Length(data))))];
+        use output = Qubit[Length(data[0])];
+
+        if applyForward {
+            SelectSwapClean(numSwapBits, data, address, output);
+        }
+        if applyAdjoint {
+            Adjoint SelectSwapClean(numSwapBits, data, address, output);
+        }
+    }
+
+    /// Loads `data[outer][inner]` into `target`, copies it into `copy`, then erases `target`.
+    function TestMakeSelectSwap2DCopyOp(
+        data : Bool[][][],
+        numSwapBits : Int,
+        outerAddressAlwaysValid : Bool
+    ) : (Qubit[], Qubit[], Qubit[], Qubit[]) => Unit {
+        (outerAddr, innerAddr, target, copy) => {
+            within {
+                SelectSwap2D(data, numSwapBits, outerAddressAlwaysValid, outerAddr, innerAddr, [], target);
+            } apply {
+                ApplyToEachCA(CNOT, Zipped(target, copy));
+            }
+        }
+    }
+
     operation TestSelectSwap2DPhaseAgreement(
         data : Bool[][][],
         numSwapBits : Int,
@@ -159,7 +196,7 @@ namespace QDKChemistry.TestUtils.SelectSwapTests {
             {
                 use target = Qubit[m];
                 within {
-                    SelectSwap2D(data, outerAddr, innerAddr, numSwapBits, outerAddressAlwaysValid, target);
+                    SelectSwap2D(data, numSwapBits, outerAddressAlwaysValid, outerAddr, innerAddr, [], target);
                 } apply {
                     Z(target[0]);
                 }
@@ -176,10 +213,9 @@ namespace QDKChemistry.TestUtils.SelectSwapTests {
             }
         }
 
-        All(r -> r == Zero, MResetEachZ(outerAddr + innerAddr))
+        All(result -> result == Zero, MResetEachZ(outerAddr + innerAddr))
     }
 
-    /// Traces `SelectSwap2D` in one or both directions for a costing regression.
     operation TestSelectSwap2DResourceProbe(
         data : Bool[][][],
         numSwapBits : Int,
@@ -195,10 +231,10 @@ namespace QDKChemistry.TestUtils.SelectSwapTests {
         use target = Qubit[Length(data[0][0])];
 
         if applyForward {
-            SelectSwap2D(data, outerAddr, innerAddr, numSwapBits, outerAddressAlwaysValid, target);
+            SelectSwap2D(data, numSwapBits, outerAddressAlwaysValid, outerAddr, innerAddr, [], target);
         }
         if applyAdjoint {
-            Adjoint SelectSwap2D(data, outerAddr, innerAddr, numSwapBits, outerAddressAlwaysValid, target);
+            Adjoint SelectSwap2D(data, numSwapBits, outerAddressAlwaysValid, outerAddr, innerAddr, [], target);
         }
     }
 }

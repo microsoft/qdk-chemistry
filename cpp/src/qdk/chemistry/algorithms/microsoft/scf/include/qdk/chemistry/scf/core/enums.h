@@ -90,6 +90,13 @@ enum class DensityInitializationMethod {
   Atom,          ///< Atom-by-atom guess
 };
 
+/// Relativistic treatment of the electronic Hamiltonian
+enum class Relativity {
+  None,             ///< Nonrelativistic Hamiltonian
+  SFX2C,            ///< Spin-free X2C with decontraction and recontraction
+  SFX2CContracted,  ///< Spin-free X2C in the supplied contracted basis
+};
+
 /// An enum to classify the available SCF algorithm methods
 enum class SCFAlgorithmName {
   ASAHF,    ///< Atomic Spherically Averaged Hartree-Fock

@@ -24,7 +24,9 @@ int main() {
   auto ring_geometry = LatticeGeometry::chain(6, /*periodic=*/true);
   auto ring_graph = LatticeGraph::from_geometry(ring_geometry, {1, 2});
   // Six first- and six second-neighbor bonds. A periodic two-site chain joins
-  // its sites through two images, so from_geometry rejects it.
+  // its sites through two images, so its edge gets weight 2.
+  auto pair_graph =
+      LatticeGraph::from_geometry(LatticeGeometry::chain(2, /*periodic=*/true));
   // end-cell-periodic-geometry
 
   // --------------------------------------------------------------------------------------------

@@ -188,6 +188,7 @@ class MacisAsciSettings : public MacisSettings {
   virtual ~MacisAsciSettings() = default;
 };
 
+/** @brief MACIS adaptive sampling configuration interaction calculator. */
 class MacisAsci : public Macis {
  public:
   /**

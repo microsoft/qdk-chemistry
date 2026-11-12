@@ -7,6 +7,7 @@
 
 import math
 
+import numpy as np
 import pytest
 
 from qdk_chemistry.algorithms.hamiltonian_unitary_builder.time_evolution.trotter_error import (
@@ -14,6 +15,7 @@ from qdk_chemistry.algorithms.hamiltonian_unitary_builder.time_evolution.trotter
     trotter_steps_naive,
 )
 from qdk_chemistry.data import QubitOperator
+from qdk_chemistry.data.qubit_operator.containers.sparse_pauli_decomposition import SparsePauliTerms
 
 
 class TestTrotterStepsNaive:
@@ -24,6 +26,15 @@ class TestTrotterStepsNaive:
         # one_norm = 2, N = ceil((2^2 * 2 * 1^2) / 0.1) = ceil(80) = 80
         h = QubitOperator(pauli_strings=["X", "Z"], coefficients=[1.0, 1.0])
         assert trotter_steps_naive(h, 1.0, 0.1, order=1) == 80
+
+    def test_sparse_operator_builds_no_labels(self, monkeypatch):
+        """Only filtered coefficient magnitudes enter the bound, so a wide sparse operator builds no labels."""
+        sparse = QubitOperator.from_sparse_terms(
+            10**6, [{0: "X"}, {999_999: "Z"}, {5: "Y"}], np.array([1.0, -1.0, 1e-13])
+        )
+        monkeypatch.setattr(SparsePauliTerms, "__getitem__", lambda *_: pytest.fail("built a Pauli label"))
+        dense = QubitOperator(pauli_strings=["X", "Z"], coefficients=[1.0, 1.0])
+        assert trotter_steps_naive(sparse, 1.0, 0.1, order=2) == trotter_steps_naive(dense, 1.0, 0.1, order=2)
 
     def test_minimum_one(self):
         """Test that result is at least 1."""

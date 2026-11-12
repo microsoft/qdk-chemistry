@@ -3,6 +3,7 @@
 // license information.
 
 #include <gtest/gtest.h>
+#include <qdk/chemistry/scf/config.h>
 #include <qdk/chemistry/scf/core/basis_set.h>
 #include <qdk/chemistry/scf/core/molecule.h>
 #include <qdk/chemistry/scf/util/blas_threads.h>
@@ -20,6 +21,7 @@
 #include <map>
 #include <memory>
 #include <mutex>
+#include <qdk/chemistry/utils/basis_archive.hpp>
 #include <string>
 #include <thread>
 #include <vector>
@@ -658,47 +660,107 @@ TEST(AtomGuessTest, CompareWithFileGuess) {
   }
 }
 
+TEST(AtomGuessTest, MismatchedFileGuessFallsBackToGeneratedGuess) {
+  auto mol = make_o2();
+  double conv_thresh = SCFConfig().scf_algorithm.density_threshold;
+  auto basis =
+      BasisSet::from_database_json(mol, "sto-3g", BasisMode::PSI4, true, false);
+  int N = basis->num_atomic_orbitals;
+  basis->name = "custom_basis_for_testing";
+  RowMajorMatrix D_generated = RowMajorMatrix::Zero(N, N);
+  atom_guess(*basis, *mol, D_generated.data());
+
+  // The def2-svp guess blocks are larger than these sto-3g shells.
+  basis->name = "def2-svp";
+  RowMajorMatrix D_mismatched = RowMajorMatrix::Zero(N, N);
+  atom_guess(*basis, *mol, D_mismatched.data());
+  EXPECT_TRUE(D_mismatched.isApprox(D_generated, conv_thresh));
+}
+
+TEST(AtomGuessTest, UnreadableArchiveFallsBackToGeneratedGuess) {
+  auto mol = make_o2();
+  double conv_thresh = SCFConfig().scf_algorithm.density_threshold;
+  auto basis =
+      BasisSet::from_database_json(mol, "sto-3g", BasisMode::PSI4, true, false);
+  int N = basis->num_atomic_orbitals;
+  basis->name = "custom_basis_for_testing";
+  RowMajorMatrix D_generated = RowMajorMatrix::Zero(N, N);
+  atom_guess(*basis, *mol, D_generated.data());
+
+  const auto original = QDKChemistryConfig::get_resources_dir();
+  struct RestoreResources {
+    std::filesystem::path path;
+    ~RestoreResources() { QDKChemistryConfig::set_resources_dir(path); }
+  } restore{original};
+  // The archive exists, so it selects the precomputed guess, but tar cannot
+  // read it.
+  const auto resources =
+      std::filesystem::temp_directory_path() / "unreadable_resources";
+  std::filesystem::create_directories(resources / "compressed");
+  std::ofstream(resources / "compressed" / "sto-3g.tar.gz") << "not an archive";
+  QDKChemistryConfig::set_resources_dir(resources);
+  ASSERT_TRUE(qdk::chemistry::utils::BasisArchive::exists("sto-3g"));
+  EXPECT_THROW(qdk::chemistry::utils::BasisArchive("sto-3g"),
+               std::runtime_error);
+
+  basis->name = "sto-3g";
+  RowMajorMatrix D_fallback = RowMajorMatrix::Zero(N, N);
+  EXPECT_NO_THROW(atom_guess(*basis, *mol, D_fallback.data()));
+  EXPECT_TRUE(D_fallback.isApprox(D_generated, conv_thresh));
+}
+
 //==============================================================================
 // BLAS thread control tests
 //==============================================================================
 
-TEST(BlasThreadsTest, DetectionIsConsistent) {
+TEST(BlasThreadsTest, ReportedCountIsSane) {
   using namespace qdk::chemistry::scf::util;
 
-  const BlasVendor vendor = detected_blas_vendor();
-  EXPECT_NE(to_string(vendor), nullptr);
-
-  if (vendor == BlasVendor::Unknown) {
-    // Legal (e.g. macOS Accelerate exposes no thread-count API); the guard
-    // then degrades to a no-op.
-    EXPECT_EQ(get_blas_num_threads(), 0);
-    GTEST_SKIP() << "No BLAS thread-control API available";
-  }
-  EXPECT_GT(get_blas_num_threads(), 0);
+  // 0 is legal (macOS Accelerate exposes no thread-count API); the guard then
+  // degrades to a no-op.
+  EXPECT_GE(blas_get_num_threads(), 0);
 }
 
 TEST(BlasThreadsTest, ScopedGuardPinsAndRestores) {
   using namespace qdk::chemistry::scf::util;
 
-  if (detected_blas_vendor() == BlasVendor::Unknown) {
+  const int original = blas_get_num_threads();
+  if (original == 0) {
     GTEST_SKIP() << "No BLAS thread-control API available";
   }
-
-  const int original = get_blas_num_threads();
   ASSERT_GT(original, 0);
 
   {
     ScopedBlasThreads guard;
     EXPECT_TRUE(guard.active());
-    EXPECT_EQ(get_blas_num_threads(), 1);
+    EXPECT_EQ(blas_get_num_threads(), 1);
 
     // Nested guards must not restore the count early.
     {
       ScopedBlasThreads nested;
-      EXPECT_EQ(get_blas_num_threads(), 1);
+      EXPECT_EQ(blas_get_num_threads(), 1);
     }
-    EXPECT_EQ(get_blas_num_threads(), 1);
+    EXPECT_EQ(blas_get_num_threads(), 1);
   }
 
-  EXPECT_EQ(get_blas_num_threads(), original);
+  EXPECT_EQ(blas_get_num_threads(), original);
+}
+
+TEST(BlasThreadsTest, SetRoundTrips) {
+  using namespace qdk::chemistry::scf::util;
+
+  const int original = blas_get_num_threads();
+  if (original == 0) {
+    GTEST_SKIP() << "No BLAS thread-control API available";
+  }
+
+  blas_set_num_threads(1);
+  EXPECT_EQ(blas_get_num_threads(), 1);
+
+  // Nonsense counts are ignored rather than passed to the backend.
+  blas_set_num_threads(0);
+  EXPECT_EQ(blas_get_num_threads(), 1);
+
+  blas_set_num_threads(original);
+  EXPECT_EQ(blas_get_num_threads(), original);
 }

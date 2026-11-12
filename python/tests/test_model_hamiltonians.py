@@ -433,6 +433,33 @@ class TestModelHamiltonians:
         )
         assert hamiltonian.get_container().content_hash() == "7283ee88ae88a265"
 
+    def test_kitaev_further_neighbor_flavors_follow_nearest_neighbor_axes(self) -> None:
+        """Shell-2 bonds are perpendicular, and shell-3 bonds parallel, to the nearest-neighbor bond of their flavor."""
+        geometry = LatticeGeometry.honeycomb(5, 5)
+        graph = _kitaev_graph(geometry, [1, 2, 3])
+        positions = np.asarray(geometry.positions)
+
+        def direction(edge: tuple[int, int]) -> np.ndarray:
+            displacement = positions[edge[1]] - positions[edge[0]]
+            return displacement / np.linalg.norm(displacement)
+
+        nearest = {label.flavor: direction(edge) for edge, label in graph.edge_labels.items() if label.shell == 1}
+        for edge, label in graph.edge_labels.items():
+            if label.shell > 1:
+                cosine = abs(float(direction(edge) @ nearest[label.flavor]))
+                assert cosine == pytest.approx(
+                    0.0 if label.shell == 2 else 1.0, abs=float_comparison_absolute_tolerance
+                )
+
+    def test_kitaev_spin_couplings_are_a_quarter_of_heisenberg_pauli_couplings(self) -> None:
+        """The Kitaev builder takes spin-operator couplings, while the Heisenberg builder takes Pauli coefficients."""
+        graph = _kitaev_graph(LatticeGeometry.honeycomb(3, 3))
+        kitaev = create_kitaev_hamiltonian(graph, 0.0, 0.0, 0.0, j=1.0, include_term_groups=False)
+        heisenberg = create_heisenberg_hamiltonian(graph, 0.25, 0.25, 0.25, include_term_groups=False)
+        assert _get_terms_dict(kitaev) == pytest.approx(
+            _get_terms_dict(heisenberg), abs=float_comparison_absolute_tolerance
+        )
+
     def test_kitaev_flavored_geometric_shells(self) -> None:
         graph = _kitaev_graph(LatticeGeometry.honeycomb(5, 5), [1, 2, 3])
         shell_couplings = {1: 4.0, 2: 8.0, 3: 12.0}

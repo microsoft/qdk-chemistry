@@ -21,45 +21,101 @@ __all__: list[str] = [
 ]
 
 
+def _sossa_mapper_setting_defaults() -> tuple[tuple[Any, ...], ...]:
+    """Return the ``_set_default`` arguments of the settings that choose the SOSSA oracles.
+
+    Shared by :class:`SOSSAMapperSettings` and the controlled SOSSA walk mapper's settings, so the
+    two mappers build the same block encoding from the same options.
+
+    Returns:
+        One argument tuple per setting.
+
+    """
+    return (
+        (
+            "outer_prepare_algorithm",
+            "algorithm_ref",
+            AlgorithmRef("state_prep", "alias_sampling"),
+        ),
+        (
+            "inner_prepare_algorithm",
+            "string",
+            "controlled_alias_sampling",
+            "Inner PREPARE algorithm ('controlled_alias_sampling' or 'direct').",
+            ["controlled_alias_sampling", "direct"],
+        ),
+        (
+            "select_algorithm",
+            "string",
+            "qrom_phase_gradient",
+            "SELECT algorithm ('qrom_phase_gradient' or 'direct').",
+            ["qrom_phase_gradient", "direct"],
+        ),
+        (
+            "rotation_bit_precision",
+            "int",
+            10,
+            "Number of bits for Givens rotation angle precision, from 1 to 30 inclusive.",
+            (1, 30),
+        ),
+        (
+            "coefficient_bit_precision",
+            "int",
+            10,
+            "Number of bits for alias sampling coefficient precision, from 1 to 30 inclusive.",
+            (1, 30),
+        ),
+        (
+            "max_givens_rotation_batches",
+            "int",
+            1,
+            "Upper bound J on the number of passes the 'qrom_phase_gradient' SELECT makes over the N-1 "
+            "Givens angles. The 'direct' SELECT loads no angle table and ignores it. 1 keeps every angle "
+            "resident, which is the cheapest in Toffolis and the widest in qubits. A larger J shrinks the "
+            "rotation register to ceil((N-1)/J) angles, at one extra table lookup per batch in each "
+            "direction. SELECT makes the fewest passes that register allows, ceil((N-1)/ceil((N-1)/J)), "
+            "which can be fewer than J: 19 angles with J = 6 run 5 passes of 4.",
+            (1, 4096),
+        ),
+        (
+            "lookup_method",
+            "string",
+            "select_swap",
+            "How the Givens rotation tables and the inner alias-sampling table are routed. The outer "
+            "PREPARE follows its own algorithm's settings, and a separately loaded free-rider word and "
+            "the direct inner PREPARE's sign table always use a plain lookup. 'select' is a plain "
+            "unary-iteration lookup; 'select_swap' is "
+            "a clean QROAM that cuts Toffolis but allocates scratch. 'dirty_select_swap' runs the same "
+            "network on borrowed dirty qubits that are provably idle across the load, so it costs no "
+            "width at all, but it pays roughly two to three times the Toffolis of the clean network at "
+            "equal width. Every method falls back to a plain lookup at shapes where its own cost model "
+            "says no network pays. 'select_swap' and 'dirty_select_swap' choose their swap widths "
+            "under max_swap_address_bits.",
+            ["select", "select_swap", "dirty_select_swap"],
+        ),
+        (
+            "max_swap_address_bits",
+            "int",
+            -1,
+            "Upper bound on the address width k of each QROAM swap network, which routes 2^k data words; "
+            "it does not count data or scratch qubits. It applies to the Givens rotation tables of the "
+            "'qrom_phase_gradient' SELECT and the inner table of the 'controlled_alias_sampling' PREPARE, "
+            "and only when lookup_method is 'select_swap' or 'dirty_select_swap'; 'select' always uses "
+            "width 0 and ignores it. -1 leaves each loader's cost model to choose, 0 forces plain select, "
+            "and a positive value limits each loader to widths at or below it.",
+            (-1, 30),
+        ),
+    )
+
+
 class SOSSAMapperSettings(Settings):
     """Settings for the SOSSAMapper."""
 
     def __init__(self):
         """Initialize settings for SOSSAMapper."""
         super().__init__()
-        self._set_default(
-            "outer_prepare_algorithm",
-            "algorithm_ref",
-            AlgorithmRef("state_prep", "alias_sampling"),
-        )
-        self._set_default(
-            "inner_prepare_algorithm",
-            "string",
-            "controlled_alias_sampling",
-            "Inner PREPARE algorithm ('controlled_alias_sampling' or 'direct').",
-            ["controlled_alias_sampling", "direct"],
-        )
-        self._set_default(
-            "select_algorithm",
-            "string",
-            "qrom_phase_gradient",
-            "SELECT algorithm ('qrom_phase_gradient' or 'direct').",
-            ["qrom_phase_gradient", "direct"],
-        )
-        self._set_default(
-            "rotation_bit_precision",
-            "int",
-            10,
-            "Number of bits for Givens rotation angle precision, from 1 to 30 inclusive.",
-            (1, 30),
-        )
-        self._set_default(
-            "coefficient_bit_precision",
-            "int",
-            10,
-            "Number of bits for alias sampling coefficient precision, from 1 to 30 inclusive.",
-            (1, 30),
-        )
+        for default in _sossa_mapper_setting_defaults():
+            self._set_default(*default)
 
 
 class SOSSAMapper(CircuitMapper):
@@ -70,7 +126,8 @@ class SOSSAMapper(CircuitMapper):
     shared ancilla and is excluded from the reflected zero register.
 
     Unary QPE controls walk iterations through its own index register. Iterative and
-    standard QPE need a controlled quantum walk mapper, which this class does not provide.
+    standard QPE query controlled walk powers instead from
+    :class:`~qdk_chemistry.algorithms.controlled_circuit_mapper.controlled_sossa_mapper.ControlledSOSSAMapper`.
     """
 
     def __init__(self):
@@ -143,10 +200,14 @@ class SOSSAMapper(CircuitMapper):
         free_rider_data = free_rider_data.tolist() if free_rider_data is not None else []
 
         if algorithm == "controlled_alias_sampling":
+            # The walk lends its system register (2N qubits) to the inner PREPARE's QROAM.
+            available_dirty = 2 * container.metadata.num_spatial_orbitals if self._borrow_dirty else 0
             return QSHARP_UTILS.SOSSAWalk.MakeInnerPrepareAliasSamplingOracles(
                 coefficients,
                 free_rider_data,
                 coeff_bits,
+                self._max_swap_address_bits,
+                available_dirty,
             )
         if algorithm == "direct":
             return (
@@ -179,6 +240,14 @@ class SOSSAMapper(CircuitMapper):
         else:
             raise ValueError(f"Unsupported SOSSA inner PREPARE algorithm '{inner_algorithm}'.")
 
+        num_angles = max(meta.num_spatial_orbitals - 1, 0)
+        max_givens_rotation_batches = int(self._settings.get("max_givens_rotation_batches"))
+        if algorithm == "qrom_phase_gradient" and 0 < num_angles < max_givens_rotation_batches:
+            raise ValueError(
+                f"max_givens_rotation_batches must be at most the {num_angles} rotation angles of a "
+                f"{meta.num_spatial_orbitals}-orbital system, got {max_givens_rotation_batches}"
+            )
+
         select_data = {
             "numOrbitals": meta.num_spatial_orbitals,
             "numRanks": meta.num_ranks,
@@ -188,6 +257,10 @@ class SOSSAMapper(CircuitMapper):
             "OneBodyRotationAngles": container.select.one_body_rotation_angles.tolist(),
             "TwoBodyRotationAngles": container.select.two_body_rotation_angles.tolist(),
             "rotationBitPrecision": rot_bits,
+            # Narrowest lambda within max_givens_rotation_batches passes; 6 on 19 angles gives lambda 4, so 5 passes.
+            "rotationBatchSize": -(-num_angles // max_givens_rotation_batches),
+            "borrowDirty": self._borrow_dirty,
+            "maxSwapBits": self._max_swap_address_bits,
             "numFreeRiderBits": num_free_rider_bits,
             "signQubitIndex": sign_qubit_index,
         }
@@ -280,6 +353,48 @@ class SOSSAMapper(CircuitMapper):
         )
         return regs, register_layout
 
+    def build_block_encoding_ops(
+        self, container: SOSSABlockEncodingContainer
+    ) -> tuple[dict[str, Any], dict[str, int], Any]:
+        """Build the Q# oracles of the block encoding and the registers they act on.
+
+        The controlled SOSSA walk mapper composes the same oracles into a controlled walk.
+
+        Args:
+            container: The SOSSA block encoding container.
+
+        Returns:
+            The ``outerPrepareOp``, ``freeRiderOp``, ``innerPrepareOp`` and ``selectOp`` callables keyed by
+            their Q# parameter names, the register width map, and the Q# ``SOSSAWalkLayout``.
+
+        Raises:
+            ValueError: If the layout reserves free-rider bits but the container carries no free-rider table.
+
+        """
+        free_rider = container.inner_prepare.free_rider_data
+        if container.layout.num_free_rider_bits and (free_rider is None or free_rider.size == 0):
+            raise ValueError(
+                f"The register layout reserves {container.layout.num_free_rider_bits} free-rider bits "
+                "but the container carries no free-rider table."
+            )
+
+        outer_prepare_circuit = self._build_outer_prepare_circuit(container)
+        regs, register_layout = self._compute_register_sizes(container, outer_prepare_circuit)
+        # Resolved per run (settings stay mutable); "select" is a width-0 cap, so only borrowing is passed on.
+        lookup_method = self._settings.get("lookup_method")
+        self._max_swap_address_bits = (
+            0 if lookup_method == "select" else int(self._settings.get("max_swap_address_bits"))
+        )
+        self._borrow_dirty = lookup_method == "dirty_select_swap"
+        inner_prepare_op, free_rider_op = self._build_inner_oracles(container)
+        ops = {
+            "outerPrepareOp": outer_prepare_circuit._qsharp_op,  # noqa: SLF001
+            "freeRiderOp": free_rider_op,
+            "innerPrepareOp": inner_prepare_op,
+            "selectOp": self._build_select(container),
+        }
+        return ops, regs, register_layout
+
     def _run_impl(self, unitary: UnitaryRepresentation) -> Circuit:
         r"""Construct the SOSSA block encoding on the flat ``[system | ancilla]`` register.
 
@@ -298,37 +413,16 @@ class SOSSAMapper(CircuitMapper):
         container = unitary.get_container()
         if not isinstance(container, SOSSABlockEncodingContainer):
             raise ValueError(f"The {unitary.get_container_type()} container type is not supported.")
-        free_rider = container.inner_prepare.free_rider_data
-        if container.layout.num_free_rider_bits and (free_rider is None or free_rider.size == 0):
-            raise ValueError(
-                f"The register layout reserves {container.layout.num_free_rider_bits} free-rider bits "
-                "but the container carries no free-rider table."
-            )
         if container.power != 1:
             raise ValueError(f"The SOSSA mapper supports only unit power, got {container.power}.")
 
-        outer_prepare_circuit = self._build_outer_prepare_circuit(container)
-        regs, register_layout = self._compute_register_sizes(container, outer_prepare_circuit)
-        outer_prepare_op = outer_prepare_circuit._qsharp_op  # noqa: SLF001
-        inner_prepare_op, free_rider_op = self._build_inner_oracles(container)
-        select_op = self._build_select(container)
-
+        ops, regs, register_layout = self.build_block_encoding_ops(container)
         qsharp_factory = QsharpFactoryData(
             program=QSHARP_UTILS.SOSSAWalk.MakeSOSSABlockEncodingCircuit,
-            parameter={
-                "outerPrepareOp": outer_prepare_op,
-                "freeRiderOp": free_rider_op,
-                "innerPrepareOp": inner_prepare_op,
-                "selectOp": select_op,
-                "layout": register_layout,
-            },
+            parameter={**ops, "layout": register_layout},
         )
         qsharp_op = QSHARP_UTILS.SOSSAWalk.MakeSOSSABlockEncodingOp(
-            outer_prepare_op,
-            free_rider_op,
-            inner_prepare_op,
-            select_op,
-            register_layout,
+            ops["outerPrepareOp"], ops["freeRiderOp"], ops["innerPrepareOp"], ops["selectOp"], register_layout
         )
 
         return Circuit(

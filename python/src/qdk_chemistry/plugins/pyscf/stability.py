@@ -30,7 +30,7 @@ from pyscf.soscf import newton_ah
 
 from qdk_chemistry.algorithms import StabilityChecker
 from qdk_chemistry.data import Settings, StabilityResult, Wavefunction
-from qdk_chemistry.plugins.pyscf.conversion import orbitals_to_scf
+from qdk_chemistry.plugins.pyscf.conversion import _apply_relativity, orbitals_to_scf
 from qdk_chemistry.utils import Logger
 
 __all__ = ["PyscfStabilityChecker", "PyscfStabilitySettings"]
@@ -220,6 +220,13 @@ class PyscfStabilitySettings(Settings):
         self._set_default(
             "xc_grid", "int", 3, "Density functional integration grid level (0=coarse, 9=very fine)", list(range(10))
         )
+        self._set_default(
+            "relativity",
+            "string",
+            "",
+            "One-body operator used when reconstructing the mean field from orbitals.",
+            ["", "sf-x2c", "sf-x2c-contracted"],
+        )
         self._set_default("pyscf_verbose", "int", 4)
 
 
@@ -297,6 +304,7 @@ class PyscfStabilityChecker(StabilityChecker):
         stability_tol = self._settings.get("stability_tolerance")
         method = self._settings.get("method")
         xc_grid = self._settings.get("xc_grid")
+        relativity = self._settings.get("relativity")
         pyscf_verbose = self._settings.get("pyscf_verbose")
 
         # Get orbitals from wavefunction
@@ -316,6 +324,7 @@ class PyscfStabilityChecker(StabilityChecker):
 
         # Convert to PySCF SCF object
         mf = orbitals_to_scf(orbitals, occ_alpha, occ_beta, method=method)
+        mf = _apply_relativity(mf, relativity)
         if method.lower() != "hf":
             mf.grids.level = xc_grid
 

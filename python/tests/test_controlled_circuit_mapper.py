@@ -22,6 +22,7 @@ from qdk_chemistry.algorithms import create
 from qdk_chemistry.algorithms.controlled_circuit_mapper.controlled_pauli_sequence_mapper import (
     ControlledPauliSequenceMapper,
 )
+from qdk_chemistry.data import LatticeGraph
 from qdk_chemistry.data.circuit import Circuit
 from qdk_chemistry.data.unitary_representation.base import UnitaryRepresentation
 from qdk_chemistry.data.unitary_representation.containers.pauli_product_formula import (
@@ -29,8 +30,15 @@ from qdk_chemistry.data.unitary_representation.containers.pauli_product_formula 
     PauliProductFormulaContainer,
 )
 from qdk_chemistry.plugins.qiskit import QDK_CHEMISTRY_HAS_QISKIT
+from qdk_chemistry.utils.model_hamiltonians import create_heisenberg_hamiltonian, create_ising_hamiltonian
 from qdk_chemistry.utils.qsharp import get_qsharp_context
 
+from .helpers import (
+    apply_operation,
+    assert_states_match_up_to_global_phase,
+    controlled_product_formula_state,
+    random_state,
+)
 from .reference_tolerances import float_comparison_absolute_tolerance, float_comparison_relative_tolerance
 
 if QDK_CHEMISTRY_HAS_QISKIT:
@@ -370,3 +378,51 @@ def test_identity_terms_share_one_control_phase_per_layer() -> None:
         logical = get_qsharp_context().logical_counts(application.entry_expr, *application.args)
         counts.append((logical["rotationCount"], logical["rotationDepth"]))
     assert counts[0] == counts[1]
+
+
+class TestHammingWeightPhasing:
+    """Equal-angle terms of a declared layer are phased through Hamming-weight registers."""
+
+    @pytest.mark.parametrize(
+        ("name", "hamiltonian", "support"),
+        [
+            # Each bond of the open 3-site chain is a singleton layer.
+            ("open-ising", create_ising_hamiltonian(LatticeGraph.chain(3, periodic=False), j=1.0, h=0.5), None),
+            # The field layer phases 8 X terms, and each bond color 4 ZZ terms.
+            ("transverse-ising", create_ising_hamiltonian(LatticeGraph.chain(8, periodic=True), j=1.0, h=0.5), None),
+            # Each bond color of the 16-site ring is a tower of 8 ZZ terms.
+            ("ising-bonds", create_ising_hamiltonian(LatticeGraph.chain(16, periodic=True), j=1.0, h=0.0), 16),
+            # XX, YY and ZZ towers of 8, each mapped onto Z by its own basis change.
+            (
+                "heisenberg",
+                create_heisenberg_hamiltonian(
+                    LatticeGraph.chain(16, periodic=True), jx=1.0, jy=1.0, jz=0.7, hx=0.0, hy=0.0, hz=0.0
+                ),
+                2,
+            ),
+        ],
+    )
+    @pytest.mark.parametrize("phasing", [True, False])
+    def test_spin_chain_matches_the_controlled_trotter_product(self, name, hamiltonian, support, phasing) -> None:
+        """Phased and unphased layers both apply exactly the controlled product of their rotations.
+
+        The control is in |+>, so a spurious phase on either control branch fails the comparison.
+        """
+        builder = create("hamiltonian_unitary_builder", "trotter")
+        builder.settings().update({"order": 1, "num_divisions": 2, "time": 0.6})
+        unitary = builder.run(hamiltonian)
+        container = unitary.get_container()
+        mapper = create("controlled_circuit_mapper", "pauli_sequence", use_hamming_weight_phasing=phasing)
+        circuit = mapper.run(unitary)
+        system = random_state(container.num_qubits, seed=len(name), support=support)
+        state = np.kron(np.ones(2) / np.sqrt(2), system)
+        actual = apply_operation(circuit._qsharp_op, state, split_control=True)
+        assert_states_match_up_to_global_phase(actual, controlled_product_formula_state(container, state), 1e-10)
+
+    @pytest.mark.parametrize("name", ["pauli_sequence", "cswap_pauli_sequence"])
+    def test_phasing_needs_layer_offsets(self, name: str) -> None:
+        """Phasing a formula without declared layers raises rather than silently leaving it unphased."""
+        container = PauliProductFormulaContainer([ExponentiatedPauliTerm({0: "Z"}, 0.1)], step_reps=1, num_qubits=1)
+        mapper = create("controlled_circuit_mapper", name, use_hamming_weight_phasing=True)
+        with pytest.raises(ValueError, match="layer_offsets"):
+            mapper.run(UnitaryRepresentation(container=container))
