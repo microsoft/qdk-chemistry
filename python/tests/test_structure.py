@@ -6,6 +6,7 @@
 # --------------------------------------------------------------------------------------------
 
 import json
+import os
 import pickle
 import re
 import tempfile
@@ -26,6 +27,17 @@ from .reference_tolerances import (
 
 class TestStructure:
     """Test cases for the Structure class."""
+
+    @pytest.mark.parametrize("dtype", [np.float32, np.float64, ">f8", np.longdouble])
+    def test_real_array_coercion(self, dtype):
+        """Real coordinates accept native, byte-swapped, and extended precision arrays."""
+        coordinates = np.array([[0.0, 0.0, 1.25]], dtype=dtype)
+        original = coordinates.copy()
+
+        structure = Structure(coordinates, ["H"])
+
+        np.testing.assert_array_equal(coordinates, original)
+        np.testing.assert_allclose(structure.get_atom_coordinates(0), [0.0, 0.0, 1.25])
 
     def test_coordinates_nuclear_charges_constructor(self):
         """Test constructor with coordinates and nuclear charges."""
@@ -248,6 +260,23 @@ class TestStructure:
         finally:
             if Path(temp_file).exists():
                 Path(temp_file).unlink()
+
+    @pytest.mark.parametrize("path_like", [False, True], ids=["bytes", "pathlike_bytes"])
+    def test_json_file_io_bytes_paths(self, tmp_path, path_like):
+        """Byte paths and PathLike objects returning bytes support reading and writing."""
+        path = os.fsencode(tmp_path / "molecule.structure.json")
+
+        class BytesPath:
+            def __fspath__(self):
+                return path
+
+        filename = BytesPath() if path_like else path
+        structure = Structure(np.array([[0.0, 0.0, 1.25]]), ["H"])
+        structure.to_json_file(filename)
+        restored = Structure.from_json_file(filename)
+
+        assert restored.get_atom_symbol(0) == "H"
+        np.testing.assert_allclose(restored.get_atom_coordinates(0), structure.get_atom_coordinates(0))
 
     def test_static_utility_functions(self):
         """Test static utility functions."""

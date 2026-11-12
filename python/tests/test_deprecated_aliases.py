@@ -16,46 +16,103 @@ downstream users are not broken immediately.
 # Licensed under the MIT License. See LICENSE.txt in the project root for license information.
 # --------------------------------------------------------------------------------------------
 
+import typing
 import warnings
+from collections.abc import Callable
+from types import GenericAlias, new_class
 
 import numpy as np
 import pytest
 
-from qdk_chemistry import algorithms
+from qdk_chemistry import algorithms, data
 from qdk_chemistry.algorithms import ExpectationEstimator, QdkExpectationEstimator, state_preparation
 from qdk_chemistry.algorithms.state_preparation import SparseIsometryStatePreparation
-from qdk_chemistry.data import AlgorithmRef, Circuit, QubitHamiltonian, QubitOperator, Settings
+from qdk_chemistry.data import AlgorithmRef, Circuit, QubitOperator, Settings, qubit_operator
 from qdk_chemistry.plugins.qiskit import QDK_CHEMISTRY_HAS_QISKIT
 
 
 class TestQubitHamiltonianDeprecation:
     """Deprecation of ``QubitHamiltonian`` -> :class:`~qdk_chemistry.data.QubitOperator`."""
 
-    def test_qubit_hamiltonian_is_subclass_of_qubit_operator(self):
-        """The deprecated ``QubitHamiltonian`` is a subclass of :class:`QubitOperator`."""
-        assert issubclass(QubitHamiltonian, QubitOperator)
-
-    def test_qubit_hamiltonian_construction_warns_and_builds_operator(self):
-        """Constructing ``QubitHamiltonian`` warns and yields a working ``QubitOperator``."""
+    @pytest.fixture(params=[data, qubit_operator], ids=["data", "qubit_operator"])
+    def qubit_hamiltonian(self, request):
+        """Both public import paths warn when resolving the deprecated name."""
         with pytest.warns(DeprecationWarning, match="QubitHamiltonian"):
-            qh = QubitHamiltonian(["ZZ"], np.array([1.0]))
+            return request.param.QubitHamiltonian
+
+    def test_qubit_hamiltonian_is_qubit_operator(self, qubit_hamiltonian):
+        """The deprecated name resolves to the actual class, not a class-like proxy."""
+        assert qubit_hamiltonian is QubitOperator
+        assert isinstance(qubit_hamiltonian, type)
+        assert issubclass(qubit_hamiltonian, QubitOperator)
+        assert issubclass(QubitOperator, qubit_hamiltonian)
+
+    def test_qubit_hamiltonian_construction_builds_operator(self, qubit_hamiltonian):
+        """Construction works without another warning after resolving the alias."""
+        with warnings.catch_warnings():
+            warnings.simplefilter("error", DeprecationWarning)
+            qh = qubit_hamiltonian(["ZZ"], np.array([1.0]))
         assert isinstance(qh, QubitOperator)
         assert qh.equiv(QubitOperator(["ZZ"], np.array([1.0])))
 
-    def test_qubit_operator_instance_is_instance_of_deprecated_alias(self):
+    def test_qubit_operator_instance_is_instance_of_deprecated_alias(self, qubit_hamiltonian):
         """Backward-compat: ``isinstance(op, QubitHamiltonian)`` still matches ``QubitOperator``."""
         op = QubitOperator(["ZZ"], np.array([1.0]))
-        assert isinstance(op, QubitHamiltonian)
+        assert isinstance(op, qubit_hamiltonian)
 
-    def test_deprecated_qubit_hamiltonian_works_when_passed_to_an_algorithm(self):
+    @pytest.mark.parametrize("deferred", [False, True], ids=["evaluated", "deferred"])
+    @pytest.mark.parametrize(
+        ("make_annotation", "expression"),
+        [
+            (lambda operator: operator, "QubitHamiltonian"),
+            (lambda operator: operator | None, "QubitHamiltonian | None"),
+            (lambda operator: int | operator, "int | QubitHamiltonian"),
+            (lambda operator: operator | None, "typing.Optional[QubitHamiltonian]"),
+            (lambda operator: int | operator, "typing.Union[int, QubitHamiltonian]"),
+            (lambda operator: GenericAlias(list, operator), "list[QubitHamiltonian]"),
+            (
+                lambda operator: GenericAlias(dict, (str, GenericAlias(list, operator | None))),
+                "dict[str, list[QubitHamiltonian | None]]",
+            ),
+            (lambda operator: type[operator], "type[QubitHamiltonian]"),
+            (lambda operator: typing.Annotated[operator, "operator"], "typing.Annotated[QubitHamiltonian, 'operator']"),
+            (lambda operator: Callable[[operator], operator], "Callable[[QubitHamiltonian], QubitHamiltonian]"),
+        ],
+    )
+    def test_qubit_hamiltonian_supports_annotations(self, qubit_hamiltonian, make_annotation, expression, deferred):
+        """The real type works in evaluated and deferred annotations without special cases."""
+        with warnings.catch_warnings():
+            warnings.simplefilter("error", DeprecationWarning)
+
+            class Annotations:
+                __annotations__ = {"operator": expression if deferred else make_annotation(qubit_hamiltonian)}
+
+            namespace = {"QubitHamiltonian": qubit_hamiltonian, "typing": typing, "Callable": Callable}
+            assert typing.get_type_hints(Annotations, globalns=namespace, include_extras=True) == {
+                "operator": make_annotation(QubitOperator),
+            }
+
+    def test_qubit_hamiltonian_supports_inheritance(self, qubit_hamiltonian):
+        """Subclassing the resolved alias preserves operator behavior."""
+        derived_operator = new_class("DerivedOperator", (qubit_hamiltonian,))
+        operator = derived_operator(["ZZ"], np.array([1.0]))
+        assert isinstance(operator, QubitOperator)
+        assert issubclass(derived_operator, qubit_hamiltonian)
+
+    def test_qubit_hamiltonian_classmethod(self, qubit_hamiltonian):
+        """Deserialization through the old name uses the current class."""
+        operator = QubitOperator(["ZZ"], np.array([1.0]))
+        restored = qubit_hamiltonian.from_json(operator.to_json())
+        assert restored.equiv(operator)
+
+    def test_deprecated_qubit_hamiltonian_works_when_passed_to_an_algorithm(self, qubit_hamiltonian):
         """A deprecated ``QubitHamiltonian`` can be passed straight into an algorithm.
 
         Uses the expectation estimator with a pure-identity Hamiltonian, whose energy
         is deterministic (equal to the coefficient), so no stochastic tolerance is
         needed. This proves the old name is accepted anywhere a ``QubitOperator`` is.
         """
-        with pytest.warns(DeprecationWarning, match="QubitHamiltonian"):
-            observable = QubitHamiltonian(["IIII"], np.array([3.5]))
+        observable = qubit_hamiltonian(["IIII"], np.array([3.5]))
 
         estimator = algorithms.create(
             "expectation_estimator",
@@ -67,13 +124,11 @@ class TestQubitHamiltonianDeprecation:
 
         assert np.isclose(energy_result.energy_expectation_value, 3.5)
 
-    def test_referencing_qubit_hamiltonian_does_not_warn(self):
-        """Merely importing/referencing the alias must not warn; only construction does."""
-        import warnings  # noqa: PLC0415
-
+    def test_referencing_resolved_qubit_hamiltonian_does_not_warn(self, qubit_hamiltonian):
+        """Using an already resolved alias does not repeat the access-time warning."""
         with warnings.catch_warnings():
             warnings.simplefilter("error", DeprecationWarning)
-            _ = QubitHamiltonian  # referencing the class object must not warn
+            assert qubit_hamiltonian is QubitOperator
 
 
 class TestEnergyEstimatorDeprecation:

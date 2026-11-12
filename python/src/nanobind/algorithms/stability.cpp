@@ -1,0 +1,212 @@
+// Copyright (c) Microsoft Corporation. All rights reserved.
+// Licensed under the MIT License. See LICENSE.txt in the project root for
+// license information.
+
+#include <nanobind/nanobind.h>
+#include <nanobind/trampoline.h>
+
+#include <qdk/chemistry.hpp>
+#include <qdk/chemistry/algorithms/microsoft/stability.hpp>
+
+#include "factory_bindings.hpp"
+#include "stl.hpp"
+
+namespace nb = nanobind;
+using namespace qdk::chemistry::algorithms;
+using namespace qdk::chemistry::data;
+using namespace qdk::chemistry::python;
+
+using ReturnType = std::pair<bool, std::shared_ptr<StabilityResult>>;
+// Trampoline class for enabling Python inheritance
+class StabilityCheckerBase : public StabilityChecker {
+ public:
+  NB_TRAMPOLINE(StabilityChecker);
+  std::string name() const override { NB_OVERRIDE_PURE(name); }
+
+  std::vector<std::string> aliases() const override { NB_OVERRIDE(aliases); }
+
+  // Helper method to expose _settings for Python binding
+  void replace_settings(
+      std::shared_ptr<qdk::chemistry::data::Settings> new_settings) {
+    this->_settings = std::move(new_settings);
+  }
+
+ protected:
+  ReturnType _run_impl(
+      std::shared_ptr<Wavefunction> wavefunction) const override {
+    NB_OVERRIDE_PURE(_run_impl, wavefunction);
+  }
+};
+
+void bind_stability(nb::module_ &m) {
+  // StabilityChecker abstract base class
+  nb::class_<StabilityChecker, StabilityCheckerBase> stability_checker(
+      m, "StabilityChecker", R"(
+Abstract base class for wavefunction stability checkers.
+
+This class defines the interface for checking the stability of wavefunctions in quantum chemistry calculations.
+Stability checking examines the second-order response of a wavefunction to determine if it corresponds to a true minimum or if there are directions in which the energy can be lowered.
+
+Examples:
+    >>> # To create a custom stability checker, inherit from this class.
+    >>> import qdk_chemistry.algorithms as alg
+    >>> import qdk_chemistry.data as data
+    >>> class MyStabilityChecker(alg.StabilityChecker):
+    ...     def __init__(self):
+    ...         super().__init__()  # Call the base class constructor
+    ...     # Implement the _run_impl method
+    ...     def _run_impl(self, wavefunction: data.Wavefunction) -> tuple[bool, data.StabilityResult]:
+    ...         # Custom stability checking implementation
+    ...         import numpy as np
+    ...         internal_eigenvalues = np.array([1.0, 2.0, 3.0])
+    ...         external_eigenvalues = np.array([0.5, 1.5])
+    ...         internal_eigenvectors = np.eye(3)
+    ...         external_eigenvectors = np.eye(2)
+    ...         internal_stable = np.all(internal_eigenvalues > 0)
+    ...         external_stable = np.all(external_eigenvalues > 0)
+    ...         result = data.StabilityResult(internal_stable, external_stable,
+    ...                                       internal_eigenvalues, internal_eigenvectors,
+    ...                                       external_eigenvalues, external_eigenvectors)
+    ...         return (result.is_stable(), result)
+)");
+
+  stability_checker.def(nb::init<>(),
+                        R"(
+Create a StabilityChecker instance.
+
+Initializes a new stability checker with default settings.
+Configuration options can be modified through the ``settings()`` method.
+
+Examples:
+    >>> checker = alg.StabilityChecker()
+    >>> checker.settings().set("nroots", 5)
+    >>> checker.settings().set("convergence_threshold", 1e-6)
+)");
+
+  stability_checker.def("run", &StabilityChecker::run,
+                        R"(
+Check the stability of the given wavefunction.
+
+This method automatically locks settings before execution and performs stability analysis on the input wavefunction by examining the eigenvalues of the electronic Hessian matrix.
+A stable wavefunction should have all positive eigenvalues for both internal and external stability.
+
+Args:
+    wavefunction (qdk_chemistry.data.Wavefunction): The wavefunction to analyze for stability
+
+Returns:
+  tuple[bool, qdk_chemistry.data.StabilityResult]: Tuple of the overall stability flag and the detailed stability information (eigenvalues, eigenvectors, and helper accessors).
+
+)",
+                        nb::arg("wavefunction"));
+
+  stability_checker.def("settings", &StabilityChecker::settings,
+                        R"(
+Access the stability checker's configuration settings.
+
+Returns:
+    qdk_chemistry.data.Settings: Reference to the settings object for configuring the stability checker
+
+)",
+                        nb::rv_policy::reference_internal);
+
+  // Expose _settings as a writable property for derived classes
+  stability_checker.def_prop_rw(
+      "_settings",
+      [](StabilityChecker &checker) -> Settings & {
+        return checker.settings();
+      },
+      [](StabilityChecker &checker,
+         std::shared_ptr<qdk::chemistry::data::Settings> new_settings) {
+        dynamic_cast<StabilityCheckerBase &>(checker).replace_settings(
+            std::move(new_settings));
+      },
+      nb::rv_policy::reference_internal,
+      R"(
+Internal settings object property.
+
+This property allows derived classes to replace the settings object with a specialized Settings subclass in their constructors.
+)");
+
+  stability_checker.def("name", &StabilityChecker::name,
+                        R"(
+The algorithm's name.
+
+Returns:
+    str: The name of the algorithm
+
+)");
+
+  stability_checker.def("aliases", &StabilityChecker::aliases,
+                        R"(
+The algorithm's aliases.
+
+Returns:
+    list[str]: All registered names for the algorithm
+
+)");
+
+  stability_checker.def("type_name", &StabilityChecker::type_name,
+                        R"(
+The algorithm's type name.
+
+Returns:
+    str: The type name of the algorithm
+)");
+
+  stability_checker.def("hash", &StabilityChecker::hash,
+                        nb::arg("wavefunction"));
+
+  // Factory class binding - creates StabilityCheckerFactory class with static
+  // methods
+  bind_algorithm_factory<StabilityCheckerFactory, StabilityChecker,
+                         StabilityCheckerBase>(m, "StabilityCheckerFactory");
+
+  stability_checker.def("__repr__", [](const StabilityChecker &) {
+    return "<qdk_chemistry.algorithms.StabilityChecker>";
+  });
+
+  qdk::chemistry::python::bind_create_nested(stability_checker);
+
+  // Bind concrete microsoft::StabilityChecker implementation
+  nb::class_<microsoft::StabilityChecker, StabilityChecker>(
+      m, "QdkStabilityChecker", R"(
+QDK implementation of the stability checker.
+
+This class provides a concrete implementation of the stability checker using the backend.
+It inherits from the base :class:`StabilityChecker` class and implements the
+``run`` method to perform stability analysis on wavefunctions.
+
+Typical usage:
+
+.. code-block:: python
+
+    import qdk_chemistry.algorithms as alg
+    import qdk_chemistry.data as data
+
+    # Assume you have a wavefunction from an SCF calculation
+    scf_solver = algorithms.create("scf_solver", backend)
+    energy, wavefunction = scf_solver.run(structure, 0, 1, "basis_set")
+
+    # Create a stability checker instance
+    stability_checker = algorithms.create("stability_checker", backend)
+
+    # Configure settings if needed
+    stability_checker.settings().set("internal", True)
+    stability_checker.settings().set("external", True)
+
+    # Perform stability analysis
+    is_stable, result = stability_checker.run(wavefunction)
+
+See Also:
+    :class:`StabilityChecker`
+    :class:`qdk_chemistry.data.StabilityResult`
+    :class:`qdk_chemistry.data.Wavefunction`
+
+)")
+      .def(nb::init<>(), R"(
+Default constructor.
+
+Initializes a stability checker with default settings.
+
+)");
+}
