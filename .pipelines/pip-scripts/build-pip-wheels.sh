@@ -224,7 +224,7 @@ elif [ "$MAC_BUILD" == "ON" ]; then
     export CMAKE_CXX_FLAGS="-fPIC -Os -fvisibility=hidden -target arm64-apple-darwin"
     python3 -m build --wheel \
         -C build-dir="build/{wheel_tag}" \
-        -C cmake.define.QDK_UARCH=native \
+        -C cmake.define.QDK_UARCH="${MARCH}" \
         -C cmake.define.BUILD_SHARED_LIBS=OFF \
         -C cmake.define.QDK_CHEMISTRY_ENABLE_MPI=OFF \
         -C cmake.define.QDK_ENABLE_OPENMP=OFF \
