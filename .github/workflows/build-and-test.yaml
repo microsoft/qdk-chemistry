@@ -82,7 +82,7 @@ jobs:
         - os-name: macOS
           runner: macos-26-xlarge
           build-parallel: 5
-          uarch: native
+          uarch: armv8-a
           python-version: '3.13'
           cpp-omp-threads: 4
           cpp-test-workers: 3
@@ -312,7 +312,7 @@ jobs:
 
         echo "=== Running C++ Tests ==="
         set +e
-        if [ "$QDK_UARCH" == "native" ]; then # Exclude particular test on macOS builds
+        if [ "${{ matrix.os-name }}" == "macOS" ]; then
           ctest -j "$CTEST_WORKERS" --output-on-failure --verbose --timeout 600 --output-junit ${{ github.workspace }}/test-results/ctest_results.xml -E "MACIS_SERIAL_TEST|AtomInitGuessEnergyConvergence"
         else
           ctest -j "$CTEST_WORKERS" --output-on-failure --verbose --timeout 600 --output-junit ${{ github.workspace }}/test-results/ctest_results.xml -E "MACIS_SERIAL_TEST"
