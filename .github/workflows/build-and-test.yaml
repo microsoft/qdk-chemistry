@@ -631,10 +631,14 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        compiler: [msvc, clang-cl]
+        include:
+        - compiler: msvc
+          uarch: AVX2
+        - compiler: clang-cl
+          uarch: x86-64-v3
     env:
       VCPKG_TRIPLET: x64-windows-static-md
-      QDK_UARCH: ${{ matrix.compiler == 'msvc' && 'AVX2' || 'x86-64-v3' }}
+      QDK_UARCH: ${{ matrix.uarch }}
       CTEST_WORKERS: '12'
       OMP_NUM_THREADS: '4'
       PYTHON_TEST_WORKERS: '8'
