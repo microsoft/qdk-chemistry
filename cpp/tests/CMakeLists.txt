@@ -48,6 +48,9 @@ configure_file(${QDK_SCF_TEST_DIR}/test_config.h.in ${PROJECT_BINARY_DIR}/tests/
 
 # Collect all test source files
 file(GLOB_RECURSE TEST_SOURCES "test_*.cpp")
+if(NOT QDK_CHEMISTRY_ENABLE_GPU)
+    list(FILTER TEST_SOURCES EXCLUDE REGEX "/test_sequant_cutensor\\.cpp$")
+endif()
 
 list(APPEND TEST_SOURCES
     ${QDK_SCF_TEST_DIR}/int1e_test.cpp
@@ -99,6 +102,9 @@ endforeach()
 
 # chemistry links SeQuant privately, so its smoke test needs it directly.
 target_link_libraries(test_sequant PRIVATE SeQuant::SeQuant)
+if(QDK_CHEMISTRY_ENABLE_GPU)
+    target_link_libraries(test_sequant_cutensor PRIVATE sequant_cutensor)
+endif()
 
 # Print information about discovered tests for debugging
 message(STATUS "Found ${CMAKE_CURRENT_LIST_LENGTH} test files:")

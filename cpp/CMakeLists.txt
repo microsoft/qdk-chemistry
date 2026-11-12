@@ -347,7 +347,11 @@ endif()
 
 
 # Install targets
-install(TARGETS chemistry ${QDK_DEP_EXPORTS}
+set(_qdk_install_targets chemistry)
+if(TARGET sequant_cutensor)
+  list(APPEND _qdk_install_targets sequant_cutensor)
+endif()
+install(TARGETS ${_qdk_install_targets} ${QDK_DEP_EXPORTS}
     EXPORT chemistryTargets
     LIBRARY DESTINATION lib
     ARCHIVE DESTINATION lib
@@ -365,11 +369,15 @@ configure_file(
   ${PROJECT_BINARY_DIR}/include/qdk/chemistry/config.hpp
 )
 
-# Install static headers
+# Install static headers; those of the cuTENSOR backend only in GPU builds.
+if(NOT QDK_CHEMISTRY_ENABLE_GPU)
+  set(_qdk_header_excludes PATTERN "cutensor" EXCLUDE)
+endif()
 install(
   DIRECTORY   ${PROJECT_SOURCE_DIR}/include
   DESTINATION .
   FILES_MATCHING PATTERN "*.hpp"
+  ${_qdk_header_excludes}
 )
 
 # Install generated headers

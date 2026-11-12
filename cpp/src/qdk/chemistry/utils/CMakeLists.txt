@@ -11,3 +11,7 @@ target_sources(chemistry PRIVATE
 if(WIN32)
     target_link_libraries(chemistry PRIVATE advapi32)
 endif()
+
+if(QDK_CHEMISTRY_ENABLE_GPU)
+    add_subdirectory(cutensor)
+endif()
