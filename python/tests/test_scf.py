@@ -459,6 +459,18 @@ class TestScfSolver:
         # Check that orbitals are unrestricted (not restricted) for the doublet state
         assert not orbitals.is_restricted()
 
+    def _assert_dft_runs_after_scf_failure(self):
+        # Invalid GDM settings fail after GauXC creation, so a later DFT run
+        # verifies that cleanup leaves the cache usable.
+        nitrogen = Structure(
+            ["N", "N"],
+            np.array([[0.0, 0.0, 0.0], [0.0, 0.0, 1.2 * ANGSTROM_TO_BOHR]]),
+        )
+        solver = algorithms.create("scf_solver", "qdk")
+        solver.settings().set("method", "pbe")
+        energy, _ = solver.run(nitrogen, 0, 1, "def2-svp")
+        assert energy == pytest.approx(-109.30399851151739, abs=scf_energy_tolerance, rel=0)
+
     def test_scf_solver_oxygen_atom_invalid_energy_thresh_diis_switch_gdm(self):
         """Test SCF solver on oxygen atom with GDM - invalid energy_thresh_diis_switch."""
         oxygen = create_oxygen_structure()
@@ -472,6 +484,8 @@ class TestScfSolver:
         # Test that negative energy_thresh_diis_switch throws a ValueError (std::invalid_argument in C++)
         with pytest.raises(ValueError, match="energy_thresh_diis_switch must be greater than"):
             scf_solver.run(oxygen, 0, 1, "cc-pvdz")  # singlet state
+
+        self._assert_dft_runs_after_scf_failure()
 
     def test_scf_solver_oxygen_atom_invalid_bfgs_history_size_limit_gdm(self):
         """Test SCF solver on oxygen atom with GDM - invalid BFGS history size limit."""
@@ -487,27 +501,14 @@ class TestScfSolver:
         with pytest.raises(ValueError, match="GDM history size limit must be at least"):
             scf_solver.run(oxygen, 0, 1, "cc-pvdz")  # singlet state
 
-    @pytest.mark.parametrize(
-        ("setting", "value", "error"),
-        [
-            ("energy_thresh_diis_switch", -2e-4, ValueError),
-            ("gdm_bfgs_history_size_limit", 0, ValueError),
-            ("max_iterations", 1, RuntimeError),
-        ],
-    )
-    def test_dft_after_failed_scf(self, setting, value, error):
+        self._assert_dft_runs_after_scf_failure()
+
+    def test_dft_after_failed_scf(self):
         """A failed calculation must not contaminate DFT on a different molecule and basis."""
         failed_solver = algorithms.create("scf_solver", "qdk")
         failed_solver.settings().set("method", "pbe")
-        failed_solver.settings().set(setting, value)
-        with pytest.raises(error):
+        failed_solver.settings().set("max_iterations", 1)
+        with pytest.raises(RuntimeError):
             failed_solver.run(create_oxygen_structure(), 0, 1, "cc-pvdz")
 
-        nitrogen = Structure(
-            ["N", "N"],
-            np.array([[0.0, 0.0, 0.0], [0.0, 0.0, 1.2 * ANGSTROM_TO_BOHR]]),
-        )
-        solver = algorithms.create("scf_solver", "qdk")
-        solver.settings().set("method", "pbe")
-        energy, _ = solver.run(nitrogen, 0, 1, "def2-svp")
-        assert energy == pytest.approx(-109.30399851151739, abs=scf_energy_tolerance, rel=0)
+        self._assert_dft_runs_after_scf_failure()

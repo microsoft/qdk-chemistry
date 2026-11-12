@@ -82,7 +82,7 @@ jobs:
         - os-name: macOS
           runner: macos-26-xlarge
           build-parallel: 5
-          uarch: native
+          uarch: armv8-a
           python-version: '3.13'
           cpp-omp-threads: 4
           cpp-test-workers: 3
@@ -312,7 +312,7 @@ jobs:
 
         echo "=== Running C++ Tests ==="
         set +e
-        if [ "$QDK_UARCH" == "native" ]; then # Exclude particular test on macOS builds
+        if [ "${{ matrix.os-name }}" == "macOS" ]; then
           ctest -j "$CTEST_WORKERS" --output-on-failure --verbose --timeout 600 --output-junit ${{ github.workspace }}/test-results/ctest_results.xml -E "MACIS_SERIAL_TEST|AtomInitGuessEnergyConvergence"
         else
           ctest -j "$CTEST_WORKERS" --output-on-failure --verbose --timeout 600 --output-junit ${{ github.workspace }}/test-results/ctest_results.xml -E "MACIS_SERIAL_TEST"
@@ -631,10 +631,14 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        compiler: [msvc, clang-cl]
+        include:
+        - compiler: msvc
+          uarch: AVX2
+        - compiler: clang-cl
+          uarch: x86-64-v3
     env:
       VCPKG_TRIPLET: x64-windows-static-md
-      QDK_UARCH: ${{ matrix.compiler == 'msvc' && 'AVX2' || 'x86-64-v3' }}
+      QDK_UARCH: ${{ matrix.uarch }}
       CTEST_WORKERS: '12'
       OMP_NUM_THREADS: '4'
       PYTHON_TEST_WORKERS: '8'
@@ -859,14 +863,18 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        compiler: [msvc, clang-cl]
+        include:
+        - compiler: msvc
+          uarch: armv8.0
+        - compiler: clang-cl
+          uarch: armv8-a
     env:
       VCPKG_TRIPLET: arm64-windows-static-md
+      # MSVC and clang-cl use different spellings for the ARMv8-A baseline.
+      QDK_UARCH: ${{ matrix.uarch }}
       CTEST_WORKERS: '12'
       OMP_NUM_THREADS: '4'
       PYTHON_TEST_WORKERS: '8'
-      # Leave QDK_UARCH unset: MSVC has no generic ARM64 /arch value, and
-      # clang-cl auto-detects armv8-a.
       # Bump to force a rebuild of the cached dependencies.
       DEPS_CACHE_VERSION: v2
       CMAKE_POLICY_VERSION_MINIMUM: '3.5'
@@ -1001,6 +1009,7 @@ jobs:
         $depsInstall = "${{ github.workspace }}\deps-install-${{ matrix.compiler }}"
         $vcpkgInstalled = "${{ github.workspace }}\vcpkg_installed\${{ env.VCPKG_TRIPLET }}"
         cmake -S cpp -B "cpp/build-${{ matrix.compiler }}" -GNinja `
+          "-DQDK_UARCH=${{ env.QDK_UARCH }}" `
           -DQDK_CHEMISTRY_ENABLE_COVERAGE=OFF `
           -DQDK_CHEMISTRY_ENABLE_MPI=OFF `
           -DMACIS_ENABLE_TESTS=OFF `

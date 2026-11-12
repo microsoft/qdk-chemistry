@@ -15,7 +15,6 @@ param(
     [string]$Triplet       = $env:VCPKG_TRIPLET,
     [ValidateSet('conda', 'venv')]
     [string]$PythonEnv     = 'conda',
-    [ValidateRange(1, 2147483647)]
     [int]$TestWorkers     = 1
 )
 
