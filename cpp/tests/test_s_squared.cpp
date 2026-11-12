@@ -459,6 +459,49 @@ TEST(SSquaredCAS, O2_Triplet) {
               testing::rdm_tolerance);
 }
 
+// With equal alpha and beta electrons, spin_flip_symmetry restricts the CAS
+// solution to even (singlet) or odd (triplet) total spin; in this active
+// space the lowest M_S = 0 state is a singlet, and 'odd' reaches the triplet,
+// the M_S = 0 component of the lowest M_S = 1 state. Dense and Davidson
+// solvers agree.
+TEST(SSquaredCAS, O2_SpinFlipSymmetry) {
+  auto structure = testing::create_o2_structure();
+  auto scf_solver = ScfSolverFactory::create();
+  scf_solver->settings().set("scf_type", std::string("restricted"));
+  scf_solver->settings().set("method", "hf");
+  scf_solver->settings().set("enable_gdm", false);
+  auto [energy, wavefunction] = scf_solver->run(structure, 0, 3, "sto-3g");
+  auto orbitals = testing::with_active_space(
+      wavefunction->get_orbitals(), std::vector<size_t>{6, 7, 8, 9},
+      std::vector<size_t>{0, 1, 2, 3, 4, 5});
+  auto hamiltonian = HamiltonianConstructorFactory::create()->run(orbitals);
+
+  auto run = [&](const std::string& symmetry, int64_t dense_cutoff,
+                 unsigned int nalpha, unsigned int nbeta) {
+    auto calculator = MultiConfigurationCalculatorFactory::create("macis_cas");
+    calculator->settings().set("calculate_one_rdm", true);
+    calculator->settings().set("calculate_two_rdm", true);
+    calculator->settings().set("spin_flip_symmetry", symmetry);
+    calculator->settings().set("iterative_solver_dimension_cutoff",
+                               dense_cutoff);
+    return calculator->run(hamiltonian, nalpha, nbeta);
+  };
+
+  const auto [E_any, wfn_any] = run("none", 2000, 2, 2);
+  const auto [E_even, wfn_even] = run("even", 2000, 2, 2);
+  const auto [E_odd, wfn_odd] = run("odd", 2000, 2, 2);
+  EXPECT_NEAR(wfn_even->compute_s_squared(), 0.0, testing::rdm_tolerance);
+  EXPECT_NEAR(wfn_odd->compute_s_squared(), 2.0, testing::rdm_tolerance);
+  EXPECT_NEAR(wfn_any->compute_s_squared(), 0.0, testing::rdm_tolerance);
+  EXPECT_NEAR(E_any, E_even, 1e-10);
+  EXPECT_GT(E_odd, E_even + 1e-3);
+  EXPECT_NEAR(run("none", 2000, 3, 1).first, E_odd, 1e-10);
+
+  EXPECT_NEAR(run("even", 1, 2, 2).first, E_even, 1e-8);
+  EXPECT_NEAR(run("odd", 1, 2, 2).first, E_odd, 1e-8);
+  EXPECT_THROW(run("even", 2000, 3, 1), std::invalid_argument);
+}
+
 TEST(SSquaredCAS, N_Quartet) {
   auto structure = testing::create_nitrogen_structure();
   auto scf_solver = ScfSolverFactory::create();

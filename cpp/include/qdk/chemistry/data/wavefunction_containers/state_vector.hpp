@@ -56,8 +56,7 @@ class StateVectorContainer : public WavefunctionContainer {
    * @param sector Name of the single-particle sector the orbitals belong to
    * @param type Wavefunction type (SelfDual or NotSelfDual)
    */
-  StateVectorContainer(const VectorVariant& coeffs,
-                       const DeterminantVector& dets,
+  StateVectorContainer(VectorVariant coeffs, DeterminantVector dets,
                        std::shared_ptr<Orbitals> orbitals,
                        const std::string& sector = Wavefunction::DEFAULT_SECTOR,
                        WavefunctionType type = WavefunctionType::SelfDual);
@@ -99,8 +98,7 @@ class StateVectorContainer : public WavefunctionContainer {
    * (1-D), "two_orbital" (2-D), and "mutual_information" (2-D) (optional)
    * @param type Wavefunction type (SelfDual or NotSelfDual)
    */
-  StateVectorContainer(const VectorVariant& coeffs,
-                       const DeterminantVector& dets,
+  StateVectorContainer(VectorVariant coeffs, DeterminantVector dets,
                        std::shared_ptr<Orbitals> orbitals,
                        const std::optional<MatrixVariant>& one_rdm_spin_traced,
                        const std::optional<VectorVariant>& two_rdm_spin_traced,
@@ -130,8 +128,7 @@ class StateVectorContainer : public WavefunctionContainer {
    * (1-D), "two_orbital" (2-D), and "mutual_information" (2-D) (optional)
    * @param type Wavefunction type (SelfDual or NotSelfDual)
    */
-  StateVectorContainer(const VectorVariant& coeffs,
-                       const DeterminantVector& dets,
+  StateVectorContainer(VectorVariant coeffs, DeterminantVector dets,
                        std::shared_ptr<Orbitals> orbitals,
                        const std::optional<MatrixVariant>& one_rdm_spin_traced,
                        const std::optional<MatrixVariant>& one_rdm_aa,
@@ -165,7 +162,7 @@ class StateVectorContainer : public WavefunctionContainer {
    * @param type Wavefunction type (SelfDual or NotSelfDual).
    */
   StateVectorContainer(
-      const VectorVariant& coeffs, const DeterminantVector& dets,
+      VectorVariant coeffs, DeterminantVector dets,
       std::shared_ptr<Orbitals> orbitals,
       std::shared_ptr<MatrixVariant> one_rdm_spin_traced,
       std::shared_ptr<VectorVariant> two_rdm_spin_traced,
@@ -257,7 +254,7 @@ class StateVectorContainer : public WavefunctionContainer {
    * @param det Configuration/determinant to check for
    * @return True if the determinant is present
    */
-  bool contains_determinant(const Configuration& det) const;
+  virtual bool contains_determinant(const Configuration& det) const;
 
   /**
    * @brief Number of particles (active + inactive) as a symmetry-blocked
@@ -415,6 +412,42 @@ class StateVectorContainer : public WavefunctionContainer {
    * @brief Feed identifying data into a hash context.
    */
   void hash_update(qdk::chemistry::utils::HashContext& ctx) const override;
+
+ protected:
+  /**
+   * @brief Constructs the coefficients and reduced density matrix (RDM) data
+   *        of a derived container that generates its own determinants
+   *
+   * No determinants are stored; the derived class overrides the determinant
+   * accessors and @ref size.
+   *
+   * @param coeffs The vector of CI coefficients (can be real or complex)
+   * @param orbitals Shared pointer to orbital basis set
+   * @param one_rdm_spin_traced Spin-traced 1-RDM for active orbitals (optional)
+   * @param one_rdm_aa Alpha-alpha block of 1-RDM for active orbitals (optional)
+   * @param one_rdm_bb Beta-beta block of 1-RDM for active orbitals (optional)
+   * @param two_rdm_spin_traced Spin-traced 2-RDM for active orbitals (optional)
+   * @param two_rdm_aaaa Alpha-alpha-alpha-alpha block of 2-RDM for active
+   * orbitals (optional)
+   * @param two_rdm_aabb Alpha-alpha-beta-beta block of 2-RDM for active
+   * orbitals (optional)
+   * @param two_rdm_bbbb Beta-beta-beta-beta block of 2-RDM for active orbitals
+   * (optional)
+   * @param sector Name of the single-particle sector the orbitals belong to
+   * @param entropies Orbital entropies
+   * @param type Wavefunction type (SelfDual or NotSelfDual)
+   */
+  StateVectorContainer(VectorVariant coeffs, std::shared_ptr<Orbitals> orbitals,
+                       const std::optional<MatrixVariant>& one_rdm_spin_traced,
+                       const std::optional<MatrixVariant>& one_rdm_aa,
+                       const std::optional<MatrixVariant>& one_rdm_bb,
+                       const std::optional<VectorVariant>& two_rdm_spin_traced,
+                       const std::optional<VectorVariant>& two_rdm_aaaa,
+                       const std::optional<VectorVariant>& two_rdm_aabb,
+                       const std::optional<VectorVariant>& two_rdm_bbbb,
+                       const std::string& sector,
+                       const OrbitalEntropies& entropies,
+                       WavefunctionType type);
 
  private:
   /// Serialization version

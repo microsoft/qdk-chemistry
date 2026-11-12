@@ -7,12 +7,16 @@
  * See LICENSE.txt for details
  */
 
+#include <algorithm>
+#include <array>
+#include <cmath>
 #include <iomanip>
 #include <iostream>
 #include <macis/csr_hamiltonian.hpp>
 #include <macis/hamiltonian_generator/double_loop.hpp>
 #include <macis/solvers/davidson.hpp>
 #include <macis/util/fcidump.hpp>
+#include <numeric>
 #include <sparsexx/util/submatrix.hpp>
 
 #include "ut_common.hpp"
@@ -71,7 +75,257 @@ TEST_CASE("Davidson") {
         blas::dot(X.size(), X.data(), 1, AX.data(), 1),
         Catch::Matchers::WithinAbs(E0, testing::numerical_zero_tolerance));
   }
-  spdlog::drop_all();
+
+  SECTION("Restarted") {
+    auto D = sparsexx::extract_diagonal_elements(H);
+    // Small search spaces force many restarts; with max_m == 2 a restart
+    // keeps only the current Ritz vector
+    for (int64_t max_m : {2, 3, 4}) {
+      DYNAMIC_SECTION("max_m = " << max_m) {
+        std::vector<double> X(H.n());
+        macis::diagonal_guess(H.n(), H, X.data());
+        auto [niter, E0] = macis::restarted_davidson(
+            H.n(), max_m, 500, macis::SparseMatrixOperator(H), D.data(), 1e-8,
+            X.data());
+
+        REQUIRE(niter > 4);
+        REQUIRE_THAT(E0 + E_core, Catch::Matchers::WithinAbs(
+                                      E0_ref, testing::davidson_tolerance));
+        REQUIRE_THAT(
+            blas::nrm2(X.size(), X.data(), 1),
+            Catch::Matchers::WithinAbs(1.0, testing::numerical_zero_tolerance));
+
+        std::vector<double> AX(X.size());
+        sparsexx::spblas::gespmbv(1, 1., H, X.data(), H.n(), 0., AX.data(),
+                                  H.n());
+        REQUIRE_THAT(
+            blas::dot(X.size(), X.data(), 1, AX.data(), 1),
+            Catch::Matchers::WithinAbs(E0, testing::numerical_zero_tolerance));
+      }
+    }
+
+    std::vector<double> X_guess(H.n());
+    macis::diagonal_guess(H.n(), H, X_guess.data());
+    REQUIRE_THROWS(macis::restarted_davidson(H.n(), 4, 3,
+                                             macis::SparseMatrixOperator(H),
+                                             D.data(), 1e-8, X_guess.data()));
+
+    // Without throwing, too few iterations return the current Ritz pair and
+    // its residual norm
+    macis::diagonal_guess(H.n(), H, X_guess.data());
+    double res = 0.0;
+    auto [niter, E3] = macis::restarted_davidson(
+        H.n(), 4, 3, macis::SparseMatrixOperator(H), D.data(), 1e-8,
+        X_guess.data(), 1e-12, false, &res);
+    REQUIRE(niter == 3);
+    REQUIRE(res > 1e-8);
+    REQUIRE_THAT(
+        blas::nrm2(X_guess.size(), X_guess.data(), 1),
+        Catch::Matchers::WithinAbs(1.0, testing::numerical_zero_tolerance));
+    std::vector<double> R(H.n());
+    sparsexx::spblas::gespmbv(1, 1., H, X_guess.data(), H.n(), 0., R.data(),
+                              H.n());
+    REQUIRE_THAT(blas::dot(H.n(), X_guess.data(), 1, R.data(), 1),
+                 Catch::Matchers::WithinAbs(E3, 1e-10));
+    blas::axpy(H.n(), -E3, X_guess.data(), 1, R.data(), 1);
+    REQUIRE_THAT(blas::nrm2(H.n(), R.data(), 1),
+                 Catch::Matchers::WithinRel(res, 1e-6));
+
+    // Inexact operator (H plus a diagonal perturbation of about 1e-6)
+    // anchored by H: the Ritz pair after anchoring carries the residual of
+    // H, and convergence (even to a tolerance the inexact operator alone
+    // would declare met at once) is only accepted after anchoring
+    struct PerturbedOperator {
+      const decltype(H)& A;
+      const std::vector<double>& d;
+      void operator_action(size_t m, double alpha, const double* V, size_t LDV,
+                           double beta, double* AV, size_t LDAV) const {
+        macis::SparseMatrixOperator(A).operator_action(m, alpha, V, LDV, beta,
+                                                       AV, LDAV);
+        for (size_t j = 0; j < m; ++j)
+          for (size_t i = 0; i < d.size(); ++i)
+            AV[i + j * LDAV] += alpha * d[i] * V[i + j * LDV];
+      }
+    };
+    // (residual tolerance, anchor tolerance, perturbation): the last case
+    // anchors only when the perturbed solve would stop, with a perturbation
+    // whose own eigenpair misses the tolerance
+    const std::vector<std::array<double, 3>> cases = {
+        {1e-6, 1e-3, 1e-6}, {1e-2, 1e-3, 1e-6}, {1e-4, 1e-12, 1e-3}};
+    macis::SparseMatrixOperator exact(H);
+    for (auto [tol, anchor_tol, scale] : cases) {
+      std::vector<double> d(H.n());
+      for (size_t i = 0; i < d.size(); ++i) d[i] = scale * std::sin(1.0 + i);
+      PerturbedOperator perturbed{H, d};
+      macis::diagonal_guess(H.n(), H, X_guess.data());
+      auto [nit, E_mixed] = macis::restarted_davidson(
+          H.n(), 4, 500, perturbed, D.data(), tol, X_guess.data(), 1e-12, false,
+          &res, 0, &exact, anchor_tol);
+      REQUIRE(res < tol);
+      sparsexx::spblas::gespmbv(1, 1., H, X_guess.data(), H.n(), 0., R.data(),
+                                H.n());
+      const double rq = blas::dot(H.n(), X_guess.data(), 1, R.data(), 1);
+      blas::axpy(H.n(), -rq, X_guess.data(), 1, R.data(), 1);
+      REQUIRE(blas::nrm2(H.n(), R.data(), 1) < tol);
+      REQUIRE_THAT(blas::nrm2(H.n(), R.data(), 1),
+                   Catch::Matchers::WithinAbs(res, 1e-2 * tol));
+      REQUIRE_THAT(E_mixed, Catch::Matchers::WithinAbs(rq, 10 * tol * tol));
+      if (tol < 1e-5)
+        REQUIRE_THAT(
+            E_mixed + E_core,
+            Catch::Matchers::WithinAbs(E0_ref, testing::davidson_tolerance));
+    }
+
+    // Error estimates for an inexact operator anchored early: the errors of
+    // its images keep entering the collapsed basis as the Ritz vector moves
+    // away from the anchor, which without op_error stalls the residual above
+    // tol (at 1.5e-7). Re-anchoring on the estimated error converges, with
+    // the true residual within the estimate. An estimate that re-anchoring
+    // cannot satisfy stops the solve within a few iterations.
+    {
+      const double scale = 1e-3, tol = 1e-7;
+      std::vector<double> d(H.n());
+      for (size_t i = 0; i < d.size(); ++i) d[i] = scale * std::sin(1.0 + i);
+      PerturbedOperator perturbed{H, d};
+      macis::diagonal_guess(H.n(), H, X_guess.data());
+      macis::restarted_davidson(H.n(), 3, 500, perturbed, D.data(), tol,
+                                X_guess.data(), 1e-12, false, &res, 0, &exact,
+                                1e-2, nullptr, scale);
+      REQUIRE(res < tol);
+      sparsexx::spblas::gespmbv(1, 1., H, X_guess.data(), H.n(), 0., R.data(),
+                                H.n());
+      const double rq = blas::dot(H.n(), X_guess.data(), 1, R.data(), 1);
+      blas::axpy(H.n(), -rq, X_guess.data(), 1, R.data(), 1);
+      REQUIRE(blas::nrm2(H.n(), R.data(), 1) < 1.25 * tol);
+
+      macis::diagonal_guess(H.n(), H, X_guess.data());
+      auto [nit, E_stopped] = macis::restarted_davidson(
+          H.n(), 3, 500, perturbed, D.data(), tol, X_guess.data(), 1e-12, false,
+          &res, 0, &exact, 1e-2, nullptr, 1.0);
+      REQUIRE(nit < 30);
+      macis::diagonal_guess(H.n(), H, X_guess.data());
+      REQUIRE_THROWS(macis::restarted_davidson(
+          H.n(), 3, 500, perturbed, D.data(), tol, X_guess.data(), 1e-12, true,
+          nullptr, 0, &exact, 1e-2, nullptr, 1.0));
+    }
+
+    // Exact block of the preconditioner on the determinants of lowest
+    // diagonal: the same eigenpair in fewer iterations. The guess is the
+    // block's own lowest eigenvector, so at the first iteration lam equals
+    // its lowest eigenvalue (that component is dropped).
+    {
+      const int64_t n = H.n(), nblock = 100;
+      std::vector<int64_t> order(n);
+      std::iota(order.begin(), order.end(), int64_t(0));
+      std::partial_sort(order.begin(), order.begin() + nblock, order.end(),
+                        [&](int64_t a, int64_t b) { return D[a] < D[b]; });
+      macis::DavidsonBlockPreconditioner block;
+      block.index.assign(order.begin(), order.begin() + nblock);
+      std::sort(block.index.begin(), block.index.end());
+      std::vector<int64_t> where(n, -1);
+      for (int64_t a = 0; a < nblock; ++a) where[block.index[a]] = a;
+      block.Z.assign(nblock * nblock, 0.0);
+      const auto base = H.indexing();
+      for (int64_t a = 0; a < nblock; ++a) {
+        const int64_t row = block.index[a];
+        for (auto e = H.rowptr()[row] - base; e < H.rowptr()[row + 1] - base;
+             ++e) {
+          const int64_t b = where[H.colind()[e] - base];
+          if (b >= 0) block.Z[a + b * nblock] = H.nzval()[e];
+        }
+      }
+      block.lambda.resize(nblock);
+      lapack::syev(lapack::Job::Vec, lapack::Uplo::Lower, nblock,
+                   block.Z.data(), nblock, block.lambda.data());
+
+      macis::SparseMatrixOperator op(H);
+      auto block_guess = [&] {
+        std::vector<double> X(n, 0.0);
+        for (int64_t a = 0; a < nblock; ++a) X[block.index[a]] = block.Z[a];
+        return X;
+      };
+      std::vector<double> X_diag = block_guess(), X_block = block_guess();
+      auto [nit_diag, E_diag] = macis::restarted_davidson(
+          n, 3, 500, op, D.data(), 1e-8, X_diag.data());
+      auto [nit_block, E_block] = macis::restarted_davidson(
+          n, 3, 500, op, D.data(), 1e-8, X_block.data(), 1e-12, true, nullptr,
+          0, static_cast<const decltype(op)*>(nullptr), 0.0, &block);
+      REQUIRE(nit_block < nit_diag);
+      REQUIRE_THAT(E_block, Catch::Matchers::WithinAbs(E_diag, 1e-12));
+      REQUIRE_THAT(E_block + E_core, Catch::Matchers::WithinAbs(
+                                         E0_ref, testing::davidson_tolerance));
+      sparsexx::spblas::gespmbv(1, 1., H, X_block.data(), n, 0., R.data(), n);
+      blas::axpy(n, -E_block, X_block.data(), 1, R.data(), 1);
+      REQUIRE(blas::nrm2(n, R.data(), 1) < 1e-8);
+    }
+  }
+  testing::drop_test_loggers();
+}
+
+TEST_CASE("Restarted Davidson Long Tail") {
+  ROOT_ONLY(MPI_COMM_WORLD);
+  if (!spdlog::get("davidson")) spdlog::null_logger_mt("davidson");
+
+  // A vector with one dominant component and a long tail of components whose
+  // squares lie below half an ulp of 1, as in large CI vectors: one running
+  // sum per thread rounds the whole tail of the first thread away, which put
+  // the eigenvalue 2e-12 (32 threads) to 6e-11 (one thread) too high here.
+  // The guess is converged at the loose tolerance, so the returned eigenvalue
+  // is its Rayleigh quotient, from the start vector and, when anchored, from
+  // the anchor's image.
+  struct Diagonal {
+    const std::vector<double>& d;
+    void operator_action(size_t m, double alpha, const double* V, size_t LDV,
+                         double beta, double* AV, size_t LDAV) const {
+      for (size_t j = 0; j < m; ++j)
+        for (size_t i = 0; i < d.size(); ++i)
+          AV[i + j * LDAV] = alpha * d[i] * V[i + j * LDV] +
+                             (beta == 0.0 ? 0.0 : beta * AV[i + j * LDAV]);
+    }
+  };
+  const int64_t n = int64_t(1) << 20;
+  std::vector<double> d(n, 1.0), X0(n);
+  d[0] = -1.0;
+  X0[0] = 1.0;
+  long double xx = 1.0L, xdx = -1.0L;
+  for (int64_t i = 1; i < n; ++i) {
+    X0[i] = 5e-9 * (1.0 + 0.5 * std::sin(double(i)));
+    xx += (long double)X0[i] * X0[i];
+    xdx += (long double)X0[i] * X0[i];
+  }
+  const double rho = double(xdx / xx);
+  REQUIRE(rho + 1.0 > 5e-11);  // the tail matters at this tolerance
+
+  const Diagonal op{d};
+  for (bool anchored : {false, true}) {
+    std::vector<double> X = X0;
+    auto [niter, E] = macis::restarted_davidson(
+        n, 3, 10, op, d.data(), 1e-4, X.data(), 1e-12, true, nullptr, 0,
+        anchored ? &op : nullptr, 1e-4);
+    REQUIRE(niter == (anchored ? 2 : 1));
+    REQUIRE_THAT(E, Catch::Matchers::WithinAbs(rho, 1e-13));
+  }
+  testing::drop_test_loggers();
+}
+
+TEST_CASE("Davidson Work Arrays") {
+  // The vectorized FCI kernels load their tiles (carved from these arrays)
+  // with aligned loads; sizes span the small and the huge-page branch
+  auto aligned = [](const void* p) {
+    return reinterpret_cast<uintptr_t>(p) % macis::detail::davidson_alignment ==
+           0;
+  };
+  for (size_t n : {size_t(0), size_t(1), size_t(3), size_t(1000),
+                   size_t(1) << 17, (size_t(1) << 18) + 5}) {
+    for (int rep = 0; rep < 4; ++rep) {
+      auto c = macis::detail::davidson_alloc<char>(n);
+      auto f = macis::detail::davidson_alloc<float>(n);
+      auto d = macis::detail::davidson_alloc<double>(n);
+      REQUIRE(aligned(c.get()));
+      REQUIRE(aligned(f.get()));
+      REQUIRE(aligned(d.get()));
+    }
+  }
 }
 
 #ifdef MACIS_ENABLE_MPI
@@ -138,6 +392,6 @@ TEST_CASE("Parallel Davidson") {
   }
 
   MPI_Barrier(MPI_COMM_WORLD);
-  spdlog::drop_all();
+  testing::drop_test_loggers();
 }
 #endif

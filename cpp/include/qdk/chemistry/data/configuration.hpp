@@ -71,26 +71,15 @@ class Configuration : public DataClass {
       throw std::invalid_argument("Number of orbitals exceeds bitset capacity");
     }
 
+    // Hot path for large CI expansions: packs 4 modes per byte inline rather
+    // than through _packed_bytes and _set_orbital; ALPHA | BETA == DOUBLY
     Configuration result;
     result._bits_per_mode = 2;
-    result._packed_orbs.resize(_packed_bytes(num_orbitals, 2), 0);
-
+    result._packed_orbs.resize((num_orbitals + 3) / 4, 0);
     for (size_t i = 0; i < num_orbitals; ++i) {
-      bool has_alpha = orbs[i];
-      bool has_beta = orbs[max_spatial_orbs + i];
-
-      OccupationState state;
-      if (has_alpha && has_beta) {
-        state = DOUBLY;
-      } else if (has_alpha) {
-        state = ALPHA;
-      } else if (has_beta) {
-        state = BETA;
-      } else {
-        state = UNOCCUPIED;
-      }
-
-      result._set_orbital(i, state);
+      const unsigned state = (orbs[i] ? ALPHA : UNOCCUPIED) |
+                             (orbs[max_spatial_orbs + i] ? BETA : UNOCCUPIED);
+      result._packed_orbs[i / 4] |= state << (2 * (i % 4));
     }
     return result;
   }

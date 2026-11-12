@@ -81,5 +81,5 @@ TEST_CASE("MCSCF") {
         E, Catch::Matchers::WithinAbs(ref_E, testing::davidson_tolerance));
   }
 
-  spdlog::drop_all();
+  testing::drop_test_loggers();
 }

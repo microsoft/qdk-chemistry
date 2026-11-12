@@ -33,7 +33,6 @@ template <size_t N>
 py::dict casci_helper::impl(size_t nalpha, size_t nbeta, Hamiltonian &ham,
                             const py::dict &settings) {
   using wfn_type = macis::wfn_t<N>;
-  using generator_t = macis::SortedDoubleLoopHamiltonianGenerator<wfn_type>;
 
   size_t norbital = ham.norb;
   validate_electron_counts(nalpha, nbeta, norbital);
@@ -49,7 +48,7 @@ py::dict casci_helper::impl(size_t nalpha, size_t nbeta, Hamiltonian &ham,
 
   // Run CASCI
   std::vector<double> C_casci;
-  double E_casci = macis::CASRDMFunctor<generator_t>::rdms(
+  double E_casci = macis::CASRDMFunctor::rdms(
       mcscf_settings, macis::NumOrbital(norbital), nalpha, nbeta, ham._T.data(),
       ham._V.data(), nullptr, nullptr, C_casci);
 

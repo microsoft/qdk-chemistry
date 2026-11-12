@@ -136,24 +136,10 @@ struct asci_helper {
       QDK_LOGGER().debug(
           "Requested number of determinants ({}) exceeds FCI dimension ({}).",
           asci_settings.ntdets_max, fci_dimension);
-      // Dispatch FCI with the same generator type as the ASCI path
-      if (algo == "residue_arrays" &&
-          (nalpha + nbeta) <= residual_array_electron_num_limit) {
-        E_casci = macis::CASRDMFunctor<ra_gen_t>::rdms(
-            mcscf_settings, macis::NumOrbital(num_molecular_orbitals), nalpha,
-            nbeta, const_cast<double*>(T_a.data()),
-            const_cast<double*>(V_aaaa.data()), nullptr, nullptr, C_casci);
-      } else if (algo == "dynamic_bit_masking") {
-        E_casci = macis::CASRDMFunctor<dbm_gen_t>::rdms(
-            mcscf_settings, macis::NumOrbital(num_molecular_orbitals), nalpha,
-            nbeta, const_cast<double*>(T_a.data()),
-            const_cast<double*>(V_aaaa.data()), nullptr, nullptr, C_casci);
-      } else {
-        E_casci = macis::CASRDMFunctor<sdl_gen_t>::rdms(
-            mcscf_settings, macis::NumOrbital(num_molecular_orbitals), nalpha,
-            nbeta, const_cast<double*>(T_a.data()),
-            const_cast<double*>(V_aaaa.data()), nullptr, nullptr, C_casci);
-      }
+      E_casci = macis::CASRDMFunctor::rdms(
+          mcscf_settings, macis::NumOrbital(num_molecular_orbitals), nalpha,
+          nbeta, const_cast<double*>(T_a.data()),
+          const_cast<double*>(V_aaaa.data()), nullptr, nullptr, C_casci);
       // Generate determinant basis for RDM calculation
       dets = macis::generate_hilbert_space<typename sdl_gen_t::full_det_t>(
           num_molecular_orbitals, nalpha, nbeta);
@@ -188,9 +174,39 @@ struct asci_helper {
     }
 
     // Build wavefunction with unified builder (supports spin-dependent RDMs
-    // when requested)
-    data::Wavefunction wfn = build_wavefunction<data::StateVectorContainer>(
-        settings_, hamiltonian, ham_gen, num_molecular_orbitals, C_casci, dets);
+    // when requested); a parallel copy, as the first touch of a large vector
+    // is otherwise one thread's page faults
+    Eigen::VectorXd coefficients(C_casci.size());
+    const auto ncoef = static_cast<std::ptrdiff_t>(C_casci.size());
+#pragma omp parallel for schedule(static)
+    for (std::ptrdiff_t i = 0; i < ncoef; ++i) coefficients[i] = C_casci[i];
+    std::vector<double>().swap(C_casci);
+    data::Wavefunction wfn = build_wavefunction(
+        settings_, num_molecular_orbitals, std::move(coefficients),
+        [&](double* C, auto... rdms) {
+          ham_gen.form_rdms_spin_dep(dets.begin(), dets.end(), dets.begin(),
+                                     dets.end(), C, rdms...);
+        },
+        [&](double* C, auto&&... entropies) {
+          ham_gen.form_entropies(
+              dets.begin(), dets.end(), dets.begin(), dets.end(), C,
+              std::forward<decltype(entropies)>(entropies)...);
+        },
+        [&](Eigen::VectorXd coeffs, const auto& one_aa, const auto& one_bb,
+            const auto& two_aaaa, const auto& two_aabb, const auto& two_bbbb,
+            const data::OrbitalEntropies& entropies) {
+          std::vector<data::Configuration> configurations;
+          configurations.reserve(dets.size());
+          for (const auto& det : dets)
+            configurations.emplace_back(
+                data::Configuration::from_spin_half_bitset(
+                    det, num_molecular_orbitals));
+          return std::make_unique<data::StateVectorContainer>(
+              std::move(coeffs), std::move(configurations),
+              hamiltonian.get_orbitals(), std::nullopt, one_aa, one_bb,
+              std::nullopt, two_aaaa, two_aabb, two_bbbb, "electrons",
+              entropies, data::WavefunctionType::SelfDual);
+        });
 
     // Add core energy to get total energy
     double final_energy = E_casci + hamiltonian.get_core_energy();

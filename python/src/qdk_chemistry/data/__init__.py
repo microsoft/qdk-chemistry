@@ -13,6 +13,7 @@ Exposed classes are:
 - :class:`BasisSet`: Gaussian basis set definitions for quantum calculations.
 - :class:`BondFlavorDefinition`: Mapping from one shell-axis class to an opaque semantic flavor ID.
 - :class:`CanonicalFourCenterHamiltonianContainer`: Container for four-center two-electron integrals in canonical form.
+- :class:`CasStateVectorContainer`: Complete-active-space state vector that stores only its coefficients.
 - :class:`CholeskyHamiltonianContainer`: Container for Hamiltonians represented using Cholesky-decomposed integrals.
 - :class:`Circuit`: Quantum circuit information.
 - :class:`Configuration`: Electronic configuration state information.
@@ -84,6 +85,7 @@ from qdk_chemistry._core.data import (
     BasisSet,
     BondFlavorDefinition,
     CanonicalFourCenterHamiltonianContainer,
+    CasStateVectorContainer,
     CholeskyHamiltonianContainer,
     Configuration,
     ConfigurationSet,
@@ -161,6 +163,7 @@ __all__ = [
     "BasisSet",
     "BondFlavorDefinition",
     "CanonicalFourCenterHamiltonianContainer",
+    "CasStateVectorContainer",
     "CholeskyHamiltonianContainer",
     "Circuit",
     "CircuitExecutorData",

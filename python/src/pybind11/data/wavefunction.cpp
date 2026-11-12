@@ -15,6 +15,7 @@
 #include <qdk/chemistry.hpp>
 #include <qdk/chemistry/data/wavefunction.hpp>
 #include <qdk/chemistry/data/wavefunction_containers/amplitude_container.hpp>
+#include <qdk/chemistry/data/wavefunction_containers/cas_state_vector.hpp>
 #include <qdk/chemistry/data/wavefunction_containers/state_vector.hpp>
 
 #include "path_utils.hpp"
@@ -1369,6 +1370,15 @@ Examples:
       .def("contains_determinant", &StateVectorContainer::contains_determinant,
            "Check if a determinant is present in the expansion",
            py::arg("det"));
+
+  py::class_<CasStateVectorContainer, StateVectorContainer, py::smart_holder>(
+      data, "CasStateVectorContainer",
+      R"(
+Complete-active-space state vector that stores only its coefficients.
+
+Determinants are generated on demand. The container behaves and serializes as
+a :class:`StateVectorContainer`.
+)");
 
   // Bind AmplitudeType enum
   py::enum_<AmplitudeType>(data, "AmplitudeType",

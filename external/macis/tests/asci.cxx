@@ -571,7 +571,7 @@ TEST_CASE("ASCI") {
 #endif
 
   MACIS_MPI_CODE(MPI_Barrier(MPI_COMM_WORLD);)
-  spdlog::drop_all();
+  testing::drop_test_loggers();
 }
 
 TEST_CASE("ASCI Exponential Backoff", "[asci][backoff]") {
@@ -730,7 +730,7 @@ TEST_CASE("ASCI Exponential Backoff", "[asci][backoff]") {
         Catch::Matchers::WithinAbs(1.0, testing::numerical_zero_tolerance));
   }
 
-  spdlog::drop_all();
+  testing::drop_test_loggers();
 }
 
 TEST_CASE("CoreSelectionStrategy") {
@@ -940,5 +940,5 @@ TEST_CASE("CoreSelectionStrategy") {
   }
 
   MACIS_MPI_CODE(MPI_Barrier(MPI_COMM_WORLD);)
-  spdlog::drop_all();
+  testing::drop_test_loggers();
 }

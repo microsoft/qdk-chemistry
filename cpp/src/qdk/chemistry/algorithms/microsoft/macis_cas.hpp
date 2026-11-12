@@ -4,6 +4,7 @@
 
 #pragma once
 
+#include <limits>
 #include <macis/asci/determinant_search.hpp>
 #include <macis/hamiltonian_generator/sorted_double_loop.hpp>
 #include <qdk/chemistry/algorithms/mc.hpp>
@@ -16,11 +17,22 @@ namespace qdk::chemistry::algorithms::microsoft {
  * @class MacisCasSettings
  * @brief Settings class for MACIS CAS calculations.
  *
- * Inherits MCSCF defaults from MacisSettings.
+ * Inherits MCSCF defaults from MacisSettings and adds settings for the
+ * spin-flip symmetry and the Davidson search space.
  */
 class MacisCasSettings : public MacisSettings {
  public:
-  MacisCasSettings() = default;
+  MacisCasSettings() {
+    set_default<std::string>(
+        "spin_flip_symmetry", "none",
+        "Restrict the solution to even or odd total spin",
+        data::ListConstraint<std::string>{
+            {std::vector<std::string>{"none", "even", "odd"}}});
+    set_default<int64_t>(
+        "max_subspace", 10,
+        "Maximum number of vectors in the Davidson search space",
+        data::BoundConstraint<int64_t>{2, std::numeric_limits<int64_t>::max()});
+  }
   ~MacisCasSettings() override = default;
 };
 

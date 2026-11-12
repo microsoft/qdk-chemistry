@@ -150,9 +150,12 @@ MACIS CAS
 
 .. rubric:: Factory name: ``"macis_cas"`` (default)
 
-The :term:`MACIS` (Many-body Adaptive Configuration Interaction Solver) :term:`CAS` implementation provides a reference solver to compute the exact energy within the active space. This module is very memory and compute intensive, and is thus suitable only for small active spaces.
+The :term:`MACIS` (Many-body Adaptive Configuration Interaction Solver) :cite:`Williams-Young2023` :term:`CAS` implementation provides a reference solver to compute the exact energy within the active space.
+It uses a direct full :term:`CI` algorithm :cite:`Knowles1984,Olsen1988,Harrison1989` that never builds the Hamiltonian matrix, which makes it suitable for large active spaces.
+Large calculations run in mixed precision: the Hamiltonian is applied in single precision, and the result is refined until its double-precision residual meets ``ci_residual_tolerance`` :cite:`Dongarra1983,vanderVorst2000`.
+The resulting wavefunction stores only the :term:`CI` coefficients (:class:`~qdk_chemistry.data.CasStateVectorContainer`).
 
-This implementation uses only the common settings described above, plus the following MACIS-specific setting. For small determinant spaces (at or below ``iterative_solver_dimension_cutoff``), dense diagonalization is used; otherwise the iterative Davidson solver is employed.
+This implementation uses the common settings described above, plus the following MACIS-specific settings. For small determinant spaces (at or below ``iterative_solver_dimension_cutoff``), dense diagonalization is used; otherwise the iterative Davidson solver :cite:`Davidson1975` is employed.
 
 .. list-table::
    :header-rows: 1
@@ -162,10 +165,14 @@ This implementation uses only the common settings described above, plus the foll
      - Type
      - Default
      - Description
-   * - ``ci_matel_tol``
-     - float
-     - ``~2.2e-16`` (machine epsilon)
-     - Hamiltonian matrix element sparsification threshold for building the CI Hamiltonian
+   * - ``spin_flip_symmetry``
+     - string
+     - ``"none"``
+     - Restrict the solution to even (``"even"``: singlet, quintet, ...) or odd (``"odd"``: triplet, septet, ...) total spin, which roughly halves the cost; requires equal numbers of active alpha and beta electrons
+   * - ``max_subspace``
+     - int
+     - ``10``
+     - Maximum number of vectors in the Davidson search space; larger values can reduce the number of iterations at the cost of memory
 
 .. _macis-asci:
 
@@ -215,6 +222,11 @@ In addition to the common settings, :term:`MACIS` :term:`ASCI` supports the foll
      - Type
      - Default
      - Description
+
+   * - ``ci_matel_tol``
+     - float
+     - ``~2.2e-16`` (machine epsilon)
+     - Hamiltonian matrix element sparsification threshold for building the CI Hamiltonian
 
    * - ``ntdets_max``
      - int

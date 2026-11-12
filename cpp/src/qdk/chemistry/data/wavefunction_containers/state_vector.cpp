@@ -25,12 +25,12 @@ using ScalarVariant = ContainerTypes::ScalarVariant;
 // Constructors
 // ---------------------------------------------------------------------------
 
-StateVectorContainer::StateVectorContainer(const VectorVariant& coeffs,
-                                           const DeterminantVector& dets,
+StateVectorContainer::StateVectorContainer(VectorVariant coeffs,
+                                           DeterminantVector dets,
                                            std::shared_ptr<Orbitals> orbitals,
                                            const std::string& sector,
                                            WavefunctionType type)
-    : StateVectorContainer(coeffs, dets, orbitals,
+    : StateVectorContainer(std::move(coeffs), std::move(dets), orbitals,
                            std::nullopt,  // one_rdm_spin_traced
                            std::nullopt,  // one_rdm_aa
                            std::nullopt,  // one_rdm_bb
@@ -83,13 +83,14 @@ StateVectorContainer::StateVectorContainer(const Configuration& det,
 }
 
 StateVectorContainer::StateVectorContainer(
-    const VectorVariant& coeffs, const DeterminantVector& dets,
+    VectorVariant coeffs, DeterminantVector dets,
     std::shared_ptr<Orbitals> orbitals,
     const std::optional<MatrixVariant>& one_rdm_spin_traced,
     const std::optional<VectorVariant>& two_rdm_spin_traced,
     const std::string& sector, const OrbitalEntropies& entropies,
     WavefunctionType type)
-    : StateVectorContainer(coeffs, dets, orbitals, one_rdm_spin_traced,
+    : StateVectorContainer(std::move(coeffs), std::move(dets), orbitals,
+                           one_rdm_spin_traced,
                            std::nullopt,  // one_rdm_aa
                            std::nullopt,  // one_rdm_bb
                            two_rdm_spin_traced,
@@ -101,7 +102,7 @@ StateVectorContainer::StateVectorContainer(
 }
 
 StateVectorContainer::StateVectorContainer(
-    const VectorVariant& coeffs, const DeterminantVector& dets,
+    VectorVariant coeffs, DeterminantVector dets,
     std::shared_ptr<Orbitals> orbitals,
     const std::optional<MatrixVariant>& one_rdm_spin_traced,
     const std::optional<MatrixVariant>& one_rdm_aa,
@@ -114,24 +115,25 @@ StateVectorContainer::StateVectorContainer(
     : WavefunctionContainer(one_rdm_spin_traced, one_rdm_aa, one_rdm_bb,
                             two_rdm_spin_traced, two_rdm_aaaa, two_rdm_aabb,
                             two_rdm_bbbb, entropies, type),
-      _coefficients(coeffs),
-      _configuration_set(dets, orbitals, sector) {
+      _coefficients(std::move(coeffs)),
+      _configuration_set(std::move(dets), orbitals, sector) {
   QDK_LOG_TRACE_ENTERING();
-  auto n_coeffs =
-      detail::is_vector_variant_complex(coeffs)
-          ? static_cast<size_t>(std::get<Eigen::VectorXcd>(coeffs).size())
-          : static_cast<size_t>(std::get<Eigen::VectorXd>(coeffs).size());
-  if (n_coeffs != dets.size()) {
+  auto n_coeffs = detail::is_vector_variant_complex(_coefficients)
+                      ? static_cast<size_t>(
+                            std::get<Eigen::VectorXcd>(_coefficients).size())
+                      : static_cast<size_t>(
+                            std::get<Eigen::VectorXd>(_coefficients).size());
+  if (n_coeffs != _configuration_set.size()) {
     throw std::invalid_argument(
         "StateVectorContainer: coefficient vector size (" +
         std::to_string(n_coeffs) +
         ") does not match the number of determinants (" +
-        std::to_string(dets.size()) + ").");
+        std::to_string(_configuration_set.size()) + ").");
   }
 }
 
 StateVectorContainer::StateVectorContainer(
-    const VectorVariant& coeffs, const DeterminantVector& dets,
+    VectorVariant coeffs, DeterminantVector dets,
     std::shared_ptr<Orbitals> orbitals,
     std::shared_ptr<MatrixVariant> one_rdm_spin_traced,
     std::shared_ptr<VectorVariant> two_rdm_spin_traced,
@@ -143,20 +145,39 @@ StateVectorContainer::StateVectorContainer(
                             std::move(two_rdm_spin_traced),
                             std::move(active_one_rdm),
                             std::move(active_two_rdm), entropies, type),
-      _coefficients(coeffs),
-      _configuration_set(dets, orbitals, sector) {
+      _coefficients(std::move(coeffs)),
+      _configuration_set(std::move(dets), orbitals, sector) {
   QDK_LOG_TRACE_ENTERING();
-  auto n_coeffs =
-      detail::is_vector_variant_complex(coeffs)
-          ? static_cast<size_t>(std::get<Eigen::VectorXcd>(coeffs).size())
-          : static_cast<size_t>(std::get<Eigen::VectorXd>(coeffs).size());
-  if (n_coeffs != dets.size()) {
+  auto n_coeffs = detail::is_vector_variant_complex(_coefficients)
+                      ? static_cast<size_t>(
+                            std::get<Eigen::VectorXcd>(_coefficients).size())
+                      : static_cast<size_t>(
+                            std::get<Eigen::VectorXd>(_coefficients).size());
+  if (n_coeffs != _configuration_set.size()) {
     throw std::invalid_argument(
         "StateVectorContainer: coefficient vector size (" +
         std::to_string(n_coeffs) +
         ") does not match the number of determinants (" +
-        std::to_string(dets.size()) + ").");
+        std::to_string(_configuration_set.size()) + ").");
   }
+}
+
+StateVectorContainer::StateVectorContainer(
+    VectorVariant coeffs, std::shared_ptr<Orbitals> orbitals,
+    const std::optional<MatrixVariant>& one_rdm_spin_traced,
+    const std::optional<MatrixVariant>& one_rdm_aa,
+    const std::optional<MatrixVariant>& one_rdm_bb,
+    const std::optional<VectorVariant>& two_rdm_spin_traced,
+    const std::optional<VectorVariant>& two_rdm_aaaa,
+    const std::optional<VectorVariant>& two_rdm_aabb,
+    const std::optional<VectorVariant>& two_rdm_bbbb, const std::string& sector,
+    const OrbitalEntropies& entropies, WavefunctionType type)
+    : WavefunctionContainer(one_rdm_spin_traced, one_rdm_aa, one_rdm_bb,
+                            two_rdm_spin_traced, two_rdm_aaaa, two_rdm_aabb,
+                            two_rdm_bbbb, entropies, type),
+      _coefficients(std::move(coeffs)),
+      _configuration_set(DeterminantVector{}, orbitals, sector) {
+  QDK_LOG_TRACE_ENTERING();
 }
 
 // ---------------------------------------------------------------------------
@@ -791,8 +812,7 @@ StateVectorContainer::active_orbital_occupations() const {
 std::pair<Eigen::VectorXd, Eigen::VectorXd>
 StateVectorContainer::_active_occupations_pair() const {
   QDK_LOG_TRACE_ENTERING();
-  const auto& determinants = get_active_determinants();
-  if (determinants.empty()) {
+  if (size() == 0) {
     throw std::runtime_error("No determinants available");
   }
 
@@ -884,8 +904,7 @@ StateVectorContainer::total_orbital_occupations() const {
 std::pair<Eigen::VectorXd, Eigen::VectorXd>
 StateVectorContainer::_total_occupations_pair() const {
   QDK_LOG_TRACE_ENTERING();
-  const auto& determinants = get_active_determinants();
-  if (determinants.empty()) {
+  if (size() == 0) {
     throw std::runtime_error("No determinants available");
   }
 
@@ -982,7 +1001,7 @@ nlohmann::json StateVectorContainer::to_json() const {
         coeffs_real.data(), coeffs_real.data() + coeffs_real.size());
   }
 
-  j["configuration_set"] = _configuration_set.to_json();
+  j["configuration_set"] = get_configuration_set().to_json();
 
   {
     bool has_any_rdm = _one_rdm_spin_traced != nullptr ||
@@ -1062,7 +1081,7 @@ void StateVectorContainer::hash_update(
   WavefunctionContainer::hash_update(ctx);
   hash_value(ctx, get_container_type());
   hash_value(ctx, _coefficients);
-  hash_value(ctx, _configuration_set.content_hash());
+  hash_value(ctx, get_configuration_set().content_hash());
 }
 
 }  // namespace qdk::chemistry::data

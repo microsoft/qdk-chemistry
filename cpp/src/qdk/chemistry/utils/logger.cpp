@@ -8,6 +8,7 @@
 #include <spdlog/sinks/base_sink.h>
 #endif
 
+#include <atomic>
 #include <cstdio>
 #include <mutex>
 #include <qdk/chemistry/config.hpp>
@@ -58,7 +59,10 @@ static constexpr spdlog::level::level_enum default_level_from_config() {
   }
 }
 
-static spdlog::level::level_enum g_global_level = default_level_from_config();
+// Written under g_level_mutex; atomic so log_trace_entering can read it
+// without the lock
+static std::atomic<spdlog::level::level_enum> g_global_level =
+    default_level_from_config();
 static std::mutex g_level_mutex;
 
 // Single global logger instance
@@ -322,6 +326,13 @@ ScopedLogLevel::~ScopedLogLevel() {
 }
 
 void log_trace_entering(const std::source_location& location) {
+  // Building the context strings costs microseconds, so skip them unless
+  // trace messages are emitted (Logger::get keeps the logger at the global
+  // level); the logger is still initialized on first use
+  std::call_once(g_logger_init_flag, init_global_logger);
+  if (g_global_level.load(std::memory_order_relaxed) != spdlog::level::trace) {
+    return;
+  }
   auto logger = Logger::get();
   std::string file_ctx = path_to_colon_string(location.file_name(), "qdk");
   std::string method = extract_method_name(location.function_name());

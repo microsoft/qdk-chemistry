@@ -348,7 +348,7 @@ int main(int argc, char** argv) {
       std::vector<double> C;
       std::vector<wfn_type> dets;
       if (ci_exp == CIExpansion::CAS) {
-        E0 = macis::CASRDMFunctor<generator_t>::rdms(
+        E0 = macis::CASRDMFunctor::rdms(
             mcscf_settings, NumOrbital(n_active), nalpha, nbeta,
             T_active.data(), V_active.data(), nullptr /*active_ordm.data()*/,
             nullptr /*active_trdm.data()*/, C MACIS_MPI_CODE(, MPI_COMM_WORLD));
