@@ -402,19 +402,6 @@ MajoranaMapping MajoranaMapping::verstraete_cirac(const LatticeGraph& lattice) {
     return 2 * (mode_idx + 1) + offset;
   };
 
-  // Get a Pauli representation of the antisymmetric Majorana bilinear iγ_pγ_q
-  auto get_bilinear =
-      [&](std::size_t p,
-          std::size_t q) -> std::pair<std::complex<double>, SparsePauliWord> {
-    if (p < q) {
-      auto b = jw_base.bilinear(p, q);
-      return {b.first, b.second};
-    } else {
-      auto b = jw_base.bilinear(q, p);
-      return {-b.first, b.second};
-    }
-  };
-
   std::vector<std::pair<std::complex<double>, SparsePauliWord>> stabilizers;
   std::vector<std::map<std::pair<std::uint64_t, std::uint64_t>, std::size_t>>
       edge_to_stab_idx(2);
@@ -434,7 +421,7 @@ MajoranaMapping MajoranaMapping::verstraete_cirac(const LatticeGraph& lattice) {
           std::size_t p = get_aux_majorana(u, spin, a);
           std::size_t q = get_aux_majorana(v, spin, b);
 
-          auto [coeff, word] = get_bilinear(p, q);
+          auto [coeff, word] = jw_base.bilinear(p, q);
           edge_to_stab_idx[spin][{u, v}] = stabilizers.size();
           edge_to_stab_idx[spin][{v, u}] = stabilizers.size();
           stabilizers.emplace_back(coeff, std::move(word));
@@ -457,7 +444,7 @@ MajoranaMapping MajoranaMapping::verstraete_cirac(const LatticeGraph& lattice) {
     for (std::size_t i = 0; i < unpaired_modes.size(); i += 2) {
       if (i + 1 < unpaired_modes.size()) {
         auto [coeff, word] =
-            get_bilinear(unpaired_modes[i], unpaired_modes[i + 1]);
+            jw_base.bilinear(unpaired_modes[i], unpaired_modes[i + 1]);
         stabilizers.emplace_back(coeff, std::move(word));
       }
     }
@@ -490,7 +477,7 @@ MajoranaMapping MajoranaMapping::verstraete_cirac(const LatticeGraph& lattice) {
 
         std::size_t p = get_sys_majorana(i, s_u, a);
         std::size_t q = get_sys_majorana(j, s_v, b);
-        auto [coeff, word] = get_bilinear(p, q);
+        auto [coeff, word] = jw_base.bilinear(p, q);
 
         // For non-local paths, the raw JW bilinear iγ_pγ_q loses its long
         // Z-string by multiplying by edge stabilizer iγ̃_aγ̃_b
@@ -509,7 +496,7 @@ MajoranaMapping MajoranaMapping::verstraete_cirac(const LatticeGraph& lattice) {
       } else {
         std::size_t p = get_sys_majorana(i, s_u, a);
         std::size_t q = get_sys_majorana(j, s_v, b);
-        auto [coeff, word] = get_bilinear(p, q);
+        auto [coeff, word] = jw_base.bilinear(p, q);
         upper_triangle.emplace_back(coeff, std::move(word));
       }
     }

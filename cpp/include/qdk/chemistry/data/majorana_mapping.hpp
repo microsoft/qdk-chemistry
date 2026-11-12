@@ -78,13 +78,14 @@ class MajoranaMapping : public DataClass {
   /**
    * @brief Pauli image of the bilinear i*gamma_j*gamma_k.
    *
-   * O(1) lookup. For Majorana-atomic mappings the coefficient is real (+/-1);
-   * for bilinear-only mappings it is whatever was provided at construction.
+   * Majorana-atomic mappings multiply the two table entries, so the
+   * coefficient is real (+/-1); bilinear-only mappings return what was
+   * provided at construction.
    *
    * @throws std::out_of_range if j or k >= 2N.
    * @throws std::invalid_argument if j == k.
    */
-  std::pair<std::complex<double>, const SparsePauliWord&> bilinear(
+  std::pair<std::complex<double>, SparsePauliWord> bilinear(
       std::size_t j, std::size_t k) const;
 
   /// Whether individual Majoranas have a Pauli image.
@@ -287,7 +288,8 @@ class MajoranaMapping : public DataClass {
   /// Majorana-to-Pauli table (empty for bilinear-only mappings).
   std::vector<SparsePauliWord> table_;
 
-  /// Cached bilinear table, upper triangle row-major. Always populated.
+  /// Bilinears of a bilinear-only mapping, upper triangle row-major; empty
+  /// for Majorana-atomic mappings.
   std::vector<std::pair<std::complex<double>, SparsePauliWord>> bilinears_;
 
   /// Human-readable encoding name.
@@ -362,7 +364,8 @@ struct MajoranaMapResult {
  * @param integral_threshold Screening cutoff for one- and two-body integrals;
  *        two-body ones are screened as ((pq|rs) +/- (pq|sr)) / 2.
  * @return MajoranaMapResult with Pauli words and coefficients.
- * @throws std::invalid_argument If core_energy or an integral is not finite.
+ * @throws std::invalid_argument If the mapping needs more than 1024 qubits,
+ *         or core_energy or an integral is not finite.
  */
 MajoranaMapResult majorana_map_hamiltonian(
     const MajoranaMapping& mapping, double core_energy, const double* h1_alpha,
@@ -431,8 +434,8 @@ MajoranaMapResult majorana_map_hamiltonian(const MajoranaMapping& mapping,
  * @param integral_threshold Screening cutoff, as for
  *        ::majorana_map_hamiltonian.
  * @return MajoranaMapResult with Pauli words and coefficients.
- * @throws std::invalid_argument If core_energy, a factor, or a one-body
- *         integral is not finite.
+ * @throws std::invalid_argument If the mapping needs more than 1024 qubits,
+ *         or core_energy, a factor, or a one-body integral is not finite.
  */
 MajoranaMapResult majorana_map_hamiltonian_cholesky(
     const MajoranaMapping& mapping, double core_energy, const double* h1_alpha,
@@ -446,7 +449,10 @@ MajoranaMapResult majorana_map_hamiltonian_cholesky(
  *
  * Equivalent to ::majorana_map_hamiltonian but consumes the stored
  * (p,q,r,s) integrals without reconstructing a dense N^4 tensor, iterating
- * nonzero pair products rather than the full N^4 index space.
+ * nonzero pair products rather than the full N^4 index space.  Its two-body
+ * cost follows the stored entries, so it also maps beyond the 1024-qubit limit
+ * of the dense and Cholesky entry points, up to a 131072-qubit word limit; the
+ * dense one-body integrals still grow as N^2.
  *
  * Entries are read literally: positions that are not stored are zero, as in
  * the dense view of SparseHamiltonianContainer, and the resulting tensor is
@@ -477,8 +483,8 @@ MajoranaMapResult majorana_map_hamiltonian_cholesky(
  * @return MajoranaMapResult with Pauli words and coefficients.
  * @throws std::invalid_argument If spin_symmetric is false, any two-body
  *         index is outside [0, n_spatial), core_energy or an integral is not
- *         finite, or duplicate entries for the same position carry
- *         conflicting values.
+ *         finite, duplicate entries for the same position carry conflicting
+ *         values, or the mapping needs more than 131072 qubits.
  */
 MajoranaMapResult majorana_map_hamiltonian_sparse(
     const MajoranaMapping& mapping, double core_energy, const double* h1_alpha,

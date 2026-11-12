@@ -235,7 +235,10 @@ compressed form:
   and :func:`~qdk_chemistry.utils.model_hamiltonians.create_ppp_hamiltonian`).
   Stored entries are read literally, with unstored positions zero; use
   :meth:`~qdk_chemistry.data.SparseHamiltonianContainer.expand_symmetry_representatives`
-  to build them from symmetry representatives.
+  to build them from symmetry representatives.  Because its two-body cost
+  follows the stored entries, this path maps encodings beyond 1024 qubits, up
+  to a 131072-qubit word limit, although the dense one-body integrals still
+  grow as :math:`N^2`; the dense and Cholesky paths stop at 1024 qubits.
 - :class:`~qdk_chemistry.data.CholeskyHamiltonianContainer` — the three-center
   (Cholesky / density-fitted) factors are kept in their
   :math:`O(N^2 \cdot n_\text{aux})` form and the auxiliary index is contracted

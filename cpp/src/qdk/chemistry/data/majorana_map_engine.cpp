@@ -46,7 +46,8 @@ constexpr std::complex<double> excitation_coeff[2][2] = {
 //
 // Each uint64_t covers 64 qubits. Templated on NW (number of uint64
 // words) to keep everything on the stack. The engine dispatches to
-// NW in {1, ..., 16} at runtime (covers up to 1024 qubits).
+// NW in {1, ..., 16} (1024 qubits) for every integral format, and to powers
+// of two up to 2048 words (131072 qubits) for sparse integrals.
 
 template <std::size_t NW>
 struct PackedPauliWord {
@@ -377,7 +378,9 @@ struct CholeskyEriProvider {
 //
 // entries_ holds one canonical position per 8-fold class with a stored
 // member, with the values at (p,q,r,s) and (p,q,s,r), sorted so the sum does
-// not depend on input order; map_ holds every stored entry.
+// not depend on input order; map_ holds every stored entry.  The engine
+// builds pair products and excitation pairs only for the orbitals these
+// entries reference.
 struct SparseEriProvider {
   // Enables the dedicated non-zero-only two-body loop in majorana_map_impl.
   static constexpr bool kSparse = true;
@@ -390,9 +393,10 @@ struct SparseEriProvider {
   std::unordered_map<std::uint64_t, double> map_;
   // Canonical class positions, sorted lexicographically.
   std::vector<Entry> entries_;
-  // Stored (rs, value) entries of each (pq|·) row, for the row accessors that
-  // the per-channel loop uses.
-  std::vector<std::vector<std::pair<std::size_t, double>>> rows_;
+  // Stored (rs, value) entries of each (pq|·) row with any, keyed by p * N + q.
+  std::map<std::size_t, std::vector<std::pair<std::size_t, double>>> rows_;
+  // Orbitals q with a stored (pq|qs) or (pq|sq), keyed by p * N + s.
+  std::unordered_map<std::size_t, std::set<std::size_t>> contraction_orbitals_;
   std::size_t n_ = 0;
   mutable std::vector<double> row_buf_{};
   const std::vector<Entry>& entries() const { return entries_; }
@@ -415,7 +419,8 @@ struct SparseEriProvider {
   }
   const double* build_row(std::size_t p, std::size_t q) const {
     row_buf_.assign(n_ * n_, 0.0);
-    for (const auto& [rs, value] : rows_[p * n_ + q]) row_buf_[rs] = value;
+    if (const auto it = rows_.find(p * n_ + q); it != rows_.end())
+      for (const auto& [rs, value] : it->second) row_buf_[rs] = value;
     return row_buf_.data();
   }
   const double* row_aaaa(std::size_t p, std::size_t q) const {
@@ -443,43 +448,48 @@ MajoranaMapResult majorana_map_impl(const MajoranaMapping& mapping,
 
   // ─── Pair product cache ───────────────────────────────────────────
   //
-  // Precompute γ_j · γ_k = (-i) · bilinear(j, k) for each within-spin-block
-  // pair. Using bilinear() as the access primitive makes this work for both
-  // Majorana-atomic and bilinear-only mappings.
+  // γ_j · γ_k = (-i) · bilinear(j, k) for each within-spin-block pair.
+  // Dense and Cholesky loops read every pair, so they are precomputed;
+  // sparse integrals build only the pairs their stored entries reference.
 
   struct PackedPairProduct {
     std::complex<double> coeff;
     PackedPauliWord<NW> word;
   };
   const std::size_t maj_per_spin = 2 * n_spatial;
-  const std::size_t alpha_offset = 0;
-  const std::size_t beta_offset = maj_per_spin;
-
-  auto build_pair_cache =
-      [&](std::size_t global_offset) -> std::vector<PackedPairProduct> {
-    std::vector<PackedPairProduct> cache(maj_per_spin * maj_per_spin);
-    for (std::size_t i = 0; i < maj_per_spin; ++i) {
-      cache[i * maj_per_spin + i] = {{1.0, 0.0}, PackedPauliWord<NW>{}};
-      for (std::size_t j = 0; j < maj_per_spin; ++j) {
-        if (i == j) continue;
-        auto [bl_coeff, bl_word] =
-            mapping.bilinear(i + global_offset, j + global_offset);
-        cache[i * maj_per_spin + j] = {
-            std::complex<double>(0.0, -1.0) * bl_coeff,
-            sparse_to_packed<NW>(bl_word)};
-      }
-    }
-    return cache;
-  };
-
   const std::size_t num_spin_species =
       (mapping.num_modes() < 2 * n_spatial) ? 1 : 2;
 
-  auto ppair_alpha = build_pair_cache(alpha_offset);
-  std::vector<PackedPairProduct> ppair_beta;
-  if (num_spin_species == 2) {
-    ppair_beta = build_pair_cache(beta_offset);
+  auto make_pair_product = [&](std::size_t spin, std::size_t i,
+                               std::size_t j) -> PackedPairProduct {
+    if (i == j) return {{1.0, 0.0}, PackedPauliWord<NW>{}};
+    const std::size_t offset = spin * maj_per_spin;
+    auto [bl_coeff, bl_word] = mapping.bilinear(i + offset, j + offset);
+    return {std::complex<double>(0.0, -1.0) * bl_coeff,
+            sparse_to_packed<NW>(bl_word)};
+  };
+  std::array<std::vector<PackedPairProduct>, 2> dense_pairs;
+  std::array<std::unordered_map<std::size_t, PackedPairProduct>, 2>
+      sparse_pairs;
+  if constexpr (!EriProvider::kSparse) {
+    for (std::size_t spin = 0; spin < num_spin_species; ++spin) {
+      dense_pairs[spin].reserve(maj_per_spin * maj_per_spin);
+      for (std::size_t i = 0; i < maj_per_spin; ++i)
+        for (std::size_t j = 0; j < maj_per_spin; ++j)
+          dense_pairs[spin].push_back(make_pair_product(spin, i, j));
+    }
   }
+  auto pair_product = [&](std::size_t spin, std::size_t i,
+                          std::size_t j) -> const PackedPairProduct& {
+    const std::size_t index = i * maj_per_spin + j;
+    if constexpr (EriProvider::kSparse) {
+      auto& cache = sparse_pairs[spin];
+      if (auto it = cache.find(index); it != cache.end()) return it->second;
+      return cache.emplace(index, make_pair_product(spin, i, j)).first->second;
+    } else {
+      return dense_pairs[spin][index];
+    }
+  };
 
   auto mode_alpha = [](std::size_t p) -> std::size_t { return p; };
   auto mode_beta = [n_spatial](std::size_t p) -> std::size_t {
@@ -489,13 +499,12 @@ MajoranaMapResult majorana_map_impl(const MajoranaMapping& mapping,
   auto accumulate_epq = [&](std::size_t mode_p, std::size_t mode_q,
                             double h_pq) {
     bool is_alpha = mode_p < n_spatial;
-    auto& cache = is_alpha ? ppair_alpha : ppair_beta;
+    std::size_t spin = is_alpha ? 0 : 1;
     std::size_t bp = is_alpha ? mode_p : (mode_p - n_spatial);
     std::size_t bq = is_alpha ? mode_q : (mode_q - n_spatial);
     for (int a = 0; a < 2; ++a) {
       for (int b = 0; b < 2; ++b) {
-        const auto& [coeff, word] =
-            cache[(2 * bp + a) * maj_per_spin + (2 * bq + b)];
+        const auto& [coeff, word] = pair_product(spin, 2 * bp + a, 2 * bq + b);
         acc.accumulate(word, coeff * h_pq * 0.25 * excitation_coeff[a][b]);
       }
     }
@@ -520,16 +529,25 @@ MajoranaMapResult majorana_map_impl(const MajoranaMapping& mapping,
 
   // ─── One-body terms ──────────────────────────────────────────────
   // The split adds the δ_{qr} contraction -1/2 sum_q g'_pqqs of its two-body
-  // operator here; the general loops add it per integral.
+  // operator here; the general loops add it per integral.  Sparse integrals
+  // sum only the orbitals q with a stored term, in the same increasing order.
   auto contraction = [&](bool beta, std::size_t p, std::size_t s) {
     double sum = 0.0;
-    for (std::size_t q = 0; q < n_spatial; ++q) {
+    auto add = [&](std::size_t q) {
       const auto [symmetric, antisymmetric] =
           beta ? split(eri_provider.bbbb(p, q, q, s),
                        eri_provider.bbbb(p, q, s, q))
                : split(eri_provider.aaaa(p, q, q, s),
                        eri_provider.aaaa(p, q, s, q));
       sum += symmetric + antisymmetric;
+    };
+    if constexpr (EriProvider::kSparse) {
+      const auto it =
+          eri_provider.contraction_orbitals_.find(p * n_spatial + s);
+      if (it != eri_provider.contraction_orbitals_.end())
+        for (std::size_t q : it->second) add(q);
+    } else {
+      for (std::size_t q = 0; q < n_spatial; ++q) add(q);
     }
     return -0.5 * sum;
   };
@@ -565,46 +583,39 @@ MajoranaMapResult majorana_map_impl(const MajoranaMapping& mapping,
       std::size_t bra, ket;
       std::array<Terms, 2> symmetric, antisymmetric;
     };
-    auto make_pairs = [&](bool spin_sum, std::size_t spin) {
-      std::vector<ExcitationPair> pairs;
-      pairs.reserve(n_spatial * (n_spatial + 1) / 2);
-      for (std::size_t bra = 0; bra < n_spatial; ++bra) {
-        for (std::size_t ket = bra; ket < n_spatial; ++ket) {
-          ExcitationPair pair{bra, ket, {}, {}};
-          for (std::size_t channel = spin_sum ? 0 : spin;
-               channel < (spin_sum ? num_spin_species : spin + 1); ++channel) {
-            std::unordered_map<PackedPauliWord<NW>, std::complex<double>,
-                               PackedPauliWordHash<NW>>
-                symmetric, antisymmetric;
-            const auto& cache = channel == 0 ? ppair_alpha : ppair_beta;
-            for (std::size_t first = 0; first < 2; ++first) {
-              for (std::size_t second = 0; second < 2; ++second) {
-                const auto& forward =
-                    cache[(2 * bra + first) * maj_per_spin + 2 * ket + second];
-                const auto coefficient = 0.25 * excitation_coeff[first][second];
-                symmetric[forward.word] += coefficient * forward.coeff;
-                if (bra != ket) {
-                  const auto& reverse = cache[(2 * ket + first) * maj_per_spin +
-                                              2 * bra + second];
-                  symmetric[reverse.word] += coefficient * reverse.coeff;
-                  antisymmetric[forward.word] += coefficient * forward.coeff;
-                  antisymmetric[reverse.word] -= coefficient * reverse.coeff;
-                }
-              }
-            }
-            for (const auto& [word, coefficient] : symmetric) {
-              if (std::abs(coefficient) > 1e-15)
-                pair.symmetric[channel].emplace_back(coefficient, word);
-            }
-            for (const auto& [word, coefficient] : antisymmetric) {
-              if (std::abs(coefficient) > 1e-15)
-                pair.antisymmetric[channel].emplace_back(coefficient, word);
+    auto make_excitation_pair = [&](std::size_t bra, std::size_t ket,
+                                    bool spin_sum, std::size_t spin) {
+      ExcitationPair pair{bra, ket, {}, {}};
+      for (std::size_t channel = spin_sum ? 0 : spin;
+           channel < (spin_sum ? num_spin_species : spin + 1); ++channel) {
+        std::unordered_map<PackedPauliWord<NW>, std::complex<double>,
+                           PackedPauliWordHash<NW>>
+            symmetric, antisymmetric;
+        for (std::size_t first = 0; first < 2; ++first) {
+          for (std::size_t second = 0; second < 2; ++second) {
+            const auto& forward =
+                pair_product(channel, 2 * bra + first, 2 * ket + second);
+            const auto coefficient = 0.25 * excitation_coeff[first][second];
+            symmetric[forward.word] += coefficient * forward.coeff;
+            if (bra != ket) {
+              const auto& reverse =
+                  pair_product(channel, 2 * ket + first, 2 * bra + second);
+              symmetric[reverse.word] += coefficient * reverse.coeff;
+              antisymmetric[forward.word] += coefficient * forward.coeff;
+              antisymmetric[reverse.word] -= coefficient * reverse.coeff;
             }
           }
-          pairs.push_back(std::move(pair));
+        }
+        for (const auto& [word, coefficient] : symmetric) {
+          if (std::abs(coefficient) > 1e-15)
+            pair.symmetric[channel].emplace_back(coefficient, word);
+        }
+        for (const auto& [word, coefficient] : antisymmetric) {
+          if (std::abs(coefficient) > 1e-15)
+            pair.antisymmetric[channel].emplace_back(coefficient, word);
         }
       }
-      return pairs;
+      return pair;
     };
     auto product = [&](const Terms& left, const Terms& right, double scale,
                        bool both_orders) {
@@ -633,46 +644,60 @@ MajoranaMapResult majorana_map_impl(const MajoranaMapping& mapping,
       // cross-spin products coincide.
       if (both_orders) product(left[1], right[0], 2.0 * scale, false);
     };
-    auto same_spin = [&](const auto& pairs, bool beta) {
-      auto process = [&](std::size_t left, std::size_t right, double direct,
-                         double ket_swapped) {
-        const auto& first = pairs[left];
-        const auto& second = pairs[right];
+    // Maps the same-spin terms of one channel, or of both spin-summed.  Dense
+    // input returns its excitation pairs for the cross-spin loop, which sparse
+    // input never reaches because map_sparse requires restricted orbitals.
+    auto same_spin = [&](bool spin_sum, std::size_t spin) {
+      auto process = [&](const ExcitationPair& first,
+                         const ExcitationPair& second, bool distinct,
+                         double direct, double ket_swapped) {
         const auto [symmetric, antisymmetric] = split(direct, ket_swapped);
         channel_product(first.symmetric, second.symmetric, 0.5 * symmetric,
-                        left != right);
+                        distinct);
         channel_product(first.antisymmetric, second.antisymmetric,
-                        0.5 * antisymmetric, left != right);
+                        0.5 * antisymmetric, distinct);
       };
+      std::vector<ExcitationPair> pairs;
       if constexpr (EriProvider::kSparse) {
-        std::vector<std::size_t> pair_indices(n_spatial * n_spatial);
-        for (std::size_t index = 0; index < pairs.size(); ++index)
-          pair_indices[pairs[index].bra * n_spatial + pairs[index].ket] = index;
+        std::unordered_map<std::size_t, ExcitationPair> built;
+        auto pair_at = [&](std::size_t bra,
+                           std::size_t ket) -> const ExcitationPair& {
+          const std::size_t key = bra * n_spatial + ket;
+          if (auto it = built.find(key); it != built.end()) return it->second;
+          return built
+              .emplace(key, make_excitation_pair(bra, ket, spin_sum, spin))
+              .first->second;
+        };
         for (const auto& entry : eri_provider.entries())
-          process(pair_indices[entry.p * n_spatial + entry.q],
-                  pair_indices[entry.r * n_spatial + entry.s], entry.value,
+          process(pair_at(entry.p, entry.q), pair_at(entry.r, entry.s),
+                  entry.p != entry.r || entry.q != entry.s, entry.value,
                   entry.ket_swapped_value);
-        return;
-      }
-      for (std::size_t left = 0; left < pairs.size(); ++left) {
-        const auto& first = pairs[left];
-        const double* row = beta ? eri_provider.row_bbbb(first.bra, first.ket)
-                                 : eri_provider.row_aaaa(first.bra, first.ket);
-        for (std::size_t right = left; right < pairs.size(); ++right) {
-          const auto& second = pairs[right];
-          process(left, right, row[second.bra * n_spatial + second.ket],
-                  row[second.ket * n_spatial + second.bra]);
+      } else {
+        pairs.reserve(n_spatial * (n_spatial + 1) / 2);
+        for (std::size_t bra = 0; bra < n_spatial; ++bra)
+          for (std::size_t ket = bra; ket < n_spatial; ++ket)
+            pairs.push_back(make_excitation_pair(bra, ket, spin_sum, spin));
+        for (std::size_t left = 0; left < pairs.size(); ++left) {
+          const auto& first = pairs[left];
+          const double* row = spin == 1
+                                  ? eri_provider.row_bbbb(first.bra, first.ket)
+                                  : eri_provider.row_aaaa(first.bra, first.ket);
+          for (std::size_t right = left; right < pairs.size(); ++right) {
+            const auto& second = pairs[right];
+            process(first, second, left != right,
+                    row[second.bra * n_spatial + second.ket],
+                    row[second.ket * n_spatial + second.bra]);
+          }
         }
       }
+      return pairs;
     };
     if (spin_symmetric && num_spin_species == 2) {
-      same_spin(make_pairs(true, 0), false);
+      same_spin(true, 0);
     } else {
-      const auto alpha = make_pairs(false, 0);
-      same_spin(alpha, false);
+      const auto alpha = same_spin(false, 0);
       if (num_spin_species == 2) {
-        const auto beta = make_pairs(false, 1);
-        same_spin(beta, true);
+        const auto beta = same_spin(false, 1);
         for (const auto& first : alpha) {
           const double* row = eri_provider.row_aabb(first.bra, first.ket);
           for (const auto& second : beta) {
@@ -692,8 +717,8 @@ MajoranaMapResult majorana_map_impl(const MajoranaMapping& mapping,
             std::size_t mode_s, double eri) {
           bool pq_is_alpha = mode_p < n_spatial;
           bool rs_is_alpha = mode_r < n_spatial;
-          auto& cache_pq = pq_is_alpha ? ppair_alpha : ppair_beta;
-          auto& cache_rs = rs_is_alpha ? ppair_alpha : ppair_beta;
+          std::size_t spin_pq = pq_is_alpha ? 0 : 1;
+          std::size_t spin_rs = rs_is_alpha ? 0 : 1;
           std::size_t bp = pq_is_alpha ? mode_p : (mode_p - n_spatial);
           std::size_t bq = pq_is_alpha ? mode_q : (mode_q - n_spatial);
           std::size_t br = rs_is_alpha ? mode_r : (mode_r - n_spatial);
@@ -703,11 +728,11 @@ MajoranaMapResult majorana_map_impl(const MajoranaMapping& mapping,
           for (int a = 0; a < 2; ++a) {
             for (int b = 0; b < 2; ++b) {
               const auto& [coeff1, w1] =
-                  cache_pq[(2 * bp + a) * maj_per_spin + (2 * bq + b)];
+                  pair_product(spin_pq, 2 * bp + a, 2 * bq + b);
               for (int c = 0; c < 2; ++c) {
                 for (int d = 0; d < 2; ++d) {
                   const auto& [coeff2, w2] =
-                      cache_rs[(2 * br + c) * maj_per_spin + (2 * bs + d)];
+                      pair_product(spin_rs, 2 * br + c, 2 * bs + d);
                   std::complex<double> scale = coeff1 * coeff2 * half_eri *
                                                0.0625 * excitation_coeff[a][b] *
                                                excitation_coeff[c][d];
@@ -718,64 +743,75 @@ MajoranaMapResult majorana_map_impl(const MajoranaMapping& mapping,
           }
         };
 
-    // αα channel
-    for (std::size_t p = 0; p < n_spatial; ++p) {
-      for (std::size_t q = 0; q < n_spatial; ++q) {
-        const double* row = eri_provider.row_aaaa(p, q);
-        for (std::size_t r = 0; r < n_spatial; ++r) {
-          for (std::size_t s = 0; s < n_spatial; ++s) {
-            double eri = row[r * n_spatial + s];
-            if (std::abs(eri) < integral_threshold) continue;
-            accumulate_two_body_product(mode_alpha(p), mode_alpha(q),
-                                        mode_alpha(r), mode_alpha(s), eri);
-            if (q == r) {
-              accumulate_epq(mode_alpha(p), mode_alpha(s), -0.5 * eri);
-            }
+    // Visits one channel's integrals in row-major order: every position of
+    // dense and Cholesky rows, only the stored entries of sparse ones.
+    auto for_each_integral = [&]([[maybe_unused]] auto row_of, auto visit) {
+      if constexpr (EriProvider::kSparse) {
+        for (const auto& [pq, row] : eri_provider.rows_)
+          for (const auto& [rs, eri] : row)
+            visit(pq / n_spatial, pq % n_spatial, rs / n_spatial,
+                  rs % n_spatial, eri);
+      } else {
+        for (std::size_t p = 0; p < n_spatial; ++p) {
+          for (std::size_t q = 0; q < n_spatial; ++q) {
+            const double* row = row_of(p, q);
+            for (std::size_t r = 0; r < n_spatial; ++r)
+              for (std::size_t s = 0; s < n_spatial; ++s)
+                visit(p, q, r, s, row[r * n_spatial + s]);
           }
         }
       }
-    }
+    };
+
+    // αα channel
+    for_each_integral(
+        [&](std::size_t p, std::size_t q) {
+          return eri_provider.row_aaaa(p, q);
+        },
+        [&](std::size_t p, std::size_t q, std::size_t r, std::size_t s,
+            double eri) {
+          if (std::abs(eri) < integral_threshold) return;
+          accumulate_two_body_product(mode_alpha(p), mode_alpha(q),
+                                      mode_alpha(r), mode_alpha(s), eri);
+          if (q == r) {
+            accumulate_epq(mode_alpha(p), mode_alpha(s), -0.5 * eri);
+          }
+        });
 
     // ββ channel
-    for (std::size_t p = 0; p < n_spatial; ++p) {
-      for (std::size_t q = 0; q < n_spatial; ++q) {
-        const double* row = eri_provider.row_bbbb(p, q);
-        for (std::size_t r = 0; r < n_spatial; ++r) {
-          for (std::size_t s = 0; s < n_spatial; ++s) {
-            double eri = row[r * n_spatial + s];
-            if (std::abs(eri) < integral_threshold) continue;
-            accumulate_two_body_product(mode_beta(p), mode_beta(q),
-                                        mode_beta(r), mode_beta(s), eri);
-            if (q == r) {
-              accumulate_epq(mode_beta(p), mode_beta(s), -0.5 * eri);
-            }
+    for_each_integral(
+        [&](std::size_t p, std::size_t q) {
+          return eri_provider.row_bbbb(p, q);
+        },
+        [&](std::size_t p, std::size_t q, std::size_t r, std::size_t s,
+            double eri) {
+          if (std::abs(eri) < integral_threshold) return;
+          accumulate_two_body_product(mode_beta(p), mode_beta(q), mode_beta(r),
+                                      mode_beta(s), eri);
+          if (q == r) {
+            accumulate_epq(mode_beta(p), mode_beta(s), -0.5 * eri);
           }
-        }
-      }
-    }
+        });
 
     // αβ + βα cross-spin channels.  Restricted integrals serve both spin
     // orderings; unrestricted ones store αβ, with (pq|rs)_βα = (rs|pq)_αβ.
-    for (std::size_t p = 0; p < n_spatial; ++p) {
-      for (std::size_t q = 0; q < n_spatial; ++q) {
-        const double* row = eri_provider.row_aabb(p, q);
-        for (std::size_t r = 0; r < n_spatial; ++r) {
-          for (std::size_t s = 0; s < n_spatial; ++s) {
-            double eri = row[r * n_spatial + s];
-            if (std::abs(eri) < integral_threshold) continue;
-            accumulate_two_body_product(mode_alpha(p), mode_alpha(q),
-                                        mode_beta(r), mode_beta(s), eri);
-            if (spin_symmetric) {
-              accumulate_two_body_product(mode_beta(p), mode_beta(q),
-                                          mode_alpha(r), mode_alpha(s), eri);
-            } else {
-              accumulate_two_body_product(mode_beta(r), mode_beta(s),
-                                          mode_alpha(p), mode_alpha(q), eri);
-            }
+    for_each_integral(
+        [&](std::size_t p, std::size_t q) {
+          return eri_provider.row_aabb(p, q);
+        },
+        [&](std::size_t p, std::size_t q, std::size_t r, std::size_t s,
+            double eri) {
+          if (std::abs(eri) < integral_threshold) return;
+          accumulate_two_body_product(mode_alpha(p), mode_alpha(q),
+                                      mode_beta(r), mode_beta(s), eri);
+          if (spin_symmetric) {
+            accumulate_two_body_product(mode_beta(p), mode_beta(q),
+                                        mode_alpha(r), mode_alpha(s), eri);
+          } else {
+            accumulate_two_body_product(mode_beta(r), mode_beta(s),
+                                        mode_alpha(p), mode_alpha(q), eri);
           }
-        }
-      }
-    }
+        });
   }
 
   if (!mapping.stabilizers().empty()) {
@@ -936,14 +972,23 @@ MajoranaMapResult majorana_map_impl(const MajoranaMapping& mapping,
   return result;
 }
 
-constexpr std::size_t max_nw = 16;
+// Word counts the engine is instantiated for: each count up to 16 (1024
+// qubits), then powers of two for sparse integrals, whose two-body cost follows
+// the stored entries rather than N^4.  The list stops at 2048 words (131072
+// qubits), where each packed word already takes 32 KiB of stack.
+using DenseWordCounts =
+    std::index_sequence<1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16>;
+using SparseWordCounts =
+    std::index_sequence<1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16,
+                        32, 64, 128, 256, 512, 1024, 2048>;
+constexpr std::size_t max_dense_qubits = DenseWordCounts::size() * 64;
 
-// Runtime dispatch over the number of 64-bit words needed for the qubit
-// count, templated on the ERI provider so each storage format reuses the
+// Runtime dispatch to the narrowest instantiated word count that holds the
+// qubits, templated on the ERI provider so each storage format reuses the
 // identical mapping implementation.
-template <class EriProvider, std::size_t... Is>
+template <class EriProvider, std::size_t... Ws>
 MajoranaMapResult dispatch_by_words(
-    std::index_sequence<Is...>, std::size_t num_words,
+    std::index_sequence<Ws...>, std::size_t num_words,
     const MajoranaMapping& mapping, double core_energy, const double* h1_alpha,
     const double* h1_beta, const EriProvider& eri_provider,
     std::size_t n_spatial, bool spin_symmetric, bool pair_split,
@@ -951,11 +996,33 @@ MajoranaMapResult dispatch_by_words(
   using Fn = MajoranaMapResult (*)(
       const MajoranaMapping&, double, const double*, const double*,
       const EriProvider&, std::size_t, bool, bool, double, double);
-  static const std::array<Fn, sizeof...(Is)> table = {
-      {&majorana_map_impl<Is + 1, EriProvider>...}};
-  return table[num_words - 1](mapping, core_energy, h1_alpha, h1_beta,
-                              eri_provider, n_spatial, spin_symmetric,
-                              pair_split, threshold, integral_threshold);
+  static constexpr std::array<std::size_t, sizeof...(Ws)> widths{Ws...};
+  static const std::array<Fn, sizeof...(Ws)> table = {
+      {&majorana_map_impl<Ws, EriProvider>...}};
+  for (std::size_t i = 0; i < widths.size(); ++i) {
+    if (num_words <= widths[i]) {
+      return table[i](mapping, core_energy, h1_alpha, h1_beta, eri_provider,
+                      n_spatial, spin_symmetric, pair_split, threshold,
+                      integral_threshold);
+    }
+  }
+  throw std::invalid_argument("majorana_map_hamiltonian: num_qubits=" +
+                              std::to_string(mapping.num_qubits()) +
+                              " exceeds the maximum of " +
+                              std::to_string(widths.back() * 64) + " qubits.");
+}
+
+// Dense and Cholesky loops visit all N^4 positions, so they stop at 1024
+// qubits; checked before the integrals are read.
+void require_dense_width(const MajoranaMapping& mapping,
+                         const std::string& consumer) {
+  if (mapping.num_qubits() > max_dense_qubits) {
+    throw std::invalid_argument(
+        consumer + ": num_qubits=" + std::to_string(mapping.num_qubits()) +
+        " exceeds the " + std::to_string(max_dense_qubits) +
+        "-qubit limit for dense and Cholesky integrals; larger mappings need "
+        "a sparse Hamiltonian container.");
+  }
 }
 
 template <class EriProvider>
@@ -974,12 +1041,6 @@ MajoranaMapResult run_with_provider(const MajoranaMapping& mapping,
   }
   const std::size_t num_words = (num_qubits + 63) / 64;
 
-  if (num_words > max_nw) {
-    throw std::invalid_argument(
-        "majorana_map_hamiltonian: num_qubits=" + std::to_string(num_qubits) +
-        " exceeds the maximum of " + std::to_string(max_nw * 64) + " qubits.");
-  }
-
   // Screening would silently drop a NaN (|NaN| > threshold is false).
   if (!std::isfinite(core_energy)) {
     throw std::invalid_argument(
@@ -997,9 +1058,10 @@ MajoranaMapResult run_with_provider(const MajoranaMapping& mapping,
   if (!spin_symmetric) require_finite_one_body(h1_beta);
 
   return dispatch_by_words<EriProvider>(
-      std::make_index_sequence<max_nw>{}, num_words, mapping, core_energy,
-      h1_alpha, h1_beta, eri_provider, n_spatial, spin_symmetric, pair_split,
-      threshold, integral_threshold);
+      std::conditional_t<EriProvider::kSparse, SparseWordCounts,
+                         DenseWordCounts>{},
+      num_words, mapping, core_energy, h1_alpha, h1_beta, eri_provider,
+      n_spatial, spin_symmetric, pair_split, threshold, integral_threshold);
 }
 
 MajoranaMapResult map_dense(const MajoranaMapping& mapping, double core_energy,
@@ -1009,6 +1071,7 @@ MajoranaMapResult map_dense(const MajoranaMapping& mapping, double core_energy,
                             bool spin_symmetric, bool hermitian,
                             double threshold, double integral_threshold) {
   const std::string consumer = "majorana_map_hamiltonian";
+  require_dense_width(mapping, consumer);
   if (!hermitian) {
     const std::size_t count = n_spatial * n_spatial * n_spatial * n_spatial;
     for (const double* tensor : {eri_aaaa, eri_aabb, eri_bbbb}) {
@@ -1048,6 +1111,7 @@ MajoranaMapResult map_cholesky(const MajoranaMapping& mapping,
                                bool spin_symmetric, bool hermitian,
                                double threshold, double integral_threshold) {
   const std::string consumer = "majorana_map_hamiltonian_cholesky";
+  require_dense_width(mapping, consumer);
   const std::size_t n2 = n_spatial * n_spatial;
   auto require_finite = [&](const double* factors) {
     if (!std::all_of(factors, factors + n2 * naux,
@@ -1160,13 +1224,18 @@ MajoranaMapResult map_sparse(const MajoranaMapping& mapping, double core_energy,
   SparseEriProvider provider;
   provider.n_ = n_spatial;
   provider.map_.reserve(tensor.size());
-  provider.rows_.resize(n_spatial * n_spatial);
   std::set<TwoBodyKey> canonical_keys;
   for (const auto& [key, value] : tensor) {
     provider.map_[provider.key(key[0], key[1], key[2], key[3])] = value;
     provider.rows_[key[0] * n_spatial + key[1]].emplace_back(
         key[2] * n_spatial + key[3], value);
     canonical_keys.insert(eightfold_canonical(key));
+    if (key[1] == key[2])
+      provider.contraction_orbitals_[key[0] * n_spatial + key[3]].insert(
+          key[1]);
+    if (key[1] == key[3])
+      provider.contraction_orbitals_[key[0] * n_spatial + key[2]].insert(
+          key[1]);
   }
   // One canonical (p<=q, r<=s, (p,q)<=(r,s)) entry per class, in
   // lexicographic order, so accumulation is independent of input order.
@@ -1282,6 +1351,7 @@ MajoranaMapResult majorana_map_hamiltonian(const MajoranaMapping& mapping,
                               integral_threshold);
   }
 
+  detail::require_dense_width(mapping, "majorana_map_hamiltonian");
   const auto two_body = hamiltonian.get_two_body_integrals();
   const Eigen::VectorXd& aaaa = std::get<0>(two_body);
   const Eigen::VectorXd& aabb = std::get<1>(two_body);
