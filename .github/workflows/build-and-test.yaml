@@ -869,8 +869,8 @@ jobs:
       CTEST_WORKERS: '12'
       OMP_NUM_THREADS: '4'
       PYTHON_TEST_WORKERS: '8'
-      # Leave QDK_UARCH unset: MSVC has no generic ARM64 /arch value, and
-      # clang-cl auto-detects armv8-a.
+      # Let qdk-uarch.cmake select armv8-a for clang-cl; native MSVC uses its
+      # default ARM64 ISA because it has no generic /arch option.
       # Bump to force a rebuild of the cached dependencies.
       DEPS_CACHE_VERSION: v2
       CMAKE_POLICY_VERSION_MINIMUM: '3.5'
