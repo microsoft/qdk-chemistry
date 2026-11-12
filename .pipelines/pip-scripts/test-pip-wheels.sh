@@ -150,8 +150,7 @@ if [ -d "$EXACHEM_INSTALL_DIR" ]; then
 
     # Libint reads basis files from $LIBINT_DATA_PATH/basis.
     export LIBINT_DATA_PATH="${EXACHEM_INSTALL_DIR}"
-    # Scoped to just this pytest invocation, for the (upcoming, PR #611) ExaChem CCSD integration test's
-    # shutil.which("ExaChem") lookup.
+    # Scoped to just this pytest invocation, for the ExaChem CCSD integration test's shutil.which("ExaChem") lookup.
     export PATH="${EXACHEM_INSTALL_DIR}/bin:${PATH}"
     # ${LD_LIBRARY_PATH:+...} avoids a trailing/empty ":" component when unset -- the dynamic loader treats
     # that as the current working directory, an untrusted-search-path risk.
@@ -159,6 +158,8 @@ if [ -d "$EXACHEM_INSTALL_DIR" ]; then
 
     # command -v confirms the binary is actually reachable on PATH.
     command -v ExaChem
+    # The test container runs as root; OpenMPI's mpirun refuses to launch as root without these.
+    export OMPI_ALLOW_RUN_AS_ROOT=1 OMPI_ALLOW_RUN_AS_ROOT_CONFIRM=1
 fi
 
 
