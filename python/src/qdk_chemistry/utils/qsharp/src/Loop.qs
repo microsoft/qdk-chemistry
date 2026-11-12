@@ -10,31 +10,8 @@ namespace QDKChemistry.Utils.Loop {
     import Std.ResourceEstimation.IsResourceEstimating;
     import Std.ResourceEstimation.RepeatEstimates;
 
-    /// Runs every indexed iteration in simulation; estimation counts up to `numWarmupIterations`
-    /// exactly to warm stateful placement, then repeats the next iteration's cost for the rest.
-    operation Loop(numIterations : Int, numWarmupIterations : Int, iteration : (Int => Unit)) : Unit {
-        Fact(numIterations >= 0, "numIterations must be non-negative");
-        Fact(numWarmupIterations >= 0, "numWarmupIterations must be non-negative");
-        if IsResourceEstimating() {
-            let numExact = MinI(numIterations, numWarmupIterations);
-            for i in 0..numExact - 1 {
-                iteration(i);
-            }
-            if numIterations > numExact {
-                within {
-                    RepeatEstimates(numIterations - numExact);
-                } apply {
-                    iteration(numExact);
-                }
-            }
-        } else {
-            for i in 0..numIterations - 1 {
-                iteration(i);
-            }
-        }
-    }
-
-    /// Adjointable `Loop` whose derived adjoint counts the repeated body before the warm-up.
+    /// Counts warm-up iterations exactly before repeating the next iteration's cost under estimation;
+    /// simulation runs every iteration, and the adjoint reverses the warm-up and repeated-body order.
     operation LoopA(numIterations : Int, numWarmupIterations : Int, iteration : (Int => Unit is Adj)) : Unit is Adj {
         Fact(numIterations >= 0, "numIterations must be non-negative");
         Fact(numWarmupIterations >= 0, "numWarmupIterations must be non-negative");
@@ -57,7 +34,7 @@ namespace QDKChemistry.Utils.Loop {
         }
     }
 
-    /// Adjointable and controllable `Loop` with the same adjoint ordering as `LoopA`.
+    /// Adjointable and controllable version of `LoopA`.
     operation LoopCA(
         numIterations : Int,
         numWarmupIterations : Int,

@@ -61,7 +61,7 @@ namespace QDKChemistry.Utils.UnaryPhaseEstimation {
     /// (see `UnaryIterationWithControl`) and realize a wrong walk power.
     ///
     /// Under resource estimation one representative slot is repeated `numQueries` times, and the
-    /// first two of those repetitions are counted exactly (see `Loop.Loop`).
+    /// first two of those repetitions are counted exactly (see `Loop.LoopA`).
     internal operation ApplySignedPowerSchedule(
         applyBlockEncoding : (Qubit[] => Unit is Adj),
         applyReflection : (Qubit[] => Unit is Adj + Ctl),

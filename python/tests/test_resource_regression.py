@@ -1,4 +1,4 @@
-"""Regress logical counts and dollar-cost estimates against pytest-regressions baselines."""
+"""Regress logical counts and physical resource optima for each algorithm."""
 
 # --------------------------------------------------------------------------------------------
 # Copyright (c) Microsoft Corporation. All rights reserved.
@@ -15,7 +15,7 @@ from qdk_chemistry.data import (
     AlgorithmRef,
     Circuit,
     Configuration,
-    FactorizedHamiltonianContainer,
+    DFTHCHamiltonianContainer,
     Hamiltonian,
     MajoranaMapping,
     ModelOrbitals,
@@ -26,12 +26,9 @@ from qdk_chemistry.utils.qsharp import get_qsharp_context
 
 try:
     from qdk.qre import PSSPC, LatticeSurgery, estimate
-    from qdk.qre.dollar_cost import DollarCostModelFromSpec
     from qdk.qre.models import GateBased, RoundBasedFactory, SurfaceCode
 except ImportError:
-    pytest.skip("qdk.qre with dollar_cost is not available", allow_module_level=True)
-
-_TEST_DATA = Path(__file__).resolve().parent / "test_data"
+    pytest.skip("qdk.qre is not available", allow_module_level=True)
 
 #: Hamiltonian file and alpha/beta electron counts of each active space.
 _HAMILTONIANS = {
@@ -47,7 +44,7 @@ _NUM_QUERIES = 255
 def _circuit(hamiltonian_name: str, algorithm: str) -> Circuit:
     """Build the phase-estimation circuit of ``algorithm`` for ``hamiltonian_name``."""
     filename, num_alpha, num_beta = _HAMILTONIANS[hamiltonian_name]
-    hamiltonian = Hamiltonian.from_json_file(_TEST_DATA / filename)
+    hamiltonian = Hamiltonian.from_json_file(Path(__file__).parent / "test_data" / filename)
     num_orbitals = hamiltonian.get_one_body_integrals()[0].shape[0]
     mapping = MajoranaMapping.jordan_wigner(2 * num_orbitals)
     configuration = Configuration.canonical_hf_configuration(num_alpha, num_beta, num_orbitals)
@@ -67,7 +64,7 @@ def _circuit(hamiltonian_name: str, algorithm: str) -> Circuit:
         operator = create("qubit_mapper", "qdk").run(hamiltonian, mapping)
         builder = create("qpe_circuit_builder", "qdk_unary", num_queries=_NUM_QUERIES)
     else:
-        if not isinstance(hamiltonian.get_container(), FactorizedHamiltonianContainer):
+        if not isinstance(hamiltonian.get_container(), DFTHCHamiltonianContainer):
             hamiltonian = create("hamiltonian_factorization", "double_factorization").run(hamiltonian)
         operator = create("qubit_mapper", "sum_of_squares").run(hamiltonian, mapping)
         builder = create(
@@ -88,94 +85,65 @@ def _circuit(hamiltonian_name: str, algorithm: str) -> Circuit:
     return builder.run(state_preparation=state_preparation, qubit_hamiltonian=operator)[0]
 
 
-def _logical_counts(circuit: Circuit) -> dict[str, int]:
-    """Return the pinned subset of the circuit's logical counts."""
-    factory = circuit._qsharp_factory
-    counts = get_qsharp_context().logical_counts(factory.program, *factory.parameter.values())
-    return {
-        key: counts.get(key, 0)
-        for key in (
-            "numQubits",
-            "tCount",
-            "rotationCount",
-            "rotationDepth",
-            "cczCount",
-            "ccixCount",
-            "measurementCount",
-        )
-    }
-
-
-def _cheapest_estimate(application) -> dict[str, float]:
-    """Estimate as in the ``dollar_cost`` sample and return its cheapest feasible point."""
-    results = estimate(
-        application,
-        GateBased(error_rate=1e-4, gate_time=100, measurement_time=500),
-        isa_query=SurfaceCode.q() * RoundBasedFactory.q(),
-        trace_query=PSSPC.q() * LatticeSurgery.q(slow_down_factor=[1.0, 1.5, 2.0, 3.0, 4.0]),
-        max_error=0.01,
-    )
-    cost_model = DollarCostModelFromSpec(str(_TEST_DATA / "example_cost_spec.json"))
-    entries = [
-        {
-            "qubits": entry.qubits,
-            "runtime_ns": entry.runtime,
-            "usd": cost_model.cost_usd(qubits=entry.qubits, runtime_nanos=entry.runtime),
+@pytest.mark.parametrize("algorithm", ["trotter", "lcu", "sossa"])
+def test_resource_estimates(algorithm, num_regression):
+    """Pin each system's logical counts and physical optima, excluding nondeterministic trace estimates."""
+    resources = {}
+    for hamiltonian_name in _HAMILTONIANS:
+        circuit = _circuit(hamiltonian_name, algorithm)
+        factory = circuit._qsharp_factory
+        counts = get_qsharp_context().logical_counts(factory.program, *factory.parameter.values())
+        row = {
+            key: counts.get(key, 0)
+            for key in (
+                "numQubits",
+                "tCount",
+                "rotationCount",
+                "rotationDepth",
+                "cczCount",
+                "ccixCount",
+                "measurementCount",
+            )
         }
-        for entry in results
-    ]
-    assert entries, "the estimate has no feasible point within the error budget"
-    return min(entries, key=lambda entry: (entry["usd"], entry["runtime_ns"], entry["qubits"]))
+        for backend in ("counts", "trace"):
+            application = (
+                circuit.get_qre_application(use_trace_backend=False)
+                if backend == "counts"
+                else circuit.get_qre_application()
+            )
+            if backend == "trace":
+                assert application.get_trace().compute_qubits == row["numQubits"]
+            entries = list(
+                estimate(
+                    application,
+                    GateBased(error_rate=1e-4, gate_time=100, measurement_time=500),
+                    isa_query=SurfaceCode.q() * RoundBasedFactory.q(),
+                    trace_query=PSSPC.q() * LatticeSurgery.q(slow_down_factor=[1.0, 1.5, 2.0, 3.0, 4.0]),
+                    max_error=0.01,
+                )
+            )
+            assert entries, f"{hamiltonian_name}/{algorithm}/{backend} has no feasible estimate"
+            if backend == "counts" or algorithm == "trotter":
+                min_qubits = min(entries, key=lambda entry: (entry.qubits, entry.runtime))
+                fastest = min(entries, key=lambda entry: (entry.runtime, entry.qubits))
+                row.update(
+                    {
+                        f"{backend}_min_qubits": min_qubits.qubits,
+                        f"{backend}_min_qubits_runtime_ns": min_qubits.runtime,
+                        f"{backend}_fastest_qubits": fastest.qubits,
+                        f"{backend}_fastest_runtime_ns": fastest.runtime,
+                    }
+                )
+        for key, value in row.items():
+            resources.setdefault(key, []).append(value)
 
-
-_CASES = [
-    pytest.param(name, algorithm, id=f"{name}-{algorithm}")
-    for name in _HAMILTONIANS
-    for algorithm in ("trotter", "lcu", "sossa")
-]
-
-
-@pytest.mark.parametrize(("hamiltonian_name", "algorithm"), _CASES)
-def test_logical_counts(hamiltonian_name, algorithm, data_regression):
-    """The circuit's logical counts must match the pinned values."""
-    data_regression.check(
-        _logical_counts(_circuit(hamiltonian_name, algorithm)),
-        basename=f"logical_counts_{hamiltonian_name}_{algorithm}",
-    )
-
-
-@pytest.mark.parametrize(("hamiltonian_name", "algorithm"), _CASES)
-def test_physical_estimate_and_dollar_cost(hamiltonian_name, algorithm, num_regression):
-    """The seeded counts backend must reproduce the cheapest point's qubits, runtime, and USD cost."""
-    application = _circuit(hamiltonian_name, algorithm).get_qre_application(use_trace_backend=False)
-
-    cheapest = _cheapest_estimate(application)
-
+    print(f"{algorithm} resource baseline: {resources!r}")
     num_regression.check(
-        cheapest,
-        basename=f"physical_estimate_and_dollar_cost_{hamiltonian_name}_{algorithm}",
+        resources,
+        data_index=list(_HAMILTONIANS),
+        basename=algorithm,
         default_tolerance={"atol": 0, "rtol": 0},
-        tolerances={"usd": {"atol": 1e-12, "rtol": 1e-6}},
     )
-
-
-@pytest.mark.parametrize(("hamiltonian_name", "algorithm"), _CASES)
-def test_the_default_trace_backend_estimates_the_circuit(hamiltonian_name, algorithm, num_regression):
-    """Trace every circuit on its logical qubits, pinning only the reproducible Trotter estimates."""
-    circuit = _circuit(hamiltonian_name, algorithm)
-    application = circuit.get_qre_application()
-
-    trace = application.get_trace()
-    cheapest = _cheapest_estimate(application)
-
-    assert trace.compute_qubits == _logical_counts(circuit)["numQubits"]
-    if algorithm == "trotter":
-        num_regression.check(
-            cheapest,
-            basename=f"default_trace_backend_{hamiltonian_name}",
-            default_tolerance={"atol": 0, "rtol": 0},
-            tolerances={"usd": {"atol": 1e-12, "rtol": 1e-6}},
-        )
 
 
 @pytest.mark.xfail(
