@@ -6,6 +6,7 @@
 #include <gtest/gtest.h>
 
 #include <array>
+#include <cmath>
 #include <complex>
 #include <limits>
 #include <map>
@@ -634,6 +635,55 @@ TEST(MPSConventionTest, SignedReferenceAmplitudes) {
   }
 }
 
+TEST(MPSConventionTest, NormAndOverlapOfSignedReference) {
+  using Complex = std::complex<double>;
+  // Real bond-dimension-one chain holding one product state.
+  auto product_sites = [](const std::string& states, double scale) {
+    const std::string order = "0ud2";
+    std::vector<MPSContainer::SitePtr> sites;
+    for (const char state : states) {
+      Eigen::MatrixXd site = Eigen::MatrixXd::Zero(4, 1);
+      site(static_cast<Eigen::Index>(order.find(state)), 0) =
+          sites.empty() ? scale : 1.0;
+      sites.push_back(make_site(site));
+    }
+    return sites;
+  };
+  auto orbitals = std::make_shared<ModelOrbitals>(3);
+  const std::vector<std::size_t> order{2, 0, 1};
+  const MPSContainer reference(signed_reference_sites(), orbitals, nullptr,
+                               std::nullopt, order);
+  const MPSContainer product(product_sites("u02", 3.0), orbitals, nullptr,
+                             std::nullopt, order);
+  EXPECT_NEAR(reference.norm(), 1.0, testing::wf_tolerance);
+  EXPECT_NEAR(product.norm(), 3.0, testing::wf_tolerance);
+  // The reference holds i/2 |u02>, and the bra is conjugated.
+  EXPECT_NEAR(std::abs(std::get<Complex>(reference.overlap(product)) -
+                       Complex(0.0, -1.5)),
+              0.0, testing::wf_tolerance);
+  EXPECT_NEAR(std::abs(std::get<Complex>(product.overlap(reference)) -
+                       Complex(0.0, 1.5)),
+              0.0, testing::wf_tolerance);
+
+  // Against a determinant expansion the signed amplitudes enter: for order
+  // [2,0,1] they are 1/2, -i/2, -1/2 and i/2 on the determinants below.
+  StateVectorContainer::DeterminantVector determinants;
+  for (const auto* bits : {"101001", "011010", "011100", "110100"}) {
+    determinants.push_back(from_blocked_bits(bits));
+  }
+  Eigen::VectorXcd coefficients(4);
+  coefficients << Complex(0.5, 0.0), Complex(0.0, 0.5), Complex(0.5, 0.0),
+      Complex(0.5, 0.0);
+  const StateVectorContainer expansion(coefficients, determinants, orbitals);
+  EXPECT_NEAR(std::abs(std::get<Complex>(reference.overlap(expansion)) -
+                       Complex(-0.25, -0.25)),
+              0.0, testing::wf_tolerance);
+
+  // A different site order would need fermionic swaps.
+  const MPSContainer identity(product_sites("u02", 1.0), orbitals);
+  EXPECT_THROW(reference.overlap(identity), std::runtime_error);
+}
+
 TEST_F(MPSContainerTest, CoefficientsContractBlockedSitesInBasisOrder) {
   using SBT = SymmetryBlockedTensor<3>;
   auto symmetry = std::make_shared<const SymmetryProduct>(
@@ -675,6 +725,7 @@ TEST_F(MPSContainerTest, CoefficientsContractBlockedSitesInBasisOrder) {
   const auto left = std::get<Eigen::MatrixXd>(first->to_dense());
   const auto right = std::get<Eigen::MatrixXd>(second->to_dense());
   std::size_t nonzero = 0;
+  double squared_norm = 0.0;
   for (Eigen::Index p0 = 0; p0 < 4; ++p0) {
     for (Eigen::Index p1 = 0; p1 < 4; ++p1) {
       double expected = 0.0;
@@ -689,6 +740,7 @@ TEST_F(MPSContainerTest, CoefficientsContractBlockedSitesInBasisOrder) {
         expected = -expected;
       }
       if (expected != 0.0) ++nonzero;
+      squared_norm += expected * expected;
       const auto det =
           Configuration::from_spin_half_string(std::string{s0, s1});
       EXPECT_NEAR(std::get<double>(container.get_coefficient(det)), expected,
@@ -697,6 +749,22 @@ TEST_F(MPSContainerTest, CoefficientsContractBlockedSitesInBasisOrder) {
     }
   }
   EXPECT_EQ(nonzero, 5u);
+  // The norm contracts the blocked sites and agrees with the amplitudes.
+  EXPECT_NEAR(container.norm(), std::sqrt(squared_norm), testing::wf_tolerance);
+  // Overlaps match local states through the physical bases: |ud> stored in
+  // the default (0,u,d,2) order picks rows u = 1 and d = 2 of (2,u,d,0).
+  Eigen::MatrixXd up = Eigen::MatrixXd::Zero(4, 1);
+  Eigen::MatrixXd down = Eigen::MatrixXd::Zero(4, 1);
+  up(1, 0) = 1.0;
+  down(2, 0) = 1.0;
+  const MPSContainer product({make_site(up), make_site(down)}, orbitals);
+  double amplitude = 0.0;
+  for (Eigen::Index bond = 0; bond < 3; ++bond) {
+    amplitude += left(1, bond) * right(bond * 4 + 2, 0);
+  }
+  EXPECT_NE(amplitude, 0.0);
+  EXPECT_NEAR(std::get<double>(product.overlap(container)), amplitude,
+              testing::wf_tolerance);
 }
 
 TEST_F(MPSContainerTest, SpinlessCoefficientsCarryPermutationSign) {

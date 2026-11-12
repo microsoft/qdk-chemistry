@@ -124,6 +124,13 @@ def test_coefficients_match_macis_determinants():
     phase = np.sign(np.dot(coefficients, signed))
     np.testing.assert_allclose(signed, phase * coefficients, atol=1e-8)
 
+    # Norm and overlap are contracted from the sites. The overlap needs both states on one orbital basis.
+    assert mps.norm() == pytest.approx(1.0, abs=1e-8)
+    same_basis = Wavefunction(
+        MPSContainer(exact_mps_sites(amplitudes), reference.get_orbitals(), site_to_orbital_order=site_order)
+    )
+    assert same_basis.overlap(reference) == pytest.approx(phase, abs=1e-8)
+
     # Negative control: the chain-ordered amplitudes without the fermionic sign do not match.
     unsigned = []
     for det in determinants:

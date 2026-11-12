@@ -230,9 +230,20 @@ class MPSContainer : public WavefunctionContainer {
       const std::string& name) const override;
 
   /**
-   * @brief Unsupported MPS contraction.
-   * @param other Wavefunction that would be used in the overlap.
-   * @throws std::runtime_error Always.
+   * @brief Overlap <this|other>, conjugating this state.
+   *
+   * With another MPSContainer the two chains are contracted site by site in
+   * O(num_sites * d * D^3); the sites are exported densely, so symmetry
+   * blocks are not exploited. Local states are matched through the physical
+   * bases, which may differ in order or extent. With a determinant expansion
+   * such as StateVectorContainer, the conjugated get_coefficient() of each
+   * determinant is summed against its coefficient. The stored scale is used
+   * as is; nothing is normalized.
+   * @param other MPS or determinant-expansion container on the same orbitals.
+   * @return Real overlap if both states are real, complex otherwise.
+   * @throws std::runtime_error if the orbitals differ, if two MPS differ in
+   * number of sites, site-to-orbital order or configuration encoding, or if
+   * @p other is neither an MPS nor a determinant expansion.
    */
   ScalarVariant overlap(const WavefunctionContainer& other) const override;
   /**
@@ -253,7 +264,10 @@ class MPSContainer : public WavefunctionContainer {
    * physical basis or @p det has fewer modes than the chain has sites.
    */
   ScalarVariant get_coefficient(const Configuration& det) const override;
-  /** @brief Unsupported MPS norm; throws std::runtime_error. */
+  /**
+   * @brief Norm sqrt(<this|this>) of the stored state, contracted from the
+   * sites in O(num_sites * d * D^3) without using the orthogonality center.
+   */
   double norm() const override;
   /** @brief Unsupported total orbital occupations; throws std::runtime_error.
    */

@@ -4,6 +4,7 @@
 
 #include <algorithm>
 #include <array>
+#include <cmath>
 #include <complex>
 #include <cstdint>
 #include <limits>
@@ -246,6 +247,71 @@ Scalar contract_amplitude(const std::vector<MPSContainer::SitePtr>& sites,
     left = std::move(right);
   }
   return left(0);
+}
+
+/**
+ * @brief Bond matrix of one local state of a densely packed site.
+ * @param dense Packed site with rows left * physical + local state.
+ * @param state Flattened physical index of the local state.
+ * @param physical Physical dimension of the site.
+ * @return Left-bond by right-bond matrix, converted to @p Result.
+ */
+template <typename Result, typename Scalar>
+Eigen::Matrix<Result, Eigen::Dynamic, Eigen::Dynamic> bond_matrix(
+    const Eigen::Matrix<Scalar, Eigen::Dynamic, Eigen::Dynamic>& dense,
+    Eigen::Index state, Eigen::Index physical) {
+  Eigen::Matrix<Result, Eigen::Dynamic, Eigen::Dynamic> bond(
+      dense.rows() / physical, dense.cols());
+  for (Eigen::Index left = 0; left < bond.rows(); ++left) {
+    bond.row(left) = dense.row(left * physical + state).template cast<Result>();
+  }
+  return bond;
+}
+
+/**
+ * @brief Contract <bra|ket> for two chains with one site per mode.
+ *
+ * Sites are exported densely, so symmetry blocks are not exploited: the cost
+ * is O(num_sites * d * D^3). Local states are matched through each site's
+ * physical basis, so the two chains may order or restrict their local states
+ * differently; a state missing on either side contributes zero.
+ * @param bra Sites of the conjugated state, all storing @p Bra.
+ * @param ket Sites of the other state, all storing @p Ket.
+ * @return Overlap, complex if either chain is.
+ */
+template <typename Bra, typename Ket>
+auto contract_overlap(const std::vector<MPSContainer::SitePtr>& bra,
+                      const std::vector<MPSContainer::SitePtr>& ket) {
+  using Result = decltype(Bra{} * Ket{});
+  using Matrix = Eigen::Matrix<Result, Eigen::Dynamic, Eigen::Dynamic>;
+  Matrix environment = Matrix::Ones(1, 1);
+  for (std::size_t s = 0; s < bra.size(); ++s) {
+    const auto bra_dense =
+        std::get<Eigen::Matrix<Bra, Eigen::Dynamic, Eigen::Dynamic>>(
+            bra[s]->to_dense());
+    const auto ket_dense =
+        std::get<Eigen::Matrix<Ket, Eigen::Dynamic, Eigen::Dynamic>>(
+            ket[s]->to_dense());
+    const auto& bra_basis = bra[s]->physical_basis();
+    const auto& ket_basis = ket[s]->physical_basis();
+    const auto bra_physical = static_cast<Eigen::Index>(bra_basis.size());
+    const auto ket_physical = static_cast<Eigen::Index>(ket_basis.size());
+    Matrix next = Matrix::Zero(bra_dense.cols(), ket_dense.cols());
+    for (Eigen::Index p = 0; p < bra_physical; ++p) {
+      const auto state =
+          bra_basis[static_cast<std::size_t>(p)].get_mode_state(0);
+      const auto match =
+          std::ranges::find_if(ket_basis, [state](const Configuration& local) {
+            return local.get_mode_state(0) == state;
+          });
+      if (match == ket_basis.end()) continue;
+      const auto q = static_cast<Eigen::Index>(match - ket_basis.begin());
+      next += bond_matrix<Result>(bra_dense, p, bra_physical).adjoint() *
+              environment * bond_matrix<Result>(ket_dense, q, ket_physical);
+    }
+    environment = std::move(next);
+  }
+  return environment(0, 0);
 }
 
 }  // namespace
@@ -524,9 +590,56 @@ MPSContainer::active_num_particles() const {
 }
 
 MPSContainer::ScalarVariant MPSContainer::overlap(
-    const WavefunctionContainer&) const {
-  throw std::runtime_error(
-      "overlap() is not implemented for MPS wavefunctions.");
+    const WavefunctionContainer& other) const {
+  if (get_orbitals() != other.get_orbitals()) {
+    throw std::runtime_error(
+        "Overlap only implemented for wavefunctions with same orbitals");
+  }
+  if (const auto* mps = dynamic_cast<const MPSContainer*>(&other)) {
+    if (mps->num_sites() != num_sites() ||
+        mps->_site_to_orbital_order != _site_to_orbital_order) {
+      throw std::runtime_error(
+          "Overlap between MPS wavefunctions requires the same number of "
+          "sites and the same site-to-orbital order.");
+    }
+    if (mps->_sites.front()->physical_basis().front().bits_per_mode() !=
+        _sites.front()->physical_basis().front().bits_per_mode()) {
+      throw std::runtime_error(
+          "Overlap between MPS wavefunctions requires the same configuration "
+          "encoding.");
+    }
+    using Complex = std::complex<double>;
+    if (is_complex()) {
+      return mps->is_complex()
+                 ? contract_overlap<Complex, Complex>(_sites, mps->_sites)
+                 : contract_overlap<Complex, double>(_sites, mps->_sites);
+    }
+    if (mps->is_complex()) {
+      return contract_overlap<double, Complex>(_sites, mps->_sites);
+    }
+    return contract_overlap<double, double>(_sites, mps->_sites);
+  }
+  // Determinant expansion: sum the conjugated MPS amplitude of each
+  // determinant times its coefficient. Containers without one throw here.
+  const auto& determinants = other.get_active_determinants();
+  std::complex<double> sum = 0.0;
+  const bool complex_result = std::visit(
+      [&](const auto& coefficients) -> bool {
+        for (std::size_t i = 0; i < determinants.size(); ++i) {
+          const auto amplitude = std::visit(
+              [](const auto& value) { return std::complex<double>(value); },
+              get_coefficient(determinants[i]));
+          sum +=
+              std::conj(amplitude) * coefficients(static_cast<Eigen::Index>(i));
+        }
+        return Eigen::NumTraits<typename std::decay_t<
+                   decltype(coefficients)>::Scalar>::IsComplex != 0;
+      },
+      other.get_coefficients());
+  if (complex_result || is_complex()) {
+    return sum;
+  }
+  return sum.real();
 }
 
 MPSContainer::ScalarVariant MPSContainer::get_coefficient(
@@ -586,7 +699,14 @@ MPSContainer::ScalarVariant MPSContainer::get_coefficient(
 }
 
 double MPSContainer::norm() const {
-  throw std::runtime_error("norm() is not implemented for MPS wavefunctions.");
+  const double squared =
+      is_complex()
+          ? contract_overlap<std::complex<double>, std::complex<double>>(_sites,
+                                                                         _sites)
+                .real()
+          : contract_overlap<double, double>(_sites, _sites);
+  // Rounding can leave a vanishing state marginally negative.
+  return std::sqrt(std::max(squared, 0.0));
 }
 
 std::shared_ptr<const SymmetryBlockedTensor<1>>

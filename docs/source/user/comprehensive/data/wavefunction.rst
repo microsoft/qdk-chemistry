@@ -137,8 +137,8 @@ MPS wavefunction container
 
 :class:`~qdk_chemistry.data.MPSContainer` stores a matrix product state (MPS), for example the result of a density matrix renormalization group (DMRG) calculation.
 It holds one :class:`~qdk_chemistry.data.MPSSite` per active orbital, each an optionally symmetry-blocked rank-3 tensor with left-bond, physical, and right-bond indices, together with the order of the orbitals along the chain and an optional orthogonality center.
-It is storage first: the sites are not expanded into determinants, so determinant-, norm-, overlap-, and occupation-based accessors raise.
-The one exception is :meth:`~qdk_chemistry.data.MPSContainer.get_coefficient`, which contracts the sites for a single determinant and serves as the executable definition of the convention below.
+It is storage first: the sites are not expanded into determinants, so accessors that need the full determinant list or orbital occupations raise.
+Three quantities are contracted directly from the sites: :meth:`~qdk_chemistry.data.MPSContainer.get_coefficient` gives the amplitude of a single determinant and serves as the executable definition of the convention below, ``norm`` gives the norm of the stored state, and ``overlap`` gives the overlap with another MPS that uses the same site order, or with a determinant expansion such as :class:`~qdk_chemistry.data.StateVectorContainer`.
 Particle counts and RDMs are available only if they are passed to the constructor.
 
 Fermionic coefficient convention
@@ -290,7 +290,7 @@ The :class:`~qdk_chemistry.data.Wavefunction` class provides access to various q
      - ✗
      - ✗
      - ✗
-     - ✗
+     - ✓
 
    * - **Norm calculations**
      - ✓
@@ -298,7 +298,7 @@ The :class:`~qdk_chemistry.data.Wavefunction` class provides access to various q
      - ✗
      - ✗
      - ✗
-     - ✗
+     - ✓
 
 
 
