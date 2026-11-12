@@ -100,7 +100,7 @@ void DensityFittingBase::generate_metric() {
 #ifdef QDK_CHEMISTRY_ENABLE_GPU
 void DensityFittingBase::solve_metric_system_device(double* X, size_t LDX) {
   QDK_LOG_TRACE_ENTERING();
-  const size_t naux = abs_.num_atomic_orbitals();
+  const size_t naux = abs_.nbf();
 #if QDK_CHEMISTRY_DF_INV_METHOD == QDK_CHEMISTRY_DF_CHOLESKY
   cusolver::potrs(*cusolverHandle_, CUBLAS_FILL_MODE_LOWER, naux, 1, d_metric_,
                   naux, X, LDX);
