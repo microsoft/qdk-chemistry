@@ -1095,7 +1095,7 @@ class TestSOSSAResourceEstimation:
         )
         circuit = builder.run(state_preparation=state_prep, qubit_hamiltonian=operator)[0]
 
-        counts = circuit.estimate().logical_counts
+        counts = circuit.estimate_logical_count()
         return counts["numQubits"], counts["cczCount"] + counts["ccixCount"]
 
     def test_fe2s2_logical_resource_estimate(self):

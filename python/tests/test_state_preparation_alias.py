@@ -79,7 +79,7 @@ class TestAliasSamplingStatePreparation:
         prep = AliasSamplingStatePreparation(bits_precision=4)
         circuit = prep.run(create_dense_wavefunction([0.5, 0.3, 0.7, 0.1]))
 
-        lc = circuit.estimate()["logicalCounts"]
+        lc = circuit.estimate_logical_count()
         assert lc["numQubits"] == 17
         assert lc["cczCount"] == 8
         assert lc["tCount"] == 0

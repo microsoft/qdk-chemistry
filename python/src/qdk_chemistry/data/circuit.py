@@ -13,23 +13,23 @@ Supported formats and conversions:
 # Copyright (c) Microsoft Corporation. All rights reserved.
 # Licensed under the MIT License. See LICENSE.txt in the project root for license information.
 # --------------------------------------------------------------------------------------------
-import warnings
 from collections.abc import Callable
 from dataclasses import dataclass
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 import h5py
-from qdk import TargetProfile, qsharp
-from qdk.estimator import EstimatorParams, EstimatorResult
-from qdk.openqasm import OutputSemantics
+from qdk import Context, TargetProfile, qsharp
+from qdk.openqasm import OutputSemantics, ProgramType
 from qdk.openqasm import circuit as openqasm_circuit
 from qdk.openqasm import compile as openqasm_compile
-from qdk.openqasm import estimate as openqasm_estimate
 
 from qdk_chemistry.data._hashing import _hash_optional, _hash_str, _hash_uint
 from qdk_chemistry.data.base import DataClass
 from qdk_chemistry.utils import Logger
 from qdk_chemistry.utils.qsharp import get_qsharp_context
+
+if TYPE_CHECKING:
+    from qdk.qre import Architecture, ErrorComposition, EstimationTable, ISAQuery, TraceQuery
 
 try:
     from qdk._interpreter import QirInputData
@@ -275,60 +275,82 @@ class Circuit(DataClass):
 
     def estimate(
         self,
-        params: dict[str, Any] | list[Any] | EstimatorParams | None = None,
-    ) -> EstimatorResult:
-        """Estimate resources with the deprecated ``qdk.estimator`` backend.
-
-        .. deprecated:: 2.4.0
-            Use :meth:`get_qre_application` with ``qdk.qre.estimate()`` and the ``qre`` extra instead;
-            see https://aka.ms/qdk.QREv3 for migration guidance.
+        architecture: "Architecture | None" = None,
+        isa_query: "ISAQuery | None" = None,
+        trace_query: "TraceQuery | None" = None,
+        *,
+        max_error: float = 1.0,
+        post_process: bool = False,
+        use_graph: bool = True,
+        composition: "ErrorComposition | None" = None,
+        name: str | None = None,
+        use_trace_backend: bool = False,
+    ) -> "EstimationTable":
+        """Estimate physical resources with QRE v3.
 
         Args:
-            params: Resource estimation parameters. Accepts a dict, list, or ``qsharp.estimator.EstimatorParams``.
+            architecture: Physical architecture; defaults to Majorana with error rate ``1e-6``.
+            isa_query: ISA query; defaults to ThreeAux with RoundBasedFactory.
+            trace_query: Trace query; defaults to QRE's PSSPC with lattice surgery.
+            max_error: Maximum allowed estimation error.
+            post_process: Apply application-specific post-processing.
+            use_graph: Prune dominated ISA instructions during estimation.
+            composition: Error-composition rule; defaults to QRE's union bound.
+            name: Optional name for the estimation table.
+            use_trace_backend: Opt into tracing instead of the default logical-counts backend.
 
         Returns:
-            The estimated resources.
+            A QRE v3 table of Pareto-optimal physical estimates.
 
         Raises:
-            RuntimeError: If no suitable circuit representation is available for estimation.
+            RuntimeError: If QRE is unavailable or the circuit has no supported representation.
 
         """
-        warnings.warn(
-            "Circuit.estimate() is deprecated and will be removed in a future release; it uses the older "
-            "version of the QDK Quantum Resource Estimator (qdk.estimator). Use Circuit.get_qre_application() "
-            "with qdk.qre.estimate() instead; see https://aka.ms/qdk.QREv3 for migration guidance.",
-            DeprecationWarning,
-            stacklevel=2,
-        )
-        return self._estimate(params)
+        application = self.get_qre_application(use_trace_backend=use_trace_backend)
+        from qdk.qre import ErrorComposition, estimate  # noqa: PLC0415
+        from qdk.qre.models import Majorana, RoundBasedFactory, ThreeAux  # noqa: PLC0415
 
-    def _estimate(
-        self,
-        params: dict[str, Any] | list[Any] | EstimatorParams | None = None,
-    ) -> EstimatorResult:
-        """Run the legacy estimator for internal callers without the public deprecation warning."""
+        return estimate(
+            application,
+            architecture if architecture is not None else Majorana(error_rate=1e-6),
+            isa_query if isa_query is not None else ThreeAux.q() * RoundBasedFactory.q(),
+            trace_query,
+            max_error=max_error,
+            post_process=post_process,
+            use_graph=use_graph,
+            composition=composition if composition is not None else ErrorComposition.UnionBound,
+            name=name,
+        )
+
+    def estimate_logical_count(self) -> dict[str, int]:
+        """Estimate logical gate counts for a Q# factory or OpenQASM circuit."""
         if self._qsharp_factory is not None:
             context = getattr(self._qsharp_factory.program, "_qdk_context", qsharp)
-            logical_counts = context.logical_counts(
-                self._qsharp_factory.program,
-                *self._qsharp_factory.parameter.values(),
+            counts = dict(
+                context.logical_counts(
+                    self._qsharp_factory.program,
+                    *self._qsharp_factory.parameter.values(),
+                )
             )
-            result = logical_counts.estimate(params)
         elif self.qasm is not None:
-            result = openqasm_estimate(self.qasm, params)
+            context = Context(target_profile=TargetProfile.Adaptive_RIF)
+            context.import_openqasm(self.qasm, name="EstimateLogicalCount", program_type=ProgramType.File)
+            counts = dict(context.logical_counts(context.code.qasm_import.EstimateLogicalCount))
         else:
-            raise RuntimeError("Cannot estimate resources: no Q# factory data or QASM representation is available.")
+            raise RuntimeError(
+                "Cannot estimate logical counts: no Q# factory data or QASM representation is available."
+            )
 
-        estimated_num_qubits = getattr(result, "logical_counts", {}).get("numQubits")
+        estimated_num_qubits = counts.get("numQubits")
         if self.num_qubits is not None and estimated_num_qubits is not None and estimated_num_qubits != self.num_qubits:
             Logger.info(
                 f"This circuit declares {self.num_qubits} qubits but the resource estimate reports "
                 f"{estimated_num_qubits}; there could be ancillary qubits allocated and deallocated "
                 "within the circuit."
             )
-        return result
+        return counts
 
-    def get_qre_application(self, use_trace_backend: bool = True):
+    def get_qre_application(self, use_trace_backend: bool = False):
         """Convert the circuit to a ``qdk.qre`` Application for resource estimation.
 
         Returns a ``QSharpApplication``, ``OpenQASMApplication``, or ``QIRApplication``
@@ -336,7 +358,7 @@ class Circuit(DataClass):
 
         Args:
             use_trace_backend: For Q# factory circuits, generate the QRE trace with the
-                ``qdk.qre`` trace backend instead of the logical-counts backend. The trace
+                ``qdk.qre`` trace backend instead of the default logical-counts backend. The trace
                 backend keeps ``RepeatEstimates`` blocks as repeated trace blocks but ignores
                 ``EnableMemoryComputeArchitecture``, so pass ``False`` to estimate a
                 memory-compute layout. It also draws the outcomes of measurements the circuit

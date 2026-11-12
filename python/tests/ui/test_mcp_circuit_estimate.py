@@ -6,9 +6,9 @@
 # --------------------------------------------------------------------------------------------
 
 import inspect
+import json
 import os
 from pathlib import Path
-from unittest.mock import MagicMock
 
 import pytest
 
@@ -48,51 +48,18 @@ def test_estimate_circuit_mcp_signature():
     ]
 
 
-def test_estimate_circuit_returns_raw_estimator_data(circuit_project, monkeypatch):
-    """The tool forwards parameters and returns JSON-compatible estimator data."""
-    params = {
-        "qubitParams": {"name": "qubit_gate_ns_e3"},
-        "qecScheme": {"name": "surface_code"},
-        "errorBudget": 0.001,
-    }
-    result_data = {
-        "status": "success",
-        "logicalCounts": {"numQubits": 1, "tCount": 1},
-    }
-    estimate_result = MagicMock()
-    estimate_result.data.return_value = result_data
-    estimate = MagicMock(return_value=estimate_result)
-    monkeypatch.setattr(data.Circuit, "estimate", estimate)
-
+@pytest.mark.parametrize("params", [None, {"max_error": 0.001, "name": "custom"}])
+def test_estimate_circuit_returns_qre_frontier(circuit_project, params):
+    """The tool accepts QRE v3 options and returns a JSON-compatible physical frontier."""
     result = srv.estimate_circuit(
         project_name=circuit_project,
         circuit_filename="input.circuit.json",
         params=params,
     )
 
-    assert result == {"status": "ok", "result": result_data}
-    estimate.assert_called_once_with(params)
-    estimate_result.data.assert_called_once_with()
-
-
-def test_estimate_circuit_preserves_batch_results(circuit_project, monkeypatch):
-    """A parameter batch returns estimator items in their original order."""
-    params = [
-        {"qubitParams": {"name": "qubit_gate_ns_e3"}},
-        {"qubitParams": {"name": "qubit_maj_ns_e4"}},
-    ]
-    result_data = [
-        {"status": "success", "physicalCounts": {"physicalQubits": 100}},
-        {"status": "success", "physicalCounts": {"physicalQubits": 200}},
-    ]
-    estimate_result = MagicMock()
-    estimate_result.data.return_value = result_data
-    monkeypatch.setattr(data.Circuit, "estimate", MagicMock(return_value=estimate_result))
-
-    result = srv.estimate_circuit(
-        project_name=circuit_project,
-        circuit_filename="input.circuit.json",
-        params=params,
-    )
-
-    assert result == {"status": "ok", "result": result_data}
+    assert result["status"] == "ok"
+    assert result["result"]
+    assert all(row["qubits"] > 0 and row["runtime"] > 0 for row in result["result"])
+    if params is not None:
+        assert all(row["name"] == "custom" for row in result["result"])
+    json.dumps(result)

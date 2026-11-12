@@ -2269,15 +2269,15 @@ def run_state_preparation(
 def estimate_circuit(
     project_name: str,
     circuit_filename: str,
-    params: dict[str, Any] | list[dict[str, Any]] | None = None,
+    params: dict[str, Any] | None = None,
 ) -> dict | list | str:
-    """Estimate a stored Circuit with its QDK estimator parameters and return the result inline."""
+    """Estimate a stored Circuit with QRE v3 estimator parameters and return its physical frontier."""
     circuit_filename = _strip(circuit_filename)
     circuit, error = _load_or_error(circuit_filename, data.Circuit, "circuit")
     if error:
         return error
 
-    return circuit.estimate(params).data()
+    return circuit.estimate(**(params or {})).as_frame().to_dict(orient="records")
 
 
 @app.tool()

@@ -226,7 +226,7 @@ class TestPrepareSelectMapper:
             circuit = registry.create("controlled_circuit_mapper", "prepare_select_prepare", **settings).run(
                 unitary_rep
             )
-            logical_counts = circuit.estimate().logical_counts
+            logical_counts = circuit.estimate_logical_count()
             return circuit.num_qubits, logical_counts["numQubits"], logical_counts["cczCount"]
 
         assert counts() == (12, 17, 19)

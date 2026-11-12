@@ -8,11 +8,13 @@
 from functools import cache
 from pathlib import Path
 
+import numpy as np
 import pytest
 
 from qdk_chemistry.algorithms import create
 from qdk_chemistry.data import (
     AlgorithmRef,
+    CholeskyHamiltonianContainer,
     Circuit,
     Configuration,
     DFTHCHamiltonianContainer,
@@ -22,19 +24,22 @@ from qdk_chemistry.data import (
     StateVectorContainer,
     Wavefunction,
 )
-from qdk_chemistry.utils.qsharp import get_qsharp_context
 
 try:
-    from qdk.qre import PSSPC, LatticeSurgery, estimate
+    from qdk.qre import PSSPC, LatticeSurgery
     from qdk.qre.models import GateBased, RoundBasedFactory, SurfaceCode
 except ImportError:
     pytest.skip("qdk.qre is not available", allow_module_level=True)
 
 #: Hamiltonian file and alpha/beta electron counts of each active space.
 _HAMILTONIANS = {
-    "ethylene_4e4o": ("ethylene_4e4o_2det.hamiltonian.json", 2, 2),
-    "f2_10e6o": ("f2_10e6o.hamiltonian.json", 5, 5),
-    "h2_dfthc": ("h2_dfthc_r2_b2_c1.hamiltonian.json", 1, 1),
+    "ethylene_4e4o": (Path(__file__).parent / "test_data" / "ethylene_4e4o_2det.hamiltonian.json", 2, 2),
+    "f2_10e6o": (Path(__file__).parent / "test_data" / "f2_10e6o.hamiltonian.json", 5, 5),
+    "h2_dfthc": (
+        Path(__file__).resolve().parents[2] / "examples" / "data" / "h2_dfthc_r2_b2_c1.hamiltonian.json",
+        1,
+        1,
+    ),
 }
 
 _NUM_QUERIES = 255
@@ -44,7 +49,7 @@ _NUM_QUERIES = 255
 def _circuit(hamiltonian_name: str, algorithm: str) -> Circuit:
     """Build the phase-estimation circuit of ``algorithm`` for ``hamiltonian_name``."""
     filename, num_alpha, num_beta = _HAMILTONIANS[hamiltonian_name]
-    hamiltonian = Hamiltonian.from_json_file(Path(__file__).parent / "test_data" / filename)
+    hamiltonian = Hamiltonian.from_json_file(filename)
     num_orbitals = hamiltonian.get_one_body_integrals()[0].shape[0]
     mapping = MajoranaMapping.jordan_wigner(2 * num_orbitals)
     configuration = Configuration.canonical_hf_configuration(num_alpha, num_beta, num_orbitals)
@@ -65,6 +70,17 @@ def _circuit(hamiltonian_name: str, algorithm: str) -> Circuit:
         builder = create("qpe_circuit_builder", "qdk_unary", num_queries=_NUM_QUERIES)
     else:
         if not isinstance(hamiltonian.get_container(), DFTHCHamiltonianContainer):
+            one_body = hamiltonian.get_one_body_integrals()[0]
+            two_body = hamiltonian.get_two_body_integrals()[0]
+            eigenvalues, eigenvectors = np.linalg.eigh(two_body.reshape(one_body.size, one_body.size))
+            assert eigenvalues.min() >= -1e-10 * eigenvalues.max()
+            keep = eigenvalues > 1e-10 * eigenvalues.max()
+            vectors = eigenvectors[:, keep] * np.sqrt(eigenvalues[keep])
+            hamiltonian = Hamiltonian(
+                CholeskyHamiltonianContainer(
+                    one_body, vectors, hamiltonian.get_orbitals(), hamiltonian.get_core_energy(), np.eye(0)
+                )
+            )
             hamiltonian = create("hamiltonian_factorization", "double_factorization").run(hamiltonian)
         operator = create("qubit_mapper", "sum_of_squares").run(hamiltonian, mapping)
         builder = create(
@@ -87,12 +103,11 @@ def _circuit(hamiltonian_name: str, algorithm: str) -> Circuit:
 
 @pytest.mark.parametrize("algorithm", ["trotter", "lcu", "sossa"])
 def test_resource_estimates(algorithm, num_regression):
-    """Pin each system's logical counts and physical optima, excluding nondeterministic trace estimates."""
-    resources = {}
+    """Compare counts and trace physical optima while pinning only reproducible estimates."""
+    resources: dict[str, list[int | float]] = {}
     for hamiltonian_name in _HAMILTONIANS:
         circuit = _circuit(hamiltonian_name, algorithm)
-        factory = circuit._qsharp_factory
-        counts = get_qsharp_context().logical_counts(factory.program, *factory.parameter.values())
+        counts = circuit.estimate_logical_count()
         row = {
             key: counts.get(key, 0)
             for key in (
@@ -106,20 +121,16 @@ def test_resource_estimates(algorithm, num_regression):
             )
         }
         for backend in ("counts", "trace"):
-            application = (
-                circuit.get_qre_application(use_trace_backend=False)
-                if backend == "counts"
-                else circuit.get_qre_application()
-            )
             if backend == "trace":
+                application = circuit.get_qre_application(use_trace_backend=True)
                 assert application.get_trace().compute_qubits == row["numQubits"]
             entries = list(
-                estimate(
-                    application,
+                circuit.estimate(
                     GateBased(error_rate=1e-4, gate_time=100, measurement_time=500),
                     isa_query=SurfaceCode.q() * RoundBasedFactory.q(),
                     trace_query=PSSPC.q() * LatticeSurgery.q(slow_down_factor=[1.0, 1.5, 2.0, 3.0, 4.0]),
                     max_error=0.01,
+                    use_trace_backend=backend == "trace",
                 )
             )
             assert entries, f"{hamiltonian_name}/{algorithm}/{backend} has no feasible estimate"
@@ -136,8 +147,14 @@ def test_resource_estimates(algorithm, num_regression):
                 )
         for key, value in row.items():
             resources.setdefault(key, []).append(value)
+        print(f"{algorithm}/{hamiltonian_name} resource baseline: {row!r}")
 
-    print(f"{algorithm} resource baseline: {resources!r}")
+    if algorithm == "trotter":
+        assert any(
+            resources[f"counts_{metric}"] != resources[f"trace_{metric}"]
+            for metric in ("min_qubits", "min_qubits_runtime_ns", "fastest_qubits", "fastest_runtime_ns")
+        ), "Counts and trace backends unexpectedly produced identical physical estimates"
+
     num_regression.check(
         resources,
         data_index=list(_HAMILTONIANS),
@@ -148,6 +165,7 @@ def test_resource_estimates(algorithm, num_regression):
 
 @pytest.mark.xfail(
     strict=True,
+    raises=AssertionError,
     reason="The qdk.qre trace backend draws measurement outcomes from an unseeded random "
     "generator, so circuits that uncompute with measurements trace differently on every run. "
     "Once it is seeded, pin the LCU and SOSSA trace-backend estimates as well.",
@@ -156,6 +174,6 @@ def test_the_trace_backend_traces_reproducibly():
     """Canary: tracing a SOSSA circuit, which uncomputes with measurements, is reproducible."""
     circuit = _circuit("h2_dfthc", "sossa")
 
-    traces = [circuit.get_qre_application().get_trace() for _ in range(3)]
+    traces = [circuit.get_qre_application(use_trace_backend=True).get_trace() for _ in range(3)]
 
     assert len({(trace.num_gates, trace.depth) for trace in traces}) == 1
