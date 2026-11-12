@@ -765,6 +765,7 @@ def _register_cpp_factories():
         GeometryOptimizerFactory,
         HamiltonianConstructorFactory,
         HamiltonianFactorizationFactory,
+        JKBuilderFactory,
         LocalizerFactory,
         MultiConfigurationCalculatorFactory,
         MultiConfigurationScfFactory,
@@ -781,6 +782,7 @@ def _register_cpp_factories():
     register_factory(GeometryOptimizerFactory)
     register_factory(HamiltonianConstructorFactory)
     register_factory(HamiltonianFactorizationFactory)
+    register_factory(JKBuilderFactory)
     register_factory(LocalizerFactory)
     register_factory(MultiConfigurationCalculatorFactory)
     register_factory(MultiConfigurationScfFactory)

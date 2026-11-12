@@ -13,6 +13,7 @@
 #include <filesystem>
 #include <memory>
 #include <qdk/chemistry/algorithms/hamiltonian.hpp>
+#include <qdk/chemistry/algorithms/jk_builder.hpp>
 #include <qdk/chemistry/algorithms/scf.hpp>
 #include <qdk/chemistry/algorithms/stability.hpp>
 #include <qdk/chemistry/constants.hpp>
@@ -31,6 +32,61 @@
 
 using namespace qdk::chemistry::data;
 using namespace qdk::chemistry::algorithms;
+
+namespace jk_builder_test {
+
+// The "qdk" J/K builder with an ERI method
+AlgorithmRef qdk_jk_builder(const std::string& eri_method) {
+  AlgorithmRef jk_builder("jk_builder", "qdk");
+  jk_builder.get_settings()->set("eri_method", eri_method);
+  return jk_builder;
+}
+
+// Analytic HF/sto-3g nuclear gradient of water with a J/K builder
+Eigen::VectorXd water_gradient(const AlgorithmRef& jk_builder) {
+  qdk::chemistry::algorithms::microsoft::ScfSolver solver;
+  solver.settings().set("jk_builder", jk_builder);
+  return *solver
+              .run_with_analytic_gradient(testing::create_water_structure(), 0,
+                                          1, std::string("sto-3g"))
+              .nuclear_gradient;
+}
+
+// J/K builder whose engine delegates to the engine of the "qdk" builder, so
+// that the SCF builds J, K, and gradients through the JKEngine interface.
+class DelegatingJKBuilder : public JKBuilder {
+ public:
+  std::string name() const override { return "test_delegating"; }
+  static inline int num_builds = 0;
+
+ protected:
+  std::shared_ptr<JKEngine> _run_impl(std::shared_ptr<BasisSet> basis_set,
+                                      double eri_threshold) const override {
+    struct Engine : JKEngine {
+      std::shared_ptr<JKEngine> qdk;
+      void build(const double* P, size_t num_atomic_orbitals,
+                 size_t num_densities, double* J, double* K, double alpha,
+                 double beta, double omega) override {
+        qdk->build(P, num_atomic_orbitals, num_densities, J, K, alpha, beta,
+                   omega);
+        ++num_builds;
+      }
+      void build_gradients(const double* P, size_t num_atomic_orbitals,
+                           size_t num_densities, size_t num_atoms, double* dJ,
+                           double* dK, double alpha, double beta,
+                           double omega) override {
+        qdk->build_gradients(P, num_atomic_orbitals, num_densities, num_atoms,
+                             dJ, dK, alpha, beta, omega);
+      }
+    };
+    auto engine = std::make_shared<Engine>();
+    engine->qdk =
+        JKBuilderFactory::create("qdk")->run(basis_set, eri_threshold);
+    return engine;
+  }
+};
+
+}  // namespace jk_builder_test
 
 class ScfTest : public ::testing::Test {
  protected:
@@ -273,7 +329,8 @@ TEST_F(ScfTest, OH_ROHF_INCORE_DIIS) {
   scf_solver->settings().set("enable_gdm", false);
   scf_solver->settings().set("method", "hf");
   scf_solver->settings().set("scf_type", "restricted");
-  scf_solver->settings().set("eri_method", "incore");
+  scf_solver->settings().set("jk_builder",
+                             jk_builder_test::qdk_jk_builder("incore"));
   auto [E_doublet, wfn_doublet] = scf_solver->run(oh, 0, 2, "sto-3g");
 
   EXPECT_NEAR(E_doublet, -74.361530753176, testing::scf_energy_tolerance);
@@ -500,7 +557,8 @@ void expect_rohf_gdm_empty_subspace(std::shared_ptr<Structure> structure,
   auto solver = ScfSolverFactory::create("qdk");
   solver->settings().set("method", "hf");
   solver->settings().set("scf_type", "restricted");
-  solver->settings().set("eri_method", "incore");
+  solver->settings().set("jk_builder",
+                         jk_builder_test::qdk_jk_builder("incore"));
   solver->settings().set("enable_gdm", true);
   solver->settings().set("gdm_max_diis_iteration", 2);
   solver->settings().set("convergence_threshold", 1e-9);
@@ -718,13 +776,15 @@ TEST_F(ScfTest, WaterRangeSeparatedDftDirectMatchesIncore) {
 
   auto direct_solver = ScfSolverFactory::create();
   direct_solver->settings().set("method", "cam-b3lyp");
-  direct_solver->settings().set("eri_method", "direct");
+  direct_solver->settings().set("jk_builder",
+                                jk_builder_test::qdk_jk_builder("direct"));
   auto [direct_energy, direct_wavefunction] =
       direct_solver->run(water, 0, 1, "sto-3g");
 
   auto incore_solver = ScfSolverFactory::create();
   incore_solver->settings().set("method", "cam-b3lyp");
-  incore_solver->settings().set("eri_method", "incore");
+  incore_solver->settings().set("jk_builder",
+                                jk_builder_test::qdk_jk_builder("incore"));
   auto [incore_energy, incore_wavefunction] =
       incore_solver->run(water, 0, 1, "sto-3g");
 
@@ -740,7 +800,8 @@ TEST_F(ScfTest, WaterRangeSeparatedDftDirectEnergy) {
   auto water = testing::create_water_structure();
   auto scf_solver = ScfSolverFactory::create();
   scf_solver->settings().set("method", "cam-b3lyp");
-  scf_solver->settings().set("eri_method", "direct");
+  scf_solver->settings().set("jk_builder",
+                             jk_builder_test::qdk_jk_builder("direct"));
 
   auto [energy, wavefunction] = scf_solver->run(water, 0, 1, "sto-3g");
 
@@ -752,7 +813,8 @@ TEST_F(ScfTest, LithiumRangeSeparatedDftDirectEnergyUks) {
   auto lithium = testing::create_li_structure();
   auto scf_solver = ScfSolverFactory::create();
   scf_solver->settings().set("method", "cam-b3lyp");
-  scf_solver->settings().set("eri_method", "direct");
+  scf_solver->settings().set("jk_builder",
+                             jk_builder_test::qdk_jk_builder("direct"));
 
   auto [energy, wavefunction] = scf_solver->run(lithium, 0, 2, "sto-3g");
 
@@ -941,45 +1003,93 @@ TEST_F(ScfTest, EriMethodSetting) {
   auto water = testing::create_water_structure();
 
   // Test default eri_method (direct)
-  auto scf_solver_direct = ScfSolverFactory::create();
-  EXPECT_EQ(scf_solver_direct->settings().get<std::string>("eri_method"),
-            "direct");
+  auto jk_builder = JKBuilderFactory::create("qdk");
+  EXPECT_EQ(jk_builder->settings().get<std::string>("eri_method"), "direct");
   auto [energy_direct, wfn_direct] =
-      scf_solver_direct->run(water, 0, 1, "sto-3g");
+      ScfSolverFactory::create()->run(water, 0, 1, "sto-3g");
 
   // Test eri_method = incore
   auto scf_solver_incore = ScfSolverFactory::create();
-  scf_solver_incore->settings().set("eri_method", "incore");
-  EXPECT_EQ(scf_solver_incore->settings().get<std::string>("eri_method"),
-            "incore");
+  scf_solver_incore->settings().set("jk_builder",
+                                    jk_builder_test::qdk_jk_builder("incore"));
   auto [energy_incore, wfn_incore] =
       scf_solver_incore->run(water, 0, 1, "sto-3g");
 
   // Both methods should give the same energy
   EXPECT_NEAR(energy_direct, energy_incore, testing::scf_energy_tolerance);
 
+  // In-core engines build gradients directly
+  EXPECT_LT((jk_builder_test::water_gradient(
+                 jk_builder_test::qdk_jk_builder("incore")) -
+             jk_builder_test::water_gradient(
+                 jk_builder_test::qdk_jk_builder("direct")))
+                .cwiseAbs()
+                .maxCoeff(),
+            1e-6);
+
   // Test invalid eri_method - should throw when setting invalid value
-  EXPECT_THROW(
-      {
-        auto scf_solver = ScfSolverFactory::create();
-        scf_solver->settings().set("eri_method", "not_a_method");
-      },
-      std::invalid_argument);
+  EXPECT_THROW(jk_builder->settings().set("eri_method", "not_a_method"),
+               std::invalid_argument);
 
   // Test default shell_pair_threshold
-  auto scf_solver_spt = ScfSolverFactory::create();
-  EXPECT_DOUBLE_EQ(
-      scf_solver_spt->settings().get<double>("shell_pair_threshold"), 1e-12);
+  EXPECT_DOUBLE_EQ(jk_builder->settings().get<double>("shell_pair_threshold"),
+                   1e-12);
 
   // Test setting shell_pair_threshold and running
-  scf_solver_spt->settings().set("shell_pair_threshold", 1e-10);
-  EXPECT_DOUBLE_EQ(
-      scf_solver_spt->settings().get<double>("shell_pair_threshold"), 1e-10);
+  AlgorithmRef jk_builder_spt("jk_builder", "qdk");
+  jk_builder_spt.get_settings()->set("shell_pair_threshold", 1e-10);
+  auto scf_solver_spt = ScfSolverFactory::create();
+  scf_solver_spt->settings().set("jk_builder", jk_builder_spt);
   auto [energy_spt, wfn_spt] = scf_solver_spt->run(water, 0, 1, "sto-3g");
 
   // Loosening the shell pair threshold on a small basis should not change
   // the result
   EXPECT_NEAR(energy_spt, energy_direct, testing::scf_energy_tolerance);
+}
+
+TEST_F(ScfTest, JKBuilderSetting) {
+  EXPECT_EQ(JKBuilderFactory::create()->name(), "qdk");
+  EXPECT_EQ(ScfSolverFactory::create()
+                ->settings()
+                .get<AlgorithmRef>("jk_builder")
+                .get_algorithm_name(),
+            "qdk");
+  JKBuilderFactory::register_instance(
+      [] { return std::make_unique<jk_builder_test::DelegatingJKBuilder>(); });
+
+  auto run = [](const std::string& method, int multiplicity,
+                const std::string& jk_builder) {
+    auto solver = ScfSolverFactory::create();
+    solver->settings().set("method", method);
+    solver->settings().set("jk_builder",
+                           AlgorithmRef("jk_builder", jk_builder));
+    auto structure = multiplicity == 1 ? testing::create_water_structure()
+                                       : testing::create_o2_structure();
+    return solver->run(structure, 0, multiplicity, "sto-3g").first;
+  };
+  // Range-separated exchange (restricted) and two densities (unrestricted).
+  EXPECT_NEAR(run("cam-b3lyp", 1, "test_delegating"),
+              run("cam-b3lyp", 1, "qdk"), testing::scf_energy_tolerance);
+  EXPECT_NEAR(run("hf", 3, "test_delegating"), run("hf", 3, "qdk"),
+              testing::scf_energy_tolerance);
+  EXPECT_GT(jk_builder_test::DelegatingJKBuilder::num_builds, 0);
+  EXPECT_LT((jk_builder_test::water_gradient(
+                 AlgorithmRef("jk_builder", "test_delegating")) -
+             jk_builder_test::water_gradient(AlgorithmRef("jk_builder", "qdk")))
+                .cwiseAbs()
+                .maxCoeff(),
+            1e-6);
+
+  JKBuilderFactory::unregister_instance("test_delegating");
+
+  // Engines build gradients only if they implement them
+  struct Engine : JKEngine {
+    void build(const double*, size_t, size_t, double*, double*, double, double,
+               double) override {}
+  };
+  EXPECT_THROW(
+      Engine().build_gradients(nullptr, 0, 1, 0, nullptr, nullptr, 1, 0, 0),
+      std::runtime_error);
 }
 
 TEST_F(ScfTest, InitialGuessRestart) {

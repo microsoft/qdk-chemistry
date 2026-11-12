@@ -310,9 +310,32 @@ set_target_properties(chemistry PROPERTIES POSITION_INDEPENDENT_CODE ON)
 set(QDK_DEP_EXPORTS "" CACHE STRING "QDK Chemistry Exported Dependencies" FORCE)
 
 # Include Addons
+# An add-on adds its sources to `chemistry` and declares its plugin with
+# qdk_add_plugin(<function>): a function `void <function>()`, optionally
+# namespace-qualified, that registers the add-on's implementations through
+# the algorithm factories. QDK/Chemistry runs each plugin once, after the
+# built-in implementations are registered (see plugins.cpp.in).
+function(qdk_add_plugin function)
+  set_property(GLOBAL APPEND PROPERTY QDK_PLUGINS ${function})
+endfunction()
 if(QDK_ADDONS_DIR)
   add_subdirectory(${QDK_ADDONS_DIR} addons)
 endif()
+get_property(_qdk_plugins GLOBAL PROPERTY QDK_PLUGINS)
+set(QDK_PLUGIN_DECLARATIONS "")
+set(QDK_PLUGIN_ENTRIES "")
+foreach(_plugin IN LISTS _qdk_plugins)
+  if(_plugin MATCHES "^(.+)::([^:]+)$")
+    string(APPEND QDK_PLUGIN_DECLARATIONS
+      "namespace ${CMAKE_MATCH_1} {\nvoid ${CMAKE_MATCH_2}();\n}\n")
+  else()
+    string(APPEND QDK_PLUGIN_DECLARATIONS "void ${_plugin}();\n")
+  endif()
+  string(APPEND QDK_PLUGIN_ENTRIES "{\"${_plugin}\", &::${_plugin}},")
+endforeach()
+configure_file(src/qdk/chemistry/algorithms/plugins.cpp.in
+  ${CMAKE_CURRENT_BINARY_DIR}/plugins.cpp @ONLY)
+target_sources(chemistry PRIVATE ${CMAKE_CURRENT_BINARY_DIR}/plugins.cpp)
 
 get_target_property(_imported nlohmann_json::nlohmann_json IMPORTED)
 get_target_property(_aliased nlohmann_json::nlohmann_json ALIASED_TARGET)

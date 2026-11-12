@@ -4,6 +4,7 @@
 
 #include "scf.hpp"
 
+#include <qdk/chemistry/scf/core/eri.h>
 #include <qdk/chemistry/scf/core/molecule.h>
 #include <qdk/chemistry/scf/core/scf.h>
 #include <qdk/chemistry/scf/scf/scf_solver.h>
@@ -11,6 +12,7 @@
 #include <qdk/chemistry/scf/util/libint2_util.h>
 
 #include <numeric>
+#include <qdk/chemistry/algorithms/jk_builder.hpp>
 #include <qdk/chemistry/data/wavefunction_containers/state_vector.hpp>
 #include <qdk/chemistry/utils/logger.hpp>
 
@@ -38,16 +40,10 @@ ScfSettings::ScfSettings()
   set_default("gdm_max_diis_iteration", 50);
   set_default("gdm_bfgs_history_size_limit", 50);
   set_default("fock_reset_steps", 1073741824);
-  set_default("eri_use_atomics", false);
   set_default("eri_threshold", -1.0);
-  set_default("shell_pair_threshold", 1e-12,
-              "Overlap-based shell pair pre-screening threshold. Shell "
-              "pairs with overlap norm below this value are excluded.");
-  set_default("eri_method", std::string("direct"),
-              "ERI evaluation method: 'direct' computes integrals on-the-fly, "
-              "'incore' stores all integrals in memory",
-              data::ListConstraint<std::string>{
-                  {std::vector<std::string>{"direct", "incore"}}});
+  set_default("jk_builder", data::AlgorithmRef("jk_builder", "qdk"),
+              "J/K builder for the Coulomb and exchange matrices and their "
+              "nuclear gradients");
   set_default("relativity", std::string(""),
               "Relativistic treatment: '' for nonrelativistic, "
               "'sf-x2c' for spin-free X2C with basis decontraction and "
@@ -70,6 +66,44 @@ std::pair<int, int> calculate_electron_counts(
   int n_beta = total_electrons - n_alpha;
   return {n_alpha, n_beta};
 }
+
+/// ERI engine of the SCF building J, K, and their gradients with a J/K engine
+class JKEngineERI : public qcs::ERI {
+ public:
+  JKEngineERI(std::shared_ptr<JKEngine> engine, qcs::BasisSet& basis_set,
+              const qcs::SCFConfig& cfg)
+      : ERI(cfg.scf_orbital_type, cfg.eri.eri_threshold, basis_set, cfg.mpi),
+        engine_(std::move(engine)) {}
+
+  // The engine returns complete matrices, so the MPI reduction of
+  // ERI::build_JK is skipped.
+  void build_JK(const double* P, double* J, double* K, double alpha,
+                double beta, double omega) override {
+    build_JK_impl_(P, J, K, alpha, beta, omega);
+  }
+
+  void get_gradients(const double* P, double* dJ, double* dK, double alpha,
+                     double beta, double omega) override {
+    engine_->build_gradients(
+        P, basis_set_.num_atomic_orbitals, has_spin_split_density() ? 2 : 1,
+        basis_set_.mol->n_atoms, dJ, dK, alpha, beta, omega);
+  }
+
+ protected:
+  void build_JK_impl_(const double* P, double* J, double* K, double alpha,
+                      double beta, double omega) override {
+    engine_->build(P, basis_set_.num_atomic_orbitals,
+                   has_spin_split_density() ? 2 : 1, J, K, alpha, beta, omega);
+  }
+
+  void quarter_trans_impl(size_t, const double*, double*) override {
+    throw std::runtime_error(
+        "J/K engines do not provide quarter transformations");
+  }
+
+ private:
+  std::shared_ptr<JKEngine> engine_;
+};
 
 ScfCalculationResult ScfSolver::_run_with_options(
     std::shared_ptr<data::Structure> structure, int charge, int multiplicity,
@@ -271,14 +305,6 @@ ScfCalculationResult ScfSolver::_run_with_options(
           ? qcs::DensityInitializationMethod::UserProvided
           : qcs::DensityInitializationMethod::Atom;
 
-  // Configure ERI method from settings
-  std::string eri_method = _settings->get<std::string>("eri_method");
-  if (eri_method == "direct") {
-    ms_scf_config->eri.method = qcs::ERIMethod::Libint2Direct;
-  } else {  // Must be "incore" due to ListConstraint validation
-    ms_scf_config->eri.method = qcs::ERIMethod::Incore;
-  }
-
   double eri_threshold = _settings->get<double>("eri_threshold");
   if (eri_threshold > 0.0) {
     ms_scf_config->eri.eri_threshold = eri_threshold;
@@ -288,11 +314,15 @@ ScfCalculationResult ScfSolver::_run_with_options(
     ms_scf_config->eri.eri_threshold =
         convergence_threshold * eri_threshold_multiplier;
   }
-  ms_scf_config->eri.use_atomics = _settings->get<bool>("eri_use_atomics");
-  ms_scf_config->eri.shell_pair_threshold =
-      _settings->get<double>("shell_pair_threshold");
   ms_scf_config->k_eri = ms_scf_config->eri;
   ms_scf_config->grad_eri = ms_scf_config->eri;
+  auto jk_engine =
+      _create_nested<JKBuilderFactory>("jk_builder")
+          ->run(qdk_raw_basis_set, ms_scf_config->eri.eri_threshold);
+  ms_scf_config->eri_factory = [jk_engine](qcs::BasisSet& basis_set,
+                                           const qcs::SCFConfig& cfg) {
+    return std::make_shared<JKEngineERI>(jk_engine, basis_set, cfg);
+  };
 
   ms_scf_config->fock_reset_steps = _settings->get<int64_t>("fock_reset_steps");
 
@@ -315,13 +345,6 @@ ScfCalculationResult ScfSolver::_run_with_options(
       _settings->get<int64_t>("gdm_max_diis_iteration");
   ms_scf_config->scf_algorithm.gdm_config.gdm_bfgs_history_size_limit =
       _settings->get<int64_t>("gdm_bfgs_history_size_limit");
-  if (ms_scf_config->eri.method == qcs::ERIMethod::Incore) {
-#ifdef QDK_CHEMISTRY_ENABLE_HGP
-    ms_scf_config->grad_eri.method = qcs::ERIMethod::HGP;
-#else
-    ms_scf_config->grad_eri.method = qcs::ERIMethod::Libint2Direct;
-#endif
-  }
 
   // Configure OpenMP thread count if specified
 #ifdef _OPENMP

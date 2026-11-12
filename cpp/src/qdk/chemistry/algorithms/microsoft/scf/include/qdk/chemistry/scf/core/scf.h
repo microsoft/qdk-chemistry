@@ -12,8 +12,10 @@
 #include <qdk/chemistry/scf/util/gauxc_util.h>
 
 #include <cstring>
+#include <functional>
 #include <gauxc/enums.hpp>
 #include <gauxc/grid_factory.hpp>
+#include <memory>
 
 #ifdef QDK_CHEMISTRY_ENABLE_QMMM
 #include <qdk/chemistry/scf/core/qmmm.h>
@@ -32,6 +34,8 @@
 #endif
 
 namespace qdk::chemistry::scf {
+class ERI;
+
 /**
  * @brief MPI parallel configuration
  */
@@ -201,6 +205,8 @@ struct SCFConfig {
   ERIConfig
       k_eri;  ///< Configuration for exchange (K) integrals (can differ from J)
   ERIConfig grad_eri;  ///< Configuration for gradient integrals
+  /// Creates the ERI engines in place of the ERI methods above when set
+  std::function<std::shared_ptr<ERI>(BasisSet&, const SCFConfig&)> eri_factory;
 #ifdef QDK_CHEMISTRY_ENABLE_LIBINTX
   LIBINTXConfig libintx_config;  ///< LIBINTX-specific configuration
 #endif

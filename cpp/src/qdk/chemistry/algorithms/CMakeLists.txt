@@ -5,6 +5,7 @@ target_sources(chemistry PRIVATE
     hamiltonian_factorization.cpp
     finite_difference_nuclear_derivative.cpp
     hamiltonian.cpp
+    jk_builder.cpp
     localization.cpp
     mc.cpp
     nuclear_derivative.cpp

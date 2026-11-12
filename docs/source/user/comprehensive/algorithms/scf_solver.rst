@@ -291,14 +291,10 @@ This hybrid approach combines the speed of :term:`DIIS` for typical systems with
      - float
      - ``-1.0``
      - Electron repulsion integral screening threshold (negative = auto)
-   * - ``shell_pair_threshold``
-     - float
-     - ``1e-12``
-     - Overlap-based shell pair pre-screening threshold. Shell pairs with overlap norm below this value are excluded.
-   * - ``eri_use_atomics``
-     - bool
-     - ``False``
-     - Use atomic operations for :term:`ERI` computation
+   * - ``jk_builder``
+     - AlgorithmRef
+     - ``AlgorithmRef("jk_builder", "qdk")``
+     - :doc:`J/K builder <jk_builder>` for the Coulomb and exchange matrices and their nuclear gradients, including the :term:`ERI` evaluation settings of the ``qdk`` builder
    * - ``relativity``
      - string
      - ``""``

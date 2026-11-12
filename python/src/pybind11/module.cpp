@@ -35,6 +35,7 @@ void bind_mcscf(py::module& m);
 void bind_hamiltonian_constructor(py::module& m);
 void bind_effective_hamiltonian_constructor(py::module& m);
 void bind_hamiltonian_factorization(py::module& m);
+void bind_jk_builder(py::module& m);
 void bind_double_factorization(py::module& m);
 void bind_scf(py::module& m);
 void bind_nuclear_derivative(py::module& m);
@@ -111,6 +112,7 @@ PYBIND11_MODULE(_core, m) {
   bind_hamiltonian_constructor(algorithms);
   bind_effective_hamiltonian_constructor(algorithms);
   bind_hamiltonian_factorization(algorithms);
+  bind_jk_builder(algorithms);
   bind_double_factorization(algorithms);
   bind_scf(algorithms);
   bind_nuclear_derivative(algorithms);

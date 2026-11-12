@@ -184,6 +184,7 @@ pybind11_add_module(_core
     src/pybind11/algorithms/dynamical_correlation_calculator.cpp
     src/pybind11/algorithms/effective_hamiltonian.cpp
     src/pybind11/algorithms/hamiltonian_factorization.cpp
+    src/pybind11/algorithms/jk_builder.cpp
     src/pybind11/algorithms/double_factorization.cpp
     src/pybind11/algorithms/davidson_solver.cpp
     src/pybind11/algorithms/syev_solver.cpp

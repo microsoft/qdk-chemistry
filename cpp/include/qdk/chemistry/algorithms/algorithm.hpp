@@ -208,6 +208,15 @@ struct DeprecationAccess {
     return algorithm._deprecation_message();
   }
 };
+
+/**
+ * @brief Run the plugins of the add-ons built into the library.
+ *
+ * Each plugin registers its implementations through the algorithm factories.
+ * Called when the registry of any factory is first used, after its built-in
+ * implementations; the plugins run once.
+ */
+void load_plugins();
 }  // namespace detail
 
 /**
@@ -479,6 +488,7 @@ class AlgorithmFactory {
       // Ensure at least one implementation is registered
       initialized = true;
       Derived::register_default_instances();
+      detail::load_plugins();
     }
     return instance;
   }
