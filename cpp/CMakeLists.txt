@@ -177,6 +177,10 @@ block()
     set(_sequant_patch PATCH_COMMAND "${CMAKE_COMMAND}"
         "-DPATCH_FILE=${CMAKE_CURRENT_LIST_DIR}/cmake/patches/sequant-eval-trace-labels.patch"
         -P "${CMAKE_CURRENT_LIST_DIR}/cmake/patches/apply-patch.cmake")
+    # WickTheorem::max_ops caps partial contractions as they are emitted (DUCC level 3 with triples).
+    list(APPEND _sequant_patch COMMAND "${CMAKE_COMMAND}"
+        "-DPATCH_FILE=${CMAKE_CURRENT_LIST_DIR}/cmake/patches/sequant-wick-max-ops.patch"
+        -P "${CMAKE_CURRENT_LIST_DIR}/cmake/patches/apply-patch.cmake")
     # clang-cl ignores [[no_unique_address]] like MSVC, which fails a SeQuant size check.
     if(CMAKE_CXX_COMPILER_ID MATCHES "Clang" AND CMAKE_CXX_SIMULATE_ID STREQUAL "MSVC")
         list(APPEND _sequant_patch COMMAND "${CMAKE_COMMAND}" -P

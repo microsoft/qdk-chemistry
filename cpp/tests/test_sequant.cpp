@@ -11,6 +11,8 @@
 #include <SeQuant/core/eval/backends/btas/result.hpp>
 #include <SeQuant/core/eval/eval.hpp>
 #include <SeQuant/core/expr.hpp>
+#include <SeQuant/core/op.hpp>
+#include <SeQuant/core/wick.hpp>
 #include <SeQuant/domain/mbpt/context.hpp>
 #include <SeQuant/domain/mbpt/convention.hpp>
 #include <SeQuant/domain/mbpt/op.hpp>
@@ -40,6 +42,25 @@ BTensor antisymmetrize(BTensor const& x) {
   y -= BTensor{btas::permute(x, {0, 1, 3, 2})};
   y += BTensor{btas::permute(x, {1, 0, 3, 2})};
   return y;
+}
+
+// Number of operators a Wick-result term leaves uncontracted.
+std::size_t uncontracted_operators(sequant::ExprPtr const& term) {
+  std::size_t count = 0;
+  auto const add = [&](sequant::ExprPtr const& factor) {
+    if (factor.is<sequant::FNOperator>()) {
+      auto const& op = factor.as<sequant::FNOperator>();
+      count += op.ncreators() + op.nannihilators();
+    }
+  };
+  if (term.is<sequant::Product>()) {
+    for (auto const& factor : term.as<sequant::Product>().factors()) {
+      add(factor);
+    }
+  } else {
+    add(term);
+  }
+  return count;
 }
 
 }  // namespace
@@ -120,4 +141,38 @@ TEST(SeQuantBtasTest, EvaluatesWickDerivedCcsdEnergy) {
     }
   }
   EXPECT_NEAR(computed, expected, testing::numerical_zero_tolerance);
+}
+
+TEST(SeQuantWickTest, OutputCapEqualsFilteringTheFullResult) {
+  using namespace sequant;
+
+  auto context = set_scoped_default_context(
+      {.index_basis_registry_shared_ptr =
+           mbpt::make_min_sr_spaces(mbpt::SpinConvention::None),
+       .vacuum = Vacuum::SingleProduct});
+  auto mbpt_context = mbpt::set_scoped_default_mbpt_context(
+      {.op_registry_ptr = mbpt::make_minimal_registry()});
+
+  // H T2 leaves up to eight operators uncontracted; keep at most four.
+  constexpr std::size_t cap = 4;
+  auto input = mbpt::tensor::H(2) * mbpt::tensor::T(2);
+  expand(input);
+  auto const full =
+      FWickTheorem{input->clone()}.full_contractions(false).compute();
+  auto const capped = FWickTheorem{input->clone()}
+                          .full_contractions(false)
+                          .max_ops(cap)
+                          .compute();
+
+  ASSERT_TRUE(full.is<Sum>());
+  std::vector<ExprPtr> kept;
+  for (auto const& term : full.as<Sum>().summands()) {
+    if (uncontracted_operators(term) <= cap) kept.push_back(term);
+  }
+  ASSERT_GT(kept.size(), 0u);
+  ASSERT_LT(kept.size(), full.as<Sum>().summands().size());
+
+  auto difference = capped - ex<Sum>(kept.begin(), kept.end());
+  simplify(difference);
+  EXPECT_TRUE(difference.is<Constant>() && difference.as<Constant>().is_zero());
 }

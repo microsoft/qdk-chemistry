@@ -1,0 +1,71 @@
+# WickTheorem::max_ops(n): with full_contractions(false), do not emit partial
+# contractions that leave more than n operators uncontracted (they are still
+# contracted further). Equals filtering the result afterwards, but avoids forming
+# the high-rank intermediate terms (e.g. DUCC level-3 commutators with triples).
+diff --git a/SeQuant/core/wick.hpp b/SeQuant/core/wick.hpp
+index 4964ebd98..447e0b2df 100644
+--- a/SeQuant/core/wick.hpp
++++ b/SeQuant/core/wick.hpp
+@@ -142,6 +142,19 @@ class WickTheorem {
+     return *this;
+   }
+ 
++  /// Bounds the number of uncontracted operators in the terms emitted by the
++  /// next call to compute(); only matters if full_contractions(false), and is
++  /// not supported under a Vacuum::MultiProduct vacuum. Partial contractions
++  /// above the bound are still contracted further, so this equals dropping
++  /// those terms from the result, without ever forming them.
++  /// @param n the largest number of uncontracted operators of a term;
++  /// std::nullopt (default) means no bound
++  /// @return reference to @c *this , for daisy-chaining
++  WickTheorem &max_ops(std::optional<std::size_t> n) {
++    max_ops_ = n;
++    return *this;
++  }
++
+   /// Controls the largest cumulant formed by the next call to compute();
+   /// only matters under a Vacuum::MultiProduct vacuum. By default cumulants of
+   /// every rank are formed.
+@@ -496,6 +509,7 @@ class WickTheorem {
+   mutable ExprPtr prefactor_;
+   bool full_contractions_ = true;
+   bool use_topology_ = true;
++  std::optional<std::size_t> max_ops_;
+   std::optional<std::size_t> max_cumulant_rank_;
+   bool eta_as_delta_minus_gamma_ = false;
+   mutable Stats stats_;
+@@ -1289,7 +1303,8 @@ class WickTheorem {
+     // if computing everything, and the user does not insist on some
+     // target contractions, include the contraction-free term
+     if (!full_contractions_ &&
+-        (nop_nconnections_total_ == 0 || !pairwise_connectivity())) {
++        (nop_nconnections_total_ == 0 || !pairwise_connectivity()) &&
++        (!max_ops_ || input_->opsize() <= *max_ops_)) {
+       if (count_only) {
+         ++state.count;
+       } else {
+@@ -1619,7 +1634,8 @@ class WickTheorem {
+                 // if have a nonzero result ...
+                 if (state.sp.size() != state.sp_initial_size) {
+                   // update the result if nothing left to contract and
+-                  if (!full_contractions_ ||
++                  if ((!full_contractions_ &&
++                       (!max_ops_ || state.nopseq_size <= *max_ops_)) ||
+                       (full_contractions_ && state.nopseq_size == 0)) {
+                     if (!state.count_only) {
+                       // clang-format off
+diff --git a/SeQuant/core/wick.impl.hpp b/SeQuant/core/wick.impl.hpp
+index 33857571c..1782f1fa8 100644
+--- a/SeQuant/core/wick.impl.hpp
++++ b/SeQuant/core/wick.impl.hpp
+@@ -1410,6 +1410,10 @@ ExprPtr WickTheorem<S>::compute(const bool count_only,
+       throw Exception(
+           "WickTheorem<S>::compute: spin-free operators are not supported "
+           "under a MultiProduct vacuum");
++    if (max_ops_)
++      throw Exception(
++          "WickTheorem<S>::compute: max_ops is not supported under a "
++          "MultiProduct vacuum");
+     if constexpr (S == Statistics::FermiDirac) {
+       return detail::extended_wick<S>(
+           expr_input_ ? expr_input_ : ExprPtr(input_),
