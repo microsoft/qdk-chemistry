@@ -863,14 +863,18 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        compiler: [msvc, clang-cl]
+        include:
+        - compiler: msvc
+          uarch: armv8.0
+        - compiler: clang-cl
+          uarch: armv8-a
     env:
       VCPKG_TRIPLET: arm64-windows-static-md
+      # MSVC and clang-cl use different spellings for the ARMv8-A baseline.
+      QDK_UARCH: ${{ matrix.uarch }}
       CTEST_WORKERS: '12'
       OMP_NUM_THREADS: '4'
       PYTHON_TEST_WORKERS: '8'
-      # Let qdk-uarch.cmake select armv8-a for clang-cl; native MSVC uses its
-      # default ARM64 ISA because it has no generic /arch option.
       # Bump to force a rebuild of the cached dependencies.
       DEPS_CACHE_VERSION: v2
       CMAKE_POLICY_VERSION_MINIMUM: '3.5'
@@ -1005,6 +1009,7 @@ jobs:
         $depsInstall = "${{ github.workspace }}\deps-install-${{ matrix.compiler }}"
         $vcpkgInstalled = "${{ github.workspace }}\vcpkg_installed\${{ env.VCPKG_TRIPLET }}"
         cmake -S cpp -B "cpp/build-${{ matrix.compiler }}" -GNinja `
+          -DQDK_UARCH=${{ env.QDK_UARCH }} `
           -DQDK_CHEMISTRY_ENABLE_COVERAGE=OFF `
           -DQDK_CHEMISTRY_ENABLE_MPI=OFF `
           -DMACIS_ENABLE_TESTS=OFF `
