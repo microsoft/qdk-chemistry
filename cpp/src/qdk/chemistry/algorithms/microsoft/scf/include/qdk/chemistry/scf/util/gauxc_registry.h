@@ -76,4 +76,30 @@ class GAUXCRegistry {
   }
 };
 
+/**
+ * @brief Clear cached GauXC instances when the scope exits.
+ *
+ * A failed SCF can leave a cached integrator that is invalid for a later basis.
+ */
+class ScopedGAUXCCacheCleanup {
+ public:
+  ~ScopedGAUXCCacheCleanup() { clear(); }
+
+  void clear() {
+    if (active_) {
+      active_ = false;
+      GAUXCRegistry::clear();
+    }
+  }
+
+  ScopedGAUXCCacheCleanup() = default;
+  ScopedGAUXCCacheCleanup(const ScopedGAUXCCacheCleanup&) = delete;
+  ScopedGAUXCCacheCleanup& operator=(const ScopedGAUXCCacheCleanup&) = delete;
+  ScopedGAUXCCacheCleanup(ScopedGAUXCCacheCleanup&&) = delete;
+  ScopedGAUXCCacheCleanup& operator=(ScopedGAUXCCacheCleanup&&) = delete;
+
+ private:
+  bool active_ = true;
+};
+
 }  // namespace qdk::chemistry::scf::util
