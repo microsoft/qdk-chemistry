@@ -315,11 +315,13 @@ class QubitOperator(HamiltonianDescription):
         return cls(container=container)
 
 
-class _DeprecatedQubitHamiltonian(QubitOperator):
-    """Deprecated alias for :class:`QubitOperator`."""
+if TYPE_CHECKING:
+    QubitHamiltonian = QubitOperator
 
-    def __init__(self, *args: Any, **kwargs: Any) -> None:
-        """Construct a :class:`QubitOperator`, warning that ``QubitHamiltonian`` is deprecated."""
+
+def __getattr__(name: str) -> type[QubitOperator]:
+    """Resolve the deprecated class name without wrapping the actual type."""
+    if name == "QubitHamiltonian":
         warnings.warn(
             "'QubitHamiltonian' has been renamed to 'QubitOperator' and is deprecated; it will be "
             "removed in a future release. Replace 'QubitHamiltonian' with 'QubitOperator' "
@@ -327,36 +329,5 @@ class _DeprecatedQubitHamiltonian(QubitOperator):
             DeprecationWarning,
             stacklevel=2,
         )
-        super().__init__(*args, **kwargs)
-
-
-class _DeprecatedQubitOperatorAlias:
-    """Class-like alias without subclassing nanobind's immutable metaclass."""
-
-    __bases__ = (QubitOperator,)
-
-    def __call__(self, *args: Any, **kwargs: Any) -> QubitOperator:
-        """Construct an operator through the deprecated constructor."""
-        return _DeprecatedQubitHamiltonian(*args, **kwargs)
-
-    def __getattr__(self, name: str) -> Any:
-        """Forward class attributes and constructors to the deprecated class."""
-        return getattr(_DeprecatedQubitHamiltonian, name)
-
-    def __instancecheck__(self, instance: object) -> bool:
-        """Recognize operators constructed through either public name."""
-        return isinstance(instance, QubitOperator)
-
-    def __subclasscheck__(self, subclass: type) -> bool:
-        """Recognize subclasses of the current operator class."""
-        return issubclass(subclass, QubitOperator)
-
-    def __mro_entries__(self, _bases: tuple) -> tuple:
-        """Preserve inheritance through the deprecated name."""
-        return (_DeprecatedQubitHamiltonian,)
-
-
-if TYPE_CHECKING:
-    QubitHamiltonian = _DeprecatedQubitHamiltonian
-else:
-    QubitHamiltonian = _DeprecatedQubitOperatorAlias()
+        return QubitOperator
+    raise AttributeError(f"module '{__name__}' has no attribute '{name}'")
