@@ -469,9 +469,11 @@ The walk operator has eigenvalues :math:`e^{\pm i \arccos(E_k/\lambda)}` where :
       :start-after: # start-cell-run-lcu
       :end-before: # end-cell-run-lcu
 
-To use alias sampling for the PREPARE oracle, pass an
-:class:`~qdk_chemistry.data.AlgorithmRef` to the
-:class:`~qdk_chemistry.algorithms.circuit_mapper.psp_mapper.PSPMapper`:
+The :class:`~qdk_chemistry.algorithms.circuit_mapper.psp_mapper.PSPMapper` defaults to
+``dense_pure_state`` PREPARE and unary-iteration SELECT :cite:`Babbush2018`. To configure PREPARE,
+for example alias sampling, which uses Toffolis but no rotations, pass an
+:class:`~qdk_chemistry.data.AlgorithmRef`. For the available PREPARE methods, see
+:doc:`StatePreparation <state_preparation>`:
 
 .. tab:: Python API -- alias sampling PREPARE
 
