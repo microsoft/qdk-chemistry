@@ -5,9 +5,9 @@
 # Licensed under the MIT License. See LICENSE.txt in the project root for license information.
 # --------------------------------------------------------------------------------------------
 
-from qdk_chemistry.algorithms.circuit_mapper.psp_mapper import PSPMapper
+from qdk_chemistry.algorithms.circuit_mapper.psp_mapper import _PREPARE_DESCRIPTION, _SELECT_METHODS, PSPMapper
 from qdk_chemistry.data import AlgorithmRef
-from qdk_chemistry.data.circuit import Circuit, QsharpFactoryData
+from qdk_chemistry.data.circuit import Circuit, CircuitMetadata, QsharpFactoryData
 from qdk_chemistry.data.unitary_representation.base import UnitaryRepresentation
 from qdk_chemistry.utils.qsharp import QSHARP_UTILS
 
@@ -20,8 +20,9 @@ class ControlledPSPMapperSettings(ControlledCircuitMapperSettings):
     """Settings for the ControlledPSPMapper.
 
     Attributes:
-        prepare: Algorithm reference for the PREPARE oracle state preparation.
-            Defaults to ``DensePureStatePreparation``.
+        prepare: Algorithm reference for the PREPARE oracle state preparation. One of
+            ``"dense_pure_state"`` (default), ``"alias_sampling"``, ``"sparse_isometry"``, or ``"qrom"``.
+        select_method: ``"unary_iteration"`` (default) or ``"multi_controlled"``.
 
     """
 
@@ -32,7 +33,14 @@ class ControlledPSPMapperSettings(ControlledCircuitMapperSettings):
             "prepare",
             "algorithm_ref",
             AlgorithmRef("state_prep", "dense_pure_state"),
-            "Algorithm for the PREPARE oracle state preparation. ",
+            _PREPARE_DESCRIPTION,
+        )
+        self._set_default(
+            "select_method",
+            "string",
+            "unary_iteration",
+            "SELECT construction: 'multi_controlled' or 'unary_iteration'.",
+            list(_SELECT_METHODS),
         )
 
 
@@ -82,11 +90,12 @@ class ControlledPSPMapper(ControlledCircuitMapper):
         """Build the uncontrolled PSP mapper to delegate the block encoding to.
 
         Returns:
-            A :class:`PSPMapper` carrying this mapper's ``prepare`` setting.
+            A :class:`PSPMapper` carrying this mapper's ``prepare`` and ``select_method`` settings.
 
         """
         mapper = PSPMapper()
         mapper.settings().set("prepare", self._settings.get("prepare"))
+        mapper.settings().set("select_method", self._settings.get("select_method"))
         return mapper
 
     def _run_impl(self, unitary: UnitaryRepresentation) -> Circuit:
@@ -112,7 +121,7 @@ class ControlledPSPMapper(ControlledCircuitMapper):
         container = unitary.get_container()
         _, use_quantum_walk = block_mapper.resolve_lcu(container)
         select_op, num_system_qubits = block_mapper.build_select_ops(container)
-        prepare_op, num_select_qubits, num_block_ancillas = block_mapper.build_prep_ops(container)
+        prepare_op, num_select_qubits, num_block_ancillas, num_gradient_qubits = block_mapper.build_prep_ops(container)
 
         step_op = QSHARP_UTILS.PrepSelPrep.MakePrepSelPrepOp(
             prepare_op, select_op, num_system_qubits, num_select_qubits
@@ -132,6 +141,7 @@ class ControlledPSPMapper(ControlledCircuitMapper):
                 "numSystemQubits": num_system_qubits,
                 "numSelectQubits": num_select_qubits,
                 "numBlockAncillaQubits": num_block_ancillas,
+                "numPhaseGradientQubits": num_gradient_qubits,
                 "power": container.power,
                 "useWalk": use_quantum_walk,
             },
@@ -140,5 +150,6 @@ class ControlledPSPMapper(ControlledCircuitMapper):
         return Circuit(
             qsharp_factory=qsharp_factory,
             qsharp_op=QSHARP_UTILS.CircuitComposition.MakeSingleControlOp(controlled_op),
-            num_qubits=1 + num_system_qubits + num_block_ancillas,
+            num_qubits=1 + num_system_qubits + num_block_ancillas + num_gradient_qubits,
+            metadata=CircuitMetadata(num_phase_gradient_ancillas=num_gradient_qubits),
         )

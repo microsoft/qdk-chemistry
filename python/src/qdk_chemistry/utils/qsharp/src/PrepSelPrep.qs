@@ -16,6 +16,7 @@ namespace QDKChemistry.Utils.PrepSelPrep {
     import Std.Intrinsic.AND;
     import Std.Intrinsic.R;
     import Std.Math.PI;
+    import QDKChemistry.Utils.PhaseGradient.PreparePhaseGradientState;
 
     /// No-op PREPARE callable for single-term Hamiltonians (0-ancilla case).
     operation NoOpPrepare(ancillaRegister : Qubit[]) : Unit is Adj + Ctl {}
@@ -185,41 +186,56 @@ namespace QDKChemistry.Utils.PrepSelPrep {
         );
     }
 
-    /// Circuit entry point: allocates the register and applies the block encoding `power` times.
+    /// Circuit entry point: prepares the phase gradient once around the repeated block encoding.
     operation MakePrepSelPrepCircuit(
         prepareOp : Qubit[] => Unit is Adj + Ctl,
         selectOp : (Qubit[], Qubit[]) => Unit is Adj + Ctl,
         numSystemQubits : Int,
         numSelectQubits : Int,
         numBlockAncillaQubits : Int,
+        numPhaseGradientQubits : Int,
         power : Int,
         useWalk : Bool,
     ) : Unit {
-        use register = Qubit[numSystemQubits + numBlockAncillaQubits];
+        use register = Qubit[numSystemQubits + numBlockAncillaQubits + numPhaseGradientQubits];
         let systems = register[0..numSystemQubits - 1];
         let prepareRegister = register[numSystemQubits...];
         let blockAncilla = register[numSystemQubits..numSystemQubits + numBlockAncillaQubits - 1];
+        if numPhaseGradientQubits > 0 {
+            PreparePhaseGradientState(register[numSystemQubits + numBlockAncillaQubits...]);
+        }
         ApplyPrepSelPrepPower(prepareOp, selectOp, systems, prepareRegister, numSelectQubits, blockAncilla, useWalk, power);
+        if numPhaseGradientQubits > 0 {
+            Adjoint PreparePhaseGradientState(register[numSystemQubits + numBlockAncillaQubits...]);
+        }
     }
 
-    /// Circuit entry point for the singly-controlled block encoding
+    /// Circuit entry point for the singly-controlled block encoding; prepares the phase
+    /// gradient like `MakePrepSelPrepCircuit`.
     operation MakeControlledPrepSelPrepCircuit(
         prepareOp : Qubit[] => Unit is Adj + Ctl,
         selectOp : (Qubit[], Qubit[]) => Unit is Adj + Ctl,
         numSystemQubits : Int,
         numSelectQubits : Int,
         numBlockAncillaQubits : Int,
+        numPhaseGradientQubits : Int,
         power : Int,
         useWalk : Bool,
     ) : Unit {
         use control = Qubit();
-        use register = Qubit[numSystemQubits + numBlockAncillaQubits];
+        use register = Qubit[numSystemQubits + numBlockAncillaQubits + numPhaseGradientQubits];
         let systems = register[0..numSystemQubits - 1];
         let prepareRegister = register[numSystemQubits...];
         let blockAncilla = register[numSystemQubits..numSystemQubits + numBlockAncillaQubits - 1];
+        if numPhaseGradientQubits > 0 {
+            PreparePhaseGradientState(register[numSystemQubits + numBlockAncillaQubits...]);
+        }
         Controlled ApplyPrepSelPrepPower(
             [control],
             (prepareOp, selectOp, systems, prepareRegister, numSelectQubits, blockAncilla, useWalk, power)
         );
+        if numPhaseGradientQubits > 0 {
+            Adjoint PreparePhaseGradientState(register[numSystemQubits + numBlockAncillaQubits...]);
+        }
     }
 }

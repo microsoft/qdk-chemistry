@@ -44,6 +44,7 @@ _BASE_PROFILE_FILES = (
     "PauliExp.qs",
     "PhaseGradient.qs",
     "MeasurementBasis.qs",
+    "UnaryIteration.qs",
     "Select.qs",
     "PrepSelPrep.qs",
     "AmplitudeAmplification.qs",
