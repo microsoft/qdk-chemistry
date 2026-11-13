@@ -449,10 +449,7 @@ MajoranaMapResult majorana_map_hamiltonian_cholesky(
  *
  * Equivalent to ::majorana_map_hamiltonian but consumes the stored
  * (p,q,r,s) integrals without reconstructing a dense N^4 tensor, iterating
- * nonzero pair products rather than the full N^4 index space.  Its two-body
- * cost follows the stored entries, so it also maps beyond the 1024-qubit limit
- * of the dense and Cholesky entry points, up to a 131072-qubit word limit; the
- * dense one-body integrals still grow as N^2.
+ * nonzero pair products rather than the full N^4 index space.
  *
  * Entries are read literally: positions that are not stored are zero, as in
  * the dense view of SparseHamiltonianContainer, and the resulting tensor is
