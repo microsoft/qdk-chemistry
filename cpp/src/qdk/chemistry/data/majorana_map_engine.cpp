@@ -450,7 +450,7 @@ MajoranaMapResult majorana_map_impl(const MajoranaMapping& mapping,
   //
   // γ_j · γ_k = (-i) · bilinear(j, k) for each within-spin-block pair.
   // Dense and Cholesky loops read every pair, so they are precomputed;
-  // sparse integrals cache only the pairs their two-body entries reference.
+  // sparse integrals cache only the pairs their two-body entries reuse.
 
   struct PackedPairProduct {
     std::complex<double> coeff;
@@ -490,6 +490,16 @@ MajoranaMapResult majorana_map_impl(const MajoranaMapping& mapping,
       return dense_pairs[spin][index];
     }
   };
+  // One-body and excitation-pair terms read each sparse pair about once, so
+  // only the non-Hermitian two-body loop, which reuses them, fills the cache.
+  auto single_use_product = [&](std::size_t spin, std::size_t i,
+                                std::size_t j) -> decltype(auto) {
+    if constexpr (EriProvider::kSparse) {
+      return make_pair_product(spin, i, j);
+    } else {
+      return pair_product(spin, i, j);
+    }
+  };
 
   auto mode_alpha = [](std::size_t p) -> std::size_t { return p; };
   auto mode_beta = [n_spatial](std::size_t p) -> std::size_t {
@@ -504,16 +514,9 @@ MajoranaMapResult majorana_map_impl(const MajoranaMapping& mapping,
     std::size_t bq = is_alpha ? mode_q : (mode_q - n_spatial);
     for (int a = 0; a < 2; ++a) {
       for (int b = 0; b < 2; ++b) {
-        // Sparse one-body pairs rarely recur, so they skip the cache.
-        if constexpr (EriProvider::kSparse) {
-          const auto [coeff, word] =
-              make_pair_product(spin, 2 * bp + a, 2 * bq + b);
-          acc.accumulate(word, coeff * h_pq * 0.25 * excitation_coeff[a][b]);
-        } else {
-          const auto& [coeff, word] =
-              pair_product(spin, 2 * bp + a, 2 * bq + b);
-          acc.accumulate(word, coeff * h_pq * 0.25 * excitation_coeff[a][b]);
-        }
+        const auto& [coeff, word] =
+            single_use_product(spin, 2 * bp + a, 2 * bq + b);
+        acc.accumulate(word, coeff * h_pq * 0.25 * excitation_coeff[a][b]);
       }
     }
   };
@@ -602,12 +605,12 @@ MajoranaMapResult majorana_map_impl(const MajoranaMapping& mapping,
         for (std::size_t first = 0; first < 2; ++first) {
           for (std::size_t second = 0; second < 2; ++second) {
             const auto& forward =
-                pair_product(channel, 2 * bra + first, 2 * ket + second);
+                single_use_product(channel, 2 * bra + first, 2 * ket + second);
             const auto coefficient = 0.25 * excitation_coeff[first][second];
             symmetric[forward.word] += coefficient * forward.coeff;
             if (bra != ket) {
-              const auto& reverse =
-                  pair_product(channel, 2 * ket + first, 2 * bra + second);
+              const auto& reverse = single_use_product(channel, 2 * ket + first,
+                                                       2 * bra + second);
               symmetric[reverse.word] += coefficient * reverse.coeff;
               antisymmetric[forward.word] += coefficient * forward.coeff;
               antisymmetric[reverse.word] -= coefficient * reverse.coeff;
