@@ -971,8 +971,8 @@ TEST(MajoranaMapEngineTest, SparseMappingBeyondTheDenseWidthMatchesSmallOne) {
         map_embedded(4, *two_body, type, integral_threshold), 4);
   }
 
-  // A beta qubit at 65536 needs the widest word count; one at 131072 exceeds
-  // it.
+  // A beta qubit at 65536 needs the widest word count and must land exactly
+  // where qubit 1 does in the narrow mapping; one at 131072 exceeds it.
   const double h1[1] = {1.0};
   const int index[4] = {0, 0, 0, 0};
   const double value[1] = {0.75};
@@ -982,7 +982,19 @@ TEST(MajoranaMapEngineTest, SparseMappingBeyondTheDenseWidthMatchesSmallOne) {
             {{{0, 1}}, {{0, 2}}, {{0, 3}, {beta, 1}}, {{0, 3}, {beta, 2}}}),
         0.5, h1, h1, index, value, 1, 1, true, 1e-12, 1e-12);
   };
-  expect_same_block_terms(map_gapped(65536), 1, map_gapped(1), 1);
+  auto gapped = map_gapped(65536);
+  bool has_beta = false;
+  for (auto& word : gapped.words) {
+    for (auto& [qubit, op] : word) {
+      ASSERT_TRUE(qubit == 0 || qubit == 65536) << qubit;
+      if (qubit == 65536) {
+        has_beta = true;
+        qubit = 1;
+      }
+    }
+  }
+  EXPECT_TRUE(has_beta);
+  expect_same_coefficients(gapped, map_gapped(1), 2);
   EXPECT_THROW(map_gapped(131072), std::invalid_argument);
 
   // Verstraete-Cirac stabilizer penalties map alike with every qubit shifted
