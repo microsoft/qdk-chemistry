@@ -177,8 +177,10 @@ Each method returns the circuit in the requested format, converting from whateve
      - Returns the OpenQASM string. Converts from :term:`QIR` via Qiskit if only :term:`QIR` is available.
    * - :meth:`~qdk_chemistry.data.Circuit.get_qiskit_circuit`
      - Returns a Qiskit ``QuantumCircuit``. Requires ``qiskit`` to be installed.
+   * - :meth:`~qdk_chemistry.data.Circuit.get_qre_application`
+     - Returns a ``qdk.qre`` application (Q#, OpenQASM, or :term:`QIR`) to pass to ``qdk.qre.estimate()``. Requires the ``qre`` extra.
    * - :meth:`~qdk_chemistry.data.Circuit.estimate`
-     - Runs Q#'s resource estimator on the circuit. Accepts optional ``params`` for estimation configuration.
+     - Returns logical counts and QRE v3 physical estimates, defaulting to Majorana at error rate ``1e-6`` with ThreeAux and RoundBasedFactory.
 
 Example: Convert state preparation circuits to different formats
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~

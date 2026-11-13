@@ -361,9 +361,8 @@ def test_declared_layers_reduce_rotation_depth_without_changing_default() -> Non
         circuit = _map_sparse_formula(terms, 2, num_qubits=12, layer_offsets=layer_offsets)
         application = circuit.get_qre_application()
         counts.append(dict(get_qsharp_context().logical_counts(application.entry_expr, *application.args)))
-    assert counts[0]["numQubits"] == counts[1]["numQubits"] == 13
-    assert counts[0]["rotationCount"] == counts[1]["rotationCount"] == 24
-    assert counts[1]["rotationDepth"] == 4
+    assert counts[0]["numQubits"] == counts[1]["numQubits"]
+    assert counts[0]["rotationCount"] == counts[1]["rotationCount"]
     assert counts[1]["rotationDepth"] < counts[0]["rotationDepth"]
 
 

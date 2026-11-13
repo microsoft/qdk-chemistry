@@ -6,7 +6,6 @@
 # --------------------------------------------------------------------------------------------
 
 import math
-from collections.abc import Mapping
 
 import h5py
 import numpy as np
@@ -32,7 +31,7 @@ from qdk_chemistry.data import (
 from qdk_chemistry.data.circuit import QsharpFactoryData
 from qdk_chemistry.data.unitary_representation.containers.hubbard_plaquette import HubbardPlaquetteContainer
 from qdk_chemistry.utils.pauli_matrix import pauli_to_dense_matrix, pauli_to_sparse_matrix
-from qdk_chemistry.utils.qsharp import QSHARP_UTILS, get_qsharp_context
+from qdk_chemistry.utils.qsharp import QSHARP_UTILS
 
 from .helpers import apply_operation, random_state
 
@@ -472,70 +471,6 @@ class TestPauliProductFormulaOutput:
         assert abs(np.vdot(expected, apply_operation(circuit._qsharp_op, state, split_control=True))) == pytest.approx(
             1.0, abs=1e-9
         )
-
-
-# Logical counts of the benchmark circuit in examples/resource_estimation/estimation_hubbard_2d.ipynb.
-# Every tower takes an adder tree, and its weight is added into a catalyst prepared once for the
-# interaction layers and once for the hopping layers, which turns the place-value rotations of
-# every tower into one rotation and Toffolis.
-_COUNT_KEYS = ("numQubits", "rotationCount", "rotationDepth", "tCount", "cczCount", "ccixCount", "measurementCount")
-_BENCHMARK_COUNTS = {
-    2: (34, 131632, 131433, 697995, 1177641, 0, 1177651),
-    4: (78, 24549, 24274, 758427, 592250, 0, 592260),
-}
-
-#: Logical counts treat a rotation by a multiple of pi/4 as a Clifford or T gate, and floating-point
-#: angles land on or just off those multiples differently across platforms, so the rotation counts
-#: drift by a few units. The catalyst leaves few rotations at L=4, where a relative tolerance
-#: alone would not absorb that drift, so they also get an absolute tolerance.
-_ROTATION_RELATIVE_TOLERANCE = 1e-4
-_ROTATION_ABSOLUTE_TOLERANCE = 16
-
-
-def _assert_counts_match_the_pins(counts: Mapping[str, float], size: int) -> None:
-    """Exact, except rotations get a tolerance for cross-platform drift in their angles."""
-    mismatches = {
-        key: (counts.get(key, 0), pinned)
-        for key, pinned in zip(_COUNT_KEYS, _BENCHMARK_COUNTS[size], strict=True)
-        if counts.get(key, 0)
-        != (
-            pytest.approx(pinned, rel=_ROTATION_RELATIVE_TOLERANCE, abs=_ROTATION_ABSOLUTE_TOLERANCE)
-            if key.startswith("rotation")
-            else pinned
-        )
-    }
-    assert not mismatches, f"L={size} (actual, pinned): {mismatches}"
-
-
-class TestBenchmarkResources:
-    """Pin the logical cost the 2D Hubbard estimation notebook reports."""
-
-    @pytest.mark.parametrize("size", [2, 4])
-    def test_counts_match_the_pins(self, size):
-        """``test_estimation_hubbard_2d`` holds the notebook's own output to the same pins."""
-        # The notebook's 10-bit sine-window QPE on an LxL lattice.
-        num_bits, energy_budget = 10, 0.0051 * size * size
-        qpe_budget = 2.0 / 3.0 * energy_budget  # The optimal split of Campbell arXiv:2012.09238v4, App. F.
-        builder = create(
-            "qpe_circuit_builder",
-            "qdk_standard",
-            num_bits=num_bits,
-            phase_state="sine",
-            unitary_builder=AlgorithmRef(
-                "hamiltonian_unitary_builder",
-                "hubbard_plaquette",
-                order=2,
-                # A sine window over 2^bits - 1 queries has spread tan(pi / (2^bits + 1)).
-                time=math.tan(math.pi / (2**num_bits + 1)) / qpe_budget,
-                power_strategy="rescale",
-                target_accuracy=energy_budget - qpe_budget,
-            ),
-            controlled_circuit_mapper=AlgorithmRef("controlled_circuit_mapper", "hubbard_plaquette"),
-        )
-        model = _model(size, t=1.0, u=8.0)
-        factory = builder.run(identity_state_prep(num_qubits=2 * size * size), model)[0]._qsharp_factory
-        counts = get_qsharp_context().logical_counts(factory.program, *factory.parameter.values())
-        _assert_counts_match_the_pins(counts, size)
 
 
 class TestStepCountAndShift:

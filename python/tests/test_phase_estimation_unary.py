@@ -140,6 +140,19 @@ class TestBlockEncodingAgnosticSchedule:
 
         assert optimized == direct
 
+    @pytest.mark.parametrize("compute_capacity", [4, 6])
+    def test_resource_optimized_schedule_preserves_memory_traffic(
+        self, qsharp_test_context, qsharp_test_utils, compute_capacity
+    ):
+        """The resource loop must preserve the unrolled schedule's memory traffic."""
+        operation = qsharp_test_utils.UnaryPhaseEstimationTests.TestSignedPowerScheduleMemoryTraffic
+        optimized = qsharp_test_context.logical_counts(operation, 100, compute_capacity, True)
+        unrolled = qsharp_test_context.logical_counts(operation, 100, compute_capacity, False)
+
+        assert optimized["readFromMemoryCount"] > 0
+        assert optimized["writeToMemoryCount"] > 0
+        assert optimized == unrolled
+
     @pytest.mark.parametrize(
         ("num_queries", "address_value"),
         [(p, t) for p in (1, 2, 3, 5) for t in range(p + 1)],
@@ -664,7 +677,9 @@ def test_a_positive_compute_capacity_moves_qubits_into_memory():
 
     def split(compute_capacity: int) -> tuple[int, int]:
         circuit = _run_builder(QdkUnaryQpeCircuitBuilder(num_queries=3, compute_capacity=compute_capacity))[0]
-        result = estimate(circuit.get_qre_application(), architecture, isa_query, trace_query, max_error=0.1)
+        # Memory-compute placement requires the counts backend.
+        application = circuit.get_qre_application(use_trace_backend=False)
+        result = estimate(application, architecture, isa_query, trace_query, max_error=0.1)
         entries = list(result)
         assert entries, f"capacity {compute_capacity} admitted no feasible estimate"
         best = min(entries, key=lambda entry: entry.qubits)

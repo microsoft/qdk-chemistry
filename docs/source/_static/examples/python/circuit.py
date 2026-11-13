@@ -54,10 +54,12 @@ circuit_json = json.loads(qsharp_circuit.json())
 print(f"Qubits: {len(circuit_json['qubits'])}")
 
 # 5. Resource estimation
-estimate_result = circuit.estimate()
-formatted = estimate_result["physicalCountsFormatted"]
-print(f"Physical qubits: {formatted['physicalQubits']}")
-print(f"Runtime: {formatted['runtime']}")
+estimate_result = min(
+    circuit.estimate().physical_estimates,
+    key=lambda entry: (entry.qubits, entry.runtime),
+)
+print(f"Physical qubits: {estimate_result.qubits}")
+print(f"Runtime (ns): {estimate_result.runtime}")
 # end-cell-qsharp-workflow
 ################################################################################
 

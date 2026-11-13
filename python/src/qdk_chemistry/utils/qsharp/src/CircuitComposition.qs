@@ -4,40 +4,29 @@
 
 namespace QDKChemistry.Utils.CircuitComposition {
 
+    import QDKChemistry.Utils.Loop.ResourceEstimateLoop;
     import Std.Arrays.Subarray;
-    import Std.ResourceEstimation.BeginEstimateCaching;
-    import Std.ResourceEstimation.EndEstimateCaching;
-    import Std.ResourceEstimation.SingleVariant;
 
     /// Returns the controlled version of `op`, taking the control register as its first argument.
     function MakeControlledOp(op : Qubit[] => Unit is Adj + Ctl) : ((Qubit[], Qubit[]) => Unit is Adj + Ctl) {
         Controlled op
     }
 
-    /// Applies `op` to `target` `power` times.
+    /// Applies `op` to `target` `power` times, repeating its estimated cost without warm-up.
     operation ApplyRepeated<'T>(
-        cacheName : String,
         op : 'T => Unit is Adj + Ctl,
         power : Int,
         target : 'T
     ) : Unit is Adj + Ctl {
-        for _ in 1..power {
-            if BeginEstimateCaching(cacheName, SingleVariant()) {
-                op(target);
-                EndEstimateCaching();
-            }
-        }
+        ResourceEstimateLoop(power, 0, _ => op(target));
     }
 
     /// Returns an operation applying `op` `power` times.
-    /// Parameters:
-    /// - `cacheName`: A string used for caching the resource estimation
     function MakeRepeatedOp(
-        cacheName : String,
         op : Qubit[] => Unit is Adj + Ctl,
         power : Int
     ) : (Qubit[] => Unit is Adj + Ctl) {
-        ApplyRepeated(cacheName, op, power, _)
+        ApplyRepeated(op, power, _)
     }
 
     /// Adapts a control-register operation to the single-control-qubit shape phase estimation takes.

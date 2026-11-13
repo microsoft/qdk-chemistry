@@ -518,8 +518,12 @@ class TestCircuitEstimate:
         c[1] = measure q[1];
     """
 
-    def test_estimate_from_factory(self):
-        """Test that estimate works with Q# factory data."""
+    @pytest.mark.parametrize("use_trace_backend", [False, True])
+    def test_estimate_from_factory(self, use_trace_backend):
+        """Default physical estimates match QRE v3's Majorana and ThreeAux configuration."""
+        from qdk.qre import estimate  # noqa: PLC0415
+        from qdk.qre.models import Majorana, RoundBasedFactory, ThreeAux  # noqa: PLC0415
+
         state_prep_params = {
             "rowMap": [1, 0],
             "stateVector": [0.6, 0.0, 0.0, 0.8],
@@ -531,16 +535,45 @@ class TestCircuitEstimate:
             parameter=state_prep_params,
         )
         circuit = Circuit(qsharp_factory=qsharp_factory)
-        result = circuit.estimate()
-        assert result is not None
-        assert hasattr(result, "logical_counts")
+        result = circuit.estimate(use_trace_backend=True) if use_trace_backend else circuit.estimate()
+        expected = estimate(
+            circuit.get_qre_application(use_trace_backend=use_trace_backend),
+            Majorana(error_rate=1e-6),
+            ThreeAux.q() * RoundBasedFactory.q(),
+        )
+        assert result.physical_estimates
+        assert [(entry.qubits, entry.runtime) for entry in result.physical_estimates] == [
+            (entry.qubits, entry.runtime) for entry in expected
+        ]
+        assert result.logical_counts is not None
+        assert result["logicalCounts"] is result.logical_counts
+        assert result.logical_counts["numQubits"] == 2
 
     def test_estimate_from_qasm(self):
-        """Test that estimate works with QASM representation."""
+        """Custom QRE v3 queries and error options match direct estimation of OpenQASM."""
+        from qdk.qre import PSSPC, ErrorComposition, LatticeSurgery, estimate  # noqa: PLC0415
+        from qdk.qre.models import GateBased, RoundBasedFactory, SurfaceCode  # noqa: PLC0415
+
         circuit = Circuit(qasm=self._QASM_WITH_T)
-        result = circuit.estimate()
-        assert result is not None
-        assert hasattr(result, "logical_counts")
+        architecture = GateBased(error_rate=1e-4, gate_time=100, measurement_time=500)
+        isa_query = SurfaceCode.q(distance=[5, 7]) * RoundBasedFactory.q()
+        trace_query = PSSPC.q() * LatticeSurgery.q(slow_down_factor=2.0)
+        options = {
+            "max_error": 0.01,
+            "post_process": True,
+            "use_graph": False,
+            "composition": ErrorComposition.Product,
+            "name": "custom",
+        }
+        result = circuit.estimate(architecture, isa_query, trace_query, **options)
+        expected = estimate(circuit.get_qre_application(), architecture, isa_query, trace_query, **options)
+        assert result.physical_estimates
+        assert result.physical_estimates.as_frame().equals(expected.as_frame())
+        counts = result["logicalCounts"]
+        assert counts is result.logical_counts
+        assert counts is not None
+        assert counts["numQubits"] == 2
+        assert counts["tCount"] == 1
 
     def test_estimate_reports_but_does_not_change_the_declared_width(self, monkeypatch):
         """``num_qubits`` is the argument register, so internal scratch is reported, not written back."""
@@ -548,37 +581,30 @@ class TestCircuitEstimate:
         monkeypatch.setattr(circuit_module.Logger, "info", messages.append)
 
         circuit = Circuit(qasm=self._QASM_WITH_T, num_qubits=5)
-        result = circuit.estimate()
+        result = circuit.estimate().logical_counts
 
-        assert result.logical_counts["numQubits"] == 2
+        assert result["numQubits"] == 2
         assert circuit.num_qubits == 5
         assert any("declares 5 qubits" in m for m in messages)
 
-    def test_estimate_raises_with_qir_only(self):
-        """Test that estimate raises when only QIR representation is available."""
+    def test_estimate_from_qir(self):
+        """QIR physical estimates remain available without logical counts."""
         qir = openqasm_compile(
-            """
-            OPENQASM 3.0;
-            include "stdgates.inc";
-            qubit[2] q;
-            bit[2] c;
-            h q[0];
-            cx q[0], q[1];
-            c[0] = measure q[0];
-            c[1] = measure q[1];
-            """,
+            self._QASM_WITH_T,
             target_profile=TargetProfile.Base,
         )
         circuit = Circuit(qir=qir)
-        with pytest.raises(RuntimeError, match="Cannot estimate resources"):
-            circuit.estimate()
+        result = circuit.estimate()
+        assert result.physical_estimates
+        assert all(entry.qubits > 0 and entry.runtime > 0 for entry in result.physical_estimates)
+        assert result.logical_counts is None
 
 
 class TestGetQreApplication:
     """Test cases for Circuit.get_qre_application method."""
 
     def test_get_qre_application_from_factory(self):
-        """Test that get_qre_application works with Q# factory data."""
+        """Default to counts-based resources while allowing a distinct trace-backend estimate."""
         from qdk.qre.application import QSharpApplication  # noqa: PLC0415
 
         state_prep_params = {
@@ -594,6 +620,15 @@ class TestGetQreApplication:
         circuit = Circuit(qsharp_factory=qsharp_factory)
         app = circuit.get_qre_application()
         assert isinstance(app, QSharpApplication)
+        default = app.get_trace()
+        counts = circuit.get_qre_application(use_trace_backend=False).get_trace()
+        trace = circuit.get_qre_application(use_trace_backend=True).get_trace()
+        assert (default.compute_qubits, default.num_gates, default.depth) == (
+            counts.compute_qubits,
+            counts.num_gates,
+            counts.depth,
+        )
+        assert (counts.num_gates, counts.depth) != (trace.num_gates, trace.depth)
 
     def test_get_qre_application_from_qasm(self):
         """Test that get_qre_application works with QASM-only circuit."""

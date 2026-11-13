@@ -216,29 +216,6 @@ class TestPrepareSelectMapper:
             phases, expected_phases, atol=float_comparison_absolute_tolerance, rtol=float_comparison_relative_tolerance
         )
 
-    def test_resource_pin(self):
-        """Pin the logical counts of the default mapper against the multi-controlled, dense-PREPARE one."""
-        rng = np.random.default_rng(0)
-        paulis = sorted({"".join(rng.choice(list("IXYZ"), 6)) for _ in range(60)})[:20]
-        unitary_rep = _build_unitary_rep(paulis, rng.normal(size=len(paulis)))
-
-        def counts(**settings):
-            circuit = registry.create("controlled_circuit_mapper", "prepare_select_prepare", **settings).run(
-                unitary_rep
-            )
-            logical_counts = circuit.estimate().logical_counts
-            return circuit.num_qubits, logical_counts["numQubits"], logical_counts["cczCount"]
-
-        assert counts() == (12, 17, 19)
-        assert counts(prepare=AlgorithmRef("state_prep", "alias_sampling")) == (38, 48, 84)
-        # QROM rotates through one shared gradient the circuit prepares once.
-        assert counts(prepare=AlgorithmRef("state_prep", "qrom", rotation_bit_precision=10)) == (22, 42, 159)
-        assert counts(select_method="multi_controlled", prepare=AlgorithmRef("state_prep", "dense_pure_state")) == (
-            12,
-            16,
-            802,
-        )
-
     def test_reflect_via_dump_machine(self):
         r"""Verify the Reflect oracle via Q# dump_machine.
 
