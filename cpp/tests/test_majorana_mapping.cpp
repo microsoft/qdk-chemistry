@@ -888,39 +888,6 @@ TEST(MajoranaMapEngineTest, WarnsOnlyWhenAveragingChangesTheOperator) {
       << unrestricted;
 }
 
-namespace {
-
-// Terms keyed by spin block and in-block qubit, so that Jordan-Wigner
-// mappings of the same orbitals embedded in different spaces compare directly.
-std::map<std::string, std::complex<double>> block_terms(
-    const MajoranaMapResult& result, std::size_t n_spatial) {
-  std::map<std::string, std::complex<double>> terms;
-  for (std::size_t i = 0; i < result.words.size(); ++i) {
-    std::string label;
-    for (const auto& [qubit, op] : result.words[i])
-      label += (qubit < n_spatial ? "a" : "b") +
-               std::to_string(qubit % n_spatial) + "XYZ"[op - 1];
-    terms[label] += result.coefficients[i];
-  }
-  return terms;
-}
-
-void expect_same_block_terms(const MajoranaMapResult& actual,
-                             std::size_t actual_n,
-                             const MajoranaMapResult& expected,
-                             std::size_t expected_n) {
-  const auto actual_terms = block_terms(actual, actual_n);
-  const auto expected_terms = block_terms(expected, expected_n);
-  ASSERT_EQ(actual_terms.size(), expected_terms.size());
-  for (const auto& [label, coefficient] : expected_terms) {
-    const auto it = actual_terms.find(label);
-    ASSERT_NE(it, actual_terms.end()) << label;
-    EXPECT_NEAR(std::abs(it->second - coefficient), 0.0, 1e-12) << label;
-  }
-}
-
-}  // namespace
-
 TEST(MajoranaMapEngineTest, SparseMappingBeyondTheDenseWidthMatchesSmallOne) {
   // Sparse mappings beyond 1024 qubits match the same terms mapped within it.
   constexpr std::size_t active = 3;
@@ -960,15 +927,37 @@ TEST(MajoranaMapEngineTest, SparseMappingBeyondTheDenseWidthMatchesSmallOne) {
                                                                  0.0, type)),
         true, 1e-12, integral_threshold);
   };
+  // Terms keyed by spin block and in-block qubit, so that Jordan-Wigner
+  // mappings of the same orbitals embedded in different spaces compare
+  // directly.
+  auto block_terms = [](const MajoranaMapResult& result,
+                        std::size_t n_spatial) {
+    std::map<std::string, std::complex<double>> terms;
+    for (std::size_t i = 0; i < result.words.size(); ++i) {
+      std::string label;
+      for (const auto& [qubit, op] : result.words[i])
+        label += (qubit < n_spatial ? "a" : "b") +
+                 std::to_string(qubit % n_spatial) + "XYZ"[op - 1];
+      terms[label] += result.coefficients[i];
+    }
+    return terms;
+  };
   using Case = std::tuple<const std::vector<double>*, HamiltonianType, double>;
   for (const auto& [two_body, type, integral_threshold] :
        {Case{&eightfold, HamiltonianType::Hermitian, 1e-12},
         Case{&fourfold, HamiltonianType::Hermitian, 1e-12},
         Case{&fourfold, HamiltonianType::Hermitian, 0.1},
         Case{&asymmetric, HamiltonianType::NonHermitian, 1e-12}}) {
-    expect_same_block_terms(
-        map_embedded(520, *two_body, type, integral_threshold), 520,
-        map_embedded(4, *two_body, type, integral_threshold), 4);
+    const auto wide = block_terms(
+        map_embedded(520, *two_body, type, integral_threshold), 520);
+    const auto narrow =
+        block_terms(map_embedded(4, *two_body, type, integral_threshold), 4);
+    ASSERT_EQ(wide.size(), narrow.size());
+    for (const auto& [label, coefficient] : narrow) {
+      const auto it = wide.find(label);
+      ASSERT_NE(it, wide.end()) << label;
+      EXPECT_NEAR(std::abs(it->second - coefficient), 0.0, 1e-12) << label;
+    }
   }
 
   // A beta qubit at 65536 needs the widest word count and must land exactly
