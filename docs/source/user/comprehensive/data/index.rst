@@ -80,6 +80,9 @@ The following table summarizes the available data classes in QDK/Chemistry and t
    * - :doc:`QpeResult <qpe_result>`
      - Phase estimation results (phase, energy, aliases)
      - :doc:`PhaseEstimation <../algorithms/phase_estimation>`
+   * - :class:`~qdk_chemistry.data.StabilizerRenyiEntropyResult`
+     - Second-order stabilizer Renyi entropy in bits and truncation metadata
+     - :doc:`StabilizerRenyiEntropy <../algorithms/stabilizer_renyi_entropy>`
    * - :doc:`Circuit <circuit>`
      - Quantum circuit (OpenQASM, Q#, QIR, Qiskit)
      - :doc:`StatePreparation <../algorithms/state_preparation>`, User input

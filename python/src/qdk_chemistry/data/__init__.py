@@ -50,6 +50,7 @@ Exposed classes are:
 - :class:`SettingValue`: Type-safe variant for storing different setting value types.
 - :class:`Shell`: Individual shell within a basis set.
 - :class:`StabilityResult`: Result of stability analysis for electronic structure calculations.
+- :class:`StabilizerRenyiEntropyResult`: Stabilizer Renyi entropy in bits with truncation metadata.
 - :class:`StateVectorContainer`: Determinant-expansion wavefunction (single determinant, CAS, or SCI).
 - :class:`Structure`: Molecular structure and geometry information.
 - :class:`Symmetries`: Physical symmetries of an electronic state.
@@ -140,6 +141,7 @@ from qdk_chemistry.data.qpe_result import QpeResult
 # ``QubitHamiltonian`` is re-exported as a deprecated alias of ``QubitOperator``.
 from qdk_chemistry.data.qubit_operator import QubitHamiltonian, QubitOperator
 from qdk_chemistry.data.registry import available_dataclasses, get_dataclass_type, register_dataclass
+from qdk_chemistry.data.stabilizer_renyi_entropy_result import StabilizerRenyiEntropyResult
 from qdk_chemistry.data.symmetries import Symmetries
 from qdk_chemistry.data.term_partition import FlatPartition, LayeredPartition, TermPartition
 from qdk_chemistry.data.time_dependent_qubit_hamiltonian.base import TimeDependentQubitHamiltonian
@@ -217,6 +219,7 @@ __all__ = [
     "SparseHamiltonianContainer",
     "SpinChannel",
     "StabilityResult",
+    "StabilizerRenyiEntropyResult",
     "StateVectorContainer",
     "Structure",
     "Symmetries",

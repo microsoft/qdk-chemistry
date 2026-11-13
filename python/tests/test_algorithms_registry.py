@@ -11,7 +11,7 @@ import numpy as np
 import pytest
 
 from qdk_chemistry._core._algorithms import ScfSolverFactory
-from qdk_chemistry.algorithms import ScfSolver, registry
+from qdk_chemistry.algorithms import ReplicaStabilizerRenyiEntropy, ScfSolver, registry
 from qdk_chemistry.data import AlgorithmRef
 from qdk_chemistry.plugins import DuplicateRegistrationError
 from qdk_chemistry.plugins.qiskit import (
@@ -20,6 +20,7 @@ from qdk_chemistry.plugins.qiskit import (
     QDK_CHEMISTRY_HAS_QISKIT_NATURE,
 )
 from qdk_chemistry.remote.job import Job
+from tests.helpers import create_dense_wavefunction
 
 try:
     import pyscf  # noqa: F401
@@ -31,6 +32,30 @@ except ImportError:
 # Algorithm types that ship as an interface only, with no registered implementation
 # and therefore an empty default name. Remove entries here as implementations land.
 INTERFACE_ONLY_TYPES = {"effective_hamiltonian_constructor"}
+
+
+def test_stabilizer_renyi_entropy_registration():
+    """Expose the replica backend and its default settings through the registry."""
+    assert registry.available("stabilizer_renyi_entropy") == ["replica"]
+    assert registry.show_default("stabilizer_renyi_entropy") == "replica"
+    algorithm = registry.create("stabilizer_renyi_entropy")
+    assert algorithm.type_name() == "stabilizer_renyi_entropy"
+    assert algorithm.name() == "replica"
+    assert not algorithm.settings().get("truncate")
+    assert algorithm.settings().get("coefficient_cutoff") == 1e-12
+
+
+def test_stabilizer_renyi_entropy_cache(tmp_path, monkeypatch):
+    """Load an entropy result from cache without rerunning the calculation."""
+    wavefunction = create_dense_wavefunction([0.6, -0.8])
+    algorithm = registry.create("stabilizer_renyi_entropy")
+    result = algorithm.run(wavefunction, cache=tmp_path)
+    implementation = MagicMock(side_effect=AssertionError("A cache hit must not rerun the replica calculation."))
+    monkeypatch.setattr(ReplicaStabilizerRenyiEntropy, "_run_impl", implementation)
+    cached = registry.create("stabilizer_renyi_entropy").run(wavefunction, cache=tmp_path)
+    implementation.assert_not_called()
+    assert cached.to_json() == result.to_json()
+    assert cached.content_hash() == result.content_hash()
 
 
 def test_algorithm_wrapper_forwards_remote_execution_options(monkeypatch):
@@ -170,6 +195,7 @@ class TestRegistryShowDefault:
             "projected_multi_configuration_calculator",
             "scf_solver",
             "stability_checker",
+            "stabilizer_renyi_entropy",
             "expectation_estimator",
             "state_prep",
             "qubit_mapper",
