@@ -475,7 +475,6 @@ TEST(MajoranaMapEngineTest, RejectsNonFiniteOneBodyIntegrals) {
       majorana_map_hamiltonian(mapping, 0.0, finite.data(), invalid.data(), eri,
                                eri, eri, 2, false, 1e-12, 1e-12),
       std::invalid_argument);
-  // The sparse path beyond 1024 qubits shares the check.
   constexpr std::size_t wide = 520;
   std::vector<double> wide_invalid(wide * wide, 0.0);
   wide_invalid[1] = std::numeric_limits<double>::quiet_NaN();
@@ -496,7 +495,6 @@ TEST(MajoranaMapEngineTest, RejectsNonFiniteCoreEnergy) {
   Eigen::MatrixXd factors = Eigen::MatrixXd::Zero(4, 1);
   const int index[4] = {0, 0, 0, 0};
   const double value[1] = {0.5};
-  // The sparse path beyond 1024 qubits shares the check.
   constexpr std::size_t wide = 520;
   const auto wide_mapping = MajoranaMapping::jordan_wigner(2 * wide);
   const std::vector<double> wide_one_body(wide * wide, 0.0);

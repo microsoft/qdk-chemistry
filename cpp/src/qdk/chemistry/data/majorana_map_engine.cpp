@@ -450,7 +450,7 @@ MajoranaMapResult majorana_map_impl(const MajoranaMapping& mapping,
   //
   // γ_j · γ_k = (-i) · bilinear(j, k) for each within-spin-block pair.
   // Dense and Cholesky loops read every pair, so they are precomputed;
-  // sparse integrals build only the pairs their stored entries reference.
+  // sparse integrals cache only the pairs their two-body entries reference.
 
   struct PackedPairProduct {
     std::complex<double> coeff;
@@ -504,8 +504,16 @@ MajoranaMapResult majorana_map_impl(const MajoranaMapping& mapping,
     std::size_t bq = is_alpha ? mode_q : (mode_q - n_spatial);
     for (int a = 0; a < 2; ++a) {
       for (int b = 0; b < 2; ++b) {
-        const auto& [coeff, word] = pair_product(spin, 2 * bp + a, 2 * bq + b);
-        acc.accumulate(word, coeff * h_pq * 0.25 * excitation_coeff[a][b]);
+        // Sparse one-body pairs rarely recur, so they skip the cache.
+        if constexpr (EriProvider::kSparse) {
+          const auto [coeff, word] =
+              make_pair_product(spin, 2 * bp + a, 2 * bq + b);
+          acc.accumulate(word, coeff * h_pq * 0.25 * excitation_coeff[a][b]);
+        } else {
+          const auto& [coeff, word] =
+              pair_product(spin, 2 * bp + a, 2 * bq + b);
+          acc.accumulate(word, coeff * h_pq * 0.25 * excitation_coeff[a][b]);
+        }
       }
     }
   };
