@@ -35,6 +35,7 @@ INTERFACE_ONLY_TYPES = {"effective_hamiltonian_constructor"}
 
 
 def test_stabilizer_renyi_entropy_registration():
+    """Expose the replica backend and its default settings through the registry."""
     assert registry.available("stabilizer_renyi_entropy") == ["replica"]
     assert registry.show_default("stabilizer_renyi_entropy") == "replica"
     algorithm = registry.create("stabilizer_renyi_entropy")
@@ -45,6 +46,7 @@ def test_stabilizer_renyi_entropy_registration():
 
 
 def test_stabilizer_renyi_entropy_cache(tmp_path, monkeypatch):
+    """Load an entropy result from cache without rerunning the calculation."""
     wavefunction = create_dense_wavefunction([0.6, -0.8])
     algorithm = registry.create("stabilizer_renyi_entropy")
     result = algorithm.run(wavefunction, cache=tmp_path)

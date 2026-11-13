@@ -50,6 +50,7 @@ Exposed classes are:
 - :class:`SettingValue`: Type-safe variant for storing different setting value types.
 - :class:`Shell`: Individual shell within a basis set.
 - :class:`StabilityResult`: Result of stability analysis for electronic structure calculations.
+- :class:`StabilizerRenyiEntropyResult`: Stabilizer Renyi entropy in bits with truncation metadata.
 - :class:`StateVectorContainer`: Determinant-expansion wavefunction (single determinant, CAS, or SCI).
 - :class:`Structure`: Molecular structure and geometry information.
 - :class:`Symmetries`: Physical symmetries of an electronic state.

@@ -25,6 +25,8 @@ class StabilizerRenyiEntropyResult(DataClass):
     Configuration counts exclude exact zeros. ``coefficient_cutoff`` is ``None``
     when truncation is disabled. The discarded probability is measured in the
     original state, before renormalizing the retained coefficients.
+    Unchanged configuration counts require zero discarded probability.
+    Zero entropy is stored as positive zero, and enabled cutoffs as floats.
     """
 
     _serialization_version = "0.1.0"
@@ -81,6 +83,8 @@ class StabilizerRenyiEntropyResult(DataClass):
         if truncation_enabled:
             if coefficient_cutoff is None or not isfinite(coefficient_cutoff) or coefficient_cutoff < 0:
                 raise ValueError("Enabled truncation requires a finite, non-negative coefficient_cutoff.")
+            if num_retained_configurations == num_configurations and discarded_weight != 0:
+                raise ValueError("Unchanged configuration counts require zero discarded_weight.")
         elif (
             coefficient_cutoff is not None or discarded_weight != 0 or num_retained_configurations != num_configurations
         ):
@@ -90,12 +94,12 @@ class StabilizerRenyiEntropyResult(DataClass):
         if alpha != 2 or log_base != 2 or encoding != "jordan-wigner" or fermion_mode_order != "blocked":
             raise ValueError("Only alpha=2, log_base=2, Jordan-Wigner encoding, and blocked ordering are supported.")
 
-        self.entropy = float(entropy)
+        self.entropy = 0.0 if entropy == 0 else float(entropy)
         self.num_qubits = num_qubits
         self.num_configurations = num_configurations
         self.num_retained_configurations = num_retained_configurations
         self.truncation_enabled = truncation_enabled
-        self.coefficient_cutoff = coefficient_cutoff
+        self.coefficient_cutoff = float(coefficient_cutoff) if coefficient_cutoff is not None else None
         self.discarded_weight = float(discarded_weight)
         self.alpha = alpha
         self.log_base = log_base
@@ -159,11 +163,13 @@ class StabilizerRenyiEntropyResult(DataClass):
         )
 
     def to_hdf5(self, group: "h5py.Group") -> None:
-        """Serialize scalar fields as versioned HDF5 attributes."""
+        """Serialize scalar fields, replacing result attributes in a reused group."""
         self._add_hdf5_version(group)
         for key, value in self.to_json().items():
             if value is not None:
                 group.attrs[key] = value
+            elif key in group.attrs:
+                del group.attrs[key]
 
     @classmethod
     def from_hdf5(cls, group: "h5py.Group") -> "StabilizerRenyiEntropyResult":

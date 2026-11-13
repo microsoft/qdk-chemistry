@@ -63,8 +63,12 @@ def _sparse_coefficients(wavefunction: Wavefunction) -> tuple[int, list[int], "N
     """Extract real, normalized occupation coefficients without a dense vector."""
     if not isinstance(wavefunction, Wavefunction):
         raise TypeError("wavefunction must be a Wavefunction.")
-    if wavefunction.get_container_type() != "state_vector":
-        raise TypeError("Stabilizer Renyi entropy requires a coefficient expansion, not an amplitude container.")
+    container_type = wavefunction.get_container_type()
+    if container_type != "state_vector":
+        raise TypeError(
+            "Stabilizer Renyi entropy requires a state_vector coefficient expansion; "
+            f"received container type {container_type!r}."
+        )
 
     determinants = wavefunction.get_active_determinants()
     coefficients = np.asarray(wavefunction.get_coefficients())
@@ -83,6 +87,7 @@ def _sparse_coefficients(wavefunction: Wavefunction) -> tuple[int, list[int], "N
             f"sum(abs(c)**2) = {norm_squared!r}, tolerance = {_NORMALIZATION_TOLERANCE}."
         )
 
+    # Assume all determinants use the same occupation representation.
     bits_per_mode = determinants[0].bits_per_mode()
     if bits_per_mode not in (1, 2):
         raise ValueError("Only binary spinless or spin-half occupation configurations are supported.")
@@ -241,7 +246,7 @@ class ReplicaStabilizerRenyiEntropy(StabilizerRenyiEntropy):
         moment = _replica_moment(retained_labels, retained_coefficients)
         if not isfinite(moment) or moment <= 0 or moment > 1.0 + _MOMENT_TOLERANCE:
             raise RuntimeError(f"The replica calculation produced an invalid Pauli fourth moment: {moment!r}.")
-        entropy = -log2(min(moment, 1.0))
+        entropy = 0.0 if moment >= 1.0 else -log2(moment)
         if entropy > num_qubits + _MOMENT_TOLERANCE:
             raise RuntimeError(f"The replica calculation produced entropy {entropy!r} above n = {num_qubits}.")
         return StabilizerRenyiEntropyResult(

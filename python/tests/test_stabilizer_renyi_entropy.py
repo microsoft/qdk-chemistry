@@ -6,7 +6,7 @@
 # --------------------------------------------------------------------------------------------
 
 from itertools import combinations, product
-from math import fsum, log2
+from math import copysign, fsum, log2
 from unittest.mock import MagicMock
 
 import numpy as np
@@ -20,9 +20,12 @@ from qdk_chemistry.data import (
     AmplitudeType,
     Configuration,
     ModelOrbitals,
+    MPSContainer,
+    MPSSite,
     StateVectorContainer,
     Wavefunction,
 )
+from qdk_chemistry.data import symmetry as sym
 from qdk_chemistry.utils import Logger
 from tests.helpers import (
     create_dense_wavefunction,
@@ -66,25 +69,8 @@ def _ordered_replica_moment(state: np.ndarray) -> float:
     )
 
 
-def _bitwise_pauli_entropy(state: np.ndarray) -> float:
-    """Evaluate every Pauli expectation with an independent Walsh transform."""
-    indices = np.arange(state.size)
-    moments = []
-    for flip in range(state.size):
-        overlaps = state * state[indices ^ flip]
-        width = 1
-        while width < state.size:
-            blocks = overlaps.reshape(-1, 2 * width)
-            left = blocks[:, :width].copy()
-            right = blocks[:, width:].copy()
-            blocks[:, :width] = left + right
-            blocks[:, width:] = left - right
-            width *= 2
-        moments.append(float(np.sum(overlaps**4)))
-    return -log2(fsum(moments) / state.size)
-
-
 def _calculate(state, *, truncate=False, cutoff=1e-12):
+    """Evaluate a small qubit state with the requested truncation settings."""
     algorithm = ReplicaStabilizerRenyiEntropy()
     algorithm.settings().set("truncate", truncate)
     algorithm.settings().set("coefficient_cutoff", cutoff)
@@ -99,16 +85,23 @@ def _calculate(state, *, truncate=False, cutoff=1e-12):
         [1 / np.sqrt(2), 1 / np.sqrt(2)],
         [1 / np.sqrt(2), -1 / np.sqrt(2)],
         [1 / np.sqrt(2), 0.0, 0.0, 1 / np.sqrt(2)],
+        [1 / np.sqrt(2), 0.0, 0.0, -1 / np.sqrt(2)],
+        [0.0, 1 / np.sqrt(2), 1 / np.sqrt(2), 0.0],
+        [0.0, 1 / np.sqrt(2), -1 / np.sqrt(2), 0.0],
         [0.5, 0.5, 0.5, -0.5],
         np.ones(8) / np.sqrt(8),
     ],
 )
 def test_stabilizer_states(state):
-    assert _calculate(state).entropy == pytest.approx(0.0, abs=1e-12)
+    """Check that computational, plus, Bell and graph stabilizers have zero magic."""
+    result = _calculate(state)
+    assert result.entropy == pytest.approx(0.0, abs=1e-12)
+    assert copysign(1.0, result.entropy) == 1.0
     assert _pauli_entropy(np.asarray(state)) == pytest.approx(0.0, abs=1e-12)
 
 
 def test_real_magic_state():
+    """Check the analytical H-state entropy and representation metadata."""
     state = np.array([np.cos(np.pi / 8), np.sin(np.pi / 8)])
     result = _calculate(state)
     assert result.entropy == pytest.approx(log2(4 / 3), abs=1e-12)
@@ -117,8 +110,20 @@ def test_real_magic_state():
     assert result.fermion_mode_order == "blocked"
 
 
+@pytest.mark.parametrize("entangled", [False, True])
+def test_two_qubit_magic_state(entangled):
+    """Check additivity and CNOT invariance for two H-states."""
+    h_state = np.array([np.cos(np.pi / 8), np.sin(np.pi / 8)])
+    state = np.kron(h_state, h_state)
+    if entangled:
+        state = state[[0, 3, 2, 1]]
+    assert _calculate(state).entropy == pytest.approx(2 * log2(4 / 3), abs=1e-12)
+    assert _pauli_entropy(state) == pytest.approx(2 * log2(4 / 3), abs=1e-12)
+
+
 @pytest.mark.parametrize("truncate", [False, True])
 def test_calculation_and_result_do_not_trace_function_entry(monkeypatch, truncate):
+    """Keep calculation and result serialization free of function-entry tracing."""
     state = np.array([0.6, -0.8])
     wavefunction = create_dense_wavefunction(state)
     algorithm = algorithms.create("stabilizer_renyi_entropy", truncate=truncate, coefficient_cutoff=0.7)
@@ -138,6 +143,7 @@ def test_calculation_and_result_do_not_trace_function_entry(monkeypatch, truncat
 @pytest.mark.parametrize("support_size", [1, 2, 3, 4, 5, 8, 11, 16])
 @pytest.mark.parametrize("batched", [False, True])
 def test_three_independent_real_state_calculations(seed, support_size, batched, monkeypatch):
+    """Compare scalar and batched evaluation with two direct mathematical references."""
     if batched:
         monkeypatch.setattr(sre, "_SCALAR_CONFIGURATION_LIMIT", 0)
     rng = np.random.default_rng(seed)
@@ -152,18 +158,28 @@ def test_three_independent_real_state_calculations(seed, support_size, batched, 
 
 
 @pytest.mark.parametrize("seed", [42, 91])
-@pytest.mark.parametrize("num_configurations", [17, 24, 50, 100, 256])
-def test_batched_replica_against_all_bitwise_paulis(seed, num_configurations):
+@pytest.mark.parametrize("num_configurations", [17, 24, 32])
+def test_batched_replica_against_all_paulis(seed, num_configurations):
+    """Check the default batched path against explicit Pauli matrices."""
     rng = np.random.default_rng(seed)
-    labels = rng.choice(256, num_configurations, replace=False)
-    state = np.zeros(256)
+    labels = rng.choice(32, num_configurations, replace=False)
+    state = np.zeros(32)
     state[labels] = rng.standard_normal(num_configurations)
     state /= np.linalg.norm(state)
-    assert _calculate(state).entropy == pytest.approx(_bitwise_pauli_entropy(state), abs=1e-12)
+    assert _calculate(state).entropy == pytest.approx(_pauli_entropy(state), abs=1e-12)
+
+
+def test_batched_replica_large_support_with_stabilizer_factor():
+    """Expand to 256 configurations without changing the independently known entropy."""
+    state = np.random.default_rng(42).standard_normal(16)
+    state /= np.linalg.norm(state)
+    expanded = np.kron(np.ones(16) / 4, state)
+    assert _calculate(expanded).entropy == pytest.approx(_pauli_entropy(state), abs=1e-12)
 
 
 @pytest.mark.parametrize("signs", [False, True])
 def test_batched_replica_dense_stabilizer(signs):
+    """Check large dense stabilizers with and without Clifford-generated signs."""
     state = np.ones(256) / 16
     if signs:
         state *= np.array([-1 if (x & 3) == 3 else 1 for x in range(256)])
@@ -171,16 +187,18 @@ def test_batched_replica_dense_stabilizer(signs):
 
 
 def test_batched_replica_fixed_particle_number():
+    """Check a fixed-particle-number expansion against the ordered replica sum."""
     sector = [sum(1 << i for i in occupied) for occupied in combinations(range(4), 2)]
     labels = [a | (b << 4) for a in sector for b in sector]
     state = np.zeros(256)
     state[labels] = np.random.default_rng(42).standard_normal(len(labels))
     state /= np.linalg.norm(state)
-    assert _calculate(state).entropy == pytest.approx(_bitwise_pauli_entropy(state), abs=1e-12)
+    assert _calculate(state).entropy == pytest.approx(-log2(_ordered_replica_moment(state)), abs=1e-12)
 
 
 @pytest.mark.parametrize("positions", [[0, 1, 2, 3, 63], [0, 7, 63, 64, 129]])
 def test_batched_replica_arbitrary_width_labels_and_input_order(positions):
+    """Preserve entropy, input data and hashing when labels are wide or reordered."""
     state = np.random.default_rng(42).standard_normal(32)
     state /= np.linalg.norm(state)
     labels = [sum(((x >> i) & 1) << bit for i, bit in enumerate(positions)) for x in range(32)]
@@ -188,7 +206,7 @@ def test_batched_replica_arbitrary_width_labels_and_input_order(positions):
     original_hash = wavefunction.content_hash()
     result = ReplicaStabilizerRenyiEntropy().run(wavefunction)
     assert result.num_qubits == max(positions) + 1
-    assert result.entropy == pytest.approx(_bitwise_pauli_entropy(state), abs=1e-12)
+    assert result.entropy == pytest.approx(_pauli_entropy(state), abs=1e-12)
     permuted = create_sparse_wavefunction(max(positions) + 1, labels[::-1], state[::-1])
     assert ReplicaStabilizerRenyiEntropy().run(permuted).to_json() == result.to_json()
     np.testing.assert_array_equal(wavefunction.get_coefficients(), state)
@@ -196,6 +214,7 @@ def test_batched_replica_arbitrary_width_labels_and_input_order(positions):
 
 
 def test_batched_replica_without_distinct_xor_partners():
+    """Check repeated-index contributions when distinct XOR partners are absent."""
     labels = [1 << i for i in range(24)]
     coefficients = np.random.default_rng(42).standard_normal(len(labels))
     coefficients /= np.linalg.norm(coefficients)
@@ -206,6 +225,7 @@ def test_batched_replica_without_distinct_xor_partners():
 
 @pytest.mark.parametrize("gate", ["h", "cnot", "swap"])
 def test_real_clifford_invariance(gate):
+    """Preserve magic under real Hadamard, CNOT and SWAP transformations."""
     state = np.random.default_rng(42).standard_normal(8)
     state /= np.linalg.norm(state)
     transformed = np.empty_like(state)
@@ -220,6 +240,7 @@ def test_real_clifford_invariance(gate):
 
 
 def test_global_sign_and_tensor_additivity():
+    """Preserve global-sign invariance and entropy additivity."""
     first = np.array([np.cos(0.21), -np.sin(0.21)])
     second = np.array([np.cos(0.37), np.sin(0.37)])
     assert _calculate(-first).entropy == pytest.approx(_calculate(first).entropy, abs=1e-12)
@@ -229,6 +250,7 @@ def test_global_sign_and_tensor_additivity():
 
 
 def test_sparse_input_order_and_repeated_calls():
+    """Keep results independent of determinant order and previous calls."""
     labels = [1, 4, 6, 9, 15]
     coefficients = np.array([1.0, -2.0, 3.0, -4.0, 5.0]) / np.sqrt(55)
     algorithm = ReplicaStabilizerRenyiEntropy()
@@ -241,6 +263,7 @@ def test_sparse_input_order_and_repeated_calls():
 
 
 def test_blocked_jordan_wigner_labels():
+    """Check molecular occupations against QDK's blocked alpha/beta bit ordering."""
     orbitals = create_test_orbitals(2)
     determinants = [Configuration.from_spin_half_string("20"), Configuration.from_spin_half_string("02")]
     wavefunction = Wavefunction(StateVectorContainer(np.array([0.6, -0.8]), determinants, orbitals, "electrons"))
@@ -255,6 +278,7 @@ def test_blocked_jordan_wigner_labels():
 
 @pytest.mark.parametrize("labels", [[0, 1], [0, 1 << 69]])
 def test_register_width_and_labels_above_int64(labels):
+    """Retain empty upper modes and integer labels wider than 64 bits."""
     wavefunction = create_sparse_wavefunction(70, labels, [np.cos(np.pi / 8), np.sin(np.pi / 8)])
     n, extracted, _ = sre._sparse_coefficients(wavefunction)
     assert n == 70
@@ -265,6 +289,7 @@ def test_register_width_and_labels_above_int64(labels):
 
 
 def test_truncation_disabled_preserves_every_nonzero_coefficient():
+    """Ignore the cutoff and retain tiny amplitudes when truncation is disabled."""
     state = [1.0, 1e-13, -2e-13, 0.0]
     result = _calculate(state, cutoff=0.9)
     assert not result.truncation_enabled
@@ -274,6 +299,7 @@ def test_truncation_disabled_preserves_every_nonzero_coefficient():
 
 
 def test_default_cutoff_and_tiny_discarded_probability():
+    """Record tiny discarded weights without modifying the input state or hash."""
     wavefunction = create_dense_wavefunction([1.0, 1e-13, -2e-13, 1e-10])
     original = wavefunction.get_coefficients().copy()
     original_hash = wavefunction.content_hash()
@@ -291,6 +317,7 @@ def test_default_cutoff_and_tiny_discarded_probability():
 
 
 def test_custom_cutoff_renormalizes_and_records_weight():
+    """Check retained-state normalization, entropy and discarded probability."""
     state = np.array([np.sqrt(0.75), 0.2, -0.4, np.sqrt(0.05)])
     result = _calculate(state, truncate=True, cutoff=0.2)
     retained = state.copy()
@@ -303,6 +330,7 @@ def test_custom_cutoff_renormalizes_and_records_weight():
 
 
 def test_strict_cutoff_boundary():
+    """Discard amplitudes equal to the selected cutoff."""
     result = _calculate([np.sqrt(0.5), 0.5, -0.5, 0.0], truncate=True, cutoff=0.5)
     assert result.num_configurations == 3
     assert result.num_retained_configurations == 1
@@ -311,6 +339,7 @@ def test_strict_cutoff_boundary():
 
 
 def test_zero_cutoff_and_no_discarded_support():
+    """Preserve all nonzero amplitudes with a zero cutoff."""
     state = [0.6, -0.8, 0.0, 0.0]
     result = _calculate(state, truncate=True, cutoff=0.0)
     assert result.num_configurations == result.num_retained_configurations == 2
@@ -320,12 +349,14 @@ def test_zero_cutoff_and_no_discarded_support():
 
 @pytest.mark.parametrize("cutoff", [-1.0, float("nan"), float("inf")])
 def test_invalid_cutoff_only_applies_when_enabled(cutoff):
+    """Validate cutoff values only when truncation is requested."""
     with pytest.raises(ValueError, match="finite and non-negative"):
         _calculate([1.0, 0.0], truncate=True, cutoff=cutoff)
     assert _calculate([1.0, 0.0], cutoff=cutoff).entropy == 0
 
 
 def test_all_coefficients_discarded():
+    """Reject a cutoff that removes the entire nonzero expansion."""
     with pytest.raises(ValueError, match="removed every"):
         _calculate([0.6, -0.8], truncate=True, cutoff=0.8)
 
@@ -333,11 +364,13 @@ def test_all_coefficients_discarded():
 @pytest.mark.parametrize("truncate", [False, True])
 @pytest.mark.parametrize("state", [[0.0, 0.0], [0.6, 0.7], [np.sqrt(1 + 2e-10), 0.0], [1e200, 0.0]])
 def test_unnormalized_input_rejected_before_truncation(state, truncate):
+    """Reject materially unnormalized states before applying any cutoff."""
     with pytest.raises(ValueError, match="must be normalized"):
         _calculate(state, truncate=truncate, cutoff=2.0)
 
 
 def test_roundoff_normalization_is_bounded_and_does_not_mutate():
+    """Correct permitted normalization drift without changing the supplied coefficients."""
     state = [np.sqrt(1 + 0.5e-10), 0.0]
     wavefunction = create_dense_wavefunction(state)
     assert ReplicaStabilizerRenyiEntropy().run(wavefunction).entropy == 0
@@ -346,17 +379,20 @@ def test_roundoff_normalization_is_bounded_and_does_not_mutate():
 
 @pytest.mark.parametrize("value", [np.nan, np.inf, -np.inf])
 def test_nonfinite_coefficients(value):
+    """Reject nonfinite amplitudes explicitly."""
     with pytest.raises(ValueError, match="must be finite"):
         _calculate([1.0, value])
 
 
 def test_empty_expansion():
+    """Reject an empty coefficient expansion."""
     wavefunction = Wavefunction(StateVectorContainer(np.array([]), [], ModelOrbitals(1)))
     with pytest.raises(ValueError, match="must not be empty"):
         ReplicaStabilizerRenyiEntropy().run(wavefunction)
 
 
 def test_duplicate_configurations_rejected():
+    """Reject repeated computational-basis labels."""
     wavefunction = create_sparse_wavefunction(1, [0, 0], [0.6, 0.8])
     with pytest.raises(ValueError, match="duplicate configurations"):
         ReplicaStabilizerRenyiEntropy().run(wavefunction)
@@ -364,6 +400,7 @@ def test_duplicate_configurations_rejected():
 
 @pytest.mark.parametrize("imaginary", [0.5, 1e-30])
 def test_genuinely_complex_coefficients_rejected(imaginary):
+    """Reject nonzero imaginary amplitudes even when they are very small."""
     real = create_dense_wavefunction([1.0, 0.0])
     coefficients = np.array([1.0, imaginary * 1j])
     coefficients /= np.linalg.norm(coefficients)
@@ -373,6 +410,7 @@ def test_genuinely_complex_coefficients_rejected(imaginary):
 
 
 def test_complex_storage_with_real_values():
+    """Accept complex arrays whose imaginary components are exactly zero."""
     real = create_dense_wavefunction([0.6, -0.8])
     coefficients = np.array([0.6, -0.8], dtype=complex)
     wavefunction = Wavefunction(StateVectorContainer(coefficients, real.get_active_determinants(), real.get_orbitals()))
@@ -380,6 +418,7 @@ def test_complex_storage_with_real_values():
 
 
 def test_amplitude_container_rejected():
+    """Reject coupled-cluster-style amplitudes instead of treating them as coefficients."""
     orbitals = create_test_orbitals(2)
     reference = Wavefunction(StateVectorContainer(Configuration.from_spin_half_string("20"), orbitals, "electrons"))
     amplitudes = Wavefunction(AmplitudeContainer(orbitals, reference, AmplitudeType.CoupledCluster))
@@ -387,24 +426,60 @@ def test_amplitude_container_rejected():
         ReplicaStabilizerRenyiEntropy().run(amplitudes)
 
 
+def test_mps_container_rejected():
+    """Identify unsupported MPS storage accurately without attempting coefficient extraction."""
+    product = sym.SymmetryProduct([])
+    label = sym.SymmetryLabel([])
+    tensor = sym.SymmetryBlockedTensorRank3(
+        [product] * 3,
+        [{label: 1}, {label: 2}, {label: 1}],
+        [((label, label, label), np.array([[1.0], [0.0]]))],
+    )
+    site = MPSSite(tensor, [label], [label], [label], [])
+    wavefunction = Wavefunction(MPSContainer([site], ModelOrbitals(1)))
+    assert wavefunction.get_container_type() == "mps"
+    with pytest.raises(TypeError, match="requires a state_vector coefficient expansion.*'mps'"):
+        ReplicaStabilizerRenyiEntropy().run(wavefunction)
+
+
 def test_non_wavefunction_rejected():
+    """Reject objects outside the public wavefunction input contract."""
     with pytest.raises(TypeError, match="must be a Wavefunction"):
         ReplicaStabilizerRenyiEntropy().run([1.0, 0.0])
 
 
 @pytest.mark.parametrize("moment", [0.0, -0.1, np.nan, np.inf, 1.01, 2.0**-10])
 def test_invalid_replica_results_raise(monkeypatch, moment):
+    """Reject nonphysical moments or entropy rather than returning a plausible result."""
     monkeypatch.setattr(sre, "_replica_moment", lambda *_args: moment)
     with pytest.raises(RuntimeError, match="replica calculation produced"):
         _calculate([1.0, 0.0])
 
 
 def test_bounded_moment_roundoff(monkeypatch):
+    """Clip a moment exceeding one only within the existing roundoff tolerance."""
     monkeypatch.setattr(sre, "_replica_moment", lambda *_args: 1 + 0.5e-12)
-    assert _calculate([1.0, 0.0]).entropy == 0
+    result = _calculate([1.0, 0.0])
+    assert result.entropy == 0
+    assert copysign(1.0, result.entropy) == 1.0
+
+
+def test_bounded_entropy_roundoff(monkeypatch):
+    """Clip an injected entropy just above the register-size bound."""
+    monkeypatch.setattr(sre, "_replica_moment", lambda *_args: 2.0 ** -(1 + 0.5e-12))
+    assert _calculate([1.0, 0.0]).entropy == 1
+
+
+@pytest.mark.parametrize("excess", [2e-12, 1e-5])
+def test_entropy_above_roundoff_tolerance_raises(monkeypatch, excess):
+    """Reject entropy excesses beyond tolerance, including the agreed clear-error case."""
+    monkeypatch.setattr(sre, "_replica_moment", lambda *_args: 2.0 ** -(1 + excess))
+    with pytest.raises(RuntimeError, match="above n"):
+        _calculate([1.0, 0.0])
 
 
 def test_h2_ground_state_against_all_paulis():
+    """Compare a native H2 ground-state calculation with every Pauli expectation."""
     _, mean_field = algorithms.create("scf_solver").run(create_h2_molecule(), 0, 1, "sto-3g")
     hamiltonian = algorithms.create("hamiltonian_constructor").run(mean_field.get_orbitals())
     _, ground_state = algorithms.create("multi_configuration_calculator", "macis_cas").run(hamiltonian, 1, 1)
