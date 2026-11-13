@@ -66,18 +66,29 @@ static void hash_bilinear_entry(
 // ── MajoranaMapping implementation ───────────────────────────────────
 
 MajoranaMapping::MajoranaMapping(
-    std::vector<SparsePauliWord> table,
+    std::vector<std::vector<detail::PauliRun>> runs,
     std::vector<std::pair<std::complex<double>, SparsePauliWord>> bilinears,
     std::string name, std::size_t num_modes, std::size_t num_qubits,
     std::string base_encoding, std::optional<TaperingSpecification> tapering,
     std::vector<std::pair<std::complex<double>, SparsePauliWord>> stabilizers)
-    : table_(std::move(table)),
+    : runs_(std::move(runs)),
+      increasing_(std::all_of(runs_.begin(), runs_.end(),
+                              [](const auto& word) {
+                                for (std::size_t i = 1; i < word.size(); ++i) {
+                                  if (word[i].first <
+                                      word[i - 1].first + word[i - 1].count) {
+                                    return false;
+                                  }
+                                }
+                                return true;
+                              })),
+      expanded_(std::make_shared<ExpandedTable>()),
       bilinears_(std::move(bilinears)),
       name_(std::move(name)),
       base_encoding_(std::move(base_encoding)),
       num_modes_(num_modes),
       num_qubits_(num_qubits),
-      majorana_atomic_(!table_.empty()),
+      majorana_atomic_(!runs_.empty()),
       tapering_(std::move(tapering)),
       stabilizers_(std::move(stabilizers)) {
   if (base_encoding_.empty()) {
@@ -104,7 +115,20 @@ MajoranaMapping MajoranaMapping::from_table(std::vector<SparsePauliWord> table,
   auto num_modes = table.size() / 2;
   auto num_qubits = compute_num_qubits(table);
   auto base_encoding = name;
-  return MajoranaMapping(std::move(table), {}, std::move(name), num_modes,
+  // Consecutive qubits carrying the same Pauli share one run.
+  std::vector<std::vector<detail::PauliRun>> runs(table.size());
+  for (std::size_t k = 0; k < table.size(); ++k) {
+    auto& word = runs[k];
+    for (const auto& [qubit, op] : table[k]) {
+      if (!word.empty() && word.back().op == op &&
+          word.back().first + word.back().count == qubit) {
+        ++word.back().count;
+      } else {
+        word.push_back({qubit, 1, op});
+      }
+    }
+  }
+  return MajoranaMapping(std::move(runs), {}, std::move(name), num_modes,
                          num_qubits, std::move(base_encoding));
 }
 
@@ -143,18 +167,34 @@ MajoranaMapping MajoranaMapping::from_bilinears(
                          num_modes, nq, std::move(base_encoding));
 }
 
+const std::vector<SparsePauliWord>& MajoranaMapping::table() const {
+  std::call_once(expanded_->once, [this] {
+    // Built aside so a throw leaves nothing for a retried call_once to extend.
+    std::vector<SparsePauliWord> words(runs_.size());
+    for (std::size_t k = 0; k < runs_.size(); ++k) {
+      for (const auto& run : runs_[k]) {
+        for (std::uint64_t i = 0; i < run.count; ++i) {
+          words[k].emplace_back(run.first + i, run.op);
+        }
+      }
+    }
+    expanded_->words = std::move(words);
+  });
+  return expanded_->words;
+}
+
 const SparsePauliWord& MajoranaMapping::operator()(std::size_t k) const {
   if (!majorana_atomic_) {
     throw std::logic_error(
         "MajoranaMapping::majorana(k) is not available for bilinear-only "
         "mappings; use bilinear(j, k) instead.");
   }
-  if (k >= table_.size()) {
+  if (k >= runs_.size()) {
     throw std::out_of_range("Majorana index " + std::to_string(k) +
                             " out of range [0, " +
-                            std::to_string(table_.size()) + ")");
+                            std::to_string(runs_.size()) + ")");
   }
-  return table_[k];
+  return table()[k];
 }
 
 std::pair<std::complex<double>, SparsePauliWord> MajoranaMapping::bilinear(
@@ -175,19 +215,85 @@ std::pair<std::complex<double>, SparsePauliWord> MajoranaMapping::bilinear(
   const std::size_t lo = std::min(j, k);
   const std::size_t hi = std::max(j, k);
   std::pair<std::complex<double>, SparsePauliWord> entry;
-  if (majorana_atomic_) {
+  if (!majorana_atomic_) {
+    entry = bilinears_[bilinear_index(lo, hi)];
+  } else if (!increasing_) {
     auto [phase, word] =
-        PauliTermAccumulator::multiply_uncached(table_[lo], table_[hi]);
+        PauliTermAccumulator::multiply_uncached(table()[lo], table()[hi]);
     entry = {std::complex<double>(0.0, 1.0) * phase, std::move(word)};
   } else {
-    entry = bilinears_[bilinear_index(lo, hi)];
+    // multiply_uncached of the expanded entries, merged run by run so equal
+    // runs (the shared Jordan-Wigner Z strings) cancel without expanding.
+    const auto& left = runs_[lo];
+    const auto& right = runs_[hi];
+    const std::complex<double> imag_unit(0.0, 1.0);
+    std::complex<double> phase(1.0, 0.0);
+    SparsePauliWord word;
+    auto emit = [&word](std::uint64_t first, std::uint64_t count,
+                        std::uint8_t op) {
+      for (std::uint64_t i = 0; i < count; ++i)
+        word.emplace_back(first + i, op);
+    };
+    std::size_t a = 0, b = 0;
+    // Qubits already consumed from left[a] and right[b].
+    std::uint64_t a_used = 0, b_used = 0;
+    while (a < left.size() && b < right.size()) {
+      const auto& l = left[a];
+      const auto& r = right[b];
+      const std::uint64_t l_qubit = l.first + a_used;
+      const std::uint64_t r_qubit = r.first + b_used;
+      if (l_qubit < r_qubit) {
+        const std::uint64_t step =
+            std::min(l.count - a_used, r_qubit - l_qubit);
+        emit(l_qubit, step, l.op);
+        a_used += step;
+      } else if (r_qubit < l_qubit) {
+        const std::uint64_t step =
+            std::min(r.count - b_used, l_qubit - r_qubit);
+        emit(r_qubit, step, r.op);
+        b_used += step;
+      } else {
+        const std::uint64_t step = std::min(l.count - a_used, r.count - b_used);
+        if (l.op == 0) {
+          if (r.op != 0) emit(l_qubit, step, r.op);
+        } else if (r.op == 0) {
+          emit(l_qubit, step, l.op);
+        } else if (l.op != r.op) {
+          const bool cyclic = (l.op == 1 && r.op == 2) ||
+                              (l.op == 2 && r.op == 3) ||
+                              (l.op == 3 && r.op == 1);
+          for (std::uint64_t i = 0; i < step; ++i) {
+            phase *= cyclic ? imag_unit : -imag_unit;
+            word.emplace_back(l_qubit + i,
+                              static_cast<std::uint8_t>(6 - l.op - r.op));
+          }
+        }
+        a_used += step;
+        b_used += step;
+      }
+      if (a_used == l.count) {
+        ++a;
+        a_used = 0;
+      }
+      if (b_used == r.count) {
+        ++b;
+        b_used = 0;
+      }
+    }
+    for (; a < left.size(); ++a, a_used = 0) {
+      emit(left[a].first + a_used, left[a].count - a_used, left[a].op);
+    }
+    for (; b < right.size(); ++b, b_used = 0) {
+      emit(right[b].first + b_used, right[b].count - b_used, right[b].op);
+    }
+    entry = {imag_unit * phase, std::move(word)};
   }
   if (j > k) entry.first = -entry.first;
   return entry;
 }
 
 MajoranaMapping MajoranaMapping::without_tapering() const {
-  return MajoranaMapping(table_, bilinears_, base_encoding_, num_modes_,
+  return MajoranaMapping(runs_, bilinears_, base_encoding_, num_modes_,
                          num_qubits_, base_encoding_, std::nullopt,
                          stabilizers_);
 }
@@ -210,7 +316,7 @@ std::string MajoranaMapping::get_summary() const {
 
 nlohmann::json MajoranaMapping::to_json() const {
   nlohmann::json data{{"version", SERIALIZATION_VERSION},
-                      {"table", table_},
+                      {"table", table()},
                       {"name", name_},
                       {"base_encoding", base_encoding_}};
   if (tapering_) {
@@ -272,7 +378,7 @@ MajoranaMapping MajoranaMapping::from_json(const nlohmann::json& data) {
     if (name == base_encoding && !tapering && stabilizers.empty()) {
       return mapping;
     }
-    return MajoranaMapping(mapping.table_, mapping.bilinears_, std::move(name),
+    return MajoranaMapping(mapping.runs_, mapping.bilinears_, std::move(name),
                            mapping.num_modes_, mapping.num_qubits_,
                            std::move(base_encoding), std::move(tapering),
                            std::move(stabilizers));
@@ -282,7 +388,7 @@ MajoranaMapping MajoranaMapping::from_json(const nlohmann::json& data) {
   if (name == base_encoding && !tapering && stabilizers.empty()) {
     return mapping;
   }
-  return MajoranaMapping(mapping.table_, mapping.bilinears_, std::move(name),
+  return MajoranaMapping(mapping.runs_, mapping.bilinears_, std::move(name),
                          mapping.num_modes_, mapping.num_qubits_,
                          std::move(base_encoding), std::move(tapering),
                          std::move(stabilizers));
@@ -365,9 +471,18 @@ void MajoranaMapping::hash_update(
   hash_value(ctx, static_cast<std::uint64_t>(num_qubits_));
   hash_value(ctx, majorana_atomic_);
 
-  hash_value(ctx, static_cast<std::uint64_t>(table_.size()));
-  for (const auto& word : table_) {
-    hash_sparse_pauli_word(ctx, word);
+  // Hashes the expanded table without materializing it.
+  hash_value(ctx, static_cast<std::uint64_t>(runs_.size()));
+  for (const auto& runs : runs_) {
+    std::uint64_t size = 0;
+    for (const auto& run : runs) size += run.count;
+    hash_value(ctx, size);
+    for (const auto& run : runs) {
+      for (std::uint64_t i = 0; i < run.count; ++i) {
+        hash_value(ctx, static_cast<std::uint64_t>(run.first + i));
+        hash_value(ctx, run.op);
+      }
+    }
   }
 
   hash_value(ctx, static_cast<std::uint64_t>(bilinears_.size()));

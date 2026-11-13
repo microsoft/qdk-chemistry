@@ -119,26 +119,20 @@ MajoranaMapping MajoranaMapping::jordan_wigner(std::size_t num_modes) {
     throw std::invalid_argument("jordan_wigner requires num_modes > 0");
   }
 
-  std::vector<SparsePauliWord> table;
-  table.reserve(2 * num_modes);
-
+  // gamma_{2j} = Z_0..Z_{j-1} X_j and gamma_{2j+1} = Z_0..Z_{j-1} Y_j.
+  std::vector<std::vector<PauliRun>> runs;
+  runs.reserve(2 * num_modes);
   for (std::size_t j = 0; j < num_modes; ++j) {
-    std::vector<std::pair<std::uint64_t, std::uint8_t>> even_entries;
-    for (std::size_t k = 0; k < j; ++k) {
-      even_entries.emplace_back(static_cast<std::uint64_t>(k), op_z);
+    for (std::uint8_t op : {op_x, op_y}) {
+      std::vector<PauliRun> word;
+      if (j > 0) word.push_back({0, j, op_z});
+      word.push_back({j, 1, op});
+      runs.push_back(std::move(word));
     }
-    even_entries.emplace_back(static_cast<std::uint64_t>(j), op_x);
-    table.push_back(build_sorted_word(std::move(even_entries)));
-
-    std::vector<std::pair<std::uint64_t, std::uint8_t>> odd_entries;
-    for (std::size_t k = 0; k < j; ++k) {
-      odd_entries.emplace_back(static_cast<std::uint64_t>(k), op_z);
-    }
-    odd_entries.emplace_back(static_cast<std::uint64_t>(j), op_y);
-    table.push_back(build_sorted_word(std::move(odd_entries)));
   }
 
-  return MajoranaMapping::from_table(std::move(table), "jordan-wigner");
+  return MajoranaMapping(std::move(runs), {}, "jordan-wigner", num_modes,
+                         num_modes, "jordan-wigner");
 }
 
 // ── Factory: Bravyi-Kitaev ───────────────────────────────────────────
@@ -285,32 +279,22 @@ MajoranaMapping MajoranaMapping::parity(std::size_t num_modes) {
     throw std::invalid_argument("parity requires num_modes > 0");
   }
 
-  std::vector<SparsePauliWord> table;
-  table.reserve(2 * num_modes);
-
+  // gamma_{2j} = Z_{j-1} X_j..X_{N-1} and gamma_{2j+1} = Y_j X_{j+1}..X_{N-1}.
+  std::vector<std::vector<PauliRun>> runs;
+  runs.reserve(2 * num_modes);
   for (std::size_t j = 0; j < num_modes; ++j) {
-    {
-      std::vector<std::pair<std::uint64_t, std::uint8_t>> entries;
-      if (j > 0) {
-        entries.emplace_back(static_cast<std::uint64_t>(j - 1), op_z);
-      }
-      for (std::size_t k = j; k < num_modes; ++k) {
-        entries.emplace_back(static_cast<std::uint64_t>(k), op_x);
-      }
-      table.push_back(build_sorted_word(std::move(entries)));
-    }
+    std::vector<PauliRun> even;
+    if (j > 0) even.push_back({j - 1, 1, op_z});
+    even.push_back({j, num_modes - j, op_x});
+    runs.push_back(std::move(even));
 
-    {
-      std::vector<std::pair<std::uint64_t, std::uint8_t>> entries;
-      entries.emplace_back(static_cast<std::uint64_t>(j), op_y);
-      for (std::size_t k = j + 1; k < num_modes; ++k) {
-        entries.emplace_back(static_cast<std::uint64_t>(k), op_x);
-      }
-      table.push_back(build_sorted_word(std::move(entries)));
-    }
+    std::vector<PauliRun> odd{{j, 1, op_y}};
+    if (j + 1 < num_modes) odd.push_back({j + 1, num_modes - j - 1, op_x});
+    runs.push_back(std::move(odd));
   }
 
-  return MajoranaMapping::from_table(std::move(table), "parity");
+  return MajoranaMapping(std::move(runs), {}, "parity", num_modes, num_modes,
+                         "parity");
 }
 
 MajoranaMapping MajoranaMapping::parity(std::size_t num_modes,
@@ -319,7 +303,7 @@ MajoranaMapping MajoranaMapping::parity(std::size_t num_modes,
   auto base = MajoranaMapping::parity(num_modes);
   auto tapering = TaperingSpecification::parity_two_qubit_reduction(
       num_modes, n_alpha, n_beta);
-  return MajoranaMapping(base.table_, base.bilinears_, "parity-2q-reduced",
+  return MajoranaMapping(base.runs_, base.bilinears_, "parity-2q-reduced",
                          base.num_modes_, base.num_qubits_, "parity",
                          std::move(tapering));
 }
@@ -329,7 +313,7 @@ MajoranaMapping MajoranaMapping::symmetry_conserving_bravyi_kitaev(
   auto base = MajoranaMapping::bravyi_kitaev_tree(num_modes);
   auto tapering = TaperingSpecification::symmetry_conserving_bravyi_kitaev(
       num_modes, n_alpha, n_beta);
-  return MajoranaMapping(base.table_, base.bilinears_,
+  return MajoranaMapping(base.runs_, base.bilinears_,
                          "symmetry-conserving-bravyi-kitaev", base.num_modes_,
                          base.num_qubits_, "bravyi-kitaev-tree",
                          std::move(tapering));
@@ -502,9 +486,8 @@ MajoranaMapping MajoranaMapping::verstraete_cirac(const LatticeGraph& lattice) {
     }
   }
 
-  return MajoranaMapping(std::vector<SparsePauliWord>{},
-                         std::move(upper_triangle), name, num_physical_modes,
-                         base_qubits, name, std::nullopt,
+  return MajoranaMapping({}, std::move(upper_triangle), name,
+                         num_physical_modes, base_qubits, name, std::nullopt,
                          std::move(stabilizers));
 }
 

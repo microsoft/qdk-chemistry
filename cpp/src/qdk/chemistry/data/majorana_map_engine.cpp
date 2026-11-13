@@ -46,8 +46,8 @@ constexpr std::complex<double> excitation_coeff[2][2] = {
 //
 // Each uint64_t covers 64 qubits. Templated on NW (number of uint64
 // words) to keep everything on the stack. The engine dispatches to
-// NW in {1, ..., 16} (1024 qubits) for every integral format, and to powers
-// of two up to 2048 words (131072 qubits) for sparse integrals.
+// NW in {1, ..., 16} (1024 qubits) for every integral format; wider sparse
+// mappings use BlockPauliWord below.
 
 template <std::size_t NW>
 struct PackedPauliWord {
@@ -108,28 +108,167 @@ SparsePauliWord packed_to_sparse(const PackedPauliWord<NW>& pw) {
   return word;
 }
 
+// Phase exponent (mod 4) that one 64-qubit block contributes to a product.
+inline int block_phase(std::uint64_t x1, std::uint64_t z1, std::uint64_t x2,
+                       std::uint64_t z2) {
+  std::uint64_t nx1 = ~x1, nz1 = ~z1, nx2 = ~x2, nz2 = ~z2;
+  std::uint64_t cyc =
+      (x1 & nz1 & x2 & z2) | (x1 & z1 & nx2 & z2) | (nx1 & z1 & x2 & nz2);
+  std::uint64_t anti =
+      (x1 & z1 & x2 & nz2) | (nx1 & z1 & x2 & z2) | (x1 & nz1 & nx2 & z2);
+  return std::popcount(cyc) - std::popcount(anti);
+}
+
 template <std::size_t NW>
 std::pair<int, PackedPauliWord<NW>> multiply_packed(
     const PackedPauliWord<NW>& p1, const PackedPauliWord<NW>& p2) {
   PackedPauliWord<NW> result;
   int phase_exp = 0;
   for (std::size_t i = 0; i < NW; ++i) {
-    std::uint64_t x1 = p1.x[i], z1 = p1.z[i];
-    std::uint64_t x2 = p2.x[i], z2 = p2.z[i];
-    result.x[i] = x1 ^ x2;
-    result.z[i] = z1 ^ z2;
-    std::uint64_t nx1 = ~x1, nz1 = ~z1, nx2 = ~x2, nz2 = ~z2;
-    std::uint64_t cyc =
-        (x1 & nz1 & x2 & z2) | (x1 & z1 & nx2 & z2) | (nx1 & z1 & x2 & nz2);
-    std::uint64_t anti =
-        (x1 & z1 & x2 & nz2) | (nx1 & z1 & x2 & z2) | (x1 & nz1 & nx2 & z2);
-    phase_exp += std::popcount(cyc);
-    phase_exp -= std::popcount(anti);
+    result.x[i] = p1.x[i] ^ p2.x[i];
+    result.z[i] = p1.z[i] ^ p2.z[i];
+    phase_exp += block_phase(p1.x[i], p1.z[i], p2.x[i], p2.z[i]);
   }
   // Pauli multiplication phases cycle mod 4:
   // 0: +1, 1: +i, 2: −1, 3: −i.
   return {phase_exp & 3, result};
 }
+
+// Pauli word kept as its non-identity 64-qubit blocks in increasing order, so
+// wide mappings store and multiply only the blocks a term touches.
+struct BlockPauliWord {
+  struct Block {
+    std::uint64_t index, x, z;
+    bool operator==(const Block& other) const = default;
+  };
+  std::vector<Block> blocks;
+  bool operator==(const BlockPauliWord& other) const = default;
+};
+
+struct BlockPauliWordHash {
+  std::size_t operator()(const BlockPauliWord& w) const noexcept {
+    auto mix = [](std::uint64_t v) {
+      v = (v ^ (v >> 30)) * 0xbf58476d1ce4e5b9ULL;
+      v = (v ^ (v >> 27)) * 0x94d049bb133111ebULL;
+      return v ^ (v >> 31);
+    };
+    std::uint64_t h = w.blocks.size();
+    for (const auto& block : w.blocks) {
+      for (std::uint64_t value : {block.index, block.x, block.z}) {
+        h = mix(h * 0x9e3779b97f4a7c15ULL + value);
+      }
+    }
+    return static_cast<std::size_t>(h);
+  }
+};
+
+SparsePauliWord packed_to_sparse(const BlockPauliWord& word) {
+  SparsePauliWord result;
+  for (const auto& block : word.blocks) {
+    std::uint64_t active = block.x | block.z;
+    while (active) {
+      int bit = std::countr_zero(active);
+      std::uint64_t mask = std::uint64_t(1) << bit;
+      bool has_x = (block.x & mask) != 0;
+      bool has_z = (block.z & mask) != 0;
+      std::uint8_t op = has_x ? (has_z ? 2 : 1) : 3;
+      result.emplace_back(block.index * 64 + bit, op);
+      active &= ~mask;
+    }
+  }
+  return result;
+}
+
+std::pair<int, BlockPauliWord> multiply_packed(const BlockPauliWord& p1,
+                                               const BlockPauliWord& p2) {
+  BlockPauliWord result;
+  result.blocks.reserve(p1.blocks.size() + p2.blocks.size());
+  int phase_exp = 0;
+  auto i = p1.blocks.begin();
+  auto j = p2.blocks.begin();
+  while (i != p1.blocks.end() && j != p2.blocks.end()) {
+    if (i->index < j->index) {
+      result.blocks.push_back(*i++);
+    } else if (j->index < i->index) {
+      result.blocks.push_back(*j++);
+    } else {
+      phase_exp += block_phase(i->x, i->z, j->x, j->z);
+      const std::uint64_t x = i->x ^ j->x;
+      const std::uint64_t z = i->z ^ j->z;
+      if ((x | z) != 0) result.blocks.push_back({i->index, x, z});
+      ++i;
+      ++j;
+    }
+  }
+  result.blocks.insert(result.blocks.end(), i, p1.blocks.end());
+  result.blocks.insert(result.blocks.end(), j, p2.blocks.end());
+  return {phase_exp & 3, std::move(result)};
+}
+
+// Conversion, hashing and weight of each word type the engine runs on.
+template <class Word>
+struct WordTraits;
+
+template <std::size_t NW>
+struct WordTraits<PackedPauliWord<NW>> {
+  using Hash = PackedPauliWordHash<NW>;
+  static PackedPauliWord<NW> from_sparse(const SparsePauliWord& word) {
+    return sparse_to_packed<NW>(word);
+  }
+  static int weight(const PackedPauliWord<NW>& word) {
+    int w = 0;
+    for (std::size_t k = 0; k < NW; ++k) {
+      w += std::popcount(word.x[k] | word.z[k]);
+    }
+    return w;
+  }
+};
+
+template <>
+struct WordTraits<BlockPauliWord> {
+  using Hash = BlockPauliWordHash;
+  static BlockPauliWord from_sparse(const SparsePauliWord& word) {
+    BlockPauliWord result;
+    auto& blocks = result.blocks;
+    for (const auto& [qubit, op] : word) {
+      const std::uint64_t index = qubit / 64;
+      const std::uint64_t bit = std::uint64_t(1) << (qubit % 64);
+      if (blocks.empty() || blocks.back().index != index) {
+        blocks.push_back({index, 0, 0});
+      }
+      if (op == 1 || op == 2) blocks.back().x |= bit;
+      if (op == 2 || op == 3) blocks.back().z |= bit;
+    }
+    // Words with unsorted qubits revisit blocks; merge them as
+    // sparse_to_packed does.
+    auto by_index = [](const auto& a, const auto& b) {
+      return a.index < b.index;
+    };
+    if (!std::is_sorted(blocks.begin(), blocks.end(), by_index)) {
+      std::sort(blocks.begin(), blocks.end(), by_index);
+      std::size_t kept = 0;
+      for (const auto& block : blocks) {
+        if (kept > 0 && blocks[kept - 1].index == block.index) {
+          blocks[kept - 1].x |= block.x;
+          blocks[kept - 1].z |= block.z;
+        } else {
+          blocks[kept++] = block;
+        }
+      }
+      blocks.resize(kept);
+    }
+    std::erase_if(blocks,
+                  [](const auto& block) { return (block.x | block.z) == 0; });
+    return result;
+  }
+  static int weight(const BlockPauliWord& word) {
+    int w = 0;
+    for (const auto& block : word.blocks) {
+      w += std::popcount(block.x | block.z);
+    }
+    return w;
+  }
+};
 
 /// Apply a phase index (0=+1, 1=+i, 2=-1, 3=-i) to a complex scale factor.
 inline std::complex<double> apply_phase(int phase_idx,
@@ -147,18 +286,17 @@ inline std::complex<double> apply_phase(int phase_idx,
   return scale;  // unreachable
 }
 
-template <std::size_t NW>
+template <class Word>
 class PackedAccumulator {
  public:
-  void accumulate(const PackedPauliWord<NW>& word, std::complex<double> coeff) {
+  void accumulate(const Word& word, std::complex<double> coeff) {
     terms_[word] += coeff;
   }
 
-  void accumulate_product(const PackedPauliWord<NW>& w1,
-                          const PackedPauliWord<NW>& w2,
+  void accumulate_product(const Word& w1, const Word& w2,
                           std::complex<double> scale) {
     auto [phase_idx, word] = multiply_packed(w1, w2);
-    terms_[word] += apply_phase(phase_idx, scale);
+    terms_[std::move(word)] += apply_phase(phase_idx, scale);
   }
 
   std::vector<std::pair<std::complex<double>, SparsePauliWord>> get_terms(
@@ -174,8 +312,8 @@ class PackedAccumulator {
   }
 
  private:
-  std::unordered_map<PackedPauliWord<NW>, std::complex<double>,
-                     PackedPauliWordHash<NW>>
+  std::unordered_map<Word, std::complex<double>,
+                     typename WordTraits<Word>::Hash>
       terms_;
 };
 
@@ -380,7 +518,7 @@ struct CholeskyEriProvider {
 // member, with the values at (p,q,r,s) and (p,q,s,r), sorted so the sum does
 // not depend on input order; map_ holds every stored entry.  The engine
 // builds pair products and excitation pairs only for the orbitals these
-// entries reference.
+// entries reference, and reads the one-body integrals from one_body_.
 struct SparseEriProvider {
   // Enables the dedicated non-zero-only two-body loop in majorana_map_impl.
   static constexpr bool kSparse = true;
@@ -389,6 +527,8 @@ struct SparseEriProvider {
     double value;
     double ket_swapped_value = 0.0;
   };
+  // Stored one-body (p * N + q, value) entries in increasing position.
+  std::vector<std::pair<std::size_t, double>> one_body_;
   // Literal flattened position -> value.
   std::unordered_map<std::uint64_t, double> map_;
   // Canonical class positions, sorted lexicographically.
@@ -434,7 +574,7 @@ struct SparseEriProvider {
   }
 };
 
-template <std::size_t NW, class EriProvider>
+template <class Word, class EriProvider>
 MajoranaMapResult majorana_map_impl(const MajoranaMapping& mapping,
                                     double core_energy, const double* h1_alpha,
                                     const double* h1_beta,
@@ -444,7 +584,7 @@ MajoranaMapResult majorana_map_impl(const MajoranaMapping& mapping,
                                     double integral_threshold) {
   const std::size_t n_modes = 2 * n_spatial;
 
-  PackedAccumulator<NW> acc;
+  PackedAccumulator<Word> acc;
 
   // ─── Pair product cache ───────────────────────────────────────────
   //
@@ -454,7 +594,7 @@ MajoranaMapResult majorana_map_impl(const MajoranaMapping& mapping,
 
   struct PackedPairProduct {
     std::complex<double> coeff;
-    PackedPauliWord<NW> word;
+    Word word;
   };
   const std::size_t maj_per_spin = 2 * n_spatial;
   const std::size_t num_spin_species =
@@ -462,11 +602,11 @@ MajoranaMapResult majorana_map_impl(const MajoranaMapping& mapping,
 
   auto make_pair_product = [&](std::size_t spin, std::size_t i,
                                std::size_t j) -> PackedPairProduct {
-    if (i == j) return {{1.0, 0.0}, PackedPauliWord<NW>{}};
+    if (i == j) return {{1.0, 0.0}, Word{}};
     const std::size_t offset = spin * maj_per_spin;
     auto [bl_coeff, bl_word] = mapping.bilinear(i + offset, j + offset);
     return {std::complex<double>(0.0, -1.0) * bl_coeff,
-            sparse_to_packed<NW>(bl_word)};
+            WordTraits<Word>::from_sparse(bl_word)};
   };
   std::array<std::vector<PackedPairProduct>, 2> dense_pairs;
   std::array<std::unordered_map<std::size_t, PackedPairProduct>, 2>
@@ -512,7 +652,7 @@ MajoranaMapResult majorana_map_impl(const MajoranaMapping& mapping,
 
   // ─── Core energy ──────────────────────────────────────────────────
   if (std::abs(core_energy) > integral_threshold) {
-    PackedPauliWord<NW> identity{};
+    Word identity{};
     acc.accumulate(identity, std::complex<double>(core_energy, 0.0));
   }
 
@@ -554,30 +694,53 @@ MajoranaMapResult majorana_map_impl(const MajoranaMapping& mapping,
   auto one_body = [integral_threshold](double value) {
     return std::abs(value) > integral_threshold ? value : 0.0;
   };
-  for (std::size_t p = 0; p < n_spatial; ++p) {
-    for (std::size_t q = 0; q < n_spatial; ++q) {
-      const double h_pq_a = one_body(h1_alpha[p * n_spatial + q]) +
-                            (pair_split ? contraction(false, p, q) : 0.0);
-      if (h_pq_a != 0.0) {
-        accumulate_epq(mode_alpha(p), mode_alpha(q), h_pq_a);
-      }
-      if (num_spin_species == 2) {
-        const double h_pq_b =
-            spin_symmetric ? h_pq_a
-                           : one_body(h1_beta[p * n_spatial + q]) +
-                                 (pair_split ? contraction(true, p, q) : 0.0);
-        if (h_pq_b != 0.0) {
-          accumulate_epq(mode_beta(p), mode_beta(q), h_pq_b);
-        }
+  auto map_one_body = [&](std::size_t p, std::size_t q, double h1_pq_alpha) {
+    const double h_pq_a =
+        one_body(h1_pq_alpha) + (pair_split ? contraction(false, p, q) : 0.0);
+    if (h_pq_a != 0.0) {
+      accumulate_epq(mode_alpha(p), mode_alpha(q), h_pq_a);
+    }
+    if (num_spin_species == 2) {
+      const double h_pq_b =
+          spin_symmetric ? h_pq_a
+                         : one_body(h1_beta[p * n_spatial + q]) +
+                               (pair_split ? contraction(true, p, q) : 0.0);
+      if (h_pq_b != 0.0) {
+        accumulate_epq(mode_beta(p), mode_beta(q), h_pq_b);
       }
     }
+  };
+  if constexpr (EriProvider::kSparse) {
+    // The dense loop's row-major order, restricted to the positions where a
+    // one-body entry or a contraction can be non-zero.
+    std::vector<std::size_t> positions;
+    for (const auto& [position, value] : eri_provider.one_body_)
+      positions.push_back(position);
+    if (pair_split) {
+      for (const auto& [position, orbitals] :
+           eri_provider.contraction_orbitals_)
+        positions.push_back(position);
+    }
+    std::sort(positions.begin(), positions.end());
+    positions.erase(std::unique(positions.begin(), positions.end()),
+                    positions.end());
+    auto entry = eri_provider.one_body_.begin();
+    for (std::size_t position : positions) {
+      double value = 0.0;
+      if (entry != eri_provider.one_body_.end() && entry->first == position)
+        value = (entry++)->second;
+      map_one_body(position / n_spatial, position % n_spatial, value);
+    }
+  } else {
+    for (std::size_t p = 0; p < n_spatial; ++p)
+      for (std::size_t q = 0; q < n_spatial; ++q)
+        map_one_body(p, q, h1_alpha[p * n_spatial + q]);
   }
 
   // ─── Two-body terms ───────────────────────────────────────────────
 
   if (pair_split) {
-    using Terms =
-        std::vector<std::pair<std::complex<double>, PackedPauliWord<NW>>>;
+    using Terms = std::vector<std::pair<std::complex<double>, Word>>;
     // Excitation terms per spin channel; a spin-summed pair fills both.
     struct ExcitationPair {
       std::size_t bra, ket;
@@ -588,8 +751,8 @@ MajoranaMapResult majorana_map_impl(const MajoranaMapping& mapping,
       ExcitationPair pair{bra, ket, {}, {}};
       for (std::size_t channel = spin_sum ? 0 : spin;
            channel < (spin_sum ? num_spin_species : spin + 1); ++channel) {
-        std::unordered_map<PackedPauliWord<NW>, std::complex<double>,
-                           PackedPauliWordHash<NW>>
+        std::unordered_map<Word, std::complex<double>,
+                           typename WordTraits<Word>::Hash>
             symmetric, antisymmetric;
         for (std::size_t first = 0; first < 2; ++first) {
           for (std::size_t second = 0; second < 2; ++second) {
@@ -816,13 +979,21 @@ MajoranaMapResult majorana_map_impl(const MajoranaMapping& mapping,
 
   if (!mapping.stabilizers().empty()) {
     double h1_sum = 0.0;
-    for (std::size_t p = 0; p < n_spatial; ++p) {
-      for (std::size_t q = 0; q < n_spatial; ++q) {
-        h1_sum += std::abs(h1_alpha[p * n_spatial + q]);
-        if (!spin_symmetric) {
-          h1_sum += std::abs(h1_beta[p * n_spatial + q]);
-        } else {
+    if constexpr (EriProvider::kSparse) {
+      // Restricted, so each entry counts once per spin as in the dense sum.
+      for (const auto& [position, value] : eri_provider.one_body_) {
+        h1_sum += std::abs(value);
+        h1_sum += std::abs(value);
+      }
+    } else {
+      for (std::size_t p = 0; p < n_spatial; ++p) {
+        for (std::size_t q = 0; q < n_spatial; ++q) {
           h1_sum += std::abs(h1_alpha[p * n_spatial + q]);
+          if (!spin_symmetric) {
+            h1_sum += std::abs(h1_beta[p * n_spatial + q]);
+          } else {
+            h1_sum += std::abs(h1_alpha[p * n_spatial + q]);
+          }
         }
       }
     }
@@ -838,12 +1009,12 @@ MajoranaMapResult majorana_map_impl(const MajoranaMapping& mapping,
 
     struct PackedStab {
       std::complex<double> coeff;
-      PackedPauliWord<NW> word;
+      Word word;
     };
     std::vector<PackedStab> packed_stabs;
     packed_stabs.reserve(num_stabs);
     for (const auto& [coeff, word] : mapping.stabilizers()) {
-      packed_stabs.push_back({coeff, sparse_to_packed<NW>(word)});
+      packed_stabs.push_back({coeff, WordTraits<Word>::from_sparse(word)});
     }
 
     std::size_t num_penalty_terms = 0;
@@ -853,7 +1024,7 @@ MajoranaMapResult majorana_map_impl(const MajoranaMapping& mapping,
       num_penalty_terms = num_stabs;
     }
 
-    PackedPauliWord<NW> identity{};
+    Word identity{};
     acc.accumulate(identity,
                    std::complex<double>(aux_ham_coefficient * num_stabs, 0.0));
 
@@ -862,12 +1033,8 @@ MajoranaMapResult majorana_map_impl(const MajoranaMapping& mapping,
     // of adjacent link stabilizers (paired via Minimum Spanning Tree to
     // minimize their Pauli weight) to form local loop-plaquette stabilizers.
     if (half_stabs >= 1) {
-      auto get_packed_weight = [](const PackedPauliWord<NW>& pw) -> int {
-        int w = 0;
-        for (std::size_t k = 0; k < NW; ++k) {
-          w += std::popcount(pw.x[k] | pw.z[k]);
-        }
-        return w;
+      auto get_packed_weight = [](const Word& pw) -> int {
+        return WordTraits<Word>::weight(pw);
       };
 
       auto accumulate_product = [&](std::size_t i, std::size_t j) {
@@ -972,15 +1139,11 @@ MajoranaMapResult majorana_map_impl(const MajoranaMapping& mapping,
   return result;
 }
 
-// Word counts the engine is instantiated for: each count up to 16 (1024
-// qubits), then powers of two for sparse integrals, whose two-body cost follows
-// the stored entries rather than N^4.  The list stops at 2048 words (131072
-// qubits), where each packed word already takes 32 KiB of stack.
+// Word counts the packed engine is instantiated for: each count up to 16 (1024
+// qubits).  Wider sparse mappings use BlockPauliWord, whose size follows the
+// qubits a term touches rather than the register width.
 using DenseWordCounts =
     std::index_sequence<1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16>;
-using SparseWordCounts =
-    std::index_sequence<1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16,
-                        32, 64, 128, 256, 512, 1024, 2048>;
 constexpr std::size_t max_dense_qubits = DenseWordCounts::size() * 64;
 
 // Runtime dispatch to the narrowest instantiated word count that holds the
@@ -998,7 +1161,7 @@ MajoranaMapResult dispatch_by_words(
       const EriProvider&, std::size_t, bool, bool, double, double);
   static constexpr std::array<std::size_t, sizeof...(Ws)> widths{Ws...};
   static const std::array<Fn, sizeof...(Ws)> table = {
-      {&majorana_map_impl<Ws, EriProvider>...}};
+      {&majorana_map_impl<PackedPauliWord<Ws>, EriProvider>...}};
   for (std::size_t i = 0; i < widths.size(); ++i) {
     if (num_words <= widths[i]) {
       return table[i](mapping, core_energy, h1_alpha, h1_beta, eri_provider,
@@ -1046,22 +1209,35 @@ MajoranaMapResult run_with_provider(const MajoranaMapping& mapping,
     throw std::invalid_argument(
         "majorana_map_hamiltonian: the core energy is not finite.");
   }
-  auto require_finite_one_body = [n_spatial](const double* one_body) {
-    if (!std::all_of(one_body, one_body + n_spatial * n_spatial,
-                     [](double value) { return std::isfinite(value); })) {
-      throw std::invalid_argument(
-          "majorana_map_hamiltonian: the one-body integrals contain a "
-          "non-finite value.");
-    }
-  };
-  require_finite_one_body(h1_alpha);
-  if (!spin_symmetric) require_finite_one_body(h1_beta);
+  auto finite = [](double value) { return std::isfinite(value); };
+  bool one_body_finite;
+  if constexpr (EriProvider::kSparse) {
+    one_body_finite = std::all_of(
+        eri_provider.one_body_.begin(), eri_provider.one_body_.end(),
+        [&finite](const auto& entry) { return finite(entry.second); });
+  } else {
+    const std::size_t count = n_spatial * n_spatial;
+    one_body_finite =
+        std::all_of(h1_alpha, h1_alpha + count, finite) &&
+        (spin_symmetric || std::all_of(h1_beta, h1_beta + count, finite));
+  }
+  if (!one_body_finite) {
+    throw std::invalid_argument(
+        "majorana_map_hamiltonian: the one-body integrals contain a "
+        "non-finite value.");
+  }
 
+  if constexpr (EriProvider::kSparse) {
+    if (num_words > DenseWordCounts::size()) {
+      return majorana_map_impl<BlockPauliWord, EriProvider>(
+          mapping, core_energy, h1_alpha, h1_beta, eri_provider, n_spatial,
+          spin_symmetric, pair_split, threshold, integral_threshold);
+    }
+  }
   return dispatch_by_words<EriProvider>(
-      std::conditional_t<EriProvider::kSparse, SparseWordCounts,
-                         DenseWordCounts>{},
-      num_words, mapping, core_energy, h1_alpha, h1_beta, eri_provider,
-      n_spatial, spin_symmetric, pair_split, threshold, integral_threshold);
+      DenseWordCounts{}, num_words, mapping, core_energy, h1_alpha, h1_beta,
+      eri_provider, n_spatial, spin_symmetric, pair_split, threshold,
+      integral_threshold);
 }
 
 MajoranaMapResult map_dense(const MajoranaMapping& mapping, double core_energy,
@@ -1150,14 +1326,13 @@ MajoranaMapResult map_cholesky(const MajoranaMapping& mapping,
   return result;
 }
 
-MajoranaMapResult map_sparse(const MajoranaMapping& mapping, double core_energy,
-                             const double* h1_alpha, const double* h1_beta,
-                             const int* two_body_indices,
-                             const double* two_body_values,
-                             std::size_t num_entries, std::size_t n_spatial,
-                             bool spin_symmetric, bool hermitian,
-                             bool expand_shorthand, double threshold,
-                             double integral_threshold) {
+MajoranaMapResult map_sparse(
+    const MajoranaMapping& mapping, double core_energy,
+    std::vector<std::pair<std::size_t, double>> one_body,
+    const int* two_body_indices, const double* two_body_values,
+    std::size_t num_entries, std::size_t n_spatial, bool spin_symmetric,
+    bool hermitian, bool expand_shorthand, double threshold,
+    double integral_threshold) {
   // The sparse fast path is spin-summed: SparseHamiltonianContainer is
   // restricted-only, so all spin channels share the same integrals and the
   // unrestricted branch would only redo identical work per channel.  Callers
@@ -1168,6 +1343,14 @@ MajoranaMapResult map_sparse(const MajoranaMapping& mapping, double core_energy,
         "spin_symmetric=true (restricted orbitals); use "
         "majorana_map_hamiltonian with dense integrals for unrestricted "
         "Hamiltonians.");
+  }
+  // SparseEriProvider keys a position ((p*N + q)*N + r)*N + s in 64 bits.
+  constexpr std::size_t max_sparse_orbitals = std::size_t{1} << 16;
+  if (n_spatial > max_sparse_orbitals) {
+    throw std::invalid_argument(
+        "majorana_map_hamiltonian_sparse: " + std::to_string(n_spatial) +
+        " spatial orbitals exceed the supported " +
+        std::to_string(max_sparse_orbitals) + ".");
   }
 
   SparseTwoBodyTensor tensor;
@@ -1223,6 +1406,7 @@ MajoranaMapResult map_sparse(const MajoranaMapping& mapping, double core_energy,
 
   SparseEriProvider provider;
   provider.n_ = n_spatial;
+  provider.one_body_ = std::move(one_body);
   provider.map_.reserve(tensor.size());
   std::set<TwoBodyKey> canonical_keys;
   for (const auto& [key, value] : tensor) {
@@ -1247,7 +1431,7 @@ MajoranaMapResult map_sparse(const MajoranaMapping& mapping, double core_energy,
          provider.aaaa(key[0], key[1], key[3], key[2])});
   }
 
-  return run_with_provider(mapping, core_energy, h1_alpha, h1_beta, provider,
+  return run_with_provider(mapping, core_energy, nullptr, nullptr, provider,
                            n_spatial, spin_symmetric, hermitian, threshold,
                            integral_threshold);
 }
@@ -1276,11 +1460,17 @@ MajoranaMapResult majorana_map_hamiltonian_cholesky(
 
 MajoranaMapResult majorana_map_hamiltonian_sparse(
     const MajoranaMapping& mapping, double core_energy, const double* h1_alpha,
-    const double* h1_beta, const int* two_body_indices,
+    [[maybe_unused]] const double* h1_beta, const int* two_body_indices,
     const double* two_body_values, std::size_t num_entries,
     std::size_t n_spatial, bool spin_symmetric, double threshold,
     double integral_threshold) {
-  return detail::map_sparse(mapping, core_energy, h1_alpha, h1_beta,
+  // Restricted input reads only the alpha block, as the dense engine does.
+  std::vector<std::pair<std::size_t, double>> one_body;
+  for (std::size_t position = 0; position < n_spatial * n_spatial; ++position) {
+    if (h1_alpha[position] != 0.0)
+      one_body.emplace_back(position, h1_alpha[position]);
+  }
+  return detail::map_sparse(mapping, core_energy, std::move(one_body),
                             two_body_indices, two_body_values, num_entries,
                             n_spatial, spin_symmetric, true, true, threshold,
                             integral_threshold);
@@ -1294,6 +1484,47 @@ MajoranaMapResult majorana_map_hamiltonian(const MajoranaMapping& mapping,
   constexpr double core_energy = 0.0;
   const bool hermitian = hamiltonian.is_hermitian();
   spin_symmetric = spin_symmetric || hamiltonian.is_restricted();
+
+  // Sparse containers are read from their sparse one-body matrix, so large
+  // lattices never take a dense N^2 copy here.
+  if (hamiltonian.has_container_type<SparseHamiltonianContainer>()) {
+    const auto& container =
+        hamiltonian.get_container<SparseHamiltonianContainer>();
+    const auto& h1 = container.sparse_one_body_integrals();
+    const std::size_t n = static_cast<std::size_t>(h1.rows());
+    std::vector<std::pair<std::size_t, double>> one_body;
+    one_body.reserve(static_cast<std::size_t>(h1.nonZeros()));
+    for (int k = 0; k < h1.outerSize(); ++k) {
+      for (Eigen::SparseMatrix<double>::InnerIterator it(h1, k); it; ++it) {
+        one_body.emplace_back(static_cast<std::size_t>(it.row()) * n +
+                                  static_cast<std::size_t>(it.col()),
+                              it.value());
+      }
+    }
+    std::sort(one_body.begin(), one_body.end(),
+              [](const auto& a, const auto& b) { return a.first < b.first; });
+    const auto& two_body_map = container.sparse_two_body_integrals();
+    static_assert(
+        std::is_same_v<SparseHamiltonianContainer::TwoBodyIndex,
+                       std::tuple<int, int, int, int>>,
+        "sparse two-body indices must be int to match the engine API");
+    std::vector<int> indices;
+    std::vector<double> values;
+    indices.reserve(two_body_map.size() * 4);
+    values.reserve(two_body_map.size());
+    for (const auto& [idx, val] : two_body_map) {
+      const auto& [p, q, r, s] = idx;
+      indices.push_back(p);
+      indices.push_back(q);
+      indices.push_back(r);
+      indices.push_back(s);
+      values.push_back(val);
+    }
+    return detail::map_sparse(mapping, core_energy, std::move(one_body),
+                              indices.data(), values.data(), values.size(), n,
+                              spin_symmetric, hermitian, false, threshold,
+                              integral_threshold);
+  }
 
   auto one_body = hamiltonian.get_one_body_integrals();
   const Eigen::MatrixXd& h1a = std::get<0>(one_body);
@@ -1323,32 +1554,6 @@ MajoranaMapResult majorana_map_hamiltonian(const MajoranaMapping& mapping,
                                 three_center_aa.data(), three_center_bb.data(),
                                 n, naux, spin_symmetric, hermitian, threshold,
                                 integral_threshold);
-  }
-
-  if (hamiltonian.has_container_type<SparseHamiltonianContainer>()) {
-    const auto& container =
-        hamiltonian.get_container<SparseHamiltonianContainer>();
-    const auto& two_body_map = container.sparse_two_body_integrals();
-    static_assert(
-        std::is_same_v<SparseHamiltonianContainer::TwoBodyIndex,
-                       std::tuple<int, int, int, int>>,
-        "sparse two-body indices must be int to match the engine API");
-    std::vector<int> indices;
-    std::vector<double> values;
-    indices.reserve(two_body_map.size() * 4);
-    values.reserve(two_body_map.size());
-    for (const auto& [idx, val] : two_body_map) {
-      const auto& [p, q, r, s] = idx;
-      indices.push_back(p);
-      indices.push_back(q);
-      indices.push_back(r);
-      indices.push_back(s);
-      values.push_back(val);
-    }
-    return detail::map_sparse(mapping, core_energy, h1a_flat.data(), h1b_ptr,
-                              indices.data(), values.data(), values.size(), n,
-                              spin_symmetric, hermitian, false, threshold,
-                              integral_threshold);
   }
 
   detail::require_dense_width(mapping, "majorana_map_hamiltonian");

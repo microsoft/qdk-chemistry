@@ -973,8 +973,8 @@ TEST(MajoranaMapEngineTest, SparseMappingBeyondTheDenseWidthMatchesSmallOne) {
         map_embedded(4, *two_body, type, integral_threshold), 4);
   }
 
-  // A beta qubit at 65536 needs the widest word count; one at 131072 exceeds
-  // it.
+  // Wide words cost only the blocks a term touches, so a beta qubit far past
+  // the 1024-qubit packed width maps like one beside alpha.
   const double h1[1] = {1.0};
   const int index[4] = {0, 0, 0, 0};
   const double value[1] = {0.75};
@@ -984,8 +984,8 @@ TEST(MajoranaMapEngineTest, SparseMappingBeyondTheDenseWidthMatchesSmallOne) {
             {{{0, 1}}, {{0, 2}}, {{0, 3}, {beta, 1}}, {{0, 3}, {beta, 2}}}),
         0.5, h1, h1, index, value, 1, 1, true, 1e-12, 1e-12);
   };
-  expect_same_block_terms(map_gapped(65536), 1, map_gapped(1), 1);
-  EXPECT_THROW(map_gapped(131072), std::invalid_argument);
+  expect_same_block_terms(map_gapped(std::uint64_t{1} << 20), 1, map_gapped(1),
+                          1);
 
   // Verstraete-Cirac stabilizer penalties map alike with every qubit shifted
   // past 1024.
@@ -1063,6 +1063,40 @@ TEST(MajoranaMappingHashTest, BilinearOnlyMappingsHashTheirCoefficients) {
   auto second = MajoranaMapping::from_bilinears(1, bilinears, "custom");
 
   EXPECT_NE(first.content_hash(), second.content_hash());
+}
+
+TEST(MajoranaMappingHashTest, RunTablesHashAndMultiplyLikeTheirWords) {
+  // Tables stored as runs hash and multiply exactly like their expanded words.
+  const std::vector<MajoranaMapping> mappings{
+      MajoranaMapping::jordan_wigner(6),
+      MajoranaMapping::parity(6),
+      MajoranaMapping::bravyi_kitaev(6),
+      MajoranaMapping::bravyi_kitaev_tree(6),
+      MajoranaMapping::from_table({{{0, 0}, {1, 3}, {2, 3}},
+                                   {{1, 1}, {2, 0}, {3, 2}},
+                                   {{2, 3}, {3, 3}, {4, 3}, {9, 1}},
+                                   {{0, 2}, {4, 3}, {5, 3}}},
+                                  "sorted"),
+      MajoranaMapping::from_table({{{3, 3}, {1, 1}}, {{5, 2}, {5, 2}}},
+                                  "unsorted")};
+  for (const auto& mapping : mappings) {
+    const auto& table = mapping.table();
+    EXPECT_EQ(MajoranaMapping::from_table(table, mapping.name()).content_hash(),
+              mapping.content_hash())
+        << mapping.name();
+    for (std::size_t j = 0; j < table.size(); ++j) {
+      for (std::size_t k = 0; k < table.size(); ++k) {
+        if (j == k) continue;
+        const auto [phase, word] = PauliTermAccumulator::multiply_uncached(
+            table[std::min(j, k)], table[std::max(j, k)]);
+        const auto [coefficient, bilinear] = mapping.bilinear(j, k);
+        EXPECT_EQ(bilinear, word) << mapping.name() << " " << j << " " << k;
+        EXPECT_EQ(coefficient,
+                  (j < k ? 1.0 : -1.0) * std::complex<double>(0.0, 1.0) * phase)
+            << mapping.name() << " " << j << " " << k;
+      }
+    }
+  }
 }
 
 TEST(TaperingSpecificationHashTest, HashIncludesIndicesAndEigenvalues) {

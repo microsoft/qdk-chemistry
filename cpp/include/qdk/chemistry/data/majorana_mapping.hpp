@@ -7,6 +7,8 @@
 
 #include <complex>
 #include <cstdint>
+#include <memory>
+#include <mutex>
 #include <nlohmann/json_fwd.hpp>
 #include <optional>
 #include <qdk/chemistry/data/data_class.hpp>
@@ -21,6 +23,15 @@ namespace qdk::chemistry::data {
 class Hamiltonian;
 
 class LatticeGraph;
+
+namespace detail {
+/// One Pauli repeated on consecutive qubits of a Majorana table entry.
+struct PauliRun {
+  std::uint64_t first;
+  std::uint64_t count;
+  std::uint8_t op;
+};
+}  // namespace detail
 
 /**
  * @brief Data class describing a fermion-to-qubit encoding.
@@ -67,6 +78,9 @@ class MajoranaMapping : public DataClass {
 
   /**
    * @brief Pauli word for Majorana operator gamma_k.
+   *
+   * Expands the full table on first use, as table() does.
+   *
    * @throws std::out_of_range if k >= 2N.
    * @throws std::logic_error if the mapping is not Majorana-atomic.
    */
@@ -91,8 +105,9 @@ class MajoranaMapping : public DataClass {
   /// Whether individual Majoranas have a Pauli image.
   bool is_majorana_atomic() const { return majorana_atomic_; }
 
-  /// The full Majorana-to-Pauli table (empty for bilinear-only mappings).
-  const std::vector<SparsePauliWord>& table() const { return table_; }
+  /// The full Majorana-to-Pauli table (empty for bilinear-only mappings),
+  /// expanded from its runs on first use.
+  const std::vector<SparsePauliWord>& table() const;
 
   /// Encoding name (may be empty for custom encodings).
   const std::string& name() const { return name_; }
@@ -277,7 +292,7 @@ class MajoranaMapping : public DataClass {
 
  private:
   MajoranaMapping(
-      std::vector<SparsePauliWord> table,
+      std::vector<std::vector<detail::PauliRun>> runs,
       std::vector<std::pair<std::complex<double>, SparsePauliWord>> bilinears,
       std::string name, std::size_t num_modes, std::size_t num_qubits,
       std::string base_encoding,
@@ -285,8 +300,19 @@ class MajoranaMapping : public DataClass {
       std::vector<std::pair<std::complex<double>, SparsePauliWord>>
           stabilizers = {});
 
-  /// Majorana-to-Pauli table (empty for bilinear-only mappings).
-  std::vector<SparsePauliWord> table_;
+  /// Majorana-to-Pauli table as runs (empty for bilinear-only mappings), so
+  /// Jordan-Wigner and parity tables take O(N) rather than O(N^2) memory.
+  std::vector<std::vector<detail::PauliRun>> runs_;
+
+  /// Whether every table entry lists strictly increasing qubits.
+  bool increasing_;
+
+  /// Table expanded from runs_ on first use, shared by copies.
+  struct ExpandedTable {
+    std::once_flag once;
+    std::vector<SparsePauliWord> words;
+  };
+  std::shared_ptr<ExpandedTable> expanded_;
 
   /// Bilinears of a bilinear-only mapping, upper triangle row-major; empty
   /// for Majorana-atomic mappings.
@@ -481,7 +507,7 @@ MajoranaMapResult majorana_map_hamiltonian_cholesky(
  * @throws std::invalid_argument If spin_symmetric is false, any two-body
  *         index is outside [0, n_spatial), core_energy or an integral is not
  *         finite, duplicate entries for the same position carry conflicting
- *         values, or the mapping needs more than 131072 qubits.
+ *         values, or n_spatial exceeds 65536.
  */
 MajoranaMapResult majorana_map_hamiltonian_sparse(
     const MajoranaMapping& mapping, double core_energy, const double* h1_alpha,
