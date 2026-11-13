@@ -10,6 +10,7 @@ from functools import cache
 from pathlib import Path
 
 import numpy as np
+import pandas as pd
 import pytest
 
 from qdk_chemistry.algorithms import create
@@ -282,7 +283,7 @@ def test_controlled_psp_resources(num_regression):
     )
 
 
-def test_fe2s2_resources(num_regression):
+def test_fe2s2_resources(dataframe_regression):
     """Pin Fe2S2-20 costs for the original and both streamed SELECT implementations."""
     num_orbitals = 20
     factorized = create_random_factorized_hamiltonian(
@@ -320,16 +321,22 @@ def test_fe2s2_resources(num_regression):
             builder.run(state_preparation=state_preparation, qubit_hamiltonian=operator)[0].estimate().logical_counts
         )
         rows.append({"numQubits": counts["numQubits"], "toffoliCount": counts["cczCount"] + counts["ccixCount"]})
-    num_regression.check(
-        {key: [row[key] for row in rows] for key in ("numQubits", "toffoliCount")},
-        data_index=["fe2s2", "fe2s2_streamed", "fe2s2_streamed_select"],
+    # Decimal strings keep tolerated columns floating-point when the fixture rereads its CSV.
+    dataframe_regression.check(
+        pd.DataFrame(
+            {
+                "numQubits": [row["numQubits"] for row in rows],
+                "toffoliCount": [f"{row['toffoliCount']:.1f}" for row in rows],
+            },
+            index=["fe2s2", "fe2s2_streamed", "fe2s2_streamed_select"],
+        ),
         basename="sossa_fe2s2",
         tolerances={"toffoliCount": {"atol": 0, "rtol": 0.01}},
         default_tolerance={"atol": 0, "rtol": 0},
     )
 
 
-def test_hubbard_plaquette_resources(num_regression):
+def test_hubbard_plaquette_resources(dataframe_regression):
     """Pin both Hubbard lattice sizes with the existing tolerance for Clifford-boundary rotations."""
     rows = []
     for size in (2, 4):
@@ -353,20 +360,23 @@ def test_hubbard_plaquette_resources(num_regression):
         lattice = LatticeGeometry.square(size, size, periodic_x=True, periodic_y=True)
         model = FermiHubbardModelHamiltonianDescription(lattice, t=1.0, u=8.0, epsilon=0.0)
         rows.append(builder.run(identity_state_prep(num_qubits=2 * size * size), model)[0].estimate().logical_counts)
-    num_regression.check(
-        {
-            key: [row.get(key, 0) for row in rows]
-            for key in (
-                "numQubits",
-                "rotationCount",
-                "rotationDepth",
-                "tCount",
-                "cczCount",
-                "ccixCount",
-                "measurementCount",
-            )
-        },
-        data_index=["2", "4"],
+    # Decimal strings keep tolerated columns floating-point when the fixture rereads its CSV.
+    dataframe_regression.check(
+        pd.DataFrame(
+            {
+                key: [f"{row.get(key, 0):.1f}" if key.startswith("rotation") else row.get(key, 0) for row in rows]
+                for key in (
+                    "numQubits",
+                    "rotationCount",
+                    "rotationDepth",
+                    "tCount",
+                    "cczCount",
+                    "ccixCount",
+                    "measurementCount",
+                )
+            },
+            index=["2", "4"],
+        ),
         basename="hubbard_plaquette",
         tolerances={key: {"atol": 16, "rtol": 0} for key in ("rotationCount", "rotationDepth")},
         default_tolerance={"atol": 0, "rtol": 0},
