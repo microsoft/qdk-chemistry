@@ -294,7 +294,7 @@ class Circuit(DataClass):
         name: str | None = None,
         use_trace_backend: bool = False,
     ) -> CircuitEstimateResult:
-        """Estimate physical resources with QRE v3.
+        """Estimate logical counts and physical resources with QRE v3.
 
         Args:
             architecture: Physical architecture; defaults to Majorana with error rate ``1e-6``.
@@ -329,13 +329,7 @@ class Circuit(DataClass):
             composition=composition if composition is not None else ErrorComposition.UnionBound,
             name=name,
         )
-        logical_counts = (
-            self.estimate_logical_counts() if self._qsharp_factory is not None or self.qasm is not None else None
-        )
-        return CircuitEstimateResult(logical_counts=logical_counts, physical_estimates=physical_estimates)
-
-    def estimate_logical_counts(self) -> dict[str, int]:
-        """Estimate logical gate counts for a Q# factory or OpenQASM circuit."""
+        counts: dict[str, int] | None = None
         if self._qsharp_factory is not None:
             context = getattr(self._qsharp_factory.program, "_qdk_context", qsharp)
             counts = dict(
@@ -348,19 +342,14 @@ class Circuit(DataClass):
             context = Context(target_profile=TargetProfile.Adaptive_RIF)
             context.import_openqasm(self.qasm, name="EstimateLogicalCount", program_type=ProgramType.File)
             counts = dict(context.logical_counts(context.code.qasm_import.EstimateLogicalCount))
-        else:
-            raise RuntimeError(
-                "Cannot estimate logical counts: no Q# factory data or QASM representation is available."
-            )
-
-        estimated_num_qubits = counts.get("numQubits")
+        estimated_num_qubits = counts.get("numQubits") if counts is not None else None
         if self.num_qubits is not None and estimated_num_qubits is not None and estimated_num_qubits != self.num_qubits:
             Logger.info(
                 f"This circuit declares {self.num_qubits} qubits but the resource estimate reports "
                 f"{estimated_num_qubits}; there could be ancillary qubits allocated and deallocated "
                 "within the circuit."
             )
-        return counts
+        return CircuitEstimateResult(logical_counts=counts, physical_estimates=physical_estimates)
 
     def get_qre_application(self, use_trace_backend: bool = False):
         """Convert the circuit to a ``qdk.qre`` Application for resource estimation.

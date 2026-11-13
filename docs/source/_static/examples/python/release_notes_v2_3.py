@@ -73,7 +73,7 @@ qpe_builder = create(
 )
 circuit = qpe_builder.run(trial_state, operator)[0]
 print(f"Phase-estimation target: {epsilon_pea} Hartree; queries: {num_queries}")
-logical_counts = circuit.estimate_logical_counts()
+logical_counts = circuit.estimate().logical_counts
 print(f"Logical counts: {logical_counts}")
 # end-cell-unary-sossa
 ################################################################################

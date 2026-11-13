@@ -545,7 +545,7 @@ class TestCircuitEstimate:
         assert [(entry.qubits, entry.runtime) for entry in result.physical_estimates] == [
             (entry.qubits, entry.runtime) for entry in expected
         ]
-        assert result.logical_counts == circuit.estimate_logical_counts()
+        assert result.logical_counts is not None
         assert result.logical_counts["numQubits"] == 2
 
     def test_estimate_from_qasm(self):
@@ -568,8 +568,8 @@ class TestCircuitEstimate:
         expected = estimate(circuit.get_qre_application(), architecture, isa_query, trace_query, **options)
         assert result.physical_estimates
         assert result.physical_estimates.as_frame().equals(expected.as_frame())
-        counts = circuit.estimate_logical_counts()
-        assert result.logical_counts == counts
+        counts = result.logical_counts
+        assert counts is not None
         assert counts["numQubits"] == 2
         assert counts["tCount"] == 1
 
@@ -579,14 +579,14 @@ class TestCircuitEstimate:
         monkeypatch.setattr(circuit_module.Logger, "info", messages.append)
 
         circuit = Circuit(qasm=self._QASM_WITH_T, num_qubits=5)
-        result = circuit.estimate_logical_counts()
+        result = circuit.estimate().logical_counts
 
         assert result["numQubits"] == 2
         assert circuit.num_qubits == 5
         assert any("declares 5 qubits" in m for m in messages)
 
     def test_estimate_from_qir(self):
-        """Physical estimation accepts QIR while logical counting reports its unsupported representation."""
+        """QIR physical estimates remain available without logical counts."""
         qir = openqasm_compile(
             self._QASM_WITH_T,
             target_profile=TargetProfile.Base,
@@ -596,8 +596,6 @@ class TestCircuitEstimate:
         assert result.physical_estimates
         assert all(entry.qubits > 0 and entry.runtime > 0 for entry in result.physical_estimates)
         assert result.logical_counts is None
-        with pytest.raises(RuntimeError, match="Cannot estimate logical counts"):
-            circuit.estimate_logical_counts()
 
 
 class TestGetQreApplication:

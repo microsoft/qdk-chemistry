@@ -122,7 +122,7 @@ def test_resource_estimates(algorithm, num_regression):
     resources: dict[str, list[int | float]] = {}
     for hamiltonian_name in _HAMILTONIANS:
         circuit = _circuit(hamiltonian_name, algorithm)
-        counts = circuit.estimate_logical_counts()
+        counts = circuit.estimate().logical_counts
         row = {
             key: counts.get(key, 0)
             for key in (
@@ -182,7 +182,7 @@ def test_state_preparation_resources(algorithm, num_regression):
     """Pin the logical cost of preparing the same four amplitudes with each algorithm."""
     settings = {"bits_precision": 4} if algorithm == "alias_sampling" else {"rotation_bit_precision": 4}
     circuit = create("state_prep", algorithm, **settings).run(create_dense_wavefunction([0.5, 0.3, 0.7, 0.1]))
-    counts = circuit.estimate_logical_counts()
+    counts = circuit.estimate().logical_counts
     num_regression.check(
         {key: [counts[key]] for key in ("numQubits", "cczCount", "tCount", "rotationCount", "measurementCount")},
         data_index=["four_amplitudes"],
@@ -227,7 +227,8 @@ def test_binary_encoding_resources(test_data_files_path, num_regression):
     rows = [
         create("state_prep", "sparse_isometry", binary_encoding=True, include_negative_controls=enabled)
         .run(wavefunction)
-        .estimate_logical_counts()
+        .estimate()
+        .logical_counts
         for enabled in (True, False)
     ]
     num_regression.check(
@@ -246,7 +247,7 @@ def test_controlled_pauli_sequence_resources(num_regression):
     terms = [ExponentiatedPauliTerm({2 * i: "X", 2 * i + 1: "Y"}, 0.123) for i in range(6)]
     container = PauliProductFormulaContainer(terms, step_reps=2, num_qubits=12, layer_offsets=(0, 6))
     mapper = create("controlled_circuit_mapper", "pauli_sequence", control_indices=[12])
-    counts = mapper.run(UnitaryRepresentation(container=container)).estimate_logical_counts()
+    counts = mapper.run(UnitaryRepresentation(container=container)).estimate().logical_counts
     num_regression.check(
         {key: [counts[key]] for key in ("numQubits", "rotationCount", "rotationDepth")},
         data_index=["six_disjoint_pairs"],
@@ -269,7 +270,7 @@ def test_controlled_psp_resources(num_regression):
         {"select_method": "multi_controlled", "prepare": AlgorithmRef("state_prep", "dense_pure_state")},
     ):
         circuit = create("controlled_circuit_mapper", "prepare_select_prepare", **settings).run(unitary)
-        counts = circuit.estimate_logical_counts()
+        counts = circuit.estimate().logical_counts
         rows.append(
             {"declaredNumQubits": circuit.num_qubits, "numQubits": counts["numQubits"], "cczCount": counts["cczCount"]}
         )
@@ -315,9 +316,9 @@ def test_fe2s2_resources(num_regression):
             ),
             unitary_builder=AlgorithmRef("hamiltonian_unitary_builder", "sossa"),
         )
-        counts = builder.run(state_preparation=state_preparation, qubit_hamiltonian=operator)[
-            0
-        ].estimate_logical_counts()
+        counts = (
+            builder.run(state_preparation=state_preparation, qubit_hamiltonian=operator)[0].estimate().logical_counts
+        )
         rows.append({"numQubits": counts["numQubits"], "toffoliCount": counts["cczCount"] + counts["ccixCount"]})
     num_regression.check(
         {key: [row[key] for row in rows] for key in ("numQubits", "toffoliCount")},
@@ -349,7 +350,7 @@ def _hubbard_benchmark_counts(size):
     )
     lattice = LatticeGeometry.square(size, size, periodic_x=True, periodic_y=True)
     model = FermiHubbardModelHamiltonianDescription(lattice, t=1.0, u=8.0, epsilon=0.0)
-    return builder.run(identity_state_prep(num_qubits=2 * size * size), model)[0].estimate_logical_counts()
+    return builder.run(identity_state_prep(num_qubits=2 * size * size), model)[0].estimate().logical_counts
 
 
 def test_hubbard_plaquette_resources(num_regression):
