@@ -5,6 +5,7 @@
 # Licensed under the MIT License. See LICENSE.txt in the project root for license information.
 # --------------------------------------------------------------------------------------------
 
+import json
 import math
 from functools import cache
 from pathlib import Path
@@ -14,13 +15,12 @@ import pandas as pd
 import pytest
 
 from qdk_chemistry.algorithms import create
+from qdk_chemistry.algorithms.phase_estimation.circuit_builder import unary_phase_estimation_builder
 from qdk_chemistry.algorithms.state_preparation import identity_state_prep
 from qdk_chemistry.data import (
     AlgorithmRef,
-    CholeskyHamiltonianContainer,
     Circuit,
     Configuration,
-    DFTHCHamiltonianContainer,
     FermiHubbardModelHamiltonianDescription,
     Hamiltonian,
     LatticeGeometry,
@@ -58,6 +58,7 @@ _HAMILTONIANS = {
 }
 
 _NUM_QUERIES = 255
+_RESOURCE_INPUTS = Path(__file__).parent / "test_data" / "resource_regression"
 
 
 @cache
@@ -71,8 +72,18 @@ def _circuit(hamiltonian_name: str, algorithm: str) -> Circuit:
     wavefunction = Wavefunction(StateVectorContainer(configuration, ModelOrbitals(num_orbitals)))
     state_preparation = create("state_prep", "sparse_isometry").run(wavefunction)
 
-    if algorithm == "trotter":
+    if algorithm in ("trotter", "lcu"):
         operator = create("qubit_mapper", "qdk").run(hamiltonian, mapping)
+        # Native unordered-map iteration must not choose the product-formula order.
+        order = sorted(range(len(operator.pauli_strings)), key=operator.pauli_strings.__getitem__)
+        operator = QubitOperator(
+            [operator.pauli_strings[index] for index in order],
+            operator.coefficients[order],
+            encoding=operator.encoding,
+            fermion_mode_order=operator.fermion_mode_order,
+        )
+
+    if algorithm == "trotter":
         builder = create(
             "qpe_circuit_builder",
             "qdk_standard",
@@ -81,23 +92,10 @@ def _circuit(hamiltonian_name: str, algorithm: str) -> Circuit:
             controlled_circuit_mapper=AlgorithmRef("controlled_circuit_mapper", "pauli_sequence"),
         )
     elif algorithm == "lcu":
-        operator = create("qubit_mapper", "qdk").run(hamiltonian, mapping)
         builder = create("qpe_circuit_builder", "qdk_unary", num_queries=_NUM_QUERIES)
     else:
-        if not isinstance(hamiltonian.get_container(), DFTHCHamiltonianContainer):
-            one_body = hamiltonian.get_one_body_integrals()[0]
-            two_body = hamiltonian.get_two_body_integrals()[0]
-            eigenvalues, eigenvectors = np.linalg.eigh(two_body.reshape(one_body.size, one_body.size))
-            assert eigenvalues.min() >= -1e-10 * eigenvalues.max()
-            keep = eigenvalues > 1e-10 * eigenvalues.max()
-            vectors = eigenvectors[:, keep] * np.sqrt(eigenvalues[keep])
-            hamiltonian = Hamiltonian(
-                CholeskyHamiltonianContainer(
-                    one_body, vectors, hamiltonian.get_orbitals(), hamiltonian.get_core_energy(), np.eye(0)
-                )
-            )
-            hamiltonian = create("hamiltonian_factorization", "double_factorization").run(hamiltonian)
-        operator = create("qubit_mapper", "sum_of_squares").run(hamiltonian, mapping)
+        # Fix the eigensolver's basis choices; factorization has its own functional tests.
+        operator = QubitOperator.from_json_file(_RESOURCE_INPUTS / f"{hamiltonian_name}.sossa.qubit_hamiltonian.json")
         builder = create(
             "qpe_circuit_builder",
             "qdk_unary",
@@ -118,8 +116,11 @@ def _circuit(hamiltonian_name: str, algorithm: str) -> Circuit:
 
 @pytest.mark.parametrize("algorithm", ["trotter", "lcu", "sossa"])
 @pytest.mark.skipif(not _HAS_QRE, reason="qdk.qre is not available")
-def test_resource_estimates(algorithm, num_regression):
+def test_resource_estimates(algorithm, num_regression, monkeypatch):
     """Compare counts and trace physical optima while pinning only reproducible estimates."""
+    phase_state = json.loads((_RESOURCE_INPUTS / "cosine_window_255.json").read_text())
+    # Pin the phase-preparation input rather than host-libm rounding of its amplitudes.
+    monkeypatch.setattr(unary_phase_estimation_builder, "cosine_window_state", lambda _: phase_state)
     resources: dict[str, list[int | float]] = {}
     for hamiltonian_name in _HAMILTONIANS:
         circuit = _circuit(hamiltonian_name, algorithm)
