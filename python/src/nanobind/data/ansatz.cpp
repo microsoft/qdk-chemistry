@@ -134,7 +134,7 @@ Raises:
     ValueError: If pointers are None or orbital dimensions are inconsistent
 
 )",
-      nb::arg("hamiltonian"), nb::arg("wavefunction"));
+      nb::arg("hamiltonian").none(), nb::arg("wavefunction").none());
 
   // Copy constructor
   ansatz.def(nb::init<const Ansatz&>(), "Copy constructor", nb::arg("other"));
