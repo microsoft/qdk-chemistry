@@ -35,7 +35,6 @@ The :class:`~qdk_chemistry.data.MajoranaMapping` supports both forms:
 
 Majorana-atomic mappings are constructed from a Pauli-string table (the constructor or factory methods) and derive each bilinear from it on demand.
 Bilinear-only mappings are constructed via :py:meth:`~qdk_chemistry.data.MajoranaMapping.from_bilinears`.
-Table-built mappings no longer store precomputed bilinears, so their content hashes differ from earlier releases; invalidate caches keyed by them.
 
 Convention
 ~~~~~~~~~~
