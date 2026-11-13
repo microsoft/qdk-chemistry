@@ -130,7 +130,16 @@ inline Eigen::SparseMatrix<double> _build_huckel_integrals(
   auto n = static_cast<int>(lattice.num_sites());
   const auto& epsilon =
       detail::to_site_param(std::forward<EpsT>(epsilon_in), lattice, "epsilon");
-  const auto& t = detail::to_pair_param(std::forward<TT>(t_in), lattice, "t");
+  // A scalar hopping is read directly instead of broadcast to n x n.
+  constexpr bool scalar_t = std::is_same_v<std::decay_t<TT>, double>;
+  if constexpr (!scalar_t) detail::to_pair_param(t_in, lattice, "t");
+  auto t = [&t_in](int i, int j) -> double {
+    if constexpr (scalar_t) {
+      return t_in;
+    } else {
+      return t_in(i, j);
+    }
+  };
 
   // Check lattice properties
   if (lattice.is_symmetric() == false) {
@@ -208,11 +217,13 @@ _build_hubbard_integrals(const qdk::chemistry::data::LatticeGraph& lattice,
   auto n = static_cast<int>(lattice.num_sites());
   const auto& epsilon =
       detail::to_site_param(std::forward<EpsT>(epsilon_in), lattice, "epsilon");
-  const auto& t = detail::to_pair_param(std::forward<TT>(t_in), lattice, "t");
+  if constexpr (!std::is_same_v<std::decay_t<TT>, double>) {
+    detail::to_pair_param(t_in, lattice, "t");
+  }
   const auto& U = detail::to_site_param(std::forward<UT>(U_in), lattice, "U");
 
   // Build the one-body part using the Hückel constructor
-  auto h1 = _build_huckel_integrals(lattice, epsilon, t);
+  auto h1 = _build_huckel_integrals(lattice, epsilon, std::forward<TT>(t_in));
 
   // Build the two-body map for on-site repulsion: (p,q,r,s) = (i,i,i,i) -> U_i
   qdk::chemistry::data::SparseHamiltonianContainer::TwoBodyMap h2;

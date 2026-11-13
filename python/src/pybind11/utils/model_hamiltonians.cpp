@@ -15,11 +15,16 @@ namespace {
 
 namespace detail = qdk::chemistry::utils::model_hamiltonians::detail;
 
+/// Whether a Python parameter is a scalar rather than an array.
+bool is_scalar(const py::object& obj) {
+  return py::isinstance<py::float_>(obj) || py::isinstance<py::int_>(obj);
+}
+
 /// Dispatch a py::object to the appropriate C++ to_site_param overload.
 Eigen::VectorXd to_site_param(const py::object& obj,
                               const qdk::chemistry::data::LatticeGraph& lattice,
                               const std::string& name = "parameter") {
-  if (py::isinstance<py::float_>(obj) || py::isinstance<py::int_>(obj)) {
+  if (is_scalar(obj)) {
     return detail::to_site_param(obj.cast<double>(), lattice, name);
   }
   return detail::to_site_param(obj.cast<Eigen::VectorXd>(), lattice, name);
@@ -29,7 +34,7 @@ Eigen::VectorXd to_site_param(const py::object& obj,
 Eigen::MatrixXd to_pair_param(const py::object& obj,
                               const qdk::chemistry::data::LatticeGraph& lattice,
                               const std::string& name = "parameter") {
-  if (py::isinstance<py::float_>(obj) || py::isinstance<py::int_>(obj)) {
+  if (is_scalar(obj)) {
     return detail::to_pair_param(obj.cast<double>(), lattice, name);
   }
   return detail::to_pair_param(obj.cast<Eigen::MatrixXd>(), lattice, name);
@@ -118,9 +123,13 @@ Returns:
       "create_huckel_hamiltonian",
       [](const qdk::chemistry::data::LatticeGraph& lattice,
          const py::object& epsilon, const py::object& t) {
-        return create_huckel_hamiltonian(
-            lattice, to_site_param(epsilon, lattice, "epsilon"),
-            to_pair_param(t, lattice, "t"));
+        auto eps = to_site_param(epsilon, lattice, "epsilon");
+        // Scalar hopping stays scalar so large lattices skip an n x n matrix.
+        if (is_scalar(t)) {
+          return create_huckel_hamiltonian(lattice, eps, t.cast<double>());
+        }
+        return create_huckel_hamiltonian(lattice, eps,
+                                         to_pair_param(t, lattice, "t"));
       },
       R"(
 Create a Hückel model Hamiltonian.
@@ -144,9 +153,14 @@ Returns:
       "create_hubbard_hamiltonian",
       [](const qdk::chemistry::data::LatticeGraph& lattice,
          const py::object& epsilon, const py::object& t, const py::object& U) {
-        return create_hubbard_hamiltonian(
-            lattice, to_site_param(epsilon, lattice, "epsilon"),
-            to_pair_param(t, lattice, "t"), to_site_param(U, lattice, "U"));
+        auto eps = to_site_param(epsilon, lattice, "epsilon");
+        if (is_scalar(t)) {
+          return create_hubbard_hamiltonian(lattice, eps, t.cast<double>(),
+                                            to_site_param(U, lattice, "U"));
+        }
+        return create_hubbard_hamiltonian(lattice, eps,
+                                          to_pair_param(t, lattice, "t"),
+                                          to_site_param(U, lattice, "U"));
       },
       R"(
 Create a Hubbard model Hamiltonian.
