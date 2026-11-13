@@ -77,6 +77,18 @@ void bind_sbt_instance(py::module& m, const char* name) {
           "The dense numpy block stored for the given per-slot labels.")
       .def("num_blocks", &SBT::num_blocks,
            "Total number of stored blocks (including aliases).")
+      .def(
+          "blocks",
+          [](const SBT& self) {
+            std::vector<std::pair<Labels, BlockTensor>> out;
+            out.reserve(self.blocks().size());
+            for (const auto& [labels, block] : self.blocks()) {
+              out.emplace_back(labels, *block);
+            }
+            return out;
+          },
+          "List of (labels, block) pairs for every stored block (including "
+          "aliases), in label order.")
       .def_static("data_type_name", &SBT::data_type_name, R"(
       Return the wire-format identifier for this tensor specialization.
 

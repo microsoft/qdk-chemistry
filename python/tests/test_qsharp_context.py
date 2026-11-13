@@ -55,6 +55,8 @@ _ADAPTIVE_ONLY_MODULES = (
     "SOSSAWalk",
     "UnitarySynthesis",
     "IsometrySynthesis",
+    "MPSSequential",
+    "MPSSparse",
 )
 
 
