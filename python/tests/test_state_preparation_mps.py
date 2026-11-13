@@ -34,7 +34,7 @@ from qdk_chemistry.data import (
     MPSSite,
     Orbitals,
     QubitOperator,
-    RealUnitaryContainer,
+    UnitaryMatrixContainer,
     UnitaryRepresentation,
     Wavefunction,
 )
@@ -508,7 +508,7 @@ def test_multi_site_mps_matches_contraction(method):
     if method == "dense":
         last = MatrixProductStatePreparation._site_isometry(mps.sites[-1], ancilla_dim=4)
         mapper = create("circuit_mapper", "unitary_synthesis", num_input_qubits=2)
-        right_factor = mapper.right_factor(UnitaryRepresentation(RealUnitaryContainer(last.reshape(-1, 2))))
+        right_factor = mapper.right_factor(UnitaryRepresentation(UnitaryMatrixContainer(last.reshape(-1, 2))))
         assert not np.allclose(np.abs(right_factor), np.eye(2), atol=1e-3)
     operation, site_struct = _QSHARP_OPERATIONS[method]
     with use_qsharp_context(create_qsharp_context()):

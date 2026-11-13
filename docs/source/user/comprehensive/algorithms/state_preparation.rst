@@ -292,7 +292,7 @@ The MPS must be real and right-canonical with orthogonality center at site 0, wi
 The physical basis is loaded in the blocked Jordan-Wigner layout.
 An ancilla register of :math:`\max(1, \lceil \log_2 \chi \rceil)` qubits carries the virtual bond of maximal dimension :math:`\chi`.
 Every site isometry, excluding site 0, which is prepared as the initial state, maps the left bond held in the ancilla register to the qubits of its site and its right bond.
-The nested ``unitary_synthesis`` setting holds an :class:`~qdk_chemistry.data.AlgorithmRef` to the :ref:`unitary synthesis mapper <unitary-synthesis-mapper>`, whose ``method`` setting selects the dense or block-sparse synthesis of every site isometry.
+The nested ``unitary_synthesis`` setting holds an :class:`~qdk_chemistry.data.AlgorithmRef` to :class:`~qdk_chemistry.algorithms.circuit_mapper.UnitarySynthesisMapper`, whose ``method`` setting selects the dense or block-sparse synthesis of every site isometry.
 The preparer sets the mapper's ``num_input_qubits`` to the ancilla register width.
 For the dense method it also sets ``omit_right_factor`` and absorbs the right factor of each site isometry into the preceding site, or into the initial state for site 1.
 Givens decomposition converts the orthogonal factors into adjacent rotations and sign corrections for the circuit.

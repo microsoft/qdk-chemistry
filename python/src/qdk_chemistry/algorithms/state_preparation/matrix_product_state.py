@@ -23,8 +23,8 @@ from qdk_chemistry.data import (
     Configuration,
     MPSContainer,
     MPSSite,
-    RealUnitaryContainer,
     Settings,
+    UnitaryMatrixContainer,
     UnitaryRepresentation,
     Wavefunction,
 )
@@ -182,7 +182,7 @@ class MatrixProductStatePreparation(StatePreparation):
                     isometry[:, :bond] = np.einsum("bc,pca->pba", right_factor, isometry[:, :bond])
                 matrix = isometry.reshape(-1, isometry.shape[2])
             try:
-                container = RealUnitaryContainer(matrix)
+                container = UnitaryMatrixContainer(matrix)
             except ValueError as error:
                 raise ValueError(f"{_DESCRIPTION} requires isometric sites; site {index} is not: {error}") from error
             unitary = UnitaryRepresentation(container)

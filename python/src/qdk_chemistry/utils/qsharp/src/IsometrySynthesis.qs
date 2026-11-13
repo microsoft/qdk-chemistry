@@ -7,13 +7,24 @@
 // (DLR), licensed under the Apache License, Version 2.0, and modified for QDK
 // Chemistry.
 
-/// Circuits for real isometries and orthogonal matrices from the C++ unitary synthesis
+/// Circuits for isometries and unitary matrices from the C++ unitary synthesis
 /// (Rupprecht & Wölk, arXiv:2605.28489).
 ///
 /// Registers are little-endian: basis state |r⟩ of a register holds bit k of r in qubit k.
 /// An isometry with 2^k · 2^n rows acts on an n-qubit input register followed by k added
 /// qubits, so row q · 2^n + a is added state q and input state a. Column a is input state
 /// a with the added qubits in |0⟩.
+///
+/// Each synthesis method of the `unitary_synthesis` circuit mapper provides the same entry
+/// points under a prefix X, which the mapper resolves by name:
+/// - `struct XSynthesis`, the circuit data computed by the method;
+/// - `ApplyX(synthesis, input, added, phaseGradient, angleReg) : Unit is Adj`;
+/// - `struct XParams { synthesis, numInputQubits, numAddedQubits, rotationBitPrecision }`;
+/// - `MakeXOp(params)` and `MakeXOpWithPhaseGradient(params)`, see `ApplyIsometryOnTarget`
+///   and `ApplyIsometryOnRegister`;
+/// - `MakeXCircuit(synthesis, numInputQubits, numAddedQubits, rotationBitPrecision)`.
+/// The structs are concrete per method so that no generic type crosses the Python interop
+/// boundary.
 namespace QDKChemistry.Utils.IsometrySynthesis {
 
     import Std.Arrays.Any;
@@ -75,11 +86,11 @@ namespace QDKChemistry.Utils.IsometrySynthesis {
         rotationBitPrecision : Int,
     }
 
-    /// Parameters of a composable sparse isometry operation.
+    /// Parameters of a composable sparse isometry operation; see `DenseIsometryParams`.
     struct SparseIsometryParams {
         synthesis : SparseIsometrySynthesis,
-        /// Qubits of the target register.
-        numQubits : Int,
+        numInputQubits : Int,
+        numAddedQubits : Int,
         rotationBitPrecision : Int,
     }
 
@@ -282,8 +293,8 @@ namespace QDKChemistry.Utils.IsometrySynthesis {
     /// its own phase gradient.
     function MakeSparseIsometryOp(params : SparseIsometryParams) : Qubit[] => Unit is Adj {
         ApplyIsometryOnTarget(
-            params.numQubits,
-            0,
+            params.numInputQubits,
+            params.numAddedQubits,
             params.rotationBitPrecision,
             ApplySparseIsometry(params.synthesis, _, _, _, _),
             _
@@ -294,8 +305,8 @@ namespace QDKChemistry.Utils.IsometrySynthesis {
     /// `MakeDenseIsometryOpWithPhaseGradient`.
     function MakeSparseIsometryOpWithPhaseGradient(params : SparseIsometryParams) : Qubit[] => Unit is Adj {
         ApplyIsometryOnRegister(
-            params.numQubits,
-            0,
+            params.numInputQubits,
+            params.numAddedQubits,
             params.rotationBitPrecision,
             ApplySparseIsometry(params.synthesis, _, _, _, _),
             _
@@ -306,10 +317,11 @@ namespace QDKChemistry.Utils.IsometrySynthesis {
     /// `MakeDenseIsometryCircuit`.
     operation MakeSparseIsometryCircuit(
         synthesis : SparseIsometrySynthesis,
-        numQubits : Int,
+        numInputQubits : Int,
+        numAddedQubits : Int,
         rotationBitPrecision : Int
     ) : Unit {
-        use target = Qubit[numQubits];
-        ApplyIsometryOnTarget(numQubits, 0, rotationBitPrecision, ApplySparseIsometry(synthesis, _, _, _, _), target);
+        use target = Qubit[numInputQubits + numAddedQubits];
+        ApplyIsometryOnTarget(numInputQubits, numAddedQubits, rotationBitPrecision, ApplySparseIsometry(synthesis, _, _, _, _), target);
     }
 }
