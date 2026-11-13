@@ -22,6 +22,10 @@ namespace nb = nanobind;
  */
 nb::tuple dense_matrix_solver(
     const nb::ndarray<nb::numpy, const double, nb::f_contig>& matrix) {
+  if (matrix.device_type() != nb::device::cpu::value) {
+    throw std::invalid_argument("Input matrix must be on the CPU.");
+  }
+
   // Validate input matrix
   if (matrix.ndim() != 2) {
     throw std::invalid_argument("Input matrix must be 2-dimensional.");
@@ -72,7 +76,7 @@ void bind_syev_solver(nb::module_& m) {
             Raises
             ------
             ValueError
-                If the input matrix is not square or symmetric.
+              If the input matrix is not on the CPU, not two-dimensional, or not square.
             RuntimeError
                 If LAPACK fails to compute the eigenvalues.
         )",

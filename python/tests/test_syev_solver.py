@@ -5,6 +5,8 @@
 # Licensed under the MIT License. See LICENSE.txt in the project root for license information.
 # --------------------------------------------------------------------------------------------
 
+import ctypes
+
 import numpy as np
 import pytest
 
@@ -84,6 +86,31 @@ def test_syev_solver_real_array_coercion(dtype):
 
     np.testing.assert_array_equal(matrix, original)
     np.testing.assert_allclose(eigenvectors @ np.diag(eigenvalues) @ eigenvectors.T, original)
+
+
+def test_syev_solver_rejects_non_cpu_arrays():
+    """Reject CUDA-labelled DLPack data, backed by host memory to keep the test safe."""
+
+    class TensorHeader(ctypes.Structure):
+        _fields_ = (("data", ctypes.c_void_p), ("device_type", ctypes.c_int), ("device_id", ctypes.c_int))
+
+    matrix = np.asfortranarray([[2.0, -1.0], [-1.0, 3.0]])
+    capsule_pointer = ctypes.pythonapi.PyCapsule_GetPointer
+    capsule_pointer.argtypes = [ctypes.py_object, ctypes.c_char_p]
+    capsule_pointer.restype = ctypes.c_void_p
+
+    class CudaArray:
+        def __dlpack_device__(self):
+            return (2, 0)
+
+        def __dlpack__(self, *args, **kwargs):
+            capsule = matrix.__dlpack__()
+            header = ctypes.cast(capsule_pointer(capsule, b"dltensor"), ctypes.POINTER(TensorHeader))
+            header.contents.device_type = 2
+            return capsule
+
+    with pytest.raises(ValueError, match="Input matrix must be on the CPU"):
+        syev_solver(CudaArray())
 
 
 def test_syev_solver_invalid_input():
