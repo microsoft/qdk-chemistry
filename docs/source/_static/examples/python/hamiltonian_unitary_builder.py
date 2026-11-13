@@ -161,6 +161,6 @@ psp_mapper = create(
     prepare=AlgorithmRef("state_prep", "alias_sampling", bits_precision=6),
 )
 lcu_circuit = psp_mapper.run(unitary)
-print(lcu_circuit.estimate().logical_counts)
+print(lcu_circuit.estimate()["logicalCounts"])
 # end-cell-lcu-prepare
 ################################################################################

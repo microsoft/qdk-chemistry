@@ -18,10 +18,11 @@ from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any
 
 import h5py
-from qdk import Context, TargetProfile, qsharp
-from qdk.openqasm import OutputSemantics, ProgramType
+from qdk import TargetProfile, qsharp
+from qdk.openqasm import OutputSemantics
 from qdk.openqasm import circuit as openqasm_circuit
 from qdk.openqasm import compile as openqasm_compile
+from qdk.openqasm import estimate as openqasm_estimate
 
 from qdk_chemistry.data._hashing import _hash_optional, _hash_str, _hash_uint
 from qdk_chemistry.data.base import DataClass
@@ -47,6 +48,12 @@ class CircuitEstimateResult:
 
     logical_counts: dict[str, int] | None
     physical_estimates: "EstimationTable"
+
+    def __getitem__(self, key: str) -> dict[str, int] | None:
+        """Read logical counts using the legacy estimator dictionary key."""
+        if key == "logicalCounts":
+            return self.logical_counts
+        raise KeyError(key)
 
 
 @dataclass(frozen=True)
@@ -339,9 +346,7 @@ class Circuit(DataClass):
                 )
             )
         elif self.qasm is not None:
-            context = Context(target_profile=TargetProfile.Adaptive_RIF)
-            context.import_openqasm(self.qasm, name="EstimateLogicalCount", program_type=ProgramType.File)
-            counts = dict(context.logical_counts(context.code.qasm_import.EstimateLogicalCount))
+            counts = dict(openqasm_estimate(self.qasm).logical_counts)
         estimated_num_qubits = counts.get("numQubits") if counts is not None else None
         if self.num_qubits is not None and estimated_num_qubits is not None and estimated_num_qubits != self.num_qubits:
             Logger.info(

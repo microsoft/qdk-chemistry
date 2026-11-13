@@ -546,6 +546,7 @@ class TestCircuitEstimate:
             (entry.qubits, entry.runtime) for entry in expected
         ]
         assert result.logical_counts is not None
+        assert result["logicalCounts"] is result.logical_counts
         assert result.logical_counts["numQubits"] == 2
 
     def test_estimate_from_qasm(self):
@@ -568,7 +569,8 @@ class TestCircuitEstimate:
         expected = estimate(circuit.get_qre_application(), architecture, isa_query, trace_query, **options)
         assert result.physical_estimates
         assert result.physical_estimates.as_frame().equals(expected.as_frame())
-        counts = result.logical_counts
+        counts = result["logicalCounts"]
+        assert counts is result.logical_counts
         assert counts is not None
         assert counts["numQubits"] == 2
         assert counts["tCount"] == 1

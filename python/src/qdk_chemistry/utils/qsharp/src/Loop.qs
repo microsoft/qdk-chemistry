@@ -12,7 +12,7 @@ namespace QDKChemistry.Utils.Loop {
 
     /// Counts warm-up iterations exactly before repeating the next iteration's cost under estimation;
     /// simulation runs every iteration, and the adjoint reverses the warm-up and repeated-body order.
-    operation LoopCA(
+    operation ResourceEstimateLoop(
         numIterations : Int,
         numWarmupIterations : Int,
         iteration : (Int => Unit is Adj + Ctl)

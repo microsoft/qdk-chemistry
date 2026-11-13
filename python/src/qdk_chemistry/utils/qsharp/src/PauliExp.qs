@@ -4,7 +4,7 @@
 
 namespace QDKChemistry.Utils.PauliExp {
 
-    import QDKChemistry.Utils.Loop.LoopCA;
+    import QDKChemistry.Utils.Loop.ResourceEstimateLoop;
     import Std.Arrays.Subarray;
     import Std.Math.Max;
 
@@ -42,7 +42,7 @@ namespace QDKChemistry.Utils.PauliExp {
         let step = params.numPrefixTerms..suffixStart - 1;
         let suffix = suffixStart..Length(params.pauliCoefficients) - 1;
         PauliExp(params.pauliIndices[prefix], params.pauliOps[prefix], params.pauliCoefficients[prefix], systems);
-        LoopCA(
+        ResourceEstimateLoop(
             params.repetitions,
             0,
             _ => PauliExp(params.pauliIndices[step], params.pauliOps[step], params.pauliCoefficients[step], systems)

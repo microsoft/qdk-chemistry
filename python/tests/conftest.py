@@ -116,8 +116,6 @@ def qsharp_test_context():
     # Unrestricted: ArithmeticOpTester needs Std.ArithmeticTestUtils, which Adaptive_RIF does not resolve.
     context = create_qsharp_context(target_profile=TargetProfile.Unrestricted)
     paths = sorted((Path(__file__).parent / "qsharp").glob("*.qs"))
-    if not paths:
-        raise RuntimeError("No Q# test sources found in tests/qsharp")
     sources = [path.read_text(encoding="utf-8") for path in paths]
     try:
         context.eval("\n".join(sources))

@@ -10,7 +10,7 @@
 /// the two callables and this module handles the stitching.
 namespace QDKChemistry.Utils.PrepSelPrep {
 
-    import QDKChemistry.Utils.Loop.LoopCA;
+    import QDKChemistry.Utils.Loop.ResourceEstimateLoop;
     import Std.Canon.ApplyToEachCA;
     import Std.Core.Length;
     import Std.Intrinsic.AND;
@@ -174,7 +174,7 @@ namespace QDKChemistry.Utils.PrepSelPrep {
         useWalk : Bool,
         power : Int,
     ) : Unit is Adj + Ctl {
-        LoopCA(
+        ResourceEstimateLoop(
             power,
             0,
             _ => {

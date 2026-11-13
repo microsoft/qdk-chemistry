@@ -182,10 +182,6 @@ Each method returns the circuit in the requested format, converting from whateve
    * - :meth:`~qdk_chemistry.data.Circuit.estimate`
      - Returns logical counts and QRE v3 physical estimates, defaulting to Majorana at error rate ``1e-6`` with ThreeAux and RoundBasedFactory.
 
-``estimate()`` accepts QRE v3 architecture, ISA, trace, and error-budget options
-and returns ``logical_counts`` and a ``physical_estimates`` QRE table.
-Logical counts are unavailable for QIR-only circuits.
-
 Example: Convert state preparation circuits to different formats
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 

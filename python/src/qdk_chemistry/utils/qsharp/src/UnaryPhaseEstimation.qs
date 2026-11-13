@@ -7,7 +7,6 @@ namespace QDKChemistry.Utils.UnaryPhaseEstimation {
     import Std.Arrays.Reversed;
     import Std.Canon.ApplyQFT;
     import Std.Diagnostics.Fact;
-    import Std.Math.MinI;
     import Std.ResourceEstimation.EnableMemoryComputeArchitecture;
     import Std.ResourceEstimation.IsResourceEstimating;
     import Std.ResourceEstimation.LeastRecentlyUsed;
@@ -71,16 +70,10 @@ namespace QDKChemistry.Utils.UnaryPhaseEstimation {
         if IsResourceEstimating() {
             UnaryIterationWithControl(phaseReg, numQueries + 1, (slot, selected) => {
                 if slot == 0 {
-                    let numExact = MinI(numQueries, 2);
-                    for _ in 1..numExact {
+                    within {
+                        RepeatEstimates(numQueries);
+                    } apply {
                         ApplySignedPowerSlot(applyBlockEncoding, applyReflection, true, selected, allQubits);
-                    }
-                    if numQueries > numExact {
-                        within {
-                            RepeatEstimates(numQueries - numExact);
-                        } apply {
-                            ApplySignedPowerSlot(applyBlockEncoding, applyReflection, true, selected, allQubits);
-                        }
                     }
                 } elif slot == numQueries {
                     ApplySignedPowerSlot(applyBlockEncoding, applyReflection, false, selected, allQubits);

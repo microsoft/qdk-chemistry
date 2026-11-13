@@ -4,7 +4,7 @@
 
 namespace QDKChemistry.Utils.CircuitComposition {
 
-    import QDKChemistry.Utils.Loop.LoopCA;
+    import QDKChemistry.Utils.Loop.ResourceEstimateLoop;
     import Std.Arrays.Subarray;
 
     /// Returns the controlled version of `op`, taking the control register as its first argument.
@@ -18,7 +18,7 @@ namespace QDKChemistry.Utils.CircuitComposition {
         power : Int,
         target : 'T
     ) : Unit is Adj + Ctl {
-        LoopCA(power, 0, _ => op(target));
+        ResourceEstimateLoop(power, 0, _ => op(target));
     }
 
     /// Returns an operation applying `op` `power` times.

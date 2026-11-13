@@ -206,7 +206,7 @@ class TestSparseIsometryBinaryEncoding:
         expected_total = n_system + n_ancilla
 
         # Resource estimate must agree.
-        lc = circuit.estimate().logical_counts
+        lc = circuit.estimate()["logicalCounts"]
         assert lc["numQubits"] == expected_total
         assert lc["cczCount"] > 0
 
@@ -352,7 +352,7 @@ class TestSparseIsometryBinaryEncoding:
         # The fallback must not go through the binary-encoding composition.
         assert circuit._qsharp_factory.program is QSHARP_UTILS.StatePreparation.MakeComposeSparseIsometryCircuit
 
-        lc = circuit.estimate().logical_counts
+        lc = circuit.estimate()["logicalCounts"]
         # No binary-encoding SELECT/SELECT_AND ops in the fallback path.
         assert lc["cczCount"] == 0
         # System qubits only — PreparePureStateD does not need external ancilla.
@@ -444,16 +444,16 @@ class TestCreateDense:
         assert len(binenc_sv) < len(gf2x_sv)
 
         # A smaller amplitude register means a cheaper dense load.
-        gf2x_counts = gf2x_dense.estimate().logical_counts
-        binenc_counts = binenc_dense.estimate().logical_counts
+        gf2x_counts = gf2x_dense.estimate()["logicalCounts"]
+        binenc_counts = binenc_dense.estimate()["logicalCounts"]
         assert binenc_counts["rotationCount"] < gf2x_counts["rotationCount"]
         assert binenc_counts["numQubits"] == gf2x_counts["numQubits"]
 
     def test_binary_encoding_isometry_cost_by_subtraction(self, ozone_wf):
         """Under binary encoding the isometry contributes the multi-controlled gates."""
         prep = create("state_prep", "sparse_isometry", binary_encoding=True)
-        full = prep.run(ozone_wf).estimate().logical_counts
-        dense = prep.create_dense(ozone_wf).estimate().logical_counts
+        full = prep.run(ozone_wf).estimate()["logicalCounts"]
+        dense = prep.create_dense(ozone_wf).estimate()["logicalCounts"]
 
         assert dense["cczCount"] == 0
         assert full["cczCount"] > 0
@@ -462,8 +462,8 @@ class TestCreateDense:
     def test_gf2x_isometry_is_clifford_only(self, ozone_wf):
         """Without binary encoding the isometry is only CX/X, so it adds no non-Clifford cost."""
         prep = create("state_prep", "sparse_isometry", binary_encoding=False)
-        full = prep.run(ozone_wf).estimate().logical_counts
-        dense = prep.create_dense(ozone_wf).estimate().logical_counts
+        full = prep.run(ozone_wf).estimate()["logicalCounts"]
+        dense = prep.create_dense(ozone_wf).estimate()["logicalCounts"]
 
         for key in ("tCount", "rotationCount", "cczCount"):
             assert full[key] == dense[key]
@@ -546,8 +546,8 @@ class TestMeasurementBasedUncompute:
         ).run(ozone_wf)
         _assert_uses_binary_encoding(measured_circuit)
 
-        toffoli_counts = toffoli_circuit.estimate().logical_counts
-        measured_counts = measured_circuit.estimate().logical_counts
+        toffoli_counts = toffoli_circuit.estimate()["logicalCounts"]
+        measured_counts = measured_circuit.estimate()["logicalCounts"]
         assert toffoli_counts["measurementCount"] == 0
         assert measured_counts["measurementCount"] > 0
         assert measured_counts["cczCount"] < toffoli_counts["cczCount"]
@@ -559,7 +559,7 @@ class TestMeasurementBasedUncompute:
         circuit = create("state_prep", "sparse_isometry", binary_encoding=True, measurement_based_uncompute=True).run(
             ozone_wf
         )
-        measurement_count = circuit.estimate().logical_counts["measurementCount"]
+        measurement_count = circuit.estimate()["logicalCounts"]["measurementCount"]
         assert measurement_count > 0
         assert str(circuit.get_qir())
 
@@ -633,7 +633,7 @@ class TestMeasurementBasedUncompute:
                 "state_prep", "sparse_isometry", binary_encoding=True, measurement_based_uncompute=True
             ).run(ozone_wf)
             _assert_uses_binary_encoding(circuit)
-            counts = circuit.estimate().logical_counts
+            counts = circuit.estimate()["logicalCounts"]
 
         assert any("measurement_based_uncompute" in message and "Base" in message for message in emitted), (
             f"Expected a fallback warning naming the profile, got: {emitted}"
@@ -682,7 +682,7 @@ class TestBinaryEncodingWithQPE:
         # Build binary encoding state prep — requires ancilla beyond the pool
         state_prep_circuit = create("state_prep", "sparse_isometry", binary_encoding=True).run(wf)
         _assert_uses_binary_encoding(state_prep_circuit)
-        sp_lc = state_prep_circuit.estimate().logical_counts
+        sp_lc = state_prep_circuit.estimate()["logicalCounts"]
         num_system_qubits = 2 * 6  # 12 system qubits
         state_prep_total_qubits = sp_lc["numQubits"]
         extra_ancilla = state_prep_total_qubits - num_system_qubits
@@ -713,7 +713,7 @@ class TestBinaryEncodingWithQPE:
         # beyond the system register, so total = 1 + 15 = 16
         expected_qpe_qubits = 1 + state_prep_total_qubits
         for i, qpe_circuit in enumerate(iqpe_circuits):
-            lc = qpe_circuit.estimate().logical_counts
+            lc = qpe_circuit.estimate()["logicalCounts"]
             assert lc["numQubits"] == expected_qpe_qubits, (
                 f"Iteration {i}: expected {expected_qpe_qubits} qubits "
                 f"(1 control + {state_prep_total_qubits} state_prep), got {lc['numQubits']}. "
@@ -731,7 +731,7 @@ class TestBinaryEncodingWithQPE:
 
         state_prep_circuit = create("state_prep", "sparse_isometry", binary_encoding=True).run(wf)
         _assert_uses_binary_encoding(state_prep_circuit)
-        sp_lc = state_prep_circuit.estimate().logical_counts
+        sp_lc = state_prep_circuit.estimate()["logicalCounts"]
         num_system_qubits = 12
         state_prep_total_qubits = sp_lc["numQubits"]
         extra_ancilla = state_prep_total_qubits - num_system_qubits
@@ -759,7 +759,7 @@ class TestBinaryEncodingWithQPE:
         # Standard QPE: num_bits phase qubits + state_prep_total_qubits
         # = 4 + 15 = 19
         expected_qpe_qubits = num_bits + state_prep_total_qubits
-        lc = qpe_circuits[0].estimate().logical_counts
+        lc = qpe_circuits[0].estimate()["logicalCounts"]
         assert lc["numQubits"] == expected_qpe_qubits, (
             f"Expected {expected_qpe_qubits} qubits "
             f"(num_bits={num_bits} + state_prep={state_prep_total_qubits}), got {lc['numQubits']}. "
@@ -828,7 +828,7 @@ class TestBinaryEncodingWithQPE:
         # Binary encoding state prep — must require ancilla
         state_prep_circuit = create("state_prep", "sparse_isometry", binary_encoding=True).run(wf)
         _assert_uses_binary_encoding(state_prep_circuit)
-        sp_lc = state_prep_circuit.estimate().logical_counts
+        sp_lc = state_prep_circuit.estimate()["logicalCounts"]
         state_prep_qubits = sp_lc["numQubits"]
         extra_ancilla = state_prep_qubits - n
         assert extra_ancilla > 0, f"Expected ancilla overflow but state prep uses only {state_prep_qubits} qubits"

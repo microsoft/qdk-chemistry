@@ -4,7 +4,7 @@
 
 namespace QDKChemistry.Utils.ControlledPauliExp {
 
-    import QDKChemistry.Utils.Loop.LoopCA;
+    import QDKChemistry.Utils.Loop.ResourceEstimateLoop;
     import QDKChemistry.Utils.HammingWeightPhasing.HammingWeightPhase;
     import QDKChemistry.Utils.PauliExp.RepPauliExp;
     import QDKChemistry.Utils.PauliExp.RepPauliExpParams;
@@ -172,7 +172,7 @@ namespace QDKChemistry.Utils.ControlledPauliExp {
             let last = IndexOf(offset -> offset == Length(params.pauliCoefficients) - params.numSuffixTerms, layerOffsets);
             let stepOffsets = layerOffsets[first..last];
             ControlledPauliLayers(params, layerOffsets[0..first], useHammingWeightPhasing, maxBatchSize, control, systems);
-            LoopCA(
+            ResourceEstimateLoop(
                 params.repetitions,
                 0,
                 _ => ControlledPauliLayers(params, stepOffsets, useHammingWeightPhasing, maxBatchSize, control, systems)

@@ -15,13 +15,9 @@ namespace QDKChemistry.TestUtils.UnaryPhaseEstimationTests {
     import Std.Canon.ApplyXorInPlace;
     import Std.Diagnostics.Fact;
     import Std.Math.AbsI;
-    import Std.ResourceEstimation.EnableMemoryComputeArchitecture;
-    import Std.ResourceEstimation.LeastRecentlyUsed;
     import QDKChemistry.Utils.UnaryIteration.AddressQubits;
-    import QDKChemistry.Utils.UnaryIteration.UnaryIterationWithControl;
     import QDKChemistry.Utils.UnaryPhaseEstimation.ApplySignedPowerSchedule;
     import QDKChemistry.Utils.UnaryPhaseEstimation.ApplySignedPowerScheduleDirect;
-    import QDKChemistry.Utils.UnaryPhaseEstimation.ApplySignedPowerSlot;
     import QDKChemistry.Utils.UnaryPhaseEstimation.MakeUnaryQPECircuit;
     import QDKChemistry.Utils.UnaryPhaseEstimation.PhaseRegisterSize;
 
@@ -72,37 +68,6 @@ namespace QDKChemistry.TestUtils.UnaryPhaseEstimationTests {
             ApplySignedPowerSchedule(applyBlockEncoding, applyReflection, numQueries, address, targets);
         } else {
             ApplySignedPowerScheduleDirect(applyBlockEncoding, applyReflection, numQueries, address, targets);
-        }
-
-        ResetAll(qs);
-    }
-
-    /// Compares the fixed warm-up with fully unrolled repetitions under memory placement.
-    operation TestSignedPowerScheduleMemoryTraffic(
-        numQueries : Int,
-        computeCapacity : Int,
-        useOptimizedSchedule : Bool
-    ) : Unit {
-        EnableMemoryComputeArchitecture(computeCapacity, LeastRecentlyUsed());
-        let numAddressQubits = AddressQubits(numQueries + 1);
-        use qs = Qubit[numAddressQubits + 1];
-        let address = qs[0..numAddressQubits - 1];
-        let targets = qs[numAddressQubits...];
-        let applyBlockEncoding = (register) => T(register[0]);
-        let applyReflection = (register) => Z(register[0]);
-
-        if useOptimizedSchedule {
-            ApplySignedPowerSchedule(applyBlockEncoding, applyReflection, numQueries, address, targets);
-        } else {
-            UnaryIterationWithControl(address, numQueries + 1, (slot, selected) => {
-                if slot == 0 {
-                    for _ in 1..numQueries {
-                        ApplySignedPowerSlot(applyBlockEncoding, applyReflection, true, selected, targets);
-                    }
-                } elif slot == numQueries {
-                    ApplySignedPowerSlot(applyBlockEncoding, applyReflection, false, selected, targets);
-                }
-            });
         }
 
         ResetAll(qs);
