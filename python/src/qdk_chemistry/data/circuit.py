@@ -321,10 +321,10 @@ class Circuit(DataClass):
             RuntimeError: If QRE is unavailable or the circuit has no supported representation.
 
         """
-        application = self.get_qre_application(use_trace_backend=use_trace_backend)
         from qdk.qre import ErrorComposition, estimate  # noqa: PLC0415
         from qdk.qre.models import Majorana, RoundBasedFactory, ThreeAux  # noqa: PLC0415
 
+        application = self.get_qre_application(use_trace_backend=use_trace_backend)
         physical_estimates = estimate(
             application,
             architecture if architecture is not None else Majorana(error_rate=1e-6),
