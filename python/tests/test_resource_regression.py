@@ -329,33 +329,30 @@ def test_fe2s2_resources(num_regression):
     )
 
 
-def _hubbard_benchmark_counts(size):
-    """Build the notebook's ten-bit sine-window QPE benchmark and return its logical counts."""
-    num_bits, energy_budget = 10, 0.0051 * size * size
-    qpe_budget = 2.0 / 3.0 * energy_budget  # Optimal split: Campbell arXiv:2012.09238v4, App. F.
-    builder = create(
-        "qpe_circuit_builder",
-        "qdk_standard",
-        num_bits=num_bits,
-        phase_state="sine",
-        unitary_builder=AlgorithmRef(
-            "hamiltonian_unitary_builder",
-            "hubbard_plaquette",
-            order=2,
-            time=math.tan(math.pi / (2**num_bits + 1)) / qpe_budget,
-            power_strategy="rescale",
-            target_accuracy=energy_budget - qpe_budget,
-        ),
-        controlled_circuit_mapper=AlgorithmRef("controlled_circuit_mapper", "hubbard_plaquette"),
-    )
-    lattice = LatticeGeometry.square(size, size, periodic_x=True, periodic_y=True)
-    model = FermiHubbardModelHamiltonianDescription(lattice, t=1.0, u=8.0, epsilon=0.0)
-    return builder.run(identity_state_prep(num_qubits=2 * size * size), model)[0].estimate().logical_counts
-
-
 def test_hubbard_plaquette_resources(num_regression):
     """Pin both Hubbard lattice sizes with the existing tolerance for Clifford-boundary rotations."""
-    rows = [_hubbard_benchmark_counts(size) for size in (2, 4)]
+    rows = []
+    for size in (2, 4):
+        num_bits, energy_budget = 10, 0.0051 * size * size
+        qpe_budget = 2.0 / 3.0 * energy_budget  # Optimal split: Campbell arXiv:2012.09238v4, App. F.
+        builder = create(
+            "qpe_circuit_builder",
+            "qdk_standard",
+            num_bits=num_bits,
+            phase_state="sine",
+            unitary_builder=AlgorithmRef(
+                "hamiltonian_unitary_builder",
+                "hubbard_plaquette",
+                order=2,
+                time=math.tan(math.pi / (2**num_bits + 1)) / qpe_budget,
+                power_strategy="rescale",
+                target_accuracy=energy_budget - qpe_budget,
+            ),
+            controlled_circuit_mapper=AlgorithmRef("controlled_circuit_mapper", "hubbard_plaquette"),
+        )
+        lattice = LatticeGeometry.square(size, size, periodic_x=True, periodic_y=True)
+        model = FermiHubbardModelHamiltonianDescription(lattice, t=1.0, u=8.0, epsilon=0.0)
+        rows.append(builder.run(identity_state_prep(num_qubits=2 * size * size), model)[0].estimate().logical_counts)
     num_regression.check(
         {
             key: [row.get(key, 0) for row in rows]

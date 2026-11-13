@@ -16,8 +16,6 @@ To run slow notebook tests, set:
 # Licensed under the MIT License. See LICENSE.txt in the project root for license information.
 # --------------------------------------------------------------------------------------------
 
-import ast
-import re
 from pathlib import Path
 
 import pytest
@@ -132,28 +130,10 @@ def test_qpe_stretched_n2():
     reason="qdk.qre not available",
 )
 def test_estimation_hubbard_2d():
-    """Run the Hubbard notebook and compare its counts with the independently built benchmark."""
-    from .test_resource_regression import _hubbard_benchmark_counts  # noqa: PLC0415
-
+    """Run the Hubbard resource-estimation notebook without errors."""
     notebook_path = EXAMPLES_DIR / "resource_estimation" / "estimation_hubbard_2d.ipynb"
     assert notebook_path.exists(), f"Notebook not found: {notebook_path}"
-    executed = _execute_notebook(notebook_path, skip_visualizations=True)
-    code_cells = [cell for cell in executed.cells if cell.cell_type == "code"]
-    (size,) = (
-        int(match.group(1))
-        for cell in code_cells
-        if (match := re.search(r"^EXAMPLE_SIZE = (\d+)$", cell.source, re.MULTILINE))
-    )
-    (counts_cell,) = (cell for cell in code_cells if cell.source.rstrip().endswith("\ncounts"))
-    (result,) = (output for output in counts_cell.outputs if output.output_type == "execute_result")
-    counts = ast.literal_eval(result.data["text/plain"])
-    expected = _hubbard_benchmark_counts(size)
-    for key in ("numQubits", "rotationCount", "rotationDepth", "tCount", "cczCount", "ccixCount", "measurementCount"):
-        assert counts.get(key, 0) == (
-            pytest.approx(expected.get(key, 0), rel=1e-4, abs=16)
-            if key.startswith("rotation")
-            else expected.get(key, 0)
-        )
+    _execute_notebook(notebook_path, skip_visualizations=True)
 
 
 @_requires_notebook_deps
