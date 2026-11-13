@@ -31,6 +31,9 @@ if TYPE_CHECKING:
 
 __all__ = ["QdkQubitMapper", "QdkQubitMapperSettings"]
 
+# Widest output stored as full-width Pauli labels; wider outputs keep sparse terms.
+_MAX_LABEL_QUBITS = 1024
+
 
 class QdkQubitMapperSettings(QubitMapperSettings):
     """Settings configuration for a QdkQubitMapper.
@@ -152,7 +155,8 @@ class QdkQubitMapper(QubitMapper):
             mapping: The Majorana-to-Pauli encoding (table is consumed directly by the C++ engine).
 
         Returns:
-            QubitOperator: The qubit operator with Pauli strings and coefficients.
+            QubitOperator: The qubit operator with Pauli strings and coefficients; above 1024 qubits it keeps
+                each term's non-identity factors instead of full-width labels.
 
         Raises:
             ValueError: If an integral or Cholesky factor is not finite.
@@ -190,14 +194,22 @@ class QdkQubitMapper(QubitMapper):
         )
 
         n_qubits = base_mapping.num_qubits
-        pauli_strings = [sparse_pauli_word_to_label(word, n_qubits) for word in words]
+        if n_qubits > _MAX_LABEL_QUBITS:
+            # A full-width label costs a byte per qubit per term, so wide outputs keep only their factors.
+            qh = QubitOperator.from_sparse_terms(
+                n_qubits,
+                (((qubit, "IXYZ"[op]) for qubit, op in word) for word in words),
+                np.array(coefficients, dtype=complex),
+                encoding=base_mapping.base_encoding,
+                fermion_mode_order=FermionModeOrder.BLOCKED,
+            )
+        else:
+            qh = QubitOperator(
+                pauli_strings=[sparse_pauli_word_to_label(word, n_qubits) for word in words],
+                coefficients=np.array(coefficients, dtype=complex),
+                encoding=base_mapping.base_encoding,
+                fermion_mode_order=FermionModeOrder.BLOCKED,
+            )
 
-        Logger.debug(f"Generated {len(pauli_strings)} Pauli terms for {n_qubits} qubits")
-
-        qh = QubitOperator(
-            pauli_strings=pauli_strings,
-            coefficients=np.array(coefficients, dtype=complex),
-            encoding=base_mapping.base_encoding,
-            fermion_mode_order=FermionModeOrder.BLOCKED,
-        )
+        Logger.debug(f"Generated {len(coefficients)} Pauli terms for {n_qubits} qubits")
         return self._taper_result(qh, mapping)

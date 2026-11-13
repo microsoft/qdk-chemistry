@@ -15,6 +15,7 @@ from qdk_chemistry.data import (
     CanonicalFourCenterHamiltonianContainer,
     Hamiltonian,
     HamiltonianType,
+    LatticeGraph,
     MajoranaMapping,
     Orbitals,
     QubitOperator,
@@ -22,6 +23,7 @@ from qdk_chemistry.data import (
     Symmetries,
 )
 from qdk_chemistry.plugins.qiskit import QDK_CHEMISTRY_HAS_QISKIT_NATURE
+from qdk_chemistry.utils.model_hamiltonians import create_hubbard_hamiltonian
 
 from .helpers import (
     create_dense_test_hamiltonian,
@@ -96,6 +98,30 @@ class TestQdkQubitMapper:
         assert len(result.pauli_strings) > 0
         assert len(result.coefficients) == len(result.pauli_strings)
         assert result.coefficients.dtype == complex
+
+    def test_wide_hubbard_chain_keeps_sparse_terms(self) -> None:
+        """Outputs beyond 1024 qubits store sparse terms equal to the analytic Jordan-Wigner Hubbard chain."""
+        sites, t, u = 513, 1.0, 4.0
+        hamiltonian = create_hubbard_hamiltonian(LatticeGraph.chain(sites, periodic=True), epsilon=0.0, t=t, U=u)
+
+        result = create("qubit_mapper", "qdk").run(hamiltonian, MajoranaMapping.jordan_wigner(num_modes=2 * sites))
+
+        assert result.get_container_type() == "sparse_pauli_decomposition"
+        assert result.num_qubits == 2 * sites
+        expected: dict[tuple, complex] = {(): u / 4 * sites}
+        for site in range(sites):
+            expected[((site, "Z"),)] = -u / 4
+            expected[((sites + site, "Z"),)] = -u / 4
+            expected[((site, "Z"), (sites + site, "Z"))] = u / 4
+            low, high = sorted((site, (site + 1) % sites))
+            for offset in (0, sites):
+                for axis in "XY":
+                    string = tuple((offset + qubit, "Z") for qubit in range(low + 1, high))
+                    expected[((offset + low, axis), *string, (offset + high, axis))] = -t / 2
+        actual = dict(result.iter_sparse_terms())
+        assert actual.keys() == expected.keys()
+        for word, coefficient in expected.items():
+            assert actual[word] == pytest.approx(coefficient, abs=1e-12)
 
     @pytest.mark.usefixtures("warn_logger")
     @pytest.mark.parametrize(
