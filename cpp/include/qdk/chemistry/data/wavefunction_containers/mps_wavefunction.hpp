@@ -11,7 +11,6 @@
 #include <qdk/chemistry/data/symmetry/symmetry_blocked_tensor.hpp>
 #include <qdk/chemistry/data/wavefunction.hpp>
 #include <string>
-#include <unordered_map>
 #include <vector>
 
 namespace qdk::chemistry::data {
@@ -25,7 +24,8 @@ namespace qdk::chemistry::data {
  *
  * Physical states use Configuration's binary or spin-half encoding. Physical
  * sector labels must match the particle number, and for spin-half states the
- * spin projection, of the basis states they contain.
+ * spin projection, of the basis states they contain. Binary states are
+ * spinless, so their labels must not have a spin axis.
  */
 class MPSSite {
  public:
@@ -35,9 +35,6 @@ class MPSSite {
   using TensorPtr = std::shared_ptr<const TensorVariant>;
   /** @brief Sector packing orders for the left, physical, and right slots. */
   using SectorOrders = std::array<std::vector<SymmetryLabel>, 3>;
-  /** @brief First basis index of each sector in the three tensor slots. */
-  using SectorOffsets =
-      std::array<std::unordered_map<SymmetryLabel, Eigen::Index>, 3>;
   /** @brief Real or complex matrix used for packed dense export. */
   using DenseMatrixVariant = ContainerTypes::MatrixVariant;
 
@@ -45,9 +42,10 @@ class MPSSite {
    * @brief Construct a site from blocks and index spaces.
    * @param tensor Rank-3 blocks in the packing convention above.
    * @param sector_orders Packing order for each of the three tensor slots.
-   * @param physical_basis One-mode configurations in flattened physical order.
-   * Defaults to (0,1) for dimension two or (0,u,d,2) for dimension four.
-   * Other dimensions require an explicit basis.
+   * @param physical_basis Distinct one-mode configurations in flattened
+   * physical order. Defaults to (0,1) for dimension two or (0,u,d,2) for
+   * dimension four. MPS sites have at most four physical states; dimensions
+   * one and three require a physical basis.
    * @throws std::invalid_argument for incompatible shapes, orders or basis
    * states, nonfinite entries, or equivalent-sector axes.
    */
@@ -58,8 +56,6 @@ class MPSSite {
   const TensorVariant& tensor() const { return *_tensor; }
   /** @brief Packing orders for (left, physical, right). */
   const SectorOrders& sector_orders() const { return _sector_orders; }
-  /** @brief Sector offsets implied by the packing orders. */
-  const SectorOffsets& sector_offsets() const { return _sector_offsets; }
   /** @brief Packing order of left-bond sectors. */
   const std::vector<SymmetryLabel>& left_sector_order() const {
     return _sector_orders[0];
@@ -94,12 +90,16 @@ class MPSSite {
  private:
   /** @brief Check tensor packing, sector orders, local basis, and finiteness.
    */
-  void _validate();
+  void _validate() const;
+  /**
+   * @brief Sum sector extents for one index slot.
+   * @param slot Slot index: left (0), physical (1), or right (2).
+   * @return Total dimension of the selected index space.
+   */
+  std::size_t _dimension(std::size_t slot) const;
 
   TensorPtr _tensor;
   SectorOrders _sector_orders;
-  SectorOffsets _sector_offsets;
-  std::array<std::size_t, 3> _dimensions{};
   std::vector<Configuration> _physical_basis;
 };
 
@@ -127,8 +127,9 @@ class MPSContainer : public WavefunctionContainer {
    * @brief Construct an MPS with optional precomputed RDMs.
    * @param sites Sites in chain order.
    * @param orbitals Orbital or model-mode basis for the active sites.
-   * @param total_num_particles Optional total number of particles.
-   * @param active_num_particles Optional active number of particles.
+   * @param active_num_particles Optional active number of particles, blocked
+   * like the orbitals: alpha/beta blocks if they carry a spin axis, otherwise
+   * one trivial block. The total count adds the inactive orbitals.
    * @param orthogonality_center Optional, unverified orthogonality center.
    * @param site_to_orbital_order Permutation of active-mode slots, not full
    * orbital indices. An empty vector selects identity.
@@ -142,12 +143,12 @@ class MPSContainer : public WavefunctionContainer {
    * @param two_rdm_bbbb Optional flattened beta-beta-beta-beta 2-RDM block.
    * RDMs use the same conventions and real/complex storage as
    * StateVectorContainer. They are supplied data, not computed from the sites.
-   * @throws std::invalid_argument for null sites/basis, incompatible bonds or
-   * scalar types, or invalid site counts, permutations or center indices.
+   * @throws std::invalid_argument for null sites/basis, incompatible bonds,
+   * scalar types or encodings, particle counts not blocked like the orbitals,
+   * or invalid site counts, permutations or center indices.
    */
   MPSContainer(
       std::vector<SitePtr> sites, std::shared_ptr<Orbitals> orbitals,
-      std::shared_ptr<const ParticleCount> total_num_particles = nullptr,
       std::shared_ptr<const ParticleCount> active_num_particles = nullptr,
       std::optional<std::size_t> orthogonality_center = std::nullopt,
       std::vector<std::size_t> site_to_orbital_order = {},
@@ -161,13 +162,6 @@ class MPSContainer : public WavefunctionContainer {
 
   /** @brief Immutable sites in chain order. */
   const std::vector<SitePtr>& sites() const { return _sites; }
-  /**
-   * @brief Validate the sites.
-   * @param sites Nonempty chain of nonnull sites with one scalar type.
-   * @throws std::invalid_argument for incompatible adjacent bond spaces or
-   * outer bond dimensions other than one.
-   */
-  static void validate_sites(const std::vector<SitePtr>& sites);
   /** @brief Number of sites. */
   std::size_t num_sites() const { return _sites.size(); }
   /** @brief Largest total bond dimension in the stored chain. */
@@ -184,16 +178,13 @@ class MPSContainer : public WavefunctionContainer {
   /** @brief Return the associated orbital or model-mode basis. */
   std::shared_ptr<Orbitals> get_orbitals() const override { return _orbitals; }
 
-  /** @brief Whether total particle-count metadata was supplied. */
-  bool has_total_num_particles() const {
-    return _total_num_particles != nullptr;
-  }
   /** @brief Whether active particle-count metadata was supplied. */
   bool has_active_num_particles() const {
     return _active_num_particles != nullptr;
   }
   /**
-   * @brief Get the supplied total particle count.
+   * @brief Get the supplied active particle count plus the fully occupied
+   * inactive orbitals.
    * @return Symmetry-blocked total occupation-count metadata.
    * @throws std::runtime_error if no count was supplied.
    */
@@ -291,7 +282,6 @@ class MPSContainer : public WavefunctionContainer {
 
   std::vector<SitePtr> _sites;
   std::shared_ptr<Orbitals> _orbitals;
-  std::shared_ptr<const ParticleCount> _total_num_particles;
   std::shared_ptr<const ParticleCount> _active_num_particles;
   std::optional<std::size_t> _orthogonality_center;
   std::vector<std::size_t> _site_to_orbital_order;

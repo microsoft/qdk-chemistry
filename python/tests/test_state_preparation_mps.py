@@ -241,7 +241,7 @@ def _malformed_givens_params(field: str):
         ),
         pytest.param(
             lambda: MatrixProductStatePreparation().generate_matrix_product_state_preparation_data(
-                _fixture_mps("mps_h2", _identity_order("mps_h2")).sites
+                _fixture_mps("mps_h2", _identity_order("mps_h2")).sites()
             ),
             (TypeError, "requires an MPSContainer"),
             id="generate-rejects-raw-site-list",
@@ -449,7 +449,7 @@ def test_sparse_site_isometry_scatters_symmetry_blocks():
 
     matrix = MatrixProductStatePreparation._sparse_site_isometry(site, ancilla_dim)
 
-    expected = MatrixProductStatePreparation._site_isometry(site, ancilla_dim).reshape(-1, site.left_bond_dimension)
+    expected = MatrixProductStatePreparation._site_isometry(site, ancilla_dim).reshape(-1, site.left_bond_dimension())
     assert isinstance(matrix, sparse.csc_array)
     assert matrix.nnz == np.count_nonzero(expected) == sum(block.size for _, block in blocks)
     assert np.array_equal(matrix.toarray(), expected)
@@ -476,12 +476,12 @@ def _target_state(mps: MPSContainer) -> np.ndarray:
     channel ``c`` on orbital ``o`` is qubit ``c * num_sites + o`` (qubit 0 most significant), and each
     amplitude carries the sign of reordering the creation operators from chain order into qubit order.
     """
-    qubits_per_site = 1 if mps.sites[0].physical_dimension == 2 else 2
-    num_sites, order = mps.num_sites, list(mps.site_to_orbital_order)
+    qubits_per_site = 1 if mps.sites()[0].physical_dimension() == 2 else 2
+    num_sites, order = mps.num_sites(), list(mps.site_to_orbital_order())
     num_qubits = qubits_per_site * num_sites
     chain = np.ones((1, 1))
-    for site in mps.sites:
-        tensor = np.asarray(site.to_dense()).reshape(site.shape)
+    for site in mps.sites():
+        tensor = np.asarray(site.to_dense()).reshape(site.shape())
         chain = np.einsum("sa,apb->spb", chain, tensor).reshape(-1, tensor.shape[2])
     chain = chain[:, 0] / np.linalg.norm(chain[:, 0])
     target = np.zeros(1 << num_qubits)
@@ -506,7 +506,7 @@ def test_multi_site_mps_matches_contraction(method):
     """
     mps = make_mps(_random_right_canonical_tensors([1, 4, 3, 2, 1], 4, seed=11), site_to_orbital_order=(2, 0, 3, 1))
     if method == "dense":
-        last = MatrixProductStatePreparation._site_isometry(mps.sites[-1], ancilla_dim=4)
+        last = MatrixProductStatePreparation._site_isometry(mps.sites()[-1], ancilla_dim=4)
         mapper = create("circuit_mapper", "unitary_synthesis", num_input_qubits=2)
         right_factor = mapper.right_factor(UnitaryRepresentation(UnitaryMatrixContainer(last.reshape(-1, 2))))
         assert not np.allclose(np.abs(right_factor), np.eye(2), atol=1e-3)

@@ -47,7 +47,6 @@ _PORTABLE_MODULES = tuple(Path(name).stem for name in _BASE_PROFILE_FILES)
 #: rather than compile and mislead.
 _ADAPTIVE_ONLY_MODULES = (
     "CombinedIterationPhaseEstimation",
-    "UnaryIteration",
     "UnaryPhaseEstimation",
     "SelectSwap",
     "SelectSwapDirty",

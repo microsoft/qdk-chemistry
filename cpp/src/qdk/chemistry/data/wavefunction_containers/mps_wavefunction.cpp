@@ -9,9 +9,11 @@
 #include <limits>
 #include <numeric>
 #include <qdk/chemistry/data/configuration_set.hpp>
+#include <qdk/chemistry/data/symmetry/spin_channel_indices.hpp>
 #include <qdk/chemistry/data/wavefunction_containers/mps_wavefunction.hpp>
 #include <stdexcept>
 #include <type_traits>
+#include <unordered_map>
 #include <utility>
 #include <variant>
 
@@ -25,6 +27,39 @@ constexpr auto index_limit =
 constexpr std::array<const char*, 3> order_keys{
     "left_sector_order", "physical_sector_order", "right_sector_order"};
 
+template <typename Extents>
+std::size_t total_extent(const Extents& extents) {
+  std::size_t total = 0;
+  for (const auto& [label, extent] : extents) {
+    if (extent == 0 || extent > index_limit - total) {
+      throw std::invalid_argument(
+          "MPS sector extents must be positive and fit Eigen::Index.");
+    }
+    total += extent;
+  }
+  return total;
+}
+
+template <typename Extents>
+std::unordered_map<SymmetryLabel, std::size_t> sector_offsets(
+    const Extents& extents, const std::vector<SymmetryLabel>& order) {
+  if (order.size() != extents.size()) {
+    throw std::invalid_argument(
+        "MPS sector order must contain every sector exactly once.");
+  }
+  std::unordered_map<SymmetryLabel, std::size_t> offsets;
+  std::size_t offset = 0;
+  for (const auto& label : order) {
+    const auto extent = extents.find(label);
+    if (extent == extents.end() || !offsets.emplace(label, offset).second) {
+      throw std::invalid_argument(
+          "MPS sector order contains a missing or duplicate sector.");
+    }
+    offset += extent->second;
+  }
+  return offsets;
+}
+
 std::vector<Configuration> default_physical_basis(std::size_t dimension) {
   std::vector<Configuration> basis;
   if (dimension == 2) {
@@ -37,13 +72,13 @@ std::vector<Configuration> default_physical_basis(std::size_t dimension) {
     }
   } else {
     throw std::invalid_argument(
-        "MPS sites outside dimension two or four require a physical basis.");
+        "MPS sites have at most four physical states; dimensions one and three "
+        "require a physical basis.");
   }
   return basis;
 }
 
-// Binary states carry no spin projection, so only their particle number is
-// compared with the label.
+// Binary states are spinless, so labels with a spin axis never describe them.
 bool label_describes_state(const SymmetryLabel& label,
                            const Configuration& state) {
   for (const auto& [axis, value] : label.values()) {
@@ -60,6 +95,8 @@ bool label_describes_state(const SymmetryLabel& label,
           if (!value->equals(SpinValue(two_ms))) {
             return false;
           }
+        } else {
+          return false;
         }
         break;
     }
@@ -158,7 +195,6 @@ std::unique_ptr<MPSContainer> mps_from_metadata(
   };
   return std::make_unique<MPSContainer>(
       std::move(sites), std::move(orbitals),
-      read_counts(json.at("total_num_particles")),
       read_counts(json.at("active_num_particles")), center, std::move(order));
 }
 
@@ -172,45 +208,26 @@ MPSSite::MPSSite(TensorPtr tensor, SectorOrders sector_orders,
   if (!_tensor) {
     throw std::invalid_argument("MPS site requires a tensor.");
   }
+  if (_physical_basis.empty()) {
+    _physical_basis = default_physical_basis(physical_dimension());
+  }
   _validate();
 }
 
-void MPSSite::_validate() {
+void MPSSite::_validate() const {
   std::visit(
       [&](const auto& tensor) {
         for (std::size_t slot = 0; slot < 3; ++slot) {
-          const auto& extents = tensor.extents()[slot];
-          const auto& order = _sector_orders[slot];
-          if (extents.empty()) {
+          if (total_extent(tensor.extents()[slot]) == 0) {
             throw std::invalid_argument("MPS index spaces must be nonempty.");
           }
-          if (order.size() != extents.size()) {
-            throw std::invalid_argument(
-                "MPS sector order must contain every sector exactly once.");
-          }
-          auto& offsets = _sector_offsets[slot];
-          std::size_t offset = 0;
-          for (const auto& label : order) {
-            const auto extent = extents.find(label);
-            if (extent == extents.end() ||
-                !offsets.emplace(label, static_cast<Eigen::Index>(offset))
-                     .second) {
-              throw std::invalid_argument(
-                  "MPS sector order contains a missing or duplicate sector.");
-            }
-            if (extent->second == 0 || extent->second > index_limit - offset) {
-              throw std::invalid_argument(
-                  "MPS sector extents must be positive and fit Eigen::Index.");
-            }
-            offset += extent->second;
-          }
-          _dimensions[slot] = offset;
           for (const auto& axis : tensor.symmetries()[slot]->axes()) {
             if (axis.equivalent()) {
               throw std::invalid_argument(
                   "MPS axes must not enable equivalent-sector aliasing.");
             }
           }
+          sector_offsets(tensor.extents()[slot], _sector_orders[slot]);
         }
         for (const auto& [labels, block] : tensor.blocks()) {
           const auto left = tensor.extents()[0].at(labels[0]);
@@ -229,9 +246,6 @@ void MPSSite::_validate() {
       },
       *_tensor);
 
-  if (_physical_basis.empty()) {
-    _physical_basis = default_physical_basis(physical_dimension());
-  }
   if (_physical_basis.size() != physical_dimension()) {
     throw std::invalid_argument(
         "MPS physical basis size must match the physical dimension.");
@@ -274,9 +288,17 @@ void MPSSite::_validate() {
       *_tensor);
 }
 
-std::size_t MPSSite::left_bond_dimension() const { return _dimensions[0]; }
-std::size_t MPSSite::physical_dimension() const { return _dimensions[1]; }
-std::size_t MPSSite::right_bond_dimension() const { return _dimensions[2]; }
+std::size_t MPSSite::_dimension(std::size_t slot) const {
+  return std::visit(
+      [slot](const auto& tensor) {
+        return total_extent(tensor.extents()[slot]);
+      },
+      *_tensor);
+}
+
+std::size_t MPSSite::left_bond_dimension() const { return _dimension(0); }
+std::size_t MPSSite::physical_dimension() const { return _dimension(1); }
+std::size_t MPSSite::right_bond_dimension() const { return _dimension(2); }
 bool MPSSite::is_complex() const { return _tensor->index() == 1; }
 
 MPSSite::DenseMatrixVariant MPSSite::to_dense() const {
@@ -293,7 +315,11 @@ MPSSite::DenseMatrixVariant MPSSite::to_dense() const {
             std::remove_const_t<typename TensorType::BlockPtr::element_type>;
         Matrix dense = Matrix::Zero(static_cast<Eigen::Index>(left * physical),
                                     static_cast<Eigen::Index>(right));
-        const auto& offsets = _sector_offsets;
+        std::array<std::unordered_map<SymmetryLabel, std::size_t>, 3> offsets;
+        for (std::size_t slot = 0; slot < 3; ++slot) {
+          offsets[slot] =
+              sector_offsets(tensor.extents()[slot], _sector_orders[slot]);
+        }
         for (const auto& [labels, block] : tensor.blocks()) {
           const auto local_left = tensor.extents()[0].at(labels[0]);
           const auto local_physical = tensor.extents()[1].at(labels[1]);
@@ -315,7 +341,6 @@ MPSSite::DenseMatrixVariant MPSSite::to_dense() const {
 
 MPSContainer::MPSContainer(
     std::vector<SitePtr> sites, std::shared_ptr<Orbitals> orbitals,
-    std::shared_ptr<const ParticleCount> total_num_particles,
     std::shared_ptr<const ParticleCount> active_num_particles,
     std::optional<std::size_t> orthogonality_center,
     std::vector<std::size_t> site_to_orbital_order,
@@ -331,7 +356,6 @@ MPSContainer::MPSContainer(
                             two_rdm_bbbb),
       _sites(std::move(sites)),
       _orbitals(std::move(orbitals)),
-      _total_num_particles(std::move(total_num_particles)),
       _active_num_particles(std::move(active_num_particles)),
       _orthogonality_center(orthogonality_center),
       _site_to_orbital_order(std::move(site_to_orbital_order)) {
@@ -344,15 +368,35 @@ MPSContainer::MPSContainer(
 }
 
 void MPSContainer::_validate() const {
-  if (!_orbitals) {
+  if (_sites.empty() || !_orbitals) {
     throw std::invalid_argument(
         "MPS requires nonempty sites and a mode basis.");
   }
-  validate_sites(_sites);
+  for (const auto& site : _sites) {
+    if (!site) {
+      throw std::invalid_argument("MPS site pointers must not be null.");
+    }
+    if (site->is_complex() != _sites.front()->is_complex()) {
+      throw std::invalid_argument("MPS sites must use one scalar type.");
+    }
+    if (site->physical_basis().front().bits_per_mode() !=
+        _sites.front()->physical_basis().front().bits_per_mode()) {
+      throw std::invalid_argument(
+          "MPS sites must use one configuration encoding.");
+    }
+  }
   const ConfigurationSet mode_space(std::vector<Configuration>{}, _orbitals,
                                     Wavefunction::DEFAULT_SECTOR);
   if (mode_space.num_modes() != num_sites()) {
     throw std::invalid_argument("MPS must contain one site per active mode.");
+  }
+  const auto blocked_count = _make_particle_count(0, 0);
+  if (_active_num_particles &&
+      (*_active_num_particles->symmetries()[0] !=
+           *blocked_count->symmetries()[0] ||
+       _active_num_particles->num_blocks() != blocked_count->num_blocks())) {
+    throw std::invalid_argument(
+        "MPS particle counts must be blocked like the orbitals.");
   }
   if (_orthogonality_center && *_orthogonality_center >= num_sites()) {
     throw std::invalid_argument(
@@ -369,36 +413,22 @@ void MPSContainer::_validate() const {
           "MPS site order must be a permutation of active-mode slots.");
     }
   }
-}
-
-void MPSContainer::validate_sites(const std::vector<SitePtr>& sites) {
-  if (sites.empty()) {
-    throw std::invalid_argument("MPS requires nonempty sites.");
-  }
-  for (const auto& site : sites) {
-    if (!site) {
-      throw std::invalid_argument("MPS site pointers must not be null.");
-    }
-    if (site->is_complex() != sites.front()->is_complex()) {
-      throw std::invalid_argument("MPS sites must use one scalar type.");
-    }
-  }
-  if (sites.front()->left_bond_dimension() != 1 ||
-      sites.back()->right_bond_dimension() != 1) {
+  if (_sites.front()->left_bond_dimension() != 1 ||
+      _sites.back()->right_bond_dimension() != 1) {
     throw std::invalid_argument("MPS outer bond dimensions must be one.");
   }
-  for (std::size_t i = 0; i + 1 < sites.size(); ++i) {
+  for (std::size_t i = 0; i + 1 < num_sites(); ++i) {
     std::visit(
         [&](const auto& left, const auto& right) {
           if (*left.symmetries()[2] != *right.symmetries()[0] ||
               left.extents()[2] != right.extents()[0] ||
-              sites[i]->right_sector_order() !=
-                  sites[i + 1]->left_sector_order()) {
+              _sites[i]->right_sector_order() !=
+                  _sites[i + 1]->left_sector_order()) {
             throw std::invalid_argument(
                 "Adjacent MPS sites have incompatible bond spaces.");
           }
         },
-        sites[i]->tensor(), sites[i + 1]->tensor());
+        _sites[i]->tensor(), _sites[i + 1]->tensor());
   }
 }
 
@@ -418,10 +448,21 @@ bool MPSContainer::_is_restricted_closed_shell() const { return false; }
 
 std::shared_ptr<const MPSContainer::ParticleCount>
 MPSContainer::total_num_particles() const {
-  if (!_total_num_particles) {
-    throw std::runtime_error("Total particle-count is not set.");
+  const auto active = active_num_particles();
+  const auto inactive = _orbitals->inactive_indices();
+  const auto inactive_alpha = spin_channel_indices(inactive, axes::alpha());
+  if (_orbitals->symmetries()->has_axis(AxisName::Spin)) {
+    const auto [n_alpha, n_beta] = _read_spin_count(*active);
+    return _make_particle_count(
+        n_alpha + inactive_alpha.size(),
+        n_beta + spin_channel_indices(inactive, axes::beta()).size());
   }
-  return _total_num_particles;
+  // All sites share one encoding. Without a spin axis, an inactive mode holds
+  // one particle per encoding bit.
+  const std::size_t bits =
+      _sites.front()->physical_basis().front().bits_per_mode();
+  return _make_particle_count(
+      active->value(SymmetryLabel{}) + bits * inactive_alpha.size(), 0);
 }
 
 std::shared_ptr<const MPSContainer::ParticleCount>
@@ -474,9 +515,6 @@ nlohmann::json MPSContainer::_metadata_to_json() const {
   json["version"] = SERIALIZATION_VERSION;
   json["container_type"] = get_container_type();
   json["scalar"] = is_complex() ? "complex" : "real";
-  json["total_num_particles"] = _total_num_particles
-                                    ? _total_num_particles->to_json()
-                                    : nlohmann::json(nullptr);
   json["active_num_particles"] = _active_num_particles
                                      ? _active_num_particles->to_json()
                                      : nlohmann::json(nullptr);
@@ -608,7 +646,6 @@ void MPSContainer::hash_update(qdk::chemistry::utils::HashContext& ctx) const {
   WavefunctionContainer::hash_update(ctx);
   hash_value(ctx, get_container_type());
   hash_value(ctx, _orbitals->content_hash());
-  hash_value(ctx, _total_num_particles);
   hash_value(ctx, _active_num_particles);
   hash_value(ctx, _orthogonality_center);
   hash_value(ctx, _site_to_orbital_order);

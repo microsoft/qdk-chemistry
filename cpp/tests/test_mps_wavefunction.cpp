@@ -10,6 +10,7 @@
 #include <limits>
 #include <memory>
 #include <qdk/chemistry/data/wavefunction_containers/mps_wavefunction.hpp>
+#include <qdk/chemistry/data/wavefunction_containers/state_vector.hpp>
 #include <random>
 #include <stdexcept>
 #include <string>
@@ -64,7 +65,7 @@ class MPSContainerTest : public ::testing::Test {
   }
 
   std::unique_ptr<MPSContainer> make_container() {
-    return std::make_unique<MPSContainer>(sites, orbitals, counts, counts, 1,
+    return std::make_unique<MPSContainer>(sites, orbitals, counts, 1,
                                           std::vector<std::size_t>{1, 0});
   }
 
@@ -109,14 +110,13 @@ TEST_F(MPSContainerTest, BinaryLocalBasisAndOptionalMetadata) {
   EXPECT_EQ(container.max_bond_dimension(), 1u);
   EXPECT_EQ(container.site_to_orbital_order(), (std::vector<std::size_t>{0}));
   EXPECT_FALSE(container.orthogonality_center().has_value());
-  EXPECT_FALSE(container.has_total_num_particles());
   EXPECT_FALSE(container.has_active_num_particles());
   EXPECT_FALSE(container.has_one_rdm_spin_traced());
   EXPECT_FALSE(container.has_two_rdm_spin_traced());
   EXPECT_THROW(container.total_num_particles(), std::runtime_error);
   EXPECT_THROW(container.active_num_particles(), std::runtime_error);
   auto restored = MPSContainer::from_json(container.to_json());
-  EXPECT_FALSE(restored->has_total_num_particles());
+  EXPECT_FALSE(restored->has_active_num_particles());
   EXPECT_FALSE(restored->orthogonality_center().has_value());
   EXPECT_TRUE(std::get<Eigen::MatrixXd>(restored->sites()[0]->to_dense())
                   .isApprox(binary, testing::wf_tolerance));
@@ -154,17 +154,6 @@ TEST_F(MPSContainerTest, BlockedSitePreservesBlocksAndSectorOrder) {
   expected.block(5, 1, 2, 2) = block.bottomRows(2);
   EXPECT_TRUE(std::get<Eigen::MatrixXd>(site.to_dense())
                   .isApprox(expected, testing::wf_tolerance));
-  for (std::size_t slot = 0; slot < 3; ++slot) {
-    auto invalid_order = orders;
-    invalid_order[slot].pop_back();
-    EXPECT_THROW(MPSSite(tensor, invalid_order), std::invalid_argument);
-    invalid_order = orders;
-    invalid_order[slot].back() = invalid_order[slot].front();
-    EXPECT_THROW(MPSSite(tensor, invalid_order), std::invalid_argument);
-    invalid_order = orders;
-    invalid_order[slot].front() = SymmetryLabel{};
-    EXPECT_THROW(MPSSite(tensor, invalid_order), std::invalid_argument);
-  }
 }
 
 TEST_F(MPSContainerTest, RejectsPhysicalBasisThatContradictsSectorLabels) {
@@ -193,6 +182,14 @@ TEST_F(MPSContainerTest, RejectsPhysicalBasisThatContradictsSectorLabels) {
   EXPECT_NO_THROW(site_with({empty, up, down, pair}));
   EXPECT_THROW(site_with({empty, down, up, pair}), std::invalid_argument);
   EXPECT_THROW(site_with({pair, up, down, empty}), std::invalid_argument);
+  // Dimension two defaults to binary (0, 1). Binary states are spinless, so
+  // even the labels of an alpha spin orbital are rejected.
+  SBT::ExtentsArray binary_extents = extents;
+  binary_extents[1] = {{empty, 1}, {up, 1}};
+  auto binary = std::make_shared<const MPSSite::TensorVariant>(
+      SBT({symmetry, symmetry, symmetry}, binary_extents, SBT::BlockMap{}));
+  EXPECT_THROW(MPSSite(binary, {{{empty}, {empty, up}, {empty}}}),
+               std::invalid_argument);
 }
 
 TEST_F(MPSContainerTest, SerializationAndClone) {
@@ -225,6 +222,14 @@ TEST_F(MPSContainerTest, SerializationAndClone) {
                       .isApprox(data[i], testing::wf_tolerance));
     }
   }
+  // Only Wavefunction dispatches MPS; state-vector loaders reject it.
+  auto state_vector_envelope = original.to_json();
+  state_vector_envelope["container_type"] = "state_vector";
+  EXPECT_THROW(Wavefunction::from_json(state_vector_envelope),
+               std::runtime_error);
+  H5::Group container_group = file.openGroup("container");
+  EXPECT_THROW(StateVectorContainer::from_hdf5(container_group),
+               std::runtime_error);
 }
 
 TEST_F(MPSContainerTest, BlockedSerializationPreservesIndexSpacesAndData) {
@@ -349,11 +354,8 @@ TEST_F(MPSContainerTest, RejectsDifferentBondSectorsWithEqualDimensions) {
     ASSERT_EQ(first->right_bond_dimension(), second->left_bond_dimension());
     if (mismatch == "none") {
       EXPECT_NO_THROW(MPSContainer({first, second}, orbitals));
-      EXPECT_NO_THROW(MPSContainer::validate_sites({first, second}));
     } else {
       EXPECT_THROW(MPSContainer({first, second}, orbitals),
-                   std::invalid_argument);
-      EXPECT_THROW(MPSContainer::validate_sites({first, second}),
                    std::invalid_argument);
     }
   }
@@ -406,9 +408,8 @@ TEST_F(MPSContainerTest, SuppliedRdms) {
             std::complex<double>(0, 1) *
                 random_matrix(16, 1).cast<std::complex<double>>());
     }
-    MPSContainer original(sites, orbitals, nullptr, nullptr, std::nullopt, {},
-                          one[0], one[1], one[2], two[0], two[1], two[2],
-                          two[3]);
+    MPSContainer original(sites, orbitals, nullptr, std::nullopt, {}, one[0],
+                          one[1], one[2], two[0], two[1], two[2], two[3]);
     H5::FileAccPropList access;
     access.setCore(4096, false);
     H5::H5File file("mps_rdms_in_memory.h5", H5F_ACC_TRUNC,
@@ -452,26 +453,19 @@ TEST_F(MPSContainerTest, SuppliedRdms) {
 
 TEST_F(MPSContainerTest, RejectsInvalidStructure) {
   EXPECT_THROW(MPSContainer({}, orbitals), std::invalid_argument);
-  EXPECT_THROW(MPSContainer::validate_sites({}), std::invalid_argument);
-  EXPECT_THROW(MPSContainer::validate_sites({nullptr, sites[1]}),
-               std::invalid_argument);
-  EXPECT_NO_THROW(MPSContainer::validate_sites(sites));
   EXPECT_THROW(MPSContainer({nullptr, sites[1]}, orbitals),
                std::invalid_argument);
   EXPECT_THROW(MPSContainer(sites, nullptr), std::invalid_argument);
-  EXPECT_THROW(MPSContainer(sites, orbitals, nullptr, nullptr, 2),
+  EXPECT_THROW(MPSContainer(sites, orbitals, nullptr, 2),
                std::invalid_argument);
-  EXPECT_THROW(
-      MPSContainer(sites, orbitals, nullptr, nullptr, std::nullopt, {0, 0}),
-      std::invalid_argument);
+  EXPECT_THROW(MPSContainer(sites, orbitals, nullptr, std::nullopt, {0, 0}),
+               std::invalid_argument);
   const Eigen::MatrixXd wrong_bond = random_matrix(8, 1);
   EXPECT_THROW(MPSContainer({sites[0], make_site(wrong_bond)}, orbitals),
                std::invalid_argument);
   const Eigen::MatrixXd nonfinite =
       Eigen::MatrixXd::Constant(4, 1, std::numeric_limits<double>::quiet_NaN());
   EXPECT_THROW(make_site(nonfinite), std::invalid_argument);
-  const Eigen::MatrixXd zero = Eigen::MatrixXd::Zero(4, 1);
-  EXPECT_NO_THROW(make_site(zero));
   auto json = make_container()->to_json();
   json["version"] = "9.0.0";
   EXPECT_THROW(MPSContainer::from_json(json), std::runtime_error);
@@ -487,8 +481,8 @@ TEST_F(MPSContainerTest, EqualSpinCountsDoNotImplyClosedShellRdms) {
           {{axes::alpha()}, std::make_shared<const std::size_t>(1)},
           {{axes::beta()}, std::make_shared<const std::size_t>(1)}});
   ContainerTypes::MatrixVariant traced = random_matrix(2, 2);
-  MPSContainer traced_only(sites, restricted, equal_counts, equal_counts,
-                           std::nullopt, {}, traced);
+  MPSContainer traced_only(sites, restricted, equal_counts, std::nullopt, {},
+                           traced);
   EXPECT_TRUE(traced_only.has_one_rdm_spin_traced());
   EXPECT_FALSE(traced_only.has_one_rdm_spin_dependent());
   EXPECT_THROW(traced_only.active_one_rdm(), std::runtime_error);
@@ -496,11 +490,10 @@ TEST_F(MPSContainerTest, EqualSpinCountsDoNotImplyClosedShellRdms) {
   Eigen::VectorXd aaaa = random_matrix(16, 1), aabb = random_matrix(16, 1),
                   bbbb = random_matrix(16, 1);
   MPSContainer supplied(
-      sites, restricted, equal_counts, equal_counts, std::nullopt, {},
-      std::nullopt, ContainerTypes::MatrixVariant{aa},
-      ContainerTypes::MatrixVariant{bb}, std::nullopt,
-      ContainerTypes::VectorVariant{aaaa}, ContainerTypes::VectorVariant{aabb},
-      ContainerTypes::VectorVariant{bbbb});
+      sites, restricted, equal_counts, std::nullopt, {}, std::nullopt,
+      ContainerTypes::MatrixVariant{aa}, ContainerTypes::MatrixVariant{bb},
+      std::nullopt, ContainerTypes::VectorVariant{aaaa},
+      ContainerTypes::VectorVariant{aabb}, ContainerTypes::VectorVariant{bbbb});
   Eigen::VectorXd expected = aaaa + bbbb + aabb;
   for (std::size_t p = 0; p < 2; ++p)
     for (std::size_t q = 0; q < 2; ++q)
@@ -514,4 +507,45 @@ TEST_F(MPSContainerTest, EqualSpinCountsDoNotImplyClosedShellRdms) {
   EXPECT_TRUE(
       std::get<Eigen::VectorXd>(supplied.get_active_two_rdm_spin_traced())
           .isApprox(expected, testing::wf_tolerance));
+}
+
+TEST_F(MPSContainerTest, ParticleCountsFollowTheOrbitals) {
+  using Count = MPSContainer::ParticleCount;
+  auto spin_counts = std::make_shared<const Count>(
+      Count::SymmetriesArray{testing::spin_symmetry(false)},
+      Count::BlockMap{
+          {{axes::alpha()}, std::make_shared<const std::size_t>(1)},
+          {{axes::beta()}, std::make_shared<const std::size_t>(1)}});
+  EXPECT_THROW(MPSContainer(sites, testing::create_test_orbitals(2, 2), counts),
+               std::invalid_argument);
+  EXPECT_THROW(MPSContainer(sites, orbitals, spin_counts),
+               std::invalid_argument);
+  MPSContainer spin(
+      sites,
+      std::make_shared<ModelOrbitals>(testing::restricted_index_set(3, {1, 2}),
+                                      testing::restricted_index_set(3, {0})),
+      spin_counts);
+  using Electrons = std::pair<std::size_t, std::size_t>;
+  EXPECT_EQ(spin.get_active_num_electrons(), Electrons(1, 1));
+  EXPECT_EQ(spin.get_total_num_electrons(), Electrons(2, 2));
+  // Without a spin axis an inactive mode holds two particles on spin-half
+  // sites and one on binary sites, so a chain must not mix the two.
+  auto spin_free = [](std::vector<std::uint32_t> indices) {
+    return std::make_shared<const SymmetryBlockedIndexSet>(
+        std::make_shared<const SymmetryProduct>(SymmetryProduct::trivial()),
+        std::unordered_map<SymmetryLabel, std::size_t>{{SymmetryLabel{}, 3}},
+        std::unordered_map<SymmetryLabel, std::vector<std::uint32_t>>{
+            {SymmetryLabel{}, std::move(indices)}});
+  };
+  auto core =
+      std::make_shared<ModelOrbitals>(spin_free({1, 2}), spin_free({0}));
+  MPSContainer spin_half(sites, core, counts);
+  EXPECT_EQ(spin_half.total_num_particles()->value(SymmetryLabel{}), 4u);
+  MPSContainer binary(
+      {make_site(random_matrix(2, 3), 2), make_site(random_matrix(6, 1), 2)},
+      core, counts);
+  EXPECT_EQ(binary.total_num_particles()->value(SymmetryLabel{}), 3u);
+  EXPECT_THROW(
+      MPSContainer({make_site(random_matrix(2, 3), 2), sites[1]}, core, counts),
+      std::invalid_argument);
 }

@@ -7,6 +7,7 @@
 #include <algorithm>
 #include <cmath>
 #include <cstddef>
+#include <limits>
 #include <stdexcept>
 
 namespace qdk::chemistry::scf::impl {
@@ -19,9 +20,9 @@ namespace qdk::chemistry::scf::impl {
  * 1. Bracketing phase: Find an interval containing acceptable step sizes.
  * 2. Zoom phase: Refine the interval using interpolation to find optimal step.
  *
- * The algorithm satisfies both Armijo (sufficient decrease) and strong Wolfe
- * (curvature) conditions, ensuring global convergence properties for
- * quasi-Newton methods like BFGS.
+ * Ordinary steps satisfy Armijo and strong Wolfe conditions. Roundoff-limited
+ * steps may instead accept indistinguishable energies when both the Wolfe
+ * curvature condition and full-gradient reduction hold.
  *
  * @tparam Functor Function object type that provides:
  *         - eval(x): Function evaluation
@@ -55,7 +56,12 @@ void nocedal_wright_line_search(Functor& op,
 
   const auto fx0 = fx;
   const auto dgi = Functor::dot(p, gfx);
+  const auto initial_grad_norm_squared = Functor::dot(gfx, gfx);
 
+  if (!std::isfinite(fx0) || !std::isfinite(dgi) ||
+      !std::isfinite(initial_grad_norm_squared) || !std::isfinite(step)) {
+    throw std::runtime_error("Nonfinite line search starting point");
+  }
   if (dgi > 0)
     throw std::logic_error(
         "the moving direction increases the objective function value");
@@ -67,6 +73,19 @@ void nocedal_wright_line_search(Functor& op,
 
   const auto armijo_test_val = c1 * dgi;
   const auto wolfe_test_curv = -c2 * dgi;
+
+  const auto accept_roundoff_step = [&](ret_type dg,
+                                        ret_type grad_norm_squared) {
+    // This small roundoff allowance is not a bound on objective-evaluation
+    // error. Require a tiny predicted decrease and independent gradient
+    // improvement.
+    const auto energy_roundoff =
+        8 * std::numeric_limits<ret_type>::epsilon() *
+        std::max({ret_type(1), std::abs(fx0), std::abs(fx)});
+    return dgi < 0 && -step * dgi <= energy_roundoff &&
+           fx - fx0 <= energy_roundoff && std::abs(dg) <= wolfe_test_curv &&
+           grad_norm_squared <= c2 * c2 * initial_grad_norm_squared;
+  };
 
   ret_type step_hi = 0, step_lo = 0, fx_hi = fx0, fx_lo = fx0, dg_hi = dgi,
            dg_lo = dgi;
@@ -84,6 +103,16 @@ void nocedal_wright_line_search(Functor& op,
 
     if (iter++ >= max_iter) break;
     auto dg = Functor::dot(gfx, p);
+    const auto grad_norm_squared = Functor::dot(gfx, gfx);
+    if (!std::isfinite(fx) || !std::isfinite(dg) ||
+        !std::isfinite(grad_norm_squared) || !std::isfinite(step)) {
+      throw std::runtime_error("Nonfinite line search trial");
+    }
+
+    if (accept_roundoff_step(dg, grad_norm_squared)) {
+      converged = true;
+      break;
+    }
 
     if (fx - fx0 > step * armijo_test_val || (0 < step_lo and fx >= fx_lo)) {
       step_hi = step;
@@ -128,6 +157,16 @@ void nocedal_wright_line_search(Functor& op,
 
     if (iter++ >= max_iter) break;
     auto dg = Functor::dot(gfx, p);
+    const auto grad_norm_squared = Functor::dot(gfx, gfx);
+    if (!std::isfinite(fx) || !std::isfinite(dg) ||
+        !std::isfinite(grad_norm_squared) || !std::isfinite(step)) {
+      throw std::runtime_error("Nonfinite line search trial");
+    }
+
+    if (accept_roundoff_step(dg, grad_norm_squared)) {
+      converged = true;
+      break;
+    }
 
     if (fx - fx0 > step * armijo_test_val or fx >= fx_lo) {
       if (step == step_hi) throw std::runtime_error("Line Search Failed");

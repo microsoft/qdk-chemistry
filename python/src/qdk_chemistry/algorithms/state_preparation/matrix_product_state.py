@@ -162,9 +162,9 @@ class MatrixProductStatePreparation(StatePreparation):
             raise TypeError(f"MatrixProductStatePreparation requires an MPSContainer, got {type(mps)}.")
         if mps.is_complex():
             raise ValueError(f"{_DESCRIPTION} currently supports only real-valued MPS tensors.")
-        mps_sites = mps.sites
+        mps_sites = mps.sites()
         self._validate_physical_basis(mps_sites)
-        ancilla_bits = self._ancilla_bits(mps.max_bond_dimension)
+        ancilla_bits = self._ancilla_bits(mps.max_bond_dimension())
         ancilla_dim = 1 << ancilla_bits
         mapper, method = self._create_site_mapper(ancilla_bits)
 
@@ -204,8 +204,8 @@ class MatrixProductStatePreparation(StatePreparation):
 
         return MatrixProductStatePreparationData(
             initial_state_vec=(vector / norm).tolist(),
-            site_to_orbital_order=mps.site_to_orbital_order,
-            num_sites=mps.num_sites,
+            site_to_orbital_order=mps.site_to_orbital_order(),
+            num_sites=mps.num_sites(),
             num_qubits_per_site=self._qubits_per_site(mps_sites),
             ancilla_bits=ancilla_bits,
             method=method,
@@ -235,7 +235,7 @@ class MatrixProductStatePreparation(StatePreparation):
         container = wavefunction.get_container()
         if not isinstance(container, MPSContainer):
             raise TypeError(f"MatrixProductStatePreparation requires an MPSContainer, got {type(container)}.")
-        if container.orthogonality_center != 0:
+        if container.orthogonality_center() != 0:
             raise ValueError(f"{_DESCRIPTION} requires a right-canonical MPS with center zero.")
 
         data = self.generate_matrix_product_state_preparation_data(container)
@@ -298,7 +298,7 @@ class MatrixProductStatePreparation(StatePreparation):
         Reshaped to ``(physical * ancilla_dim, left)``, row ``p * ancilla_dim + b`` is site
         qubit state ``p`` and bond register state ``b``, and column ``a`` is the left bond state.
         """
-        left, physical, right = site.shape
+        left, physical, right = site.shape()
         tensor = np.asarray(site.to_dense()).reshape(left, physical, right)
         isometry = np.zeros((physical, ancilla_dim, left))
         isometry[:, :right] = tensor.transpose(1, 2, 0)
@@ -311,10 +311,10 @@ class MatrixProductStatePreparation(StatePreparation):
         The symmetry blocks of the site are scattered straight into the matrix, so neither the dense
         site nor the padded isometry is formed.
         """
-        tensor = site.tensor
+        tensor = site.tensor()
         extents = tensor.extents()
         offsets = []
-        for order, slot_extents in zip(site.sector_orders, extents, strict=True):
+        for order, slot_extents in zip(site.sector_orders(), extents, strict=True):
             starts = np.cumsum([0] + [slot_extents[label] for label in order[:-1]])
             offsets.append(dict(zip(order, starts.tolist(), strict=True)))
         rows, columns, values = [np.empty(0, dtype=int)], [np.empty(0, dtype=int)], [np.empty(0)]
@@ -328,7 +328,7 @@ class MatrixProductStatePreparation(StatePreparation):
             values.append(values_3d[left, physical, right])
         return sparse.csc_array(
             (np.concatenate(values), (np.concatenate(rows), np.concatenate(columns))),
-            shape=(site.physical_dimension * ancilla_dim, site.left_bond_dimension),
+            shape=(site.physical_dimension() * ancilla_dim, site.left_bond_dimension()),
         )
 
     @staticmethod
@@ -343,20 +343,20 @@ class MatrixProductStatePreparation(StatePreparation):
                 four, or a site does not order its basis as ``('0', '1')`` or ``('0', 'u', 'd', '2')``.
 
         """
-        dimensions = {site.physical_dimension for site in sites}
+        dimensions = {site.physical_dimension() for site in sites}
         if len(dimensions) > 1:
             raise ValueError("MPS state preparation requires the same physical dimension on every site.")
         (dimension,) = dimensions
         if dimension not in _PHYSICAL_BASES:
             raise ValueError(_DIMENSION_ERROR)
-        if any(site.physical_basis != _PHYSICAL_BASES[dimension] for site in sites):
+        if any(site.physical_basis() != _PHYSICAL_BASES[dimension] for site in sites):
             labels = ", ".join(f"'{label}'" for label in _PHYSICAL_BASIS_LABELS[dimension])
             raise ValueError(f"MPS state preparation requires physical basis ordering ({labels}).")
 
     @staticmethod
     def _qubits_per_site(sites: Sequence[MPSSite]) -> int:
         """Return one for the ``('0', '1')`` basis and two for the ``('0', 'u', 'd', '2')`` basis."""
-        return (sites[0].physical_dimension - 1).bit_length()
+        return (sites[0].physical_dimension() - 1).bit_length()
 
     @staticmethod
     def _ancilla_bits(max_bond: int) -> int:
