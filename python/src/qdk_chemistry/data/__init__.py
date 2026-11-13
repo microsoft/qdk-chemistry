@@ -58,6 +58,7 @@ Exposed classes are:
 - :class:`TwoBodyPermutationGroup`: Permutation group of sparse two-body symmetry representatives (FourFold, EightFold).
 - :class:`UnitaryRepresentation`: Unitary representation.
 - :class:`UnitaryContainer`: Abstract base class for different unitary representations.
+- :class:`UnitaryMatrixContainer`: Container for a real or complex unitary matrix or isometry, stored dense or sparse.
 - :class:`Wavefunction`: Electronic wavefunction data and coefficients.
 - :class:`WavefunctionContainer`: Abstract base class for different wavefunction representations.
 - :class:`WavefunctionType`: Enumeration of wavefunction types (SelfDual, NotSelfDual).
@@ -149,6 +150,7 @@ from qdk_chemistry.data.time_dependent_qubit_hamiltonian.driven import DrivenQub
 from qdk_chemistry.data.unitary_representation.base import UnitaryRepresentation
 from qdk_chemistry.data.unitary_representation.containers.base import UnitaryContainer
 from qdk_chemistry.data.unitary_representation.containers.pauli_product_formula import PauliProductFormulaContainer
+from qdk_chemistry.data.unitary_representation.containers.unitary_matrix import UnitaryMatrixContainer
 
 # Give Users the option to use "Error" suffix for exceptions if they prefer
 SettingNotFoundError = SettingNotFound
@@ -226,6 +228,7 @@ __all__ = [
     "TimeDependentQubitHamiltonianContainer",
     "TwoBodyPermutationGroup",
     "UnitaryContainer",
+    "UnitaryMatrixContainer",
     "UnitaryRepresentation",
     "Wavefunction",
     "WavefunctionContainer",
