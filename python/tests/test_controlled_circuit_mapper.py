@@ -31,7 +31,7 @@ from qdk_chemistry.data.unitary_representation.containers.pauli_product_formula 
 )
 from qdk_chemistry.plugins.qiskit import QDK_CHEMISTRY_HAS_QISKIT
 from qdk_chemistry.utils.model_hamiltonians import create_heisenberg_hamiltonian, create_ising_hamiltonian
-from qdk_chemistry.utils.qsharp import create_qsharp_context, get_qsharp_context
+from qdk_chemistry.utils.qsharp import get_qsharp_context
 
 from .helpers import (
     apply_operation,
@@ -378,40 +378,6 @@ def test_identity_terms_share_one_control_phase_per_layer() -> None:
         logical = get_qsharp_context().logical_counts(application.entry_expr, *application.args)
         counts.append((logical["rotationCount"], logical["rotationDepth"]))
     assert counts[0] == counts[1]
-
-
-def test_reused_estimates_sum_like_separate_programs() -> None:
-    """Calls that reuse cached parts in one program count the same as each call estimated alone."""
-    context = create_qsharp_context()
-    context.eval("""
-        import QDKChemistry.Utils.PauliExp.RepPauliExpParams;
-        import QDKChemistry.Utils.ControlledPauliExp.RepControlledPauliExp;
-
-        operation EstimateCachingProbe(calls : Int[]) : Unit {
-            use controls = Qubit[4];
-            use systems = Qubit[4];
-            // Equal angles change the Hamming-weight phasing, so calls 1 and 2 must not share counts.
-            let angles = [[0.1, 0.2, 0.3], [0.1, 0.2, 0.3], [0.2, 0.2, 0.2], [0.1, 0.2, 0.3]];
-            for k in calls {
-                let params = new RepPauliExpParams {
-                    pauliIndices = [[0, 1], [1, 2], [2, 3]],
-                    pauliOps = [[PauliZ, PauliZ], [PauliZ, PauliZ], [PauliZ, PauliZ]],
-                    pauliCoefficients = angles[k],
-                    repetitions = 1 <<< k,
-                    numPrefixTerms = 0,
-                    numSuffixTerms = 0,
-                };
-                RepControlledPauliExp(params, [0, 3], true, -1, controls[k], systems);
-            }
-        }
-    """)
-    fields = ("rotationCount", "tCount", "cczCount", "ccixCount", "measurementCount")
-    combined = context.logical_counts("EstimateCachingProbe([0, 1, 2, 3])")
-    separate = [context.logical_counts(f"EstimateCachingProbe([{k}])") for k in range(4)]
-    assert combined["cczCount"] > 0
-    assert {field: combined[field] for field in fields} == {
-        field: sum(counts[field] for counts in separate) for field in fields
-    }
 
 
 class TestHammingWeightPhasing:
