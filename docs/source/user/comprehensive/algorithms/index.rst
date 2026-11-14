@@ -23,6 +23,7 @@ All algorithms follow a :doc:`factory pattern <factory_pattern>` design, allowin
    scf_solver
    stability_checker
    state_preparation
+   symmetry_shift
    hadamard_test
    phase_estimation
    qpe_circuit_builder
@@ -74,6 +75,9 @@ The following table summarizes the available algorithm classes in QDK/Chemistry 
    * - :doc:`MultiConfigurationScf <mcscf>`
      - Coupled `Orbital`-`Wavefunction` calculations.
      - Orbitals → Wavefunction
+   * - :doc:`SymmetryShifter <symmetry_shift>`
+     - Number-symmetry (:term:`BLISS`) Hamiltonian shift
+     - Hamiltonian → Hamiltonian
    * - :doc:`QubitMapper <qubit_mapper>`
      - Fermion-to-qubit mapping
      - Hamiltonian → QubitOperator
