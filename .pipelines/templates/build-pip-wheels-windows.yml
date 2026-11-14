@@ -1,7 +1,7 @@
 parameters:
 - name: march
   type: string
-  default: x86-64-v3
+  default: AVX2
 - name: buildType
   type: string
   default: Release
