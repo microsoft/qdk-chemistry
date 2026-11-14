@@ -263,6 +263,33 @@ The value returned by ``data_type_name()`` identifies the serialized format duri
 
 Register these classes with :meth:`~qdk_chemistry.plugins.base.PluginRegistrar.register_dataclass` or pass them through the ``data_classes`` argument of :meth:`~qdk_chemistry.plugins.base.PluginRegistrar.register_algorithm`. Python return annotations are not used for discovery.
 
+.. _cpp-plugins:
+
+C++ plugins
+~~~~~~~~~~~
+
+C++ code compiled into QDK/Chemistry as an add-on, a directory passed through the ``QDK_ADDONS_DIR`` CMake option, adds its sources to the ``chemistry`` target and declares its plugin in its ``CMakeLists.txt``, the counterpart of the entry point:
+
+.. code-block:: cmake
+
+   target_sources(chemistry PRIVATE plugin.cpp custom_scf_solver.cpp)
+   qdk_add_plugin(custom::register_plugin)
+
+The plugin is a function that registers the add-on's implementations through the algorithm factories:
+
+.. code-block:: cpp
+
+   namespace custom {
+   void register_plugin() {
+     qdk::chemistry::algorithms::ScfSolverFactory::register_instance(
+         [] { return std::make_unique<CustomScfSolver>(); });
+   }
+   }  // namespace custom
+
+QDK/Chemistry runs each plugin once, the first time an algorithm factory is used, after the built-in implementations are registered.
+A plugin that throws, for example on a duplicate name, is reported as a warning and does not prevent other plugins from loading.
+Its implementations are available through the factories in C++ and through the registry in Python.
+
 Remote backend MCP configuration
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 

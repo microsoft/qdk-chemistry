@@ -41,6 +41,7 @@ std::shared_ptr<ERI> ERI::create(BasisSet& basis_set, const SCFConfig& cfg,
   nvtx3::scoped_range r{nvtx3::rgb{127, 0, 255}, "ERI::create"};
 #endif
   AutoTimer t("ERI::create");
+  if (cfg.eri_factory) return cfg.eri_factory(basis_set, cfg);
   switch (cfg.eri.method) {
 #ifdef QDK_CHEMISTRY_ENABLE_RYS
     case ERIMethod::Rys:

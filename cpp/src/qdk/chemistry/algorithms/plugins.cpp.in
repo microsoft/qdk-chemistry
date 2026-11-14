@@ -1,0 +1,33 @@
+// Copyright (c) Microsoft Corporation. All rights reserved.
+// Licensed under the MIT License. See LICENSE.txt in the project root for
+// license information.
+
+// Configured by cpp/CMakeLists.txt with the plugins that add-ons declare
+// through qdk_add_plugin().
+
+#include <exception>
+#include <initializer_list>
+#include <qdk/chemistry/algorithms/algorithm.hpp>
+#include <qdk/chemistry/utils/logger.hpp>
+#include <utility>
+
+@QDK_PLUGIN_DECLARATIONS@
+namespace qdk::chemistry::algorithms::detail {
+
+void load_plugins() {
+  static bool loaded = false;
+  if (loaded) return;
+  loaded = true;
+  for (const auto& [name, plugin] :
+       std::initializer_list<std::pair<const char*, void (*)()>>{
+           @QDK_PLUGIN_ENTRIES@}) {
+    try {
+      plugin();
+    } catch (const std::exception& e) {
+      QDK_LOGGER().warn("Failed to load QDK/Chemistry plugin '{}': {}", name,
+                        e.what());
+    }
+  }
+}
+
+}  // namespace qdk::chemistry::algorithms::detail
