@@ -467,6 +467,12 @@ TEST_F(WavefunctionCoreTest, RejectsMalformedSerializedEntropies) {
   json["mutual_information_rows"] = 3;
   EXPECT_THROW(WavefunctionContainer::from_json(json), std::runtime_error);
 
+  // An empty matrix, as the writer stores it, still loads.
+  json["mutual_information_rows"] = 0;
+  json["mutual_information_cols"] = 0;
+  json["mutual_information"] = std::vector<double>{};
+  EXPECT_NO_THROW(WavefunctionContainer::from_json(json));
+
   // A dataset of the wrong rank is rejected before its extent is read.
   const std::string filename =
       "test_wavefunction_malformed_entropies.wavefunction.h5";

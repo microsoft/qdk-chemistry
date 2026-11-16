@@ -995,10 +995,14 @@ std::optional<Eigen::MatrixXd> entropy_matrix_from_json(
   std::vector<double> data = j.at(key);
   const auto rows = j.value(key + "_rows", static_cast<Eigen::Index>(0));
   const auto cols = j.value(key + "_cols", static_cast<Eigen::Index>(0));
-  if (rows <= 0 || cols <= 0 ||
-      data.size() / static_cast<std::size_t>(rows) !=
-          static_cast<std::size_t>(cols) ||
-      data.size() % static_cast<std::size_t>(rows) != 0) {
+  // An empty matrix (a zero dimension and no data) is valid.
+  const bool matches =
+      rows >= 0 && cols >= 0 &&
+      (rows == 0 ? data.empty()
+                 : data.size() / static_cast<std::size_t>(rows) ==
+                           static_cast<std::size_t>(cols) &&
+                       data.size() % static_cast<std::size_t>(rows) == 0);
+  if (!matches) {
     throw std::runtime_error("Serialized " + key +
                              " dimensions do not match its data.");
   }
