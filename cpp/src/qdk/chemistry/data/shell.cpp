@@ -80,8 +80,8 @@ nlohmann::json Shell::to_json(const bool include_radial_powers) const {
 
 Shell Shell::from_json(const nlohmann::json& json, const size_t atom_index,
                        const bool allow_radial_powers) {
-  const auto type =
-      detail::string_to_orbital_type(json.at("orbital_type").get<std::string>());
+  const auto type = detail::string_to_orbital_type(
+      json.at("orbital_type").get<std::string>());
   const auto exponents = json.at("exponents").get<std::vector<double>>();
   const auto coefficients = json.at("coefficients").get<std::vector<double>>();
   if (json.contains("rpowers")) {

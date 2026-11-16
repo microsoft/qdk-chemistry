@@ -228,8 +228,7 @@ Get the number of atoms the auxiliary basis is blocked over.
 Returns:
     int: Number of atoms
 )")
-      .def("get_num_atomic_orbitals",
-           &AuxiliaryBasis::get_num_atomic_orbitals,
+      .def("get_num_atomic_orbitals", &AuxiliaryBasis::get_num_atomic_orbitals,
            R"(
 Get the total number of atomic orbitals.
 
