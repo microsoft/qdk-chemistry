@@ -8,6 +8,7 @@
 #include <qdk/chemistry/algorithms/jk_builder.hpp>
 #include <qdk/chemistry/data/settings.hpp>
 #include <string>
+#include <utility>
 #include <vector>
 
 namespace qdk::chemistry::scf {
@@ -17,7 +18,7 @@ class ERI;
 
 namespace qdk::chemistry::algorithms::microsoft {
 
-class JKBuilderSettings : public data::Settings {
+class JKBuilderSettings : public algorithms::JKBuilderSettings {
  public:
   JKBuilderSettings() {
     set_default("eri_method", std::string("direct"),
@@ -32,63 +33,71 @@ class JKBuilderSettings : public data::Settings {
                 "Overlap-based shell pair pre-screening threshold. Shell "
                 "pairs with overlap norm below this value are excluded.");
   }
-  ~JKBuilderSettings() override = default;
 };
 
-/**
- * @class JKEngine
- * @brief J/K engine of the "qdk" builder.
- *
- * Evaluates the integrals with Libint2, directly or in memory. Gradients are
- * always evaluated directly.
- */
-class JKEngine : public algorithms::JKEngine {
+class JKGradientBuilderSettings : public algorithms::JKBuilderSettings {
  public:
-  JKEngine(std::shared_ptr<data::BasisSet> basis_set, double eri_threshold,
-           bool incore, bool use_atomics, double shell_pair_threshold);
-  ~JKEngine() override;
-
-  void build(const double* P, size_t num_atomic_orbitals, size_t num_densities,
-             double* J, double* K, double alpha, double beta,
-             double omega) override;
-
-  void build_gradients(const double* P, size_t num_atomic_orbitals,
-                       size_t num_densities, size_t num_atoms, double* dJ,
-                       double* dK, double alpha, double beta,
-                       double omega) override;
-
- private:
-  /// Integral engine for num_densities density matrices
-  qdk::chemistry::scf::ERI& eri(size_t num_atomic_orbitals,
-                                size_t num_densities, bool incore,
-                                double omega);
-
-  std::shared_ptr<data::BasisSet> basis_set_;
-  double eri_threshold_;
-  bool incore_;
-  bool use_atomics_;
-  double shell_pair_threshold_;
-  std::shared_ptr<qdk::chemistry::scf::BasisSet> scf_basis_set_;
-  /// Engines for one (restricted) and two (unrestricted) densities
-  std::unique_ptr<qdk::chemistry::scf::ERI> direct_[2];
-  std::unique_ptr<qdk::chemistry::scf::ERI> incore_eri_[2];
-  double incore_omega_[2] = {};
+  JKGradientBuilderSettings() {
+    set_default("shell_pair_threshold", 1e-12,
+                "Overlap-based shell pair pre-screening threshold. Shell "
+                "pairs with overlap norm below this value are excluded.");
+  }
 };
 
 /**
  * @class JKBuilder
  * @brief QDK/Chemistry's J/K builder ("qdk").
+ *
+ * Evaluates the integrals with Libint2, directly or in memory, and keeps the
+ * integral data of the last basis set for later runs.
  */
 class JKBuilder : public algorithms::JKBuilder {
  public:
-  JKBuilder() { _settings = std::make_unique<JKBuilderSettings>(); }
+  JKBuilder();
+  ~JKBuilder() override;
 
   std::string name() const override { return "qdk"; }
 
  protected:
-  std::shared_ptr<algorithms::JKEngine> _run_impl(
-      std::shared_ptr<data::BasisSet> basis_set,
-      double eri_threshold) const override;
+  std::pair<std::shared_ptr<const data::SymmetryBlockedTensor<2>>,
+            std::shared_ptr<const data::SymmetryBlockedTensor<2>>>
+  _run_impl(std::shared_ptr<data::BasisSet> basis_set,
+            std::shared_ptr<const data::SymmetryBlockedTensor<2>> densities)
+      const override;
+
+ private:
+  mutable std::shared_ptr<data::BasisSet> _basis_set;
+  mutable std::shared_ptr<scf::BasisSet> _scf_basis_set;
+  /// Integral engines for one (restricted) and two (unrestricted) densities
+  mutable std::unique_ptr<scf::ERI> _eri[2];
+};
+
+/**
+ * @class JKGradientBuilder
+ * @brief QDK/Chemistry's J/K gradient builder ("qdk").
+ *
+ * Evaluates the integral derivatives directly with Libint2 and keeps the
+ * integral screening data of the last basis set for later runs.
+ */
+class JKGradientBuilder : public algorithms::JKGradientBuilder {
+ public:
+  JKGradientBuilder();
+  ~JKGradientBuilder() override;
+
+  std::string name() const override { return "qdk"; }
+
+ protected:
+  std::pair<std::shared_ptr<data::NuclearGradients>,
+            std::shared_ptr<data::NuclearGradients>>
+  _run_impl(std::shared_ptr<data::BasisSet> basis_set,
+            std::shared_ptr<const data::SymmetryBlockedTensor<2>> densities)
+      const override;
+
+ private:
+  mutable std::shared_ptr<data::BasisSet> _basis_set;
+  mutable std::shared_ptr<scf::BasisSet> _scf_basis_set;
+  /// Integral engines for one (restricted) and two (unrestricted) densities
+  mutable std::unique_ptr<scf::ERI> _eri[2];
 };
 
 }  // namespace qdk::chemistry::algorithms::microsoft

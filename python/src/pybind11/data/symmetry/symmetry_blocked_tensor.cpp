@@ -11,6 +11,7 @@
 #include <complex>
 #include <cstddef>
 #include <memory>
+#include <optional>
 #include <qdk/chemistry/data/data_class.hpp>
 #include <qdk/chemistry/data/symmetry/symmetry_blocked_tensor.hpp>
 #include <string>
@@ -141,4 +142,16 @@ void bind_symmetry_blocked_tensor(py::module& m) {
   bind_sbt_instance<4, double>(m, "SymmetryBlockedTensorRank4");
   bind_sbt_instance<4, std::complex<double>>(
       m, "SymmetryBlockedTensorRank4Complex");
+
+  m.def(
+      "make_spin_diagonal_rank2_sbt",
+      [](const Eigen::MatrixXd& alpha,
+         const std::optional<Eigen::MatrixXd>& beta) {
+        return make_spin_diagonal_rank2_sbt(
+            std::optional<Eigen::MatrixXd>(alpha), beta);
+      },
+      py::arg("alpha"), py::arg("beta") = py::none(),
+      "Rank-2 spin-diagonal SymmetryBlockedTensorRank2 with the alpha-alpha "
+      "block 'alpha' and the beta-beta block 'beta'. Without 'beta', the spin "
+      "axis is restricted and the beta block aliases the alpha block.");
 }

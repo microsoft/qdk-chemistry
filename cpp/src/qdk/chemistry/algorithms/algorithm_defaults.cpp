@@ -55,6 +55,7 @@ std::shared_ptr<data::Settings> resolve_algorithm_defaults(
   REGISTER_FACTORY_SETTINGS_INIT(StabilityCheckerFactory)
   REGISTER_FACTORY_SETTINGS_INIT(HamiltonianFactorizationFactory)
   REGISTER_FACTORY_SETTINGS_INIT(JKBuilderFactory)
+  REGISTER_FACTORY_SETTINGS_INIT(JKGradientBuilderFactory)
 
 #undef REGISTER_FACTORY_SETTINGS_INIT
 

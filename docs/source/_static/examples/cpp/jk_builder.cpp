@@ -12,40 +12,33 @@
 using namespace qdk::chemistry::algorithms;
 using namespace qdk::chemistry::data;
 
-// J/K engine timing the builds of another engine
-class TimedJKEngine : public JKEngine {
- public:
-  explicit TimedJKEngine(std::shared_ptr<JKEngine> engine)
-      : engine_(std::move(engine)) {}
-
-  void build(const double* P, size_t num_atomic_orbitals, size_t num_densities,
-             double* J, double* K, double alpha, double beta,
-             double omega) override {
-    const auto start = std::chrono::steady_clock::now();
-    engine_->build(P, num_atomic_orbitals, num_densities, J, K, alpha, beta,
-                   omega);
-    seconds +=
-        std::chrono::duration<double>(std::chrono::steady_clock::now() - start)
-            .count();
-  }
-
-  static inline double seconds = 0.0;
-
- private:
-  std::shared_ptr<JKEngine> engine_;
-};
-
-// J/K builder timing the builds of the qdk engine
+// J/K builder timing the builds of the qdk builder
 class TimedJKBuilder : public JKBuilder {
  public:
   std::string name() const override { return "timed"; }
 
+  static inline double seconds = 0.0;
+
  protected:
-  std::shared_ptr<JKEngine> _run_impl(std::shared_ptr<BasisSet> basis_set,
-                                      double eri_threshold) const override {
-    return std::make_shared<TimedJKEngine>(
-        JKBuilderFactory::create("qdk")->run(basis_set, eri_threshold));
+  std::pair<std::shared_ptr<const SymmetryBlockedTensor<2>>,
+            std::shared_ptr<const SymmetryBlockedTensor<2>>>
+  _run_impl(std::shared_ptr<BasisSet> basis_set,
+            std::shared_ptr<const SymmetryBlockedTensor<2>> densities)
+      const override {
+    if (!_qdk) {
+      _qdk = JKBuilderFactory::create("qdk");
+      _qdk->settings().update(*_settings);
+    }
+    const auto start = std::chrono::steady_clock::now();
+    auto result = _qdk->run(basis_set, densities);
+    seconds +=
+        std::chrono::duration<double>(std::chrono::steady_clock::now() - start)
+            .count();
+    return result;
   }
+
+ private:
+  mutable std::unique_ptr<JKBuilder> _qdk;
 };
 // end-cell-custom
 // --------------------------------------------------------------------------------------------
@@ -76,22 +69,24 @@ H   -0.758602    0.000000    0.504284
   // --------------------------------------------------------------------------------------------
 
   // --------------------------------------------------------------------------------------------
-  // start-cell-engine
+  // start-cell-build
   auto orbitals = wavefunction->get_orbitals();
   auto basis_set = orbitals->get_basis_set();
-  const size_t n = basis_set->get_num_atomic_orbitals();
   Eigen::VectorXd occupations =
       Eigen::VectorXd::Zero(orbitals->get_num_molecular_orbitals());
-  occupations.head(5).setConstant(2.0);
-  const Eigen::MatrixXd P = orbitals->calculate_ao_density_matrix(occupations);
+  occupations.head(5).setConstant(1.0);
+  const Eigen::MatrixXd P_alpha =
+      orbitals->calculate_ao_density_matrix(occupations);
 
-  // An engine for the basis set; J and K are filled in place
-  auto engine = JKBuilderFactory::create()->run(basis_set, 1e-12);
-  Eigen::MatrixXd J(n, n), K(n, n);
-  engine->build(P.data(), n, 1, J.data(), K.data(), 1.0, 0.0, 0.0);
-  std::cout << "Coulomb energy: " << 0.5 * (P.array() * J.array()).sum()
-            << " Hartree" << std::endl;
-  // end-cell-engine
+  // J and K of the closed-shell spin densities (restricted: one alpha block)
+  auto densities = std::make_shared<const SymmetryBlockedTensor<2>>(
+      make_spin_diagonal_rank2_sbt(P_alpha, P_alpha, true));
+  auto [J, K] = JKBuilderFactory::create()->run(basis_set, densities);
+  const auto& J_alpha = J->block({axes::alpha(), axes::alpha()});
+  std::cout << "Coulomb energy: "
+            << 2.0 * (P_alpha.array() * J_alpha.array()).sum() << " Hartree"
+            << std::endl;
+  // end-cell-build
   // --------------------------------------------------------------------------------------------
 
   // --------------------------------------------------------------------------------------------
@@ -104,7 +99,7 @@ H   -0.758602    0.000000    0.504284
                                AlgorithmRef("jk_builder", "timed"));
   auto [timed_energy, timed_wavefunction] =
       timed_solver->run(structure, 0, 1, "cc-pvdz");
-  std::cout << "J/K builds: " << TimedJKEngine::seconds << " s" << std::endl;
+  std::cout << "J/K builds: " << TimedJKBuilder::seconds << " s" << std::endl;
   // end-cell-register
   // --------------------------------------------------------------------------------------------
   return 0;

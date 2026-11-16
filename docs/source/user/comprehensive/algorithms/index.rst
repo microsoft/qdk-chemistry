@@ -52,8 +52,11 @@ The following table summarizes the available algorithm classes in QDK/Chemistry 
      - Mean-field (:term:`HF`/:term:`DFT`) calculations
      - Structure → Orbitals
    * - :doc:`JKBuilder <jk_builder>`
-     - Coulomb and exchange builds of the :term:`SCF`
-     - BasisSet → JKEngine
+     - Coulomb and exchange matrices of spin densities
+     - BasisSet, densities → J, K
+   * - :doc:`JKGradientBuilder <jk_builder>`
+     - Nuclear gradients of the Coulomb and exchange energies
+     - BasisSet, densities → NuclearGradients
    * - :doc:`OrbitalLocalizer <localizer>`
      - Orbital transformations
      - Orbitals → Orbitals

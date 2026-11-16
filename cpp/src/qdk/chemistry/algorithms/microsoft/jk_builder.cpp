@@ -20,79 +20,141 @@ namespace qdk::chemistry::algorithms::microsoft {
 
 namespace qcs = qdk::chemistry::scf;
 
-JKEngine::JKEngine(std::shared_ptr<data::BasisSet> basis_set,
-                   double eri_threshold, bool incore, bool use_atomics,
-                   double shell_pair_threshold)
-    : basis_set_(std::move(basis_set)),
-      eri_threshold_(eri_threshold),
-      incore_(incore),
-      use_atomics_(use_atomics),
-      shell_pair_threshold_(shell_pair_threshold) {}
+namespace {
 
-JKEngine::~JKEngine() = default;
+bool is_restricted(const data::SymmetryBlockedTensor<2>& densities) {
+  return densities.symmetries()[0]->axis(data::AxisName::Spin).equivalent();
+}
 
-qcs::ERI& JKEngine::eri(size_t num_atomic_orbitals, size_t num_densities,
-                        bool incore, double omega) {
-  if (!scf_basis_set_) {
-    scf_basis_set_ = utils::microsoft::convert_basis_set_from_qdk(*basis_set_);
+/// The spin densities as consecutive matrices, P_alpha alone if restricted,
+/// times scale
+Eigen::MatrixXd stacked(const data::SymmetryBlockedTensor<2>& densities,
+                        size_t num_atomic_orbitals, bool restricted,
+                        double scale) {
+  const size_t n = num_atomic_orbitals;
+  const auto alpha = data::axes::alpha();
+  const auto beta = data::axes::beta();
+  const auto& P_alpha = densities.block({alpha, alpha});
+  const auto& P_beta = densities.block({beta, beta});
+  if (static_cast<size_t>(P_alpha.rows()) != n ||
+      static_cast<size_t>(P_alpha.cols()) != n ||
+      static_cast<size_t>(P_beta.rows()) != n ||
+      static_cast<size_t>(P_beta.cols()) != n) {
+    throw std::invalid_argument("Spin densities must be matrices in the " +
+                                std::to_string(n) +
+                                " atomic orbitals of the basis set");
   }
-  if (num_atomic_orbitals != scf_basis_set_->num_atomic_orbitals ||
-      (num_densities != 1 && num_densities != 2)) {
-    throw std::invalid_argument(
-        "JKEngine: expected one or two density matrices of " +
-        std::to_string(scf_basis_set_->num_atomic_orbitals) +
-        " atomic orbitals");
-  }
-  const auto type = num_densities == 1 ? qcs::SCFOrbitalType::Restricted
-                                       : qcs::SCFOrbitalType::Unrestricted;
-  auto& engine = (incore ? incore_eri_ : direct_)[num_densities - 1];
-  // In-core integrals are computed for one range-separation parameter.
-  if (incore && engine && omega != incore_omega_[num_densities - 1]) {
-    engine.reset();
-  }
-  if (!engine) {
-    if (incore) {
-      engine = std::make_unique<qcs::ERIINCORE>(
-          type, *scf_basis_set_, qcs::mpi_default_input(), omega);
-      incore_omega_[num_densities - 1] = omega;
+  Eigen::MatrixXd P(n, (restricted ? 1 : 2) * n);
+  P.leftCols(n) = scale * P_alpha;
+  if (!restricted) P.rightCols(n) = scale * P_beta;
+  return P;
+}
+
+/// Converts basis_set unless it is the cached basis set, releasing the
+/// engines of the cached one
+void cache_basis_set(const std::shared_ptr<data::BasisSet>& basis_set,
+                     std::shared_ptr<data::BasisSet>& cached,
+                     std::shared_ptr<qcs::BasisSet>& converted,
+                     std::unique_ptr<qcs::ERI> (&eri)[2]) {
+  if (basis_set == cached) return;
+  eri[0].reset();
+  eri[1].reset();
+  converted = utils::microsoft::convert_basis_set_from_qdk(*basis_set);
+  cached = basis_set;
+}
+
+}  // namespace
+
+JKBuilder::JKBuilder() { _settings = std::make_unique<JKBuilderSettings>(); }
+
+JKBuilder::~JKBuilder() = default;
+
+std::pair<std::shared_ptr<const data::SymmetryBlockedTensor<2>>,
+          std::shared_ptr<const data::SymmetryBlockedTensor<2>>>
+JKBuilder::_run_impl(
+    std::shared_ptr<data::BasisSet> basis_set,
+    std::shared_ptr<const data::SymmetryBlockedTensor<2>> densities) const {
+  utils::microsoft::initialize_backend();
+  const size_t n = basis_set->get_num_atomic_orbitals();
+  const bool restricted = is_restricted(*densities);
+  const Eigen::MatrixXd P = stacked(*densities, n, restricted, 1.0);
+
+  cache_basis_set(basis_set, _basis_set, _scf_basis_set, _eri);
+  auto& eri = _eri[restricted ? 0 : 1];
+  if (!eri) {
+    const auto type = restricted ? qcs::SCFOrbitalType::Restricted
+                                 : qcs::SCFOrbitalType::Unrestricted;
+    if (_settings->get<std::string>("eri_method") == "incore") {
+      eri = std::make_unique<qcs::ERIINCORE>(type, *_scf_basis_set,
+                                             qcs::mpi_default_input(),
+                                             _settings->get<double>("omega"));
     } else {
-      engine = std::make_unique<qcs::LIBINT2_DIRECT>(
-          type, *scf_basis_set_, qcs::mpi_default_input(), use_atomics_,
-          eri_threshold_, shell_pair_threshold_);
+      eri = std::make_unique<qcs::LIBINT2_DIRECT>(
+          type, *_scf_basis_set, qcs::mpi_default_input(),
+          _settings->get<bool>("eri_use_atomics"),
+          _settings->get<double>("eri_threshold"),
+          _settings->get<double>("shell_pair_threshold"));
     }
   }
-  return *engine;
+
+  Eigen::MatrixXd J = Eigen::MatrixXd::Zero(n, P.cols());
+  Eigen::MatrixXd K = Eigen::MatrixXd::Zero(n, P.cols());
+  eri->build_JK(P.data(), J.data(), K.data(), _settings->get<double>("alpha"),
+                _settings->get<double>("beta"),
+                _settings->get<double>("omega"));
+
+  auto spin_blocks = [&](const Eigen::MatrixXd& X) {
+    return std::make_shared<const data::SymmetryBlockedTensor<2>>(
+        data::make_spin_diagonal_rank2_sbt(X.leftCols(n), X.rightCols(n),
+                                           restricted));
+  };
+  return {spin_blocks(J), spin_blocks(K)};
 }
 
-void JKEngine::build(const double* P, size_t num_atomic_orbitals,
-                     size_t num_densities, double* J, double* K, double alpha,
-                     double beta, double omega) {
-  eri(num_atomic_orbitals, num_densities, incore_, omega)
-      .build_JK(P, J, K, alpha, beta, omega);
+JKGradientBuilder::JKGradientBuilder() {
+  _settings = std::make_unique<JKGradientBuilderSettings>();
 }
 
-void JKEngine::build_gradients(const double* P, size_t num_atomic_orbitals,
-                               size_t num_densities, size_t num_atoms,
-                               double* dJ, double* dK, double alpha,
-                               double beta, double omega) {
-  const size_t expected_atoms = basis_set_->get_structure()->get_num_atoms();
-  if (num_atoms != expected_atoms) {
-    throw std::invalid_argument("JKEngine: expected gradients of " +
-                                std::to_string(expected_atoms) + " atoms");
-  }
-  // In-core gradients are not implemented, so gradients are always direct.
-  eri(num_atomic_orbitals, num_densities, false, omega)
-      .get_gradients(P, dJ, dK, alpha, beta, omega);
-}
+JKGradientBuilder::~JKGradientBuilder() = default;
 
-std::shared_ptr<algorithms::JKEngine> JKBuilder::_run_impl(
-    std::shared_ptr<data::BasisSet> basis_set, double eri_threshold) const {
+std::pair<std::shared_ptr<data::NuclearGradients>,
+          std::shared_ptr<data::NuclearGradients>>
+JKGradientBuilder::_run_impl(
+    std::shared_ptr<data::BasisSet> basis_set,
+    std::shared_ptr<const data::SymmetryBlockedTensor<2>> densities) const {
   utils::microsoft::initialize_backend();
-  return std::make_shared<JKEngine>(
-      std::move(basis_set), eri_threshold,
-      _settings->get<std::string>("eri_method") == "incore",
-      _settings->get<bool>("eri_use_atomics"),
-      _settings->get<double>("shell_pair_threshold"));
+  const size_t n = basis_set->get_num_atomic_orbitals();
+  const bool restricted = is_restricted(*densities);
+  // For one density, the engines take the total density P = 2 P_alpha.
+  const Eigen::MatrixXd P =
+      stacked(*densities, n, restricted, restricted ? 2.0 : 1.0);
+
+  cache_basis_set(basis_set, _basis_set, _scf_basis_set, _eri);
+  auto& eri = _eri[restricted ? 0 : 1];
+  if (!eri) {
+    eri = std::make_unique<qcs::LIBINT2_DIRECT>(
+        restricted ? qcs::SCFOrbitalType::Restricted
+                   : qcs::SCFOrbitalType::Unrestricted,
+        *_scf_basis_set, qcs::mpi_default_input(), false /*use_atomics*/,
+        _settings->get<double>("eri_threshold"),
+        _settings->get<double>("shell_pair_threshold"));
+  }
+
+  const auto structure = basis_set->get_structure();
+  using Gradient = Eigen::Matrix<double, 3, Eigen::Dynamic, Eigen::RowMajor>;
+  Gradient dJ = Gradient::Zero(3, structure->get_num_atoms());
+  Gradient dK = Gradient::Zero(3, structure->get_num_atoms());
+  eri->get_gradients(
+      P.data(), dJ.data(), dK.data(), _settings->get<double>("alpha"),
+      _settings->get<double>("beta"), _settings->get<double>("omega"));
+
+  auto gradients = [&](const Gradient& d) {
+    const Eigen::Matrix3Xd atom_major = d;
+    return std::make_shared<data::NuclearGradients>(
+        structure,
+        Eigen::Map<const Eigen::VectorXd>(atom_major.data(), d.size()));
+  };
+  return {gradients(dJ), gradients(dK)};
 }
 
 }  // namespace qdk::chemistry::algorithms::microsoft

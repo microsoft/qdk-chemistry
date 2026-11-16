@@ -42,47 +42,52 @@ AlgorithmRef qdk_jk_builder(const std::string& eri_method) {
   return jk_builder;
 }
 
-// Analytic HF/sto-3g nuclear gradient of water with a J/K builder
-Eigen::VectorXd water_gradient(const AlgorithmRef& jk_builder) {
+// Analytic HF/sto-3g nuclear gradient of water with J/K builders
+Eigen::VectorXd water_gradient(const AlgorithmRef& jk_builder,
+                               const AlgorithmRef& jk_gradient_builder =
+                                   AlgorithmRef("jk_gradient_builder", "qdk")) {
   qdk::chemistry::algorithms::microsoft::ScfSolver solver;
   solver.settings().set("jk_builder", jk_builder);
+  solver.settings().set("jk_gradient_builder", jk_gradient_builder);
   return *solver
               .run_with_analytic_gradient(testing::create_water_structure(), 0,
                                           1, std::string("sto-3g"))
               .nuclear_gradient;
 }
 
-// J/K builder whose engine delegates to the engine of the "qdk" builder, so
-// that the SCF builds J, K, and gradients through the JKEngine interface.
+// J/K builders delegating, with their settings, to the "qdk" builders, so that
+// the SCF builds J, K, and gradients through the builder interfaces.
 class DelegatingJKBuilder : public JKBuilder {
  public:
   std::string name() const override { return "test_delegating"; }
   static inline int num_builds = 0;
 
  protected:
-  std::shared_ptr<JKEngine> _run_impl(std::shared_ptr<BasisSet> basis_set,
-                                      double eri_threshold) const override {
-    struct Engine : JKEngine {
-      std::shared_ptr<JKEngine> qdk;
-      void build(const double* P, size_t num_atomic_orbitals,
-                 size_t num_densities, double* J, double* K, double alpha,
-                 double beta, double omega) override {
-        qdk->build(P, num_atomic_orbitals, num_densities, J, K, alpha, beta,
-                   omega);
-        ++num_builds;
-      }
-      void build_gradients(const double* P, size_t num_atomic_orbitals,
-                           size_t num_densities, size_t num_atoms, double* dJ,
-                           double* dK, double alpha, double beta,
-                           double omega) override {
-        qdk->build_gradients(P, num_atomic_orbitals, num_densities, num_atoms,
-                             dJ, dK, alpha, beta, omega);
-      }
-    };
-    auto engine = std::make_shared<Engine>();
-    engine->qdk =
-        JKBuilderFactory::create("qdk")->run(basis_set, eri_threshold);
-    return engine;
+  std::pair<std::shared_ptr<const SymmetryBlockedTensor<2>>,
+            std::shared_ptr<const SymmetryBlockedTensor<2>>>
+  _run_impl(std::shared_ptr<BasisSet> basis_set,
+            std::shared_ptr<const SymmetryBlockedTensor<2>> densities)
+      const override {
+    ++num_builds;
+    auto qdk = JKBuilderFactory::create("qdk");
+    qdk->settings().update(*_settings);
+    return qdk->run(basis_set, densities);
+  }
+};
+
+class DelegatingJKGradientBuilder : public JKGradientBuilder {
+ public:
+  std::string name() const override { return "test_delegating"; }
+
+ protected:
+  std::pair<std::shared_ptr<NuclearGradients>,
+            std::shared_ptr<NuclearGradients>>
+  _run_impl(std::shared_ptr<BasisSet> basis_set,
+            std::shared_ptr<const SymmetryBlockedTensor<2>> densities)
+      const override {
+    auto qdk = JKGradientBuilderFactory::create("qdk");
+    qdk->settings().update(*_settings);
+    return qdk->run(basis_set, densities);
   }
 };
 
@@ -1049,13 +1054,21 @@ TEST_F(ScfTest, EriMethodSetting) {
 
 TEST_F(ScfTest, JKBuilderSetting) {
   EXPECT_EQ(JKBuilderFactory::create()->name(), "qdk");
-  EXPECT_EQ(ScfSolverFactory::create()
-                ->settings()
+  EXPECT_EQ(JKGradientBuilderFactory::create()->name(), "qdk");
+  auto scf_settings = ScfSolverFactory::create();
+  EXPECT_EQ(scf_settings->settings()
                 .get<AlgorithmRef>("jk_builder")
+                .get_algorithm_name(),
+            "qdk");
+  EXPECT_EQ(scf_settings->settings()
+                .get<AlgorithmRef>("jk_gradient_builder")
                 .get_algorithm_name(),
             "qdk");
   JKBuilderFactory::register_instance(
       [] { return std::make_unique<jk_builder_test::DelegatingJKBuilder>(); });
+  JKGradientBuilderFactory::register_instance([] {
+    return std::make_unique<jk_builder_test::DelegatingJKGradientBuilder>();
+  });
 
   auto run = [](const std::string& method, int multiplicity,
                 const std::string& jk_builder) {
@@ -1074,22 +1087,65 @@ TEST_F(ScfTest, JKBuilderSetting) {
               testing::scf_energy_tolerance);
   EXPECT_GT(jk_builder_test::DelegatingJKBuilder::num_builds, 0);
   EXPECT_LT((jk_builder_test::water_gradient(
-                 AlgorithmRef("jk_builder", "test_delegating")) -
+                 AlgorithmRef("jk_builder", "test_delegating"),
+                 AlgorithmRef("jk_gradient_builder", "test_delegating")) -
              jk_builder_test::water_gradient(AlgorithmRef("jk_builder", "qdk")))
                 .cwiseAbs()
                 .maxCoeff(),
             1e-6);
 
   JKBuilderFactory::unregister_instance("test_delegating");
+  JKGradientBuilderFactory::unregister_instance("test_delegating");
+}
 
-  // Engines build gradients only if they implement them
-  struct Engine : JKEngine {
-    void build(const double*, size_t, size_t, double*, double*, double, double,
-               double) override {}
+TEST_F(ScfTest, JKBuilderSpinDensities) {
+  auto [energy, wavefunction] = ScfSolverFactory::create()->run(
+      testing::create_water_structure(), 0, 1, "sto-3g");
+  auto orbitals = wavefunction->get_orbitals();
+  auto basis_set = orbitals->get_basis_set();
+  Eigen::VectorXd occupations =
+      Eigen::VectorXd::Zero(orbitals->get_num_molecular_orbitals());
+  occupations.head(5).setConstant(1.0);
+  const Eigen::MatrixXd P_alpha =
+      orbitals->calculate_ao_density_matrix(occupations);
+  const Eigen::MatrixXd zero =
+      Eigen::MatrixXd::Zero(P_alpha.rows(), P_alpha.cols());
+  auto densities = [](const Eigen::MatrixXd& P_a, const Eigen::MatrixXd& P_b,
+                      bool restricted) {
+    return std::make_shared<const SymmetryBlockedTensor<2>>(
+        make_spin_diagonal_rank2_sbt(P_a, P_b, restricted));
   };
-  EXPECT_THROW(
-      Engine().build_gradients(nullptr, 0, 1, 0, nullptr, nullptr, 1, 0, 0),
-      std::runtime_error);
+  const auto alpha = axes::alpha();
+  const auto beta = axes::beta();
+  auto max_abs = [](const Eigen::MatrixXd& X) {
+    return X.cwiseAbs().maxCoeff();
+  };
+
+  // J and K have the spin structure of the densities, block by block.
+  auto [J, K] = JKBuilderFactory::create()->run(
+      basis_set, densities(P_alpha, P_alpha, true));
+  EXPECT_TRUE(J->all_aliased({{alpha, alpha}, {beta, beta}}));
+  EXPECT_TRUE(K->all_aliased({{alpha, alpha}, {beta, beta}}));
+  auto [J_u, K_u] = JKBuilderFactory::create()->run(
+      basis_set, densities(P_alpha, zero, false));
+  EXPECT_FALSE(J_u->all_aliased({{alpha, alpha}, {beta, beta}}));
+  EXPECT_LT(max_abs(J_u->block({alpha, alpha}) - J->block({alpha, alpha})),
+            1e-10);
+  EXPECT_LT(max_abs(K_u->block({alpha, alpha}) - K->block({alpha, alpha})),
+            1e-10);
+  EXPECT_LT(max_abs(J_u->block({beta, beta})), 1e-12);
+  EXPECT_LT(max_abs(K_u->block({beta, beta})), 1e-12);
+
+  // Restricted and equal unrestricted spin densities have the same gradients.
+  auto [dJ, dK] = JKGradientBuilderFactory::create()->run(
+      basis_set, densities(P_alpha, P_alpha, true));
+  auto [dJ_u, dK_u] = JKGradientBuilderFactory::create()->run(
+      basis_set, densities(P_alpha, P_alpha, false));
+  EXPECT_GT(dJ->get_values().cwiseAbs().maxCoeff(), 0.1);
+  EXPECT_LT((dJ->get_values() - dJ_u->get_values()).cwiseAbs().maxCoeff(),
+            1e-10);
+  EXPECT_LT((dK->get_values() - dK_u->get_values()).cwiseAbs().maxCoeff(),
+            1e-10);
 }
 
 TEST_F(ScfTest, InitialGuessRestart) {

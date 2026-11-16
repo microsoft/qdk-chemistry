@@ -38,7 +38,7 @@ from qdk_chemistry.algorithms.hamiltonian_constructor import (
 )
 from qdk_chemistry.algorithms.hamiltonian_factorization import HamiltonianFactorization
 from qdk_chemistry.algorithms.hamiltonian_unitary_builder.base import HamiltonianUnitaryBuilder, TimeEvolutionBuilder
-from qdk_chemistry.algorithms.jk_builder import JKBuilder, JKEngine, QdkJKBuilder
+from qdk_chemistry.algorithms.jk_builder import JKBuilder, JKGradientBuilder, QdkJKBuilder, QdkJKGradientBuilder
 from qdk_chemistry.algorithms.multi_configuration_calculator import (
     MultiConfigurationCalculator,
     QdkMacisAsci,
@@ -92,7 +92,7 @@ __all__ = [
     "HamiltonianFactorization",
     "HamiltonianUnitaryBuilder",
     "JKBuilder",
-    "JKEngine",
+    "JKGradientBuilder",
     "MultiConfigurationCalculator",
     "MultiConfigurationScf",
     "NuclearDerivativeCalculator",
@@ -108,6 +108,7 @@ __all__ = [
     "QdkGaugeFixingLocalizer",
     "QdkHamiltonianConstructor",
     "QdkJKBuilder",
+    "QdkJKGradientBuilder",
     "QdkMP2Calculator",
     "QdkMP2NaturalOrbitalLocalizer",
     "QdkMacisAsci",

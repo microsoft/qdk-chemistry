@@ -1,44 +1,41 @@
-J/K builder
-===========
+J/K builders
+============
 
-The :class:`~qdk_chemistry.algorithms.JKBuilder` algorithm in QDK/Chemistry provides the Coulomb (:math:`\mathbf{J}`) and exchange (:math:`\mathbf{K}`) matrices of the ``qdk`` :doc:`SCF solver <scf_solver>`, and their contributions to its analytic nuclear gradients.
-It takes a :doc:`BasisSet <../data/basis_set>` and an integral screening threshold as input and produces a :class:`~qdk_chemistry.algorithms.JKEngine`, which builds :math:`\mathbf{J}` and :math:`\mathbf{K}` of density matrices in that basis set.
-The SCF solver creates one engine per calculation and uses it in every iteration, so implementations can keep data such as integral screening information between builds.
+The :class:`~qdk_chemistry.algorithms.JKBuilder` algorithm in QDK/Chemistry builds the Coulomb (:math:`\mathbf{J}`) and exchange (:math:`\mathbf{K}`) matrices of spin densities, and the :class:`~qdk_chemistry.algorithms.JKGradientBuilder` algorithm builds the nuclear gradients of the Coulomb and exchange energies.
+Both take a :doc:`BasisSet <../data/basis_set>` and spin densities as input.
+The ``qdk`` :doc:`SCF solver <scf_solver>` builds its :math:`\mathbf{J}` and :math:`\mathbf{K}` matrices, and their contributions to its analytic nuclear gradients, with them.
 
 Overview
 --------
 
-For a density matrix :math:`\mathbf{P}` in the atomic orbitals :math:`\{\chi_\mu\}` of the basis set, the engine computes
+The spin densities :math:`\mathbf{P}^\alpha` and :math:`\mathbf{P}^\beta`, in the atomic orbitals :math:`\{\chi_\mu\}` of the basis set, are the alpha-alpha and beta-beta blocks of a spin-diagonal :class:`~qdk_chemistry.data.symmetry.SymmetryBlockedTensorRank2`; on a restricted spin axis the two blocks share storage.
+The atomic orbitals are those of the basis set, in their order, with each contracted shell normalized (Cartesian shells: the :math:`x^l` function).
+For each spin density :math:`\mathbf{P}^s`, a J/K builder computes
 
 .. math::
 
-   J_{\mu\nu}[\mathbf{P}] = \sum_{\lambda\sigma} (\mu\nu|\lambda\sigma) P_{\lambda\sigma},
+   J_{\mu\nu}[\mathbf{P}^s] = \sum_{\lambda\sigma} (\mu\nu|\lambda\sigma) P^s_{\lambda\sigma},
    \qquad
-   K_{\mu\nu}[\mathbf{P}] = \sum_{\lambda\sigma} (\mu\lambda|\hat v|\nu\sigma) P_{\lambda\sigma},
+   K_{\mu\nu}[\mathbf{P}^s] = \sum_{\lambda\sigma} (\mu\lambda|\hat v|\nu\sigma) P^s_{\lambda\sigma},
 
-with the exchange operator :math:`\hat v = \alpha / r_{12} + \beta \operatorname{erfc}(\omega r_{12}) / r_{12}` of the density functional (:math:`\alpha = 1`, :math:`\beta = 0` for Hartree-Fock).
-The atomic orbitals are those of the basis set, in their order, with each contracted shell normalized (Cartesian shells: the :math:`x^l` function).
+with the exchange operator :math:`\hat v = \alpha / r_{12} + \beta \operatorname{erfc}(\omega r_{12}) / r_{12}` of its ``alpha``, ``beta``, and ``omega`` settings (:math:`\alpha = 1`, :math:`\beta = 0` for Hartree-Fock).
+:math:`\mathbf{J}` and :math:`\mathbf{K}` are returned in the spin structure of the densities, so the Coulomb potential of the electrons is :math:`\mathbf{J}[\mathbf{P}^\alpha] + \mathbf{J}[\mathbf{P}^\beta]`.
 
-A build receives one density matrix for restricted calculations and two (:math:`\alpha`, :math:`\beta`) for unrestricted and restricted open-shell calculations.
-With incremental Fock builds, the density matrices are differences between successive iterations, so their elements have no fixed bound.
-
-For analytic nuclear gradients, the engine's ``build_gradients`` computes the derivatives, at fixed density matrices, of the Coulomb and exchange energies
+A J/K gradient builder computes the derivatives with respect to the nuclear coordinates, at fixed spin densities, of the Coulomb and exchange energies
 
 .. math::
 
    E_J = \tfrac{1}{2} \operatorname{Tr}(\mathbf{P} \mathbf{J}[\mathbf{P}]),
    \qquad
-   E_K = -\tfrac{1}{4} \operatorname{Tr}(\mathbf{P} \mathbf{K}[\mathbf{P}])
-   \quad \text{or} \quad
    E_K = -\tfrac{1}{2} \sum_{s = \alpha, \beta} \operatorname{Tr}(\mathbf{P}^s \mathbf{K}[\mathbf{P}^s]),
 
-for one or two density matrices, with :math:`\mathbf{P}` the total density in :math:`E_J`.
-Engines that do not implement ``build_gradients`` raise an error when gradients are requested.
+with :math:`\mathbf{P} = \mathbf{P}^\alpha + \mathbf{P}^\beta`, as :class:`~qdk_chemistry.data.NuclearGradients` of the basis set's structure.
 
 Using a J/K builder
 -------------------
 
-The ``jk_builder`` setting of the ``qdk`` :doc:`SCF solver <scf_solver>` holds an :class:`~qdk_chemistry.data.AlgorithmRef` to the builder and its settings, ``qdk`` by default:
+The ``jk_builder`` and ``jk_gradient_builder`` settings of the ``qdk`` :doc:`SCF solver <scf_solver>` hold :class:`~qdk_chemistry.data.AlgorithmRef` references to the builders and their settings, ``qdk`` by default.
+The solver sets the ``eri_threshold`` of its builders from its own ``eri_threshold`` setting, and their exchange operator from its density functional:
 
 .. tab:: Python API
 
@@ -54,21 +51,21 @@ The ``jk_builder`` setting of the ``qdk`` :doc:`SCF solver <scf_solver>` holds a
       :start-after: // start-cell-scf
       :end-before: // end-cell-scf
 
-An engine can also be used on its own:
+A builder can also be used on its own:
 
 .. tab:: Python API
 
    .. literalinclude:: ../../../_static/examples/python/jk_builder.py
       :language: python
-      :start-after: # start-cell-engine
-      :end-before: # end-cell-engine
+      :start-after: # start-cell-build
+      :end-before: # end-cell-build
 
 .. tab:: C++ API
 
    .. literalinclude:: ../../../_static/examples/cpp/jk_builder.cpp
       :language: cpp
-      :start-after: // start-cell-engine
-      :end-before: // end-cell-engine
+      :start-after: // start-cell-build
+      :end-before: // end-cell-build
 
 Available implementations
 -------------------------
@@ -78,10 +75,43 @@ QDK
 
 .. rubric:: Factory name: ``"qdk"`` (default)
 
-Evaluates the integrals with Libint2, directly or in memory.
-Gradients are always evaluated directly.
+The ``qdk`` J/K builder evaluates the integrals with Libint2, directly or in memory, and the ``qdk`` J/K gradient builder evaluates the integral derivatives directly.
+Both keep the integral data of the last basis set between runs.
 
 .. rubric:: Settings
+
+Both builders have the settings
+
+.. list-table::
+   :header-rows: 1
+   :widths: 25 15 15 45
+
+   * - Setting
+     - Type
+     - Default
+     - Description
+   * - ``eri_threshold``
+     - float
+     - ``1e-12``
+     - Integral screening threshold
+   * - ``alpha``
+     - float
+     - ``1.0``
+     - Coefficient of the full-range exchange operator
+   * - ``beta``
+     - float
+     - ``0.0``
+     - Coefficient of the short-range exchange operator
+   * - ``omega``
+     - float
+     - ``0.0``
+     - Range-separation parameter of the short-range exchange operator
+   * - ``shell_pair_threshold``
+     - float
+     - ``1e-12``
+     - Overlap-based shell pair pre-screening threshold. Shell pairs with overlap norm below this value are excluded.
+
+and the J/K builder also has
 
 .. list-table::
    :header-rows: 1
@@ -99,18 +129,14 @@ Gradients are always evaluated directly.
      - bool
      - ``False``
      - Accumulate direct J/K builds with atomic operations instead of per-thread buffers
-   * - ``shell_pair_threshold``
-     - float
-     - ``1e-12``
-     - Overlap-based shell pair pre-screening threshold. Shell pairs with overlap norm below this value are excluded.
 
 Implementing a J/K builder
 --------------------------
 
-A J/K builder derives from :class:`~qdk_chemistry.algorithms.JKBuilder` and returns a :class:`~qdk_chemistry.algorithms.JKEngine` from ``_run_impl``; the engine implements ``build`` and, to support analytic nuclear gradients, ``build_gradients``.
-In C++, ``build`` receives the matrices as consecutive :math:`n \times n` arrays, and ``build_gradients`` writes row-major :math:`3 \times N_\text{atoms}` gradients.
-Python implementations receive NumPy views, valid during the call: ``densities`` (read-only) of shape ``(num_densities, n, n)``, and ``coulomb`` and ``exchange`` (``None`` when not requested), filled in place, of shape ``(num_densities, n, n)`` in ``build`` and ``(3, num_atoms)`` in ``build_gradients``.
-The example below times the builds of the ``qdk`` engine:
+A J/K builder derives from :class:`~qdk_chemistry.algorithms.JKBuilder` and implements ``_run_impl``, which returns :math:`\mathbf{J}` and :math:`\mathbf{K}` for a basis set and spin densities; a J/K gradient builder derives from :class:`~qdk_chemistry.algorithms.JKGradientBuilder` and returns the gradients of :math:`E_J` and :math:`E_K`.
+In Python, :func:`~qdk_chemistry.data.symmetry.make_spin_diagonal_rank2_sbt` builds the spin-diagonal tensors.
+The SCF solver uses one builder for all iterations of a calculation, so a builder can keep data derived from the basis set, such as integral screening data, between runs.
+The example below times the builds of the ``qdk`` builder:
 
 .. tab:: Python API
 

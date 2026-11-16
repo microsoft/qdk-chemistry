@@ -294,7 +294,11 @@ This hybrid approach combines the speed of :term:`DIIS` for typical systems with
    * - ``jk_builder``
      - AlgorithmRef
      - ``AlgorithmRef("jk_builder", "qdk")``
-     - :doc:`J/K builder <jk_builder>` for the Coulomb and exchange matrices and their nuclear gradients, including the :term:`ERI` evaluation settings of the ``qdk`` builder
+     - :doc:`J/K builder <jk_builder>` for the Coulomb and exchange matrices, including the :term:`ERI` evaluation settings of the ``qdk`` builder
+   * - ``jk_gradient_builder``
+     - AlgorithmRef
+     - ``AlgorithmRef("jk_gradient_builder", "qdk")``
+     - :doc:`J/K gradient builder <jk_builder>` for the nuclear gradients of the Coulomb and exchange energies
    * - ``relativity``
      - string
      - ``""``

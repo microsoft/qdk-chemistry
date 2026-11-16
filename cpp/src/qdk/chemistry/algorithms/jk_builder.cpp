@@ -5,21 +5,24 @@
 #include "microsoft/jk_builder.hpp"
 
 #include <qdk/chemistry/algorithms/jk_builder.hpp>
-#include <stdexcept>
 
 namespace qdk::chemistry::algorithms {
-
-void JKEngine::build_gradients(const double*, size_t, size_t, size_t, double*,
-                               double*, double, double, double) {
-  throw std::runtime_error("This J/K engine does not build gradients");
-}
 
 std::unique_ptr<JKBuilder> make_microsoft_jk_builder() {
   return std::make_unique<microsoft::JKBuilder>();
 }
 
+std::unique_ptr<JKGradientBuilder> make_microsoft_jk_gradient_builder() {
+  return std::make_unique<microsoft::JKGradientBuilder>();
+}
+
 void JKBuilderFactory::register_default_instances() {
   JKBuilderFactory::register_instance(&make_microsoft_jk_builder);
+}
+
+void JKGradientBuilderFactory::register_default_instances() {
+  JKGradientBuilderFactory::register_instance(
+      &make_microsoft_jk_gradient_builder);
 }
 
 }  // namespace qdk::chemistry::algorithms
