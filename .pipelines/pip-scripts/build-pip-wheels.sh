@@ -131,7 +131,7 @@ python3 --version
 python3 -m pip install --upgrade pip
 
 # This is necessary for 1ES Geneva telemetry during the Linux builds.
-python3 -m pip install -r .pipelines/requirements.txt
+python3 -m pip install -r .pipelines/requirements.in
 
 # Snapshot the full env and feed it to a dry-run `pip install --report` so
 # Component Governance's PipReportDetector sees every package in buildenv.
