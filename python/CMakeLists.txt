@@ -126,7 +126,7 @@ else()
 endif()
 
 # Find Python first (required for pybind11)
-find_package(Python 3.10 REQUIRED COMPONENTS Interpreter Development.Module)
+find_package(Python 3.11 REQUIRED COMPONENTS Interpreter Development.Module)
 
 # Find pybind11 - tell it to use the FindPython we already called
 set(PYBIND11_FINDPYTHON ON)
@@ -155,6 +155,7 @@ pybind11_add_module(_core
     src/pybind11/data/element_data.cpp
     src/pybind11/data/orbitals.cpp
     src/pybind11/data/wavefunction.cpp
+    src/pybind11/data/mps_wavefunction.cpp
     src/pybind11/data/hamiltonian.cpp
     src/pybind11/data/settings.cpp
     src/pybind11/data/structure.cpp

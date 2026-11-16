@@ -1,0 +1,20 @@
+# Scope BUILD_TESTING with a normal variable: forcing the cache writes the visible value back,
+# so a caller's block-scoped BUILD_TESTING=OFF would turn testing off for the whole build.
+diff --git a/modules/FindOrFetchLinalgPP.cmake b/modules/FindOrFetchLinalgPP.cmake
+--- a/modules/FindOrFetchLinalgPP.cmake
++++ b/modules/FindOrFetchLinalgPP.cmake
+@@ -1,7 +1,7 @@
+ # BLAS++ / LAPACK++
+ include(CTest) # defines BUILD_TESTING option
+ set(OLD_BUILD_TESTING "${BUILD_TESTING}") # Save testing state
+-set(BUILD_TESTING OFF CACHE BOOL "Enable Testing" FORCE) # Disable LinAlgPP Testing
++set(BUILD_TESTING OFF) # Disable LinAlgPP Testing
+ 
+ if (NOT TARGET blaspp)
+     find_package(blaspp QUIET CONFIG)
+@@ -104,4 +104,4 @@ if (NOT TARGET blaspp_headers)
+ 
+ endif (NOT TARGET blaspp_headers)
+ 
+-set(BUILD_TESTING "${OLD_BUILD_TESTING}" CACHE BOOL "Enable Testing" FORCE) # Potentially re-enable testing based on saved state
++set(BUILD_TESTING "${OLD_BUILD_TESTING}") # Potentially re-enable testing based on saved state

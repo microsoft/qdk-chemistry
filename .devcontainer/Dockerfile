@@ -113,7 +113,7 @@ ENV VIRTUAL_ENV=/home/$USERNAME/qdk_chemistry_venv \
 RUN python -m venv "$VIRTUAL_ENV" \
     && python -m pip install --no-cache-dir --upgrade pip setuptools wheel \
     && python -m pip install --no-cache-dir \
-    "scikit-build-core>=0.10.0" \
+    "scikit-build-core>=1.0" \
     "pybind11>=2.13.6" \
     "numpy>=2.0.0,<2.4.0" \
     && echo "source $VIRTUAL_ENV/bin/activate" >> ~/.bashrc

@@ -20,10 +20,19 @@ def _is_release_build() -> bool:
     return os.environ.get(_RELEASE_BUILD_ENV, "").strip().lower() not in _FALSEY
 
 
-def dynamic_metadata(field, settings):
+def _version_file(settings) -> Path:
+    """Locate VERSION: the repo root in a checkout, the bundled copy in an SDist."""
+    if Path("PKG-INFO").is_file():
+        return Path("VERSION")
+    return Path(settings.get("input", "../VERSION"))
+
+
+def dynamic_metadata(settings, project):  # noqa: ARG001
     """Return version from VERSION file, appending +local if HEAD is not release-tagged."""
-    assert field == "version"
-    version_file = Path(settings.get("input", "../VERSION"))
+    return {"version": _compute_version(_version_file(settings))}
+
+
+def _compute_version(version_file: Path) -> str:
     version = version_file.read_text().strip()
 
     # If VERSION already carries a pre-release/dev suffix (e.g. CI set it), use as-is.

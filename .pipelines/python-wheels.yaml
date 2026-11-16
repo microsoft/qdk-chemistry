@@ -55,13 +55,11 @@ parameters:
 - name: pythonVersions
   type: stringList
   values:
-  - 3.10
   - 3.11
   - 3.12
   - 3.13
   - 3.14
   default:
-  - 3.10
   - 3.11
   - 3.12
   - 3.13
@@ -119,7 +117,7 @@ extends:
       displayName: Build C++ Deps and Python Wheels
       jobs:
       # Windows C++ dependency build (vcpkg + FetchContent targets).
-      # Runs once so the 5 parallel Python-version wheel jobs share a single
+      # Runs once so the parallel Python-version wheel jobs share a single
       # warm cache entry instead of each rebuilding deps independently.
       # Gated on windows_x86_64 being present in the matrix, so overriding the matrix (e.g. Linux-only) doesn't
       # waste a Windows agent on an unused dependency build.
@@ -225,11 +223,9 @@ extends:
           strategy:
             matrix:
               ${{ each py in parameters.pythonVersions }}:
-                # CPython ships win-arm64 builds only from 3.11 onwards.
-                ${{ if not(and(eq(target.name, 'windows_aarch64'), eq(py, '3.10'))) }}:
-                  Py${{ py }}:
-                    pythonVersion: ${{ py }}
-            maxParallel: 5
+                Py${{ py }}:
+                  pythonVersion: ${{ py }}
+            maxParallel: 4
           displayName: Build ${{ target.march }} ${{ target.os }} wheels
           variables:
             # Must stay a literal value: ADO's variables: block doesn't expand $VAR.
@@ -400,9 +396,6 @@ extends:
           isProduction: true
           inputs:     # Declare all build artifacts to be consumed in the release job
           - input: pipelineArtifact
-            artifactName: linux-x86_64-wheels-python3.10
-            targetPath: $(System.DefaultWorkingDirectory)/artifacts/linux-x86_64-wheels-python3.10
-          - input: pipelineArtifact
             artifactName: linux-x86_64-wheels-python3.11
             targetPath: $(System.DefaultWorkingDirectory)/artifacts/linux-x86_64-wheels-python3.11
           - input: pipelineArtifact
@@ -414,9 +407,6 @@ extends:
           - input: pipelineArtifact
             artifactName: linux-x86_64-wheels-python3.14
             targetPath: $(System.DefaultWorkingDirectory)/artifacts/linux-x86_64-wheels-python3.14
-          - input: pipelineArtifact
-            artifactName: linux-aarch64-wheels-python3.10
-            targetPath: $(System.DefaultWorkingDirectory)/artifacts/linux-aarch64-wheels-python3.10
           - input: pipelineArtifact
             artifactName: linux-aarch64-wheels-python3.11
             targetPath: $(System.DefaultWorkingDirectory)/artifacts/linux-aarch64-wheels-python3.11
@@ -430,9 +420,6 @@ extends:
             artifactName: linux-aarch64-wheels-python3.14
             targetPath: $(System.DefaultWorkingDirectory)/artifacts/linux-aarch64-wheels-python3.14
           - input: pipelineArtifact
-            artifactName: macos-aarch64-wheels-python3.10
-            targetPath: $(System.DefaultWorkingDirectory)/artifacts/macos-aarch64-wheels-python3.10
-          - input: pipelineArtifact
             artifactName: macos-aarch64-wheels-python3.11
             targetPath: $(System.DefaultWorkingDirectory)/artifacts/macos-aarch64-wheels-python3.11
           - input: pipelineArtifact
@@ -445,9 +432,6 @@ extends:
             artifactName: macos-aarch64-wheels-python3.14
             targetPath: $(System.DefaultWorkingDirectory)/artifacts/macos-aarch64-wheels-python3.14
           - input: pipelineArtifact
-            artifactName: windows-x86_64-wheels-python3.10
-            targetPath: $(System.DefaultWorkingDirectory)/artifacts/windows-x86_64-wheels-python3.10
-          - input: pipelineArtifact
             artifactName: windows-x86_64-wheels-python3.11
             targetPath: $(System.DefaultWorkingDirectory)/artifacts/windows-x86_64-wheels-python3.11
           - input: pipelineArtifact
@@ -459,7 +443,6 @@ extends:
           - input: pipelineArtifact
             artifactName: windows-x86_64-wheels-python3.14
             targetPath: $(System.DefaultWorkingDirectory)/artifacts/windows-x86_64-wheels-python3.14
-          # No 3.10 entry: CPython ships win-arm64 builds only from 3.11 onwards.
           - input: pipelineArtifact
             artifactName: windows-aarch64-wheels-python3.11
             targetPath: $(System.DefaultWorkingDirectory)/artifacts/windows-aarch64-wheels-python3.11

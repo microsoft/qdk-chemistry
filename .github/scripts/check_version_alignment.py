@@ -6,7 +6,7 @@ all version-dependent files are configured to read from it:
 - VERSION (canonical source of truth)
 - cpp/CMakeLists.txt (reads from VERSION via file(READ ...))
 - python/CMakeLists.txt (reads from VERSION via file(READ ...))
-- python/pyproject.toml (uses scikit-build-core metadata provider)
+- python/pyproject.toml (uses the _dev_version dynamic-metadata provider)
 - python/src/qdk_chemistry/__init__.py (uses importlib.metadata with fallback)
 - python/src/qdk_chemistry/utils/telemetry.py (uses importlib.metadata with fallback)
 - docs/source/conf.py (uses Path.read_text())
@@ -85,17 +85,17 @@ def check_versions() -> int:
                 "(CMake won't reconfigure when VERSION changes)"
             )
 
-    # Check 2: pyproject.toml uses scikit-build-core metadata provider
+    # Check 2: pyproject.toml uses the _dev_version dynamic-metadata provider
     pyproject = repo_root / "python/pyproject.toml"
     if pyproject.exists():
         content = pyproject.read_text()
-        if 'metadata.version.provider = "_dev_version"' not in content:
+        if 'provider = {path = ".", module = "_dev_version"}' not in content:
             errors.append(
-                "pyproject.toml: missing _dev_version metadata.version.provider"
+                "pyproject.toml: missing _dev_version [[tool.dynamic-metadata]] provider"
             )
-        if 'metadata.version.input = "../VERSION"' not in content:
+        if 'input = "../VERSION"' not in content:
             errors.append(
-                "pyproject.toml: missing metadata.version.input pointing to VERSION"
+                "pyproject.toml: missing dynamic-metadata input pointing to VERSION"
             )
         if 'dynamic = ["version"]' not in content:
             errors.append('pyproject.toml: missing dynamic = ["version"]')
