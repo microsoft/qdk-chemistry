@@ -69,10 +69,10 @@ void bind_auxiliary_basis(py::module& module) {
   py::enum_<AuxiliaryBasisRole>(
       module, "AuxiliaryBasisRole",
       "Algorithm-facing purpose served by an auxiliary basis")
-      .value("JFIT", AuxiliaryBasisRole::JFit, "Coulomb density-fitting basis")
-      .value("JKFIT", AuxiliaryBasisRole::JKFit,
+      .value("JFit", AuxiliaryBasisRole::JFit, "Coulomb density-fitting basis")
+      .value("JKFit", AuxiliaryBasisRole::JKFit,
              "Coulomb and exchange density-fitting basis")
-      .value("RIFIT", AuxiliaryBasisRole::RIFit, "Correlation-fitting basis")
+      .value("RIFit", AuxiliaryBasisRole::RIFit, "Correlation-fitting basis")
       .value("CABS", AuxiliaryBasisRole::CABS, "Complementary auxiliary basis");
 
   py::class_<AuxiliaryBasis, DataClass, py::smart_holder> auxiliary_basis(
@@ -228,16 +228,16 @@ Get the number of atoms the auxiliary basis is blocked over.
 Returns:
     int: Number of atoms
 )")
-      .def("get_num_auxiliary_orbitals",
-           &AuxiliaryBasis::get_num_auxiliary_orbitals,
+      .def("get_num_atomic_orbitals",
+           &AuxiliaryBasis::get_num_atomic_orbitals,
            R"(
-Get the total number of auxiliary orbitals.
+Get the total number of atomic orbitals.
 
 The count depends on the atomic orbital type: a d shell contributes 5 spherical
 or 6 Cartesian orbitals.
 
 Returns:
-    int: Total number of auxiliary orbitals from all shells
+    int: Total number of atomic orbitals from all shells
 )")
       .def_static("from_basis_name", &AuxiliaryBasis::from_basis_name,
                   R"(
@@ -484,7 +484,7 @@ Raises:
 Check whether an auxiliary basis is associated with an exact role.
 
 This method does not apply compatibility fallbacks. For example, a collection
-containing only ``JKFIT`` reports ``False`` for ``JFIT``.
+containing only ``JKFit`` reports ``False`` for ``JFit``.
 
 Args:
     role (AuxiliaryBasisRole): Exact role to inspect
@@ -511,8 +511,8 @@ Raises:
            R"(
 Resolve an auxiliary basis compatible with a required role.
 
-Exact associations take precedence. A ``JKFIT`` basis may satisfy a ``JFIT``
-request, but a ``JFIT`` basis cannot satisfy ``JKFIT``. Other roles require an
+Exact associations take precedence. A ``JKFit`` basis may satisfy a ``JFit``
+request, but a ``JFit`` basis cannot satisfy ``JKFit``. Other roles require an
 exact match.
 
 Args:

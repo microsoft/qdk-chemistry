@@ -130,10 +130,10 @@ class AuxiliaryBasis : public DataClass,
   size_t get_num_atoms() const;
 
   /**
-   * @brief Get the total number of auxiliary orbitals.
+   * @brief Get the total number of atomic orbitals.
    * @return Orbital count under the selected orbital representation
    */
-  size_t get_num_auxiliary_orbitals() const;
+  size_t get_num_atomic_orbitals() const;
 
   /**
    * @brief Load one named auxiliary basis for every atom.

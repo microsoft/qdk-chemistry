@@ -8,7 +8,6 @@
 #include <cstddef>
 #include <nlohmann/json_fwd.hpp>
 #include <stdexcept>
-#include <string>
 #include <vector>
 
 namespace qdk::chemistry::data {
@@ -205,44 +204,5 @@ struct Shell {
   static Shell from_json(const nlohmann::json& json, size_t atom_index,
                          bool allow_radial_powers = false);
 };
-
-/**
- * @brief Convert an orbital type to its canonical lowercase name.
- * @param orbital_type Orbital type to convert
- * @return @c ul, @c s, @c p, @c d, @c f, @c g, @c h, @c i, or @c unknown
- */
-std::string orbital_type_to_string(OrbitalType orbital_type);
-
-/**
- * @brief Convert angular momentum to an orbital type.
- * @param l Angular momentum, from -1 through
- *        @ref MAX_ORBITAL_ANGULAR_MOMENTUM
- * @return Corresponding orbital type
- * @throws std::invalid_argument if @p l is unsupported
- */
-OrbitalType l_to_orbital_type(int l);
-
-/**
- * @brief Parse an orbital type name case-insensitively.
- * @param orbital_string Orbital name
- * @return Corresponding orbital type
- * @throws std::invalid_argument if the name is unknown
- */
-OrbitalType string_to_orbital_type(const std::string& orbital_string);
-
-/**
- * @brief Convert an atomic-orbital representation to its canonical name.
- * @param atomic_orbital_type Representation to convert
- * @return @c spherical, @c cartesian, or @c unknown
- */
-std::string atomic_orbital_type_to_string(AOType atomic_orbital_type);
-
-/**
- * @brief Parse an atomic-orbital representation case-insensitively.
- * @param basis_string @c spherical, @c sph, @c cartesian, or @c cart
- * @return Parsed atomic-orbital representation
- * @throws std::invalid_argument if the name is unknown
- */
-AOType string_to_atomic_orbital_type(const std::string& basis_string);
 
 }  // namespace qdk::chemistry::data

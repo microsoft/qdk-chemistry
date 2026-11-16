@@ -49,9 +49,9 @@ basis_from_index = BasisSet.from_index_map(index_basis_map, structure)
 # Build the primary and auxiliary inputs independently
 primary_basis = BasisSet.from_basis_name("def2-svp", structure)
 aux_basis = AuxiliaryBasis.from_basis_name("def2-universal-jfit", structure)
-auxiliary_bases = AuxiliaryBasisCollection({AuxiliaryBasisRole.JFIT: aux_basis})
+auxiliary_bases = AuxiliaryBasisCollection({AuxiliaryBasisRole.JFit: aux_basis})
 
-assert auxiliary_bases.get_auxiliary_basis(AuxiliaryBasisRole.JFIT) is aux_basis
+assert auxiliary_bases.get_auxiliary_basis(AuxiliaryBasisRole.JFit) is aux_basis
 assert (
     primary_basis.get_structure().content_hash()
     == aux_basis.get_structure().content_hash()
@@ -167,8 +167,8 @@ aux_shells = [
 
 # Construct a named auxiliary basis for this molecular structure
 auxiliary_basis = AuxiliaryBasis("my-aux-fit", aux_shells, structure)
-auxiliary_bases = AuxiliaryBasisCollection({AuxiliaryBasisRole.RIFIT: auxiliary_basis})
-stored_auxiliary = auxiliary_bases.get_auxiliary_basis(AuxiliaryBasisRole.RIFIT)
+auxiliary_bases = AuxiliaryBasisCollection({AuxiliaryBasisRole.RIFit: auxiliary_basis})
+stored_auxiliary = auxiliary_bases.get_auxiliary_basis(AuxiliaryBasisRole.RIFit)
 
 # Query auxiliary data
 print(f"Auxiliary name: {stored_auxiliary.get_name()}")

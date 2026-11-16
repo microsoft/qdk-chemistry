@@ -66,7 +66,7 @@ Shell::Shell(size_t atom_idx, OrbitalType orb_type,
 
 nlohmann::json Shell::to_json(const bool include_radial_powers) const {
   nlohmann::json json;
-  json["orbital_type"] = orbital_type_to_string(orbital_type);
+  json["orbital_type"] = detail::orbital_type_to_string(orbital_type);
   json["exponents"] = std::vector<double>(exponents.data(),
                                           exponents.data() + exponents.size());
   json["coefficients"] = std::vector<double>(
@@ -81,7 +81,7 @@ nlohmann::json Shell::to_json(const bool include_radial_powers) const {
 Shell Shell::from_json(const nlohmann::json& json, const size_t atom_index,
                        const bool allow_radial_powers) {
   const auto type =
-      string_to_orbital_type(json.at("orbital_type").get<std::string>());
+      detail::string_to_orbital_type(json.at("orbital_type").get<std::string>());
   const auto exponents = json.at("exponents").get<std::vector<double>>();
   const auto coefficients = json.at("coefficients").get<std::vector<double>>();
   if (json.contains("rpowers")) {
@@ -206,8 +206,6 @@ size_t count_orbitals(const ShellsPerAtom& shells_per_atom,
   return result;
 }
 
-}  // namespace detail
-
 std::string orbital_type_to_string(const OrbitalType orbital_type) {
   switch (orbital_type) {
     case OrbitalType::UL:
@@ -290,5 +288,7 @@ AOType string_to_atomic_orbital_type(const std::string& basis_string) {
   throw std::invalid_argument("Unknown atomic orbital type string: " +
                               basis_string);
 }
+
+}  // namespace detail
 
 }  // namespace qdk::chemistry::data

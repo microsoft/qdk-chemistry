@@ -1968,18 +1968,18 @@ std::shared_ptr<BasisSet> BasisSet::from_json(const nlohmann::json& j) {
 
 std::string BasisSet::orbital_type_to_string(OrbitalType orbital_type) {
   QDK_LOG_TRACE_ENTERING();
-  return qdk::chemistry::data::orbital_type_to_string(orbital_type);
+  return detail::orbital_type_to_string(orbital_type);
 }
 
 OrbitalType BasisSet::l_to_orbital_type(int l) {
   QDK_LOG_TRACE_ENTERING();
-  return qdk::chemistry::data::l_to_orbital_type(l);
+  return detail::l_to_orbital_type(l);
 }
 
 OrbitalType BasisSet::string_to_orbital_type(
     const std::string& orbital_string) {
   QDK_LOG_TRACE_ENTERING();
-  return qdk::chemistry::data::string_to_orbital_type(orbital_string);
+  return detail::string_to_orbital_type(orbital_string);
 }
 
 int BasisSet::get_angular_momentum(OrbitalType orbital_type) {
@@ -2000,14 +2000,13 @@ int BasisSet::get_num_orbitals_for_l(int l, AOType atomic_orbital_type) {
 std::string BasisSet::atomic_orbital_type_to_string(
     AOType atomic_orbital_type) {
   QDK_LOG_TRACE_ENTERING();
-  return qdk::chemistry::data::atomic_orbital_type_to_string(
-      atomic_orbital_type);
+  return detail::atomic_orbital_type_to_string(atomic_orbital_type);
 }
 
 AOType BasisSet::string_to_atomic_orbital_type(
     const std::string& basis_string) {
   QDK_LOG_TRACE_ENTERING();
-  return qdk::chemistry::data::string_to_atomic_orbital_type(basis_string);
+  return detail::string_to_atomic_orbital_type(basis_string);
 }
 
 void BasisSet::_clear_maps() {

@@ -70,8 +70,8 @@ def test_orbital_counts_and_shell_access():
     spherical = AuxiliaryBasis("spherical", _make_shells(), structure)
     cartesian = AuxiliaryBasis("cartesian", _make_shells(), structure, AOType.Cartesian)
 
-    assert spherical.get_num_auxiliary_orbitals() == 10
-    assert cartesian.get_num_auxiliary_orbitals() == 11
+    assert spherical.get_num_atomic_orbitals() == 10
+    assert cartesian.get_num_atomic_orbitals() == 11
     assert cartesian.get_atomic_orbital_type() == AOType.Cartesian
     assert spherical.get_shell(0).orbital_type == OrbitalType.S
     assert len(spherical.get_shells_for_atom(0)) == 2
@@ -165,7 +165,7 @@ def test_summary_and_data_type():
 
     summary = basis.get_summary()
     assert "AuxiliaryBasis: summary-aux" in summary
-    assert "Number of auxiliary orbitals: 10" in summary
+    assert "Number of atomic orbitals: 10" in summary
     assert str(basis) == summary
     assert repr(basis) == summary
     assert AuxiliaryBasis._data_type_name == "auxiliary_basis"
@@ -205,20 +205,20 @@ def test_role_keyed_collection_and_persistence(tmp_path: Path):
     jkfit = AuxiliaryBasis("jkfit-basis", _make_shells(), structure)
     empty = AuxiliaryBasisCollection()
 
-    jk_collection = with_auxiliary_basis(empty, AuxiliaryBasisRole.JKFIT, jkfit)
-    assert not empty.has_auxiliary_basis(AuxiliaryBasisRole.JKFIT)
-    assert jk_collection.resolve_auxiliary_basis(AuxiliaryBasisRole.JFIT).get_name() == "jkfit-basis"
+    jk_collection = with_auxiliary_basis(empty, AuxiliaryBasisRole.JKFit, jkfit)
+    assert not empty.has_auxiliary_basis(AuxiliaryBasisRole.JKFit)
+    assert jk_collection.resolve_auxiliary_basis(AuxiliaryBasisRole.JFit).get_name() == "jkfit-basis"
 
-    j_collection = with_auxiliary_basis(empty, AuxiliaryBasisRole.JFIT, jfit)
-    with pytest.raises(IndexError, match=r"JKFIT|jkfit"):
-        j_collection.resolve_auxiliary_basis(AuxiliaryBasisRole.JKFIT)
+    j_collection = with_auxiliary_basis(empty, AuxiliaryBasisRole.JFit, jfit)
+    with pytest.raises(IndexError, match="jkfit"):
+        j_collection.resolve_auxiliary_basis(AuxiliaryBasisRole.JKFit)
 
-    collection = with_auxiliary_basis(jk_collection, AuxiliaryBasisRole.JFIT, jfit)
+    collection = with_auxiliary_basis(jk_collection, AuxiliaryBasisRole.JFit, jfit)
     assert set(collection.get_auxiliary_bases()) == {
-        AuxiliaryBasisRole.JFIT,
-        AuxiliaryBasisRole.JKFIT,
+        AuxiliaryBasisRole.JFit,
+        AuxiliaryBasisRole.JKFit,
     }
-    assert collection.get_auxiliary_basis(AuxiliaryBasisRole.JFIT).get_name() == "jfit-basis"
+    assert collection.get_auxiliary_basis(AuxiliaryBasisRole.JFit).get_name() == "jfit-basis"
     assert collection.content_hash() != empty.content_hash()
 
     restored = AuxiliaryBasisCollection.from_json(collection.to_json())
@@ -249,17 +249,17 @@ def test_collection_rejects_invalid_entries():
     with pytest.raises(ValueError, match="same molecular structure"):
         AuxiliaryBasisCollection(
             {
-                AuxiliaryBasisRole.JFIT: matching,
-                AuxiliaryBasisRole.RIFIT: mismatched,
+                AuxiliaryBasisRole.JFit: matching,
+                AuxiliaryBasisRole.RIFit: mismatched,
             }
         )
 
     with pytest.raises(ValueError, match="cannot be null"):
-        AuxiliaryBasisCollection({AuxiliaryBasisRole.JFIT: None})
+        AuxiliaryBasisCollection({AuxiliaryBasisRole.JFit: None})
 
-    collection = AuxiliaryBasisCollection({AuxiliaryBasisRole.JFIT: matching})
+    collection = AuxiliaryBasisCollection({AuxiliaryBasisRole.JFit: matching})
     with pytest.raises(ValueError, match="same molecular structure"):
-        with_auxiliary_basis(collection, AuxiliaryBasisRole.RIFIT, mismatched)
+        with_auxiliary_basis(collection, AuxiliaryBasisRole.RIFit, mismatched)
 
 
 def test_collection_is_independent_of_primary_basis():
@@ -268,8 +268,8 @@ def test_collection_is_independent_of_primary_basis():
     primary_hash = primary.content_hash()
     auxiliary = AuxiliaryBasis("jfit", _make_shells(), structure)
 
-    collection = AuxiliaryBasisCollection({AuxiliaryBasisRole.JFIT: auxiliary})
+    collection = AuxiliaryBasisCollection({AuxiliaryBasisRole.JFit: auxiliary})
 
     assert primary.content_hash() == primary_hash
     assert "auxiliary_bases" not in primary.to_json()
-    assert collection.get_auxiliary_basis(AuxiliaryBasisRole.JFIT).content_hash() == auxiliary.content_hash()
+    assert collection.get_auxiliary_basis(AuxiliaryBasisRole.JFit).content_hash() == auxiliary.content_hash()

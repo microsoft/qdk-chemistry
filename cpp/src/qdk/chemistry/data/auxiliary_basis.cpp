@@ -94,7 +94,7 @@ AuxiliaryBasis::AuxiliaryBasis(std::string name, std::vector<Shell> shells,
       throw std::invalid_argument(
           "Auxiliary shells cannot use the ECP local-potential orbital type");
     }
-    l_to_orbital_type(shell.get_angular_momentum());
+    detail::l_to_orbital_type(shell.get_angular_momentum());
     if (shell.exponents.size() == 0 || shell.coefficients.size() == 0 ||
         shell.exponents.size() != shell.coefficients.size()) {
       throw std::invalid_argument("AuxiliaryBasis contains an invalid shell");
@@ -150,7 +150,7 @@ size_t AuxiliaryBasis::get_num_shells() const {
 
 size_t AuxiliaryBasis::get_num_atoms() const { return _shells_per_atom.size(); }
 
-size_t AuxiliaryBasis::get_num_auxiliary_orbitals() const {
+size_t AuxiliaryBasis::get_num_atomic_orbitals() const {
   return detail::count_orbitals(_shells_per_atom, _atomic_orbital_type);
 }
 
@@ -225,10 +225,10 @@ std::string AuxiliaryBasis::get_summary() const {
   std::ostringstream output;
   output << "AuxiliaryBasis: " << _name << "\n"
          << "Basis type: "
-         << atomic_orbital_type_to_string(_atomic_orbital_type) << "\n"
+         << detail::atomic_orbital_type_to_string(_atomic_orbital_type) << "\n"
          << "Number of atoms: " << get_num_atoms() << "\n"
          << "Number of shells: " << get_num_shells() << "\n"
-         << "Number of auxiliary orbitals: " << get_num_auxiliary_orbitals();
+         << "Number of atomic orbitals: " << get_num_atomic_orbitals();
   return output.str();
 }
 
@@ -248,7 +248,7 @@ nlohmann::json AuxiliaryBasis::to_json() const {
   json["version"] = SERIALIZATION_VERSION;
   json["name"] = _name;
   json["atomic_orbital_type"] =
-      atomic_orbital_type_to_string(_atomic_orbital_type);
+      detail::atomic_orbital_type_to_string(_atomic_orbital_type);
   json["structure"] = _structure->to_json();
   json["atoms"] = nlohmann::json::array();
   for (size_t atom_index = 0; atom_index < _shells_per_atom.size();
@@ -288,7 +288,7 @@ std::shared_ptr<AuxiliaryBasis> AuxiliaryBasis::from_json(
   return std::make_shared<AuxiliaryBasis>(
       json.at("name").get<std::string>(), std::move(shells),
       std::move(structure),
-      string_to_atomic_orbital_type(
+      detail::string_to_atomic_orbital_type(
           json.value("atomic_orbital_type", "spherical")));
 }
 

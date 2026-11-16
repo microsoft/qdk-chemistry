@@ -135,8 +135,8 @@ TEST_F(AuxiliaryBasisTest, SphericalAndCartesianOrbitalCounts) {
   AuxiliaryBasis cartesian("cartesian", make_shells(), structure,
                            AOType::Cartesian);
 
-  EXPECT_EQ(10u, spherical.get_num_auxiliary_orbitals());
-  EXPECT_EQ(11u, cartesian.get_num_auxiliary_orbitals());
+  EXPECT_EQ(10u, spherical.get_num_atomic_orbitals());
+  EXPECT_EQ(11u, cartesian.get_num_atomic_orbitals());
   EXPECT_EQ(AOType::Cartesian, cartesian.get_atomic_orbital_type());
 }
 
@@ -253,7 +253,7 @@ TEST_F(AuxiliaryBasisTest, HighestSupportedAngularMomentumRoundTrips) {
   shells.emplace_back(0, OrbitalType::I, std::vector{1.0}, std::vector{1.0});
   AuxiliaryBasis basis(shells, make_structure({"H"}));
 
-  EXPECT_EQ(13u, basis.get_num_auxiliary_orbitals());
+  EXPECT_EQ(13u, basis.get_num_atomic_orbitals());
   EXPECT_EQ("i", basis.to_json()["atoms"][0]["shells"][0]["orbital_type"]);
   auto from_json = AuxiliaryBasis::from_json(basis.to_json());
   EXPECT_EQ(basis.content_hash(), from_json->content_hash());
@@ -287,7 +287,7 @@ TEST_F(AuxiliaryBasisTest, SummaryAndDataType) {
   EXPECT_NE(std::string::npos,
             basis.get_summary().find("AuxiliaryBasis: summary-aux"));
   EXPECT_NE(std::string::npos,
-            basis.get_summary().find("Number of auxiliary orbitals: 10"));
+            basis.get_summary().find("Number of atomic orbitals: 10"));
 }
 
 TEST_F(AuxiliaryBasisTest, JSONRoundTripsInMemoryAndFile) {
