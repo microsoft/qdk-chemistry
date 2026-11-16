@@ -267,8 +267,14 @@ class ERI {
     const double exchange_scale = alpha + beta;
     const bool need_erf_exchange = K && is_rsx && std::abs(beta) > 1e-12;
 
-    // Compute shell block norm of P
-    const auto P_shnrm = compute_shellblock_norm(obs_, P, num_atomic_orbitals);
+    // Shell block norms bounding every density matrix
+    RowMajorMatrix P_shnrm =
+        compute_shellblock_norm(obs_, P, num_atomic_orbitals);
+    for (size_t idm = 1; idm < num_density_matrices; ++idm) {
+      P_shnrm = P_shnrm.cwiseMax(compute_shellblock_norm(
+          obs_, P + idm * num_atomic_orbitals * num_atomic_orbitals,
+          num_atomic_orbitals));
+    }
     const auto P_shmax = P_shnrm.maxCoeff();
 
     // Check for NaN/Inf values
@@ -690,7 +696,13 @@ class ERI {
       }
       P_J = P_total.data();
     }
-    const auto P_shnrm = compute_shellblock_norm(obs_, P, num_atomic_orbitals);
+    // Shell block norms bounding the total and every spin density matrix
+    RowMajorMatrix P_shnrm =
+        compute_shellblock_norm(obs_, P_J, num_atomic_orbitals);
+    for (size_t idm = 0; idm < spin_density_factor_; ++idm) {
+      P_shnrm = P_shnrm.cwiseMax(compute_shellblock_norm(
+          obs_, P + idm * num_atomic_orbitals2, num_atomic_orbitals));
+    }
 
     const auto ln_max_engine_precision = std::log(max_engine_precision);
     struct OrderedShellPair {

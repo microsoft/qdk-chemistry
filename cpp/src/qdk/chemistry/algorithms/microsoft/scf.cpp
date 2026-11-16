@@ -17,6 +17,7 @@
 #include <qdk/chemistry/algorithms/jk_builder.hpp>
 #include <qdk/chemistry/data/wavefunction_containers/state_vector.hpp>
 #include <qdk/chemistry/utils/logger.hpp>
+#include <vector>
 
 #ifdef _OPENMP
 #include <omp.h>
@@ -49,6 +50,19 @@ ScfSettings::ScfSettings()
               data::AlgorithmRef("jk_gradient_builder", "qdk"),
               "J/K gradient builder for the nuclear gradients of the Coulomb "
               "and exchange energies");
+  // Settings of earlier releases, forwarded to the J/K builders
+  set_default("eri_method", std::string("direct"),
+              "Deprecated: set eri_method in the jk_builder",
+              data::ListConstraint<std::string>{
+                  {std::vector<std::string>{"direct", "incore"}}},
+              false);
+  set_default("eri_use_atomics", false,
+              "Deprecated: set eri_use_atomics in the jk_builder", std::nullopt,
+              false);
+  set_default("shell_pair_threshold", 1e-12,
+              "Deprecated: set shell_pair_threshold in the jk_builder and "
+              "jk_gradient_builder",
+              std::nullopt, false);
   set_default("relativity", std::string(""),
               "Relativistic treatment: '' for nonrelativistic, "
               "'sf-x2c' for spin-free X2C with basis decontraction and "
@@ -98,18 +112,8 @@ class JKBuilderERI : public qcs::ERI {
     set_exchange_operator(alpha, beta, omega);
     auto [coulomb, exchange] =
         _jk_gradient_builder->run(_qdk_basis_set, spin_densities(P, true));
-    const size_t num_atoms = basis_set_.mol->n_atoms;
-    using Gradient = Eigen::Matrix<double, 3, Eigen::Dynamic, Eigen::RowMajor>;
-    if (dJ) {
-      Eigen::Map<Gradient>(dJ, 3, num_atoms) =
-          Eigen::Map<const Eigen::Matrix3Xd>(coulomb->get_values().data(), 3,
-                                             num_atoms);
-    }
-    if (dK) {
-      Eigen::Map<Gradient>(dK, 3, num_atoms) =
-          Eigen::Map<const Eigen::Matrix3Xd>(exchange->get_values().data(), 3,
-                                             num_atoms);
-    }
+    copy_gradients(coulomb, dJ);
+    copy_gradients(exchange, dK);
   }
 
  protected:
@@ -118,8 +122,8 @@ class JKBuilderERI : public qcs::ERI {
     set_exchange_operator(alpha, beta, omega);
     auto [coulomb, exchange] =
         _jk_builder->run(_qdk_basis_set, spin_densities(P, false));
-    copy_spin_blocks(*coulomb, J);
-    copy_spin_blocks(*exchange, K);
+    copy_spin_blocks(coulomb, J);
+    copy_spin_blocks(exchange, K);
   }
 
   void quarter_trans_impl(size_t, const double*, double*) override {
@@ -160,16 +164,38 @@ class JKBuilderERI : public qcs::ERI {
                                            restricted));
   }
 
-  void copy_spin_blocks(const data::SymmetryBlockedTensor<2>& X,
-                        double* Y) const {
+  void copy_spin_blocks(
+      const std::shared_ptr<const data::SymmetryBlockedTensor<2>>& X,
+      double* Y) const {
     if (!Y) return;
     const size_t n = basis_set_.num_atomic_orbitals;
-    const auto alpha = data::axes::alpha();
-    const auto beta = data::axes::beta();
-    Eigen::Map<Eigen::MatrixXd>(Y, n, n) = X.block({alpha, alpha});
-    if (has_spin_split_density()) {
-      Eigen::Map<Eigen::MatrixXd>(Y + n * n, n, n) = X.block({beta, beta});
+    for (size_t s = 0; s < (has_spin_split_density() ? 2u : 1u); ++s) {
+      const auto spin = s == 0 ? data::axes::alpha() : data::axes::beta();
+      const auto* block =
+          X && X->has_block({spin, spin}) ? &X->block({spin, spin}) : nullptr;
+      if (!block || static_cast<size_t>(block->rows()) != n ||
+          static_cast<size_t>(block->cols()) != n) {
+        throw std::runtime_error("J/K builder '" + _jk_builder->name() +
+                                 "' returned no " + std::to_string(n) + " x " +
+                                 std::to_string(n) + " spin blocks");
+      }
+      Eigen::Map<Eigen::MatrixXd>(Y + s * n * n, n, n) = *block;
     }
+  }
+
+  void copy_gradients(const std::shared_ptr<data::NuclearGradients>& gradients,
+                      double* d) const {
+    if (!d) return;
+    const size_t num_atoms = basis_set_.mol->n_atoms;
+    if (!gradients ||
+        static_cast<size_t>(gradients->get_values().size()) != 3 * num_atoms) {
+      throw std::runtime_error(
+          "J/K gradient builder '" + _jk_gradient_builder->name() +
+          "' returned no gradients of " + std::to_string(num_atoms) + " atoms");
+    }
+    using Gradient = Eigen::Matrix<double, 3, Eigen::Dynamic, Eigen::RowMajor>;
+    Eigen::Map<Gradient>(d, 3, num_atoms) = Eigen::Map<const Eigen::Matrix3Xd>(
+        gradients->get_values().data(), 3, num_atoms);
   }
 
   std::shared_ptr<data::BasisSet> _qdk_basis_set;
@@ -389,14 +415,37 @@ ScfCalculationResult ScfSolver::_run_with_options(
   }
   ms_scf_config->k_eri = ms_scf_config->eri;
   ms_scf_config->grad_eri = ms_scf_config->eri;
-  ms_scf_config->eri_factory = [this, qdk_raw_basis_set](
+  // Deprecated settings that differ from their defaults
+  std::vector<std::string> deprecated_settings;
+  if (_settings->get<std::string>("eri_method") != "direct") {
+    deprecated_settings.push_back("eri_method");
+  }
+  if (_settings->get<bool>("eri_use_atomics")) {
+    deprecated_settings.push_back("eri_use_atomics");
+  }
+  if (_settings->get<double>("shell_pair_threshold") != 1e-12) {
+    deprecated_settings.push_back("shell_pair_threshold");
+  }
+  for (const auto& key : deprecated_settings) {
+    QDK_LOGGER().warn(
+        "The '{}' setting of the qdk SCF solver is deprecated and will be "
+        "removed in a future release; set it in the jk_builder or "
+        "jk_gradient_builder AlgorithmRef instead",
+        key);
+  }
+  ms_scf_config->eri_factory = [this, qdk_raw_basis_set, deprecated_settings](
                                    qcs::BasisSet& basis_set,
                                    const qcs::SCFConfig& cfg) {
     auto jk_builder = _create_nested<JKBuilderFactory>("jk_builder");
     auto jk_gradient_builder =
         _create_nested<JKGradientBuilderFactory>("jk_gradient_builder");
-    jk_builder->settings().set("eri_threshold", cfg.eri.eri_threshold);
-    jk_gradient_builder->settings().set("eri_threshold", cfg.eri.eri_threshold);
+    for (auto* settings :
+         {&jk_builder->settings(), &jk_gradient_builder->settings()}) {
+      settings->set("eri_threshold", cfg.eri.eri_threshold);
+      for (const auto& key : deprecated_settings) {
+        if (settings->has(key)) settings->set(key, _settings->get(key));
+      }
+    }
     return std::make_shared<JKBuilderERI>(
         qdk_raw_basis_set, std::move(jk_builder),
         std::move(jk_gradient_builder), basis_set, cfg);

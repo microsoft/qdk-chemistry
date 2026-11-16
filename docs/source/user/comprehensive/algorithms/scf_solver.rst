@@ -308,6 +308,9 @@ This hybrid approach combines the speed of :term:`DIIS` for typical systems with
      - ``1073741824``
      - Number of steps between Fock matrix resets
 
+The ``eri_method``, ``eri_use_atomics``, and ``shell_pair_threshold`` settings are deprecated; the solver forwards them to its :doc:`J/K builders <jk_builder>` with a warning.
+Set them in the ``jk_builder`` and ``jk_gradient_builder`` references instead.
+
 .. _qdk-stabilized-scf-native:
 
 QDK Stabilized

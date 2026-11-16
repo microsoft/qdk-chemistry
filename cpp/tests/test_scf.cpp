@@ -25,6 +25,7 @@
 #include <sstream>
 
 #include "../src/qdk/chemistry/algorithms/microsoft/utils.hpp"
+#include "qdk/chemistry/algorithms/microsoft/jk_builder.hpp"
 #include "qdk/chemistry/algorithms/microsoft/scf.hpp"
 #include "qdk/chemistry/algorithms/microsoft/scf/src/scf/scf_impl.h"
 #include "qdk/chemistry/algorithms/microsoft/scf/src/scf_algorithm/asahf.h"
@@ -88,6 +89,60 @@ class DelegatingJKGradientBuilder : public JKGradientBuilder {
     auto qdk = JKGradientBuilderFactory::create("qdk");
     qdk->settings().update(*_settings);
     return qdk->run(basis_set, densities);
+  }
+};
+
+// J/K builder with the settings of the "qdk" builder, recording them
+class RecordingJKBuilder : public JKBuilder {
+ public:
+  RecordingJKBuilder() {
+    _settings = std::make_unique<
+        qdk::chemistry::algorithms::microsoft::JKBuilderSettings>();
+  }
+  std::string name() const override { return "test_recording"; }
+  static inline std::string eri_method;
+  static inline bool eri_use_atomics = false;
+  static inline double shell_pair_threshold = 0.0;
+
+ protected:
+  std::pair<std::shared_ptr<const SymmetryBlockedTensor<2>>,
+            std::shared_ptr<const SymmetryBlockedTensor<2>>>
+  _run_impl(std::shared_ptr<BasisSet> basis_set,
+            std::shared_ptr<const SymmetryBlockedTensor<2>> densities)
+      const override {
+    eri_method = _settings->get<std::string>("eri_method");
+    eri_use_atomics = _settings->get<bool>("eri_use_atomics");
+    shell_pair_threshold = _settings->get<double>("shell_pair_threshold");
+    auto qdk = JKBuilderFactory::create("qdk");
+    qdk->settings().update(*_settings);
+    return qdk->run(basis_set, densities);
+  }
+};
+
+// J/K builders returning null results
+class NullJKBuilder : public JKBuilder {
+ public:
+  std::string name() const override { return "test_null"; }
+
+ protected:
+  std::pair<std::shared_ptr<const SymmetryBlockedTensor<2>>,
+            std::shared_ptr<const SymmetryBlockedTensor<2>>>
+  _run_impl(std::shared_ptr<BasisSet>,
+            std::shared_ptr<const SymmetryBlockedTensor<2>>) const override {
+    return {};
+  }
+};
+
+class NullJKGradientBuilder : public JKGradientBuilder {
+ public:
+  std::string name() const override { return "test_null"; }
+
+ protected:
+  std::pair<std::shared_ptr<NuclearGradients>,
+            std::shared_ptr<NuclearGradients>>
+  _run_impl(std::shared_ptr<BasisSet>,
+            std::shared_ptr<const SymmetryBlockedTensor<2>>) const override {
+    return {};
   }
 };
 
@@ -823,7 +878,7 @@ TEST_F(ScfTest, LithiumRangeSeparatedDftDirectEnergyUks) {
 
   auto [energy, wavefunction] = scf_solver->run(lithium, 0, 2, "sto-3g");
 
-  EXPECT_NEAR(energy, -7.3499880727469851, testing::scf_energy_tolerance);
+  EXPECT_NEAR(energy, -7.3499442454222308, testing::scf_energy_tolerance);
   EXPECT_FALSE(wavefunction->get_orbitals()->is_restricted());
 }
 
@@ -1135,6 +1190,13 @@ TEST_F(ScfTest, JKBuilderSpinDensities) {
             1e-10);
   EXPECT_LT(max_abs(J_u->block({beta, beta})), 1e-12);
   EXPECT_LT(max_abs(K_u->block({beta, beta})), 1e-12);
+  auto [J_b, K_b] = JKBuilderFactory::create()->run(
+      basis_set, densities(zero, P_alpha, false));
+  EXPECT_LT(max_abs(J_b->block({beta, beta}) - J->block({alpha, alpha})),
+            1e-10);
+  EXPECT_LT(max_abs(K_b->block({beta, beta}) - K->block({alpha, alpha})),
+            1e-10);
+  EXPECT_LT(max_abs(J_b->block({alpha, alpha})), 1e-12);
 
   // Restricted and equal unrestricted spin densities have the same gradients.
   auto [dJ, dK] = JKGradientBuilderFactory::create()->run(
@@ -1146,6 +1208,112 @@ TEST_F(ScfTest, JKBuilderSpinDensities) {
             1e-10);
   EXPECT_LT((dK->get_values() - dK_u->get_values()).cwiseAbs().maxCoeff(),
             1e-10);
+
+  // The energies are invariant under the exchange of the spin densities.
+  auto [dJ_a, dK_a] = JKGradientBuilderFactory::create()->run(
+      basis_set, densities(P_alpha, zero, false));
+  auto [dJ_b, dK_b] = JKGradientBuilderFactory::create()->run(
+      basis_set, densities(zero, P_alpha, false));
+  EXPECT_GT(dJ_a->get_values().cwiseAbs().maxCoeff(), 0.1);
+  EXPECT_LT((dJ_a->get_values() - dJ_b->get_values()).cwiseAbs().maxCoeff(),
+            1e-10);
+  EXPECT_LT((dK_a->get_values() - dK_b->get_values()).cwiseAbs().maxCoeff(),
+            1e-10);
+}
+
+TEST_F(ScfTest, JKBuildersCartesianBasisSets) {
+  Structure structure(
+      std::vector<Eigen::Vector3d>{Eigen::Vector3d(0.0, 0.0, 0.0)},
+      std::vector<std::string>{"O"});
+  const std::vector<double> exponents{1.0};
+  const std::vector<double> coefficients{1.0};
+  const std::vector<Shell> sp_shells{
+      Shell(0, OrbitalType::S, exponents, coefficients),
+      Shell(0, OrbitalType::P, exponents, coefficients)};
+  const std::vector<Shell> d_shells{
+      Shell(0, OrbitalType::D, exponents, coefficients)};
+  auto densities = [](size_t n) {
+    const Eigen::MatrixXd P = Eigen::MatrixXd::Identity(n, n);
+    return std::make_shared<const SymmetryBlockedTensor<2>>(
+        make_spin_diagonal_rank2_sbt(P, P, true));
+  };
+  const auto alpha = axes::alpha();
+
+  // Cartesian s and p shells are the spherical ones.
+  auto cartesian =
+      std::make_shared<BasisSet>("sp", sp_shells, structure, AOType::Cartesian);
+  auto spherical =
+      std::make_shared<BasisSet>("sp", sp_shells, structure, AOType::Spherical);
+  const auto n = spherical->get_num_atomic_orbitals();
+  auto [J_c, K_c] = JKBuilderFactory::create()->run(cartesian, densities(n));
+  auto [J_s, K_s] = JKBuilderFactory::create()->run(spherical, densities(n));
+  EXPECT_LT((J_c->block({alpha, alpha}) - J_s->block({alpha, alpha}))
+                .cwiseAbs()
+                .maxCoeff(),
+            1e-12);
+  EXPECT_LT((K_c->block({alpha, alpha}) - K_s->block({alpha, alpha}))
+                .cwiseAbs()
+                .maxCoeff(),
+            1e-12);
+
+  auto d_basis_set =
+      std::make_shared<BasisSet>("d", d_shells, structure, AOType::Cartesian);
+  const auto n_d = d_basis_set->get_num_atomic_orbitals();
+  EXPECT_THROW(JKBuilderFactory::create()->run(d_basis_set, densities(n_d)),
+               std::invalid_argument);
+  EXPECT_THROW(
+      JKGradientBuilderFactory::create()->run(d_basis_set, densities(n_d)),
+      std::invalid_argument);
+}
+
+TEST_F(ScfTest, JKBuilderResultsAreChecked) {
+  JKBuilderFactory::register_instance(
+      [] { return std::make_unique<jk_builder_test::NullJKBuilder>(); });
+  JKGradientBuilderFactory::register_instance([] {
+    return std::make_unique<jk_builder_test::NullJKGradientBuilder>();
+  });
+
+  auto solver = ScfSolverFactory::create();
+  solver->settings().set("jk_builder", AlgorithmRef("jk_builder", "test_null"));
+  EXPECT_THROW(solver->run(testing::create_water_structure(), 0, 1, "sto-3g"),
+               std::runtime_error);
+  EXPECT_THROW(jk_builder_test::water_gradient(
+                   AlgorithmRef("jk_builder", "qdk"),
+                   AlgorithmRef("jk_gradient_builder", "test_null")),
+               std::runtime_error);
+
+  JKBuilderFactory::unregister_instance("test_null");
+  JKGradientBuilderFactory::unregister_instance("test_null");
+}
+
+TEST_F(ScfTest, DeprecatedEriSettingsAreForwarded) {
+  using qdk::chemistry::utils::Logger;
+  using qdk::chemistry::utils::LogLevel;
+  std::ostringstream messages;
+  auto logger = Logger::get();
+  LoggerGuard guard{logger, logger->sinks(), Logger::get_global_level()};
+  logger->sinks().push_back(
+      std::make_shared<spdlog::sinks::ostream_sink_mt>(messages));
+  Logger::set_global_level(LogLevel::warn);
+  JKBuilderFactory::register_instance(
+      [] { return std::make_unique<jk_builder_test::RecordingJKBuilder>(); });
+
+  auto solver = ScfSolverFactory::create();
+  solver->settings().set("jk_builder",
+                         AlgorithmRef("jk_builder", "test_recording"));
+  solver->settings().set("eri_method", "incore");
+  solver->settings().set("eri_use_atomics", true);
+  solver->settings().set("shell_pair_threshold", 1e-11);
+  solver->run(testing::create_water_structure(), 0, 1, "sto-3g");
+  EXPECT_EQ(jk_builder_test::RecordingJKBuilder::eri_method, "incore");
+  EXPECT_TRUE(jk_builder_test::RecordingJKBuilder::eri_use_atomics);
+  EXPECT_DOUBLE_EQ(jk_builder_test::RecordingJKBuilder::shell_pair_threshold,
+                   1e-11);
+  EXPECT_NE(messages.str().find("'eri_method' setting of the qdk SCF solver "
+                                "is deprecated"),
+            std::string::npos);
+
+  JKBuilderFactory::unregister_instance("test_recording");
 }
 
 TEST_F(ScfTest, InitialGuessRestart) {

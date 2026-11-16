@@ -9,7 +9,7 @@ Overview
 --------
 
 The spin densities :math:`\mathbf{P}^\alpha` and :math:`\mathbf{P}^\beta`, in the atomic orbitals :math:`\{\chi_\mu\}` of the basis set, are the alpha-alpha and beta-beta blocks of a spin-diagonal :class:`~qdk_chemistry.data.symmetry.SymmetryBlockedTensorRank2`; on a restricted spin axis the two blocks share storage.
-The atomic orbitals are those of the basis set, in their order, with each contracted shell normalized (Cartesian shells: the :math:`x^l` function).
+The atomic orbitals are those of the basis set, in their order, with each contracted shell normalized and its functions ordered as in PySCF: :math:`x, y, z` for p shells and real solid harmonics :math:`m = -l, \ldots, l` for higher shells.
 For each spin density :math:`\mathbf{P}^s`, a J/K builder computes
 
 .. math::

@@ -4,6 +4,7 @@
 
 #pragma once
 
+#include <atomic>
 #include <cstdint>
 #include <functional>
 #include <memory>
@@ -210,13 +211,19 @@ struct DeprecationAccess {
 };
 
 /**
- * @brief Run the plugins of the add-ons built into the library.
+ * @brief Initialize the registry of an algorithm factory on its first use.
  *
- * Each plugin registers its implementations through the algorithm factories.
- * Called when the registry of any factory is first used, after its built-in
- * implementations; the plugins run once.
+ * Registers the factory's built-in implementations and, at the end of the
+ * outermost initialization, runs the plugins of the add-ons built into the
+ * library, once. Initialization is serialized across threads and re-entrant
+ * on the initializing thread.
+ *
+ * @param ready Set once the registry is initialized
+ * @param started Whether initialization of the registry has started
+ * @param register_default_instances Registers the built-in implementations
  */
-void load_plugins();
+void initialize_registry(std::atomic<bool>& ready, bool& started,
+                         void (*register_default_instances)());
 }  // namespace detail
 
 /**
@@ -483,12 +490,11 @@ class AlgorithmFactory {
    */
   static std::unordered_map<std::string, functor_type>& registry() {
     static std::unordered_map<std::string, functor_type> instance;
-    static bool initialized = false;
-    if (!initialized) {
-      // Ensure at least one implementation is registered
-      initialized = true;
-      Derived::register_default_instances();
-      detail::load_plugins();
+    static std::atomic<bool> ready{false};
+    static bool started = false;
+    if (!ready.load(std::memory_order_acquire)) {
+      detail::initialize_registry(ready, started,
+                                  &Derived::register_default_instances);
     }
     return instance;
   }

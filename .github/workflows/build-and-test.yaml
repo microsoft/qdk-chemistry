@@ -50,6 +50,7 @@ jobs:
           cpp-test-workers: 12
           python-omp-threads: 4
           python-test-workers: 8
+          build-test-addon: true
         - os-name: Linux
           runner: [self-hosted, 1ES.Pool=1es-gh-Dads_v5-pool-wus2, 1ES.ImageOverride=Ubuntu24.04Nightly, 'JobId=qdk_chemistry-linux-py3.13-${{ github.run_id }}-${{ github.run_number }}-${{ github.run_attempt }}']
           build-parallel: 32
@@ -297,7 +298,8 @@ jobs:
           -DQDK_ENABLE_OPENMP=${{ runner.os == 'Linux' && 'ON' || 'OFF' }} \
           -DQDK_CHEMISTRY_ENABLE_COVERAGE=${{ matrix.enable-coverage && 'ON' || 'OFF' }} \
           -DBUILD_TESTING=ON \
-          -DMACIS_ENABLE_TESTS=ON
+          -DMACIS_ENABLE_TESTS=ON \
+          -DQDK_ADDONS_DIR=${{ matrix.build-test-addon && format('{0}/cpp/tests/addon', github.workspace) || '' }}
 
     - name: Build C++ library
       run: cmake --build "$BUILD_DIR"
