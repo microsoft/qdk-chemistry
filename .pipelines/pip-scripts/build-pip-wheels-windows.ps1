@@ -88,7 +88,7 @@ try {
 
 # ─── Build Python wheel ───────────────────────────────────────────────────────
 # scikit-build-core builds the full C++ library; pre-installed deps (vcpkg
-# packages + libint2/ecpint/gauxc) are found via CMAKE_PREFIX_PATH.
+# packages + libint2/ecpint/gauxc/BLAS++/LAPACK++/SeQuant) are found via CMAKE_PREFIX_PATH.
 Write-Host "=== python -m build --wheel ==="
 # Default to a non-release build unless explicitly overridden (to keep +local on dev builds).
 if (-not $env:QDK_CHEMISTRY_RELEASE_BUILD) { $env:QDK_CHEMISTRY_RELEASE_BUILD = '0' }

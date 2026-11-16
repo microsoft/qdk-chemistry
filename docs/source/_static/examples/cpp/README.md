@@ -32,7 +32,7 @@ cmake -B build -DCMAKE_PREFIX_PATH="/path/to/qdk/install"
 cmake --build build
 ```
 
-On Windows, run the same commands from a *Developer PowerShell for VS 2022* so the MSVC toolchain is
+On Windows, run the same commands from a Visual Studio 2026 *Developer PowerShell* so the MSVC toolchain is
 on `PATH`:
 
 ```powershell

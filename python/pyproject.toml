@@ -38,7 +38,7 @@ dependencies = [
   "matplotlib>=3.10.0",
   "argcomplete>=3.0.0",
   "ruamel-yaml>=0.18.10",
-  "qdk[jupyter]>=1.33.1",
+  "qdk[jupyter]>=1.34.0",
   "pybind11-stubgen>=2.5.1",
   "h5py>=3.0.0",
 ]
@@ -78,6 +78,7 @@ dev = [
   "pre-commit",
   "pytest",
   "pytest-env",
+  "pytest-timeout",
   "ruff"
 ]
 docs = [
@@ -95,7 +96,7 @@ docs = [
 jupyter = [
   "ipykernel>=6.0",
   "pandas>=2.0.0",
-  "qdk[jupyter]>=1.33.1",
+  "qdk[jupyter]>=1.34.0",
 ]
 mcp = [
   "mcp>=2,<3"
@@ -122,7 +123,7 @@ qiskit-extras = [
   "requests>=2.33.0"
 ]
 qre = [
-  "qdk[qre,jupyter]>=1.33.1"
+  "qdk[qre,jupyter]>=1.34.0"
 ]
 test = [
   "qdk-chemistry[azure-quantum,coverage,discovery,jupyter,networkx-extras,openfermion-extras,plugins,qiskit-extras,qre]",
@@ -132,6 +133,7 @@ test = [
   # pennylane also requires rustworkx (see qiskit-extras); the sample test skips when it is absent.
   "pennylane; sys_platform != 'win32' or platform_machine != 'ARM64'",
   "pytest-env",
+  "pytest-timeout",
   "pytest-xdist",
   # rdkit publishes no win-arm64 wheels; the sample test skips when it is absent.
   "rdkit; sys_platform != 'win32' or platform_machine != 'ARM64'",
