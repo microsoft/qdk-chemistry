@@ -199,6 +199,19 @@ def test_hdf5_file_round_trip_and_pickle(tmp_path: Path):
     assert restored.get_structure().content_hash() == basis.get_structure().content_hash()
 
 
+def test_hdf5_file_errors_are_reported(tmp_path: Path):
+    basis = AuxiliaryBasis("hdf5-aux", _make_shells(), _make_structure())
+    collection = AuxiliaryBasisCollection({AuxiliaryBasisRole.JFit: basis})
+    for value, cls, suffix in (
+        (basis, AuxiliaryBasis, "auxiliary_basis"),
+        (collection, AuxiliaryBasisCollection, "auxiliary_basis_collection"),
+    ):
+        with pytest.raises(RuntimeError, match=f"Unable to open {cls.__name__} HDF5 file"):
+            cls.from_hdf5_file(tmp_path / f"missing.{suffix}.h5")
+        with pytest.raises(RuntimeError, match=f"Unable to write {cls.__name__} HDF5 file"):
+            value.to_hdf5_file(tmp_path / "missing-dir" / f"out.{suffix}.h5")
+
+
 def test_role_keyed_collection_and_persistence(tmp_path: Path):
     structure = _make_structure()
     jfit = AuxiliaryBasis("jfit-basis", _make_shells(), structure)
