@@ -5,6 +5,7 @@
 #include <gtest/gtest.h>
 
 #include <Eigen/Dense>
+#include <algorithm>
 #include <memory>
 #include <optional>
 #include <qdk/chemistry/algorithms/effective_hamiltonian.hpp>
@@ -86,7 +87,15 @@ TEST(EffectiveHamiltonianConstructorTest, MetaData) {
 }
 
 TEST(EffectiveHamiltonianConstructorTest, Factory) {
-  EXPECT_TRUE(EffectiveHamiltonianConstructorFactory::available().empty());
+  const auto available = EffectiveHamiltonianConstructorFactory::available();
+  EXPECT_NE(std::find(available.begin(), available.end(), "qdk_ducc"),
+            available.end());
+  auto default_constructor = EffectiveHamiltonianConstructorFactory::create();
+  ASSERT_NE(default_constructor, nullptr);
+  EXPECT_EQ(default_constructor->name(), "qdk_ducc");
+  auto ducc = EffectiveHamiltonianConstructorFactory::create("qdk_ducc");
+  ASSERT_NE(ducc, nullptr);
+  EXPECT_EQ(ducc->type_name(), "effective_hamiltonian_constructor");
   EXPECT_THROW(
       EffectiveHamiltonianConstructorFactory::create("nonexistent_constructor"),
       std::runtime_error);

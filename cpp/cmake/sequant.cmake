@@ -31,9 +31,13 @@ block()
         endforeach()
     endif()
 
-    # Concurrent evaluation otherwise races on SeQuant's trace-label map, even with tracing off.
+    # Concurrent evaluation otherwise races on SeQuant's trace labels and log records.
     set(_sequant_patch PATCH_COMMAND "${CMAKE_COMMAND}"
         "-DPATCH_FILE=${CMAKE_CURRENT_LIST_DIR}/patches/sequant-eval-trace-labels.patch"
+        -P "${CMAKE_CURRENT_LIST_DIR}/patches/apply-patch.cmake")
+    # Lets callers cap the operator rank of Wick results without pruning intermediates.
+    list(APPEND _sequant_patch COMMAND "${CMAKE_COMMAND}"
+        "-DPATCH_FILE=${CMAKE_CURRENT_LIST_DIR}/patches/sequant-final-output-cap.patch"
         -P "${CMAKE_CURRENT_LIST_DIR}/patches/apply-patch.cmake")
     # clang-cl ignores [[no_unique_address]] like MSVC, which fails a SeQuant size check.
     if(CMAKE_CXX_COMPILER_ID MATCHES "Clang" AND CMAKE_CXX_SIMULATE_ID STREQUAL "MSVC")
@@ -87,5 +91,19 @@ block()
     FetchContent_GetProperties(SeQuant)
     if(sequant_POPULATED)
         set_property(DIRECTORY "${sequant_SOURCE_DIR}/tests" PROPERTY EXCLUDE_FROM_ALL ON)
+    else()
+        # An installed SeQuant may lack the patches applied to fetched sources.
+        include(CheckCXXSourceCompiles)
+        set(CMAKE_REQUIRED_LIBRARIES SeQuant::SeQuant)
+        set(CMAKE_TRY_COMPILE_TARGET_TYPE STATIC_LIBRARY)
+        unset(QDK_SEQUANT_PATCHED CACHE)
+        check_cxx_source_compiles([=[
+#include <SeQuant/core/logger.hpp>
+#include <SeQuant/core/wick.hpp>
+void probe(sequant::FWickTheorem& wick) { wick.max_ops(4); sequant::detail::log_mutex(); }
+]=] QDK_SEQUANT_PATCHED)
+        if(NOT QDK_SEQUANT_PATCHED)
+            message(FATAL_ERROR "SeQuant at ${SeQuant_DIR} lacks QDK's patches; install it with cpp/cmake/sequant.")
+        endif()
     endif()
 endblock()

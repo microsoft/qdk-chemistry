@@ -11,6 +11,8 @@
 #include <stdexcept>
 #include <string>
 
+#include "microsoft/effective_hamiltonian/ducc.hpp"
+
 namespace qdk::chemistry::algorithms {
 
 namespace {
@@ -146,6 +148,11 @@ void EffectiveHamiltonianConstructor::_validate_inputs(
   }
 }
 
-void EffectiveHamiltonianConstructorFactory::register_default_instances() {}
+void EffectiveHamiltonianConstructorFactory::register_default_instances() {
+  EffectiveHamiltonianConstructorFactory::register_instance(
+      []() -> EffectiveHamiltonianConstructorFactory::return_type {
+        return std::make_unique<microsoft::DuccConstructor>();
+      });
+}
 
 }  // namespace qdk::chemistry::algorithms

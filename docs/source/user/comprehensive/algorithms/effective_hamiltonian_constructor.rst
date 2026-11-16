@@ -84,8 +84,72 @@ See :doc:`Settings <settings>` for a general treatment of algorithm settings in 
 Available implementations
 -------------------------
 
-QDK/Chemistry currently provides the :class:`~qdk_chemistry.algorithms.EffectiveHamiltonianConstructor` interface but no concrete implementation or default factory choice.
-Creation, configuration, and execution examples will be added with the first concrete implementation.
+QDK DUCC
+~~~~~~~~
+
+.. rubric:: Factory name: ``"qdk_ducc"`` (default)
+
+The :class:`~qdk_chemistry.algorithms.QdkDuccConstructor` implements double unitary coupled-cluster (DUCC) downfolding :cite:`Bauman2019` using real singles and doubles amplitudes, :math:`T_1` and :math:`T_2`, without triples amplitudes.
+Its input :class:`~qdk_chemistry.data.Wavefunction` must carry amplitudes over the same orbital window :math:`W` as the input :class:`~qdk_chemistry.data.Hamiltonian`, together with a single-determinant reference.
+Store both singles and doubles; supply zero singles when the amplitude source contains only doubles.
+Restricted closed-shell and unrestricted open-shell references are supported, including windows with frozen-core orbitals outside :math:`W`.
+The alpha and beta channels must have equal orbital counts in both :math:`W` and the nonempty target :math:`P`, but their occupations and unrestricted orbital selections may differ.
+Restricted amplitudes must obey the closed-shell spin relations; spatial doubles and their explicit same-spin antisymmetrizations are both accepted.
+The output preserves the input restrictedness.
+Restricted two-electron integrals and unrestricted same-spin blocks satisfy :math:`(pq|rs)=(rs|pq)=(qp|sr)`, while the alpha-beta block satisfies only :math:`(pq|rs)=(qp|sr)`.
+Unrestricted same-spin blocks store the antisymmetrized integrals :math:`\tfrac{1}{2}\left[(pq|rs)-(ps|rq)\right]`, which represent the same operator as plain integrals.
+
+External amplitudes are those whose orbital indices are not entirely contained in :math:`P`.
+The anti-Hermitian generator is
+
+.. math::
+
+   \sigma = T_{\mathrm{ext},1} + T_{\mathrm{ext},2}
+            - \left(T_{\mathrm{ext},1} + T_{\mathrm{ext},2}\right)^\dagger.
+
+Define :math:`C_0(A)=A` and :math:`C_{n+1}(A)=[C_n(A),\sigma]`.
+For level :math:`1\leq L\leq 2`, the transformed operator is
+
+.. math::
+
+   \overline{H}^{(L)} = \sum_{n=0}^{L}\frac{C_n(H)}{n!}
+                        + \frac{C_{L+1}(F)}{(L+1)!},
+
+where :math:`F` is the reference Fock operator :cite:`Bauman2022`.
+Intermediate commutators are not truncated by particle rank; only the final reference-normal-ordered scalar, one-body, and two-body terms are retained and downfolded into :math:`P`.
+Level 0 performs bare downfolding without commutator corrections.
+
+.. rubric:: Settings
+
+.. list-table::
+   :header-rows: 1
+   :widths: 20 20 60
+
+   * - Setting
+     - Type
+     - Description
+   * - ``level``
+     - int64
+     - Commutator level, from 0 to 2 inclusive. Default: 2.
+
+Given an amplitude wavefunction ``reference``, its full-window ``hamiltonian``, and target-space ``p_indices`` as described above:
+
+.. tab:: Python API
+
+   .. code-block:: python
+
+      from qdk_chemistry.algorithms import create
+
+      constructor = create("effective_hamiltonian_constructor", "qdk_ducc", level=2)
+      effective_hamiltonian = constructor.run(reference, hamiltonian, p_indices)
+
+.. tab:: C++ API
+
+   .. code-block:: cpp
+
+      auto constructor =
+          qdk::chemistry::algorithms::EffectiveHamiltonianConstructorFactory::create("qdk_ducc");
+      auto effective_hamiltonian = constructor->run(reference, hamiltonian, p_indices);
 
 Related classes
 ---------------
