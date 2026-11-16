@@ -300,6 +300,10 @@ void AuxiliaryBasis::to_json_file(const std::string& filename) const {
     throw std::runtime_error("Unable to open file for writing: " + validated);
   }
   output << to_json().dump(2);
+  output.close();
+  if (output.fail()) {
+    throw std::runtime_error("Error writing to file: " + validated);
+  }
 }
 
 std::shared_ptr<AuxiliaryBasis> AuxiliaryBasis::from_json_file(
@@ -508,6 +512,10 @@ void AuxiliaryBasisCollection::to_json_file(const std::string& filename) const {
     throw std::runtime_error("Unable to open file for writing: " + validated);
   }
   output << to_json().dump(2);
+  output.close();
+  if (output.fail()) {
+    throw std::runtime_error("Error writing to file: " + validated);
+  }
 }
 
 std::shared_ptr<AuxiliaryBasisCollection>

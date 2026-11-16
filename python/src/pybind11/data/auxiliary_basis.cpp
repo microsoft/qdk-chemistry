@@ -561,7 +561,7 @@ Returns:
 
 Raises:
     RuntimeError: If the JSON, version, or required fields are invalid
-    ValueError: If an entry is null or structures differ
+    ValueError: If a role name or auxiliary-basis data is invalid, or the entries describe different structures
 )")
       .def(
           "to_file",
