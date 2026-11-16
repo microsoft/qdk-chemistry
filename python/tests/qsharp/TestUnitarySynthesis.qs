@@ -6,6 +6,7 @@ namespace QDKChemistry.TestUtils.UnitarySynthesisTests {
     import Std.Arrays.IndexRange;
     import Std.Math.MaxI;
     import QDKChemistry.Utils.PhaseGradient.PreparePhaseGradientState;
+    import QDKChemistry.Utils.UnitarySynthesis.ApplyControlledMultiplexedRy;
     import QDKChemistry.Utils.UnitarySynthesis.ApplyPhasePolynomial;
     import QDKChemistry.Utils.UnitarySynthesis.ApplyRealUnitaryViaGivens;
     import QDKChemistry.Utils.UnitarySynthesis.GivensDecomposition;
@@ -39,9 +40,32 @@ namespace QDKChemistry.TestUtils.UnitarySynthesisTests {
                 PreparePhaseGradientState(phaseGradient);
             } apply {
                 ApplyRealUnitaryViaGivens(
-                    QuantizeGivensDecomposition(givens, numAddresses, rotationBits),
+                    QuantizeGivensDecomposition(givens, numAddresses, rotationBits, -1),
                     controls,
                     target,
+                    phaseGradient,
+                    angleReg
+                );
+            }
+        }
+    }
+
+    /// Returns an operation on [controls | address | target] that applies
+    /// `ApplyControlledMultiplexedRy` with `words` around a freshly prepared phase gradient.
+    function TestMakeMultiplexedRyOp(words : Bool[][], maxSwapBits : Int, numControls : Int, numAddress : Int) : Qubit[] => Unit {
+        (qs) => {
+            let bits = Length(words[0]);
+            use phaseGradient = Qubit[bits];
+            use angleReg = Qubit[bits];
+            within {
+                PreparePhaseGradientState(phaseGradient);
+            } apply {
+                ApplyControlledMultiplexedRy(
+                    words,
+                    maxSwapBits,
+                    qs[numControls..numControls + numAddress - 1],
+                    qs[...numControls - 1],
+                    qs[numControls + numAddress],
                     phaseGradient,
                     angleReg
                 );
@@ -66,7 +90,7 @@ namespace QDKChemistry.TestUtils.UnitarySynthesisTests {
                 PreparePhaseGradientState(phaseGradient);
             } apply {
                 ApplyRealUnitaryViaGivens(
-                    QuantizeGivensDecomposition(givens, numAddresses, bits),
+                    QuantizeGivensDecomposition(givens, numAddresses, bits, -1),
                     [],
                     target,
                     phaseGradient,

@@ -578,7 +578,7 @@ def test_open_shell_states_have_fermionic_signs(reversed_order, method):
 # rotation_bit_precision=6 and the identity site_to_orbital_order; other orders are covered by
 # the QPE-recovery test above, so only one canonical order is pinned here.
 _EXPECTED_RESOURCES = {
-    ("mps_h2", "dense"): (30, 135),
+    ("mps_h2", "dense"): (30, 126),
     ("mps_h2", "block_sparse"): (30, 79),
     ("mps_spin", "dense"): (27, 22),
     ("mps_spin", "block_sparse"): (27, 14),

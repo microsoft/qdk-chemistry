@@ -296,6 +296,7 @@ The nested ``unitary_synthesis`` setting holds an :class:`~qdk_chemistry.data.Al
 The preparer sets the mapper's ``num_input_qubits`` to the ancilla register width.
 For the dense method it also sets ``omit_right_factor`` and absorbs the right factor of each site isometry into the preceding site, or into the initial state for site 1.
 Givens decomposition converts the orthogonal factors into adjacent rotations and sign corrections for the circuit.
+The mapper's ``max_lookup_swap_bits`` setting caps the swap network of the rotation-angle lookups, trading Toffoli gates for scratch qubits; the default ``-1`` picks the Toffoli-optimal width.
 A final layer of CZ gates applies the fermionic signs of reordering these modes into qubit order.
 It relies on the container's validation of adjacent bond spaces.
 To obtain preparation data without building a circuit, call ``preparer.generate_matrix_product_state_preparation_data(mps_container)``.

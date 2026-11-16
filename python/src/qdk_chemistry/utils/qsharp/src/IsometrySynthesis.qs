@@ -45,6 +45,7 @@ namespace QDKChemistry.Utils.IsometrySynthesis {
     import QDKChemistry.Utils.UnitarySynthesis.ApplyRealUnitaryViaGivens;
     import QDKChemistry.Utils.UnitarySynthesis.GivensDecomposition;
     import QDKChemistry.Utils.UnitarySynthesis.QuantizeGivensDecomposition;
+    import QDKChemistry.Utils.UnitarySynthesis.TrimZeroWords;
 
     /// Circuit data of a dense real isometry, mirroring the C++
     /// `qdk::chemistry::utils::DenseIsometrySynthesis`.
@@ -63,6 +64,8 @@ namespace QDKChemistry.Utils.IsometrySynthesis {
         blockGivens : GivensDecomposition,
         /// V on the input register, or empty when V is omitted.
         rightFactorGivens : GivensDecomposition[],
+        /// Widest swap network of the angle lookups, -1 for the Toffoli-optimal width.
+        maxSwapBits : Int,
     }
 
     /// Circuit data of a sparse real isometry U = P_r · B · P_c, mirroring the C++
@@ -74,6 +77,8 @@ namespace QDKChemistry.Utils.IsometrySynthesis {
         rowPermutation : Int[],
         /// Block-diagonal B.
         blockGivens : GivensDecomposition,
+        /// Widest swap network of the angle lookups, -1 for the Toffoli-optimal width.
+        maxSwapBits : Int,
     }
 
     /// Parameters of a composable dense isometry operation.
@@ -150,11 +155,12 @@ namespace QDKChemistry.Utils.IsometrySynthesis {
         // A Givens layer on an n-qubit register is addressed by its n - 1 upper qubits.
         let inputAddresses = inputDim / 2;
         let blockAddresses = (inputDim <<< numAdded) / 2;
-        let quantize = givens -> QuantizeGivensDecomposition(givens, inputAddresses, rotationBitPrecision);
-        let rotations = Mapped(angles -> QuantizeRyAngles(angles, rotationBitPrecision), synthesis.rotationAngles);
+        let maxSwapBits = synthesis.maxSwapBits;
+        let quantize = givens -> QuantizeGivensDecomposition(givens, inputAddresses, rotationBitPrecision, maxSwapBits);
+        let rotations = Mapped(angles -> TrimZeroWords(QuantizeRyAngles(angles, rotationBitPrecision)), synthesis.rotationAngles);
         let mixingGivens = Mapped(quantize, synthesis.mixingGivens);
         let rightFactorGivens = Mapped(quantize, synthesis.rightFactorGivens);
-        let blockGivens = QuantizeGivensDecomposition(synthesis.blockGivens, blockAddresses, rotationBitPrecision);
+        let blockGivens = QuantizeGivensDecomposition(synthesis.blockGivens, blockAddresses, rotationBitPrecision, maxSwapBits);
 
         // The rotation tables are addressed by the little-endian input register; the Givens
         // operations take most-significant-first registers, hence `Reversed(input)`.
@@ -169,17 +175,17 @@ namespace QDKChemistry.Utils.IsometrySynthesis {
             }
         }
         if numAdded > 0 {
-            ApplyMultiplexedRy(rotations[0], input, added[0], phaseGradient, angleReg);
+            ApplyMultiplexedRy(rotations[0], maxSwapBits, input, added[0], phaseGradient, angleReg);
         }
         if numAdded == 2 {
             let q0 = added[0];
             let q1 = added[1];
             CNOT(q1, q0);
             ApplyRealUnitaryViaGivens(mixingGivens[0], [q0], Reversed(input), phaseGradient, angleReg);
-            ApplyControlledMultiplexedRy(rotations[1], input, [q0], q1, phaseGradient, angleReg);
+            ApplyControlledMultiplexedRy(rotations[1], maxSwapBits, input, [q0], q1, phaseGradient, angleReg);
             CNOT(q1, q0);
             ApplyRealUnitaryViaGivens(mixingGivens[1], [q1], Reversed(input), phaseGradient, angleReg);
-            ApplyControlledMultiplexedRy(rotations[2], input, [q1], q0, phaseGradient, angleReg);
+            ApplyControlledMultiplexedRy(rotations[2], maxSwapBits, input, [q1], q0, phaseGradient, angleReg);
         }
         // The joint register Reversed(input + added) selects block q, or block 2·q1 + q0, of B.
         ApplyRealUnitaryViaGivens(blockGivens, [], Reversed(input + added), phaseGradient, angleReg);
@@ -205,7 +211,7 @@ namespace QDKChemistry.Utils.IsometrySynthesis {
         );
         let (colPermData, colInvPermData) = PermutationData(synthesis.columnPermutation, totalBits);
         let (rowPermData, rowInvPermData) = PermutationData(synthesis.rowPermutation, totalBits);
-        let blockGivens = QuantizeGivensDecomposition(synthesis.blockGivens, 1 <<< (totalBits - 1), Length(phaseGradient));
+        let blockGivens = QuantizeGivensDecomposition(synthesis.blockGivens, 1 <<< (totalBits - 1), Length(phaseGradient), synthesis.maxSwapBits);
 
         PermutationViaQROAM(colPermData, colInvPermData, target);
         // The Givens layers act on the most-significant-first view of the register.
