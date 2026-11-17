@@ -1,0 +1,5 @@
+foreach(test_name IN LISTS scf_test_TESTS)
+    if(test_name MATCHES "^RKS_LEVEL_SHIFTING/SCFTest\\.CheckEnergyGradients/")
+        set_tests_properties("${test_name}" PROPERTIES TIMEOUT 600)
+    endif()
+endforeach()
