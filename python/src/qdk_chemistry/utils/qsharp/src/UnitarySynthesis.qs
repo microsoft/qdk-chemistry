@@ -24,6 +24,8 @@ namespace QDKChemistry.Utils.UnitarySynthesis {
     import Std.Convert.IntAsBoolArray;
     import Std.Convert.ResultArrayAsBoolArray;
     import Std.Diagnostics.Fact;
+    import Std.Math.MaxI;
+    import Std.Math.MinI;
     import Std.Math.PI;
     import Std.Measurement.MResetX;
     import Std.ResourceEstimation.BeginEstimateCaching;
@@ -34,6 +36,7 @@ namespace QDKChemistry.Utils.UnitarySynthesis {
     import QDKChemistry.Utils.PhaseGradient.RyViaPhaseGradient;
     import QDKChemistry.Utils.SelectSwap.ApplyBranchPhaseFixup;
     import QDKChemistry.Utils.SelectSwap.ComputeOptimalSwapBits;
+    import QDKChemistry.Utils.SelectSwap.MeasurementUnlookupCost;
     import QDKChemistry.Utils.SelectSwap.SelectSwap2D;
     import QDKChemistry.Utils.SelectSwap.SelectSwapAliased;
     import QDKChemistry.Utils.SelectSwap.SelectSwapForwardCost;
@@ -209,11 +212,14 @@ namespace QDKChemistry.Utils.UnitarySynthesis {
     ///
     /// The Möbius transform over GF(2) gives f(x) = ⊕_S c_S ∏_{i∈S} x_i, and each nonzero c_S
     /// becomes a Z, CZ, CCZ, … gate on the qubits in S. The constant c_∅ is the global sign
-    /// -I = R(PauliI, 2π). D is its own inverse.
+    /// -I = R(PauliI, 2π). When these gates need more Toffolis, D is applied instead as the sign
+    /// fixup of Berry et al. (Quantum 3, 208 (2019)): f is looked up into a |−⟩ marker and erased
+    /// by measurement for O(2^{n/2}) Toffolis. D is its own inverse.
     ///
     /// Controlled on the qubits C, the phase is AND(C) · f(x) = ⊕_S c_S ∏_{i∈S∪C} x_i, so each
-    /// gate also acts on C and c_∅ becomes a Z, CZ, … on C alone. Only the 2^n table of the
-    /// register is transformed, so the classical cost does not grow with the number of controls.
+    /// gate also acts on C and c_∅ becomes a Z, CZ, … on C alone, while the lookup reads AND(C)
+    /// as one more address bit. Only the 2^n table of the register is transformed, so the
+    /// classical cost does not grow with the number of controls.
     operation ApplyPhasePolynomial(phases : Bool[], register : Qubit[]) : Unit is Adj + Ctl {
         body (...) {
             Controlled ApplyPhasePolynomial([], (phases, register));
@@ -221,6 +227,7 @@ namespace QDKChemistry.Utils.UnitarySynthesis {
         adjoint self;
         controlled (controls, ...) {
             let n = Length(register);
+            let numControls = Length(controls);
             Fact(IsEmpty(phases) or Length(phases) == 1 <<< n, "Phase data needs one entry per basis state of the register.");
             // In-place Möbius butterfly; bit i of index s marks qubit i of the monomial S.
             mutable coeffs = phases;
@@ -231,13 +238,45 @@ namespace QDKChemistry.Utils.UnitarySynthesis {
                     }
                 }
             }
-            for s in Where(c -> c, coeffs) {
-                let qubits = Subarray(Where(b -> b, IntAsBoolArray(s, n)), register) + controls;
-                if IsEmpty(qubits) {
-                    Fact(n > 0, "A constant sign needs a nonempty register to carry it.");
-                    R(PauliI, 2.0 * PI(), register[0]);
+            let monomials = Mapped(s -> Subarray(Where(b -> b, IntAsBoolArray(s, n)), register), Where(c -> c, coeffs));
+            // Toffolis of an X or Z on a target with m controls, as Q# decomposes it.
+            let gateCost = m -> MaxI(0, 2 * m - 3);
+            mutable polynomialCost = 0;
+            for qubits in monomials {
+                set polynomialCost += gateCost(Length(qubits) + numControls - 1);
+            }
+            // The lookup reads AND(C) from one control directly, or from a flag computed and uncomputed.
+            let lookupCost = MeasurementUnlookupCost(n + MinI(numControls, 1)) + (numControls > 1 ? 2 * gateCost(numControls) | 0);
+            if lookupCost < polynomialCost {
+                if numControls == 0 {
+                    // The measurement-based erasure fixes signs relative to f(0), so f(0) is applied as -I.
+                    use marker = Qubit();
+                    X(marker);
+                    H(marker);
+                    Adjoint Select(Mapped(phase -> [phase != phases[0]], phases), register, [marker]);
+                    Reset(marker);
+                    if phases[0] {
+                        R(PauliI, 2.0 * PI(), register[0]);
+                    }
+                } elif numControls == 1 {
+                    ApplyBranchPhaseFixup([true], Mapped(phase -> [phase], phases), true, controls + register);
                 } else {
-                    Controlled Z(Most(qubits), Tail(qubits));
+                    use flag = Qubit();
+                    within {
+                        Controlled X(controls, flag);
+                    } apply {
+                        ApplyBranchPhaseFixup([true], Mapped(phase -> [phase], phases), true, [flag] + register);
+                    }
+                }
+            } else {
+                for qubits in monomials {
+                    let gateQubits = qubits + controls;
+                    if IsEmpty(gateQubits) {
+                        Fact(n > 0, "A constant sign needs a nonempty register to carry it.");
+                        R(PauliI, 2.0 * PI(), register[0]);
+                    } else {
+                        Controlled Z(Most(gateQubits), Tail(gateQubits));
+                    }
                 }
             }
         }

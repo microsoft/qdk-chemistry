@@ -488,14 +488,14 @@ class TestGivensNetwork:
         # Transforming the padded table took tens of seconds; the factored one takes well under one.
         assert elapsed < 5.0, f"20 controls took {elapsed:.1f} s"
 
-    @pytest.mark.parametrize(("num_register", "num_controls"), [(0, 1), (1, 0), (1, 2), (2, 1), (2, 3), (3, 2)])
-    def test_controlled_phase_polynomial_matches_padded_table(
-        self, qsharp_test_context, qsharp_test_utils, num_register, num_controls
-    ):
-        """Controlling ``ApplyPhasePolynomial`` emits the gates, counts and signs of the padded table.
+    @pytest.mark.parametrize(
+        ("num_register", "num_controls"), [(0, 1), (1, 0), (1, 2), (2, 1), (2, 3), (3, 2), (5, 0), (5, 1), (4, 3)]
+    )
+    def test_controlled_phase_polynomial(self, qsharp_test_context, qsharp_test_utils, num_register, num_controls):
+        """``Controlled ApplyPhasePolynomial`` flips the signs of ``AND(controls) * f(x)`` exactly.
 
-        The padded table over ``register + controls`` is zero unless every control is set, so its
-        polynomial is ``AND(controls) * f(x)``, which the controlled specialization applies directly.
+        The padded table over ``register + controls``, which is zero unless every control is set,
+        gives the same state uncontrolled. The larger cases take the sign lookup, the smaller ones the gates.
         """
         tests = qsharp_test_utils.UnitarySynthesisTests
         rng = np.random.default_rng(10 * num_register + num_controls)
@@ -504,25 +504,35 @@ class TestGivensNetwork:
         initial = rng.normal(size=1 << num_qubits)
         initial /= np.linalg.norm(initial)
 
-        circuits, counts, states = [], [], []
-        for padded in (True, False):
-            args = (phases, num_register, num_controls, padded)
-            circuits.append(
-                qsharp_test_context.circuit(tests.TestControlledPhasePolynomialCircuit, *args, group_by_scope=False)
-            )
-            counts.append(dict(qsharp_test_context.logical_counts(tests.TestControlledPhasePolynomialCircuit, *args)))
-            op = tests.TestMakeControlledPhasePolynomialOp(phases, num_register, padded)
-            states.append(np.array(dump_operation_on_state(op, num_qubits, list(initial), context=qsharp_test_context)))
-        assert circuits[0].json() == circuits[1].json()
-        assert counts[0] == counts[1]
-        np.testing.assert_array_equal(states[0], states[1])
-
         # Big-endian over [register | controls], with the register little-endian.
         index = np.arange(1 << num_qubits)
         register = sum(((index >> (num_qubits - 1 - q)) & 1) << q for q in range(num_register))
         controls_set = (index & ((1 << num_controls) - 1)) == (1 << num_controls) - 1
-        flipped = controls_set & np.asarray(phases)[register]
-        np.testing.assert_allclose(states[1], np.where(flipped, -initial, initial), atol=1e-12)
+        expected = np.where(controls_set & np.asarray(phases)[register], -initial, initial)
+        for padded in (True, False):
+            op = tests.TestMakeControlledPhasePolynomialOp(phases, num_register, padded)
+            state = np.array(dump_operation_on_state(op, num_qubits, list(initial), context=qsharp_test_context))
+            np.testing.assert_allclose(state, expected, atol=1e-10)
+
+    @pytest.mark.parametrize("num_controls", [0, 1, 3])
+    def test_random_signs_cost_a_sign_lookup(self, qsharp_test_context, qsharp_test_utils, num_controls):
+        """Random signs on eight qubits cost no more Toffolis than the measurement-based sign lookup.
+
+        The gate polynomial would need about one gate per monomial, hundreds of Toffolis here.
+        """
+        num_register = 8
+        phases = np.random.default_rng(num_controls).integers(0, 2, 1 << num_register).astype(bool).tolist()
+        counts = qsharp_test_context.logical_counts(
+            qsharp_test_utils.UnitarySynthesisTests.TestControlledPhasePolynomialCircuit,
+            phases,
+            num_register,
+            num_controls,
+            False,
+        )
+        bits = num_register + min(num_controls, 1)
+        flag = 2 * (2 * num_controls - 3) if num_controls > 1 else 0
+        lookup = 2 ** ((bits + 1) // 2) + 2 ** (bits // 2) - (bits + 2) + flag
+        assert 0 < counts.get("cczCount", 0) + counts.get("ccixCount", 0) <= lookup
 
     @pytest.mark.parametrize("control", [True, False], ids=["control-on", "control-off"])
     def test_shifted_layer_under_control(self, qsharp_test_context, qsharp_test_utils, control):
