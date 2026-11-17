@@ -109,6 +109,9 @@ steps:
       cpp/manifest/qdk-chemistry/cgmanifest.json |
       external/macis/manifest/cgmanifest.json |
       cpp/cmake/patches/**/* |
+      cpp/cmake/sequant.cmake |
+      cpp/cmake/sequant/**/* |
+      external/macis/src/lobpcgxx/CMakeLists.txt |
       .pipelines/toolchains/windows.cmake |
       "$(DEPS_FINGERPRINT)"
     path: $(System.DefaultWorkingDirectory)/deps-install-msvc
