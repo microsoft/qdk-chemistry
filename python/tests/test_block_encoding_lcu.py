@@ -36,6 +36,26 @@ def _lcu_container() -> LCUContainer:
     return LCUBuilder().run(hamiltonian).get_container()
 
 
+@pytest.mark.parametrize(
+    ("control_states", "address_width"), [([0], 0), ([0], 2), ([0, 1, 2], 2), ([0, 1, 2], 3), ([1, 3], 3)]
+)
+@pytest.mark.parametrize("num_controls", [0, 1, 2])
+@pytest.mark.parametrize("adjoint", [False, True])
+def test_unary_select_matches_pauli_select_on_full_domain(
+    qsharp_test_context, qsharp_test_utils, control_states, address_width, num_controls, adjoint
+):
+    """Unused addresses and outer controls preserve amplitudes and relative phases."""
+    width = address_width + num_controls + 1
+    amplitudes = np.arange(1, 2**width + 1, dtype=float)
+    amplitudes /= np.linalg.norm(amplitudes)
+    make_op = qsharp_test_utils.PrepSelPrepTests.TestMakePauliSelectOp
+    expected_op = make_op(control_states, address_width, num_controls, False, adjoint)
+    expected = dump_operation_on_state(expected_op, width, amplitudes.tolist(), context=qsharp_test_context)
+    actual_op = make_op(control_states, address_width, num_controls, True, adjoint)
+    actual = dump_operation_on_state(actual_op, width, amplitudes.tolist(), context=qsharp_test_context)
+    np.testing.assert_allclose(actual, expected, rtol=0.0, atol=float_comparison_absolute_tolerance)
+
+
 def _reverse_bits(value: int, num_bits: int) -> int:
     """Reverse the bit order of *value* within a *num_bits* field."""
     reversed_value = 0

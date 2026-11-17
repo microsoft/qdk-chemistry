@@ -43,6 +43,7 @@ struct array_like_eigen_caster {
         if (!array.from_python(converted, flags, cleanup)) return false;
       }
       const auto& input = array.value;
+      if (input.device_type() != device::cpu::value) return false;
       const Eigen::Index rows =
           Matrix::IsVectorAtCompileTime && Rows == 1 ? 1 : input.shape(0);
       const Eigen::Index cols = Matrix::IsVectorAtCompileTime
