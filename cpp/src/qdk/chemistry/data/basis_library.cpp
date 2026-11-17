@@ -9,6 +9,7 @@
 #include <filesystem>
 #include <fstream>
 #include <nlohmann/json.hpp>
+#include <qdk/chemistry/data/basis_set.hpp>
 #include <qdk/chemistry/utils/basis_archive.hpp>
 #include <regex>
 #include <stdexcept>

@@ -159,6 +159,31 @@ TEST_F(AuxiliaryBasisTest, FactoriesLoadByNameElementAndIndex) {
   EXPECT_GT(by_index->get_num_shells(), 0u);
 }
 
+TEST_F(AuxiliaryBasisTest, MapFactoriesUseEachSelectedBasis) {
+  auto structure = make_structure({"O", "H", "H"});
+  auto jfit = AuxiliaryBasis::from_basis_name("def2-universal-jfit", structure);
+  auto jkfit =
+      AuxiliaryBasis::from_basis_name("def2-universal-jkfit", structure);
+  ASSERT_NE(jfit->get_shells_for_atom(1).size(),
+            jkfit->get_shells_for_atom(1).size());
+
+  auto by_element = AuxiliaryBasis::from_element_map(
+      {{"O", "def2-universal-jfit"}, {"H", "def2-universal-jkfit"}}, structure);
+  auto by_index = AuxiliaryBasis::from_index_map({{0, "def2-universal-jkfit"},
+                                                  {1, "def2-universal-jfit"},
+                                                  {2, "def2-universal-jkfit"}},
+                                                 structure);
+
+  EXPECT_EQ(jfit->get_shells_for_atom(0).size(),
+            by_element->get_shells_for_atom(0).size());
+  EXPECT_EQ(jkfit->get_shells_for_atom(1).size(),
+            by_element->get_shells_for_atom(1).size());
+  EXPECT_EQ(jkfit->get_shells_for_atom(0).size(),
+            by_index->get_shells_for_atom(0).size());
+  EXPECT_EQ(jfit->get_shells_for_atom(1).size(),
+            by_index->get_shells_for_atom(1).size());
+}
+
 TEST_F(AuxiliaryBasisTest, ConstructorValidation) {
   auto structure = make_structure({"H"});
   std::vector<Shell> shells;
