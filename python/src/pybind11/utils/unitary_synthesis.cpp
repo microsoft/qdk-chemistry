@@ -194,7 +194,7 @@ Decompose a sparse real isometry into permutations around a block-diagonal
 orthogonal matrix.
 
 Columns that share a nonzero row form one block. Only stored nonzero entries
-are read.
+are read, and duplicate entries are summed.
 
 Args:
     isometry (numpy.ndarray | scipy.sparse.sparray | scipy.sparse.spmatrix):

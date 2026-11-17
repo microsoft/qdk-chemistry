@@ -291,6 +291,17 @@ class TestBlockSparse:
         assert synthesis.block_givens.layer_angles == []
         assert len(synthesis.column_permutation) == len(synthesis.row_permutation) == 4
 
+    def test_duplicate_entries_are_summed(self):
+        """A stored entry ``v`` split into duplicates ``2v`` and ``-v`` means ``v``, as in SciPy, not ``-v``."""
+        matrix = _block_sparse([2, 4, 1, 1], seed=4)
+        data = np.stack([2.0 * matrix.data, -matrix.data], axis=1).ravel()
+        split = sparse.csc_array((data, np.repeat(matrix.indices, 2), 2 * matrix.indptr), shape=matrix.shape)
+        expected, actual = block_sparse_isometry_synthesis(matrix), block_sparse_isometry_synthesis(split)
+        assert actual.row_permutation == expected.row_permutation
+        assert actual.column_permutation == expected.column_permutation
+        assert actual.block_givens.layer_angles == expected.block_givens.layer_angles
+        assert actual.block_givens.phases == expected.block_givens.phases
+
     def test_shared_phase_gradient(self):
         """The block-sparse operation also composes with a caller-owned gradient."""
         matrix = _block_sparse([2, 4, 1, 1], seed=11)

@@ -149,7 +149,7 @@ RowGathering gather_rows(const Eigen::SparseMatrix<double>& matrix,
       matrix, [&](Eigen::Index column, Eigen::Index row, double value) {
         groups[supports.column_group[static_cast<std::size_t>(column)]].block(
             local_index[static_cast<std::size_t>(row)],
-            supports.local_column[static_cast<std::size_t>(column)]) = value;
+            supports.local_column[static_cast<std::size_t>(column)]) += value;
       });
   for (Eigen::Index row = 0; row < dim; ++row) {
     if (supports.first_column[static_cast<std::size_t>(row)] == unused_row) {

@@ -144,7 +144,7 @@ Eigen::MatrixXd dense_isometry_right_factor(const Eigen::MatrixXd& isometry,
  * around a block-diagonal orthogonal matrix.
  *
  * Columns that share a nonzero row are joined into one block. Only stored
- * nonzero entries are read.
+ * nonzero entries are read, and duplicate entries are summed.
  *
  * @param isometry Matrix with at least as many rows as columns, orthonormal
  * within @f$\lVert M^T M-I\rVert_F\leq 10^{-8}\,n_\mathrm{cols}@f$.
