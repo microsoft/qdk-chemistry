@@ -155,6 +155,15 @@ class UnitarySynthesisMapperSettings(Settings):
             "-1 selects the smallest allowed width.",
             (-1, 62),
         )
+        self._set_default(
+            "max_lookup_swap_bits",
+            "int",
+            -1,
+            "Widest swap network of the rotation-angle lookups, which load 2^k words per select "
+            "entry at the cost of k-fold more scratch words. -1 picks the Toffoli-optimal width per "
+            "table; smaller values trade Toffolis for fewer scratch qubits, and 0 uses a plain Select.",
+            (-1, 30),
+        )
 
 
 class UnitarySynthesisMapper(CircuitMapper):
@@ -179,7 +188,9 @@ class UnitarySynthesisMapper(CircuitMapper):
 
     Both methods require a real matrix. All orthogonal factors are applied as layers of Givens
     rotations :cite:`Clements2016` whose angles, like the multiplexed rotations, are quantized
-    to ``rotation_bit_precision`` bits and applied by phase-gradient addition.
+    to ``rotation_bit_precision`` bits and applied by phase-gradient addition. Each angle table
+    holds only the words up to its last nonzero one, is loaded by QROAM with a swap network of
+    at most ``max_lookup_swap_bits`` address bits, and is erased by measurement.
 
     The returned operation acts on the :math:`n` target qubits. With
     ``allocate_phase_gradient`` disabled it acts on
@@ -308,6 +319,7 @@ class UnitarySynthesisMapper(CircuitMapper):
         rotation_bit_precision = self._settings.get("rotation_bit_precision")
 
         synthesis, right_factor = method.synthesize(container, num_input_qubits, omit_right_factor)
+        synthesis["maxSwapBits"] = self._settings.get("max_lookup_swap_bits")
         if right_factor is not None:
             self._last_right_factor = (container.content_hash(_HASH_CHARS), num_input_qubits, right_factor.copy())
         # The order matches the Q# Params structs and the positional arguments of Make*Circuit.

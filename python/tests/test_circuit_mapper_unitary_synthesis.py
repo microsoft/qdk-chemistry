@@ -26,7 +26,7 @@ from qdk_chemistry.data.unitary_representation.containers.pauli_product_formula 
     ExponentiatedPauliTerm,
     PauliProductFormulaContainer,
 )
-from qdk_chemistry.utils.qsharp import QSHARP_UTILS
+from qdk_chemistry.utils.qsharp import QSHARP_UTILS, use_qsharp_context
 
 from .helpers import apply_operation, assert_states_match_up_to_global_phase
 
@@ -320,6 +320,18 @@ class TestResourceEstimate:
         assert counts["numQubits"] > 3 + 6
         assert counts["cczCount"] > 0
 
+    def test_max_lookup_swap_bits_trades_qubits_for_toffolis(self):
+        """With ``max_lookup_swap_bits=0`` (plain ``Select``) the circuit needs fewer qubits and more Toffolis."""
+        matrix = ortho_group.rvs(256, random_state=3)
+        counts = {
+            max_swap_bits: create("circuit_mapper", "unitary_synthesis", max_lookup_swap_bits=max_swap_bits)
+            .run(_representation(matrix))
+            .estimate()["logicalCounts"]
+            for max_swap_bits in (-1, 0)
+        }
+        assert counts[0]["numQubits"] < counts[-1]["numQubits"]
+        assert counts[0]["cczCount"] > counts[-1]["cczCount"]
+
 
 _QIR_QUBIT = re.compile(r"%Qubit\* (?:null|inttoptr \(i64 (\d+) to %Qubit\*\))")
 
@@ -532,6 +544,57 @@ class TestGivensNetwork:
         for key in ("cczCount", "measurementCount"):
             assert counts[(6, 6)][key] != counts[(9, 9)][key]
             assert 2 * counts[(6, 9)][key] == counts[(6, 6)][key] + counts[(9, 9)][key], key
+
+
+class TestMultiplexedRy:
+    """``ApplyControlledMultiplexedRy`` loads short and full tables and erases them by measurement."""
+
+    _BITS = 6
+    _ADDRESS = 7
+
+    @pytest.mark.parametrize(
+        ("num_words", "num_controls", "max_swap_bits"),
+        [
+            (20, 0, -1),
+            (20, 1, -1),
+            (20, 2, -1),
+            (20, 1, 0),
+            (20, 0, 2),
+            (100, 0, -1),
+            (100, 1, 1),
+            (128, 0, -1),
+            (128, 1, -1),
+            (128, 2, 0),
+        ],
+    )
+    def test_matches_reference(self, qsharp_test_context, qsharp_test_utils, num_words, num_controls, max_swap_bits):
+        """Each address below the table length rotates by its word, later addresses and unset controls by zero.
+
+        Twenty words take the ``address < 20`` guard, 100 words are zero-padded and 128 fill the
+        address space; the comparison ignores the global sign left by the measurement-based erasure.
+        """
+        rng = np.random.default_rng(num_words + 10 * num_controls)
+        values = rng.integers(1, 1 << self._BITS, num_words)
+        words = [[bool((value >> bit) & 1) for bit in range(self._BITS)] for value in values]
+        num_qubits = num_controls + self._ADDRESS + 1
+        initial = rng.normal(size=1 << num_qubits)
+        initial /= np.linalg.norm(initial)
+        op = qsharp_test_utils.UnitarySynthesisTests.TestMakeMultiplexedRyOp(
+            words, max_swap_bits, num_controls, self._ADDRESS
+        )
+        with use_qsharp_context(qsharp_test_context):
+            state = apply_operation(op, initial)
+
+        # Big-endian over [controls | address | target], each register little-endian.
+        expected = initial.reshape(-1, 2).copy()
+        for index in range(1 << (num_qubits - 1)):
+            bits = [(index >> (num_qubits - 2 - q)) & 1 for q in range(num_qubits - 1)]
+            address = sum(bit << k for k, bit in enumerate(bits[num_controls:]))
+            if all(bits[:num_controls]) and address < num_words:
+                angle = 4 * np.pi * values[address] / (1 << self._BITS)
+                cosine, sine = np.cos(angle / 2), np.sin(angle / 2)
+                expected[index] = [[cosine, -sine], [sine, cosine]] @ expected[index]
+        assert abs(np.vdot(expected.ravel(), state)) ** 2 == pytest.approx(1.0, abs=1e-10)
 
 
 class TestAddConstant:
