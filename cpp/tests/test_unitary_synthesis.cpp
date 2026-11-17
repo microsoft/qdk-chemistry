@@ -317,6 +317,27 @@ TEST(UnitarySynthesisTest, ReconstructsDenseIsometries) {
     expect_dense_synthesis(
         pad_isometry(random_orthogonal(2 * 3, 20).leftCols(3), 2, 4), 4);
   }
+  {
+    SCOPED_TRACE("within tolerance");
+    // M = T (I + S) with symmetric ||S|| = 3e-8 has M^T M - I ~ 2S, inside
+    // the accepted 1e-8 * columns = 8e-8, and its nearest isometry is T.
+    constexpr Eigen::Index chi = 8;
+    std::uint32_t seed = 90;
+    for (const Eigen::Index added : {1, 2, 4}) {
+      SCOPED_TRACE(::testing::Message() << "added states " << added);
+      const Eigen::MatrixXd target =
+          random_orthogonal(added * chi, seed++).leftCols(chi);
+      Eigen::MatrixXd symmetric = random_orthogonal(chi, seed++);
+      symmetric += symmetric.transpose().eval();
+      symmetric *= 3.0e-8 / symmetric.norm();
+      const Eigen::MatrixXd perturbed =
+          target * (Eigen::MatrixXd::Identity(chi, chi) + symmetric);
+      expect_dense_reconstruction(dense_isometry_synthesis(perturbed, chi),
+                                  target, chi, false);
+      expect_dense_reconstruction(
+          dense_isometry_synthesis(perturbed, chi, true), target, chi, true);
+    }
+  }
 }
 
 TEST(UnitarySynthesisTest, RightFactorHelperMatchesTheOmittedFactor) {

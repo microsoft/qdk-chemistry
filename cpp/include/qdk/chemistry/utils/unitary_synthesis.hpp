@@ -109,7 +109,8 @@ struct SparseIsometrySynthesis {
  *
  * @param isometry Matrix with @f$2^k\chi@f$ rows, @f$k\in\{0,1,2\}@f$, and at
  * most @f$\chi@f$ columns, orthonormal within
- * @f$\lVert M^T M-I\rVert_F\leq 10^{-8}\,n_\mathrm{cols}@f$.
+ * @f$\lVert M^T M-I\rVert_F\leq 10^{-8}\,n_\mathrm{cols}@f$. The circuit
+ * realizes its nearest isometry, the polar factor of @f$M@f$.
  * @param num_input_states Dimension @f$\chi@f$ of the input register.
  * @param omit_right_factor Whether to leave @f$V@f$ out of the circuit. The
  * circuit then realizes @f$M V^T@f$ on the first columns, and the caller

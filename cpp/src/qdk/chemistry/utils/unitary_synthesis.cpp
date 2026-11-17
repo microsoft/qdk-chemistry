@@ -41,13 +41,18 @@ DenseIsometryFactors dense_isometry_factors(const Eigen::MatrixXd& isometry,
 
   DenseIsometryFactors factors;
   factors.num_added_qubits = ratio == 1 ? 0 : (ratio == 2 ? 1 : 2);
+  // The CSD keeps only the diagonal of D_2, which is exact only for an exact
+  // isometry, so the input is replaced by its polar factor U V^T.
+  const auto svd = singular_value_decomposition(isometry);
+  factors.isometry = svd.u.leftCols(isometry.cols()) * svd.v.transpose();
+  const auto& exact = factors.isometry;
   std::vector<std::pair<Eigen::MatrixXd, Eigen::MatrixXd>> blocks;
   if (ratio == 2) {
-    blocks.emplace_back(isometry.topRows(dim), isometry.bottomRows(dim));
+    blocks.emplace_back(exact.topRows(dim), exact.bottomRows(dim));
   } else if (ratio == 4) {
-    auto [b, r] = qr_decomposition(isometry.bottomRows(3 * dim), dim);
+    auto [b, r] = qr_decomposition(exact.bottomRows(3 * dim), dim);
     auto [c, s] = qr_decomposition(b.bottomRows(2 * dim), dim);
-    blocks.emplace_back(isometry.topRows(dim), std::move(r));
+    blocks.emplace_back(exact.topRows(dim), std::move(r));
     blocks.emplace_back(b.topRows(dim), std::move(s));
     blocks.emplace_back(c.topRows(dim), c.bottomRows(dim));
   }
@@ -89,10 +94,10 @@ DenseIsometrySynthesis dense_isometry_synthesis(const Eigen::MatrixXd& isometry,
   if (csds.empty()) {
     // Complete the columns with an orthonormal basis of their complement.
     Eigen::MatrixXd completed(dim, dim);
-    completed.leftCols(width) = isometry;
+    completed.leftCols(width) = factors.isometry;
     if (width < dim) {
       const auto svd =
-          detail::singular_value_decomposition(isometry.transpose());
+          detail::singular_value_decomposition(factors.isometry.transpose());
       completed.rightCols(dim - width) = svd.v.rightCols(dim - width);
     }
     unitaries.push_back(std::move(completed));

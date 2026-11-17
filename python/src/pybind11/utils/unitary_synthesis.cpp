@@ -145,7 +145,7 @@ Synthesize a dense real isometry with cosine-sine decompositions.
 Args:
     isometry (numpy.ndarray): Real matrix with one, two, or four times
         ``num_input_states`` rows and at most ``num_input_states`` orthonormal
-        columns.
+        columns. The circuit realizes its nearest isometry, the polar factor.
     num_input_states (int): Dimension ``chi`` of the input register.
     omit_right_factor (bool): Whether to leave the right factor ``V`` out of the
         circuit. The circuit then realizes ``isometry @ V.T`` on its first

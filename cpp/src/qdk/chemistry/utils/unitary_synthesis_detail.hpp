@@ -46,6 +46,8 @@ struct TwoBlockCsd {
 // synthesis and the right-factor helper so both see the same V.
 struct DenseIsometryFactors {
   Eigen::Index num_added_qubits = 0;
+  // Nearest exact isometry to the input, which the factors decompose.
+  Eigen::MatrixXd isometry;
   std::vector<TwoBlockCsd> csds;
 };
 
