@@ -153,6 +153,7 @@ nanobind_add_module(_core
     src/nanobind/data/element_data.cpp
     src/nanobind/data/orbitals.cpp
     src/nanobind/data/wavefunction.cpp
+    src/nanobind/data/mps_wavefunction.cpp
     src/nanobind/data/hamiltonian.cpp
     src/nanobind/data/settings.cpp
     src/nanobind/data/structure.cpp

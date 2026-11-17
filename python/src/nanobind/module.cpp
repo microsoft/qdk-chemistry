@@ -20,6 +20,7 @@ void bind_element_data(nb::module_& m);
 void bind_orbitals(nb::module_& m);
 void bind_hamiltonian(nb::module_& m);
 void bind_wavefunction(nb::module_& m);
+void bind_mps_wavefunction(nb::module_& m);
 void bind_ansatz(nb::module_& m);
 void bind_configuration_set(nb::module_& m);
 void bind_localizer(nb::module_& m);
@@ -97,6 +98,7 @@ NB_MODULE(_core, m) {
   bind_configuration(data);
   bind_configuration_set(data);
   bind_wavefunction(data);
+  bind_mps_wavefunction(data);
   bind_ansatz(data);
   bind_stability_result(data);
   bind_nuclear_gradients(data);

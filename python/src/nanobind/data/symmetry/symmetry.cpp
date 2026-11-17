@@ -20,7 +20,8 @@ using qdk::chemistry::python::utils::to_string_path;
 
 void bind_symmetry(nb::module_& symmetry) {
   nb::enum_<AxisName>(symmetry, "AxisName", "Symmetry axis identifier.")
-      .value("Spin", AxisName::Spin);
+      .value("Spin", AxisName::Spin)
+      .value("ParticleNumber", AxisName::ParticleNumber);
 
   symmetry.def(
       "axis_name_to_string", [](AxisName axis) { return to_string(axis); },
@@ -43,6 +44,12 @@ void bind_symmetry(nb::module_& symmetry) {
       .def(nb::init<int>(), nb::arg("two_ms"),
            "Construct from 2*Ms (e.g. +1 for alpha, -1 for beta).")
       .def("value", &SpinValue::value, "The stored 2*Ms value.");
+
+  nb::class_<ParticleNumberValue, SymmetryAxisValue>(
+      symmetry, "ParticleNumberValue", "Concrete particle-number axis value.")
+      .def(nb::init<std::size_t>(), nb::arg("number"))
+      .def("value", &ParticleNumberValue::value,
+           "The represented particle number.");
 
   nb::class_<SymmetryAxis, DataClass>(
       symmetry, "SymmetryAxis",
@@ -203,6 +210,9 @@ void bind_symmetry(nb::module_& symmetry) {
       [](int two_s, bool equivalent) { return axes::spin(two_s, equivalent); },
       nb::arg("two_s"), nb::arg("equivalent") = true,
       "Build a spin axis carrying the alpha and beta labels.");
+  axes.def("particle_number", &axes::particle_number, nb::arg("maximum_number"),
+           "Build a particle-number axis carrying labels from zero through the "
+           "maximum.");
   axes.def(
       "alpha",
       []() { return std::const_pointer_cast<SpinValue>(axes::alpha()); },
@@ -216,4 +226,11 @@ void bind_symmetry(nb::module_& symmetry) {
         return std::const_pointer_cast<SpinValue>(axes::spin_value(two_ms));
       },
       nb::arg("two_ms"), "Construct a spin value carrying 2*Ms = two_ms.");
+  axes.def(
+      "particle_number_value",
+      [](std::size_t number) {
+        return std::const_pointer_cast<ParticleNumberValue>(
+            axes::particle_number_value(number));
+      },
+      nb::arg("number"), "Construct a particle-number value.");
 }

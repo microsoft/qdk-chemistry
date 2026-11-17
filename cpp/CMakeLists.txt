@@ -144,84 +144,9 @@ else()
     endif()
 endif()
 
-# SeQuant, with its BTAS numerical backend, built from the pinned source. BTAS
-# must reuse the MSVC-patched BLAS++/LAPACK++ from MACIS, hence after MACIS.
-block()
-    # Makes SeQuant and BTAS re-find this Boost instead of downloading another.
-    find_package(Boost CONFIG REQUIRED)
-    set(Boost_FETCH_IF_MISSING OFF)
-
-    # These first declarations win over SeQuant's, which exclude them from install.
-    include(FetchContent)
-    FetchContent_Declare(RangeV3
-        GIT_REPOSITORY https://github.com/ericniebler/range-v3.git
-        GIT_TAG        0.12.0
-        SYSTEM
-        FIND_PACKAGE_ARGS NAMES range-v3
-    )
-    FetchContent_Declare(BTAS
-        GIT_REPOSITORY https://github.com/BTAS/btas.git
-        GIT_TAG        5b435cfdd3cb423f5a40229572c38f6700ba0456
-        SYSTEM
-    )
-    # SeQuant would otherwise take an installed BTAS over this pinned in-tree build.
-    set(CMAKE_DISABLE_FIND_PACKAGE_BTAS ON)
-    # Concurrent evaluation otherwise races on SeQuant's trace-label map, even with tracing off.
-    set(_sequant_patch PATCH_COMMAND "${CMAKE_COMMAND}"
-        "-DPATCH_FILE=${CMAKE_CURRENT_LIST_DIR}/cmake/patches/sequant-eval-trace-labels.patch"
-        -P "${CMAKE_CURRENT_LIST_DIR}/cmake/patches/apply-patch.cmake")
-    # clang-cl ignores [[no_unique_address]] like MSVC, which fails a SeQuant size check.
-    if(CMAKE_CXX_COMPILER_ID MATCHES "Clang" AND CMAKE_CXX_SIMULATE_ID STREQUAL "MSVC")
-        list(APPEND _sequant_patch COMMAND "${CMAKE_COMMAND}" -P
-            "${CMAKE_CURRENT_LIST_DIR}/cmake/patches/sequant-clang-cl-no-unique-address.cmake")
-    endif()
-    FetchContent_Declare(SeQuant
-        GIT_REPOSITORY https://github.com/ValeevGroup/SeQuant.git
-        GIT_TAG        be931075ebb4d15d252045ab4ba4b3065845355d
-        ${_sequant_patch}
-    )
-    set(SEQUANT_BTAS ON)
-    # SeQuant otherwise leaves a fetched backend out of its install and exported targets.
-    set(SEQUANT_INSTALL_FETCHED_BACKENDS BTAS)
-    # libPerm would otherwise fetch googletest and build its tests as part of `all`.
-    set(LIBPERM_TESTS OFF)
-
-    # Match the PIC and ISA flags handle_dependency gives other dependencies.
-    set(CMAKE_POSITION_INDEPENDENT_CODE ON)
-    string(APPEND CMAKE_CXX_FLAGS " ${QDK_UARCH_FLAGS}")
-
-    # SeQuant and BTAS would add their tests to ctest; BTAS also force-writes BUILD_TESTING.
-    option(BUILD_TESTING "Build the testing tree." ON)
-    set(_qdk_build_testing "${BUILD_TESTING}")
-    set(BUILD_TESTING OFF CACHE BOOL "Build the testing tree." FORCE)
-
-    # SeQuant, BTAS, and libPerm seed these global defaults (e.g. strict ISO C++,
-    # ccache) for standalone builds; drop any they create to keep them local.
-    set(_qdk_seeded "")
-    foreach(_var IN ITEMS CMAKE_BUILD_TYPE CMAKE_CXX_STANDARD CMAKE_CXX_EXTENSIONS
-                          CMAKE_FIND_NO_INSTALL_PREFIX CMAKE_C_COMPILER_LAUNCHER CMAKE_CXX_COMPILER_LAUNCHER)
-        if(NOT DEFINED CACHE{${_var}})
-            list(APPEND _qdk_seeded ${_var})
-        endif()
-    endforeach()
-
-    # Expose Catch2's CMake modules to SeQuant's tests if MACIS already fetched Catch2.
-    FetchContent_GetProperties(Catch2)
-    if(catch2_POPULATED)
-        list(APPEND CMAKE_MODULE_PATH "${catch2_SOURCE_DIR}/extras")
-    endif()
-
-    FetchContent_MakeAvailable(SeQuant)
-    set(BUILD_TESTING "${_qdk_build_testing}" CACHE BOOL "Build the testing tree." FORCE)
-    foreach(_var IN LISTS _qdk_seeded)
-        unset(${_var} CACHE)
-    endforeach()
-
-    # SeQuant's unit-test objects are otherwise part of `all`.
-    if(sequant_SOURCE_DIR)
-        set_property(DIRECTORY "${sequant_SOURCE_DIR}/tests" PROPERTY EXCLUDE_FROM_ALL ON)
-    endif()
-endblock()
+# SeQuant, with its BTAS numerical backend. BTAS must reuse the MSVC-patched
+# BLAS++/LAPACK++ from MACIS, hence after MACIS.
+include(cmake/sequant.cmake)
 
 # Enable CUDA for GPU bindings in QDK Chemistry
 if(QDK_CHEMISTRY_ENABLE_GPU)
@@ -382,9 +307,12 @@ install(EXPORT chemistryTargets
 # Create config files
 include(CMakePackageConfigHelpers)
 
-# Where kit-cmake (via BTAS) installed the blaspp_headers export, relative to qdkConfig.
-get_directory_property(QDK_BLASPP_HEADERS_DIR DIRECTORY "${BTAS_SOURCE_DIR}" DEFINITION blaspp_install_configdir)
-cmake_path(RELATIVE_PATH QDK_BLASPP_HEADERS_DIR BASE_DIRECTORY lib/cmake/qdk)
+# Where kit-cmake (via an in-tree BTAS) installed the blaspp_headers export, relative to qdkConfig.
+FetchContent_GetProperties(BTAS)
+if(btas_POPULATED)
+    get_directory_property(QDK_BLASPP_HEADERS_DIR DIRECTORY "${btas_SOURCE_DIR}" DEFINITION blaspp_install_configdir)
+    cmake_path(RELATIVE_PATH QDK_BLASPP_HEADERS_DIR BASE_DIRECTORY lib/cmake/qdk)
+endif()
 
 configure_package_config_file(
     "${CMAKE_CURRENT_SOURCE_DIR}/cmake/qdkConfig.cmake.in"
