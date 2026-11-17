@@ -9,6 +9,11 @@ The main QDK/Chemistry python package must be installed following the instructio
 pip install .[all]
 ```
 
+The `docs` extra currently uses Breathe 4.x. Breathe 5.0.0 duplicates `constexpr`
+for constructors in the XML produced by CI's Doxygen 1.9.8, causing Sphinx to
+reject their declarations. Keep the version constraint until that combination
+has been verified with an upstream fix.
+
 ## Install other dependencies
 
 A few other dependencies are also required:
