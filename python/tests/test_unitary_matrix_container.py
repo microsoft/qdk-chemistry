@@ -145,14 +145,21 @@ class TestValidation:
         np.testing.assert_array_equal(container.to_dense(), matrix.toarray() if stored_sparse else matrix)
 
     @pytest.mark.parametrize("stored_sparse", [False, True], ids=["dense", "sparse"])
-    def test_zero_imaginary_is_stored_real(self, stored_sparse):
-        """Complex input with zero imaginary parts is stored, and hashed, like the real input."""
+    def test_negligible_imaginary_is_stored_real(self, stored_sparse):
+        """Complex input with zero or round-off imaginary parts is stored, and hashed, like the real input."""
         real = _block_sparse(6) if stored_sparse else _orthogonal(8, 6)
-        container = UnitaryMatrixContainer(real.astype(np.complex128))
+        for imaginary, expect_real in ((0.0, True), (1e-15, True), (1e-12, False)):
+            noisy = real.astype(np.complex128)
+            if stored_sparse:
+                noisy.data += 1j * imaginary
+            else:
+                noisy += 1j * imaginary
+            container = UnitaryMatrixContainer(noisy)
 
-        assert container.is_real
-        assert container.matrix.dtype == np.float64
-        assert container.content_hash() == UnitaryMatrixContainer(real).content_hash()
+            assert container.is_real == expect_real
+            if expect_real:
+                assert container.matrix.dtype == np.float64
+                assert container.content_hash() == UnitaryMatrixContainer(real).content_hash()
 
     @pytest.mark.parametrize(
         "matrix",
@@ -266,6 +273,20 @@ class TestSerialization:
         matrix = _block_sparse(9)
         assert UnitaryMatrixContainer(matrix).content_hash() == UnitaryMatrixContainer(matrix.copy()).content_hash()
         assert UnitaryMatrixContainer(matrix).content_hash() != UnitaryMatrixContainer(matrix.toarray()).content_hash()
+
+    @pytest.mark.parametrize("stored_sparse", [False, True], ids=["dense", "sparse"])
+    def test_signed_zeros_keep_hash(self, stored_sparse):
+        """Signed zeros hash like +0.0, so a complex matrix keeps its hash through a JSON round trip."""
+        signed = np.array([[complex(-0.0, 1.0), complex(1.0, -0.0)], [complex(1.0, -0.0), complex(-0.0, 1.0)]])
+        signed /= np.sqrt(2.0)
+        unsigned = signed + 0.0
+        if stored_sparse:
+            signed, unsigned = sparse.csc_array(signed), sparse.csc_array(unsigned)
+        container = UnitaryMatrixContainer(signed)
+        restored = UnitaryMatrixContainer.from_json(json.loads(json.dumps(container.to_json())))
+
+        assert container.content_hash() == UnitaryMatrixContainer(unsigned).content_hash()
+        assert restored.content_hash() == container.content_hash()
 
 
 class TestOperations:

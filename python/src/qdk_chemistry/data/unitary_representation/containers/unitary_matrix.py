@@ -39,10 +39,11 @@ class UnitaryMatrixContainer(UnitaryContainer):
     :math:`m \le 2^{n-k}` columns maps the low :math:`n - k` qubits, with the high :math:`k`
     qubits in :math:`|0\rangle`, into the full register.
 
-    Entries may be real or complex. A matrix whose imaginary parts are all zero is stored as
-    float64, so :attr:`is_real` depends only on the values; any other matrix with complex
-    entries is stored as complex128. Sparse input is stored as a canonical
-    :class:`scipy.sparse.csc_array` without explicit zeros.
+    Entries may be real or complex. A matrix whose imaginary parts are all within the
+    :func:`numpy.real_if_close` tolerance of 100 machine epsilons is stored as float64 with
+    those parts dropped, so :attr:`is_real` depends only on the values; any other matrix with
+    complex entries is stored as complex128. Signed zeros are stored as +0.0. Sparse input is
+    stored as a canonical :class:`scipy.sparse.csc_array` without explicit zeros.
 
     Args:
         matrix: Matrix with orthonormal columns, as a NumPy array or a SciPy sparse array or
@@ -90,8 +91,8 @@ class UnitaryMatrixContainer(UnitaryContainer):
         array = np.asarray(matrix)
         is_complex = cls._is_complex_dtype(array.dtype)
         array = np.array(array, dtype=np.complex128 if is_complex else np.float64, order="C")
-        if is_complex and not np.any(array.imag):
-            array = np.ascontiguousarray(array.real)
+        # Adding zero turns -0.0 into +0.0, which JSON serialization of complex values does not keep.
+        array = np.ascontiguousarray(np.real_if_close(array) + 0.0)
         array.setflags(write=False)
         return array
 
@@ -101,10 +102,7 @@ class UnitaryMatrixContainer(UnitaryContainer):
         is_complex = cls._is_complex_dtype(matrix.dtype)
         array = sparse.csc_array(matrix, dtype=np.complex128 if is_complex else np.float64, copy=True)
         array.sum_duplicates()
-        if is_complex and not np.any(array.data.imag):
-            array = sparse.csc_array(
-                (np.ascontiguousarray(array.data.real), array.indices, array.indptr), shape=array.shape
-            )
+        array = sparse.csc_array((np.real_if_close(array.data) + 0.0, array.indices, array.indptr), shape=array.shape)
         array.eliminate_zeros()
         array.sort_indices()
         return array
