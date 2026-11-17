@@ -632,12 +632,15 @@ class TestAddConstant:
 class TestPermutationViaQROAM:
     """``PermutationViaQROAM`` permutes basis states coherently."""
 
-    @pytest.mark.parametrize("num_bits", [1, 2, 3, 4])
-    def test_permutes_superposition(self, qsharp_test_context, qsharp_test_utils, num_bits):
-        """The lookup, swap and measurement-based unlookup apply the permutation exactly.
+    @pytest.mark.parametrize(
+        ("num_bits", "max_swap_bits"), [(1, -1), (2, -1), (3, -1), (4, -1), (7, -1), (7, 1), (7, 0)]
+    )
+    @pytest.mark.parametrize("inverse", [False, True], ids=["forward", "adjoint"])
+    def test_permutes_superposition(self, qsharp_test_context, qsharp_test_utils, num_bits, max_swap_bits, inverse):
+        """The lookup, swap and measurement-based unlookup apply the permutation, or its inverse, exactly.
 
-        Each repetition samples new X-basis outcomes in the unlookup, so the phase fix-up is
-        exercised on different measurement records.
+        Seven bits take a two-bit swap network by default. Each repetition samples new X-basis
+        outcomes in the unlookup, so the phase fix-up is exercised on different measurement records.
         """
         rng = np.random.default_rng(num_bits)
         reverse = _bit_reversal(num_bits)
@@ -646,8 +649,13 @@ class TestPermutationViaQROAM:
             angles = rng.uniform(0.2, np.pi - 0.2, num_bits).tolist()
             amplitudes = _ry_product_state(angles[::-1])
             expected = np.zeros_like(amplitudes)
-            expected[permutation] = amplitudes
+            if inverse:
+                expected = amplitudes[permutation]
+            else:
+                expected[permutation] = amplitudes
 
-            op = qsharp_test_utils.IsometrySynthesisTests.TestMakePermutationOp(permutation, angles)
+            op = qsharp_test_utils.IsometrySynthesisTests.TestMakePermutationOp(
+                permutation, angles, max_swap_bits, inverse
+            )
             state = np.array(dump_operation_on_state(op, num_bits, context=qsharp_test_context))[reverse]
             assert_states_match_up_to_global_phase(state, expected, atol=1e-10)

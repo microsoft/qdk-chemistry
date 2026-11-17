@@ -159,9 +159,10 @@ class UnitarySynthesisMapperSettings(Settings):
             "max_lookup_swap_bits",
             "int",
             -1,
-            "Widest swap network of the rotation-angle lookups, which load 2^k words per select "
-            "entry at the cost of k-fold more scratch words. -1 picks the Toffoli-optimal width per "
-            "table; smaller values trade Toffolis for fewer scratch qubits, and 0 uses a plain Select.",
+            "Widest swap network of the QROAM lookups (rotation angles and block-sparse "
+            "permutations), which load 2^k words per select entry at the cost of k-fold more "
+            "scratch words. -1 picks the Toffoli-optimal width per table; smaller values trade "
+            "Toffolis for fewer scratch qubits, and 0 uses a plain Select.",
             (-1, 30),
         )
 
@@ -183,8 +184,8 @@ class UnitarySynthesisMapper(CircuitMapper):
           circuit drops it and realizes :math:`M V^T` on its first :math:`m` columns, and
           :meth:`right_factor` returns :math:`V`.
         - ``"block_sparse"``: :math:`U = P_r B P_c` with row and column permutations
-          :math:`P_r, P_c` loaded by QROAM :cite:`Berry2025` and a block-diagonal orthogonal
-          :math:`B` that couples only columns with a common nonzero row.
+          :math:`P_r, P_c` loaded by QROAM :cite:`Berry2025` and erased by measurement, and a
+          block-diagonal orthogonal :math:`B` that couples only columns with a common nonzero row.
 
     Both methods require a real matrix. All orthogonal factors are applied as layers of Givens
     rotations :cite:`Clements2016` whose angles, like the multiplexed rotations, are quantized

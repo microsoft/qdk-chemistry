@@ -35,6 +35,8 @@ namespace QDKChemistry.Utils.IsometrySynthesis {
     import Std.TableLookup.Select;
     import QDKChemistry.Utils.PhaseGradient.PreparePhaseGradientState;
     import QDKChemistry.Utils.PhaseGradient.QuantizeRyAngles;
+    import QDKChemistry.Utils.SelectSwap.ComputeOptimalSwapBits;
+    import QDKChemistry.Utils.SelectSwap.SelectSwap2D;
     import QDKChemistry.Utils.UnitarySynthesis.ApplyControlledMultiplexedRy;
     import QDKChemistry.Utils.UnitarySynthesis.ApplyMultiplexedRy;
     import QDKChemistry.Utils.UnitarySynthesis.ApplyRealUnitaryViaGivens;
@@ -106,19 +108,27 @@ namespace QDKChemistry.Utils.IsometrySynthesis {
     /// Applies |i⟩ → |P(i)⟩ with `permTargets[i]` = P(i) and `invPermTargets[j]` = P⁻¹(j) as
     /// little-endian bit strings.
     ///
-    /// Looks up P(i) into a fresh register and swaps it with `target`. The old register then
-    /// holds P⁻¹(target), which the measurement-based unlookup `Adjoint Select` erases for
-    /// O(√N) Toffolis instead of the O(N) of a second coherent lookup.
+    /// Loads P(i) into a fresh register by QROAM, with a swap network of at most `maxSwapBits`
+    /// address bits (-1 for the Toffoli-optimal width), and swaps it with `target`. The old
+    /// register then holds P⁻¹(target), which the measurement-based unlookup `Adjoint Select`
+    /// erases for O(√N) Toffolis. The adjoint applies P⁻¹ the same way rather than running the
+    /// lookup backwards.
     operation PermutationViaQROAM(
         permTargets : Bool[][],
         invPermTargets : Bool[][],
+        maxSwapBits : Int,
         target : Qubit[]
     ) : Unit is Adj {
-        // Select uses only the address bits its table needs.
-        use loaded = Qubit[Length(target)];
-        Select(permTargets, target, loaded);
-        ApplyToEachA(SWAP, Zipped(target, loaded));
-        Adjoint Select(invPermTargets, target, loaded);
+        body (...) {
+            use loaded = Qubit[Length(target)];
+            let swapBits = ComputeOptimalSwapBits(Length(permTargets), Length(target), maxSwapBits);
+            SelectSwap2D([permTargets], swapBits, true, [], target, [], loaded);
+            ApplyToEachA(SWAP, Zipped(target, loaded));
+            Adjoint Select(invPermTargets, target, loaded);
+        }
+        adjoint (...) {
+            PermutationViaQROAM(invPermTargets, permTargets, maxSwapBits, target);
+        }
     }
 
     /// Applies a dense isometry (Appendix B of Rupprecht & Wölk, arXiv:2605.28489) to the
@@ -208,10 +218,10 @@ namespace QDKChemistry.Utils.IsometrySynthesis {
         let (rowPermData, rowInvPermData) = PermutationData(synthesis.rowPermutation, totalBits);
         let blockGivens = QuantizeGivensDecomposition(synthesis.blockGivens, 1 <<< (totalBits - 1), Length(phaseGradient), synthesis.maxSwapBits);
 
-        PermutationViaQROAM(colPermData, colInvPermData, target);
+        PermutationViaQROAM(colPermData, colInvPermData, synthesis.maxSwapBits, target);
         // The Givens layers act on the most-significant-first view of the register.
         ApplyRealUnitaryViaGivens(blockGivens, [], Reversed(target), phaseGradient, angleReg);
-        PermutationViaQROAM(rowPermData, rowInvPermData, target);
+        PermutationViaQROAM(rowPermData, rowInvPermData, synthesis.maxSwapBits, target);
     }
 
     /// Applies `isometry(input, added, phaseGradient, angleReg)` to `qs` =
