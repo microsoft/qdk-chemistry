@@ -444,9 +444,9 @@ class TestGivensNetwork:
     # 6 rotation bits resolve each angle to O(2^-6), bounding the infidelity at O(2^-12).
     _ROTATION_BITS = 6
 
-    def _run(self, qsharp_test_context, qsharp_test_utils, givens, prep_angles, controls):
+    def _run(self, qsharp_test_context, qsharp_test_utils, givens, prep_angles, controls, inverse=False):
         op = qsharp_test_utils.UnitarySynthesisTests.TestMakeGivensOp(
-            givens, prep_angles, list(controls), self._ROTATION_BITS
+            givens, prep_angles, list(controls), self._ROTATION_BITS, inverse
         )
         num_controls, num_target = len(controls), len(prep_angles)
         state = np.array(dump_operation_on_state(op, num_controls + num_target, context=qsharp_test_context))
@@ -544,6 +544,25 @@ class TestGivensNetwork:
         for key in ("cczCount", "measurementCount"):
             assert counts[(6, 6)][key] != counts[(9, 9)][key]
             assert 2 * counts[(6, 9)][key] == counts[(6, 6)][key] + counts[(9, 9)][key], key
+
+    def test_adjoint(self, qsharp_test_context, qsharp_test_utils):
+        """The adjoint network applies ``U^T`` and, with its repeated layers cached, costs the same as ``U``."""
+        givens = {
+            "layerAngles": [[0.4, 0.2], [0.9], [0.3, 0.7], [0.5]],
+            "layerShifted": [False, True, False, True],
+            "phases": [True, False, False, True, False, True, True, False],
+        }
+        prep_angles = [1.1, 0.7, 0.4]
+        state = self._run(qsharp_test_context, qsharp_test_utils, givens, prep_angles, (), inverse=True)
+        expected = _reconstruct_givens(givens).T @ _ry_product_state(prep_angles)
+        assert abs(np.vdot(expected, state)) ** 2 > 1 - 1e-3
+
+        probe = qsharp_test_utils.UnitarySynthesisTests.TestGivensInDirection
+        forward, adjoint = (
+            dict(qsharp_test_context.logical_counts(probe, givens, 3, 6, inverse)) for inverse in (False, True)
+        )
+        assert forward["cczCount"] > 0
+        assert adjoint == forward
 
 
 class TestMultiplexedRy:

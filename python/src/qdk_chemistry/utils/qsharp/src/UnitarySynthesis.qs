@@ -275,17 +275,46 @@ namespace QDKChemistry.Utils.UnitarySynthesis {
             // A layer without nonzero words is the identity.
             if not IsEmpty(layer) {
                 let cacheName = $"GivensLayer_c{Length(controls)}_g{Length(phaseGradient)}_a{Length(angleReg)}_d{Length(layer)}_s{givens.maxSwapBits}";
-                if BeginEstimateCaching(cacheName, 2 * n + (shifted ? 1 | 0)) {
-                    // Decrementing maps the shifted pairs (1, 2), (3, 4), … onto (0, 1), (2, 3), ….
-                    within {
-                        if shifted { AddConstant(-1, Reversed(target)); }
-                    } apply {
-                        ApplyControlledMultiplexedRy(layer, givens.maxSwapBits, Reversed(Most(target)), controls, Tail(target), phaseGradient, angleReg);
-                    }
-                    EndEstimateCaching();
-                }
+                ApplyGivensLayer(cacheName, layer, shifted, givens.maxSwapBits, controls, target, phaseGradient, angleReg);
             }
         }
         Controlled ApplyPhasePolynomial(controls, (givens.phases, Reversed(target)));
+    }
+
+    /// Applies one layer of `ApplyRealUnitaryViaGivens`, estimated once per `cacheName` and shift.
+    ///
+    /// A layer and its adjoint cost the same, so both directions share the entry. The adjoint is
+    /// written out because a generated one would run `EndEstimateCaching` before the layer.
+    operation ApplyGivensLayer(
+        cacheName : String,
+        layer : Bool[][],
+        shifted : Bool,
+        maxSwapBits : Int,
+        controls : Qubit[],
+        target : Qubit[],
+        phaseGradient : Qubit[],
+        angleReg : Qubit[]
+    ) : Unit is Adj {
+        body ... {
+            if BeginEstimateCaching(cacheName, 2 * Length(target) + (shifted ? 1 | 0)) {
+                // Decrementing maps the shifted pairs (1, 2), (3, 4), … onto (0, 1), (2, 3), ….
+                within {
+                    if shifted { AddConstant(-1, Reversed(target)); }
+                } apply {
+                    ApplyControlledMultiplexedRy(layer, maxSwapBits, Reversed(Most(target)), controls, Tail(target), phaseGradient, angleReg);
+                }
+                EndEstimateCaching();
+            }
+        }
+        adjoint ... {
+            if BeginEstimateCaching(cacheName, 2 * Length(target) + (shifted ? 1 | 0)) {
+                within {
+                    if shifted { AddConstant(-1, Reversed(target)); }
+                } apply {
+                    Adjoint ApplyControlledMultiplexedRy(layer, maxSwapBits, Reversed(Most(target)), controls, Tail(target), phaseGradient, angleReg);
+                }
+                EndEstimateCaching();
+            }
+        }
     }
 }

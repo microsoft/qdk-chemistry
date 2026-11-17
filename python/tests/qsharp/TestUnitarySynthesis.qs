@@ -13,13 +13,14 @@ namespace QDKChemistry.TestUtils.UnitarySynthesisTests {
     import QDKChemistry.Utils.UnitarySynthesis.QuantizeGivensDecomposition;
 
     /// Returns an operation on [controls | target] that sets each control from `controlBits`,
-    /// applies Ry(prepAngles[k]) to target qubit k, and then applies `givens` to the target
-    /// controlled on every control.
+    /// applies Ry(prepAngles[k]) to target qubit k, and then applies `givens`, or its adjoint
+    /// when `inverse`, to the target controlled on every control.
     function TestMakeGivensOp(
         givens : GivensDecomposition,
         prepAngles : Double[],
         controlBits : Bool[],
         rotationBits : Int,
+        inverse : Bool,
     ) : Qubit[] => Unit {
         (qs) => {
             let numControls = Length(controlBits);
@@ -36,16 +37,15 @@ namespace QDKChemistry.TestUtils.UnitarySynthesisTests {
             let numAddresses = MaxI(1, 1 <<< (Length(target) - 1));
             use phaseGradient = Qubit[rotationBits];
             use angleReg = Qubit[rotationBits];
+            let quantized = QuantizeGivensDecomposition(givens, numAddresses, rotationBits, -1);
             within {
                 PreparePhaseGradientState(phaseGradient);
             } apply {
-                ApplyRealUnitaryViaGivens(
-                    QuantizeGivensDecomposition(givens, numAddresses, rotationBits, -1),
-                    controls,
-                    target,
-                    phaseGradient,
-                    angleReg
-                );
+                if inverse {
+                    Adjoint ApplyRealUnitaryViaGivens(quantized, controls, target, phaseGradient, angleReg);
+                } else {
+                    ApplyRealUnitaryViaGivens(quantized, controls, target, phaseGradient, angleReg);
+                }
             }
         }
     }
@@ -96,6 +96,24 @@ namespace QDKChemistry.TestUtils.UnitarySynthesisTests {
                     phaseGradient,
                     angleReg
                 );
+            }
+        }
+        ResetAll(target);
+    }
+
+    /// Applies `givens` with `bits` rotation bits to a fresh register, or its adjoint when `inverse`.
+    operation TestGivensInDirection(givens : GivensDecomposition, numTarget : Int, bits : Int, inverse : Bool) : Unit {
+        use target = Qubit[numTarget];
+        use phaseGradient = Qubit[bits];
+        use angleReg = Qubit[bits];
+        let quantized = QuantizeGivensDecomposition(givens, MaxI(1, 1 <<< (numTarget - 1)), bits, -1);
+        within {
+            PreparePhaseGradientState(phaseGradient);
+        } apply {
+            if inverse {
+                Adjoint ApplyRealUnitaryViaGivens(quantized, [], target, phaseGradient, angleReg);
+            } else {
+                ApplyRealUnitaryViaGivens(quantized, [], target, phaseGradient, angleReg);
             }
         }
         ResetAll(target);
