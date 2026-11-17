@@ -1,11 +1,6 @@
 // Copyright (c) Microsoft Corporation. All rights reserved.
 // Licensed under the MIT License. See LICENSE.txt in the project root for
 // license information.
-//
-// Portions of this file are adapted from code by Felix Rupprecht published at
-// https://zenodo.org/records/20393500, Copyright 2026 German Aerospace Center
-// (DLR), licensed under the Apache License, Version 2.0, and modified for QDK
-// Chemistry.
 
 #include <algorithm>
 #include <cmath>
@@ -25,8 +20,10 @@ namespace {
 
 constexpr double elimination_tolerance = 1.0e-15;
 
-// A rotation is stored by the lower index of its adjacent pair and its angle.
-using Rotation = std::pair<Eigen::Index, double>;
+// Whether an angle is large enough to keep as a rotation.
+bool is_rotation(double angle) {
+  return std::abs(angle) > elimination_tolerance;
+}
 
 }  // namespace
 
@@ -65,24 +62,26 @@ std::pair<Eigen::MatrixXd, Eigen::MatrixXd> qr_decomposition(
   return {std::move(q), std::move(r)};
 }
 
-// two-block cosine–sine decomposition. [A; B] = diag(U₁, U₂) · [D₁; D₂] · V,
-// with D₁² + D₂² = I.
+// Two-block CSD from an SVD of the top block and a polar decomposition of the
+// bottom block.
 TwoBlockCsd cosine_sine_decomposition(
     const Eigen::Ref<const Eigen::MatrixXd>& a,
     const Eigen::Ref<const Eigen::MatrixXd>& b) {
-  FullSvd upper = singular_value_decomposition(a);
-  const FullSvd lower = singular_value_decomposition(b * upper.v);
-  TwoBlockCsd result;
-  result.u_1 = std::move(upper.u);
-  result.d_1 = std::move(upper.singular_values);
-  result.v = upper.v.transpose();
-  result.u_2 = lower.u;
-  result.u_2.leftCols(a.cols()) =
-      lower.u.leftCols(a.cols()) * lower.v.transpose();
-  const Eigen::MatrixXd d_2_matrix =
-      lower.v * lower.singular_values.asDiagonal() * lower.v.transpose();
-  result.d_2 = d_2_matrix.diagonal();
-  return result;
+  const Eigen::Index width = a.cols();
+  auto top = singular_value_decomposition(a);
+  auto bottom = singular_value_decomposition(b * top.v);
+  TwoBlockCsd csd;
+  csd.u_1 = std::move(top.u);
+  csd.d_1 = std::move(top.singular_values);
+  csd.v = top.v.transpose();
+  const Eigen::MatrixXd polar_factor =
+      bottom.u.leftCols(width) * bottom.v.transpose();
+  csd.d_2 =
+      (bottom.v * bottom.singular_values.asDiagonal() * bottom.v.transpose())
+          .diagonal();
+  csd.u_2 = std::move(bottom.u);
+  csd.u_2.leftCols(width) = polar_factor;
+  return csd;
 }
 
 // Ry angles 2 atan2(d', d) of a cosine-sine pair, zero-padded to the
@@ -101,103 +100,67 @@ std::vector<double> rotation_angles(const Eigen::VectorXd& d,
 
 namespace {
 
-// Decomposes a square orthogonal matrix into parallel Givens layers with the
-// Clements double-sided elimination schedule (Clements et al. Optica 3, 1460
-// (2016), arXiv:1603.08788, Fig. 2 and the supplementary algorithm), restricted
-// to real rotations and a diagonal sign matrix. Alternating sweeps eliminate
-// entries with right column rotations and left row rotations; the left
-// rotations are then commuted through the final diagonal sign matrix.
+// Clements elimination into parallel Givens layers and a diagonal sign matrix.
 GivensDecomposition decompose_orthogonal(const Eigen::MatrixXd& matrix) {
-  const Eigen::Index dim = matrix.rows();
   if (!is_isometry(matrix)) {
     throw std::runtime_error(
         "Unitary synthesis produced a non-orthogonal factor.");
   }
-
+  const Eigen::Index n = matrix.rows();
+  const auto size = static_cast<std::size_t>(n);
+  std::vector<std::vector<double>> angles(size);
+  for (std::size_t layer = 0; layer < size; ++layer) {
+    angles[layer].assign(layer % 2 == 1 ? (size - 1) / 2 : size / 2, 0.0);
+  }
+  // Left rotations get their sign once the final diagonal is known.
+  struct LeftRotation {
+    std::size_t layer;
+    Eigen::Index pair;
+    double angle;
+  };
+  std::vector<LeftRotation> left_rotations;
   Eigen::MatrixXd work = matrix;
-  if (dim == 1) {
-    return {{}, {}, {static_cast<std::uint8_t>(work(0, 0) < 0.0)}};
+  for (Eigen::Index diagonal = 0; diagonal + 1 < n; ++diagonal) {
+    const bool from_right = diagonal % 2 == 0;
+    for (Eigen::Index step = 0; step <= diagonal; ++step) {
+      const Eigen::Index row =
+          from_right ? n - 1 - step : n - 1 - diagonal + step;
+      const Eigen::Index col = from_right ? diagonal - step : step;
+      if (std::abs(work(row, col)) < elimination_tolerance) {
+        continue;
+      }
+      const double angle = from_right
+                               ? std::atan2(work(row, col), work(row, col + 1))
+                               : std::atan2(work(row, col), work(row - 1, col));
+      const Eigen::JacobiRotation<double> rotation(std::cos(angle),
+                                                   std::sin(angle));
+      if (from_right) {
+        work.topRows(row + 1).applyOnTheRight(col, col + 1, rotation);
+        angles[static_cast<std::size_t>(step)]
+              [static_cast<std::size_t>(col / 2)] = angle;
+      } else {
+        work.rightCols(n - col).applyOnTheLeft(row - 1, row, rotation);
+        left_rotations.push_back(
+            {static_cast<std::size_t>(n - 1 - step), row - 1, angle});
+      }
+    }
   }
 
   GivensDecomposition result;
-
-  const Eigen::Index num_layers = dim == 2 ? 1 : dim;
-  std::vector<std::vector<Rotation>> upper_rotations(num_layers);
-  std::vector<std::vector<Rotation>> lower_rotations(num_layers);
-
-  // Clements elimination alternates right column rotations with left row
-  // rotations so each diagonal sweep consists of disjoint adjacent pairs.
-  for (Eigen::Index diagonal = 0; diagonal < dim - 1; ++diagonal) {
-    if (diagonal % 2 == 0) {
-      Eigen::Index slot = 0;
-      for (Eigen::Index column = diagonal; column >= 0; --column, ++slot) {
-        const Eigen::Index row = dim - 1 - slot;
-        // rotating it against its right-hand neighbour in the same row
-        const double adjacent = work(row, column + 1);
-        const double eliminated = work(row, column);
-        if (std::abs(eliminated) < elimination_tolerance) {
-          continue;
-        }
-        const double angle = std::atan2(eliminated, adjacent);
-
-        work.topRows(row + 1).applyOnTheRight(
-            column, column + 1,
-            Eigen::JacobiRotation<double>(std::cos(angle), std::sin(angle)));
-        upper_rotations[slot].emplace_back(column, angle);
-      }
-    } else {
-      Eigen::Index column = 0;
-      for (Eigen::Index row = dim - diagonal - 1; row < dim; ++row, ++column) {
-        const double adjacent = work(row - 1, column);
-        const double eliminated = work(row, column);
-        if (std::abs(eliminated) < elimination_tolerance) {
-          continue;
-        }
-        const double angle = std::atan2(eliminated, adjacent);
-        // Both rows are already zero left of this column.
-        work.rightCols(dim - column)
-            .applyOnTheLeft(row - 1, row,
-                            Eigen::JacobiRotation<double>(std::cos(angle),
-                                                          std::sin(angle)));
-        lower_rotations[column].emplace_back(row - 1, angle);
-      }
-    }
+  result.phases.reserve(size);
+  for (Eigen::Index index = 0; index < n; ++index) {
+    result.phases.push_back(work(index, index) < 0.0 ? 1 : 0);
   }
-
-  const Eigen::VectorXd diagonal = work.diagonal();
-  result.phases.reserve(dim);
-  for (Eigen::Index index = 0; index < dim; ++index) {
-    result.phases.push_back(static_cast<std::uint8_t>(diagonal(index) < 0.0));
+  for (const auto& rotation : left_rotations) {
+    const Eigen::Index pair = rotation.pair;
+    const bool same_sign = work(pair, pair) * work(pair + 1, pair + 1) > 0.0;
+    angles[rotation.layer][static_cast<std::size_t>(pair / 2)] =
+        same_sign ? rotation.angle : -rotation.angle;
   }
-
-  // Convert both elimination directions to the circuit convention in which
-  // every layer multiplies from the right. Commuting a left rotation through
-  // D reverses its angle exactly when the adjacent diagonal signs differ.
-  const Eigen::Index even_slots = dim / 2;
-  const Eigen::Index odd_slots = (dim - 1) / 2;
-  for (Eigen::Index layer = 0; layer < num_layers; ++layer) {
-    const bool shifted = layer % 2 == 1;
-    const Eigen::Index num_slots = shifted ? odd_slots : even_slots;
-    std::vector<double> angles(static_cast<std::size_t>(num_slots), 0.0);
-
-    for (const auto& [pair, angle] : upper_rotations[layer]) {
-      angles[static_cast<std::size_t>(pair / 2)] = angle;
-    }
-
-    const auto& rotations = lower_rotations[num_layers - 1 - layer];
-    for (auto rotation = rotations.rbegin(); rotation != rotations.rend();
-         ++rotation) {
-      const auto [pair, angle] = *rotation;
-      const double sign =
-          diagonal(pair) * diagonal(pair + 1) > 0.0 ? 1.0 : -1.0;
-      angles[static_cast<std::size_t>(pair / 2)] = sign * angle;
-    }
-
-    if (std::any_of(angles.begin(), angles.end(), [](double angle) {
-          return std::abs(angle) > elimination_tolerance;
-        })) {
-      result.layer_angles.push_back(std::move(angles));
-      result.layer_shifted.push_back(static_cast<std::uint8_t>(shifted));
+  for (std::size_t layer = 0; layer < size; ++layer) {
+    if (std::any_of(angles[layer].begin(), angles[layer].end(), is_rotation)) {
+      result.layer_angles.push_back(std::move(angles[layer]));
+      result.layer_shifted.push_back(layer % 2 == 1 ? 1 : 0);
     }
   }
   return result;
@@ -230,106 +193,75 @@ std::vector<GivensDecomposition> givens_decomposition(
   return results;
 }
 
-// Merges the Givens decompositions of diagonal blocks, which occupy
-// consecutive diagonal ranges in input order, into global adjacent-pair layers
-// of the block-diagonal matrix. Global layers alternate parity, starting
-// aligned with the largest block, and each block contributes its next layer to
-// the first global layer whose pair parity matches it.
+// Interleaves the layers of consecutive diagonal blocks into layers of the
+// whole block-diagonal matrix.
 GivensDecomposition merge_block_givens(
     const std::vector<GivensDecomposition>& decompositions) {
   struct BlockLayer {
     bool shifted;
-    std::vector<Rotation> rotations;
+    std::vector<std::pair<Eigen::Index, double>> rotations;
   };
-
-  Eigen::Index total_dim = 0;
-  std::vector<Eigen::Index> starts;
-  std::vector<std::deque<BlockLayer>> queues;
-  std::vector<std::uint8_t> phases;
-  starts.reserve(decompositions.size());
-  queues.reserve(decompositions.size());
-
-  std::size_t largest_block = 0;
-  for (std::size_t block_index = 0; block_index < decompositions.size();
-       ++block_index) {
-    const auto& decomposition = decompositions[block_index];
-    starts.push_back(total_dim);
-    if (decomposition.phases.size() >
-        decompositions[largest_block].phases.size()) {
-      largest_block = block_index;
+  GivensDecomposition merged;
+  if (decompositions.empty()) {
+    return merged;
+  }
+  std::vector<std::deque<BlockLayer>> queues(decompositions.size());
+  std::vector<Eigen::Index> offsets(decompositions.size());
+  std::size_t largest = 0;
+  std::size_t remaining = 0;
+  Eigen::Index total = 0;
+  for (std::size_t block = 0; block < decompositions.size(); ++block) {
+    const auto& decomposition = decompositions[block];
+    offsets[block] = total;
+    if (decomposition.phases.size() > decompositions[largest].phases.size()) {
+      largest = block;
     }
-
-    std::deque<BlockLayer> layers;
+    merged.phases.insert(merged.phases.end(), decomposition.phases.begin(),
+                         decomposition.phases.end());
     for (std::size_t layer = 0; layer < decomposition.layer_angles.size();
          ++layer) {
-      const bool shifted = decomposition.layer_shifted[layer] != 0;
-      const Eigen::Index local_offset = shifted ? 1 : 0;
-      std::vector<Rotation> rotations;
-      for (std::size_t slot = 0;
-           slot < decomposition.layer_angles[layer].size(); ++slot) {
-        const double angle = decomposition.layer_angles[layer][slot];
-        if (std::abs(angle) > elimination_tolerance) {
-          rotations.emplace_back(
-              total_dim + local_offset + 2 * static_cast<Eigen::Index>(slot),
-              angle);
+      BlockLayer entry{decomposition.layer_shifted[layer] != 0, {}};
+      const auto& angles = decomposition.layer_angles[layer];
+      for (std::size_t slot = 0; slot < angles.size(); ++slot) {
+        if (is_rotation(angles[slot])) {
+          entry.rotations.emplace_back(total + (entry.shifted ? 1 : 0) +
+                                           2 * static_cast<Eigen::Index>(slot),
+                                       angles[slot]);
         }
       }
-      if (!rotations.empty()) {
-        layers.push_back({shifted, std::move(rotations)});
+      if (!entry.rotations.empty()) {
+        queues[block].push_back(std::move(entry));
+        ++remaining;
       }
     }
-    queues.push_back(std::move(layers));
-    phases.insert(phases.end(), decomposition.phases.begin(),
-                  decomposition.phases.end());
-    total_dim += static_cast<Eigen::Index>(decomposition.phases.size());
+    total += static_cast<Eigen::Index>(decomposition.phases.size());
   }
 
-  bool global_shifted = false;
-  if (!queues[largest_block].empty()) {
-    global_shifted = queues[largest_block].front().shifted ^
-                     (starts[largest_block] % 2 == 1);
-  }
-
-  GivensDecomposition result;
-  result.phases = std::move(phases);
-  const auto has_layers = [&]() {
-    return std::any_of(queues.begin(), queues.end(),
-                       [](const auto& queue) { return !queue.empty(); });
+  // Whether the front layer of a block acts on odd-starting global pairs.
+  const auto front_is_odd = [&](std::size_t block) {
+    return (offsets[block] + (queues[block].front().shifted ? 1 : 0)) % 2 == 1;
   };
-
-  while (has_layers()) {
-    const Eigen::Index num_slots =
-        global_shifted ? (total_dim - 1) / 2 : total_dim / 2;
-    std::vector<double> angles(static_cast<std::size_t>(num_slots), 0.0);
-
-    for (std::size_t block_index = 0; block_index < queues.size();
-         ++block_index) {
-      auto& queue = queues[block_index];
-      if (queue.empty()) {
+  bool shifted = !queues[largest].empty() && front_is_odd(largest);
+  while (remaining > 0) {
+    std::vector<double> angles(
+        static_cast<std::size_t>(shifted ? (total - 1) / 2 : total / 2), 0.0);
+    for (std::size_t block = 0; block < queues.size(); ++block) {
+      if (queues[block].empty() || front_is_odd(block) != shifted) {
         continue;
       }
-      const bool aligned =
-          ((starts[block_index] + (queue.front().shifted ? 1 : 0)) % 2 ==
-           (global_shifted ? 1 : 0));
-      if (!aligned) {
-        continue;
-      }
-      for (const auto& [pair, angle] : queue.front().rotations) {
+      for (const auto& [pair, angle] : queues[block].front().rotations) {
         angles[static_cast<std::size_t>(pair / 2)] = angle;
       }
-      queue.pop_front();
+      queues[block].pop_front();
+      --remaining;
     }
-
-    if (std::any_of(angles.begin(), angles.end(), [](double angle) {
-          return std::abs(angle) > elimination_tolerance;
-        })) {
-      result.layer_angles.push_back(std::move(angles));
-      result.layer_shifted.push_back(static_cast<std::uint8_t>(global_shifted));
+    if (std::any_of(angles.begin(), angles.end(), is_rotation)) {
+      merged.layer_angles.push_back(std::move(angles));
+      merged.layer_shifted.push_back(shifted ? 1 : 0);
     }
-    global_shifted = !global_shifted;
+    shifted = !shifted;
   }
-
-  return result;
+  return merged;
 }
 
 }  // namespace qdk::chemistry::utils::detail
