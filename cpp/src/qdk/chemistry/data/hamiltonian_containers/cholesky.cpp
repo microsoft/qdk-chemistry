@@ -502,11 +502,6 @@ CholeskyHamiltonianContainer::from_json(const nlohmann::json& j) {
         SymmetryBlockedTensor<3>::from_json(j["three_center_integrals"]);
 
     if (orbitals->has_inactive_space()) {
-      if (!j.contains("inactive_fock_matrix")) {
-        throw std::runtime_error(
-            "Hamiltonian JSON: orbitals have inactive indices but no "
-            "inactive Fock matrix is provided");
-      }
       if (!j.contains("core_energy")) {
         throw std::runtime_error(
             "Hamiltonian JSON: orbitals have inactive indices but no core "

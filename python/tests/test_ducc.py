@@ -352,3 +352,26 @@ def test_nonaufbau_reference_uses_occupied_orbital_positions() -> None:
     result = constructor.run(Wavefunction(amplitudes), hamiltonian, target)
     matrix = _matrix(*_spin_integrals(result), result.get_core_energy())
     assert matrix[3, 3] == pytest.approx(0.2**2, abs=1e-12)
+
+
+def test_model_reference_restored_from_json() -> None:
+    """A model reference restored from JSON has its own orbitals and gives the same result."""
+    orbitals = ModelOrbitals(2, sym.SymmetryProduct([sym.axes.spin(1, False)]))
+    determinant = Wavefunction(StateVectorContainer(Configuration.from_spin_half_string("20"), orbitals))
+    singles, doubles, zeros = np.array([0.1]), np.array([0.05]), np.zeros(1)
+    reference = Wavefunction(
+        AmplitudeContainer(orbitals, determinant, AmplitudeType.CoupledCluster, singles, singles, doubles, zeros, zeros)
+    )
+    one = np.array([[-1.0, 0.03], [0.03, 0.5]])
+    hamiltonian = Hamiltonian(
+        CanonicalFourCenterHamiltonianContainer(
+            one, one, np.zeros(16), np.full(16, 0.07), np.zeros(16), orbitals, 0.3, np.zeros((0, 0)), np.zeros((0, 0))
+        )
+    )
+    target = sym.spin_index_set(2, [0], [0], equivalent=False)
+
+    def run(wavefunction: Wavefunction) -> _Array:
+        result = create("effective_hamiltonian_constructor", "qdk_ducc").run(wavefunction, hamiltonian, target)
+        return _matrix(*_spin_integrals(result), result.get_core_energy())
+
+    np.testing.assert_array_equal(run(Wavefunction.from_json(reference.to_json())), run(reference))

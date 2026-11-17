@@ -196,6 +196,7 @@ TEST_F(DuccTest, LevelZeroPreservesNoncontiguousWindowAndFrozenCore) {
                   result->get_one_body_element(0, 0, SpinChannel::bb) +
                   result->get_two_body_element(0, 0, 0, 0, SpinChannel::aabb),
               2.1, 1e-12);
+  expect_integrals(*Hamiltonian::from_json(result->to_json()), *result);
 }
 
 TEST_F(DuccTest, EqualZeroUnrestrictedDoublesAreAccepted) {

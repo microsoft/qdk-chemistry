@@ -153,6 +153,23 @@ TEST(EffectiveHamiltonianConstructorTest,
       constructor._validate_inputs(reference, hamiltonian, p_indices));
 }
 
+TEST(EffectiveHamiltonianConstructorTest, AcceptsEquivalentModelOrbitals) {
+  // Separately constructed model orbitals, as after deserialization.
+  auto hamiltonian = make_hamiltonian(std::make_shared<ModelOrbitals>(
+      testing::restricted_index_set(2, {0, 1})));
+  auto reference = make_wavefunction(std::make_shared<ModelOrbitals>(
+      testing::restricted_index_set(2, {0, 1})));
+  auto p_indices = testing::restricted_index_set(2, {0});
+  TestEffectiveHamiltonianConstructor constructor;
+  EXPECT_NO_THROW(
+      constructor._validate_inputs(reference, hamiltonian, p_indices));
+
+  auto larger = make_wavefunction(std::make_shared<ModelOrbitals>(
+      testing::restricted_index_set(3, {0, 1})));
+  EXPECT_THROW(constructor._validate_inputs(larger, hamiltonian, p_indices),
+               std::invalid_argument);
+}
+
 TEST(EffectiveHamiltonianConstructorTest, TreatsPIndicesAsAbsoluteIndices) {
   auto base_orbitals = testing::create_test_orbitals(8, 8);
   auto orbitals = testing::with_active_space(base_orbitals, {0, 2, 4, 6}, {});

@@ -860,9 +860,14 @@ std::shared_ptr<data::Hamiltonian> DuccConstructor::_run_impl(
         "DUCC output assembly produced non-finite integrals.");
   std::unordered_map<data::SymmetryLabel, std::vector<std::uint32_t>>
       inactive_map;
-  for (int spin = 0; spin < 2; ++spin)
-    inactive_map[spins[spin]] = std::vector<std::uint32_t>(
-        inactive[spin].begin(), inactive[spin].end());
+  if (p_indices->symmetries()->has_axis(data::AxisName::Spin)) {
+    for (int spin = 0; spin < 2; ++spin)
+      inactive_map[spins[spin]] = std::vector<std::uint32_t>(
+          inactive[spin].begin(), inactive[spin].end());
+  } else {
+    inactive_map[data::SymmetryLabel{}] =
+        std::vector<std::uint32_t>(inactive[0].begin(), inactive[0].end());
+  }
   const auto inactive_indices =
       std::make_shared<const data::SymmetryBlockedIndexSet>(
           p_indices->symmetries(), p_indices->extents(),

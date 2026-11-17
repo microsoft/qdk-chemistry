@@ -83,20 +83,24 @@ void validate_orbital_basis(const Orbitals& hamiltonian_orbitals,
         "Hamiltonian and wavefunction must have the same orbital symmetries");
   }
 
-  const auto hamiltonian_coefficients = hamiltonian_orbitals.coefficients();
-  const auto wavefunction_coefficients = wavefunction_orbitals.coefficients();
-  for (const auto& spin : {data::axes::alpha(), data::axes::beta()}) {
-    const auto& hamiltonian_block =
-        hamiltonian_coefficients->block({spin, spin});
-    const auto& wavefunction_block =
-        wavefunction_coefficients->block({spin, spin});
-    if (hamiltonian_block.rows() != wavefunction_block.rows() ||
-        hamiltonian_block.cols() != wavefunction_block.cols() ||
-        (hamiltonian_block - wavefunction_block).norm() >
-            std::numeric_limits<double>::epsilon()) {
-      throw_incompatible(
-          "Hamiltonian and wavefunction must use the same orbital "
-          "coefficients");
+  // Model orbitals carry no coefficients to compare.
+  if (!dynamic_cast<const data::ModelOrbitals*>(&hamiltonian_orbitals) ||
+      !dynamic_cast<const data::ModelOrbitals*>(&wavefunction_orbitals)) {
+    const auto hamiltonian_coefficients = hamiltonian_orbitals.coefficients();
+    const auto wavefunction_coefficients = wavefunction_orbitals.coefficients();
+    for (const auto& spin : {data::axes::alpha(), data::axes::beta()}) {
+      const auto& hamiltonian_block =
+          hamiltonian_coefficients->block({spin, spin});
+      const auto& wavefunction_block =
+          wavefunction_coefficients->block({spin, spin});
+      if (hamiltonian_block.rows() != wavefunction_block.rows() ||
+          hamiltonian_block.cols() != wavefunction_block.cols() ||
+          (hamiltonian_block - wavefunction_block).norm() >
+              std::numeric_limits<double>::epsilon()) {
+        throw_incompatible(
+            "Hamiltonian and wavefunction must use the same orbital "
+            "coefficients");
+      }
     }
   }
 
