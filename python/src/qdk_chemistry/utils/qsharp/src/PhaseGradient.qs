@@ -101,6 +101,7 @@ namespace QDKChemistry.Utils.PhaseGradient {
     /// `RyViaPhaseGradient` applies Ry(angle).
     function QuantizeRyAngle(angle : Double, bits : Int) : Int {
         Fact(AbsD(angle) <= 4.0 * PI(), "QuantizeRyAngle: angle must be finite and within [-4π, 4π]");
+        Fact(bits > 0 and bits < 63, "QuantizeRyAngle: bits must be between 1 and 62");
         let scale = 1 <<< bits;
         let raw = Round(IntAsDouble(scale) * angle / (4.0 * PI()));
         ((raw % scale) + scale) % scale
