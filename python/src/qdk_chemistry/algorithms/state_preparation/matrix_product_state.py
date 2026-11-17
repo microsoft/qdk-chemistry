@@ -5,10 +5,6 @@
 # Licensed under the MIT License. See LICENSE.txt in the project root for license information.
 # --------------------------------------------------------------------------------------------
 
-# Portions of this file are adapted from code by Felix Rupprecht published at
-# https://zenodo.org/records/20393500, Copyright 2026 German Aerospace Center (DLR),
-# licensed under the Apache License, Version 2.0, and modified for QDK Chemistry.
-
 from __future__ import annotations
 
 from dataclasses import dataclass, field
@@ -121,9 +117,6 @@ class MatrixProductStatePreparation(StatePreparation):
     orbitals in the blocked Jordan-Wigner layout. Sites
     with the ``('0', '1')`` physical basis are spinless modes in the
     Jordan-Wigner layout.
-
-    The unitary synthesis is adapted from the Qualtran implementation by Felix Rupprecht
-    published on Zenodo :cite:`Rupprecht2026Zenodo` under the Apache License 2.0.
     """
 
     def __init__(self):
