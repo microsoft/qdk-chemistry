@@ -240,10 +240,6 @@ nitpick_ignore_regex = [
     (r"py:class", r"^QdkCircuitType$"),  # internal type alias for qsharp circuit
     (
         r"py:class",
-        r"^qdk_chemistry\.algorithms\.phase_estimation\.circuit_builder\.robust_builder\._AlgorithmSnapshot$",
-    ),
-    (
-        r"py:class",
         r"^CircuitGenerationMethod$",
     ),  # qsharp enum, no intersphinx inventory
     (r"py:class", r"^PlanExpr$"),  # Zassenhaus type aliases

@@ -102,12 +102,6 @@ endforeach()
 target_link_libraries(test_sequant PRIVATE SeQuant::SeQuant)
 target_link_libraries(test_sequant_evaluation PRIVATE SeQuant::SeQuant)
 
-if(QDK_CHEMISTRY_ENABLE_COVERAGE)
-    set_property(DIRECTORY APPEND PROPERTY TEST_INCLUDE_FILES
-        "${CMAKE_CURRENT_SOURCE_DIR}/scf_coverage_timeout.cmake"
-    )
-endif()
-
 # Print information about discovered tests for debugging
 message(STATUS "Found ${CMAKE_CURRENT_LIST_LENGTH} test files:")
 foreach(test_source ${TEST_SOURCES})
