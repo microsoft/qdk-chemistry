@@ -8,11 +8,13 @@
 /// PREPARE-SELECT stitching lives in ``QDKChemistry.Utils.PrepSelPrep``.
 namespace QDKChemistry.Utils.Select {
 
+    import Std.Arrays.Fold;
     import Std.Canon.ApplyControlledOnInt;
     import Std.Canon.ApplyPauli;
     import Std.Core.Length;
     import Std.Core.Repeated;
     import Std.Diagnostics.Fact;
+    import Std.Math.MaxI;
     import Std.Math.PI;
     import QDKChemistry.Utils.UnaryIteration.ControlledUnaryIterationWithControl;
 
@@ -58,15 +60,15 @@ namespace QDKChemistry.Utils.Select {
         }
     }
 
-    /// `PauliSelect` by unary iteration (arXiv:1805.03662, Sec. III A).
-    /// Unused addresses act as identity. The iteration spans the full address-register domain.
+    /// `PauliSelect` by unary iteration (arXiv:1805.03662, Sec. III A): L - 2 Toffolis for L terms
+    /// uncontrolled, L - 1 with one control.
     operation UnaryPauliSelect(params : PauliSelectParams, selectRegister : Qubit[], targets : Qubit[]) : Unit is Adj + Ctl {
         body ... {
             Controlled UnaryPauliSelect([], (params, selectRegister, targets));
         }
         adjoint self;
         controlled (ctls, ...) {
-            let termAt = TermTable(params.controlStates, 2^Length(selectRegister));
+            let termAt = TermTable(params.controlStates);
             ControlledUnaryIterationWithControl(ctls, selectRegister, Length(termAt), (index, ctl) => {
                 ApplySignedPauliTerm(params, termAt[index], ctl, targets);
             });
@@ -75,12 +77,11 @@ namespace QDKChemistry.Utils.Select {
     }
 
     /// Term index per control state, -1 where none exists.
-    internal function TermTable(controlStates : Int[], numAddresses : Int) : Int[] {
+    internal function TermTable(controlStates : Int[]) : Int[] {
         Fact(Length(controlStates) > 0, "SELECT needs at least one term.");
-        mutable termAt = Repeated(-1, numAddresses);
+        mutable termAt = Repeated(-1, Fold(MaxI, 0, controlStates) + 1);
         for i in 0..Length(controlStates) - 1 {
             Fact(controlStates[i] >= 0, "SELECT control states must be nonnegative.");
-            Fact(controlStates[i] < numAddresses, "SELECT control states must fit the address register.");
             Fact(termAt[controlStates[i]] < 0, "SELECT control states must be distinct.");
             set termAt w/= controlStates[i] <- i;
         }
