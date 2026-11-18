@@ -67,7 +67,7 @@ bool is_rotation(double angle) {
   return std::abs(angle) > elimination_tolerance;
 }
 
-// singular value decomposition M = U · diag(s) · Vᵀ. with complete orthogonal U
+// Singular value decomposition M = U · diag(s) · Vᵀ with complete orthogonal U
 // and V.
 FullSvd singular_value_decomposition(
     const Eigen::Ref<const Eigen::MatrixXd>& matrix) {
@@ -124,14 +124,14 @@ TwoBlockCsd cosine_sine_decomposition(
   return csd;
 }
 
-// Ry angles 2 atan2(d', d) of a cosine-sine pair, zero-padded to the
-// ancilla_dim
+// Ry angles 2 atan2(d', d) of a cosine-sine pair, zero-padded to num_states
+// entries.
 std::vector<double> rotation_angles(const Eigen::VectorXd& d,
                                     const Eigen::VectorXd& d_prime,
-                                    Eigen::Index ancilla_dim) {
-  std::vector<double> angles(static_cast<std::size_t>(ancilla_dim), 0.0);
+                                    Eigen::Index num_states) {
+  std::vector<double> angles(static_cast<std::size_t>(num_states), 0.0);
   for (Eigen::Index index = 0;
-       index < std::min<Eigen::Index>(d_prime.size(), ancilla_dim); ++index) {
+       index < std::min<Eigen::Index>(d_prime.size(), num_states); ++index) {
     angles[static_cast<std::size_t>(index)] =
         2.0 * std::atan2(d_prime(index), d(index));
   }
@@ -505,7 +505,7 @@ void for_each_nonzero_entry(const Eigen::SparseMatrix<double>& matrix,
   }
 }
 
-// One column group with original column and row indices
+// One column group with original column and row indices.
 struct ColumnGroup {
   std::vector<Eigen::Index> columns;
   std::vector<Eigen::Index> rows;
@@ -513,7 +513,7 @@ struct ColumnGroup {
   double residual = 0.0;
 };
 
-// All column groups
+// All column groups.
 struct ColumnSupports {
   std::vector<ColumnGroup> groups;
   std::vector<std::size_t> column_group;
@@ -521,7 +521,7 @@ struct ColumnSupports {
   std::vector<Eigen::Index> first_column;
 };
 
-// Row permutation and starting row indices for each block
+// Row permutation and starting row indices for each block.
 struct RowGathering {
   std::vector<Eigen::Index> permutation;
   std::vector<Eigen::Index> block_starts;

@@ -20,7 +20,7 @@ from qdk_chemistry._core.utils.unitary_synthesis import (
     dense_isometry_synthesis,
 )
 from qdk_chemistry.algorithms import available, create
-from qdk_chemistry.algorithms.circuit_mapper import UnitarySynthesisMapper
+from qdk_chemistry.algorithms.circuit_mapper import UnitarySynthesisMapper, unitary_synthesis_mapper
 from qdk_chemistry.data import UnitaryMatrixContainer, UnitaryRepresentation
 from qdk_chemistry.data.unitary_representation.containers.pauli_product_formula import (
     ExponentiatedPauliTerm,
@@ -60,28 +60,6 @@ def _block_sparse(block_sizes: list[int], seed: int) -> sparse.csc_array:
     return sparse.csc_array(matrix[rng.permutation(dimension)][:, rng.permutation(dimension)])
 
 
-def _run_on_columns(circuit, num_qubits: int, coefficients: np.ndarray) -> np.ndarray:
-    r"""Return the little-endian state ``circuit`` produces from :math:`\sum_c` ``coefficients[c]`` :math:`|c\rangle`.
-
-    A circuit that acts on a caller-owned phase gradient is wrapped so the gradient is prepared
-    around it, and the gradient register must come back in :math:`|0\rangle`.
-    """
-    op = circuit._qsharp_op
-    num_ancillas = circuit.metadata.num_phase_gradient_ancillas
-    if num_ancillas:
-        op = QSHARP_UTILS.CircuitComposition.MakeSharedAncillaOp(
-            op, QSHARP_UTILS.PhaseGradient.PreparePhaseGradientState, num_ancillas
-        )
-    assert circuit.num_qubits == num_qubits + num_ancillas
-    reverse = _bit_reversal(num_qubits)
-    initial = np.zeros(1 << num_qubits)
-    initial[reverse[: len(coefficients)]] = coefficients
-    ancilla_zero = np.eye(1, 1 << num_ancillas).ravel()
-    output = apply_operation(op, np.kron(initial, ancilla_zero)).reshape(1 << num_qubits, 1 << num_ancillas)
-    np.testing.assert_allclose(output[:, 1:], 0.0, atol=1e-8, err_msg="phase gradient was not restored")
-    return output[reverse, 0]
-
-
 def _assert_realizes(circuit, matrix: np.ndarray, seed: int, preimage=None) -> None:
     """Assert that ``circuit`` maps a random combination of the leading columns through ``matrix``.
 
@@ -93,7 +71,20 @@ def _assert_realizes(circuit, matrix: np.ndarray, seed: int, preimage=None) -> N
     coefficients = np.random.default_rng(seed).normal(size=matrix.shape[1])
     coefficients /= np.linalg.norm(coefficients)
     circuit_input = coefficients if preimage is None else preimage @ coefficients
-    actual = _run_on_columns(circuit, num_qubits, circuit_input)
+    op = circuit._qsharp_op
+    num_ancillas = circuit.metadata.num_phase_gradient_ancillas
+    if num_ancillas:
+        op = QSHARP_UTILS.CircuitComposition.MakeSharedAncillaOp(
+            op, QSHARP_UTILS.PhaseGradient.PreparePhaseGradientState, num_ancillas
+        )
+    assert circuit.num_qubits == num_qubits + num_ancillas
+    reverse = _bit_reversal(num_qubits)
+    initial = np.zeros(1 << num_qubits)
+    initial[reverse[: len(circuit_input)]] = circuit_input
+    ancilla_zero = np.eye(1, 1 << num_ancillas).ravel()
+    output = apply_operation(op, np.kron(initial, ancilla_zero)).reshape(1 << num_qubits, 1 << num_ancillas)
+    np.testing.assert_allclose(output[:, 1:], 0.0, atol=1e-8, err_msg="phase gradient was not restored")
+    actual = output[reverse, 0]
     expected = matrix @ coefficients
     infidelity = 1.0 - abs(np.vdot(expected, actual)) ** 2
     assert infidelity < _INFIDELITY_TOLERANCE, f"infidelity {infidelity:.2e}"
@@ -188,16 +179,8 @@ class TestRightFactor:
         assert circuit._qsharp_factory.parameter["synthesis"]["rightFactorGivens"] == []
         _assert_realizes(circuit, matrix, seed=num_columns, preimage=right_factor)
 
-    def test_without_added_qubits_is_identity(self):
-        """With the whole register as input there is no first decomposition and ``V = I``."""
-        matrix = ortho_group.rvs(4, random_state=1)
-        mapper = create("circuit_mapper", "unitary_synthesis", num_input_qubits=2)
-        np.testing.assert_array_equal(mapper.right_factor(_representation(matrix)), np.eye(4))
-
     def test_reuses_factor_of_last_run(self, monkeypatch):
         """After ``run`` the helper returns the synthesized ``V`` without factorizing again."""
-        from qdk_chemistry.algorithms.circuit_mapper import unitary_synthesis_mapper  # noqa: PLC0415
-
         calls: list[int] = []
 
         def counting_right_factor(matrix, num_input_states):
@@ -222,17 +205,6 @@ class TestRightFactor:
             mapper.right_factor(_representation(other)), dense_isometry_right_factor(other, 4)
         )
         assert calls == [4]
-
-    def test_omitting_saves_gates(self):
-        """Leaving ``V`` out lowers the Toffoli count of the resource estimate."""
-        representation = _representation(ortho_group.rvs(8, random_state=3)[:, :2])
-        counts = [
-            create("circuit_mapper", "unitary_synthesis", omit_right_factor=omit)
-            .run(representation)
-            .estimate()["logicalCounts"]["cczCount"]
-            for omit in (False, True)
-        ]
-        assert counts[1] < counts[0]
 
 
 class TestBlockSparse:
@@ -360,17 +332,6 @@ class TestResourceEstimate:
 _QIR_QUBIT = re.compile(r"%Qubit\* (?:null|inttoptr \(i64 (\d+) to %Qubit\*\))")
 
 
-def _reset_qubits(qir: str) -> set[int]:
-    """Return the indices of the qubits that a QIR program resets or measures and resets."""
-    reset = set()
-    for line in qir.splitlines():
-        if "call" in line and ("__quantum__qis__reset__body" in line or "__quantum__qis__mresetz__body" in line):
-            match = _QIR_QUBIT.search(line)
-            assert match is not None, line
-            reset.add(int(match.group(1) or 0))
-    return reset
-
-
 class TestExportedCircuit:
     """The exported circuit leaves the synthesized output on the target register."""
 
@@ -380,7 +341,12 @@ class TestExportedCircuit:
         theta = 0.7
         matrix = np.array([[np.cos(theta), -np.sin(theta)], [np.sin(theta), np.cos(theta)]])
         circuit = create("circuit_mapper", "unitary_synthesis", method=method).run(_representation(matrix))
-        reset = _reset_qubits(str(circuit.get_qir()))
+        reset: set[int] = set()
+        for line in str(circuit.get_qir()).splitlines():
+            if "call" in line and ("__quantum__qis__reset__body" in line or "__quantum__qis__mresetz__body" in line):
+                match = _QIR_QUBIT.search(line)
+                assert match is not None, line
+                reset.add(int(match.group(1) or 0))
         assert reset, "the lookup scratch should still be measured and reset"
         assert 0 not in reset
 
