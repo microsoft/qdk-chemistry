@@ -30,7 +30,7 @@ double isometry_residual(const Eigen::Ref<const Eigen::MatrixXd>& matrix) {
       .norm();
 }
 
-// The tolerance scales with the column count. The comparison rejects NaN.
+// Whether the residual is within a column-scaled tolerance, rejecting NaN.
 bool is_isometry(const Eigen::Ref<const Eigen::MatrixXd>& matrix) {
   return isometry_residual(matrix) <=
          orthogonality_tolerance * static_cast<double>(matrix.cols());
@@ -51,11 +51,11 @@ struct TwoBlockCsd {
   Eigen::MatrixXd v;
 };
 
-// Cosine-sine decompositions of a validated dense isometry, shared by the
-// synthesis and the right-factor helper so both see the same V.
+// Cosine-sine decompositions of a dense isometry, shared so that the synthesis
+// and the right-factor helper see the same V.
 struct DenseIsometryFactors {
   Eigen::Index num_added_qubits = 0;
-  // Nearest exact isometry to the input, which the factors decompose.
+  // Nearest exact isometry to the input.
   Eigen::MatrixXd isometry;
   std::vector<TwoBlockCsd> csds;
 };
@@ -67,8 +67,7 @@ bool is_rotation(double angle) {
   return std::abs(angle) > elimination_tolerance;
 }
 
-// Singular value decomposition M = U · diag(s) · Vᵀ with complete orthogonal U
-// and V.
+// Full singular value decomposition M = U · diag(s) · Vᵀ.
 FullSvd singular_value_decomposition(
     const Eigen::Ref<const Eigen::MatrixXd>& matrix) {
   const auto rows = static_cast<std::int64_t>(matrix.rows());
@@ -102,8 +101,7 @@ std::pair<Eigen::MatrixXd, Eigen::MatrixXd> qr_decomposition(
   return {std::move(q), std::move(r)};
 }
 
-// Two-block CSD from an SVD of the top block and a polar decomposition of the
-// bottom block.
+// Two-block CSD from an SVD of the top block and a polar decomposition below.
 TwoBlockCsd cosine_sine_decomposition(
     const Eigen::Ref<const Eigen::MatrixXd>& a,
     const Eigen::Ref<const Eigen::MatrixXd>& b) {
@@ -124,8 +122,7 @@ TwoBlockCsd cosine_sine_decomposition(
   return csd;
 }
 
-// Ry angles 2 atan2(d', d) of a cosine-sine pair, zero-padded to num_states
-// entries.
+// Ry angles 2 atan2(d', d), zero-padded to num_states entries.
 std::vector<double> rotation_angles(const Eigen::VectorXd& d,
                                     const Eigen::VectorXd& d_prime,
                                     Eigen::Index num_states) {
@@ -208,8 +205,7 @@ std::vector<GivensDecomposition> givens_decomposition(
     const std::vector<std::reference_wrapper<const Eigen::MatrixXd>>&
         matrices) {
   std::vector<GivensDecomposition> results(matrices.size());
-  // An exception must not escape an OpenMP region, so each iteration keeps its
-  // own and the first is rethrown after the loop.
+  // Exceptions cannot escape an OpenMP region, so the first is rethrown after.
   std::vector<std::exception_ptr> errors(matrices.size());
 #ifdef _OPENMP
 #pragma omp parallel for schedule(dynamic, 1)
@@ -229,8 +225,7 @@ std::vector<GivensDecomposition> givens_decomposition(
   return results;
 }
 
-// Interleaves the layers of consecutive diagonal blocks into layers of the
-// whole block-diagonal matrix.
+// Interleaves the layers of consecutive diagonal blocks into global layers.
 GivensDecomposition merge_block_givens(
     const std::vector<GivensDecomposition>& decompositions) {
   struct BlockLayer {
@@ -300,8 +295,7 @@ GivensDecomposition merge_block_givens(
   return merged;
 }
 
-// Moves D to the other side of the layers, D L = L' D, by negating the angle
-// of every pair whose two signs differ.
+// Moves D through the layers, D L = L' D, negating pairs with unequal signs.
 void commute_signs(GivensDecomposition& givens) {
   for (std::size_t layer = 0; layer < givens.layer_angles.size(); ++layer) {
     const std::size_t first = givens.layer_shifted[layer] != 0 ? 1 : 0;
@@ -315,9 +309,8 @@ void commute_signs(GivensDecomposition& givens) {
   }
 }
 
-// Absorbs the input-side signs of states pair and pair + 1 into a rotation of
-// that pair, G(θ ± π) = -G(θ), using a layer whose trimmed table already
-// covers the pair; returns false when none does.
+// Absorbs the signs of states pair and pair + 1 into a covering rotation via
+// G(θ ± π) = -G(θ), returning false when no layer covers the pair.
 bool absorb_sign_pair(GivensDecomposition& givens, std::size_t pair) {
   const auto parity = static_cast<std::uint8_t>(pair % 2);
   const auto slot = pair / 2;
@@ -364,8 +357,8 @@ bool absorb_sign_pair(GivensDecomposition& givens, std::size_t pair) {
   return true;
 }
 
-// Folds the signs of D into rotation angles of layers that already cover them;
-// the rest remain in D, with unused states set to shorten its polynomial.
+// Folds the signs of D into covering rotations and sets those of unused states
+// to shorten the remaining phase polynomial.
 void absorb_signs(GivensDecomposition& givens, const std::vector<bool>& used) {
   commute_signs(givens);
   const auto size = givens.phases.size();
@@ -392,8 +385,7 @@ void absorb_signs(GivensDecomposition& givens, const std::vector<bool>& used) {
       givens.phases[index - 1] = 0;
     }
   }
-  // Unused states take the signs that cancel the monomials of D's phase
-  // polynomial whose top state they are, if the used signs stay unchanged.
+  // Unused states cancel the monomials they top if the used signs stay fixed.
   const auto mobius = [](std::vector<std::uint8_t>& values) {
     for (std::size_t bit = 1; bit < values.size(); bit <<= 1) {
       for (std::size_t index = 0; index < values.size(); ++index) {
@@ -451,8 +443,7 @@ DenseIsometryFactors dense_isometry_factors(const Eigen::MatrixXd& isometry,
 
   DenseIsometryFactors factors;
   factors.num_added_qubits = ratio == 1 ? 0 : (ratio == 2 ? 1 : 2);
-  // The CSD keeps only the diagonal of D_2, which is exact only for an exact
-  // isometry, so the input is replaced by its polar factor U V^T.
+  // The CSD keeps only the diagonal of D_2, so use the polar factor U V^T.
   const auto svd = singular_value_decomposition(isometry);
   factors.isometry = svd.u.leftCols(isometry.cols()) * svd.v.transpose();
   const auto& exact = factors.isometry;
@@ -467,8 +458,7 @@ DenseIsometryFactors dense_isometry_factors(const Eigen::MatrixXd& isometry,
     blocks.emplace_back(c.topRows(dim), c.bottomRows(dim));
   }
   factors.csds.resize(blocks.size());
-  // An exception must not escape an OpenMP region, so each iteration keeps its
-  // own and the first is rethrown after the loop.
+  // Exceptions cannot escape an OpenMP region, so the first is rethrown after.
   std::vector<std::exception_ptr> errors(blocks.size());
 #ifdef _OPENMP
 #pragma omp parallel for schedule(dynamic, 1)
@@ -513,7 +503,6 @@ struct ColumnGroup {
   double residual = 0.0;
 };
 
-// All column groups.
 struct ColumnSupports {
   std::vector<ColumnGroup> groups;
   std::vector<std::size_t> column_group;
@@ -559,8 +548,7 @@ ColumnSupports discover_column_supports(
     first = std::min(first, column);
   });
 
-  // Roots are the smallest columns, so discovery order is independent of
-  // storage.
+  // Roots are the smallest columns, so group order is storage independent.
   supports.column_group.resize(static_cast<std::size_t>(left));
   supports.local_column.resize(static_cast<std::size_t>(left));
   for (Eigen::Index column = 0; column < left; ++column) {
@@ -635,8 +623,7 @@ RowGathering gather_rows(const Eigen::SparseMatrix<double>& matrix,
 
 void complete_blocks(std::vector<ColumnGroup>& groups, Eigen::Index left) {
   const double tolerance = orthogonality_tolerance * static_cast<double>(left);
-  // An exception must not escape an OpenMP region, so each iteration keeps its
-  // own and the first is rethrown after the loop.
+  // Exceptions cannot escape an OpenMP region, so the first is rethrown after.
   std::vector<std::exception_ptr> errors(groups.size());
 #ifdef _OPENMP
 #pragma omp parallel for schedule(dynamic, 1)
@@ -709,8 +696,7 @@ std::vector<Eigen::Index> gather_columns(
   return permutation;
 }
 
-// Absorb P_o into both mappings so largest-first sorting needs no extra
-// circuit.
+// Sorts blocks largest first by absorbing P_o into both permutations.
 std::vector<std::size_t> sort_blocks(
     const std::vector<ColumnGroup>& groups,
     const std::vector<Eigen::Index>& block_starts,
@@ -827,9 +813,8 @@ DenseIsometrySynthesis dense_isometry_synthesis(const Eigen::MatrixXd& isometry,
     absorb_signs(result.block_givens, used);
     return result;
   }
-  // Block input states fed by a UCR output that is never rotated into are
-  // unused; with two added qubits W₀ and W₁ may spread a populated branch of
-  // q0 or q1 over every input state.
+  // Block states fed only by an unrotated UCR output are unused, while W₀ and
+  // W₁ spread a populated branch over every input state.
   auto& angles = result.rotation_angles;
   const auto rotates = [&](std::size_t ucr, std::size_t state) {
     return is_rotation(angles[ucr][state]);
@@ -860,10 +845,8 @@ DenseIsometrySynthesis dense_isometry_synthesis(const Eigen::MatrixXd& isometry,
         std::find_if(table.rbegin(), table.rend(), is_rotation)));
   }
 
-  // Folds the signs before UCR_j at a state and on its |0⟩ and |1⟩ outputs
-  // into its angle, wrapped into (-2π, 2π], unless that would extend the
-  // trimmed table; there the rotation is the identity, so the sign before it
-  // moves onto |0⟩ and its unpopulated |1⟩ output drops its sign.
+  // Folds the signs around UCR_j at a state into its angle in (-2π, 2π],
+  // except past the trimmed table, where the sign before moves onto |0⟩.
   commute_signs(result.block_givens);
   auto& block_signs = result.block_givens.phases;
   std::uint8_t no_sign = 0;

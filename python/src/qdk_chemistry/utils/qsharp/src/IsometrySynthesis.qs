@@ -5,21 +5,17 @@
 /// Circuits for isometries and unitary matrices from the C++ unitary synthesis
 /// (Rupprecht & Wölk, arXiv:2605.28489).
 ///
-/// Registers are little-endian: basis state |r⟩ of a register holds bit k of r in qubit k.
-/// An isometry with 2^k · 2^n rows acts on an n-qubit input register followed by k added
-/// qubits, so row q · 2^n + a is added state q and input state a. Column a is input state
-/// a with the added qubits in |0⟩.
+/// Registers are little-endian, and row q · 2^n + a of an isometry is added state q and input
+/// state a of the n-qubit input register followed by the added qubits.
 ///
-/// Each synthesis method of the `unitary_synthesis` circuit mapper provides the same entry
-/// points under a prefix X, which the mapper resolves by name:
-/// - `struct XSynthesis`, the circuit data computed by the method;
-/// - `ApplyX(synthesis, input, added, phaseGradient, angleReg) : Unit is Adj`;
-/// - `struct XParams { synthesis, numInputQubits, numAddedQubits, rotationBitPrecision }`;
-/// - `MakeXOp(params)` and `MakeXOpWithPhaseGradient(params)`, see `ApplyIsometryOnTarget`
-///   and `ApplyIsometryOnRegister`;
-/// - `MakeXCircuit(synthesis, numInputQubits, numAddedQubits, rotationBitPrecision)`.
-/// The structs are concrete per method so that no generic type crosses the Python interop
-/// boundary.
+/// Each `unitary_synthesis_*` circuit mapper uses these entry points with its prefix X
+/// (`DenseIsometry` or `SparseIsometry`):
+/// - `XSynthesis` holds the circuit data from the C++ synthesis;
+/// - `ApplyX(synthesis, input, added, phaseGradient, angleReg)` applies the isometry;
+/// - `XParams { synthesis, numInputQubits, numAddedQubits, rotationBitPrecision }` bundles it;
+/// - `MakeXOp(params)` returns the operation on the target, with its own phase gradient;
+/// - `MakeXOpWithPhaseGradient(params)` returns it on the target and a prepared phase gradient;
+/// - `MakeXCircuit(synthesis, numInputQubits, numAddedQubits, rotationBitPrecision)` runs it.
 namespace QDKChemistry.Utils.IsometrySynthesis {
 
     import Std.Arrays.Any;
@@ -45,22 +41,17 @@ namespace QDKChemistry.Utils.IsometrySynthesis {
     import QDKChemistry.Utils.UnitarySynthesis.TrimZeroWords;
 
     /// Circuit data of a dense real isometry, mirroring the C++
-    /// `qdk::chemistry::utils::DenseIsometrySynthesis`.
-    ///
-    /// With two added qubits the circuit is V → UCR₀ → CNOT → W₀ → UCR₁ → CNOT → W₁ → UCR₂ → B
-    /// (Fig. 5 of Rupprecht & Wölk, arXiv:2605.28489), with one it is V → UCR₀ → B (Eq. 6),
-    /// and with none it is B. Each UCRⱼ is an Ry on an added qubit multiplexed by the input
-    /// register, and B is block diagonal over the added qubits.
+    /// `qdk::chemistry::utils::DenseIsometrySynthesis`, applied as
+    /// V → UCR₀ → CNOT → W₀ → UCR₁ → CNOT → W₁ → UCR₂ → B for two added qubits, V → UCR₀ → B for
+    /// one, and B for none.
     struct DenseIsometrySynthesis {
-        /// Ry angles of UCR₀, UCR₁ and UCR₂, one per input state, with the signs of the Givens
-        /// factors folded in; UCR₀ only for one added qubit and none for zero.
+        /// Ry angles of each UCRⱼ, one per input state, with the Givens signs folded in.
         rotationAngles : Double[][],
         /// W₀ and W₁ on the input register; empty unless two qubits are added.
         mixingGivens : GivensDecomposition[],
         /// B on the joint input and added register.
         blockGivens : GivensDecomposition,
-        /// V on the input register, whose row signs may be folded into UCR₀, or empty when V
-        /// is omitted or no qubit is added.
+        /// V on the input register, or empty when V is omitted or no qubit is added.
         rightFactorGivens : GivensDecomposition[],
         /// Widest swap network of the angle lookups, -1 for the Toffoli-optimal width.
         maxSwapBits : Int,
@@ -73,7 +64,7 @@ namespace QDKChemistry.Utils.IsometrySynthesis {
         columnPermutation : Int[],
         /// P_r|v⟩ = |rowPermutation[v]⟩.
         rowPermutation : Int[],
-        /// Block-diagonal B, with signs folded into its angles where a layer covers them.
+        /// Block-diagonal B.
         blockGivens : GivensDecomposition,
         /// Widest swap network of the angle lookups, -1 for the Toffoli-optimal width.
         maxSwapBits : Int,
@@ -106,14 +97,9 @@ namespace QDKChemistry.Utils.IsometrySynthesis {
         (Mapped(IntAsBoolArray(_, numBits), permTargets), Mapped(IntAsBoolArray(_, numBits), inverse))
     }
 
-    /// Applies |i⟩ → |P(i)⟩ with `permTargets[i]` = P(i) and `invPermTargets[j]` = P⁻¹(j) as
-    /// little-endian bit strings.
-    ///
-    /// Loads P(i) into a fresh register by QROAM, with a swap network of at most `maxSwapBits`
-    /// address bits (-1 for the Toffoli-optimal width), and swaps it with `target`. The old
-    /// register then holds P⁻¹(target), which the measurement-based unlookup `Adjoint Select`
-    /// erases for O(√N) Toffolis. The adjoint applies P⁻¹ the same way rather than running the
-    /// lookup backwards.
+    /// Applies |i⟩ → |P(i)⟩, with P and P⁻¹ given as little-endian bit strings, by a QROAM
+    /// load of at most `maxSwapBits` swap bits (-1 for Toffoli-optimal) and a measurement-based
+    /// unlookup.
     operation PermutationViaQROAM(
         permTargets : Bool[][],
         invPermTargets : Bool[][],
@@ -132,12 +118,8 @@ namespace QDKChemistry.Utils.IsometrySynthesis {
         }
     }
 
-    /// Applies a dense isometry (Appendix B of Rupprecht & Wölk, arXiv:2605.28489) to the
-    /// little-endian `input` register and the `added` qubits, which start in |0⟩ for the
-    /// isometry's columns.
-    ///
-    /// `phaseGradient` is prepared by `PreparePhaseGradientState`, its length sets the bits of
-    /// every quantized angle, and `angleReg` is a clean register of the same length.
+    /// Applies a dense isometry to the little-endian `input` and the `added` qubits in |0⟩,
+    /// using the prepared `phaseGradient` and a clean `angleReg` of the same length.
     operation ApplyDenseIsometry(
         synthesis : DenseIsometrySynthesis,
         input : Qubit[],
@@ -168,8 +150,7 @@ namespace QDKChemistry.Utils.IsometrySynthesis {
         let rightFactorGivens = Mapped(quantize, synthesis.rightFactorGivens);
         let blockGivens = QuantizeGivensDecomposition(synthesis.blockGivens, blockAddresses, rotationBitPrecision, maxSwapBits);
 
-        // The rotation tables are addressed by the little-endian input register; the Givens
-        // operations take most-significant-first registers, hence `Reversed(input)`.
+        // The Givens operations take most-significant-first registers, hence `Reversed(input)`.
         for givens in rightFactorGivens {
             if IsEmpty(input) {
                 // V is the 1 × 1 sign ±1, a global sign with no input qubit to carry it.
@@ -197,11 +178,8 @@ namespace QDKChemistry.Utils.IsometrySynthesis {
         ApplyRealUnitaryViaGivens(blockGivens, [], Reversed(input + added), phaseGradient, angleReg);
     }
 
-    /// Applies a sparse isometry U = P_r · B · P_c to the little-endian register
-    /// `input + added`, whose value is the row index of the isometry.
-    ///
-    /// The split into `input` and `added` only matches the signature of `ApplyDenseIsometry`;
-    /// see there for `phaseGradient` and `angleReg`.
+    /// Applies a sparse isometry U = P_r · B · P_c to the little-endian register `input + added`,
+    /// with the signature of `ApplyDenseIsometry`.
     operation ApplySparseIsometry(
         synthesis : SparseIsometrySynthesis,
         input : Qubit[],
@@ -225,10 +203,8 @@ namespace QDKChemistry.Utils.IsometrySynthesis {
         PermutationViaQROAM(rowPermData, rowInvPermData, synthesis.maxSwapBits, target);
     }
 
-    /// Applies `isometry(input, added, phaseGradient, angleReg)` to `qs` =
-    /// `[input | added | phaseGradient]`, whose last `rotationBitPrecision` qubits are a
-    /// caller-owned register prepared by `PreparePhaseGradientState`. The angle register is
-    /// allocated here and returned clean.
+    /// Applies `isometry` to `qs` = `[input | added | phaseGradient]`, whose last
+    /// `rotationBitPrecision` qubits hold a prepared phase gradient, with a clean angle register.
     operation ApplyIsometryOnRegister(
         numInputQubits : Int,
         numAddedQubits : Int,
@@ -245,8 +221,7 @@ namespace QDKChemistry.Utils.IsometrySynthesis {
         isometry(qs[...numInputQubits - 1], qs[numInputQubits..numTargetQubits - 1], qs[numTargetQubits...], angleReg);
     }
 
-    /// `ApplyIsometryOnRegister` on the target qubits alone, with a phase gradient register
-    /// allocated, prepared, and released here.
+    /// `ApplyIsometryOnRegister` on the target qubits alone, with its own phase gradient.
     operation ApplyIsometryOnTarget(
         numInputQubits : Int,
         numAddedQubits : Int,
@@ -262,8 +237,7 @@ namespace QDKChemistry.Utils.IsometrySynthesis {
         }
     }
 
-    /// Returns `ApplyDenseIsometry` as an operation on the target register
-    /// `[input | added]` that allocates its own phase gradient.
+    /// Returns `ApplyDenseIsometry` on the target `[input | added]`, with its own phase gradient.
     function MakeDenseIsometryOp(params : DenseIsometryParams) : Qubit[] => Unit is Adj {
         ApplyIsometryOnTarget(
             params.numInputQubits,
@@ -274,9 +248,8 @@ namespace QDKChemistry.Utils.IsometrySynthesis {
         )
     }
 
-    /// Returns `ApplyDenseIsometry` as an operation on `[input | added | phaseGradient]`,
-    /// whose last `rotationBitPrecision` qubits are a caller-owned register prepared by
-    /// `PreparePhaseGradientState` and left in that state.
+    /// Returns `ApplyDenseIsometry` on `[input | added | phaseGradient]`, whose prepared phase
+    /// gradient is left in its state.
     function MakeDenseIsometryOpWithPhaseGradient(params : DenseIsometryParams) : Qubit[] => Unit is Adj {
         ApplyIsometryOnRegister(
             params.numInputQubits,
@@ -287,10 +260,7 @@ namespace QDKChemistry.Utils.IsometrySynthesis {
         )
     }
 
-    /// Circuit entry point for a dense isometry (allocates qubits).
-    ///
-    /// The target register keeps the synthesized output, as in the other `Make*Circuit`
-    /// wrappers; only the phase gradient and angle registers are returned to |0⟩.
+    /// Circuit entry point for a dense isometry, leaving the output on the allocated target.
     operation MakeDenseIsometryCircuit(
         synthesis : DenseIsometrySynthesis,
         numInputQubits : Int,
@@ -301,8 +271,7 @@ namespace QDKChemistry.Utils.IsometrySynthesis {
         ApplyIsometryOnTarget(numInputQubits, numAddedQubits, rotationBitPrecision, ApplyDenseIsometry(synthesis, _, _, _, _), target);
     }
 
-    /// Returns `ApplySparseIsometry` as an operation on the target register that allocates
-    /// its own phase gradient.
+    /// Returns `ApplySparseIsometry` on the target, with its own phase gradient.
     function MakeSparseIsometryOp(params : SparseIsometryParams) : Qubit[] => Unit is Adj {
         ApplyIsometryOnTarget(
             params.numInputQubits,
@@ -313,8 +282,7 @@ namespace QDKChemistry.Utils.IsometrySynthesis {
         )
     }
 
-    /// Returns `ApplySparseIsometry` as an operation on `[target | phaseGradient]`; see
-    /// `MakeDenseIsometryOpWithPhaseGradient`.
+    /// Returns `ApplySparseIsometry` on `[target | phaseGradient]`, as for dense isometries.
     function MakeSparseIsometryOpWithPhaseGradient(params : SparseIsometryParams) : Qubit[] => Unit is Adj {
         ApplyIsometryOnRegister(
             params.numInputQubits,
@@ -325,8 +293,7 @@ namespace QDKChemistry.Utils.IsometrySynthesis {
         )
     }
 
-    /// Circuit entry point for a sparse isometry (allocates qubits); see
-    /// `MakeDenseIsometryCircuit`.
+    /// Circuit entry point for a sparse isometry, leaving the output on the allocated target.
     operation MakeSparseIsometryCircuit(
         synthesis : SparseIsometrySynthesis,
         numInputQubits : Int,

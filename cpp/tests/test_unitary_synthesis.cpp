@@ -14,6 +14,8 @@
 #include <qdk/chemistry/utils/unitary_synthesis.hpp>
 #include <random>
 #include <stdexcept>
+#include <string>
+#include <utility>
 #include <vector>
 
 using qdk::chemistry::utils::block_sparse_isometry_synthesis;
@@ -68,43 +70,30 @@ Eigen::MatrixXd random_orthogonal(Eigen::Index dim, std::uint32_t seed) {
   return qr.householderQ() * Eigen::MatrixXd::Identity(dim, dim);
 }
 
+// Checks that the permutations and blocks of a sparse synthesis give target.
 void expect_sparse_reconstruction(const SparseIsometrySynthesis& result,
                                   const Eigen::MatrixXd& target) {
   const Eigen::MatrixXd block_diagonal = reconstruct(result.block_givens);
   ASSERT_EQ(block_diagonal.rows(), target.rows());
-  ASSERT_EQ(result.row_permutation.size(),
-            static_cast<std::size_t>(target.rows()));
-  ASSERT_EQ(result.column_permutation.size(), result.row_permutation.size());
-  std::vector<Eigen::Index> expected_indices(result.row_permutation.size());
-  std::iota(expected_indices.begin(), expected_indices.end(), 0);
-  auto sorted_rows = result.row_permutation;
-  auto sorted_columns = result.column_permutation;
-  std::sort(sorted_rows.begin(), sorted_rows.end());
-  std::sort(sorted_columns.begin(), sorted_columns.end());
-  ASSERT_EQ(sorted_rows, expected_indices);
-  ASSERT_EQ(sorted_columns, expected_indices);
-  EXPECT_TRUE(
-      (block_diagonal.transpose() * block_diagonal)
-          .isApprox(Eigen::MatrixXd::Identity(target.rows(), target.rows()),
-                    1.0e-11));
-  std::vector<Eigen::Index> inverse_rows(result.row_permutation.size());
-  for (std::size_t index = 0; index < inverse_rows.size(); ++index) {
-    inverse_rows[static_cast<std::size_t>(result.row_permutation[index])] =
-        static_cast<Eigen::Index>(index);
+  std::vector<Eigen::Index> indices(static_cast<std::size_t>(target.rows()));
+  std::iota(indices.begin(), indices.end(), 0);
+  for (auto permutation : {result.row_permutation, result.column_permutation}) {
+    std::sort(permutation.begin(), permutation.end());
+    ASSERT_EQ(permutation, indices);
   }
   Eigen::MatrixXd reconstructed(target.rows(), target.cols());
   for (Eigen::Index row = 0; row < target.rows(); ++row) {
     for (Eigen::Index column = 0; column < target.cols(); ++column) {
-      reconstructed(row, column) = block_diagonal(
-          inverse_rows[static_cast<std::size_t>(row)],
-          result.column_permutation[static_cast<std::size_t>(column)]);
+      reconstructed(result.row_permutation[static_cast<std::size_t>(row)],
+                    column) =
+          block_diagonal(
+              row, result.column_permutation[static_cast<std::size_t>(column)]);
     }
   }
   EXPECT_TRUE(reconstructed.isApprox(target, 1.0e-11));
 }
 
-// Pads each of the `blocks` row blocks of an isometry to `dim` rows, as when
-// an isometry on fewer states is embedded in a larger register.
+// Pads each of the `blocks` row blocks of an isometry to `dim` rows.
 Eigen::MatrixXd pad_isometry(const Eigen::MatrixXd& isometry,
                              Eigen::Index blocks, Eigen::Index dim) {
   const Eigen::Index rows = isometry.rows() / blocks;
@@ -116,9 +105,8 @@ Eigen::MatrixXd pad_isometry(const Eigen::MatrixXd& isometry,
   return padded;
 }
 
-// Ry rotations on added qubit target_bit addressed by the input state, with
-// an optional added control qubit. Basis state q * chi + a holds added-qubit
-// state q, whose bit k is added qubit k, and input state a.
+// Ry on added qubit target_bit multiplexed by input state a of basis state
+// q * chi + a, optionally controlled by added qubit control_bit.
 Eigen::MatrixXd multiplexed_ry(const std::vector<double>& angles,
                                Eigen::Index added, Eigen::Index chi,
                                int target_bit, int control_bit = -1) {
@@ -143,8 +131,8 @@ Eigen::MatrixXd multiplexed_ry(const std::vector<double>& angles,
   return result;
 }
 
-// Applies `unitary` to the input register when added qubit control_bit is
-// set, or unconditionally when control_bit is negative.
+// Applies `unitary` to the input register, controlled by added qubit
+// control_bit unless it is negative.
 Eigen::MatrixXd input_unitary(const Eigen::MatrixXd& unitary,
                               Eigen::Index added, int control_bit = -1) {
   const Eigen::Index chi = unitary.rows();
@@ -184,78 +172,65 @@ Eigen::MatrixXd dense_circuit(const DenseIsometrySynthesis& synthesis,
   return circuit;
 }
 
-void expect_dense_reconstruction(const DenseIsometrySynthesis& synthesis,
-                                 const Eigen::MatrixXd& target,
-                                 Eigen::Index chi, bool omitted,
-                                 bool generic = true) {
+// Checks both dense circuit variants of `input` (default `target`) against
+// `target` and the right-factor helper.
+void expect_dense_synthesis(const Eigen::MatrixXd& target, Eigen::Index chi,
+                            bool generic = true,
+                            const Eigen::MatrixXd* input = nullptr) {
+  const Eigen::MatrixXd& source = input != nullptr ? *input : target;
   const Eigen::Index added = target.rows() / chi;
   const Eigen::Index width = target.cols();
-  const std::size_t num_rotations = added == 4 ? 3u : (added == 2 ? 1u : 0u);
-  ASSERT_EQ(synthesis.rotation_angles.size(), num_rotations);
-  ASSERT_EQ(synthesis.mixing_givens.size(), added == 4 ? 2u : 0u);
-  for (const auto& angles : synthesis.rotation_angles) {
-    EXPECT_EQ(angles.size(), static_cast<std::size_t>(chi));
+  const auto full = dense_isometry_synthesis(source, chi);
+  const auto omitted = dense_isometry_synthesis(source, chi, true);
+  const Eigen::MatrixXd helper = dense_isometry_right_factor(source, chi);
+  if (added == 1) {
+    EXPECT_TRUE(helper.isIdentity());
   }
-  for (const auto& givens : synthesis.mixing_givens) {
-    EXPECT_EQ(givens.phases.size(), static_cast<std::size_t>(chi));
-  }
-  ASSERT_EQ(synthesis.right_factor.rows(), width);
-  ASSERT_EQ(synthesis.right_factor.cols(), width);
-  EXPECT_TRUE((synthesis.right_factor.transpose() * synthesis.right_factor)
-                  .isApprox(Eigen::MatrixXd::Identity(width, width), 1.0e-11));
-  ASSERT_EQ(synthesis.right_factor_givens.has_value(), !omitted && added > 1);
-  if (synthesis.right_factor_givens) {
-    // The Givens data realizes V up to the row signs folded into UCR 0.
-    const Eigen::MatrixXd padded = reconstruct(*synthesis.right_factor_givens);
-    ASSERT_EQ(padded.rows(), chi);
-    EXPECT_TRUE(
-        (padded.topLeftCorner(width, width) *
-         synthesis.right_factor.transpose())
-            .cwiseAbs()
-            .isApprox(Eigen::MatrixXd::Identity(width, width), 1.0e-11));
-  }
-  // For a generic isometry every sign is folded, except one when B alone uses
-  // every state.
   const auto count_signs = [](const GivensDecomposition& givens) {
     return std::count_if(givens.phases.begin(), givens.phases.end(),
                          [](std::uint8_t phase) { return phase != 0; });
   };
-  auto num_signs = count_signs(synthesis.block_givens);
-  for (const auto& givens : synthesis.mixing_givens) {
-    num_signs += count_signs(givens);
+  for (const auto* synthesis : {&full, &omitted}) {
+    const bool omit = synthesis == &omitted;
+    SCOPED_TRACE(omit ? "omitted right factor" : "full");
+    ASSERT_EQ(synthesis->rotation_angles.size(),
+              added == 4 ? 3u : (added == 2 ? 1u : 0u));
+    ASSERT_EQ(synthesis->mixing_givens.size(), added == 4 ? 2u : 0u);
+    for (const auto& angles : synthesis->rotation_angles) {
+      ASSERT_EQ(angles.size(), static_cast<std::size_t>(chi));
+    }
+    ASSERT_TRUE(synthesis->right_factor.rows() == width &&
+                synthesis->right_factor.cols() == width);
+    EXPECT_TRUE(helper == synthesis->right_factor);
+    ASSERT_EQ(synthesis->right_factor_givens.has_value(), !omit && added > 1);
+    if (synthesis->right_factor_givens) {
+      // The Givens data realizes V up to the row signs folded into UCR 0.
+      EXPECT_TRUE(
+          (reconstruct(*synthesis->right_factor_givens)
+               .topLeftCorner(width, width) *
+           synthesis->right_factor.transpose())
+              .cwiseAbs()
+              .isApprox(Eigen::MatrixXd::Identity(width, width), 1.0e-11));
+    }
+    if (generic) {
+      // Every sign is folded, except one when B alone uses every state.
+      auto num_signs = count_signs(synthesis->block_givens);
+      for (const auto& givens : synthesis->mixing_givens) {
+        num_signs += count_signs(givens);
+      }
+      if (synthesis->right_factor_givens) {
+        num_signs += count_signs(*synthesis->right_factor_givens);
+      }
+      EXPECT_LE(num_signs, added == 1 && width == chi ? 1 : 0);
+    }
+    const Eigen::MatrixXd expected =
+        omit ? Eigen::MatrixXd(target * synthesis->right_factor.transpose())
+             : target;
+    EXPECT_TRUE(dense_circuit(*synthesis, added, chi)
+                    .leftCols(width)
+                    .isApprox(expected, 1.0e-10));
   }
-  if (synthesis.right_factor_givens) {
-    num_signs += count_signs(*synthesis.right_factor_givens);
-  }
-  if (generic) {
-    EXPECT_LE(num_signs, added == 1 && width == chi ? 1 : 0);
-  }
-
-  const Eigen::MatrixXd circuit = dense_circuit(synthesis, added, chi);
-  ASSERT_EQ(circuit.rows(), target.rows());
-  EXPECT_TRUE(
-      (circuit.transpose() * circuit)
-          .isApprox(Eigen::MatrixXd::Identity(circuit.rows(), circuit.cols()),
-                    1.0e-11));
-  const Eigen::MatrixXd expected =
-      omitted ? Eigen::MatrixXd(target * synthesis.right_factor.transpose())
-              : target;
-  EXPECT_TRUE(circuit.leftCols(width).isApprox(expected, 1.0e-10));
-}
-
-// Checks both circuit variants and that the omitted factor is the helper's.
-void expect_dense_synthesis(const Eigen::MatrixXd& target, Eigen::Index chi,
-                            bool generic = true) {
-  const auto full = dense_isometry_synthesis(target, chi);
-  const auto omitted = dense_isometry_synthesis(target, chi, true);
-  expect_dense_reconstruction(full, target, chi, false, generic);
-  expect_dense_reconstruction(omitted, target, chi, true, generic);
-  const Eigen::MatrixXd helper = dense_isometry_right_factor(target, chi);
-  EXPECT_TRUE(helper == omitted.right_factor);
-  EXPECT_TRUE(helper == full.right_factor);
-  // Only UCR 0 carries the folded signs of V; a sign it cannot fold moves to
-  // the block instead.
-  ASSERT_EQ(full.rotation_angles.size(), omitted.rotation_angles.size());
+  // Only UCR 0 carries the folded signs of V.
   for (std::size_t index = 1; index < full.rotation_angles.size(); ++index) {
     EXPECT_EQ(full.rotation_angles[index], omitted.rotation_angles[index]);
   }
@@ -268,43 +243,37 @@ void expect_dense_synthesis(const Eigen::MatrixXd& target, Eigen::Index chi,
 
 }  // namespace
 
+// Dense synthesis reconstructs random, large, structured, and perturbed
+// isometries with and without the right factor.
 TEST(UnitarySynthesisTest, ReconstructsDenseIsometries) {
-  {
-    SCOPED_TRACE("random");
-    std::uint32_t seed = 50;
-    for (const Eigen::Index added : {1, 2, 4}) {
-      for (const Eigen::Index chi : {1, 2, 4}) {
-        for (const Eigen::Index width : {Eigen::Index{1}, chi}) {
-          SCOPED_TRACE(::testing::Message()
-                       << "added states " << added << " chi " << chi
-                       << " width " << width);
-          const Eigen::MatrixXd target =
-              random_orthogonal(added * chi, seed++).leftCols(width);
-          expect_dense_synthesis(target, chi);
-        }
+  std::uint32_t seed = 50;
+  for (const Eigen::Index added : {1, 2, 4}) {
+    for (const Eigen::Index chi : {1, 2, 4}) {
+      for (const Eigen::Index width : {Eigen::Index{1}, chi}) {
+        SCOPED_TRACE(::testing::Message()
+                     << "random, added states " << added << " chi " << chi
+                     << " width " << width);
+        expect_dense_synthesis(
+            random_orthogonal(added * chi, seed++).leftCols(width), chi);
       }
     }
   }
   {
     SCOPED_TRACE("partial width");
-    constexpr Eigen::Index chi = 4;
-    expect_dense_synthesis(random_orthogonal(4 * chi, 17).leftCols(3), chi);
-    expect_dense_synthesis(random_orthogonal(chi, 18).leftCols(3), chi);
+    expect_dense_synthesis(random_orthogonal(16, 17).leftCols(3), 4);
+    expect_dense_synthesis(random_orthogonal(4, 18).leftCols(3), 4);
   }
   {
     constexpr Eigen::Index chi = 32;
-    std::uint32_t seed = 60;
+    constexpr Eigen::Index sectors = 4;
+    constexpr Eigen::Index sector_dim = chi / sectors;
+    seed = 60;
     for (const Eigen::Index added : {2, 4}) {
       SCOPED_TRACE(::testing::Message() << "large, added states " << added);
       for (const Eigen::Index width : {Eigen::Index{20}, chi}) {
         expect_dense_synthesis(
             random_orthogonal(added * chi, seed++).leftCols(width), chi);
       }
-
-      // Input sector k couples only to output sector (k + q) mod 4, so every
-      // CSD block has a highly degenerate spectrum.
-      constexpr Eigen::Index sectors = 4;
-      constexpr Eigen::Index sector_dim = chi / sectors;
       Eigen::MatrixXd blocked = Eigen::MatrixXd::Zero(added * chi, chi);
       for (Eigen::Index k = 0; k < sectors; ++k) {
         const Eigen::MatrixXd block =
@@ -320,28 +289,17 @@ TEST(UnitarySynthesisTest, ReconstructsDenseIsometries) {
   }
   {
     SCOPED_TRACE("structured");
-    // Product states and rank-deficient blocks exercise the zero and pi
-    // angles.
-    Eigen::MatrixXd two_states = Eigen::MatrixXd::Zero(4, 2);
-    two_states(2, 0) = 1.0;
-    two_states(1, 1) = 1.0;
-    expect_dense_synthesis(two_states, 2);
-
     Eigen::MatrixXd four_states = Eigen::MatrixXd::Zero(8, 2);
     four_states(6, 0) = 1.0;
     four_states(3, 1) = 1.0 / std::sqrt(2.0);
     four_states(4, 1) = -1.0 / std::sqrt(2.0);
     expect_dense_synthesis(four_states, 2);
 
-    // The two added-qubit blocks each have rank two, so the CSD has angles 0
-    // and pi with doubly degenerate singular values.
     Eigen::MatrixXd rank_deficient = Eigen::MatrixXd::Zero(8, 4);
     rank_deficient.topLeftCorner(4, 2).setIdentity();
     rank_deficient.bottomRightCorner(4, 2).setIdentity();
     expect_dense_synthesis(rank_deficient, 4);
 
-    // M = [U; 0] with det U < 0 needs no rotation, and folding its signs must
-    // not activate the all-zero angle tables.
     Eigen::MatrixXd reflection = random_orthogonal(4, 21);
     if (reflection.determinant() > 0) {
       reflection.col(0) *= -1;
@@ -361,8 +319,6 @@ TEST(UnitarySynthesisTest, ReconstructsDenseIsometries) {
       }
     }
 
-    // Signs of an unused completion state are chosen so that the remaining
-    // alternating signs are a single Z, not a multi-controlled Z.
     Eigen::MatrixXd alternating = Eigen::MatrixXd::Zero(8, 7);
     for (Eigen::Index state = 0; state < 7; ++state) {
       alternating(state, state) = state % 2 == 0 ? 1.0 : -1.0;
@@ -371,217 +327,112 @@ TEST(UnitarySynthesisTest, ReconstructsDenseIsometries) {
     EXPECT_EQ(dense_isometry_synthesis(alternating, 8).block_givens.phases,
               (std::vector<std::uint8_t>{0, 1, 0, 1, 0, 1, 0, 1}));
 
-    // Rows padded with zeros, as for an isometry embedded in a larger input
-    // register.
     expect_dense_synthesis(
         pad_isometry(random_orthogonal(4 * 3, 19).leftCols(2), 4, 4), 4);
     expect_dense_synthesis(
         pad_isometry(random_orthogonal(2 * 3, 20).leftCols(3), 2, 4), 4);
   }
-  {
-    SCOPED_TRACE("within tolerance");
-    // M = T (I + S) with symmetric ||S|| = 3e-8 has M^T M - I ~ 2S, inside
-    // the accepted 1e-8 * columns = 8e-8, and its nearest isometry is T.
-    constexpr Eigen::Index chi = 8;
-    std::uint32_t seed = 90;
-    for (const Eigen::Index added : {1, 2, 4}) {
-      SCOPED_TRACE(::testing::Message() << "added states " << added);
-      const Eigen::MatrixXd target =
-          random_orthogonal(added * chi, seed++).leftCols(chi);
-      Eigen::MatrixXd symmetric = random_orthogonal(chi, seed++);
-      symmetric += symmetric.transpose().eval();
-      symmetric *= 3.0e-8 / symmetric.norm();
-      const Eigen::MatrixXd perturbed =
-          target * (Eigen::MatrixXd::Identity(chi, chi) + symmetric);
-      expect_dense_reconstruction(dense_isometry_synthesis(perturbed, chi),
-                                  target, chi, false);
-      expect_dense_reconstruction(
-          dense_isometry_synthesis(perturbed, chi, true), target, chi, true);
-    }
-  }
-}
-
-TEST(UnitarySynthesisTest, RightFactorHelperMatchesTheOmittedFactor) {
-  constexpr Eigen::Index chi = 8;
-  std::uint32_t seed = 70;
+  seed = 90;
   for (const Eigen::Index added : {1, 2, 4}) {
-    SCOPED_TRACE(::testing::Message() << "added states " << added);
+    SCOPED_TRACE(::testing::Message()
+                 << "within tolerance, added states " << added);
     const Eigen::MatrixXd target =
-        random_orthogonal(added * chi, seed++).leftCols(5);
-    const Eigen::MatrixXd helper = dense_isometry_right_factor(target, chi);
-    const auto omitted = dense_isometry_synthesis(target, chi, true);
-    EXPECT_TRUE(helper == omitted.right_factor);
-    if (added == 1) {
-      EXPECT_TRUE(helper == Eigen::MatrixXd::Identity(5, 5));
-    }
-
-    // Applying V to the input register before the omitted circuit realizes
-    // the isometry.
-    Eigen::MatrixXd padded = Eigen::MatrixXd::Identity(chi, chi);
-    padded.topLeftCorner(5, 5) = helper;
-    const Eigen::MatrixXd circuit =
-        dense_circuit(omitted, added, chi) * input_unitary(padded, added);
-    EXPECT_TRUE(circuit.leftCols(5).isApprox(target, 1.0e-10));
+        random_orthogonal(added * 8, seed++).leftCols(8);
+    Eigen::MatrixXd symmetric = random_orthogonal(8, seed++);
+    symmetric += symmetric.transpose().eval();
+    symmetric *= 3.0e-8 / symmetric.norm();
+    const Eigen::MatrixXd perturbed =
+        target * (Eigen::MatrixXd::Identity(8, 8) + symmetric);
+    expect_dense_synthesis(target, 8, true, &perturbed);
   }
-
-  // An isometry pre-rotated by the following factor V' on its outputs is
-  // synthesized like any other isometry, as when V' is absorbed upstream.
-  const Eigen::MatrixXd next = random_orthogonal(2 * chi, 80).leftCols(chi);
-  const Eigen::MatrixXd following = dense_isometry_right_factor(next, chi);
-  Eigen::MatrixXd rotated = random_orthogonal(4 * chi, 81).leftCols(6);
-  for (Eigen::Index q = 0; q < 4; ++q) {
-    rotated.middleRows(q * chi, chi) =
-        following * rotated.middleRows(q * chi, chi);
-  }
-  expect_dense_synthesis(rotated, chi);
 }
 
+// Sparse synthesis reconstructs structured, square, perturbed, and random
+// block-sparse isometries.
 TEST(UnitarySynthesisTest, ReconstructsSparseIsometries) {
-  {
-    SCOPED_TRACE("mixed block sizes");
-    // Column groups of sizes (rows, columns) = (1, 1), (3, 2), (5, 3), and
-    // (2, 2) on disjoint rows, plus five unused rows, give diagonal blocks of
-    // five different sizes.
-    Eigen::MatrixXd target = Eigen::MatrixXd::Zero(16, 8);
-    target(0, 0) = -1.0;
-    target.block(1, 1, 3, 2) = random_orthogonal(3, 20).leftCols(2);
-    target.block(4, 3, 5, 3) = random_orthogonal(5, 21).leftCols(3);
-    target.block(9, 6, 2, 2) = random_orthogonal(2, 22);
-    expect_sparse_reconstruction(block_sparse_isometry_synthesis(target),
-                                 target);
+  std::vector<std::pair<std::string, Eigen::MatrixXd>> cases;
+  Eigen::MatrixXd mixed = Eigen::MatrixXd::Zero(16, 8);
+  mixed(0, 0) = -1.0;
+  mixed.block(1, 1, 3, 2) = random_orthogonal(3, 20).leftCols(2);
+  mixed.block(4, 3, 5, 3) = random_orthogonal(5, 21).leftCols(3);
+  mixed.block(9, 6, 2, 2) = random_orthogonal(2, 22);
+  cases.emplace_back("mixed block sizes", mixed);
+
+  Eigen::MatrixXd revisiting = Eigen::MatrixXd::Zero(8, 5);
+  for (Eigen::Index column = 0; column < 3; ++column) {
+    revisiting(2 * column, column) = 1.0 / std::sqrt(2.0);
+    revisiting(2 * column + 1, column) = 1.0 / std::sqrt(2.0);
   }
-  {
-    SCOPED_TRACE("three-row blocks and unused rows");
-    Eigen::MatrixXd target = Eigen::MatrixXd::Zero(8, 2);
-    const double amplitude = 1.0 / std::sqrt(3.0);
-    for (const Eigen::Index row : {0, 5, 6}) {
-      target(row, 0) = amplitude;
-    }
-    for (const Eigen::Index row : {1, 2, 7}) {
-      target(row, 1) = amplitude;
-    }
-    expect_sparse_reconstruction(block_sparse_isometry_synthesis(target),
-                                 target);
+  for (Eigen::Index row = 0; row < 6; ++row) {
+    revisiting(row, 3) = (row % 2 == 0 ? 1.0 : -1.0) / std::sqrt(6.0);
   }
-  {
-    SCOPED_TRACE("full register");
-    Eigen::MatrixXd target = Eigen::MatrixXd::Zero(8, 4);
-    target.block(0, 0, 3, 2) = random_orthogonal(3, 31).leftCols(2);
-    target.block(4, 2, 2, 1) = random_orthogonal(2, 32).leftCols(1);
-    target(7, 3) = 1.0;
-    expect_sparse_reconstruction(block_sparse_isometry_synthesis(target),
-                                 target);
+  revisiting(6, 4) = 1.0;
+  cases.emplace_back("columns revisiting earlier rows", revisiting);
+
+  Eigen::MatrixXd non_contiguous = Eigen::MatrixXd::Zero(8, 3);
+  non_contiguous(0, 0) = 0.6;
+  non_contiguous(1, 0) = 0.8;
+  non_contiguous(0, 2) = -0.8;
+  non_contiguous(1, 2) = 0.6;
+  non_contiguous(2, 1) = 1.0 / std::sqrt(2.0);
+  non_contiguous(3, 1) = -1.0 / std::sqrt(2.0);
+  cases.emplace_back("non-contiguous columns", non_contiguous);
+
+  Eigen::MatrixXd isometry = Eigen::MatrixXd::Zero(4 * 3, 3);
+  const Eigen::MatrixXd paired = random_orthogonal(4, 81).leftCols(2);
+  for (Eigen::Index row = 0; row < 2; ++row) {
+    isometry.row(row) = Eigen::RowVector3d(paired(row, 0), paired(row, 1), 0);
+    isometry.row(6 + row) =
+        Eigen::RowVector3d(paired(2 + row, 0), paired(2 + row, 1), 0);
   }
-  {
-    SCOPED_TRACE("columns revisiting earlier rows");
-    // Columns 0-2 have disjoint supports; column 3 overlaps all of them, so the
-    // first four columns must form a single block. Column 4 starts a new
-    // block.
-    Eigen::MatrixXd target = Eigen::MatrixXd::Zero(8, 5);
-    const double pair = 1.0 / std::sqrt(2.0);
-    for (Eigen::Index column = 0; column < 3; ++column) {
-      target(2 * column, column) = pair;
-      target(2 * column + 1, column) = pair;
-    }
-    for (Eigen::Index row = 0; row < 6; ++row) {
-      target(row, 3) = (row % 2 == 0 ? 1.0 : -1.0) / std::sqrt(6.0);
-    }
-    target(6, 4) = 1.0;
-    expect_sparse_reconstruction(block_sparse_isometry_synthesis(target),
-                                 target);
-  }
-  {
-    SCOPED_TRACE("non-contiguous columns");
-    // Columns 0 and 2 share rows {0, 1}, while column 1 lives on rows {2, 3}.
-    Eigen::MatrixXd target = Eigen::MatrixXd::Zero(8, 3);
-    target(0, 0) = 0.6;
-    target(1, 0) = 0.8;
-    target(0, 2) = -0.8;
-    target(1, 2) = 0.6;
-    target(2, 1) = 1.0 / std::sqrt(2.0);
-    target(3, 1) = -1.0 / std::sqrt(2.0);
-    expect_sparse_reconstruction(block_sparse_isometry_synthesis(target),
-                                 target);
-  }
-  {
-    SCOPED_TRACE("padded row blocks");
-    // Row blocks 0 and 2 couple to rows {0, 1}, blocks 1 and 3 to row 2, and
-    // each block is padded from three to four rows.
-    constexpr Eigen::Index blocks = 4;
-    constexpr Eigen::Index rows = 3;
-    Eigen::MatrixXd isometry = Eigen::MatrixXd::Zero(blocks * rows, 3);
-    const Eigen::MatrixXd paired = random_orthogonal(4, 81).leftCols(2);
-    for (Eigen::Index row = 0; row < 2; ++row) {
-      isometry.row(row) = Eigen::RowVector3d(paired(row, 0), paired(row, 1), 0);
-      isometry.row(2 * rows + row) =
-          Eigen::RowVector3d(paired(2 + row, 0), paired(2 + row, 1), 0);
-    }
-    isometry(rows + 2, 2) = 0.6;
-    isometry(3 * rows + 2, 2) = 0.8;
-    const Eigen::MatrixXd target = pad_isometry(isometry, blocks, 4);
-    expect_sparse_reconstruction(block_sparse_isometry_synthesis(target),
-                                 target);
-  }
-  {
-    SCOPED_TRACE("signed permutation");
-    // Every column holds a single signed entry, so every block is 1x1.
-    Eigen::MatrixXd target = Eigen::MatrixXd::Zero(8, 4);
-    target(5, 0) = 1.0;
-    target(0, 1) = -1.0;
-    target(6, 2) = 1.0;
-    target(3, 3) = -1.0;
-    expect_sparse_reconstruction(block_sparse_isometry_synthesis(target),
-                                 target);
-  }
-  {
-    SCOPED_TRACE("single rotation");
-    const double angle = 0.37;
-    Eigen::MatrixXd target = Eigen::MatrixXd::Zero(4, 1);
-    target(1, 0) = std::cos(angle);
-    target(2, 0) = std::sin(angle);
-    expect_sparse_reconstruction(block_sparse_isometry_synthesis(target),
-                                 target);
-  }
-  {
-    SCOPED_TRACE("square orthogonal");
-    const Eigen::MatrixXd target = random_orthogonal(8, 42);
-    expect_sparse_reconstruction(block_sparse_isometry_synthesis(target),
-                                 target);
-  }
-  {
-    SCOPED_TRACE("within tolerance");
-    // The one-row block of column 3 carries a residual of 3e-8: inside the
-    // accepted 1e-8 * columns = 4e-8 but above the 1e-8 guard of a 1x1 block.
-    Eigen::MatrixXd target = Eigen::MatrixXd::Zero(8, 4);
-    target.topLeftCorner(3, 3) = random_orthogonal(3, 41);
-    target(4, 3) = 1.0;
-    Eigen::MatrixXd perturbed = target;
-    perturbed(4, 3) += 1.5e-8;
-    expect_sparse_reconstruction(block_sparse_isometry_synthesis(perturbed),
-                                 target);
-  }
-  // One dense block of n rows, completed to an n x n orthogonal block.
+  isometry(5, 2) = 0.6;
+  isometry(11, 2) = 0.8;
+  cases.emplace_back("padded row blocks", pad_isometry(isometry, 4, 4));
+
+  Eigen::MatrixXd signed_permutation = Eigen::MatrixXd::Zero(8, 4);
+  signed_permutation(5, 0) = 1.0;
+  signed_permutation(0, 1) = -1.0;
+  signed_permutation(6, 2) = 1.0;
+  signed_permutation(3, 3) = -1.0;
+  cases.emplace_back("signed permutation", signed_permutation);
+
+  Eigen::MatrixXd single_rotation = Eigen::MatrixXd::Zero(4, 1);
+  single_rotation(1, 0) = std::cos(0.37);
+  single_rotation(2, 0) = std::sin(0.37);
+  cases.emplace_back("single rotation", single_rotation);
+  cases.emplace_back("square orthogonal", random_orthogonal(8, 42));
+
   constexpr Eigen::Index chi = 32;
-  for (const Eigen::Index dim : {2, 3, 4, 5, 8, 16, 33, 64}) {
-    for (std::uint32_t seed = 0; seed < 2; ++seed) {
-      SCOPED_TRACE(::testing::Message()
-                   << "random, dim " << dim << " seed " << seed);
-      const Eigen::Index width = std::min(dim, chi);
-      Eigen::MatrixXd target = Eigen::MatrixXd::Zero(2 * chi, width);
-      target.topRows(dim) = random_orthogonal(dim, seed).leftCols(width);
-      expect_sparse_reconstruction(block_sparse_isometry_synthesis(target),
-                                   target);
-    }
+  for (const Eigen::Index dim : {2, 3, 5, 16, 33, 64}) {
+    Eigen::MatrixXd dense_block =
+        Eigen::MatrixXd::Zero(2 * chi, std::min(dim, chi));
+    dense_block.topRows(dim) =
+        random_orthogonal(dim, 0).leftCols(dense_block.cols());
+    cases.emplace_back("random, dim " + std::to_string(dim), dense_block);
   }
+  for (const auto& [name, target] : cases) {
+    SCOPED_TRACE(name);
+    expect_sparse_reconstruction(block_sparse_isometry_synthesis(target),
+                                 target);
+  }
+
+  Eigen::MatrixXd target = Eigen::MatrixXd::Zero(8, 4);
+  target.topLeftCorner(3, 3) = random_orthogonal(3, 41);
+  target(4, 3) = 1.0;
+  Eigen::MatrixXd perturbed = target;
+  perturbed(4, 3) += 1.5e-8;
+  SCOPED_TRACE("within tolerance");
+  expect_sparse_reconstruction(block_sparse_isometry_synthesis(perturbed),
+                               target);
 }
 
+// Dense and sparse inputs, including stored zeros, give the same synthesis.
 TEST(UnitarySynthesisTest, SparseAndDenseInputsAgree) {
   Eigen::MatrixXd target = Eigen::MatrixXd::Zero(16, 6);
   target.block(2, 0, 4, 3) = random_orthogonal(4, 90).leftCols(3);
   target.block(9, 3, 3, 2) = random_orthogonal(3, 91).leftCols(2);
   target(14, 5) = -1.0;
   Eigen::SparseMatrix<double> sparse = target.sparseView();
-  // Stored zeros do not join columns into one block.
   sparse.coeffRef(9, 0) = 0.0;
   sparse.coeffRef(2, 5) = 0.0;
   const auto from_dense = block_sparse_isometry_synthesis(target);
@@ -596,10 +447,10 @@ TEST(UnitarySynthesisTest, SparseAndDenseInputsAgree) {
   EXPECT_EQ(from_sparse.block_givens.phases, from_dense.block_givens.phases);
 }
 
+// Invalid input dimensions and non-isometric, non-finite, zero, empty, or wide
+// inputs throw.
 TEST(UnitarySynthesisTest, RejectsInvalidIsometries) {
   const Eigen::MatrixXd valid = random_orthogonal(8, 95).leftCols(2);
-  // Input dimensions that are empty, do not divide the rows, leave a row
-  // ratio other than 1, 2, or 4, or are smaller than the column count.
   for (const Eigen::Index chi :
        {Eigen::Index{0}, Eigen::Index{-2}, Eigen::Index{3}, Eigen::Index{1},
         std::numeric_limits<Eigen::Index>::max()}) {

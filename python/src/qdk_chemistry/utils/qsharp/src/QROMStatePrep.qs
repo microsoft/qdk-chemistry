@@ -39,8 +39,7 @@ namespace QDKChemistry.Utils.QROMStatePrep {
     /// Compute the SBM rotation angles as quantized integers in a binary heap.
     ///
     /// Builds a probability tree p_i = Σ_{leaves(i)} |α_j|² and converts
-    /// each node to the `QuantizeRyAngle` word of Ry(2θ_i), with
-    ///   θ_i = arccos(√(p_left / p_i)).
+    /// each node to the `QuantizeRyAngle` word of Ry(2θ_i), with θ_i = arccos(√(p_left / p_i)).
     ///
     /// # Output
     /// Int array of length 2^nQubits, indexed as a binary heap (root at index 1).

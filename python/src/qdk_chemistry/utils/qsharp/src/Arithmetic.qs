@@ -48,9 +48,6 @@ namespace QDKChemistry.Utils.Arithmetic {
 
     /// Applies |x⟩ → |x + c mod 2^n⟩ to the little-endian `target` with the ripple-carry
     /// adder of Sanders et al. (PRX Quantum 1, 020312, 2020), Fig. 18.
-    ///
-    /// For n > 2 it costs n − 2 AND gates (4(n − 2) T gates) and n − 1 clean ancillas, and the
-    /// AND gates are uncomputed by measurement. Smaller widths use only Clifford gates.
     operation AddConstant(c : Int, target : Qubit[]) : Unit is Adj {
         let n = Length(target);
         let cBits = IntAsBoolArray(c &&& ((1 <<< n) - 1), n);
