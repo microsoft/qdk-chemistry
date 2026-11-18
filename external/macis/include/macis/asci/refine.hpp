@@ -9,6 +9,8 @@
 
 #pragma once
 #include <algorithm>
+#include <cmath>
+#include <limits>
 #include <macis/asci/iteration.hpp>
 
 namespace macis {
@@ -17,8 +19,19 @@ namespace macis {
  * @brief Perform ASCI (Adaptive Sampling Configuration Interaction)
  * wavefunction refinement phase
  *
- * Reselects the determinant space and rediagonalizes until energy convergence.
- * Union stabilization can enlarge the space and extend the iteration budget.
+ * Reselects the determinant space and rediagonalizes until the energy changes
+ * by less than refine_energy_tol. The energy can instead oscillate, typically
+ * as the selection cycles between two determinant spaces: the energy steps
+ * flip sign, each cancelling the previous one to within refine_energy_tol.
+ * After two such steps in a row, refinement rediagonalizes the union of the
+ * last two spaces, continues from it at the target size (which can lead out of
+ * the cycle) and grants four more iterations, enough to confirm an oscillation
+ * that re-forms. A later oscillation ends refinement if the energy has not
+ * dropped by more than refine_energy_tol since the last union, or once the
+ * union steps have been granted at least max_refine_iter iterations in total.
+ * Once the energy has oscillated, the result is the lowest-energy iterate of
+ * a search, never the union; a refinement that never oscillates returns its
+ * last iterate.
  *
  * @tparam N Size of the wavefunction bitset representation
  * @tparam index_t Integer type for indexing operations (default: int32_t)
@@ -37,8 +50,12 @@ namespace macis {
  *
  * @return Tuple containing:
  *   - Final refined energy
- *   - Refined determinants (union stabilization can enlarge the space)
+ *   - Refined determinants
  *   - Refined CI coefficients
+ *
+ * @throws std::runtime_error if the energy neither converges nor ends in a
+ * cycle within the iteration budget, the space shrinks below ntdets_min, or
+ * an MPI build needs a union step
  *
  * @see asci_iter, asci_grow
  */
@@ -78,10 +95,22 @@ auto asci_refine(ASCISettings asci_settings, MCSCFSettings mcscf_settings,
   double prev_E_delta = 0.0;
   int oscillation_count = 0;
   size_t max_iter = asci_settings.max_refine_iter;
-  // Cap total extensions at the original budget to prevent runaway loops
+  // Iterations granted per union step: a cycle that re-forms after it takes
+  // up to four to confirm (the first step after the union cannot count)
+  constexpr size_t union_extension = 4;
+  // Union steps are taken while fewer than the original budget have been
+  // granted, which bounds the total
   size_t total_extensions = 0;
   const size_t max_extensions = asci_settings.max_refine_iter;
   std::vector<wfn_t<N>> prev_wfn;  // saved for union stabilization
+  bool cycled = false, stopped = false;
+  // Lowest-energy iterate at the target size, the result once the selection
+  // has cycled, and its energy when the last union was taken
+  double E_best = std::numeric_limits<double>::infinity();
+  double E_best_at_union = std::numeric_limits<double>::infinity();
+  size_t iter_best = 0;
+  std::vector<wfn_t<N>> wfn_best;
+  std::vector<double> X_best;
   // Incremental H_build cache — carried across refine iterations
   CachedHamiltonianState<wfn_t<N>, index_t> h_cache;
 
@@ -119,14 +148,39 @@ auto asci_refine(ASCISettings asci_settings, MCSCFSettings mcscf_settings,
       break;
     }
 
-    // Detect oscillation: sign change in energy delta with similar magnitude
+    if (E < E_best) {
+      E_best = E;
+      iter_best = iter + 1;
+      wfn_best = wfn;
+      X_best = X;
+    }
+
+    // Detect oscillation: the step flips sign and cancels the previous one,
+    // so the energy returns to that of two iterations ago
     if (iter > 0 && prev_E_delta * E_delta < 0 &&
         std::abs(prev_E_delta + E_delta) < asci_settings.refine_energy_tol) {
       oscillation_count++;
 
       if (oscillation_count >= 2 && !prev_wfn.empty()) {
-        // Stabilize by rediagonalizing in the union of the two oscillating
-        // determinant sets.
+        cycled = true;
+        // A union step that has not led to a lower energy will not either
+        const bool improved =
+            E_best < E_best_at_union - asci_settings.refine_energy_tol;
+        if (!improved || total_extensions >= max_extensions) {
+          logger->warn(
+              "  Oscillation detected — the selection cycles {}; stopping at "
+              "the lowest-energy iterate (iter = {}, E0 = {:20.12e})",
+              improved ? "and the union steps have used their iterations"
+                       : "without lowering the energy since the last union",
+              iter_best, E_best);
+          E0 = E;
+          stopped = true;
+          break;
+        }
+        E_best_at_union = E_best;
+
+        // Rediagonalize in the union of the two oscillating determinant sets
+        // and continue from it at the target size.
         using wfn_comp =
             typename wavefunction_traits<wfn_t<N>>::spin_comparator;
 
@@ -137,8 +191,8 @@ auto asci_refine(ASCISettings asci_settings, MCSCFSettings mcscf_settings,
 
         logger->info(
             "  Oscillation detected — stabilizing via union of last two "
-            "det sets ({} + {} → {} unique dets)",
-            prev_wfn.size(), wfn.size(), union_wfn.size());
+            "det sets ({} + {} → {} unique dets), searching {} dets next",
+            prev_wfn.size(), wfn.size(), union_wfn.size(), ndets);
 
         // Rediagonalize in the enlarged space — keep the cache since the
         // union is a superset of the cached dets (high overlap → patched
@@ -199,22 +253,18 @@ auto asci_refine(ASCISettings asci_settings, MCSCFSettings mcscf_settings,
 
         logger->info("  Union diag: E = {:20.12e}", E_union);
 
-        // Extend iteration budget by the number of oscillation iterations
-        // that were wasted, capped so we don't loop forever.
-        const size_t extension =
-            std::min(static_cast<size_t>(oscillation_count),
-                     max_extensions - total_extensions);
-        if (extension > 0) {
-          max_iter += extension;
-          total_extensions += extension;
-          logger->info(
-              "  Extending max_iter by {} → {} (total extended: {}/{})",
-              extension, max_iter, total_extensions, max_extensions);
-        }
+        max_iter += union_extension;
+        total_extensions += union_extension;
+        logger->info(
+            "  Extending max_iter by {} → {} (total extended: {}; unions "
+            "start below {})",
+            union_extension, max_iter, total_extensions, max_extensions);
 
+        // The next search keeps ndets determinants, from a core within the
+        // union (asci_iter caps it): searching at the union's size would only
+        // move the cycle to it.
         wfn = std::move(union_wfn);
         X = std::move(X_union);
-        ndets = wfn.size();  // allow the enlarged set through
         E0 = E_union;
         prev_wfn.clear();
         oscillation_count = 0;
@@ -230,9 +280,7 @@ auto asci_refine(ASCISettings asci_settings, MCSCFSettings mcscf_settings,
     E0 = E;
   }  // Refinement loop
 
-  if (converged)
-    logger->info("ASCI Refine Converged!");
-  else {
+  if (!converged && !stopped) {
     std::string msg = "ASCI Refine did not converge";
     if (total_extensions > 0) {
       msg += " (oscillation detected, " + std::to_string(total_extensions) +
@@ -242,6 +290,15 @@ auto asci_refine(ASCISettings asci_settings, MCSCFSettings mcscf_settings,
     }
     throw std::runtime_error(msg);
   }
+  if (cycled && E_best <= E0) {
+    E0 = E_best;
+    wfn = std::move(wfn_best);
+    X = std::move(X_best);
+  }
+  if (converged)
+    logger->info("ASCI Refine Converged!");
+  else
+    logger->info("ASCI Refine stopped at an oscillation");
 
   return std::make_tuple(E0, wfn, X);
 }
