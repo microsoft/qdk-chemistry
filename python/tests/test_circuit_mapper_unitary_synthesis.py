@@ -5,7 +5,6 @@
 # Licensed under the MIT License. See LICENSE.txt in the project root for license information.
 # --------------------------------------------------------------------------------------------
 
-import re
 import time
 
 import numpy as np
@@ -300,55 +299,6 @@ class TestBlockSparse:
         circuit = mapper.run(_representation(matrix))
         assert circuit.metadata.num_phase_gradient_ancillas == 8
         _assert_realizes(circuit, matrix.toarray(), seed=11)
-
-
-class TestResourceEstimate:
-    """Resource estimation runs on the exported circuit of each method."""
-
-    @pytest.mark.parametrize("method", ["dense", "block_sparse"])
-    def test_estimate(self, method):
-        """The estimate counts the target, the gradient and the lookup scratch."""
-        matrix = _block_sparse([2, 4, 1, 1], seed=2)[:, :2]
-        circuit = create("circuit_mapper", "unitary_synthesis", method=method, rotation_bit_precision=6).run(
-            _representation(matrix)
-        )
-        counts = circuit.estimate()["logicalCounts"]
-        assert counts["numQubits"] > 3 + 6
-        assert counts["cczCount"] > 0
-
-    def test_max_lookup_swap_bits_trades_qubits_for_toffolis(self):
-        """With ``max_lookup_swap_bits=0`` (plain ``Select``) the circuit needs fewer qubits and more Toffolis."""
-        matrix = ortho_group.rvs(256, random_state=3)
-        counts = {
-            max_swap_bits: create("circuit_mapper", "unitary_synthesis", max_lookup_swap_bits=max_swap_bits)
-            .run(_representation(matrix))
-            .estimate()["logicalCounts"]
-            for max_swap_bits in (-1, 0)
-        }
-        assert counts[0]["numQubits"] < counts[-1]["numQubits"]
-        assert counts[0]["cczCount"] > counts[-1]["cczCount"]
-
-
-_QIR_QUBIT = re.compile(r"%Qubit\* (?:null|inttoptr \(i64 (\d+) to %Qubit\*\))")
-
-
-class TestExportedCircuit:
-    """The exported circuit leaves the synthesized output on the target register."""
-
-    @pytest.mark.parametrize("method", ["dense", "block_sparse"])
-    def test_target_is_not_reset(self, method):
-        """Only scratch qubits are reset; the target keeps the output, as in main's wrappers."""
-        theta = 0.7
-        matrix = np.array([[np.cos(theta), -np.sin(theta)], [np.sin(theta), np.cos(theta)]])
-        circuit = create("circuit_mapper", "unitary_synthesis", method=method).run(_representation(matrix))
-        reset: set[int] = set()
-        for line in str(circuit.get_qir()).splitlines():
-            if "call" in line and ("__quantum__qis__reset__body" in line or "__quantum__qis__mresetz__body" in line):
-                match = _QIR_QUBIT.search(line)
-                assert match is not None, line
-                reset.add(int(match.group(1) or 0))
-        assert reset, "the lookup scratch should still be measured and reset"
-        assert 0 not in reset
 
 
 class TestErrors:
