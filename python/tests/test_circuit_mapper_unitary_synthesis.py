@@ -291,12 +291,25 @@ class TestBlockSparse:
         assert synthesis.block_givens.layer_angles == []
         assert len(synthesis.column_permutation) == len(synthesis.row_permutation) == 4
 
-    def test_duplicate_entries_are_summed(self):
-        """A stored entry ``v`` split into duplicates ``2v`` and ``-v`` means ``v``, as in SciPy, not ``-v``."""
+    @pytest.mark.parametrize("duplicates", ["split", "cancelling"])
+    def test_duplicate_entries_are_summed(self, duplicates):
+        """Duplicates are summed as in SciPy: ``2v`` and ``-v`` mean ``v``, and ``+1``, ``-1`` pairs couple no blocks."""
         matrix = _block_sparse([2, 4, 1, 1], seed=4)
-        data = np.stack([2.0 * matrix.data, -matrix.data], axis=1).ravel()
-        split = sparse.csc_array((data, np.repeat(matrix.indices, 2), 2 * matrix.indptr), shape=matrix.shape)
-        expected, actual = block_sparse_isometry_synthesis(matrix), block_sparse_isometry_synthesis(split)
+        entries = matrix.tocoo()
+        rows, columns, data = entries.row, entries.col, entries.data
+        if duplicates == "split":
+            rows, columns, data = np.tile(rows, 2), np.tile(columns, 2), np.concatenate([2.0 * data, -data])
+        else:
+            lone = np.flatnonzero(np.diff(matrix.indptr) == 1)[0]
+            pairs = np.repeat(np.delete(np.arange(matrix.shape[1]), lone), 2)
+            rows = np.concatenate([rows, np.full_like(pairs, matrix.indices[matrix.indptr[lone]])])
+            columns = np.concatenate([columns, pairs])
+            data = np.concatenate([data, np.tile([1.0, -1.0], matrix.shape[1] - 1)])
+        order = np.lexsort((rows, columns))
+        indptr = np.searchsorted(columns[order], np.arange(matrix.shape[1] + 1))
+        stored = sparse.csc_array((data[order], rows[order], indptr), shape=matrix.shape)
+        assert not stored.has_canonical_format
+        expected, actual = block_sparse_isometry_synthesis(matrix), block_sparse_isometry_synthesis(stored)
         assert actual.row_permutation == expected.row_permutation
         assert actual.column_permutation == expected.column_permutation
         assert actual.block_givens.layer_angles == expected.block_givens.layer_angles

@@ -714,11 +714,21 @@ SparseIsometrySynthesis block_sparse_isometry_synthesis(
         "more columns than rows.");
   }
 
+  // Sum duplicate entries first so cancelling pairs couple no columns.
+  std::vector<Eigen::Triplet<double>> entries;
+  entries.reserve(static_cast<std::size_t>(isometry.nonZeros()));
+  for_each_nonzero_entry(
+      isometry, [&](Eigen::Index column, Eigen::Index row, double value) {
+        entries.emplace_back(row, column, value);
+      });
+  Eigen::SparseMatrix<double> matrix(dim, left);
+  matrix.setFromTriplets(entries.begin(), entries.end());
+
   // Step 1: [U' *].
-  auto supports = discover_column_supports(isometry);
+  auto supports = discover_column_supports(matrix);
 
   // Step 2: [P_r^T U' R].
-  auto rows = gather_rows(isometry, supports);
+  auto rows = gather_rows(matrix, supports);
   complete_blocks(supports.groups, left);
   SparseIsometrySynthesis result;
   result.row_permutation = std::move(rows.permutation);
