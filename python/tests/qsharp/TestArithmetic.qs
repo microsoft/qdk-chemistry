@@ -8,8 +8,7 @@ namespace QDKChemistry.TestUtils.ArithmeticTests {
     import Std.Measurement.MeasureEachZ;
     import QDKChemistry.Utils.Arithmetic.AddConstant;
 
-    /// Returns, for each little-endian starting value of a `width`-qubit register, the value
-    /// after `AddConstant(constant)`, or after its adjoint when `inverse` is set.
+    /// Returns each little-endian `width`-qubit value after `AddConstant(constant)`, or its adjoint when `inverse`.
     operation TestAddConstantTable(constant : Int, width : Int, inverse : Bool) : Int[] {
         mutable results : Int[] = [];
         for value in 0..(1 <<< width) - 1 {

@@ -12,9 +12,7 @@ namespace QDKChemistry.TestUtils.UnitarySynthesisTests {
     import QDKChemistry.Utils.UnitarySynthesis.GivensDecomposition;
     import QDKChemistry.Utils.UnitarySynthesis.QuantizeGivensDecomposition;
 
-    /// Returns an operation on [controls | target] that sets each control from `controlBits`,
-    /// applies Ry(prepAngles[k]) to target qubit k, and then applies `givens`, or its adjoint
-    /// when `inverse`, to the target controlled on every control.
+    /// Returns an operation on [controls | target] that sets the controls, prepares Ry(prepAngles) and applies `givens` or its adjoint.
     function TestMakeGivensOp(
         givens : GivensDecomposition,
         prepAngles : Double[],
@@ -50,8 +48,7 @@ namespace QDKChemistry.TestUtils.UnitarySynthesisTests {
         }
     }
 
-    /// Returns an operation on [controls | address | target] that applies
-    /// `ApplyControlledMultiplexedRy` with `words` around a freshly prepared phase gradient.
+    /// Returns `ApplyControlledMultiplexedRy` of `words` on [controls | address | target] with its own phase gradient.
     function TestMakeMultiplexedRyOp(words : Bool[][], maxSwapBits : Int, numControls : Int, numAddress : Int) : Qubit[] => Unit {
         (qs) => {
             let bits = Length(words[0]);
@@ -73,83 +70,17 @@ namespace QDKChemistry.TestUtils.UnitarySynthesisTests {
         }
     }
 
-    /// Applies `givens` to a fresh register twice in one program, first with `firstBits` and
-    /// then with `secondBits` rotation bits, each with its own phase gradient.
-    operation TestGivensAtTwoPrecisions(
-        givens : GivensDecomposition,
-        numTarget : Int,
-        firstBits : Int,
-        secondBits : Int,
-    ) : Unit {
-        use target = Qubit[numTarget];
-        let numAddresses = MaxI(1, 1 <<< (numTarget - 1));
-        for bits in [firstBits, secondBits] {
-            use phaseGradient = Qubit[bits];
-            use angleReg = Qubit[bits];
-            within {
-                PreparePhaseGradientState(phaseGradient);
-            } apply {
-                ApplyRealUnitaryViaGivens(
-                    QuantizeGivensDecomposition(givens, numAddresses, bits, -1),
-                    [],
-                    target,
-                    phaseGradient,
-                    angleReg
-                );
-            }
-        }
-        ResetAll(target);
-    }
-
-    /// Applies `givens` with `bits` rotation bits to a fresh register, or its adjoint when `inverse`.
-    operation TestGivensInDirection(givens : GivensDecomposition, numTarget : Int, bits : Int, inverse : Bool) : Unit {
-        use target = Qubit[numTarget];
-        use phaseGradient = Qubit[bits];
-        use angleReg = Qubit[bits];
-        let quantized = QuantizeGivensDecomposition(givens, MaxI(1, 1 <<< (numTarget - 1)), bits, -1);
-        within {
-            PreparePhaseGradientState(phaseGradient);
-        } apply {
-            if inverse {
-                Adjoint ApplyRealUnitaryViaGivens(quantized, [], target, phaseGradient, angleReg);
-            } else {
-                ApplyRealUnitaryViaGivens(quantized, [], target, phaseGradient, angleReg);
-            }
-        }
-        ResetAll(target);
-    }
-
-    /// Applies `phases` to `register` controlled on every qubit of `controls`, either through
-    /// `Controlled ApplyPhasePolynomial` or, when `padded`, as one uncontrolled polynomial on
-    /// `register + controls` whose table is zero unless every control is set.
-    operation TestApplyControlledPhasePolynomial(
-        phases : Bool[],
-        controls : Qubit[],
-        register : Qubit[],
-        padded : Bool,
-    ) : Unit {
-        if padded {
-            let inactive = Repeated(false, ((1 <<< Length(controls)) - 1) * Length(phases));
-            ApplyPhasePolynomial(inactive + phases, register + controls);
-        } else {
-            Controlled ApplyPhasePolynomial(controls, (phases, register));
-        }
-    }
-
-    /// Returns `TestApplyControlledPhasePolynomial` as an operation on [register | controls].
+    /// Returns an operation on [register | controls] that flips the signs of `phases` on the register when every
+    /// control is set, via `Controlled ApplyPhasePolynomial` or, when `padded`, one zero-padded polynomial.
     function TestMakeControlledPhasePolynomialOp(phases : Bool[], numRegister : Int, padded : Bool) : Qubit[] => Unit {
-        qs => TestApplyControlledPhasePolynomial(phases, qs[numRegister...], qs[...numRegister - 1], padded)
-    }
-
-    /// `TestApplyControlledPhasePolynomial` on freshly allocated qubits.
-    operation TestControlledPhasePolynomialCircuit(
-        phases : Bool[],
-        numRegister : Int,
-        numControls : Int,
-        padded : Bool,
-    ) : Unit {
-        use register = Qubit[numRegister];
-        use controls = Qubit[numControls];
-        TestApplyControlledPhasePolynomial(phases, controls, register, padded);
+        (qs) => {
+            let (register, controls) = (qs[...numRegister - 1], qs[numRegister...]);
+            if padded {
+                let inactive = Repeated(false, ((1 <<< Length(controls)) - 1) * Length(phases));
+                ApplyPhasePolynomial(inactive + phases, register + controls);
+            } else {
+                Controlled ApplyPhasePolynomial(controls, (phases, register));
+            }
+        }
     }
 }
