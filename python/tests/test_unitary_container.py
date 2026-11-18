@@ -158,7 +158,7 @@ class TestPauliProductFormulaContainer:
         with h5py.File(tmp_path / "layered.h5", "r") as handle:
             restored_hdf5 = PauliProductFormulaContainer.from_hdf5(handle)
         for restored in (restored_json, restored_hdf5):
-            assert restored.step_terms == terms
+            assert restored.step_terms == tuple(terms)
             assert restored.layer_offsets == container.layer_offsets
             assert restored.step_reps == 3
             assert restored.scale == 0.4
