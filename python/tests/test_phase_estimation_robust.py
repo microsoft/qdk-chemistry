@@ -21,6 +21,8 @@ from typing import TYPE_CHECKING
 import numpy as np
 import pytest
 
+from qdk_chemistry import algorithms
+from qdk_chemistry.algorithms.base import create_from_ref
 from qdk_chemistry.algorithms.hamiltonian_unitary_builder.time_evolution.trotter import Trotter
 from qdk_chemistry.algorithms.phase_estimation.circuit_builder.robust_builder import (
     RobustPhaseEstimationCircuitBuilder,
@@ -32,7 +34,6 @@ from qdk_chemistry.algorithms.phase_estimation.robust_phase_estimation import (
 )
 from qdk_chemistry.algorithms.phase_estimation.rpe_experiment_scheduler import (
     RobustPhaseEstimationExperimentScheduler,
-    _AlgorithmSnapshot,
 )
 from qdk_chemistry.data import (
     AlgorithmRef,
@@ -41,7 +42,9 @@ from qdk_chemistry.data import (
     QuantumErrorProfile,
     QubitOperator,
     RobustPhaseEstimationCircuitSet,
+    RobustPhaseEstimationSchedule,
     Settings,
+    SettingsAreLocked,
     UnitaryRepresentation,
 )
 
@@ -361,22 +364,18 @@ def _install_test_stack(
     contexts: dict[int, tuple[str, object]] = {}
     unitary_records: list[dict[str, object]] = []
     executor = _FakeExecutor(contexts, expectation, resolution=resolution)
-    original_create = _AlgorithmSnapshot.create
+    original_create = algorithms.create
 
-    def create_snapshot(snapshot: _AlgorithmSnapshot, **updates: object):
-        settings = Settings.from_json(snapshot.settings_json)
-        for key, value in updates.items():
-            if settings.has(key):
-                settings.set(key, value)
-            else:
-                settings._set_default(key, "double" if isinstance(value, float) else "int", value)
-        if snapshot.algorithm_type == "hamiltonian_unitary_builder":
+    def create_algorithm(algorithm_type: str, algorithm_name: str, **settings_values: object) -> object:
+        algorithm = original_create(algorithm_type, algorithm_name, **settings_values)
+        settings = algorithm.settings()
+        if algorithm_type == "hamiltonian_unitary_builder":
             if use_real_unitary_builder:
-                return original_create(snapshot, **updates)
+                return algorithm
             return _FakeUnitaryBuilder(settings, unitary_records)
-        if snapshot.algorithm_type == "hadamard_test_circuit_builder":
+        if algorithm_type == "hadamard_test_circuit_builder":
             return _FakeHadamardCircuitBuilder(settings, contexts)
-        raise AssertionError(f"Unexpected algorithm type: {snapshot.algorithm_type}")
+        raise AssertionError(f"Unexpected algorithm type: {algorithm_type}")
 
     def create_nested(setting_key: str):
         if setting_key == "qpe_circuit_builder":
@@ -389,7 +388,7 @@ def _install_test_stack(
         executor.seed_calls.append(seed)
         return executor
 
-    monkeypatch.setattr(_AlgorithmSnapshot, "create", create_snapshot)
+    monkeypatch.setattr(algorithms, "create", create_algorithm)
     monkeypatch.setattr(driver, "_create_nested", create_nested)
     monkeypatch.setattr(driver, "_create_executor", create_executor)
     return unitary_records, executor
@@ -447,8 +446,12 @@ def test_post_process_uses_effective_qdrift_samples() -> None:
     resolution = 1_000_000_000
     for round_data in circuit_set.rounds:
         configuration = circuit_set.unitary_builder_configuration
-        builder = _AlgorithmSnapshot.from_ref(configuration).create(
-            time=round_data.evolution_time, num_samples=round_data.scheduled_samples
+        builder = algorithms.create(
+            configuration.algorithm_type,
+            configuration.algorithm_name,
+            **configuration.settings.to_dict(),
+            time=round_data.evolution_time,
+            num_samples=round_data.scheduled_samples,
         )
         actual_samples = builder._resolve_num_samples(hamiltonian, round_data.evolution_time)
         step_angle = circuit_set.lambda_norm * round_data.evolution_time / actual_samples
@@ -690,6 +693,36 @@ def test_partial_builder_retains_explicit_legacy_fraction() -> None:
     assert settings.get("target_accuracy") == pytest.approx(0.025)
 
 
+@pytest.mark.parametrize("unitary_builder_name", ["partially_randomized", "zassenhaus"])
+@pytest.mark.parametrize("fraction", [0.25, np.nextafter(np.sin(np.pi / 3.0), 0.0)])
+def test_non_trotter_fraction_accepts_branch_safe_budget(unitary_builder_name: str, fraction: float) -> None:
+    """Fraction budgets below the branch-safety limit preserve the requested split."""
+    scheduler = _make_scheduler(
+        target_accuracy=1.0,
+        unitary_builder_name=unitary_builder_name,
+        unitary_accuracy_fraction=fraction,
+    )
+
+    schedule = scheduler.run(QubitOperator(pauli_strings=["Z"], coefficients=[1.0]))
+
+    assert schedule.epsilon_unitary == pytest.approx(fraction)
+    assert schedule.epsilon_rpe == pytest.approx(1.0 - fraction)
+
+
+@pytest.mark.parametrize("unitary_builder_name", ["partially_randomized", "zassenhaus"])
+@pytest.mark.parametrize("fraction", [np.sin(np.pi / 3.0), np.nextafter(np.sin(np.pi / 3.0), 1.0), 0.9])
+def test_non_trotter_fraction_rejects_branch_unsafe_budget(unitary_builder_name: str, fraction: float) -> None:
+    """Fraction budgets enforce the same strict unitary limit as explicit budgets."""
+    scheduler = _make_scheduler(
+        target_accuracy=1.0,
+        unitary_builder_name=unitary_builder_name,
+        unitary_accuracy_fraction=fraction,
+    )
+
+    with pytest.raises(ValueError, match="epsilon_unitary must be smaller"):
+        scheduler.run(QubitOperator(pauli_strings=["Z"], coefficients=[1.0]))
+
+
 def test_trotter_uses_independent_default_tolerances() -> None:
     """Trotter uses the full energy target for RPE and an independent unitary tolerance."""
     target_accuracy = 1e-2
@@ -771,7 +804,7 @@ def test_partial_builder_receives_independent_unitary_budget(epsilon_unitary: fl
         ref = circuit_set.unitary_builder_configuration
         assert ref.settings is not None
         assert ref.settings.get("target_accuracy") == pytest.approx(outer_epsilon_unitary)
-        nested_builder = _AlgorithmSnapshot.from_ref(ref).create()
+        nested_builder = algorithms.create(ref.algorithm_type, ref.algorithm_name, **ref.settings.to_dict())
         assert sum(nested_builder._split_accuracy()) == pytest.approx(outer_epsilon_unitary)
         assert not ref.settings.has("num_samples")
         assert round_data.num_draws == round_data.shots_per_basis
@@ -822,8 +855,19 @@ def test_executor_uses_manifest_shots(
     _, executor = _install_test_stack(monkeypatch, driver, builder, _ideal_expectation(0.2))
 
     circuit_set = driver.schedule_circuit_set(_DUMMY_STATE_PREPARATION, hamiltonian)
+    original_hash = circuit_set.content_hash()
+
+    def unexpected_schedule(
+        _self: RobustPhaseEstimationExperimentScheduler, _hamiltonian: QubitOperator
+    ) -> RobustPhaseEstimationSchedule:
+        pytest.fail("Replay must not invoke the experiment scheduler.")
+
+    monkeypatch.setattr(RobustPhaseEstimationExperimentScheduler, "_run_impl", unexpected_schedule)
     result = driver.execute_circuit_set(circuit_set)
 
+    assert circuit_set.content_hash() == original_hash
+    with pytest.raises(SettingsAreLocked):
+        driver.settings().set("circuit_executor", driver.settings().get("circuit_executor"))
     if randomized:
         expected = [1 for round_data in circuit_set.schedule.rounds for _ in range(2 * round_data.num_draws)]
     else:
@@ -835,6 +879,33 @@ def test_executor_uses_manifest_shots(
     assert len(set(executor.seed_calls)) == len(executor.seed_calls)
     assert result.metadata["requested_executor_seed"] == 42
     assert result.metadata["executor_root_seed"] == 42
+
+
+@pytest.mark.parametrize("replay", [False, True])
+def test_failed_execution_keeps_settings_locked(monkeypatch: pytest.MonkeyPatch, replay: bool) -> None:
+    """Normal execution and replay lock settings before execution, even when it fails."""
+    hamiltonian = QubitOperator(pauli_strings=["Z"], coefficients=[1.0])
+    builder = _make_builder(target_accuracy=0.5)
+    driver = RobustPhaseEstimation()
+    monkeypatch.setattr(driver, "_create_circuit_builder", lambda: builder)
+    circuit_set = driver.schedule_circuit_set(_DUMMY_STATE_PREPARATION, hamiltonian)
+
+    def fail_execution(*_args: object, **_kwargs: object) -> None:
+        with pytest.raises(SettingsAreLocked):
+            driver.settings().set("circuit_executor", driver.settings().get("circuit_executor"))
+        raise RuntimeError("test execution failure")
+
+    monkeypatch.setattr(driver, "_execute_with_builder", fail_execution)
+
+    if replay:
+        with pytest.raises(RuntimeError, match="test execution failure"):
+            driver.execute_circuit_set(circuit_set)
+    else:
+        with pytest.raises(RuntimeError, match="test execution failure"):
+            driver.run(_DUMMY_STATE_PREPARATION, hamiltonian)
+
+    with pytest.raises(SettingsAreLocked):
+        driver.settings().set("circuit_executor", driver.settings().get("circuit_executor"))
 
 
 def test_executor_entropy_seed_is_resolved_once(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -1181,7 +1252,7 @@ def test_robust_circuit_builder_direct_pair_supports_qre() -> None:
     )
     builder = create("qpe_circuit_builder", "qdk_robust", experiment_scheduler=scheduler_ref)
 
-    circuit_set = builder.schedule(hamiltonian)
+    circuit_set = create_from_ref(builder.settings(), "experiment_scheduler").run(hamiltonian)
     _, x_circuit, y_circuit = next(builder.iter_build(circuit_set, state_preparation, hamiltonian))
 
     assert isinstance(x_circuit.get_qre_application(), QSharpApplication)

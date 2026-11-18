@@ -20,7 +20,6 @@ from qdk_chemistry.data import (
     RobustPhaseEstimationSchedule,
     Settings,
 )
-from qdk_chemistry.data.robust_phase_estimation import _AlgorithmConfiguration, _HamiltonianSnapshot
 
 __all__ = [
     "RobustPhaseEstimationExperimentScheduler",
@@ -38,93 +37,27 @@ _RPE_BUILDER_CATEGORIES = {
 }
 
 
-class _AlgorithmSnapshot(_AlgorithmConfiguration):
-    """Algorithm-layer operations on independent configuration snapshots."""
+def _validate_unit_power(settings: Settings) -> None:
+    """Require the RPE schedule to be the sole source of evolution powers.
 
-    @classmethod
-    def from_ref(cls, ref: AlgorithmRef) -> _AlgorithmSnapshot:
-        """Capture a resolved reference for algorithm construction.
+    Args:
+        settings: Resolved unitary-builder settings.
 
-        Args:
-            ref: Reference with resolved settings to copy.
+    Raises:
+        TypeError: If the configured power is not an integer.
+        ValueError: If the configured power is not one.
 
-        Returns:
-            A configuration snapshot with algorithm-layer operations.
-
-        """
-        configuration = _AlgorithmConfiguration.from_ref(ref)
-        return cls(configuration.algorithm_type, configuration.algorithm_name, configuration.settings_json)
-
-    def has_setting(self, key: str) -> bool:
-        """Check whether the configuration defines a setting.
-
-        Args:
-            key: Setting name to look up.
-
-        Returns:
-            Whether this setting is present.
-
-        """
-        return Settings.from_json(self.settings_json).has(key)
-
-    def with_updates(self, **updates: object) -> _AlgorithmSnapshot:
-        """Prepare a new configuration without mutating the stored snapshot.
-
-        Args:
-            **updates: Defined setting names and replacement values.
-
-        Returns:
-            An independent updated configuration.
-
-        Raises:
-            ValueError: If an update refers to an undefined setting.
-
-        """
-        settings = Settings.from_json(self.settings_json)
-        for key, value in updates.items():
-            if not settings.has(key):
-                raise ValueError(
-                    f"Algorithm '{self.algorithm_type}/{self.algorithm_name}' does not define setting '{key}'."
-                )
-            settings.set(key, value)
-        return type(self)(self.algorithm_type, self.algorithm_name, settings.to_json())
-
-    def create(self, **updates: object) -> Algorithm:
-        """Construct a fresh registered algorithm from this configuration.
-
-        Args:
-            **updates: Round-specific settings applied through the algorithm's settings schema.
-
-        Returns:
-            An algorithm initialized with independent settings.
-
-        """
-        from qdk_chemistry.algorithms import create  # noqa: PLC0415
-
-        settings = Settings.from_json(self.settings_json)
-        values = settings.to_dict()
-        values.update(updates)
-        return create(self.algorithm_type, self.algorithm_name, **values)
-
-    def validate_unit_power(self) -> None:
-        """Require the RPE schedule to be the sole source of evolution powers.
-
-        Raises:
-            TypeError: If the configured power is not an integer.
-            ValueError: If the configured power is not one.
-
-        """
-        settings = Settings.from_json(self.settings_json)
-        if not settings.has("power"):
-            return
-        power = settings.get("power")
-        if not isinstance(power, int):
-            raise TypeError(f"unitary_builder power must be an integer, got {type(power).__name__}.")
-        if power != 1:
-            raise ValueError(
-                "Robust phase estimation controls evolution powers through its round-time schedule; "
-                f"unitary_builder power must be 1, got {power}."
-            )
+    """
+    if not settings.has("power"):
+        return
+    power = settings.get("power")
+    if not isinstance(power, int):
+        raise TypeError(f"unitary_builder power must be an integer, got {type(power).__name__}.")
+    if power != 1:
+        raise ValueError(
+            "Robust phase estimation controls evolution powers through its round-time schedule; "
+            f"unitary_builder power must be 1, got {power}."
+        )
 
 
 class RobustPhaseEstimationExperimentSchedulerSettings(Settings):
@@ -277,6 +210,7 @@ class RobustPhaseEstimationExperimentScheduler(Algorithm):
             A reproducible schedule with rounds, shared settings, and concrete draw seeds, without live inputs.
 
         Raises:
+            KeyError: If the configured unitary builder is not registered.
             TypeError: If the configured builder is not a time-evolution builder.
             ValueError: If the builder name, power, base time, or error-budget settings are unsupported or invalid.
 
@@ -297,18 +231,18 @@ class RobustPhaseEstimationExperimentScheduler(Algorithm):
 
         unitary_ref = self._settings.get("unitary_builder")
         hadamard_ref = self._settings.get("hadamard_test_circuit_builder")
-        unitary_snapshot = _AlgorithmSnapshot.from_ref(unitary_ref)
-        hadamard_snapshot = _AlgorithmSnapshot.from_ref(hadamard_ref)
-        unitary_snapshot.validate_unit_power()
+        # Create first so an unregistered builder name raises the registry's KeyError.
+        unitary_builder = self._create_nested("unitary_builder")
+        unitary_settings = unitary_ref.settings
+        _validate_unit_power(unitary_settings)
 
-        unitary_builder = unitary_snapshot.create()
         if not isinstance(unitary_builder, TimeEvolutionBuilder):
             raise TypeError(
                 "RPE requires a TimeEvolutionBuilder; "
-                f"'{unitary_snapshot.algorithm_type}/{unitary_snapshot.algorithm_name}' "
+                f"'{unitary_ref.algorithm_type}/{unitary_ref.algorithm_name}' "
                 "does not represent supported time evolution. Block encodings and quantum walks are not supported."
             )
-        builder_name = unitary_snapshot.algorithm_name
+        builder_name = unitary_ref.algorithm_name
         if builder_name not in _RPE_BUILDER_CATEGORIES:
             supported = ", ".join(sorted(_RPE_BUILDER_CATEGORIES))
             raise ValueError(f"Unsupported RPE unitary builder {builder_name!r}. Supported builders: {supported}.")
@@ -364,11 +298,8 @@ class RobustPhaseEstimationExperimentScheduler(Algorithm):
             shots = int(np.ceil(np.e * (11 + 4 * (total_round - round_index))))
             samples = 2 ** (2 * round_index + 1)
             evolution_time = float((2**round_index) * base_time)
-            if category == "qdrift" and unitary_snapshot.has_setting("num_samples"):
-                if (
-                    unitary_snapshot.has_setting("target_accuracy")
-                    and unitary_builder.settings().get("target_accuracy") > 0.0
-                ):
+            if category == "qdrift" and unitary_settings.has("num_samples"):
+                if unitary_settings.has("target_accuracy") and unitary_builder.settings().get("target_accuracy") > 0.0:
                     sample_resolver = getattr(unitary_builder, "_resolve_num_samples", None)
                     if not callable(sample_resolver):
                         raise TypeError("qDRIFT builders with target_accuracy must support sample-count resolution.")
@@ -395,7 +326,7 @@ class RobustPhaseEstimationExperimentScheduler(Algorithm):
                     draw_seeds.append(draw_seed)
             else:
                 seed = None
-                if unitary_snapshot.has_setting("seed"):
+                if unitary_settings.has("seed"):
                     configured_seed = int(unitary_builder.settings().get("seed"))
                     seed = requested_seed + round_index if requested_seed >= 0 else configured_seed
                     if seed < 0:
@@ -412,17 +343,19 @@ class RobustPhaseEstimationExperimentScheduler(Algorithm):
                 )
             )
 
-        shared_settings = json.loads(unitary_snapshot.settings_json)
+        shared_settings = json.loads(unitary_settings.to_json())
         for key in ("time", "seed", "num_samples"):
             shared_settings.pop(key, None)
         if category != "qdrift" and "target_accuracy" in shared_settings:
             shared_settings["target_accuracy"] = epsilon_unitary
-        shared_configuration = _AlgorithmConfiguration(
-            unitary_snapshot.algorithm_type, unitary_snapshot.algorithm_name, json.dumps(shared_settings)
+        shared_configuration = AlgorithmRef(
+            unitary_ref.algorithm_type,
+            unitary_ref.algorithm_name,
+            settings=Settings.from_json(json.dumps(shared_settings)),
         )
         return RobustPhaseEstimationSchedule(
             rounds=tuple(rounds),
-            hamiltonian_hash=_HamiltonianSnapshot.from_operator(qubit_hamiltonian).content_hash(),
+            hamiltonian_hash=RobustPhaseEstimationSchedule.hamiltonian_fingerprint(qubit_hamiltonian),
             lambda_norm=lambda_norm,
             target_accuracy=epsilon_total,
             epsilon_rpe=epsilon_rpe,
@@ -433,8 +366,8 @@ class RobustPhaseEstimationExperimentScheduler(Algorithm):
             energy_correction=correction,
             requested_seed=requested_seed,
             root_seed=root_seed,
-            unitary_builder_configuration=shared_configuration.to_ref(),
-            hadamard_test_circuit_builder_configuration=hadamard_snapshot.to_ref(),
+            unitary_builder_configuration=shared_configuration,
+            hadamard_test_circuit_builder_configuration=hadamard_ref,
         )
 
     def _resolve_budget(
@@ -516,6 +449,8 @@ class RobustPhaseEstimationExperimentScheduler(Algorithm):
             return fraction, explicit_rpe, explicit_unitary, "explicit"
 
         epsilon_unitary = fraction * epsilon_total
+        if epsilon_unitary >= np.sin(np.pi / 3.0):
+            raise ValueError("epsilon_unitary must be smaller than sin(pi/3) for branch-safe RPE.")
         epsilon_rpe = (1.0 - fraction) * epsilon_total
         if epsilon_rpe <= 0.0:
             epsilon_rpe = epsilon_total

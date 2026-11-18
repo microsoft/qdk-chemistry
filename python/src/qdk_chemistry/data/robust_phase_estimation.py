@@ -333,6 +333,40 @@ class RobustPhaseEstimationSchedule(DataClass):
         self._validate_schedule()
         super().__init__()
 
+    @staticmethod
+    def hamiltonian_fingerprint(qubit_hamiltonian: QubitOperator) -> str:
+        """Compute the canonical fingerprint used by saved RPE schedules.
+
+        Args:
+            qubit_hamiltonian: Hamiltonian whose coefficients, labels, and metadata identify the input.
+
+        Returns:
+            The full SHA-256 fingerprint, with coefficient types normalized for replay.
+
+        """
+        return _HamiltonianSnapshot.from_operator(qubit_hamiltonian).content_hash()
+
+    def validate_and_copy_hamiltonian(self, qubit_hamiltonian: QubitOperator) -> QubitOperator:
+        """Validate the scheduled input and return an independent Hamiltonian.
+
+        Args:
+            qubit_hamiltonian: Hamiltonian to match against the saved fingerprint and coefficient norm.
+
+        Returns:
+            A defensive copy whose coefficients, labels, and metadata do not alias the caller's input.
+
+        Raises:
+            ValueError: If the input fingerprint or coefficient norm disagrees with the schedule.
+
+        """
+        snapshot = _HamiltonianSnapshot.from_operator(qubit_hamiltonian)
+        if snapshot.content_hash() != self.hamiltonian_hash:
+            raise ValueError("Hamiltonian does not match the schedule fingerprint.")
+        hamiltonian = snapshot.to_operator()
+        if not np.isclose(hamiltonian.schatten_norm, self.lambda_norm, rtol=1e-12, atol=0.0):
+            raise ValueError("Hamiltonian norm does not match the schedule lambda_norm.")
+        return hamiltonian
+
     @property
     def base_time(self) -> float:
         """Return the canonical time of round zero.

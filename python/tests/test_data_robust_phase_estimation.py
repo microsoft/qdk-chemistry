@@ -77,7 +77,7 @@ def _schedule(
     hamiltonian = QubitOperator(pauli_strings=["Z"], coefficients=np.asarray([2.5]))
     return RobustPhaseEstimationSchedule(
         rounds=(_round(),) if rounds is None else rounds,
-        hamiltonian_hash=_HamiltonianSnapshot.from_operator(hamiltonian).content_hash(),
+        hamiltonian_hash=RobustPhaseEstimationSchedule.hamiltonian_fingerprint(hamiltonian),
         lambda_norm=2.5,
         target_accuracy=0.01,
         epsilon_rpe=0.005,
@@ -207,6 +207,51 @@ def test_data_configuration_has_no_algorithm_operations() -> None:
     for operation in ("create", "with_updates", "validate_unit_power", "has_setting"):
         assert not hasattr(configuration, operation)
     assert configuration.to_ref().settings.get("value") == 1
+
+
+@pytest.mark.parametrize("dtype", [np.float64, np.complex128])
+def test_schedule_fingerprint_preserves_snapshot_format(dtype: type) -> None:
+    """The public fingerprint preserves saved hashes and real/complex coefficient normalization."""
+    hamiltonian = QubitOperator(pauli_strings=["Z"], coefficients=np.asarray([2.5], dtype=dtype))
+
+    fingerprint = RobustPhaseEstimationSchedule.hamiltonian_fingerprint(hamiltonian)
+
+    assert fingerprint == _HamiltonianSnapshot.from_operator(hamiltonian).content_hash()
+    assert fingerprint == _schedule().hamiltonian_hash
+
+
+def test_schedule_validates_and_copies_hamiltonian() -> None:
+    """Validated inputs and returned copies cannot mutate one another."""
+    schedule = _schedule()
+    hamiltonian = QubitOperator(pauli_strings=["Z"], coefficients=[2.5])
+    first = schedule.validate_and_copy_hamiltonian(hamiltonian)
+    second = schedule.validate_and_copy_hamiltonian(hamiltonian)
+
+    first.coefficients[0] = 99.0
+    first.pauli_strings[0] = "X"
+    assert hamiltonian.coefficients[0] == pytest.approx(2.5)
+    assert hamiltonian.pauli_strings == ["Z"]
+
+    hamiltonian.coefficients[0] = 50.0
+    hamiltonian.pauli_strings[0] = "Y"
+    assert second.coefficients[0] == pytest.approx(2.5)
+    assert second.pauli_strings == ["Z"]
+
+
+def test_schedule_rejects_mismatched_hamiltonian() -> None:
+    """Equal coefficient norms do not permit replay with different Pauli labels."""
+    with pytest.raises(ValueError, match="fingerprint"):
+        _schedule().validate_and_copy_hamiltonian(QubitOperator(pauli_strings=["X"], coefficients=[2.5]))
+
+
+def test_schedule_rejects_mismatched_hamiltonian_norm() -> None:
+    """Matching fingerprints cannot hide inconsistent reconstruction metadata."""
+    payload = _schedule().to_json()
+    payload["lambda_norm"] = 1.5
+    schedule = RobustPhaseEstimationSchedule.from_json(payload)
+
+    with pytest.raises(ValueError, match="lambda_norm"):
+        schedule.validate_and_copy_hamiltonian(QubitOperator(pauli_strings=["Z"], coefficients=[2.5]))
 
 
 @pytest.mark.parametrize("field", ["coefficients", "pauli_strings"])

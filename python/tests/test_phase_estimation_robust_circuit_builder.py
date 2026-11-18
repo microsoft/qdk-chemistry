@@ -27,7 +27,6 @@ from qdk_chemistry.algorithms.phase_estimation.circuit_builder.robust_builder im
 )
 from qdk_chemistry.algorithms.phase_estimation.rpe_experiment_scheduler import (
     RobustPhaseEstimationExperimentScheduler,
-    _AlgorithmSnapshot,
 )
 from qdk_chemistry.data import (
     AlgorithmRef,
@@ -101,24 +100,20 @@ def rpe_problem() -> tuple[Circuit, QubitOperator]:
 def recording_builders(
     monkeypatch: pytest.MonkeyPatch,
 ) -> tuple[list[dict[str, object]], list[tuple[str, _FakeUnitary]]]:
-    """Replace snapshot instantiation with recording unitary and Hadamard builders."""
+    """Replace factory construction with recording unitary and Hadamard builders."""
     unitary_records: list[dict[str, object]] = []
     hadamard_records: list[tuple[str, _FakeUnitary]] = []
+    original_create = algorithms.create
 
-    def create_snapshot(snapshot: _AlgorithmSnapshot, **updates: object):
-        settings = Settings.from_json(snapshot.settings_json)
-        for key, value in updates.items():
-            if settings.has(key):
-                settings.set(key, value)
-            else:
-                settings._set_default(key, "double" if isinstance(value, float) else "int", value)
-        if snapshot.algorithm_type == "hamiltonian_unitary_builder":
+    def create_algorithm(algorithm_type: str, algorithm_name: str, **settings_values: object) -> object:
+        settings = original_create(algorithm_type, algorithm_name, **settings_values).settings()
+        if algorithm_type == "hamiltonian_unitary_builder":
             return _FakeUnitaryBuilder(settings, unitary_records)
-        if snapshot.algorithm_type == "hadamard_test_circuit_builder":
+        if algorithm_type == "hadamard_test_circuit_builder":
             return _FakeHadamardBuilder(settings, hadamard_records)
-        raise AssertionError(f"Unexpected algorithm type: {snapshot.algorithm_type}")
+        raise AssertionError(f"Unexpected algorithm type: {algorithm_type}")
 
-    monkeypatch.setattr(_AlgorithmSnapshot, "create", create_snapshot)
+    monkeypatch.setattr(algorithms, "create", create_algorithm)
     return unitary_records, hadamard_records
 
 
@@ -222,8 +217,12 @@ def test_qdrift_schedule_records_effective_samples(
 
     for round_data in circuit_set.rounds:
         configuration = circuit_set.unitary_builder_configuration
-        builder = _AlgorithmSnapshot.from_ref(configuration).create(
-            time=round_data.evolution_time, num_samples=round_data.scheduled_samples
+        builder = create(
+            configuration.algorithm_type,
+            configuration.algorithm_name,
+            **configuration.settings.to_dict(),
+            time=round_data.evolution_time,
+            num_samples=round_data.scheduled_samples,
         )
         container = builder.run(hamiltonian).get_container()
 
@@ -432,7 +431,7 @@ def test_partial_schedule_serializes_additive_accuracy(rpe_problem: tuple[Circui
     assert restored.experiment_specs == circuit_set.experiment_specs
     configuration = restored.unitary_builder_configuration
     assert configuration.settings.get("target_accuracy") == pytest.approx(restored.epsilon_unitary)
-    builder = _AlgorithmSnapshot.from_ref(configuration).create()
+    builder = create(configuration.algorithm_type, configuration.algorithm_name, **configuration.settings.to_dict())
     assert sum(builder._split_accuracy()) == pytest.approx(restored.epsilon_unitary)
 
 
@@ -446,6 +445,16 @@ def test_scheduler_rejects_block_encoding_builders(
     )
 
     with pytest.raises(TypeError, match="requires a TimeEvolutionBuilder"):
+        scheduler.run(rpe_problem[1])
+
+
+def test_scheduler_rejects_unregistered_builder_name(rpe_problem: tuple[Circuit, QubitOperator]) -> None:
+    """A misspelled builder name reports the registry's available builders."""
+    scheduler = RobustPhaseEstimationExperimentScheduler(
+        unitary_builder=AlgorithmRef("hamiltonian_unitary_builder", "does_not_exist")
+    )
+
+    with pytest.raises(KeyError, match="'does_not_exist' not found"):
         scheduler.run(rpe_problem[1])
 
 
@@ -671,15 +680,15 @@ def test_basis_builders_are_created_once_per_stream(
     """X/Y builders are reused across draws without changing same-draw circuit pairing."""
     state_preparation, hamiltonian = rpe_problem
     schedule = RobustPhaseEstimationExperimentScheduler(target_accuracy=0.5, seed=7).run(hamiltonian)
-    original_create = _AlgorithmSnapshot.create
+    original_create = algorithms.create
     created_bases: list[str] = []
 
-    def record_creation(snapshot: _AlgorithmSnapshot, **updates: object) -> object:
-        if snapshot.algorithm_type == "hadamard_test_circuit_builder":
-            created_bases.append(str(snapshot.to_ref().settings.get("test_basis")))
-        return original_create(snapshot, **updates)
+    def record_creation(algorithm_type: str, algorithm_name: str, **settings_values: object) -> object:
+        if algorithm_type == "hadamard_test_circuit_builder":
+            created_bases.append(str(settings_values["test_basis"]))
+        return original_create(algorithm_type, algorithm_name, **settings_values)
 
-    monkeypatch.setattr(_AlgorithmSnapshot, "create", record_creation)
+    monkeypatch.setattr(algorithms, "create", record_creation)
     experiments = list(
         islice(RobustPhaseEstimationCircuitBuilder().iter_build(schedule, state_preparation, hamiltonian), 3)
     )
@@ -692,7 +701,7 @@ def test_basis_builders_are_created_once_per_stream(
         assert hadamard_records[index][1] is hadamard_records[index + 1][1]
 
 
-def test_build_returns_canonical_flat_circuit_list(
+def test_run_returns_canonical_flat_circuit_list(
     rpe_problem: tuple[Circuit, QubitOperator],
     recording_builders: tuple[list[dict[str, object]], list[tuple[str, _FakeUnitary]]],
 ) -> None:
@@ -700,8 +709,10 @@ def test_build_returns_canonical_flat_circuit_list(
     state_preparation, hamiltonian = rpe_problem
     unitary_records, hadamard_records = recording_builders
     circuit_set = RobustPhaseEstimationExperimentScheduler(target_accuracy=0.5, seed=17).run(hamiltonian)
-    builder = RobustPhaseEstimationCircuitBuilder()
-    circuits = builder.build(circuit_set, state_preparation, hamiltonian)
+    builder = RobustPhaseEstimationCircuitBuilder(
+        experiment_scheduler=AlgorithmRef("rpe_experiment_scheduler", "qdk", target_accuracy=0.5, seed=17)
+    )
+    circuits = builder.run(state_preparation, hamiltonian)
 
     assert len(circuits) == 2 * len(circuit_set.experiment_specs)
     for spec in circuit_set.experiment_specs:
@@ -731,15 +742,17 @@ def test_run_matches_standard_qpe_list_contract(
     unitary_records, hadamard_records = recording_builders
     scheduler_ref = AlgorithmRef("rpe_experiment_scheduler", "qdk", target_accuracy=0.5, seed=17)
     builder = RobustPhaseEstimationCircuitBuilder(experiment_scheduler=scheduler_ref)
-    original_schedule = builder.schedule
+    original_schedule = RobustPhaseEstimationExperimentScheduler._run_impl
     scheduled_workloads: list[RobustPhaseEstimationSchedule] = []
 
-    def schedule(qubit_hamiltonian: QubitOperator) -> RobustPhaseEstimationSchedule:
-        circuit_set = original_schedule(qubit_hamiltonian)
+    def schedule(
+        scheduler: RobustPhaseEstimationExperimentScheduler, qubit_hamiltonian: QubitOperator
+    ) -> RobustPhaseEstimationSchedule:
+        circuit_set = original_schedule(scheduler, qubit_hamiltonian)
         scheduled_workloads.append(circuit_set)
         return circuit_set
 
-    monkeypatch.setattr(builder, "schedule", schedule)
+    monkeypatch.setattr(RobustPhaseEstimationExperimentScheduler, "_run_impl", schedule)
 
     circuits = builder.run(state_preparation, hamiltonian)
 

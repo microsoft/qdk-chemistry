@@ -28,8 +28,8 @@ Use QpeCircuitBuilder
 This section demonstrates how to create, configure, and run a phase estimation circuit builder.
 The ``run`` method returns a list of :class:`~qdk_chemistry.data.Circuit` containing the constructed phase estimation circuits.
 
-The robust implementation additionally exposes ``schedule``, ``build``, and ``iter_build``.
-These methods retain the workload metadata needed for execution and allow randomized X/Y pairs to be streamed without retaining the complete circuit list.
+The robust implementation additionally exposes ``iter_build`` to consume a :class:`~qdk_chemistry.data.RobustPhaseEstimationSchedule` produced by the configured scheduler.
+This method retains the workload metadata needed for execution and allows X/Y pairs to be streamed without retaining the complete circuit list.
 
 Input requirements
 ~~~~~~~~~~~~~~~~~~
@@ -195,14 +195,9 @@ Create the circuit builder through the ``"qpe_circuit_builder"`` factory type wi
 Its standard ``run(state_preparation, qubit_hamiltonian)`` method returns a flat ``list[Circuit]`` consistent with the other QPE builders.
 The concrete ``_run_impl`` schedules once and returns that complete list.
 
-The robust builder additionally exposes three workload-aware methods:
-
-``schedule(qubit_hamiltonian)``
-  Resolve a :class:`~qdk_chemistry.data.RobustPhaseEstimationSchedule` without storing live inputs or constructing circuits.
-  The nested scheduler's ``run(qubit_hamiltonian)`` has the same result.
-
-``build(schedule, state_preparation, qubit_hamiltonian)``
-  Materialize the canonical flat circuit list using a previously resolved schedule and explicit inputs.
+For workload inspection or replay, run the configured :class:`~qdk_chemistry.algorithms.RobustPhaseEstimationExperimentScheduler` directly with the Hamiltonian.
+It returns a :class:`~qdk_chemistry.data.RobustPhaseEstimationSchedule` without storing live inputs or constructing circuits.
+Pass the resulting schedule and inputs to the builder's streaming method:
 
 ``iter_build(schedule, state_preparation, qubit_hamiltonian)``
   Yield ``(experiment_spec, x_circuit, y_circuit)`` tuples one at a time.
@@ -213,7 +208,7 @@ Override this shared method to customize both paths.
 Overriding only ``_run_impl`` changes eager construction, not the estimator's streaming path.
 Each stream creates its X- and Y-basis Hadamard-test builders once and reuses them across all unitary draws.
 
-Call ``schedule`` only once when the configured seed is ``-1``.
+Run the scheduler only once when the configured seed is ``-1``.
 Scheduling concretizes one entropy-backed root seed, and all later construction or execution should consume that same schedule.
 
 Configuration
@@ -363,13 +358,14 @@ For deterministic evolution, one pair represents every shot in its round.
 For randomized evolution, each specification represents one independently sampled unitary and one shot per basis.
 Both circuits in a pair always share the same unitary draw.
 
-The ``x_circuit_index`` and ``y_circuit_index`` properties identify positions in the canonical flat list returned by ``build``.
+The ``x_circuit_index`` and ``y_circuit_index`` properties identify positions in the canonical flat list returned by the builder's ``run`` method.
 When circuits are streamed, filtered, or batched, carry the experiment specification with the pair rather than treating those positions as persistent identifiers.
 
 The optional :class:`~qdk_chemistry.data.RobustPhaseEstimationCircuitSet` is a replay bundle with three fields: ``schedule``, ``state_preparation``, and ``qubit_hamiltonian``.
 The Hamiltonian is snapshotted, and accessing it returns a defensive copy.
 The bundle and circuit builder check that the Hamiltonian matches the schedule fingerprint and coefficient norm before construction.
 The high-level ``schedule_circuit_set`` and ``execute_circuit_set`` methods create and consume this bundle without changing the recorded schedule.
+Replay locks the estimator's settings before execution, just like its ordinary ``run`` method.
 
 Resource estimation and serialization
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
@@ -388,12 +384,19 @@ Call :meth:`~qdk_chemistry.data.RobustPhaseEstimationCircuitSet.rebind` with the
    Regenerate old files from their original inputs and settings.
    The standalone schedule uses its own ``0.1.0`` format and the filename suffix ``.robust_phase_estimation_schedule``.
 
-.. tab:: Python API
+.. tab:: Circuit preview
 
    .. literalinclude:: ../../../_static/examples/python/phase_estimation.py
       :language: python
-      :start-after: # start-cell-robust-circuit-set
-      :end-before: # end-cell-robust-circuit-set
+      :start-after: # start-cell-robust-preview
+      :end-before: # end-cell-robust-preview
+
+.. tab:: Save and replay
+
+   .. literalinclude:: ../../../_static/examples/python/phase_estimation.py
+      :language: python
+      :start-after: # start-cell-robust-replay
+      :end-before: # end-cell-robust-replay
 
 
 Unary-iteration Phase Estimation Circuit Builder

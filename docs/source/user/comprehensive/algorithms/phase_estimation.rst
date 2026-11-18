@@ -254,18 +254,22 @@ The estimator has two direct settings:
 - ``qpe_circuit_builder``: The ``"qdk_robust"`` :ref:`robust circuit builder <robust-phase-estimation-circuit-builder>`, which holds an experiment scheduler as a nested algorithm reference.
 - ``circuit_executor`` — The backend used to execute every generated basis circuit.
 
-The circuit builder's standard ``run`` method returns a flat list of circuits.
-For execution, reproducibility, or resource estimation, call ``schedule(qubit_hamiltonian)`` once to obtain a :class:`~qdk_chemistry.data.RobustPhaseEstimationSchedule`.
-Pass that schedule, the state preparation, and the Hamiltonian to ``iter_build`` to construct one X/Y pair at a time.
-Use ``schedule_circuit_set`` on the high-level algorithm to package a schedule and its inputs in a :class:`~qdk_chemistry.data.RobustPhaseEstimationCircuitSet` for later replay.
-The estimator uses this streaming path internally and preserves the exact schedule and concrete random draws used by :meth:`~qdk_chemistry.algorithms.phase_estimation.robust_phase_estimation.RobustPhaseEstimation.execute_circuit_set`.
+Configure the scheduler through an :class:`~qdk_chemistry.data.AlgorithmRef`, then call the estimator's ``run`` method with the state preparation and Hamiltonian.
+The estimator schedules once and streams X/Y circuit pairs internally without materializing the full workload.
+The example below uses a coarse accuracy target to keep execution short; the default target remains ``1e-3``.
+See :doc:`qpe_circuit_builder` for separate circuit-preview and saved-workload replay examples.
 
 .. tab:: Python API
 
    .. literalinclude:: ../../../_static/examples/python/phase_estimation.py
       :language: python
-      :start-after: # start-cell-robust-circuit-set
-      :end-before: # end-cell-robust-circuit-set
+      :start-after: # start-cell-configure-robust
+      :end-before: # end-cell-configure-robust
+
+   .. literalinclude:: ../../../_static/examples/python/phase_estimation.py
+      :language: python
+      :start-after: # start-cell-run-robust
+      :end-before: # end-cell-run-robust
 
 
 .. _standard-qpe-algorithm:
