@@ -10,7 +10,9 @@
 #include <functional>
 #include <iterator>
 #include <lapack.hh>
+#include <numbers>
 #include <numeric>
+#include <optional>
 #include <qdk/chemistry/utils/unitary_synthesis.hpp>
 #include <stdexcept>
 #include <utility>
@@ -296,6 +298,130 @@ GivensDecomposition merge_block_givens(
     shifted = !shifted;
   }
   return merged;
+}
+
+// Moves D to the other side of the layers, D L = L' D, by negating the angle
+// of every pair whose two signs differ.
+void commute_signs(GivensDecomposition& givens) {
+  for (std::size_t layer = 0; layer < givens.layer_angles.size(); ++layer) {
+    const std::size_t first = givens.layer_shifted[layer] != 0 ? 1 : 0;
+    auto& angles = givens.layer_angles[layer];
+    for (std::size_t slot = 0; slot < angles.size(); ++slot) {
+      const auto pair = first + 2 * slot;
+      if (givens.phases[pair] != givens.phases[pair + 1]) {
+        angles[slot] = -angles[slot];
+      }
+    }
+  }
+}
+
+// Absorbs the input-side signs of states pair and pair + 1 into a rotation of
+// that pair, G(θ ± π) = -G(θ), using a layer whose trimmed table already
+// covers the pair; returns false when none does.
+bool absorb_sign_pair(GivensDecomposition& givens, std::size_t pair) {
+  const auto parity = static_cast<std::uint8_t>(pair % 2);
+  const auto slot = pair / 2;
+  const auto num_layers = givens.layer_angles.size();
+  const auto covers = [&](std::size_t layer, std::size_t from) {
+    const auto& angles = givens.layer_angles[layer];
+    return givens.layer_shifted[layer] == parity && from < angles.size() &&
+           std::any_of(angles.begin() + static_cast<std::ptrdiff_t>(from),
+                       angles.end(), is_rotation);
+  };
+  auto chosen = num_layers;
+  for (std::size_t layer = 0; layer < num_layers && chosen == num_layers;
+       ++layer) {
+    if (covers(layer, slot) && is_rotation(givens.layer_angles[layer][slot])) {
+      chosen = layer;
+    }
+  }
+  for (std::size_t layer = 0; layer < num_layers && chosen == num_layers;
+       ++layer) {
+    if (covers(layer, slot)) {
+      chosen = layer;
+    }
+  }
+  if (chosen == num_layers) {
+    return false;
+  }
+  // The pair's -I flips the neighbouring pairs of earlier opposite layers.
+  for (std::size_t layer = 0; layer < chosen; ++layer) {
+    if (givens.layer_shifted[layer] == parity) {
+      continue;
+    }
+    auto& angles = givens.layer_angles[layer];
+    if (pair > 0 && (pair - 1) / 2 < angles.size()) {
+      angles[(pair - 1) / 2] = -angles[(pair - 1) / 2];
+    }
+    if ((pair + 1) / 2 < angles.size()) {
+      angles[(pair + 1) / 2] = -angles[(pair + 1) / 2];
+    }
+  }
+  auto& angle = givens.layer_angles[chosen][slot];
+  angle = angle > 0.0 ? angle - std::numbers::pi : angle + std::numbers::pi;
+  givens.phases[pair] ^= 1;
+  givens.phases[pair + 1] ^= 1;
+  return true;
+}
+
+// Folds the signs of D into rotation angles of layers that already cover them;
+// the rest remain in D, with unused states set to shorten its polynomial.
+void absorb_signs(GivensDecomposition& givens, const std::vector<bool>& used) {
+  commute_signs(givens);
+  const auto size = givens.phases.size();
+  std::optional<std::size_t> first_unused;
+  std::optional<std::size_t> last_unused;
+  for (std::size_t index = 0; index < size; ++index) {
+    if (!used[index]) {
+      givens.phases[index] = 0;
+      first_unused = first_unused.value_or(index);
+      last_unused = index;
+    }
+  }
+  // Each sign is carried pair by pair to the right, then to the left.
+  const auto forward_end = last_unused.value_or(size - 1);
+  for (std::size_t index = 0; index < forward_end; ++index) {
+    if (givens.phases[index] != 0 && absorb_sign_pair(givens, index) &&
+        !used[index + 1]) {
+      givens.phases[index + 1] = 0;
+    }
+  }
+  for (auto index = size - 1; first_unused && index > *first_unused; --index) {
+    if (givens.phases[index] != 0 && absorb_sign_pair(givens, index - 1) &&
+        !used[index - 1]) {
+      givens.phases[index - 1] = 0;
+    }
+  }
+  // Unused states take the signs that cancel the monomials of D's phase
+  // polynomial whose top state they are, if the used signs stay unchanged.
+  const auto mobius = [](std::vector<std::uint8_t>& values) {
+    for (std::size_t bit = 1; bit < values.size(); bit <<= 1) {
+      for (std::size_t index = 0; index < values.size(); ++index) {
+        if ((index & bit) != 0) {
+          values[index] ^= values[index ^ bit];
+        }
+      }
+    }
+  };
+  if (first_unused && std::any_of(givens.phases.begin(), givens.phases.end(),
+                                  [](std::uint8_t phase) { return phase; })) {
+    auto signs = givens.phases;
+    mobius(signs);
+    for (std::size_t index = 0; index < size; ++index) {
+      if (!used[index]) {
+        signs[index] = 0;
+      }
+    }
+    mobius(signs);
+    bool same = true;
+    for (std::size_t index = 0; index < size; ++index) {
+      same = same && (!used[index] || signs[index] == givens.phases[index]);
+    }
+    if (same) {
+      givens.phases = std::move(signs);
+    }
+  }
+  commute_signs(givens);
 }
 
 DenseIsometryFactors dense_isometry_factors(const Eigen::MatrixXd& isometry,
@@ -692,6 +818,104 @@ DenseIsometrySynthesis dense_isometry_synthesis(const Eigen::MatrixXd& isometry,
   if (block_end != givens.end()) {
     result.right_factor_givens = std::move(*block_end);
   }
+
+  const auto num_states = static_cast<std::size_t>(dim);
+  const auto num_used = static_cast<std::size_t>(width);
+  std::vector<bool> used(num_states, false);
+  std::fill_n(used.begin(), num_used, true);
+  if (factors.num_added_qubits == 0) {
+    absorb_signs(result.block_givens, used);
+    return result;
+  }
+  // Block input states fed by a UCR output that is never rotated into are
+  // unused; with two added qubits W₀ and W₁ may spread a populated branch of
+  // q0 or q1 over every input state.
+  auto& angles = result.rotation_angles;
+  const auto rotates = [&](std::size_t ucr, std::size_t state) {
+    return is_rotation(angles[ucr][state]);
+  };
+  std::vector<bool> block_used(result.block_givens.phases.size(), true);
+  std::copy(used.begin(), used.end(), block_used.begin());
+  bool q0_branch = false;
+  for (std::size_t state = 0; state < num_states; ++state) {
+    block_used[state + num_states] = used[state] && rotates(0, state);
+    q0_branch = q0_branch || block_used[state + num_states];
+  }
+  if (factors.num_added_qubits == 2) {
+    bool q1_branch = false;
+    for (std::size_t state = 0; state < num_states; ++state) {
+      q1_branch = q1_branch || (q0_branch && rotates(1, state));
+    }
+    for (std::size_t state = 0; state < num_states; ++state) {
+      block_used[state + num_states] = q0_branch;
+      block_used[state + 2 * num_states] = q1_branch;
+      block_used[state + 3 * num_states] = q1_branch && rotates(2, state);
+    }
+  }
+  // Each table is trimmed after its last rotation.
+  std::vector<std::size_t> cover;
+  for (const auto& table : angles) {
+    cover.push_back(static_cast<std::size_t>(
+        table.rend() -
+        std::find_if(table.rbegin(), table.rend(), is_rotation)));
+  }
+
+  // Folds the signs before UCR_j at a state and on its |0⟩ and |1⟩ outputs
+  // into its angle, wrapped into (-2π, 2π], unless that would extend the
+  // trimmed table; there the rotation is the identity, so the sign before it
+  // moves onto |0⟩ and its unpopulated |1⟩ output drops its sign.
+  commute_signs(result.block_givens);
+  auto& block_signs = result.block_givens.phases;
+  std::uint8_t no_sign = 0;
+  const auto fold = [&](std::size_t ucr, std::size_t state,
+                        std::uint8_t& before, std::size_t zero,
+                        std::optional<std::size_t> one) {
+    auto& angle = angles[ucr][state];
+    const bool zero_flip = (before != 0) != (block_signs[zero] != 0);
+    const bool one_flip = (before != 0) != (one && block_signs[*one] != 0);
+    double folded = (zero_flip != one_flip ? -angle : angle) +
+                    (zero_flip ? 2.0 * std::numbers::pi : 0.0);
+    if (folded > 2.0 * std::numbers::pi) {
+      folded -= 4.0 * std::numbers::pi;
+    }
+    if (state < cover[ucr] || !is_rotation(folded)) {
+      angle = folded;
+      block_signs[zero] = 0;
+    } else {
+      block_signs[zero] ^= before;
+    }
+    if (one) {
+      block_signs[*one] = 0;
+    }
+    before = 0;
+  };
+  auto* right_signs = result.right_factor_givens
+                          ? &result.right_factor_givens->phases
+                          : nullptr;
+  for (std::size_t state = 0; state < num_states; ++state) {
+    auto& before = right_signs != nullptr ? (*right_signs)[state] : no_sign;
+    if (factors.num_added_qubits == 1) {
+      if (used[state]) {
+        fold(0, state, before, state, state + num_states);
+      }
+      continue;
+    }
+    fold(2, state, result.mixing_givens[1].phases[state],
+         state + 2 * num_states, state + 3 * num_states);
+    fold(1, state, result.mixing_givens[0].phases[state], state + num_states,
+         std::nullopt);
+    if (used[state]) {
+      fold(0, state, before, state, std::nullopt);
+    }
+  }
+  commute_signs(result.block_givens);
+  absorb_signs(result.block_givens, block_used);
+  for (auto& mixing : result.mixing_givens) {
+    absorb_signs(mixing, std::vector<bool>(num_states, true));
+  }
+  if (result.right_factor_givens) {
+    absorb_signs(*result.right_factor_givens, used);
+  }
   return result;
 }
 
@@ -741,6 +965,12 @@ SparseIsometrySynthesis block_sparse_isometry_synthesis(
   const auto order = sort_blocks(supports.groups, rows.block_starts, result);
   result.block_givens =
       synthesize_completed_blocks(supports.groups, order, rows.num_unused_rows);
+  std::vector<bool> used(static_cast<std::size_t>(dim), false);
+  for (Eigen::Index column = 0; column < left; ++column) {
+    used[static_cast<std::size_t>(
+        result.column_permutation[static_cast<std::size_t>(column)])] = true;
+  }
+  absorb_signs(result.block_givens, used);
   return result;
 }
 

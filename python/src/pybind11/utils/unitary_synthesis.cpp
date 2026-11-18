@@ -54,7 +54,7 @@ shifted. ``D`` is a diagonal sign matrix.
             return detail::to_bool_vector(self.phases);
           },
           "list[bool]: Whether each basis state receives a minus sign from "
-          "``D``.");
+          "``D`` after the foldable signs are absorbed into the angles.");
 
   py::class_<DenseIsometrySynthesis>(unitary_synthesis,
                                      "DenseIsometrySynthesis",
@@ -68,16 +68,19 @@ Rupprecht and Wölk, arXiv:2605.28489), and with two it is
 ``B UCR_2 W_1 CNOT UCR_1 W_0 CNOT UCR_0 V`` (Fig. 5), in operator order. Each
 ``UCR_j`` is an Ry rotation of an added qubit multiplexed by the input register,
 and ``B`` is block diagonal over the added qubits. With no added qubit the
-completed isometry is ``B`` alone.
+completed isometry is ``B`` alone. The signs of the Givens factors are folded
+into rotation angles without extending any trimmed angle table, so for a generic
+isometry ``phases`` is all zero, except for at most one sign with no added qubit
+and no free column; degenerate inputs may keep more.
 )")
       .def_property_readonly(
           "rotation_angles",
           [](const DenseIsometrySynthesis& self) {
             return self.rotation_angles;
           },
-          "list[list[float]]: Ry angles of each multiplexed rotation, one per "
-          "input state. Three rotations for two added qubits, one for one, "
-          "none for zero.")
+          "list[list[float]]: Ry angles of each multiplexed rotation in "
+          "``(-2 pi, 2 pi]``, one per input state, with the folded signs. "
+          "Three rotations for two added qubits, one for one, none for zero.")
       .def_property_readonly(
           "mixing_givens",
           [](const DenseIsometrySynthesis& self) { return self.mixing_givens; },
@@ -100,8 +103,8 @@ completed isometry is ``B`` alone.
             return self.right_factor_givens;
           },
           "GivensDecomposition | None: Givens data of ``V`` padded with the "
-          "identity to the input register, or ``None`` when ``V`` is omitted "
-          "or no qubit is added.");
+          "identity to the input register, whose row signs may be folded into "
+          "``UCR_0``, or ``None`` when ``V`` is omitted or no qubit is added.");
 
   py::class_<SparseIsometrySynthesis>(unitary_synthesis,
                                       "SparseIsometrySynthesis",
@@ -129,7 +132,9 @@ columns equal the isometry.
           "block_givens",
           [](const SparseIsometrySynthesis& self) { return self.block_givens; },
           "GivensDecomposition: Merged Givens data of ``B``, largest diagonal "
-          "block first.");
+          "block first, with signs folded into the angles where a layer "
+          "covers them and those of completion columns set to shorten the "
+          "phase polynomial.");
 
   unitary_synthesis.def(
       "dense_isometry_synthesis",

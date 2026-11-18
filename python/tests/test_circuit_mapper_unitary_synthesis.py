@@ -293,7 +293,7 @@ class TestBlockSparse:
 
     @pytest.mark.parametrize("duplicates", ["split", "cancelling"])
     def test_duplicate_entries_are_summed(self, duplicates):
-        """Duplicates are summed as in SciPy: ``2v`` and ``-v`` mean ``v``, and ``+1``, ``-1`` pairs couple no blocks."""
+        """Duplicates sum as in SciPy: ``2v`` and ``-v`` give ``v``, and ``+1``, ``-1`` pairs couple no blocks."""
         matrix = _block_sparse([2, 4, 1, 1], seed=4)
         entries = matrix.tocoo()
         rows, columns, data = entries.row, entries.col, entries.data

@@ -51,11 +51,20 @@ struct GivensDecomposition {
  * qubit multiplexed by the input register, and @f$B@f$ is block diagonal over
  * the added qubits. For @f$k=0@f$ the isometry is completed to an orthogonal
  * matrix synthesized as @f$B@f$ alone.
+ *
+ * The sign matrices @f$D@f$ of the Givens factors are folded into rotation
+ * angles without extending any trimmed angle table: for @f$k\geq1@f$ into
+ * the UCR angles, and otherwise into Givens angles via
+ * @f$G(\theta\pm\pi)=-G(\theta)@f$. Unused states take the signs that
+ * shorten the phase polynomial of the remaining @f$D@f$. For a generic
+ * isometry every @c phases entry is then zero, except for at most one sign
+ * when @f$k=0@f$ and no column is free; degenerate inputs may keep more.
  */
 struct DenseIsometrySynthesis {
   /**
-   * @brief Ry angles @f$2\arctan(D'_b / D_b)@f$, one per input state. One
-   * rotation for one added qubit, three for two, none for zero.
+   * @brief Ry angles @f$2\arctan(D'_b / D_b)@f$ with the folded signs, in
+   * @f$(-2\pi,2\pi]@f$, one per input state. One rotation for one added
+   * qubit, three for two, none for zero.
    */
   std::vector<std::vector<double>> rotation_angles;
 
@@ -75,8 +84,9 @@ struct DenseIsometrySynthesis {
   Eigen::MatrixXd right_factor;
 
   /**
-   * @brief Givens data of @f$V\oplus I@f$ on the input register, or empty
-   * when the right factor is omitted or no qubit is added.
+   * @brief Givens data of @f$V\oplus I@f$ on the input register, whose row
+   * signs may be folded into @f$\mathrm{UCR}_0@f$, or empty when the right
+   * factor is omitted or no qubit is added.
    */
   std::optional<GivensDecomposition> right_factor_givens;
 };
@@ -100,7 +110,9 @@ struct SparseIsometrySynthesis {
    * of @f$B@f$. */
   std::vector<Eigen::Index> row_permutation;
 
-  /** @brief Merged Givens data of @f$B@f$, largest diagonal block first. */
+  /** @brief Merged Givens data of @f$B@f$, largest diagonal block first. Its
+   * signs are folded into the angles where a layer already covers them, and
+   * those of completion columns are set to shorten the phase polynomial. */
   GivensDecomposition block_givens;
 };
 

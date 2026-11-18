@@ -186,7 +186,8 @@ Eigen::MatrixXd dense_circuit(const DenseIsometrySynthesis& synthesis,
 
 void expect_dense_reconstruction(const DenseIsometrySynthesis& synthesis,
                                  const Eigen::MatrixXd& target,
-                                 Eigen::Index chi, bool omitted) {
+                                 Eigen::Index chi, bool omitted,
+                                 bool generic = true) {
   const Eigen::Index added = target.rows() / chi;
   const Eigen::Index width = target.cols();
   const std::size_t num_rotations = added == 4 ? 3u : (added == 2 ? 1u : 0u);
@@ -204,10 +205,30 @@ void expect_dense_reconstruction(const DenseIsometrySynthesis& synthesis,
                   .isApprox(Eigen::MatrixXd::Identity(width, width), 1.0e-11));
   ASSERT_EQ(synthesis.right_factor_givens.has_value(), !omitted && added > 1);
   if (synthesis.right_factor_givens) {
+    // The Givens data realizes V up to the row signs folded into UCR 0.
     const Eigen::MatrixXd padded = reconstruct(*synthesis.right_factor_givens);
     ASSERT_EQ(padded.rows(), chi);
-    EXPECT_TRUE(padded.topLeftCorner(width, width)
-                    .isApprox(synthesis.right_factor, 1.0e-11));
+    EXPECT_TRUE(
+        (padded.topLeftCorner(width, width) *
+         synthesis.right_factor.transpose())
+            .cwiseAbs()
+            .isApprox(Eigen::MatrixXd::Identity(width, width), 1.0e-11));
+  }
+  // For a generic isometry every sign is folded, except one when B alone uses
+  // every state.
+  const auto count_signs = [](const GivensDecomposition& givens) {
+    return std::count_if(givens.phases.begin(), givens.phases.end(),
+                         [](std::uint8_t phase) { return phase != 0; });
+  };
+  auto num_signs = count_signs(synthesis.block_givens);
+  for (const auto& givens : synthesis.mixing_givens) {
+    num_signs += count_signs(givens);
+  }
+  if (synthesis.right_factor_givens) {
+    num_signs += count_signs(*synthesis.right_factor_givens);
+  }
+  if (generic) {
+    EXPECT_LE(num_signs, added == 1 && width == chi ? 1 : 0);
   }
 
   const Eigen::MatrixXd circuit = dense_circuit(synthesis, added, chi);
@@ -223,17 +244,26 @@ void expect_dense_reconstruction(const DenseIsometrySynthesis& synthesis,
 }
 
 // Checks both circuit variants and that the omitted factor is the helper's.
-void expect_dense_synthesis(const Eigen::MatrixXd& target, Eigen::Index chi) {
+void expect_dense_synthesis(const Eigen::MatrixXd& target, Eigen::Index chi,
+                            bool generic = true) {
   const auto full = dense_isometry_synthesis(target, chi);
   const auto omitted = dense_isometry_synthesis(target, chi, true);
-  expect_dense_reconstruction(full, target, chi, false);
-  expect_dense_reconstruction(omitted, target, chi, true);
+  expect_dense_reconstruction(full, target, chi, false, generic);
+  expect_dense_reconstruction(omitted, target, chi, true, generic);
   const Eigen::MatrixXd helper = dense_isometry_right_factor(target, chi);
   EXPECT_TRUE(helper == omitted.right_factor);
   EXPECT_TRUE(helper == full.right_factor);
-  EXPECT_EQ(full.rotation_angles, omitted.rotation_angles);
-  EXPECT_EQ(full.block_givens.layer_angles, omitted.block_givens.layer_angles);
-  EXPECT_EQ(full.block_givens.phases, omitted.block_givens.phases);
+  // Only UCR 0 carries the folded signs of V; a sign it cannot fold moves to
+  // the block instead.
+  ASSERT_EQ(full.rotation_angles.size(), omitted.rotation_angles.size());
+  for (std::size_t index = 1; index < full.rotation_angles.size(); ++index) {
+    EXPECT_EQ(full.rotation_angles[index], omitted.rotation_angles[index]);
+  }
+  if (generic) {
+    EXPECT_EQ(full.block_givens.layer_angles,
+              omitted.block_givens.layer_angles);
+    EXPECT_EQ(full.block_givens.phases, omitted.block_givens.phases);
+  }
 }
 
 }  // namespace
@@ -309,6 +339,37 @@ TEST(UnitarySynthesisTest, ReconstructsDenseIsometries) {
     rank_deficient.topLeftCorner(4, 2).setIdentity();
     rank_deficient.bottomRightCorner(4, 2).setIdentity();
     expect_dense_synthesis(rank_deficient, 4);
+
+    // M = [U; 0] with det U < 0 needs no rotation, and folding its signs must
+    // not activate the all-zero angle tables.
+    Eigen::MatrixXd reflection = random_orthogonal(4, 21);
+    if (reflection.determinant() > 0) {
+      reflection.col(0) *= -1;
+    }
+    for (const Eigen::Index added : {2, 4}) {
+      SCOPED_TRACE(::testing::Message() << "zero block, added " << added);
+      Eigen::MatrixXd zero_block = Eigen::MatrixXd::Zero(added * 4, 4);
+      zero_block.topRows(4) = reflection;
+      expect_dense_synthesis(zero_block, 4, false);
+      for (const bool omit : {false, true}) {
+        for (const auto& angles :
+             dense_isometry_synthesis(zero_block, 4, omit).rotation_angles) {
+          for (const double angle : angles) {
+            EXPECT_LE(std::abs(angle), 1.0e-12);
+          }
+        }
+      }
+    }
+
+    // Signs of an unused completion state are chosen so that the remaining
+    // alternating signs are a single Z, not a multi-controlled Z.
+    Eigen::MatrixXd alternating = Eigen::MatrixXd::Zero(8, 7);
+    for (Eigen::Index state = 0; state < 7; ++state) {
+      alternating(state, state) = state % 2 == 0 ? 1.0 : -1.0;
+    }
+    expect_dense_synthesis(alternating, 8, false);
+    EXPECT_EQ(dense_isometry_synthesis(alternating, 8).block_givens.phases,
+              (std::vector<std::uint8_t>{0, 1, 0, 1, 0, 1, 0, 1}));
 
     // Rows padded with zeros, as for an isometry embedded in a larger input
     // register.

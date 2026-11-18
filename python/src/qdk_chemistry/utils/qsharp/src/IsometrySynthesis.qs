@@ -52,14 +52,15 @@ namespace QDKChemistry.Utils.IsometrySynthesis {
     /// and with none it is B. Each UCRⱼ is an Ry on an added qubit multiplexed by the input
     /// register, and B is block diagonal over the added qubits.
     struct DenseIsometrySynthesis {
-        /// Ry angles of UCR₀, UCR₁ and UCR₂, one per input state; UCR₀ only for one added
-        /// qubit and none for zero.
+        /// Ry angles of UCR₀, UCR₁ and UCR₂, one per input state, with the signs of the Givens
+        /// factors folded in; UCR₀ only for one added qubit and none for zero.
         rotationAngles : Double[][],
         /// W₀ and W₁ on the input register; empty unless two qubits are added.
         mixingGivens : GivensDecomposition[],
         /// B on the joint input and added register.
         blockGivens : GivensDecomposition,
-        /// V on the input register, or empty when V is omitted.
+        /// V on the input register, whose row signs may be folded into UCR₀, or empty when V
+        /// is omitted or no qubit is added.
         rightFactorGivens : GivensDecomposition[],
         /// Widest swap network of the angle lookups, -1 for the Toffoli-optimal width.
         maxSwapBits : Int,
@@ -72,7 +73,7 @@ namespace QDKChemistry.Utils.IsometrySynthesis {
         columnPermutation : Int[],
         /// P_r|v⟩ = |rowPermutation[v]⟩.
         rowPermutation : Int[],
-        /// Block-diagonal B.
+        /// Block-diagonal B, with signs folded into its angles where a layer covers them.
         blockGivens : GivensDecomposition,
         /// Widest swap network of the angle lookups, -1 for the Toffoli-optimal width.
         maxSwapBits : Int,
