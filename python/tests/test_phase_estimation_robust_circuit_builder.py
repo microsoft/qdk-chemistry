@@ -31,6 +31,8 @@ from qdk_chemistry.algorithms.phase_estimation.rpe_experiment_scheduler import (
 from qdk_chemistry.data import (
     AlgorithmRef,
     Circuit,
+    FermiHubbardModelHamiltonianDescription,
+    LatticeGeometry,
     QubitOperator,
     RobustPhaseEstimationCircuitSet,
     RobustPhaseEstimationSchedule,
@@ -456,6 +458,14 @@ def test_scheduler_rejects_unregistered_builder_name(rpe_problem: tuple[Circuit,
 
     with pytest.raises(KeyError, match="'does_not_exist' not found"):
         scheduler.run(rpe_problem[1])
+
+
+def test_scheduler_rejects_model_hamiltonian_description() -> None:
+    """Scheduling requires the Pauli coefficients that a model description does not carry."""
+    model = FermiHubbardModelHamiltonianDescription(LatticeGeometry.chain(2), t=1.0, u=4.0)
+
+    with pytest.raises(TypeError, match="takes a QubitOperator, got FermiHubbardModelHamiltonianDescription"):
+        RobustPhaseEstimationExperimentScheduler().run(model)
 
 
 @pytest.mark.parametrize(

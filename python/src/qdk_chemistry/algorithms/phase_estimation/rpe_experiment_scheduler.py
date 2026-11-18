@@ -211,10 +211,14 @@ class RobustPhaseEstimationExperimentScheduler(Algorithm):
 
         Raises:
             KeyError: If the configured unitary builder is not registered.
-            TypeError: If the configured builder is not a time-evolution builder.
+            TypeError: If the Hamiltonian is not a QubitOperator or the builder is not a time-evolution builder.
             ValueError: If the builder name, power, base time, or error-budget settings are unsupported or invalid.
 
         """
+        if not isinstance(qubit_hamiltonian, QubitOperator):
+            raise TypeError(
+                f"The {self.name()!r} RPE scheduler takes a QubitOperator, got {type(qubit_hamiltonian).__name__}."
+            )
         for setting in ("target_accuracy", "unitary_accuracy_fraction", "epsilon_rpe", "epsilon_unitary"):
             value = float(self._settings.get(setting))
             if not np.isfinite(value):

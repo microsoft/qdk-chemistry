@@ -350,12 +350,12 @@ class TestPartiallyRandomizedConstruction:
             raw_terms.extend(
                 raw_builder._build_step_terms(real_terms[:3], real_terms[3:], time / 3, trotter_order, 7, rng)
             )
-        raw = PauliProductFormulaContainer(raw_terms, 2, 3, scale=time)
+        raw = PauliProductFormulaContainer(raw_terms, 2, 3, scale=2 * time)
 
         assert layered.layer_offsets[0] == 0
         assert layered.layer_offsets[-1] == len(layered.step_terms)
         assert layered.step_reps == 2
-        assert layered.scale == time
+        assert layered.scale == 2 * time
         np.testing.assert_allclose(_container_to_unitary(layered), _container_to_unitary(raw), atol=1e-12)
 
 
@@ -404,17 +404,17 @@ class TestPartiallyRandomizedPartitions:
             reference_terms.extend(
                 reference_builder._build_step_terms(deterministic, random, -0.2, trotter_order, 5, rng)
             )
-        reference = PauliProductFormulaContainer(reference_terms, 2, 3, scale=-0.4)
+        reference = PauliProductFormulaContainer(reference_terms, 2, 3, scale=-0.8)
 
         np.testing.assert_allclose(_container_to_unitary(actual), _container_to_unitary(reference), atol=1e-12)
         assert actual.step_reps == 2
-        assert actual.scale == -0.4
+        assert actual.scale == -0.8
         assert actual.layer_offsets[0] == 0
         assert actual.layer_offsets[-1] == len(actual.step_terms)
         assert hamiltonian.term_partition is partition
         if not merge:
             assert len(actual.step_terms) == len(reference_terms)
-            assert actual.step_terms[:4] == reference_terms[:4]
+            assert actual.step_terms[:4] == tuple(reference_terms[:4])
 
     def test_declared_layer_boundaries_survive(self) -> None:
         """Disjoint neighboring declared layers are not silently collapsed by the builder."""
