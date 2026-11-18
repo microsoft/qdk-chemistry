@@ -115,6 +115,14 @@ auto asci_iter(ASCISettings asci_settings, MCSCFSettings mcscf_settings,
     default:
       throw std::runtime_error("Unknown CoreSelectionStrategy");
   }
+  // A space larger than the target (refinement continuing from the union of
+  // two oscillating spaces) can need more core dets than the target holds.
+  // The search needs room for a new det: with none, it returns the whole core
+  // or keeps every candidate.
+  if (wfn.size() > ndets_max && nkeep >= ndets_max) {
+    nkeep = ndets_max > 1 ? ndets_max - 1 : 1;
+    if (logger) logger->trace("  * Core selection: capped at nkeep={}", nkeep);
+  }
   // The core dets are the leading nkeep of wfn sorted on coefficient weights
   // (reorder_ci_on_coeff), sorted on alpha string. Only their set matters, so
   // they are copied out of wfn unless ties straddle the cut.

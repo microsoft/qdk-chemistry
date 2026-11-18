@@ -9,11 +9,14 @@
 
 #include <catch2/catch_template_test_macros.hpp>
 #include <chrono>
+#include <cmath>
 #include <future>
 #include <macis/asci/grow.hpp>
 #include <macis/asci/refine.hpp>
 #include <macis/hamiltonian_generator/sorted_double_loop.hpp>
+#include <macis/sd_operations.hpp>
 #include <new>
+#include <numeric>
 #include <thread>
 
 #include "ut_common.hpp"
@@ -39,6 +42,7 @@ class CpuExecution final : public macis::ASCIExecutionContext<N> {
 
   Failure failure = Failure::none;
   size_t searches = 0;
+  size_t last_core = 0;
   size_t updates = 0;
   size_t drains = 0;
   bool coefficients_alive_at_drain = false;
@@ -51,6 +55,7 @@ class CpuExecution final : public macis::ASCIExecutionContext<N> {
                                       const std::vector<double>& C, size_t norb,
                                       Hamiltonian& ham_gen) override {
     ++searches;
+    last_core = std::distance(begin, end);
     if (failure == Failure::search) throw std::runtime_error("search failure");
     return macis::asci_search(
         settings, target, begin, end, E0, C, norb, ham_gen.T(), ham_gen.G_red(),
@@ -107,25 +112,27 @@ class CpuExecution final : public macis::ASCIExecutionContext<N> {
 };
 
 /**
- * @brief Synthetic executor that forces ASCI refinement into union
- * stabilization.
- * @note Alternates overlapping two-determinant spaces and nonconverging
- * energies, then accepts the three-determinant union. Records requested
- * targets, build sizes and the union warm start; it is not a numerical solver.
+ * @brief Synthetic executor whose searches alternate between two overlapping
+ * two-determinant spaces, with scripted energies.
+ * @note Records requested targets, core sizes, build sizes and the warm
+ * start of the three-determinant union, and tags the coefficients of the n-th
+ * diagonalization with n / 100; it is not a numerical solver.
  */
 class AlternatingExecution final : public macis::ASCIExecutionContext<64> {
  public:
   std::vector<macis::wfn_t<64>> space;
+  std::vector<double> energies;
   std::vector<size_t> targets;
+  std::vector<size_t> cores;
   std::vector<size_t> builds;
   std::vector<double> union_guess;
 
   std::vector<macis::wfn_t<64>> search(macis::ASCISettings, size_t target,
-                                       Iterator, Iterator, double,
+                                       Iterator begin, Iterator end, double,
                                        const std::vector<double>&, size_t,
                                        Hamiltonian&) override {
     targets.push_back(target);
-    if (target == space.size()) return space;
+    cores.push_back(std::distance(begin, end));
     return {space[0], space[targets.size() % 2 ? 1 : 2]};
   }
 
@@ -135,10 +142,9 @@ class AlternatingExecution final : public macis::ASCIExecutionContext<64> {
   }
 
   double finish_diagonalization(std::vector<double>& C) override {
-    if (builds.size() == 4) union_guess = C;
-    C.assign(builds.back(), 1.0 / std::sqrt(double(builds.back())));
-    if (builds.size() >= 4) return -1.2;
-    return builds.size() % 2 ? -1.1 : -1.0;
+    if (builds.back() == 3) union_guess = C;
+    C.assign(builds.back(), builds.size() / 100.0);
+    return energies.at(builds.size() - 1);
   }
 
   void update_integrals(const Hamiltonian&) override {}
@@ -190,6 +196,37 @@ TEMPLATE_TEST_CASE("ASCI execution boundary", "[asci_execution]",
     REQUIRE_FALSE(execution.pending());
   }
 
+  SECTION("A space larger than the target leaves room in the search") {
+    // Refinement continues from the union of two oscillating spaces, which
+    // exceeds the target; core selection would keep all of its near-equal
+    // (distinct) weights. Without room, the search returned the core or kept
+    // every candidate.
+    std::vector<double> Tg(norb * norb);
+    for (size_t p = 0; p < norb; ++p)
+      for (size_t q = 0; q < norb; ++q)
+        Tg[p + q * norb] = p == q ? -2.0 + 0.2 * p + 0.013 * p * p
+                                  : 0.02 * std::sin(1.0 + p + q + 0.3 * p * q);
+    macis::SortedDoubleLoopHamiltonianGenerator<TestType> gen(
+        macis::matrix_span<double>(Tg.data(), norb, norb),
+        macis::rank4_span<double>(V.data(), norb, norb, norb, norb));
+    CpuExecution<N> generic(gen);
+    auto dets = macis::generate_hilbert_space<TestType>(norb, 3, 2);
+    dets.resize(12);
+    std::sort(dets.begin(), dets.end(),
+              typename macis::wavefunction_traits<TestType>::spin_comparator{});
+    std::vector<double> C(dets.size());
+    for (size_t i = 0; i < C.size(); ++i) C[i] = 1.0 + 0.01 * i;
+    const double norm = std::sqrt(std::inner_product(C.begin(), C.end(),
+                                                     C.begin(), 0.0));
+    for (auto& c : C) c /= norm;
+    const double E_hf = gen.matrix_element(hf, hf);
+    const auto [E, result, X] = macis::asci_iter<N, int64_t>(
+        settings, ci, 8, E_hf, dets, C, gen, norb,
+        nullptr MACIS_MPI_CODE(, MPI_COMM_WORLD), &generic);
+    REQUIRE(generic.last_core == 7);
+    REQUIRE(result.size() <= 8);
+  }
+
   SECTION("Failures propagate and pending work is drained before returning") {
     for (auto failure :
          {CpuExecution<N>::Failure::search, CpuExecution<N>::Failure::start,
@@ -222,7 +259,8 @@ TEMPLATE_TEST_CASE("ASCI execution boundary", "[asci_execution]",
   }
 }
 
-TEST_CASE("ASCI execution preserves union stabilization", "[asci_execution]") {
+TEST_CASE("ASCI refinement resolves oscillations at the target size",
+          "[asci_execution]") {
 #ifdef MACIS_ENABLE_MPI
   SKIP("Union stabilization is not supported in MPI builds");
 #endif
@@ -241,21 +279,75 @@ TEST_CASE("ASCI execution preserves union stabilization", "[asci_execution]") {
   execution.space = {hf, first, second};
   std::sort(execution.space.begin(), execution.space.end(),
             macis::wavefunction_traits<macis::wfn_t<64>>::spin_comparator{});
-  macis::ASCISettings settings;
-  settings.max_refine_iter = 4;
+  // Spaces of the odd- and even-numbered searches
+  const std::vector<macis::wfn_t<64>> odd = {execution.space[0],
+                                             execution.space[1]};
+  const std::vector<macis::wfn_t<64>> even = {execution.space[0],
+                                              execution.space[2]};
+  macis::ASCISettings settings;  // default max_refine_iter
   settings.ntdets_min = 1;
-  const auto result = macis::asci_refine<64, int64_t>(
-      settings, macis::MCSCFSettings{}, -1.0,
-      {execution.space[0], execution.space[2]},
-      {std::sqrt(0.5), std::sqrt(0.5)}, ham_gen,
-      norb MACIS_MPI_CODE(, MPI_COMM_WORLD), &execution);
-  REQUIRE(std::get<0>(result) == -1.2);
-  REQUIRE(std::get<1>(result) == execution.space);
-  REQUIRE(execution.targets == std::vector<size_t>{2, 2, 2, 3});
-  REQUIRE(execution.builds == std::vector<size_t>{2, 2, 2, 3, 3});
-  REQUIRE(execution.union_guess.size() == 3);
-  REQUIRE(std::count(execution.union_guess.begin(), execution.union_guess.end(),
-                     0.0) == 1);
+  settings.refine_energy_tol = 1e-3;
+  auto refine = [&] {
+    return macis::asci_refine<64, int64_t>(
+        settings, macis::MCSCFSettings{}, -1.0, even,
+        {std::sqrt(0.5), std::sqrt(0.5)}, ham_gen,
+        norb MACIS_MPI_CODE(, MPI_COMM_WORLD), &execution);
+  };
+  // Energies of the diagonalizations in order; a union's has three dets.
+  // Every search gets a core within the target: after a union (equal
+  // weights, all kept by core selection), one det leaves room for another.
+
+  SECTION("A union that does not lower the energy ends at the lowest iterate") {
+    // One step, a cycle confirmed at the fifth search, the union (-1.3), and
+    // the cycle re-formed in four more searches, beyond the default budget
+    execution.energies = {-1.05, -1.2, -1.1, -1.2, -1.1,
+                          -1.3,  -1.2, -1.1, -1.2, -1.1};
+    const auto [E, dets, C] = refine();
+    REQUIRE(E == -1.2);
+    REQUIRE(dets == even);
+    REQUIRE(C == std::vector{0.02, 0.02});
+    REQUIRE(execution.targets == std::vector<size_t>(9, 2));
+    REQUIRE(execution.cores == std::vector<size_t>{2, 2, 2, 2, 2, 1, 2, 2, 2});
+    REQUIRE(execution.builds ==
+            std::vector<size_t>{2, 2, 2, 2, 2, 3, 2, 2, 2, 2});
+    REQUIRE(execution.union_guess.size() == 3);
+    REQUIRE(std::count(execution.union_guess.begin(),
+                       execution.union_guess.end(), 0.0) == 1);
+  }
+
+  SECTION("A union that lowers the energy allows another one") {
+    // The first union leads to a lower cycle (-1.25), the second converges
+    execution.energies = {-1.2,  -1.1,  -1.2,  -1.1, -1.3, -1.25,
+                          -1.15, -1.25, -1.15, -1.35, -1.3, -1.3002};
+    const auto [E, dets, C] = refine();
+    REQUIRE(E == -1.3002);
+    REQUIRE(dets == even);
+    REQUIRE(C == std::vector{0.12, 0.12});
+    REQUIRE(execution.targets.size() == 10);
+    REQUIRE(execution.cores ==
+            std::vector<size_t>{2, 2, 2, 2, 1, 2, 2, 2, 1, 2});
+    REQUIRE(std::count(execution.builds.begin(), execution.builds.end(), 3) ==
+            2);
+  }
+
+  SECTION("Union steps end once they have used the refinement budget") {
+    // The first union is granted four iterations, all of max_refine_iter
+    settings.max_refine_iter = 4;
+    execution.energies = {-1.2,  -1.1,  -1.2,  -1.1, -1.3,
+                          -1.25, -1.15, -1.25, -1.15};
+    const auto [E, dets, C] = refine();
+    REQUIRE(E == -1.25);
+    REQUIRE(dets == odd);
+    REQUIRE(C == std::vector{0.06, 0.06});
+    REQUIRE(execution.builds.size() == 9);
+  }
+
+  SECTION("Refinement that neither converges nor oscillates fails") {
+    execution.energies = {-2.0, -3.0, -4.0};
+    settings.max_refine_iter = 3;
+    REQUIRE_THROWS_AS(refine(), std::runtime_error);
+    REQUIRE(execution.builds.size() == 3);
+  }
 }
 
 TEST_CASE("ASCI constraint work providers preserve the partition",
