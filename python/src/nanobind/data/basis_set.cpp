@@ -213,9 +213,9 @@ A shell represents a group of atomic orbitals with the same atom, angular moment
 Examples:
     Create a simple basis set:
 
-    >>> from qdk_chemistry.data import BasisSet, OrbitalType
-    >>> basis = BasisSet("STO-3G")
-    >>> basis.add_shell(0, OrbitalType.S, 1.0, 1.0)  # s orbital on atom 0
+    >>> from qdk_chemistry.data import BasisSet, OrbitalType, Shell
+    >>> shell = Shell(0, OrbitalType.S, [1.0], [1.0])
+    >>> basis = BasisSet("STO-3G", [shell])
     >>> print(f"Number of atomic orbitals: {basis.get_num_atomic_orbitals()}")
 )");
 
@@ -387,7 +387,8 @@ Examples:
     >>> original = BasisSet("cc-pVDZ")
     >>> copy = BasisSet(original)
     >>> print(f"Copied basis set: {copy.get_name()}")
-)");
+)",
+                nb::arg("other"));
 
   // Basis type management
   basis_set.def("get_atomic_orbital_type", &BasisSet::get_atomic_orbital_type,
@@ -1370,7 +1371,6 @@ Name used for custom ECP basis sets.
 Type:
     str
 )");
-
   // Data type name class attribute
   basis_set.def_static("data_type_name", &BasisSet::data_type_name, R"(
 Return the wire-format identifier for basis sets.

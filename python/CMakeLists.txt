@@ -158,6 +158,7 @@ nanobind_add_module(_core
     src/nanobind/data/settings.cpp
     src/nanobind/data/structure.cpp
     src/nanobind/data/basis_set.cpp
+    src/nanobind/data/auxiliary_basis.cpp
     src/nanobind/data/configuration.cpp
     src/nanobind/data/configuration_set.cpp
     src/nanobind/data/ansatz.cpp

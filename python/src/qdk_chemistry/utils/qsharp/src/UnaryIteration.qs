@@ -212,26 +212,28 @@ namespace QDKChemistry.Utils.UnaryIteration {
     /// Returns the action selected by `UnaryIteration` for any fitted address state.
     ///
     /// Valid addresses map to themselves. When `numActions` is not a power of two,
-    /// the recursive iteration aliases each unused state onto a valid final subtree.
+    /// the iteration aliases each unused state onto a valid final subtree.
     /// Classical unlookup tables use this function to reproduce that routing exactly.
     internal function UnaryIterationActionIndex(numActions : Int, addressValue : Int) : Int {
         Fact(numActions > 0, "numActions must be positive");
         Fact(addressValue >= 0, "addressValue must be nonnegative");
+        mutable numActions = numActions;
+        mutable addressValue = addressValue;
+        mutable res = 0;
+        while numActions > 1 {
+            let n = AddressQubits(numActions);
+            let addressState = addressValue % (1 <<< n);
+            let lowerSubtreeSize = 1 <<< (n - 1);
+            if addressState < lowerSubtreeSize {
+                res += addressState;
+                break;
+            }
 
-        if numActions == 1 {
-            return 0;
+            res += lowerSubtreeSize;
+            numActions -= lowerSubtreeSize;
+            addressValue = addressState - lowerSubtreeSize;
         }
 
-        let n = AddressQubits(numActions);
-        let addressState = addressValue % (1 <<< n);
-        let lowerSubtreeSize = 1 <<< (n - 1);
-        if addressState < lowerSubtreeSize {
-            return addressState;
-        }
-
-        return lowerSubtreeSize + UnaryIterationActionIndex(
-            numActions - lowerSubtreeSize,
-            addressState - lowerSubtreeSize
-        );
+        return res;
     }
 }

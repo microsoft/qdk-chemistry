@@ -31,6 +31,7 @@ void bind_nuclear_hessian(nb::module_& m);
 void bind_settings(nb::module_& m);
 void bind_structure(nb::module_& m);
 void bind_basis_set(nb::module_& m);
+void bind_auxiliary_basis(nb::module_& m);
 void bind_serialization(nb::module_& m);
 void bind_mc(nb::module_& m);
 void bind_mcscf(nb::module_& m);
@@ -91,6 +92,7 @@ NB_MODULE(_core, m) {
   bind_structure(data);
   bind_settings(data);
   bind_basis_set(data);
+  bind_auxiliary_basis(data);
   bind_orbitals(data);
   bind_lattice_geometry(data);
   bind_lattice_graph(data);
