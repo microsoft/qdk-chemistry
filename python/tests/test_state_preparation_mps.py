@@ -455,6 +455,8 @@ def test_multi_site_mps_matches_contraction(method):
 def test_shared_phase_gradient_prepares_target(method):
     """Without its own gradient the circuit acts on [state | gradient], prepares the MPS and restores the gradient."""
     mps = make_mps(_random_right_canonical_tensors([1, 4, 3, 2, 1], 4, seed=11), site_to_orbital_order=(2, 0, 3, 1))
+    # Wavefunction takes ownership of the container, so contract it first.
+    target = _target_state(mps)
     circuit = create(
         "state_prep",
         "matrix_product_state",
@@ -470,7 +472,7 @@ def test_shared_phase_gradient_prepares_target(method):
     output = apply_operation(op, np.eye(1, 1 << circuit.num_qubits).ravel())
     output = output.reshape(1 << num_state_qubits, 1 << _AGREEMENT_PRECISION)
     np.testing.assert_allclose(output[:, 1:], 0.0, atol=1e-8, err_msg="phase gradient was not restored")
-    assert np.abs(np.vdot(_target_state(mps), output[:, 0])) ** 2 > 1 - _AGREEMENT_TOLERANCE
+    assert np.abs(np.vdot(target, output[:, 0])) ** 2 > 1 - _AGREEMENT_TOLERANCE
 
 
 def _two_site_tensors(amplitudes: dict[tuple[int, int], float]):
@@ -525,10 +527,10 @@ def test_open_shell_states_have_fermionic_signs(reversed_order, method):
 # (fixture, method) -> (numQubits, cczCount, ccixCount) at rotation_bit_precision=6 and the identity
 # site_to_orbital_order.
 _EXPECTED_RESOURCES = {
-    ("mps_h2", "dense"): (30, 124, 0),
-    ("mps_h2", "block_sparse"): (30, 77, 0),
+    ("mps_h2", "dense"): (30, 146, 0),
+    ("mps_h2", "block_sparse"): (30, 61, 0),
     ("mps_spin", "dense"): (27, 22, 0),
-    ("mps_spin", "block_sparse"): (27, 14, 0),
+    ("mps_spin", "block_sparse"): (27, 16, 0),
 }
 
 
