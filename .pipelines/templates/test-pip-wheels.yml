@@ -17,6 +17,9 @@ parameters:
 - name: runSlowTests
   type: boolean
   default: true
+- name: testWorkers
+  type: number
+  default: 1
 - name: exachemRequired
   type: boolean
   default: false
@@ -34,6 +37,7 @@ steps:
         -e SYSTEM_ACCESSTOKEN \
         -e QSHARP_PYTHON_TELEMETRY=false \
         -e QDK_CHEMISTRY_RUN_SLOW_TESTS \
+        -e PYTHON_TEST_WORKERS \
         -e EXACHEM_REQUIRED \
         -v "$QDK_AGENT_BUILD_DIRECTORY:/workspace" \
         -w /workspace/qdk-chemistry/python \
@@ -49,6 +53,7 @@ steps:
       QDK_PYTHON_VERSION: ${{ parameters.pythonVersion }}
       QDK_MAC_BUILD: ${{ parameters.macBuild }}
       QDK_CHEMISTRY_RUN_SLOW_TESTS: ${{ parameters.runSlowTests }}
+      PYTHON_TEST_WORKERS: ${{ parameters.testWorkers }}
       EXACHEM_REQUIRED: ${{ parameters.exachemRequired }}
       SYSTEM_ACCESSTOKEN: $(System.AccessToken)
 
@@ -61,6 +66,7 @@ steps:
         -e SYSTEM_ACCESSTOKEN \
         -e QSHARP_PYTHON_TELEMETRY=false \
         -e QDK_CHEMISTRY_RUN_SLOW_TESTS \
+        -e PYTHON_TEST_WORKERS \
         -v "$QDK_AGENT_BUILD_DIRECTORY:/workspace" \
         -w /workspace/qdk-chemistry/python \
         "$QDK_TEST_IMAGE" \
@@ -75,6 +81,7 @@ steps:
       QDK_PYTHON_VERSION: ${{ parameters.pythonVersion }}
       QDK_MAC_BUILD: ${{ parameters.macBuild }}
       QDK_CHEMISTRY_RUN_SLOW_TESTS: ${{ parameters.runSlowTests }}
+      PYTHON_TEST_WORKERS: ${{ parameters.testWorkers }}
       SYSTEM_ACCESSTOKEN: $(System.AccessToken)
 
 - ${{ if eq(parameters.macBuild, 'ON') }}:
@@ -90,4 +97,5 @@ steps:
       QDK_PYTHON_VERSION: ${{ parameters.pythonVersion }}
       QDK_MAC_BUILD: ${{ parameters.macBuild }}
       QDK_CHEMISTRY_RUN_SLOW_TESTS: ${{ parameters.runSlowTests }}
+      PYTHON_TEST_WORKERS: ${{ parameters.testWorkers }}
       SYSTEM_ACCESSTOKEN: $(System.AccessToken)
