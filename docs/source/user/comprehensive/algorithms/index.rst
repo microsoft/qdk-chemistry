@@ -22,6 +22,7 @@ All algorithms follow a :doc:`factory pattern <factory_pattern>` design, allowin
    qubit_mapper
    scf_solver
    stability_checker
+   stabilizer_renyi_entropy
    state_preparation
    hadamard_test
    phase_estimation
@@ -89,6 +90,9 @@ The following table summarizes the available algorithm classes in QDK/Chemistry 
    * - :doc:`StabilityChecker <stability_checker>`
      - :term:`SCF` stability analysis
      - Orbitals → Stability
+   * - :doc:`StabilizerRenyiEntropy <stabilizer_renyi_entropy>`
+     - Second-order stabilizer Renyi entropy (magic) of real wavefunctions
+     - Wavefunction → StabilizerRenyiEntropyResult
    * - :doc:`PhaseEstimation <phase_estimation>`
      - Quantum phase estimation
      - Circuit + HamiltonianDescription → QpeResult

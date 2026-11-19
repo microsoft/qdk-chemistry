@@ -824,6 +824,9 @@ def _register_python_factories():
     from qdk_chemistry.algorithms.propagator import PropagatorFactory  # noqa: PLC0415
     from qdk_chemistry.algorithms.qubit_hamiltonian_solver import QubitHamiltonianSolverFactory  # noqa: PLC0415
     from qdk_chemistry.algorithms.qubit_mapper import QubitMapperFactory  # noqa: PLC0415
+    from qdk_chemistry.algorithms.stabilizer_renyi_entropy import (  # noqa: PLC0415
+        StabilizerRenyiEntropyFactory,
+    )
     from qdk_chemistry.algorithms.state_preparation import StatePreparationFactory  # noqa: PLC0415
     from qdk_chemistry.algorithms.term_grouper import TermGrouperFactory  # noqa: PLC0415
     from qdk_chemistry.algorithms.time_evolution.evolution_circuit_builder import (  # noqa: PLC0415
@@ -834,6 +837,7 @@ def _register_python_factories():
     )
 
     register_factory(ExpectationEstimatorFactory())
+    register_factory(StabilizerRenyiEntropyFactory())
     register_factory(CircuitMapperFactory())
     register_factory(HamiltonianSimulationFactory())
     register_factory(EvolutionCircuitBuilderFactory())
@@ -968,6 +972,9 @@ def _register_python_algorithms():
     from qdk_chemistry.algorithms.qubit_hamiltonian_solver import DenseMatrixSolver, SparseMatrixSolver  # noqa: PLC0415
     from qdk_chemistry.algorithms.qubit_mapper import QdkQubitMapper  # noqa: PLC0415
     from qdk_chemistry.algorithms.qubit_mapper.sum_of_squares import SumOfSquaresQubitMapper  # noqa: PLC0415
+    from qdk_chemistry.algorithms.stabilizer_renyi_entropy import (  # noqa: PLC0415
+        ReplicaStabilizerRenyiEntropy,
+    )
     from qdk_chemistry.algorithms.state_preparation import SparseIsometryStatePreparation  # noqa: PLC0415
     from qdk_chemistry.algorithms.state_preparation.alias_sampling import AliasSamplingStatePreparation  # noqa: PLC0415
     from qdk_chemistry.algorithms.state_preparation.dense_pure_state import DensePureStatePreparation  # noqa: PLC0415
@@ -984,6 +991,7 @@ def _register_python_algorithms():
     from qdk_chemistry.algorithms.time_evolution.hamiltonian_simulation import EulerIntegrator  # noqa: PLC0415
 
     register(lambda: QdkExpectationEstimator())
+    register(ReplicaStabilizerRenyiEntropy)
     # Must precede SparseIsometryStatePreparation, whose settings resolve it by name at construction.
     register(lambda: DensePureStatePreparation())
     register(lambda: SparseIsometryStatePreparation())
