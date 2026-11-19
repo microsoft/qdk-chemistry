@@ -57,9 +57,7 @@ binary_encoded_prep.settings().set(
 mps_prep = create(
     "state_prep",
     "matrix_product_state",
-    unitary_synthesis=AlgorithmRef(
-        "circuit_mapper", "unitary_synthesis", method="block_sparse"
-    ),
+    unitary_synthesis=AlgorithmRef("circuit_mapper", "unitary_synthesis_block_sparse"),
 )
 # end-cell-configure-matrix-product-state
 ################################################################################

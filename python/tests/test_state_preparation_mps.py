@@ -5,7 +5,8 @@ multi-site preparation with unequal bonds against an independent contraction, th
 matrix built from symmetry blocks, fermionic order signs on open-shell states, composition with
 Trotterized quantum phase estimation to recover classical eigenvalues, and resource-estimate
 regressions. The site isometries are
-synthesized by the ``unitary_synthesis`` circuit mapper, which has its own tests. Fixture data
+synthesized by the ``unitary_synthesis_dense`` and ``unitary_synthesis_block_sparse`` circuit mappers, which have
+their own tests. Fixture data
 (``mps_h2``, ``mps_spin``) lives in ``test_data/mps_h2.mps.json``/``mps_spin.mps.json``, generated
 by ``test_data/make_mps_fixtures.py``.
 """
@@ -86,7 +87,7 @@ def make_mps(
 
 def synthesis_ref(method: str) -> AlgorithmRef:
     """Return the ``unitary_synthesis`` setting that selects the given site synthesis method."""
-    return AlgorithmRef("circuit_mapper", "unitary_synthesis", method=method)
+    return AlgorithmRef("circuit_mapper", f"unitary_synthesis_{method}")
 
 
 def preparation_data(mps: MPSContainer, method: str = "dense"):
@@ -217,8 +218,8 @@ def _malformed_givens_params(field: str):
     [
         pytest.param(
             lambda: create("state_prep", "matrix_product_state").settings().get("unitary_synthesis"),
-            lambda ref: (ref.algorithm_type, ref.algorithm_name) == ("circuit_mapper", "unitary_synthesis"),
-            id="settings-default-is-unitary-synthesis-mapper",
+            lambda ref: (ref.algorithm_type, ref.algorithm_name) == ("circuit_mapper", "unitary_synthesis_dense"),
+            id="settings-default-is-dense-unitary-synthesis-mapper",
         ),
         pytest.param(
             lambda: create(
@@ -226,7 +227,7 @@ def _malformed_givens_params(field: str):
                 "matrix_product_state",
                 unitary_synthesis=AlgorithmRef("circuit_mapper", "pauli_sequence"),
             ).run(Wavefunction(_fixture_mps("mps_h2", _identity_order("mps_h2")))),
-            (TypeError, "requires the unitary_synthesis circuit mapper"),
+            (TypeError, "requires the unitary_synthesis_dense or unitary_synthesis_block_sparse circuit mapper"),
             id="run-rejects-other-circuit-mapper",
         ),
         pytest.param(
@@ -507,7 +508,7 @@ def test_multi_site_mps_matches_contraction(method):
     mps = make_mps(_random_right_canonical_tensors([1, 4, 3, 2, 1], 4, seed=11), site_to_orbital_order=(2, 0, 3, 1))
     if method == "dense":
         last = MatrixProductStatePreparation._site_isometry(mps.sites()[-1], ancilla_dim=4)
-        mapper = create("circuit_mapper", "unitary_synthesis", num_input_qubits=2)
+        mapper = create("circuit_mapper", "unitary_synthesis_dense", num_input_qubits=2)
         right_factor = mapper.right_factor(UnitaryRepresentation(UnitaryMatrixContainer(last.reshape(-1, 2))))
         assert not np.allclose(np.abs(right_factor), np.eye(2), atol=1e-3)
     operation, site_struct = _QSHARP_OPERATIONS[method]

@@ -13,7 +13,11 @@ from typing import TYPE_CHECKING, Any
 import numpy as np
 from scipy import sparse
 
-from qdk_chemistry.algorithms.circuit_mapper.unitary_synthesis_mapper import UnitarySynthesisMapper
+from qdk_chemistry.algorithms.circuit_mapper.unitary_synthesis_mapper import (
+    BlockSparseUnitarySynthesisMapper,
+    DenseUnitarySynthesisMapper,
+    UnitarySynthesisMapper,
+)
 from qdk_chemistry.data import (
     AlgorithmRef,
     Configuration,
@@ -68,11 +72,11 @@ class MatrixProductStatePreparationSettings(Settings):
         self._set_default(
             "unitary_synthesis",
             "algorithm_ref",
-            AlgorithmRef("circuit_mapper", "unitary_synthesis"),
-            "unitary_synthesis circuit mapper that synthesizes every site isometry; its method is "
-            "'dense' or 'block_sparse'. Its num_input_qubits is set to the bond register width and "
-            "its omit_right_factor to whether the method is 'dense'. Its rotation_bit_precision and "
-            "allocate_phase_gradient are unused, as all sites share this algorithm's phase gradient.",
+            AlgorithmRef("circuit_mapper", "unitary_synthesis_dense"),
+            "unitary_synthesis_dense or unitary_synthesis_block_sparse circuit mapper that synthesizes "
+            "every site isometry. Its num_input_qubits is set to the bond register width, and the dense "
+            "mapper's omit_right_factor to True. Its rotation_bit_precision and allocate_phase_gradient "
+            "are unused, as all sites share this algorithm's phase gradient.",
         )
         self._set_default(
             "allocate_phase_gradient",
@@ -89,17 +93,16 @@ class MatrixProductStatePreparation(StatePreparation):
     which prepares the state one site at a time using an ancilla register that stores the virtual bond.
     Site zero is loaded as an initial state, and every later site is applied as an isometry from its
     left bond, held in the bond register, to its physical state and right bond. The nested
-    ``unitary_synthesis`` circuit mapper synthesizes each isometry, and its ``method`` setting
-    selects how:
+    ``unitary_synthesis`` circuit mapper synthesizes each isometry, and its choice selects how:
 
-    ``"dense"``
+    ``"unitary_synthesis_dense"``
         Each site isometry is decomposed based on Appendix B in :cite:`Rupprecht2026`, with orthogonal
         factors synthesized as parallel Givens rotation layers using the elimination schedule of
         :cite:`Clements2016`. The right factor of each decomposition, an orthogonal matrix on the left
         bond, is absorbed classically into the preceding site or the initial state. The cost depends
         only on the bond dimensions.
 
-    ``"block_sparse"``
+    ``"unitary_synthesis_block_sparse"``
         Each site isometry is decomposed as ``U = P_row · V_blockdiag · P_col`` following
         :cite:`Rupprecht2026`, where ``P_row`` and ``P_col`` are permutations (a table lookup of the
         permuted index, a SWAP, and erasure of the old index by X-basis measurement with a phase
@@ -107,11 +110,10 @@ class MatrixProductStatePreparation(StatePreparation):
         layers. This exploits U(1) symmetries (particle number, spin) that make MPS tensors block
         sparse. :cite:`Rupprecht2026` reports 10-30x Toffoli savings over the dense state of the art
         for large molecular MPS; the savings shrink with the bond dimension and the block sparsity,
-        and small bonds can cost more than ``"dense"``.
+        and small bonds can cost more than the dense synthesis.
 
     For example, ``create("state_prep", "matrix_product_state", unitary_synthesis=AlgorithmRef(
-    "circuit_mapper", "unitary_synthesis", method="block_sparse"))`` selects the block-sparse
-    synthesis.
+    "circuit_mapper", "unitary_synthesis_block_sparse"))`` selects the block-sparse synthesis.
 
     Sites with the ``('0', 'u', 'd', '2')`` physical basis are spatial
     orbitals in the blocked Jordan-Wigner layout. Sites
@@ -146,7 +148,7 @@ class MatrixProductStatePreparation(StatePreparation):
 
         Raises:
             TypeError: If the input is not an MPSContainer, or the ``unitary_synthesis`` setting does not
-                refer to a :class:`~qdk_chemistry.algorithms.circuit_mapper.UnitarySynthesisMapper`.
+                refer to a dense or block-sparse unitary synthesis mapper.
             ValueError: If the physical basis is unsupported, the MPS is complex,
                 the initial state has zero norm, or a synthesized site is not isometric.
 
@@ -180,7 +182,7 @@ class MatrixProductStatePreparation(StatePreparation):
                 raise ValueError(f"{_DESCRIPTION} requires isometric sites; site {index} is not: {error}") from error
             unitary = UnitaryRepresentation(container)
             syntheses.append(mapper.run(unitary)._qsharp_factory.parameter["synthesis"])  # noqa: SLF001
-            right_factor = mapper.right_factor(unitary) if method == "dense" else None
+            right_factor = mapper.right_factor(unitary) if isinstance(mapper, DenseUnitarySynthesisMapper) else None
         syntheses.reverse()
 
         # With a left bond of dimension one the packed matrix is (physical, right).
@@ -216,8 +218,7 @@ class MatrixProductStatePreparation(StatePreparation):
 
         Raises:
             TypeError: If wavefunction is not an MPSContainer instance, or the ``unitary_synthesis``
-                setting does not refer to a
-                :class:`~qdk_chemistry.algorithms.circuit_mapper.UnitarySynthesisMapper`.
+                setting does not refer to a dense or block-sparse unitary synthesis mapper.
             ValueError: If the MPS is complex, not right-canonical with orthogonality
                 center zero, or does not use one of the ``('0', '1')`` and ``('0', 'u', 'd', '2')``
                 physical bases on every site.
@@ -267,21 +268,23 @@ class MatrixProductStatePreparation(StatePreparation):
         """Return the nested site mapper, configured for the bond register, and its method.
 
         Raises:
-            TypeError: If the ``unitary_synthesis`` setting does not refer to a
-                :class:`~qdk_chemistry.algorithms.circuit_mapper.UnitarySynthesisMapper`.
+            TypeError: If the ``unitary_synthesis`` setting does not refer to a dense or block-sparse
+                unitary synthesis mapper.
 
         """
         mapper = self._create_nested("unitary_synthesis")
-        if not isinstance(mapper, UnitarySynthesisMapper):
+        if isinstance(mapper, DenseUnitarySynthesisMapper):
+            method = "dense"
+            mapper.settings().update("omit_right_factor", True)
+        elif isinstance(mapper, BlockSparseUnitarySynthesisMapper):
+            method = "block_sparse"
+        else:
             raise TypeError(
-                f"{_DESCRIPTION} requires the unitary_synthesis circuit mapper, got "
-                f"{mapper.type_name()} '{mapper.name()}'."
+                f"{_DESCRIPTION} requires the unitary_synthesis_dense or unitary_synthesis_block_sparse "
+                f"circuit mapper, got {mapper.type_name()} '{mapper.name()}'."
             )
-        settings = mapper.settings()
-        method = settings.get("method")
         # The bond register is the input register; the site qubits are the added qubits.
-        settings.update("num_input_qubits", ancilla_bits)
-        settings.update("omit_right_factor", method == "dense")
+        mapper.settings().update("num_input_qubits", ancilla_bits)
         return mapper, method
 
     @staticmethod
@@ -370,7 +373,7 @@ class MatrixProductStatePreparationData:
     :meth:`~qdk_chemistry.algorithms.StatePreparation.run`. The sites are the fields of the Q#
     ``DenseIsometrySynthesis`` structs for the ``MPSSequential`` Q# operations or of the Q#
     ``SparseIsometrySynthesis`` structs for the ``MPSSparse`` Q# operations, as produced by the
-    ``unitary_synthesis`` circuit mapper. Dense sites carry no right factor, which is absorbed into
+    nested ``unitary_synthesis`` circuit mapper. Dense sites carry no right factor, which is absorbed into
     the preceding site.
     """
 
