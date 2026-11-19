@@ -137,9 +137,9 @@ def test_omit_right_factor(matrix):
     right_factor = create("circuit_mapper", _DENSE).right_factor(representation)
     np.testing.assert_allclose(right_factor.T @ right_factor, np.eye(matrix.shape[1]), atol=1e-12)
     _assert_realizes(create("circuit_mapper", _DENSE).run(representation), matrix, seed=0)
-    circuit = create("circuit_mapper", _DENSE, omit_right_factor=True).run(representation)
-    assert circuit._qsharp_factory.parameter["synthesis"]["rightFactorGivens"] == []
-    _assert_realizes(circuit, matrix, seed=1, preimage=right_factor)
+    mapper = create("circuit_mapper", _DENSE, omit_right_factor=True)
+    assert mapper.synthesize(representation)["rightFactorGivens"] == []
+    _assert_realizes(mapper.run(representation), matrix, seed=1, preimage=right_factor)
 
 
 def test_right_factor_reuses_last_run(monkeypatch):
