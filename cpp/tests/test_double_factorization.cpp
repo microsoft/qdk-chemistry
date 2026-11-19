@@ -185,28 +185,19 @@ TEST(DoubleFactorizationTest, RejectsIncompatibleThreeCenterLayout) {
       original->get_container<CholeskyHamiltonianContainer>();
   const auto& three_center = container.three_center();
 
-  // Rank-3 tensors validate total size, not the producer's row/column split.
+  // Rank-3 tensors accept the same total size, but Cholesky storage has a
+  // fixed row/column split that must be validated before factorization.
   SymmetryBlockedTensor<3>::BlockMap blocks;
   blocks[{axes::alpha(), axes::alpha(), SymmetryLabel{}}] =
       std::make_shared<const Eigen::MatrixXd>(
           container.get_three_center_integrals().first.transpose());
   SymmetryBlockedTensor<3> incompatible(
       three_center.symmetries(), three_center.extents(), std::move(blocks));
-  auto hamiltonian = std::make_shared<Hamiltonian>(
-      std::make_unique<CholeskyHamiltonianContainer>(
+  EXPECT_THROW(
+      CholeskyHamiltonianContainer(
           container.one_body_integrals(), std::move(incompatible),
-          original->get_orbitals(), original->get_core_energy(), nullptr));
-  ASSERT_TRUE(hamiltonian->is_restricted());
-
-  auto factorizer =
-      HamiltonianFactorizationFactory::create("double_factorization");
-  try {
-    factorizer->run(hamiltonian);
-    FAIL() << "incompatible three-center layout was accepted";
-  } catch (const std::invalid_argument& error) {
-    EXPECT_NE(std::string(error.what()).find("expected norb^2 = 4 rows"),
-              std::string::npos);
-  }
+          original->get_orbitals(), original->get_core_energy(), nullptr),
+      std::invalid_argument);
 }
 
 TEST(DoubleFactorizationTest, PreservesOneBodyTermAndCoreEnergy) {

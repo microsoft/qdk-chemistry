@@ -10,9 +10,11 @@
 #include <algorithm>
 #include <cmath>
 #include <limits>
+#include <numeric>
 #include <optional>
 #include <qdk/chemistry/data/hamiltonian_containers/cholesky.hpp>
 #include <qdk/chemistry/data/symmetry/spin_channel_indices.hpp>
+#include <qdk/chemistry/data/two_body_symmetry.hpp>
 #include <qdk/chemistry/utils/logger.hpp>
 #include <sstream>
 #include <stdexcept>
@@ -464,6 +466,15 @@ std::shared_ptr<data::Hamiltonian> QdkHamiltonianBasisTransformer::_run_impl(
                                        nactive, nactive);
     scratch.noalias() = input * rotation;
     output.noalias() = rotation.transpose() * scratch;
+    // Keep the exact pair symmetry used by downstream ERI consumers.
+    if (data::detail::factors_are_pair_symmetric(input.data(), nactive, 1)) {
+      for (Eigen::Index col = 0; col < nactive; ++col) {
+        for (Eigen::Index row = col + 1; row < nactive; ++row) {
+          output(row, col) = output(col, row) =
+              std::midpoint(output(row, col), output(col, row));
+        }
+      }
+    }
   };
 #ifdef _OPENMP
 #pragma omp parallel

@@ -309,6 +309,8 @@ Abstract algorithm for expressing a Hamiltonian in a target orbital basis.
           },
           py::return_value_policy::reference_internal)
       .def("name", &HamiltonianBasisTransformer::name)
+      .def("aliases", &HamiltonianBasisTransformer::aliases,
+           "Return the algorithm's registered aliases.")
       .def("type_name", &HamiltonianBasisTransformer::type_name)
       .def("hash", &HamiltonianBasisTransformer::hash, py::arg("hamiltonian"),
            py::arg("target_orbitals"))

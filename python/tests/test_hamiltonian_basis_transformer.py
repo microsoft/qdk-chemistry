@@ -16,7 +16,7 @@ from qdk_chemistry.data import CholeskyHamiltonianContainer, Hamiltonian, Orbita
 from qdk_chemistry.data._spin_channels import spin_channel_matrix
 from qdk_chemistry.data.symmetry import axes, spin_index_set
 
-from .test_helpers import create_test_basis_set, create_test_hamiltonian
+from .helpers import create_test_basis_set, create_test_hamiltonian
 
 
 def test_qdk_transformer_registry():
@@ -186,12 +186,12 @@ def test_qdk_transformer_matches_molecular_rebuild_with_frozen_core():
     rebuilt = constructor.run(target_orbitals)
 
     assert transformed.has_inactive_fock_matrix()
+    transformed_factors = transformed.get_container().get_three_center_integrals()[0]
+    factor_matrices = transformed_factors.reshape(len(active_indices), len(active_indices), -1)
+    np.testing.assert_array_equal(factor_matrices, factor_matrices.swapaxes(0, 1))
     for actual, expected in (
         (transformed.get_one_body_integrals()[0], rebuilt.get_one_body_integrals()[0]),
-        (
-            transformed.get_container().get_three_center_integrals()[0],
-            rebuilt.get_container().get_three_center_integrals()[0],
-        ),
+        (transformed_factors, rebuilt.get_container().get_three_center_integrals()[0]),
         (transformed.get_two_body_integrals()[0], rebuilt.get_two_body_integrals()[0]),
         (transformed.get_inactive_fock_matrix()[0], rebuilt.get_inactive_fock_matrix()[0]),
     ):
