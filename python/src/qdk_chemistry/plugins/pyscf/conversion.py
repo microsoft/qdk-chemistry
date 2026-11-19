@@ -37,12 +37,12 @@ from typing import TypeVar
 
 import numpy as np
 import pyscf
-from pyscf import lib
+from pyscf import ao2mo, lib
 
+from qdk_chemistry._core.data import _is_approx, _required_eightfold_symmetrized, _required_pair_symmetrized
 from qdk_chemistry.constants import FINE_STRUCTURE_CONSTANT
 from qdk_chemistry.data import AOType, BasisSet, Hamiltonian, Orbitals, Shell, Structure
 from qdk_chemistry.data._spin_channels import spin_channel_indices, spin_channel_matrix, spin_channel_vector
-from qdk_chemistry.data._two_body_symmetry import eightfold_average
 from qdk_chemistry.data.symmetry import axes
 from qdk_chemistry.utils import Logger
 from qdk_chemistry.utils.enum import CaseInsensitiveStrEnum
@@ -627,9 +627,10 @@ def orbitals_to_scf_from_n_electrons_and_multiplicity(
 def hamiltonian_to_scf(hamiltonian: Hamiltonian, alpha_occ: np.ndarray, beta_occ: np.ndarray) -> pyscf.scf.hf.SCF:
     """Convert a QDK/Chemistry Hamiltonian object to a PySCF mean-field reference.
 
-    The conversion respects the :class:`~qdk_chemistry.data.Hamiltonian` object's stored one-electron integrals
-    and scalar core energy, rather than using only its orbitals. This applies equally to
-    nonrelativistic and relativistically corrected Hamiltonians. No SCF optimization is performed.
+    The reference holds the :class:`~qdk_chemistry.data.Hamiltonian` object's stored one- and two-electron integrals
+    and scalar core energy in its molecular-orbital basis, with identity orbital coefficients and overlap. The
+    :class:`~qdk_chemistry.data.Orbitals` only label that basis, so molecular and model orbitals with equal integrals
+    give equal references. No SCF optimization is performed.
 
     Args:
         hamiltonian: QDK/Chemistry Hamiltonian containing integrals, core energy, and orbital data.
@@ -637,22 +638,27 @@ def hamiltonian_to_scf(hamiltonian: Hamiltonian, alpha_occ: np.ndarray, beta_occ
         beta_occ: Per-orbital occupations (0 or 1) for beta (spin-down) electrons.
 
     Returns:
-        A PySCF mean-field reference initialized for post-HF calculations.
+        A PySCF RHF, ROHF, or UHF reference initialized for post-HF calculations.
 
     Raises:
-        ValueError: If occupations, orbital metrics, or Hamiltonian features violate the restrictions below.
+        ValueError: If occupations or the Hamiltonian violate the restrictions below.
 
     Note:
-        Molecular references retain their AO basis and orbital coefficients. Their spin-free AO core operator
-        reproduces the stored one-body matrices in both MO spin spaces. Two-electron integrals are evaluated
-        from the molecular basis, requiring ordinary Coulomb interactions and supporting AO-direct CCSD.
+        Restricted Hamiltonians give an RHF reference for closed-shell occupations and an ROHF reference otherwise.
+        Unrestricted Hamiltonians give a UHF reference in a spin-blocked basis of twice the size, whose alpha and beta
+        orbitals span separate halves, so that each spin block keeps its own integrals. As those orbitals do not
+        overlap, overlap-based quantities such as ``spin_square()`` are not meaningful for it.
 
-        Restricted closed-shell model references use stored one- and two-body integrals with identity
-        coefficients and overlap; their two-body integrals must be 8-fold symmetric, as PySCF stores one
-        value per 8-fold class. Unrestricted and open-shell model references are not supported.
+        The reference has no AO basis, so PySCF methods that recompute integrals from one, such as AO-direct or
+        out-of-core CCSD and density fitting, are unavailable.
 
-        All represented MOs must be active, with no inactive orbitals. Overlap-rank reduction is allowed;
-        active-space effective Hamiltonians with folded core contributions are not supported.
+        PySCF stores one value per 8-fold permutation class of the integrals, and per pair class
+        (pq|rs) = (qp|rs) = (pq|sr) of the alpha-beta block. The integrals must have that symmetry to ``isApprox``
+        precision and are passed as class averages; others, such as downfolded integrals, are rejected. The one-body
+        integrals must be finite and symmetric to the same precision.
+
+        All represented MOs must be active, with no inactive orbitals, and the occupied orbitals of each spin must
+        precede its virtual orbitals, as PySCF's post-HF methods assume.
 
         For an interface using electron count and multiplicity, see
         :func:`hamiltonian_to_scf_from_n_electrons_and_multiplicity`.
@@ -684,6 +690,9 @@ def hamiltonian_to_scf(hamiltonian: Hamiltonian, alpha_occ: np.ndarray, beta_occ
         for occ in (alpha_occ, beta_occ)
     ):
         raise ValueError("Occupations must contain one value of 0 or 1 per molecular orbital and spin.")
+    # PySCF's CC and MP2 take the first nelec_alpha (nelec_beta) orbitals of each spin as occupied.
+    if any(np.any(occ[: int(np.sum(occ))] != 1) for occ in (alpha_occ, beta_occ)):
+        raise ValueError("Occupied orbitals must precede the virtual orbitals of each spin.")
 
     active = [spin_channel_indices(orbitals.active_indices(), spin) for spin in (axes.alpha(), axes.beta())]
     if any(indices != list(range(norb)) for indices in active) or any(
@@ -691,72 +700,56 @@ def hamiltonian_to_scf(hamiltonian: Hamiltonian, alpha_occ: np.ndarray, beta_occ
     ):
         raise ValueError("Active space is not supported.")
 
-    try:
-        coefficients = orbitals.coefficients()
-    except RuntimeError:
-        if hamiltonian.is_unrestricted():
-            raise ValueError("You cannot pass an unrestricted model Hamiltonian here.") from None
-    else:
-        mf = orbitals_to_scf(orbitals, occ_alpha=alpha_occ, occ_beta=beta_occ)
-        overlap = mf.get_ovlp()
-        core = mf.get_hcore()
-        one_body = hamiltonian.get_one_body_integrals()
-        mo_coefficients = [spin_channel_matrix(coefficients, spin) for spin in (axes.alpha(), axes.beta())]
-        for coeff, h1 in zip(mo_coefficients, one_body, strict=True):
-            if h1.shape != (norb, norb) or not np.all(np.isfinite(h1)):
-                raise ValueError("One-body integrals must be finite square matrices in the full MO space.")
-            if not np.allclose(coeff.T @ overlap @ coeff, np.eye(norb), rtol=0.0, atol=1e-7):
-                raise ValueError("Molecular orbital coefficients must be orthonormal in the AO overlap metric.")
-
-        # get_hcore is an AO operator. The overlap-metric dual also supports rectangular C after rank reduction.
-        coeff = mo_coefficients[0]
-        dual = np.linalg.solve(coeff.T @ overlap @ coeff, coeff.T @ overlap).T
-        core = core + dual @ (one_body[0] - coeff.T @ core @ coeff) @ dual.T
-        core = (core + core.T) * 0.5
-        # A spin-free AO operator must reproduce both channels, including independently rotated UHF orbitals.
-        for coeff, h1 in zip(mo_coefficients, one_body, strict=True):
-            if not np.allclose(coeff.T @ core @ coeff, h1, rtol=1e-9, atol=1e-8):
-                raise ValueError("Molecular one-body spin blocks must represent a common spin-free AO operator.")
-        mf.get_hcore = lambda *_: core
-        mf.energy_nuc = lambda *_: hamiltonian.get_core_energy()
-        return mf
-
-    # Consistency checks
-    if np.any(alpha_occ != beta_occ):
-        raise ValueError("Open-shell is not supported.")
-
-    # Dummy molecule
+    one_body = hamiltonian.get_one_body_integrals()
+    if not all(np.all(np.isfinite(h1)) and _is_approx(h1.ravel(), h1.T.ravel()) for h1 in one_body):
+        raise ValueError("One-body integrals must be finite and symmetric.")
+    two_body = [np.reshape(eri, (norb,) * 4) for eri in hamiltonian.get_two_body_integrals()]
     mol = pyscf.gto.M()
+    mol.nelectron = int(np.sum(alpha_occ) + np.sum(beta_occ))
+    mol.spin = int(np.sum(alpha_occ) - np.sum(beta_occ))
+    # The molecule has no basis, so PySCF must never fall back to computing integrals from it.
+    mol.incore_anyway = True
 
-    # Calculate electron numbers from occupation arrays
-    num_alpha = int(np.sum(alpha_occ))
-    num_beta = int(np.sum(beta_occ))
+    # PySCF keeps one member of each permutation class, so pass the class averages.
+    if hamiltonian.is_unrestricted():
+        aaaa = _required_eightfold_symmetrized(two_body[0], "PySCF (alpha-alpha block)")
+        aabb = _required_pair_symmetrized(two_body[1], "PySCF (alpha-beta block)")
+        bbbb = _required_eightfold_symmetrized(two_body[2], "PySCF (beta-beta block)")
+        # Alpha orbitals span the first half of the basis and beta orbitals the second; mixed pairs vanish.
+        # Alpha pairs lead the 8-fold packing; each beta pair's row holds its alpha-beta and beta-beta entries.
+        npair = norb * (norb + 1) // 2
+        rows, cols = np.tril_indices(norb)
+        beta_pairs = (rows + norb) * (rows + norb + 1) // 2 + cols + norb
+        starts = beta_pairs * (beta_pairs + 1) // 2
+        total_pairs = norb * (2 * norb + 1)
+        eri = np.zeros(total_pairs * (total_pairs + 1) // 2)
+        eri[: npair * (npair + 1) // 2] = ao2mo.restore(8, aaaa, norb)
+        eri[starts[:, None] + np.arange(npair)] = ao2mo.restore(4, aabb, norb).T
+        lower = np.tril_indices(npair)
+        eri[starts[lower[0]] + beta_pairs[lower[1]]] = ao2mo.restore(4, bbbb, norb)[lower]
+        mf = pyscf.scf.UHF(mol)
+        mf._eri = eri  # noqa: SLF001
+        zero = np.zeros((norb, norb))
+        core = np.block([[one_body[0], zero], [zero, one_body[1]]])
+        mf.mo_coeff = (np.vstack((np.eye(norb), zero)), np.vstack((zero, np.eye(norb))))
+        mf.mo_occ = (alpha_occ, beta_occ)
+    else:
+        mf = pyscf.scf.RHF(mol) if np.array_equal(alpha_occ, beta_occ) else pyscf.scf.ROHF(mol)
+        mf._eri = ao2mo.restore(8, _required_eightfold_symmetrized(two_body[0], "PySCF"), norb)  # noqa: SLF001
+        core = one_body[0]
+        mf.mo_coeff = np.eye(norb)
+        mf.mo_occ = alpha_occ + beta_occ
+    mf.get_hcore = lambda *_: core
+    mf.get_ovlp = lambda *_: np.eye(core.shape[0])
+    mf.energy_nuc = lambda *_: hamiltonian.get_core_energy()
 
-    # Create a fake SCF object
-    fake_scf = pyscf.scf.RHF(mol)
-    fake_scf.mol.nelectron = num_alpha + num_beta
-
-    # Store integrals in the SCF object
-    (eri, _, _) = hamiltonian.get_two_body_integrals()
-    # PySCF keeps one member of each 8-fold class, so pass the class averages.
-    eri = eightfold_average(np.reshape(eri, (norb, norb, norb, norb)), "PySCF")
-    (h1e, _) = hamiltonian.get_one_body_integrals()
-    # Use _eri directly as it's the established way to access this in PySCF
-    # even though it's technically a private member
-    fake_scf._eri = eri  # noqa: SLF001
-    fake_scf.get_hcore = lambda *_: h1e
-    fake_scf.get_ovlp = lambda *_: np.eye(norb)
-    fake_scf.energy_nuc = lambda *_: hamiltonian.get_core_energy()
-
-    # Setup dummy MOs
-    fake_scf.mo_coeff = np.eye(norb)
-    fake_scf.mo_energy = np.diag(h1e)
-
-    # Setup occupations from the provided arrays
-    # For restricted calculations, PySCF expects total occupation (alpha + beta)
-    fake_scf.mo_occ = alpha_occ + beta_occ
-
-    return fake_scf
+    # PySCF's ROHF-to-UHF conversion skips orbitals without energies.
+    fock = mf.get_fock(dm=mf.make_rdm1())
+    if hamiltonian.is_unrestricted():
+        mf.mo_energy = np.array([np.einsum("pi,pq,qi->i", c, f, c) for c, f in zip(mf.mo_coeff, fock, strict=True)])
+    else:
+        mf.mo_energy = np.diag(fock).copy()
+    return mf
 
 
 def hamiltonian_to_scf_from_n_electrons_and_multiplicity(

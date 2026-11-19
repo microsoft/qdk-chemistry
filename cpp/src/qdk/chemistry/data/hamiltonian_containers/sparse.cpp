@@ -611,7 +611,7 @@ void SparseHamiltonianContainer::to_fcidump_file(const std::string& filename,
     }
     if (const auto comparison = detail::sparse_eightfold_comparison(tensor);
         !comparison.approx()) {
-      throw detail::not_eightfold_error("FCIDUMP export", comparison);
+      throw detail::not_symmetric_error("FCIDUMP export", "8-fold", comparison);
     }
   }
 

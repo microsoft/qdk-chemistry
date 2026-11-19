@@ -229,15 +229,39 @@ inline TwoBodyComparison eightfold_comparison(const double* integrals,
   return comparison;
 }
 
-inline std::runtime_error not_eightfold_error(
-    const std::string& consumer, const TwoBodyComparison& comparison) {
+/// Compares a row-major alpha-beta (pq|rs) tensor with its averages over
+/// (pq|rs), (qp|rs), (pq|sr), (qp|sr).
+inline TwoBodyComparison pair_comparison(const double* integrals,
+                                         std::size_t n) {
+  const std::size_t n2 = n * n;
+  auto at = [integrals, n, n2](std::size_t p, std::size_t q, std::size_t r,
+                               std::size_t s) {
+    return integrals[(p * n + q) * n2 + r * n + s];
+  };
+  TwoBodyComparison comparison;
+  for (std::size_t p = 0; p < n; ++p)
+    for (std::size_t q = 0; q < n; ++q)
+      for (std::size_t r = 0; r < n; ++r)
+        for (std::size_t s = 0; s < n; ++s) {
+          const double value = at(p, q, r, s);
+          comparison.add(value, ((value + at(q, p, r, s)) +
+                                 (at(p, q, s, r) + at(q, p, s, r))) /
+                                    4.0);
+        }
+  return comparison;
+}
+
+/// Error for integrals that `consumer` takes only with `symmetry`, such as
+/// "8-fold" for @ref eightfold_comparison.
+inline std::runtime_error not_symmetric_error(
+    const std::string& consumer, const std::string& symmetry,
+    const TwoBodyComparison& comparison) {
   char relative[32];
   std::snprintf(relative, sizeof(relative), "%.1e", comparison.relative());
   return std::runtime_error(
-      consumer +
-      " requires 8-fold two-body permutation symmetry; the integrals differ "
-      "from their 8-fold average by " +
-      relative +
+      consumer + " requires " + symmetry +
+      " two-body permutation symmetry; the integrals differ from their " +
+      symmetry + " average by " + relative +
       " relative to their norm, so they cannot be represented losslessly. If "
       "this is round-off, as in Hamiltonians saved by earlier versions, "
       "rebuild the Hamiltonian.");

@@ -66,9 +66,9 @@ class PyscfCoupledClusterSettings(Settings):
         max_cycle (int): Max number of iterations. Default is 50.
         diis_space (int): DIIS space size. Default is 6.
         diis_start_cycle (int): The step to start DIIS. Default is 0.
-        direct (bool): AO-direct CCSD. Default is False.
+        direct (bool): AO-direct CCSD; must be False, as the integrals come from the Hamiltonian. Default is False.
         async_io (bool): Allow for asynchronous function execution. Default is True.
-        incore_complete (bool): Avoid all I/O. Default is True.
+        incore_complete (bool): Avoid all I/O; if False, the integrals must still fit in max_memory. Default is True.
         frozen (int or list): If integer is given, the inner-most orbitals are frozen from CC amplitudes.
             Given the orbital indices (0-based) in a list, both occupied and virtual orbitals can be frozen in the
             CC calculation.
@@ -140,11 +140,14 @@ class PyscfCoupledClusterCalculator(DynamicalCorrelationCalculator):
                   When compute_bra is False, only (total_energy, ket_wavefunction, None) is returned.
 
         Raises:
+            ValueError: If ``direct`` is True.
             RuntimeError: If the CCSD calculation does not converge.
             RuntimeError: If the lambda equation solver does not converge (when compute_bra=True).
 
         """
         Logger.trace_entering()
+        if self._settings.get("direct"):
+            raise ValueError("AO-direct CCSD needs an AO basis; the reference holds the Hamiltonian's integrals.")
         hamiltonian = ansatz.get_hamiltonian()
 
         alpha_occ, beta_occ = ansatz.get_wavefunction().get_total_orbital_occupations()

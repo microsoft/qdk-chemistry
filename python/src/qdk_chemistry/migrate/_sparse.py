@@ -15,13 +15,12 @@ from __future__ import annotations
 import h5py
 import numpy as np
 
+from qdk_chemistry._core.data import _is_approx
+
 from . import _io, _sbt
 
 CONTAINER_VERSION = "0.3.0"
 EIGHTFOLD_VERSIONS = ("0.1.0", "0.2.0")
-
-# Eigen's default isApprox precision, as in the library's symmetry checks.
-_PRECISION = 1e-12
 
 
 def step_key(version: str) -> str:
@@ -136,23 +135,22 @@ def _fill_eightfold_classes(entries) -> list:
         key = (int(p), int(q), int(r), int(s))
         classes.setdefault(min(_eightfold_orbit(*key)), {})[key] = float(value)
     filled: list[list] = []
-    difference = stored_norm = written_norm = 0.0
+    stored_values: list[float] = []
+    written_values: list[float] = []
     worst_change = 0.0
     conflict = ""
     for canonical, stored in sorted(classes.items()):
         # The canonical position is also the smallest, which earlier mappers preferred.
         first = min(stored)
         for key, value in stored.items():
+            stored_values.append(value)
+            written_values.append(stored[first])
             change = abs(value - stored[first])
-            difference += change**2
-            stored_norm += value**2
-            written_norm += stored[first] ** 2
-            if change > worst_change:
+            if np.isnan(change) or change > worst_change:
                 worst_change = change
                 conflict = f"{first} and {key} of one 8-fold permutation class differ ({stored[first]} vs {value})"
         filled.extend([*member, stored[first]] for member in sorted(_eightfold_orbit(*canonical)))
-    # Eigen's isApprox: ||stored - written|| <= p min(||stored||, ||written||).
-    if difference > _PRECISION**2 * min(stored_norm, written_norm):
+    if not _is_approx(np.array(stored_values), np.array(written_values)):
         raise ValueError(
             f"Two-body entries {conflict}. Sparse containers before version {CONTAINER_VERSION} "
             "read every class as 8-fold symmetric, so the file cannot be migrated unambiguously."
