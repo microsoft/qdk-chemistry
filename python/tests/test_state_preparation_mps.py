@@ -550,10 +550,10 @@ def test_open_shell_states_have_fermionic_signs(reversed_order, method):
 # (fixture, method) -> (numQubits, cczCount, ccixCount) at rotation_bit_precision=6 and the identity
 # site_to_orbital_order.
 _EXPECTED_RESOURCES = {
-    ("mps_h2", "dense"): (30, 146, 0),
-    ("mps_h2", "block_sparse"): (30, 61, 0),
-    ("mps_spin", "dense"): (27, 22, 0),
-    ("mps_spin", "block_sparse"): (27, 16, 0),
+    ("mps_h2", "dense"): (24, 146, 0),
+    ("mps_h2", "block_sparse"): (24, 61, 0),
+    ("mps_spin", "dense"): (21, 22, 0),
+    ("mps_spin", "block_sparse"): (21, 16, 0),
 }
 
 
