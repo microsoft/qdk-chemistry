@@ -289,19 +289,15 @@ Matrix Product State
 
 This method prepares a matrix product state (MPS) stored in an :class:`~qdk_chemistry.data.MPSContainer` following :cite:`Berry2025` and :cite:`Rupprecht2026`.
 The MPS must be real and right-canonical with orthogonality center at site 0, with open boundaries, and either the physical basis ``('0', 'u', 'd', '2')`` on every site or the physical basis ``('0', '1')`` on every site.
-The physical basis is loaded in the blocked Jordan-Wigner layout.
-An ancilla register of :math:`\max(1, \lceil \log_2 \chi \rceil)` qubits carries the virtual bond of maximal dimension :math:`\chi`.
-Every site isometry, excluding site 0, which is prepared as the initial state, maps the left bond held in the ancilla register to the qubits of its site and its right bond.
+The physical basis is loaded in the blocked Jordan-Wigner layout, and sites with the ``('0', '1')`` basis are spinless fermionic modes.
+A bond register of :math:`\max(1, \lceil \log_2 \chi \rceil)` qubits carries the virtual bond of maximal dimension :math:`\chi`, and the circuit also uses a rotation-angle register and a phase gradient register of ``rotation_bit_precision`` qubits each.
+Site 0 is normalized and loaded on its physical qubits and the bond qubits its right bond needs.
+Every later site isometry maps the left bond held in the bond register to the qubits of its site and its right bond.
 The nested ``unitary_synthesis`` setting holds an :class:`~qdk_chemistry.data.AlgorithmRef` to the ``unitary_synthesis_dense`` (:class:`~qdk_chemistry.algorithms.circuit_mapper.DenseUnitarySynthesisMapper`) or ``unitary_synthesis_block_sparse`` (:class:`~qdk_chemistry.algorithms.circuit_mapper.BlockSparseUnitarySynthesisMapper`) circuit mapper, which selects the dense or block-sparse synthesis of every site isometry.
-The preparer sets the mapper's ``num_input_qubits`` to the ancilla register width.
-For the dense mapper it also sets ``omit_right_factor`` and absorbs the right factor of each site isometry into the preceding site, or into the initial state for site 1.
-Givens decomposition converts the orthogonal factors into adjacent rotations and sign corrections for the circuit.
+The preparer sets the mapper's ``num_input_qubits`` to the bond register width.
+For the dense mapper it also sets ``omit_right_factor`` and absorbs the right factor of each site isometry into the preceding site, or into site 0.
 The mapper's ``max_lookup_swap_bits`` setting caps the swap network of the rotation-angle lookups, trading Toffoli gates for scratch qubits; the default ``-1`` picks the Toffoli-optimal width.
-A final layer of CZ gates applies the fermionic signs of reordering these modes into qubit order.
-It relies on the container's validation of adjacent bond spaces.
-To obtain preparation data without building a circuit, call ``preparer.generate_matrix_product_state_preparation_data(mps_container)``.
-This instance method accepts only an ``MPSContainer`` and uses the preparer's ``unitary_synthesis`` setting.
-Its sites are the synthesis data of the mapper's circuits, which the Q# structs ``DenseIsometrySynthesis`` and ``SparseIsometrySynthesis`` in ``QDKChemistry.Utils.IsometrySynthesis`` hold.
+A final layer of CZ gates applies the fermionic sign of reordering the creation operators from chain order, α before β on each site, into qubit order.
 
 .. tab:: Python API
 

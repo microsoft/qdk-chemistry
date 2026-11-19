@@ -88,7 +88,7 @@ void bind_sbt_instance(py::module& m, const char* name) {
             return out;
           },
           "List of (labels, block) pairs for every stored block (including "
-          "aliases), in label order.")
+          "aliases), in unspecified order.")
       .def_static("data_type_name", &SBT::data_type_name, R"(
       Return the wire-format identifier for this tensor specialization.
 

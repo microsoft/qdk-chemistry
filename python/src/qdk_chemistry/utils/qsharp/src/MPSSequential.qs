@@ -6,8 +6,10 @@
 namespace QDKChemistry.Utils.MPSSequential {
 
     import Std.Arrays.MappedOverRange;
+    import Std.Arrays.Sorted;
     import Std.Arrays.Subarray;
     import Std.Diagnostics.Fact;
+    import Std.Math.BitSizeI;
     import QDKChemistry.Utils.IsometrySynthesis.ApplyDenseIsometry;
     import QDKChemistry.Utils.IsometrySynthesis.DenseIsometrySynthesis;
     import QDKChemistry.Utils.PhaseGradient.PreparePhaseGradientState;
@@ -19,12 +21,12 @@ namespace QDKChemistry.Utils.MPSSequential {
     /// A register of `numOrbitals` qubits holds one spinless mode per orbital (the ('0', '1')
     /// basis). A register of 2·numOrbitals qubits holds all α modes and then all β modes, so
     /// the result [α, β] is little-endian in the ('0', 'u', 'd', '2') physical index.
-    function MPSSiteQubitIndices(numQubits : Int, numOrbitals : Int, orbital : Int) : Int[] {
+    internal function MPSSiteQubitIndices(numQubits : Int, numOrbitals : Int, orbital : Int) : Int[] {
         MappedOverRange(channel -> channel * numOrbitals + orbital, 0..numQubits / numOrbitals - 1)
     }
 
     /// Returns the qubits of `orbital`; see `MPSSiteQubitIndices`.
-    function MPSSiteQubits(state : Qubit[], numOrbitals : Int, orbital : Int) : Qubit[] {
+    internal function MPSSiteQubits(state : Qubit[], numOrbitals : Int, orbital : Int) : Qubit[] {
         Subarray(MPSSiteQubitIndices(Length(state), numOrbitals, orbital), state)
     }
 
@@ -32,18 +34,33 @@ namespace QDKChemistry.Utils.MPSSequential {
     ///
     /// MPS basis states create the modes of each site in chain order, α before β, while
     /// Jordan-Wigner basis states create them in qubit order. Reordering gives −1 for every
-    /// occupied pair of modes whose relative order differs, applied by one CZ per pair.
-    operation ApplyMPSFermionicOrderSigns(siteToOrbitalOrder : Int[], state : Qubit[]) : Unit is Adj {
+    /// occupied pair of modes whose relative order differs, applied by one CZ per pair. With the
+    /// identity order on two qubits per site the sign is (−1)^Σ_{i<j} β_i α_j, which a suffix
+    /// parity ladder on the α qubits applies with 3N − 5 gates instead of N(N − 1)/2 from N = 6.
+    internal operation ApplyMPSFermionicOrderSigns(siteToOrbitalOrder : Int[], state : Qubit[]) : Unit is Adj {
         let numSites = Length(siteToOrbitalOrder);
         let numQubits = Length(state);
-        for first in 0..numSites - 1 {
-            let firstModes = MPSSiteQubitIndices(numQubits, numSites, siteToOrbitalOrder[first]);
-            for second in first + 1..numSites - 1 {
-                // The modes of an earlier site are created before those of a later site.
-                for firstMode in firstModes {
-                    for secondMode in MPSSiteQubitIndices(numQubits, numSites, siteToOrbitalOrder[second]) {
-                        if firstMode > secondMode {
-                            CZ(state[firstMode], state[secondMode]);
+        if numQubits == 2 * numSites and numSites >= 6 and siteToOrbitalOrder == MappedOverRange(i -> i, 0..numSites - 1) {
+            within {
+                // α_j holds the parity of α_j, ..., α_{N-1}.
+                for j in numSites - 1..-1..2 {
+                    CNOT(state[j], state[j - 1]);
+                }
+            } apply {
+                for j in 1..numSites - 1 {
+                    CZ(state[numSites + j - 1], state[j]);
+                }
+            }
+        } else {
+            for first in 0..numSites - 1 {
+                let firstModes = MPSSiteQubitIndices(numQubits, numSites, siteToOrbitalOrder[first]);
+                for second in first + 1..numSites - 1 {
+                    // The modes of an earlier site are created before those of a later site.
+                    for firstMode in firstModes {
+                        for secondMode in MPSSiteQubitIndices(numQubits, numSites, siteToOrbitalOrder[second]) {
+                            if firstMode > secondMode {
+                                CZ(state[firstMode], state[secondMode]);
+                            }
                         }
                     }
                 }
@@ -54,14 +71,14 @@ namespace QDKChemistry.Utils.MPSSequential {
     /// Prepares an MPS one site at a time (Berry et al., PRX Quantum 6, 020327,
     /// https://doi.org/10.1103/PRXQuantum.6.020327).
     ///
-    /// `initialStateVec` holds the real amplitudes of the first site and its right bond,
-    /// indexed by physical · ancillaDim + bond. `applySite(site, ancilla, newSite,
-    /// phaseGradient, angleReg)` applies the isometry of each later site with the bond
-    /// register as its input and the site qubits as its added qubits. `state` uses the
-    /// layout of `MPSSiteQubitIndices`, and `ancilla` is returned to |0⟩ up to rotation
-    /// quantization error. `phaseGradient` is prepared by `PreparePhaseGradientState`, left
-    /// in that state, and its length sets the bits of every quantized angle.
-    operation PrepareMPS<'Site>(
+    /// `initialStateVec` holds the real amplitudes of the first site and its right bond, indexed
+    /// by physical · 2ᵏ + bond, so its length sets the k low bond qubits that the first site loads.
+    /// `applySite(site, ancilla, newSite, phaseGradient, angleReg)` applies the isometry of each
+    /// later site with the bond register as its input and the site qubits as its added qubits.
+    /// `state` uses the layout of `MPSSiteQubitIndices`, and `ancilla` is returned to |0⟩ up to
+    /// rotation quantization error. `phaseGradient` is prepared by `PreparePhaseGradientState`,
+    /// left in that state, and its length sets the bits of every quantized angle.
+    internal operation PrepareMPS<'Site>(
         initialStateVec : Double[],
         numSites : Int,
         siteToOrbitalOrder : Int[],
@@ -76,12 +93,22 @@ namespace QDKChemistry.Utils.MPSSequential {
             Length(state) == numSites or Length(state) == 2 * numSites,
             "The state register must hold one or two qubits per MPS site."
         );
+        Fact(
+            Sorted((a, b) -> a <= b, siteToOrbitalOrder) == MappedOverRange(i -> i, 0..numSites - 1),
+            "siteToOrbitalOrder must be a permutation of the MPS sites."
+        );
+        let qubitsPerSite = Length(state) / numSites;
+        let initialBondBits = BitSizeI(Length(initialStateVec) / (1 <<< qubitsPerSite) - 1);
+        Fact(
+            Length(initialStateVec) == 1 <<< (qubitsPerSite + initialBondBits) and initialBondBits <= Length(ancilla),
+            "The initial state must cover the first site and a power-of-two part of the bond register."
+        );
         let rotationBitPrecision = Length(phaseGradient);
         use angleReg = Qubit[rotationBitPrecision];
 
         // `initReg` is little-endian with the bond in its low qubits, so amplitude index
-        // physical · ancillaDim + bond is exactly the register value it prepares.
-        let initReg = ancilla + MPSSiteQubits(state, numSites, siteToOrbitalOrder[0]);
+        // physical · 2ᵏ + bond is exactly the register value it prepares.
+        let initReg = ancilla[...initialBondBits - 1] + MPSSiteQubits(state, numSites, siteToOrbitalOrder[0]);
         QROMStatePrepare(
             new QROMStatePrepParams {
                 amplitudes = initialStateVec,
@@ -101,7 +128,7 @@ namespace QDKChemistry.Utils.MPSSequential {
 
     /// Returns an operation on the state register that allocates the bond and phase gradient
     /// registers for `prepare(state, ancilla, phaseGradient)`.
-    function MakeMPSOp(
+    internal function MakeMPSOp(
         numStateQubits : Int,
         numAncillaQubits : Int,
         rotationBitPrecision : Int,
@@ -112,7 +139,7 @@ namespace QDKChemistry.Utils.MPSSequential {
 
     /// Returns an operation on `[state | phaseGradient]` whose last rotationBitPrecision qubits
     /// are a caller-owned register prepared by `PreparePhaseGradientState`.
-    function MakeMPSOpWithPhaseGradient(
+    internal function MakeMPSOpWithPhaseGradient(
         numStateQubits : Int,
         numAncillaQubits : Int,
         rotationBitPrecision : Int,
@@ -123,7 +150,7 @@ namespace QDKChemistry.Utils.MPSSequential {
 
     /// Applies `prepare(state, ancilla, phaseGradient)` to `state` with phase gradient and bond
     /// registers allocated here; see `PrepareMPSOnRegister`.
-    operation PrepareMPSOnState(
+    internal operation PrepareMPSOnState(
         numStateQubits : Int,
         numAncillaQubits : Int,
         rotationBitPrecision : Int,
@@ -145,7 +172,7 @@ namespace QDKChemistry.Utils.MPSSequential {
     /// it is reset before release in both directions. The operation and its adjoint are
     /// therefore inverse only up to that error, which is of the same order as the preparation
     /// error in `state`.
-    operation PrepareMPSOnRegister(
+    internal operation PrepareMPSOnRegister(
         numStateQubits : Int,
         numAncillaQubits : Int,
         rotationBitPrecision : Int,
@@ -173,7 +200,7 @@ namespace QDKChemistry.Utils.MPSSequential {
     }
 
     /// Circuit entry point for MPS state preparation (allocates qubits and leaves them prepared).
-    operation PrepareMPSCircuit(
+    internal operation PrepareMPSCircuit(
         numStateQubits : Int,
         numAncillaQubits : Int,
         rotationBitPrecision : Int,

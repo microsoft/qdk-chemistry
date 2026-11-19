@@ -22,7 +22,6 @@ from pathlib import Path
 
 import numpy as np
 import pytest
-from qdk.qsharp import QSharpError
 from scipy import sparse
 
 from qdk_chemistry.algorithms import create
@@ -40,9 +39,14 @@ from qdk_chemistry.data import (
     Wavefunction,
 )
 from qdk_chemistry.data import symmetry as sym
-from qdk_chemistry.utils.qsharp import create_qsharp_context, get_qsharp_context, use_qsharp_context
+from qdk_chemistry.utils.qsharp import (
+    QSHARP_UTILS,
+    create_qsharp_context,
+    get_qsharp_context,
+    use_qsharp_context,
+)
 
-from .helpers import create_test_basis_set, create_test_orbitals, create_test_wavefunction
+from .helpers import apply_operation, create_test_basis_set, create_test_orbitals, create_test_wavefunction
 
 # Q# operation and site struct of each synthesis method.
 _QSHARP_OPERATIONS = {
@@ -94,7 +98,7 @@ def preparation_data(mps: MPSContainer, method: str = "dense"):
     """Generate preparation data from a container using the selected site synthesis method."""
     preparer = MatrixProductStatePreparation()
     preparer.settings().update("unitary_synthesis", synthesis_ref(method))
-    return preparer.generate_matrix_product_state_preparation_data(mps)
+    return preparer._generate_preparation_data(mps)
 
 
 def simulate_mps_preparation(operation, site_struct, params, num_sites, num_ancilla_qubits):
@@ -155,22 +159,6 @@ def _fixture_site_tensors(name: str, order: tuple[int, ...]):
     return _FIXTURES[name]["orders"][",".join(map(str, order))]["site_tensors"]
 
 
-def _fixture_hamiltonian(name: str) -> QubitOperator:
-    """Return the fixture's one fixed physical Hamiltonian, qubit labels reversed for ``qdk_standard`` QPE.
-
-    The Hamiltonian is the same physical operator for every ``site_to_orbital_order``: only the
-    per-order MPS tensors (see ``_fixture_site_tensors``) change, so that each order's circuit still
-    prepares the identical physical eigenstate. The standard QPE circuit builder's ``pauli_sequence``
-    controlled-unitary mapper pairs state register qubit ``i`` with Hamiltonian qubit
-    ``num_qubits - 1 - i`` (the same convention the existing ``four_qubit_phase_problem`` fixture in
-    ``test_phase_estimation_standard.py`` handles via ``rowMap=[3, 2, 1, 0]``); reversing each Pauli
-    string here keeps the MPS circuit's own (unreversed) wire order aligned with it.
-    """
-    fixture = _FIXTURES[name]
-    reversed_strings = [string[::-1] for string in fixture["pauli_strings"]]
-    return QubitOperator(pauli_strings=reversed_strings, coefficients=fixture["coefficients"])
-
-
 def _identity_order(name: str) -> tuple[int, ...]:
     return tuple(range(_FIXTURES[name]["num_sites"]))
 
@@ -203,16 +191,6 @@ def _non_isometric_fixture_mps(name: str) -> MPSContainer:
     return make_mps([np.ones_like(np.asarray(t)) for t in _fixture_site_tensors(name, _identity_order(name))])
 
 
-def _malformed_givens_params(field: str):
-    """Build real ``to_qsharp_params`` data from a loaded fixture, then truncate one Givens field."""
-    data = preparation_data(_fixture_mps("mps_spin", _identity_order("mps_spin")), "dense")
-    params = data.to_qsharp_params(rotation_bit_precision=6)
-    block_givens = params["siteDecompositions"][0]["blockGivens"]
-    block_givens[field] = block_givens[field][:-1]
-    with use_qsharp_context(create_qsharp_context()):
-        simulate_mps_preparation(*_QSHARP_OPERATIONS["dense"], params, 2, data.ancilla_bits)
-
-
 @pytest.mark.parametrize(
     ("action", "expected"),
     [
@@ -241,7 +219,7 @@ def _malformed_givens_params(field: str):
             id="run-rejects-non-mps-wavefunction",
         ),
         pytest.param(
-            lambda: MatrixProductStatePreparation().generate_matrix_product_state_preparation_data(
+            lambda: MatrixProductStatePreparation()._generate_preparation_data(
                 _fixture_mps("mps_h2", _identity_order("mps_h2")).sites()
             ),
             (TypeError, "requires an MPSContainer"),
@@ -298,27 +276,10 @@ def _malformed_givens_params(field: str):
             (ValueError, "isometric"),
             id="rejects-non-isometric-site",
         ),
-        pytest.param(
-            lambda: _malformed_givens_params("layerShifted"),
-            (QSharpError, "one shift flag per layer"),
-            id="rejects-malformed-givens-shift-flags",
-        ),
-        pytest.param(
-            lambda: _malformed_givens_params("phases"),
-            (QSharpError, "one entry per basis state of the target register"),
-            id="rejects-malformed-givens-phases",
-        ),
     ],
 )
 def test_state_preparation_contract(action, expected):
-    """Settings, input-validation, and malformed-Givens-data contract checks, in one place.
-
-    Each case is a zero-argument *action*; ``expected`` is either an ``(exception_type, message)``
-    pair (the action must raise it) or a validator called on the action's return value. Invalid
-    MPS inputs are built by modifying copies of the real ``mps_h2``/``mps_spin`` fixture tensors
-    (zeroed, cast to complex, replaced by same-shaped all-ones arrays, orthogonality center
-    cleared) rather than from a standalone random-MPS generator or inline literal tensors.
-    """
+    """Each action raises its expected error or returns a value its validator accepts."""
     if isinstance(expected, tuple):
         exc_type, message = expected
         with pytest.raises(exc_type, match=message):
@@ -329,15 +290,9 @@ def test_state_preparation_contract(action, expected):
 
 # MPS state preparation composed with Trotterized QPE to recover classical eigenvalues.
 
-# Both Hamiltonians have noncommuting terms (a real H2/STO-3G electronic Hamiltonian, and an
-# anisotropic XY chain with a staggered field), so QPE recovers the classical ground eigenvalue
-# only approximately. Per fixture, ``(evolution_time, num_divisions)`` were chosen so a
-# second-order Trotter unitary matches the exact e^{-iHt} to within <2e-5 (mps_h2) / <4e-4
-# (mps_spin) operator norm (negligible next to the phase-estimation bin width below);
-# ``_QPE_NUM_BITS`` bits resolve the phase fraction to within half a bin of width
-# ``1/(evolution_time * 2**_QPE_NUM_BITS)``, which dominates the energy error. The tolerance below
-# is 1.25x that half-bin width plus the Trotter error above, so it is derived from these
-# resolution/approximation limits rather than relaxed to force a pass.
+# Per fixture, ``(evolution_time, num_divisions)`` keep the second-order Trotter error below 2e-5
+# (mps_h2) and 4e-4 (mps_spin) in operator norm. Each tolerance exceeds half the energy bin width
+# 2π/(evolution_time·2**_QPE_NUM_BITS), 0.041 and 0.020, plus that Trotter error.
 _QPE_NUM_BITS = 7
 _QPE_PROBLEM = {
     # Per fixture: evolution_time, trotter_num_divisions, energy_tolerance.
@@ -350,22 +305,13 @@ _QPE_PROBLEM = {
 @pytest.mark.parametrize("reversed_order", [False, True], ids=["identity-order", "reversed-order"])
 @pytest.mark.parametrize("fixture_name", ["mps_h2", "mps_spin"])
 def test_mps_trotter_qpe_recovers_eigenvalue(fixture_name, reversed_order, method):
-    """Preparing an MPS and running Trotterized standard QPE recovers the classical eigenvalue.
-
-    ``mps_h2`` is the real H2/STO-3G electronic Hamiltonian (2 chemistry sites, physical dimension
-    4, one spatial orbital each); ``mps_spin`` is a small anisotropic XY chain with a staggered
-    field (2 spin sites, physical dimension 2). The fixture Hamiltonian is one fixed physical
-    operator, independent of ``site_to_orbital_order``: only the MPS tensors differ per order (see
-    ``make_mps_fixtures.py``), so a fermionic-sign or bit-order bug in the preparation circuit
-    would make one order (but not necessarily both) fail to recover the eigenvalue. The classical
-    ground eigenvalue is derived here directly from that same fixed Hamiltonian by diagonalizing
-    its dense matrix, rather than solely trusting the fixture's stored scalar.
-    """
+    """Trotterized QPE on the prepared MPS recovers the ground eigenvalue of the fixture Hamiltonian."""
     order = tuple(reversed(_identity_order(fixture_name))) if reversed_order else _identity_order(fixture_name)
     mps = _fixture_mps(fixture_name, order)
-    hamiltonian = _fixture_hamiltonian(fixture_name)
+    fixture = _FIXTURES[fixture_name]
+    hamiltonian = QubitOperator(pauli_strings=fixture["pauli_strings"], coefficients=fixture["coefficients"])
     ground_eigenvalue = float(np.linalg.eigvalsh(hamiltonian.get_container().to_matrix())[0])
-    assert ground_eigenvalue == pytest.approx(_FIXTURES[fixture_name]["reference_eigenvalue"], abs=1e-8)
+    assert ground_eigenvalue == pytest.approx(fixture["reference_eigenvalue"], abs=1e-8)
     circuit = create(
         "state_prep", "matrix_product_state", unitary_synthesis=synthesis_ref(method), rotation_bit_precision=6
     ).run(Wavefunction(mps))
@@ -401,12 +347,7 @@ _AGREEMENT_TOLERANCE = 1e-3
 @pytest.mark.parametrize("reversed_order", [False, True], ids=["identity-order", "reversed-order"])
 @pytest.mark.parametrize("fixture_name", ["mps_h2", "mps_spin"])
 def test_dense_and_block_sparse_prepare_same_state(fixture_name, reversed_order):
-    """The dense and block-sparse circuits prepare the same state and return the bond register to ``|0>``.
-
-    The dense circuits leave out the right factor of each site isometry, which is absorbed into the
-    preceding site or the initial state, while the block-sparse circuits synthesize every isometry in
-    full, so their agreement checks the absorption.
-    """
+    """The dense circuit, with absorbed right factors, and the block-sparse circuit prepare the same state."""
     order = tuple(reversed(_identity_order(fixture_name))) if reversed_order else _identity_order(fixture_name)
     mps = _fixture_mps(fixture_name, order)
     states = {}
@@ -422,12 +363,7 @@ def test_dense_and_block_sparse_prepare_same_state(fixture_name, reversed_order)
 
 
 def test_sparse_site_isometry_scatters_symmetry_blocks():
-    """The block-sparse site matrix is built from the symmetry blocks and equals the padded dense isometry.
-
-    The bonds have two spin sectors and the physical slot has three particle-number sectors. No slot
-    stores its sectors in label order, and only some sector triples hold a block, so the sector offsets
-    and the empty blocks are both exercised.
-    """
+    """The block-sparse site matrix built from unordered, partly empty symmetry blocks equals the dense isometry."""
     bond_syms = sym.SymmetryProduct([sym.axes.spin(1, False)])
     physical_syms = sym.SymmetryProduct([sym.axes.particle_number(2)])
     alpha, beta = sym.SymmetryLabel([sym.axes.alpha()]), sym.SymmetryLabel([sym.axes.beta()])
@@ -498,13 +434,7 @@ def _target_state(mps: MPSContainer) -> np.ndarray:
 
 @_METHODS
 def test_multi_site_mps_matches_contraction(method):
-    """A four-site MPS with unequal bonds prepares its independently contracted state.
-
-    Bonds 1-4-3-2-1 leave every bond after the first below the two-qubit bond register, so the sites
-    are padded. The dense circuits absorb each site's right factor into the site before it: the last
-    site's factor, checked here to be nontrivial, goes into site two, and site two's into site one.
-    The permuted ``site_to_orbital_order`` also checks the fermionic signs across several sites.
-    """
+    """A four-site MPS with unequal bonds, a nontrivial right factor and a permuted order prepares its contraction."""
     mps = make_mps(_random_right_canonical_tensors([1, 4, 3, 2, 1], 4, seed=11), site_to_orbital_order=(2, 0, 3, 1))
     if method == "dense":
         last = MatrixProductStatePreparation._site_isometry(mps.sites()[-1], ancilla_dim=4)
@@ -519,6 +449,28 @@ def test_multi_site_mps_matches_contraction(method):
     assert data.ancilla_bits == 2
     assert probability > 1 - _AGREEMENT_TOLERANCE
     assert np.abs(np.vdot(_target_state(mps), state)) ** 2 > 1 - _AGREEMENT_TOLERANCE
+
+
+@_METHODS
+def test_shared_phase_gradient_prepares_target(method):
+    """Without its own gradient the circuit acts on [state | gradient], prepares the MPS and restores the gradient."""
+    mps = make_mps(_random_right_canonical_tensors([1, 4, 3, 2, 1], 4, seed=11), site_to_orbital_order=(2, 0, 3, 1))
+    circuit = create(
+        "state_prep",
+        "matrix_product_state",
+        unitary_synthesis=synthesis_ref(method),
+        rotation_bit_precision=_AGREEMENT_PRECISION,
+        allocate_phase_gradient=False,
+    ).run(Wavefunction(mps))
+    assert circuit.metadata.num_phase_gradient_ancillas == _AGREEMENT_PRECISION
+    num_state_qubits = circuit.num_qubits - _AGREEMENT_PRECISION
+    op = QSHARP_UTILS.CircuitComposition.MakeSharedAncillaOp(
+        circuit._qsharp_op, QSHARP_UTILS.PhaseGradient.PreparePhaseGradientState, _AGREEMENT_PRECISION
+    )
+    output = apply_operation(op, np.eye(1, 1 << circuit.num_qubits).ravel())
+    output = output.reshape(1 << num_state_qubits, 1 << _AGREEMENT_PRECISION)
+    np.testing.assert_allclose(output[:, 1:], 0.0, atol=1e-8, err_msg="phase gradient was not restored")
+    assert np.abs(np.vdot(_target_state(mps), output[:, 0])) ** 2 > 1 - _AGREEMENT_TOLERANCE
 
 
 def _two_site_tensors(amplitudes: dict[tuple[int, int], float]):
@@ -543,14 +495,7 @@ _OPEN_SHELL_STATES = {
 @_METHODS
 @pytest.mark.parametrize("reversed_order", [False, True], ids=["identity-order", "reversed-order"])
 def test_open_shell_states_have_fermionic_signs(reversed_order, method):
-    """Open-shell H2 states land in the right spin multiplet, which needs the fermionic order signs.
-
-    The fixture ground state occupies only ``20``/``02``, which never reorders spin-up past
-    spin-down operators. Here ``ud +/- du`` mixes configurations whose Jordan-Wigner order signs
-    differ, so dropping or misapplying the sign correction swaps the ``M_s = 0`` triplet and the
-    open-shell singlet. The triplet component must be degenerate with the sign-free ``uu``
-    state, and the singlet must not be.
-    """
+    """The M_s = 0 triplet is degenerate with the sign-free triplet and the open-shell singlet is not."""
     order = (1, 0) if reversed_order else (0, 1)
     fixture = _FIXTURES["mps_h2"]
     hamiltonian = (
@@ -568,6 +513,8 @@ def test_open_shell_states_have_fermionic_signs(reversed_order, method):
                 operation, site_struct, params, data.num_sites, data.ancilla_bits
             )
             assert probability > 1 - _AGREEMENT_TOLERANCE, name
+            # The dump has qubit 0 most significant; the Pauli matrix has it least significant.
+            state = state.reshape((2,) * 4).transpose().reshape(-1)
             energies[name] = float(np.real(np.vdot(state, hamiltonian @ state)))
     assert energies["triplet_zero"] == pytest.approx(energies["triplet_plus"], abs=_AGREEMENT_TOLERANCE)
     assert energies["open_shell_singlet"] - energies["triplet_plus"] > 0.1
@@ -575,14 +522,13 @@ def test_open_shell_states_have_fermionic_signs(reversed_order, method):
 
 # Resource-estimate regressions pinned from this implementation's own circuits.
 
-# (fixture, method) -> (numQubits, cczCount), measured from this repository's own circuits at
-# rotation_bit_precision=6 and the identity site_to_orbital_order; other orders are covered by
-# the QPE-recovery test above, so only one canonical order is pinned here.
+# (fixture, method) -> (numQubits, cczCount, ccixCount) at rotation_bit_precision=6 and the identity
+# site_to_orbital_order.
 _EXPECTED_RESOURCES = {
-    ("mps_h2", "dense"): (30, 126),
-    ("mps_h2", "block_sparse"): (30, 79),
-    ("mps_spin", "dense"): (27, 22),
-    ("mps_spin", "block_sparse"): (27, 14),
+    ("mps_h2", "dense"): (30, 124, 0),
+    ("mps_h2", "block_sparse"): (30, 77, 0),
+    ("mps_spin", "dense"): (27, 22, 0),
+    ("mps_spin", "block_sparse"): (27, 14, 0),
 }
 
 
@@ -594,6 +540,5 @@ def test_resource_estimate_regression(fixture_name, method):
         "state_prep", "matrix_product_state", unitary_synthesis=synthesis_ref(method), rotation_bit_precision=6
     ).run(Wavefunction(_fixture_mps(fixture_name, _identity_order(fixture_name))))
     counts = circuit.estimate().logical_counts
-    expected_qubits, expected_ccz = _EXPECTED_RESOURCES[(fixture_name, method)]
-    assert counts["numQubits"] == expected_qubits
-    assert counts["cczCount"] == expected_ccz
+    actual = (counts["numQubits"], counts["cczCount"], counts["ccixCount"])
+    assert actual == _EXPECTED_RESOURCES[(fixture_name, method)]

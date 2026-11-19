@@ -992,7 +992,6 @@ def _register_python_algorithms():
     # Must precede SparseIsometryStatePreparation, whose settings resolve it by name at construction.
     register(lambda: DensePureStatePreparation())
     register(lambda: SparseIsometryStatePreparation())
-    register(lambda: MatrixProductStatePreparation())
     register(lambda: DenseMatrixSolver())
     register(lambda: SparseMatrixSolver())
     register(lambda: QdkQubitMapper())
@@ -1018,6 +1017,8 @@ def _register_python_algorithms():
     register(lambda: ControlledSOSSAMapper())
     register(lambda: DenseUnitarySynthesisMapper())
     register(lambda: BlockSparseUnitarySynthesisMapper())
+    # Must follow the unitary synthesis mappers, which its settings resolve by name at construction.
+    register(lambda: MatrixProductStatePreparation())
     register(lambda: SOSSABuilder())
     register(lambda: SumOfSquaresQubitMapper())
     register(lambda: EulerIntegrator())

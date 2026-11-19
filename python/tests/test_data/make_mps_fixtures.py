@@ -62,7 +62,7 @@ def _reorder_matrix(num_sites, qubits_per_site, site_to_orbital_order):
         bits = parse("".join(orbital_states)).to_bits(num_qubits)
         assert sorted(created) == [qubit for qubit, bit in enumerate(bits) if bit]
         inversions = sum(first > second for i, first in enumerate(created) for second in created[i + 1 :])
-        reorder[int("".join(map(str, bits)), 2), index] = (-1) ** inversions
+        reorder[sum(1 << qubit for qubit, bit in enumerate(bits) if bit), index] = (-1) ** inversions
     return reorder
 
 

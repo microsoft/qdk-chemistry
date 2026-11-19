@@ -7,8 +7,8 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass, field
-from typing import TYPE_CHECKING, Any
+from dataclasses import dataclass
+from typing import Any
 
 import numpy as np
 from scipy import sparse
@@ -33,13 +33,7 @@ from qdk_chemistry.utils.qsharp import QSHARP_UTILS
 
 from .state_preparation import StatePreparation
 
-if TYPE_CHECKING:
-    from collections.abc import Sequence
-
-__all__: list[str] = [
-    "MatrixProductStatePreparation",
-    "MatrixProductStatePreparationData",
-]
+__all__: list[str] = ["MatrixProductStatePreparation"]
 
 _DESCRIPTION = "MPS state preparation"
 
@@ -51,7 +45,6 @@ _PHYSICAL_BASES = {
     2: [Configuration.from_bitstring(state) for state in _PHYSICAL_BASIS_LABELS[2]],
     4: [Configuration.from_spin_half_string(state) for state in _PHYSICAL_BASIS_LABELS[4]],
 }
-_DIMENSION_ERROR = "MPS state preparation requires two or four physical states per site."
 
 
 class MatrixProductStatePreparationSettings(Settings):
@@ -100,7 +93,7 @@ class MatrixProductStatePreparation(StatePreparation):
         factors synthesized as parallel Givens rotation layers using the elimination schedule of
         :cite:`Clements2016`. The right factor of each decomposition, an orthogonal matrix on the left
         bond, is absorbed classically into the preceding site or the initial state. The cost depends
-        only on the bond dimensions.
+        only on the bond and physical dimensions.
 
     ``"unitary_synthesis_block_sparse"``
         Each site isometry is decomposed as ``U = P_row · V_blockdiag · P_col`` following
@@ -108,9 +101,9 @@ class MatrixProductStatePreparation(StatePreparation):
         permuted index, a SWAP, and erasure of the old index by X-basis measurement with a phase
         fixup) and ``V_blockdiag`` is block diagonal, with each block synthesized from Givens rotation
         layers. This exploits U(1) symmetries (particle number, spin) that make MPS tensors block
-        sparse. :cite:`Rupprecht2026` reports 10-30x Toffoli savings over the dense state of the art
-        for large molecular MPS; the savings shrink with the bond dimension and the block sparsity,
-        and small bonds can cost more than the dense synthesis.
+        sparse. :cite:`Rupprecht2026` reports 10-30x fewer Toffolis than earlier MPS preparations for
+        molecular MPS; the savings shrink with the bond dimension and the block sparsity, and small
+        bonds can cost more than the dense synthesis.
 
     For example, ``create("state_prep", "matrix_product_state", unitary_synthesis=AlgorithmRef(
     "circuit_mapper", "unitary_synthesis_block_sparse"))`` selects the block-sparse synthesis.
@@ -135,7 +128,7 @@ class MatrixProductStatePreparation(StatePreparation):
         """
         return "matrix_product_state"
 
-    def generate_matrix_product_state_preparation_data(self, mps: MPSContainer) -> MatrixProductStatePreparationData:
+    def _generate_preparation_data(self, mps: MPSContainer) -> MatrixProductStatePreparationData:
         """Synthesize the site isometries with the nested ``unitary_synthesis`` circuit mapper.
 
         Args:
@@ -158,8 +151,17 @@ class MatrixProductStatePreparation(StatePreparation):
         if mps.is_complex():
             raise ValueError(f"{_DESCRIPTION} currently supports only real-valued MPS tensors.")
         mps_sites = mps.sites()
-        self._validate_physical_basis(mps_sites)
-        ancilla_bits = self._ancilla_bits(mps.max_bond_dimension())
+        dimensions = {site.physical_dimension() for site in mps_sites}
+        if len(dimensions) > 1:
+            raise ValueError("MPS state preparation requires the same physical dimension on every site.")
+        (dimension,) = dimensions
+        if dimension not in _PHYSICAL_BASES:
+            raise ValueError("MPS state preparation requires two or four physical states per site.")
+        if any(site.physical_basis() != _PHYSICAL_BASES[dimension] for site in mps_sites):
+            labels = ", ".join(f"'{label}'" for label in _PHYSICAL_BASIS_LABELS[dimension])
+            raise ValueError(f"MPS state preparation requires physical basis ordering ({labels}).")
+        # The bond register holds the largest bond, and at least one qubit.
+        ancilla_bits = max(1, (mps.max_bond_dimension() - 1).bit_length())
         ancilla_dim = 1 << ancilla_bits
         mapper, method = self._create_site_mapper(ancilla_bits)
 
@@ -174,7 +176,7 @@ class MatrixProductStatePreparation(StatePreparation):
                 isometry = self._site_isometry(mps_sites[index], ancilla_dim)
                 if right_factor is not None:
                     bond = right_factor.shape[0]
-                    isometry[:, :bond] = np.einsum("bc,pca->pba", right_factor, isometry[:, :bond])
+                    isometry[:, :bond] = right_factor @ isometry[:, :bond]
                 matrix = isometry.reshape(-1, isometry.shape[2])
             try:
                 container = UnitaryMatrixContainer(matrix)
@@ -189,8 +191,10 @@ class MatrixProductStatePreparation(StatePreparation):
         first_site = np.asarray(mps_sites[0].to_dense())
         if right_factor is not None:
             first_site = first_site @ right_factor.T
-        # The initial state is indexed by physical * ancilla_dim + bond.
-        padded = np.zeros((first_site.shape[0], ancilla_dim))
+        # Site zero's right bond only needs the low qubits of the bond register, so the initial state
+        # is indexed by physical * initial_bond_dim + bond.
+        initial_bond_dim = 1 << (first_site.shape[1] - 1).bit_length()
+        padded = np.zeros((first_site.shape[0], initial_bond_dim))
         padded[:, : first_site.shape[1]] = first_site
         vector = padded.reshape(-1)
         norm = np.linalg.norm(vector)
@@ -201,7 +205,7 @@ class MatrixProductStatePreparation(StatePreparation):
             initial_state_vec=(vector / norm).tolist(),
             site_to_orbital_order=mps.site_to_orbital_order(),
             num_sites=mps.num_sites(),
-            num_qubits_per_site=self._qubits_per_site(mps_sites),
+            num_qubits_per_site=(dimension - 1).bit_length(),
             ancilla_bits=ancilla_bits,
             method=method,
             sites=syntheses,
@@ -232,7 +236,7 @@ class MatrixProductStatePreparation(StatePreparation):
         if container.orthogonality_center() != 0:
             raise ValueError(f"{_DESCRIPTION} requires a right-canonical MPS with center zero.")
 
-        data = self.generate_matrix_product_state_preparation_data(container)
+        data = self._generate_preparation_data(container)
         params = data.to_qsharp_params(rotation_bit_precision)
         # The MPS circuits are Adaptive-only; the default shared context targets Adaptive_RIF.
         if data.method == "block_sparse":
@@ -327,38 +331,6 @@ class MatrixProductStatePreparation(StatePreparation):
             shape=(site.physical_dimension() * ancilla_dim, site.left_bond_dimension()),
         )
 
-    @staticmethod
-    def _validate_physical_basis(sites: Sequence[MPSSite]) -> None:
-        """Require a physical dimension and basis order supported by the Q# operations.
-
-        Args:
-            sites: MPS sites to check.
-
-        Raises:
-            ValueError: If the sites do not share one physical dimension, the dimension is not two or
-                four, or a site does not order its basis as ``('0', '1')`` or ``('0', 'u', 'd', '2')``.
-
-        """
-        dimensions = {site.physical_dimension() for site in sites}
-        if len(dimensions) > 1:
-            raise ValueError("MPS state preparation requires the same physical dimension on every site.")
-        (dimension,) = dimensions
-        if dimension not in _PHYSICAL_BASES:
-            raise ValueError(_DIMENSION_ERROR)
-        if any(site.physical_basis() != _PHYSICAL_BASES[dimension] for site in sites):
-            labels = ", ".join(f"'{label}'" for label in _PHYSICAL_BASIS_LABELS[dimension])
-            raise ValueError(f"MPS state preparation requires physical basis ordering ({labels}).")
-
-    @staticmethod
-    def _qubits_per_site(sites: Sequence[MPSSite]) -> int:
-        """Return one for the ``('0', '1')`` basis and two for the ``('0', 'u', 'd', '2')`` basis."""
-        return (sites[0].physical_dimension() - 1).bit_length()
-
-    @staticmethod
-    def _ancilla_bits(max_bond: int) -> int:
-        """Return ``ceil(log2(max bond dimension))``, and at least one, the width of the bond register."""
-        return max(1, (max_bond - 1).bit_length())
-
 
 # ---------------------------------------------------------------------------
 # Preparation data passed to Q#
@@ -367,14 +339,11 @@ class MatrixProductStatePreparation(StatePreparation):
 
 @dataclass
 class MatrixProductStatePreparationData:
-    """All data needed to drive the Q# MPS preparation operations.
+    """Arguments of the Q# MPS preparation operations, built by ``MatrixProductStatePreparation``.
 
-    Produced by :meth:`MatrixProductStatePreparation.generate_matrix_product_state_preparation_data` and consumed by
-    :meth:`~qdk_chemistry.algorithms.StatePreparation.run`. The sites are the fields of the Q#
-    ``DenseIsometrySynthesis`` structs for the ``MPSSequential`` Q# operations or of the Q#
-    ``SparseIsometrySynthesis`` structs for the ``MPSSparse`` Q# operations, as produced by the
-    nested ``unitary_synthesis`` circuit mapper. Dense sites carry no right factor, which is absorbed into
-    the preceding site.
+    The sites are the fields of the Q# ``DenseIsometrySynthesis`` structs for the ``MPSSequential``
+    operations or of the Q# ``SparseIsometrySynthesis`` structs for the ``MPSSparse`` operations. Dense
+    sites carry no right factor, which is absorbed into the preceding site.
     """
 
     num_sites: int
@@ -384,22 +353,23 @@ class MatrixProductStatePreparationData:
     """Physical qubits per site: one for the ``('0', '1')`` basis and two for ``('0', 'u', 'd', '2')``."""
 
     ancilla_bits: int
-    """Number of ancilla qubits."""
+    """Width of the bond register, which holds the largest bond."""
 
     initial_state_vec: list[float]
-    """Flattened initial state vector for the first site."""
+    """Normalized amplitudes of site zero, indexed by physical state times its padded right bond plus bond state."""
 
     site_to_orbital_order: list[int]
     """Orbital that holds each chain site, from the MPS container."""
 
-    method: str = "dense"
+    method: str
     """Site synthesis method, either ``"dense"`` or ``"block_sparse"``."""
 
-    sites: list[dict[str, Any]] = field(default_factory=list)
+    sites: list[dict[str, Any]]
     """Per-site Q# synthesis data (one entry per site 1..num_sites-1)."""
 
     def to_qsharp_params(self, rotation_bit_precision: int) -> dict:
         """Flatten into the dict expected by ``MakeMPSSequentialCircuit`` or ``MakeMPSSparseCircuit``."""
+        # The order matches the Q# Params structs and the positional arguments of Make*Circuit.
         return {
             "initialStateVec": self.initial_state_vec,
             "numSites": self.num_sites,
