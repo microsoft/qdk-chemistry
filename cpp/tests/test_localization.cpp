@@ -58,7 +58,7 @@ TEST_F(LocalizationTest, LocalizationSelector_MetaData) {
 }
 
 TEST_F(LocalizationTest, GaugeFixingHamiltonianConstructorDefault) {
-  auto localizer = LocalizerFactory::create("qdk_gauge_fixing");
+  auto localizer = OrbitalLocalizerFactory::create("qdk_gauge_fixing");
   const auto constructor_ref =
       localizer->settings().get<AlgorithmRef>("hamiltonian_constructor");
   EXPECT_EQ(constructor_ref.get_algorithm_type(), "hamiltonian_constructor");
@@ -1846,14 +1846,14 @@ GaugeFixingFixture make_gauge_fixing_fixture() {
   std::vector<size_t> active_indices(active_channel.begin(),
                                      active_channel.end());
 
-  auto natural = LocalizerFactory::create("qdk_natural_orbitals")
+  auto natural = OrbitalLocalizerFactory::create("qdk_natural_orbitals")
                      ->run(wfn_cas, active_indices, active_indices);
   return {natural, active_indices, num_alpha, num_beta};
 }
 
 TEST_F(LocalizationTest, GaugeFixingUsesConfiguredHamiltonianConstructor) {
   auto fixture = make_gauge_fixing_fixture();
-  auto localizer = LocalizerFactory::create("qdk_gauge_fixing");
+  auto localizer = OrbitalLocalizerFactory::create("qdk_gauge_fixing");
   localizer->settings().set(
       "hamiltonian_constructor",
       AlgorithmRef("hamiltonian_constructor",
@@ -2006,7 +2006,7 @@ TEST_F(LocalizationTest, GaugeFixingPreservesEnergyAndDoesNotIncreaseNorm) {
       mapped_coefficient_norm(fixture.natural_wavefunction->get_orbitals(),
                               fixture.active_indices.size());
 
-  auto gauge_fixed = LocalizerFactory::create("qdk_gauge_fixing")
+  auto gauge_fixed = OrbitalLocalizerFactory::create("qdk_gauge_fixing")
                          ->run(fixture.natural_wavefunction,
                                fixture.active_indices, fixture.active_indices);
 
@@ -2025,7 +2025,7 @@ TEST_F(LocalizationTest, GaugeFixingCarriesTheSpinResolvedActiveOneRdm) {
   auto fixture = make_gauge_fixing_fixture();
   ASSERT_TRUE(fixture.natural_wavefunction->has_active_one_rdm());
 
-  auto gauge_fixed = LocalizerFactory::create("qdk_gauge_fixing")
+  auto gauge_fixed = OrbitalLocalizerFactory::create("qdk_gauge_fixing")
                          ->run(fixture.natural_wavefunction,
                                fixture.active_indices, fixture.active_indices);
 
@@ -2061,7 +2061,7 @@ TEST_F(LocalizationTest, GaugeFixingIsIdempotentAndPreservesOccupations) {
           fixture.natural_wavefunction->get_active_one_rdm_spin_traced())
           .diagonal();
 
-  auto gauge_fixed = LocalizerFactory::create("qdk_gauge_fixing")
+  auto gauge_fixed = OrbitalLocalizerFactory::create("qdk_gauge_fixing")
                          ->run(fixture.natural_wavefunction,
                                fixture.active_indices, fixture.active_indices);
   const Eigen::VectorXd occupations =
@@ -2072,7 +2072,7 @@ TEST_F(LocalizationTest, GaugeFixingIsIdempotentAndPreservesOccupations) {
               1e-12);
 
   auto repeated =
-      LocalizerFactory::create("qdk_gauge_fixing")
+      OrbitalLocalizerFactory::create("qdk_gauge_fixing")
           ->run(gauge_fixed, fixture.active_indices, fixture.active_indices);
   const auto& first = gauge_fixed->get_orbitals()->coefficients()->block(
       {axes::alpha(), axes::alpha()});
@@ -2100,7 +2100,7 @@ TEST_F(LocalizationTest, GaugeFixingIsIndependentOfStartingOrientation) {
   }
   ASSERT_EQ(degenerate.size(), 2u);
 
-  auto localizer = LocalizerFactory::create("qdk_gauge_fixing");
+  auto localizer = OrbitalLocalizerFactory::create("qdk_gauge_fixing");
   auto expected =
       localizer->run(fixture.natural_wavefunction, fixture.active_indices,
                      fixture.active_indices);
@@ -2127,7 +2127,7 @@ TEST_F(LocalizationTest, GaugeFixingIsIndependentOfStartingOrientation) {
           fixture.natural_wavefunction, rotated_orbitals,
           ContainerTypes::MatrixVariant(one_rdm));
 
-  auto actual = LocalizerFactory::create("qdk_gauge_fixing")
+  auto actual = OrbitalLocalizerFactory::create("qdk_gauge_fixing")
                     ->run(rotated_wavefunction, fixture.active_indices,
                           fixture.active_indices);
   const auto& expected_coefficients =
@@ -2166,7 +2166,7 @@ TEST_F(LocalizationTest, GaugeFixingRejectsSplitDegenerateBlock) {
 
   // Rotating a partly selected block would change the selected subspace.
   EXPECT_THROW(
-      LocalizerFactory::create("qdk_gauge_fixing")
+      OrbitalLocalizerFactory::create("qdk_gauge_fixing")
           ->run(fixture.natural_wavefunction, split_indices, split_indices),
       std::runtime_error);
 }
@@ -2175,20 +2175,20 @@ TEST_F(LocalizationTest, GaugeFixingRejectsInvalidIndices) {
   auto fixture = make_gauge_fixing_fixture();
   std::vector<size_t> unsorted(fixture.active_indices.rbegin(),
                                fixture.active_indices.rend());
-  EXPECT_THROW(LocalizerFactory::create("qdk_gauge_fixing")
+  EXPECT_THROW(OrbitalLocalizerFactory::create("qdk_gauge_fixing")
                    ->run(fixture.natural_wavefunction, unsorted, unsorted),
                std::invalid_argument);
 
   std::vector<size_t> shortened(fixture.active_indices.begin(),
                                 fixture.active_indices.end() - 1);
-  EXPECT_THROW(LocalizerFactory::create("qdk_gauge_fixing")
+  EXPECT_THROW(OrbitalLocalizerFactory::create("qdk_gauge_fixing")
                    ->run(fixture.natural_wavefunction, fixture.active_indices,
                          shortened),
                std::invalid_argument);
 
   std::vector<size_t> duplicated{fixture.active_indices.front(),
                                  fixture.active_indices.front()};
-  EXPECT_THROW(LocalizerFactory::create("qdk_gauge_fixing")
+  EXPECT_THROW(OrbitalLocalizerFactory::create("qdk_gauge_fixing")
                    ->run(fixture.natural_wavefunction, duplicated, duplicated),
                std::invalid_argument);
 }
@@ -2198,7 +2198,7 @@ TEST_F(LocalizationTest, GaugeFixingRejectsNonFiniteToleranceSettings) {
   // The settings bounds cannot reject NaN, so every tolerance the algorithm
   // branches on has to be checked before it is used.
   for (const auto* key : {"degeneracy_tolerance", "improvement_tolerance"}) {
-    auto localizer = LocalizerFactory::create("qdk_gauge_fixing");
+    auto localizer = OrbitalLocalizerFactory::create("qdk_gauge_fixing");
     localizer->settings().set(key, std::numeric_limits<double>::quiet_NaN());
     EXPECT_THROW(localizer->run(fixture.natural_wavefunction,
                                 fixture.active_indices, fixture.active_indices),
@@ -2234,7 +2234,7 @@ TEST_F(LocalizationTest, GaugeFixingPreservesActiveSpaceForPartialSelection) {
       fixture.num_alpha, fixture.num_beta);
 
   auto gauge_fixed =
-      LocalizerFactory::create("qdk_gauge_fixing")
+      OrbitalLocalizerFactory::create("qdk_gauge_fixing")
           ->run(fixture.natural_wavefunction, degenerate, degenerate);
 
   // Selecting a subset restricts which blocks are swept; it must not truncate
@@ -2276,7 +2276,7 @@ TEST_F(LocalizationTest, GaugeFixingBoundsBlockSpreadByDegeneracyTolerance) {
           fixture.natural_wavefunction, orbitals,
           ContainerTypes::MatrixVariant(chained_rdm));
 
-  auto localizer = LocalizerFactory::create("qdk_gauge_fixing");
+  auto localizer = OrbitalLocalizerFactory::create("qdk_gauge_fixing");
   localizer->settings().set("degeneracy_tolerance", degeneracy_tolerance);
   auto gauge_fixed =
       localizer->run(chained, fixture.active_indices, fixture.active_indices);
@@ -2512,7 +2512,7 @@ static void expect_active_space_qio_reference_entropy(
   const auto active_indices =
       spin_channel_indices(active_orbitals->active_indices(), axes::alpha());
   const double entropy_before = wfn_cas->get_single_orbital_entropies().sum();
-  auto localizer = LocalizerFactory::create("qdk_active_space_qio");
+  auto localizer = OrbitalLocalizerFactory::create("qdk_active_space_qio");
   auto qio_wfn = localizer->run(wfn_cas, active_indices, active_indices);
 
   auto [E_rotated_cas, rotated_wfn_cas] =
@@ -2536,7 +2536,7 @@ TEST_F(LocalizationTest, ActiveSpaceQIOReferenceEntropyOpenShell) {
 }
 
 TEST_F(LocalizationTest, ActiveSpaceQIO) {
-  auto localizer = LocalizerFactory::create("qdk_active_space_qio");
+  auto localizer = OrbitalLocalizerFactory::create("qdk_active_space_qio");
   EXPECT_NO_THROW({ auto settings = localizer->settings(); });
 
   // Get a canonical set of water orbitals.
@@ -2664,7 +2664,7 @@ TEST_F(LocalizationTest,
 }
 
 TEST_F(LocalizationTest, ActiveSpaceQIORejectsMismatchedSpinIndices) {
-  auto localizer = LocalizerFactory::create("qdk_active_space_qio");
+  auto localizer = OrbitalLocalizerFactory::create("qdk_active_space_qio");
 
   Eigen::MatrixXd coeffs = Eigen::MatrixXd::Identity(4, 4);
   Eigen::MatrixXd overlap = Eigen::MatrixXd::Identity(4, 4);
@@ -2705,13 +2705,13 @@ static std::shared_ptr<Wavefunction> make_minimal_active_space_qio_wfn(
 }
 
 TEST_F(LocalizationTest, ActiveSpaceQIORejectsUnsortedIndices) {
-  auto localizer = LocalizerFactory::create("qdk_active_space_qio");
+  auto localizer = OrbitalLocalizerFactory::create("qdk_active_space_qio");
   auto wfn = make_minimal_active_space_qio_wfn({0, 1, 2, 3}, {}, "2200");
   std::vector<size_t> unsorted({2, 0, 1, 3});
   EXPECT_THROW(localizer->run(wfn, unsorted, unsorted), std::invalid_argument);
 }
 TEST_F(LocalizationTest, ActiveSpaceQIORejectsDuplicateIndices) {
-  auto localizer = LocalizerFactory::create("qdk_active_space_qio");
+  auto localizer = OrbitalLocalizerFactory::create("qdk_active_space_qio");
   auto wfn = make_minimal_active_space_qio_wfn({0, 1, 2, 3}, {}, "2200");
   std::vector<size_t> duplicated({0, 1, 1, 2});  // sorted but not unique
   EXPECT_THROW(localizer->run(wfn, duplicated, duplicated),
@@ -2719,7 +2719,7 @@ TEST_F(LocalizationTest, ActiveSpaceQIORejectsDuplicateIndices) {
 }
 
 TEST_F(LocalizationTest, ActiveSpaceQIORejectsMissingOverlap) {
-  auto localizer = LocalizerFactory::create("qdk_active_space_qio");
+  auto localizer = OrbitalLocalizerFactory::create("qdk_active_space_qio");
   const std::vector<size_t> active({0, 1, 2, 3});
   const std::vector<size_t> inactive;
   Eigen::MatrixXd coeffs = Eigen::MatrixXd::Identity(4, 4);
@@ -2735,7 +2735,7 @@ TEST_F(LocalizationTest, ActiveSpaceQIORejectsMissingOverlap) {
 }
 
 TEST_F(LocalizationTest, ActiveSpaceQIOEmptyIndicesAreNoOp) {
-  auto localizer = LocalizerFactory::create("qdk_active_space_qio");
+  auto localizer = OrbitalLocalizerFactory::create("qdk_active_space_qio");
   auto wfn = make_minimal_active_space_qio_wfn({0, 1, 2, 3}, {}, "2200");
   std::shared_ptr<Wavefunction> result;
   std::vector<size_t> empty;
@@ -2757,7 +2757,7 @@ TEST_F(LocalizationTest, ActiveSpaceQIOEmptyIndicesAreNoOp) {
 }
 
 TEST_F(LocalizationTest, ActiveSpaceQIORejectsUnrestricted) {
-  auto localizer = LocalizerFactory::create("qdk_active_space_qio");
+  auto localizer = OrbitalLocalizerFactory::create("qdk_active_space_qio");
   Eigen::MatrixXd coeffs_alpha = Eigen::MatrixXd::Identity(4, 4);
   Eigen::MatrixXd coeffs_beta = Eigen::MatrixXd::Identity(4, 4);
   Eigen::MatrixXd overlap = Eigen::MatrixXd::Identity(4, 4);
@@ -2773,14 +2773,14 @@ TEST_F(LocalizationTest, ActiveSpaceQIORejectsUnrestricted) {
 }
 
 TEST_F(LocalizationTest, ActiveSpaceQIORejectsPartialActiveSpaceIndices) {
-  auto localizer = LocalizerFactory::create("qdk_active_space_qio");
+  auto localizer = OrbitalLocalizerFactory::create("qdk_active_space_qio");
   auto wfn = make_minimal_active_space_qio_wfn({0, 1, 2, 3}, {}, "2200");
   std::vector<size_t> partial({1, 2});  // strict subset of the active space
   EXPECT_THROW(localizer->run(wfn, partial, partial), std::invalid_argument);
 }
 
 TEST_F(LocalizationTest, ActiveSpaceQIORejectsMissingSpinDependentRdm) {
-  auto localizer = LocalizerFactory::create("qdk_active_space_qio");
+  auto localizer = OrbitalLocalizerFactory::create("qdk_active_space_qio");
   // A multi-determinant wavefunction that neither carries nor can lazily
   // generate the spin-dependent active RDMs that QIO requires.
   Eigen::MatrixXd coeffs = Eigen::MatrixXd::Identity(4, 4);
@@ -2899,7 +2899,7 @@ make_scrambled_meanfield_active_space_qio_wfn(size_t n) {
 }
 
 TEST_F(LocalizationTest, ActiveSpaceQIOSettings) {
-  auto localizer = LocalizerFactory::create("qdk_active_space_qio");
+  auto localizer = OrbitalLocalizerFactory::create("qdk_active_space_qio");
   auto& settings = localizer->settings();
   // Jacobi-sweep controls are exposed with documented defaults.
   EXPECT_EQ(settings.get<int64_t>("max_cycles"), 200);
@@ -2938,7 +2938,7 @@ TEST_F(LocalizationTest, ActiveSpaceQIOSettings) {
 TEST_F(LocalizationTest, ActiveSpaceQIORejectsNonFiniteSetting) {
   // A NaN slips past the BoundConstraint range check (every comparison with NaN
   // is false), so it must be rejected at run time with std::invalid_argument.
-  auto localizer = LocalizerFactory::create("qdk_active_space_qio");
+  auto localizer = OrbitalLocalizerFactory::create("qdk_active_space_qio");
   localizer->settings().set("coarse_angle_step",
                             std::numeric_limits<double>::quiet_NaN());
   const size_t n = 4;

@@ -93,6 +93,11 @@ class OrbitalLocalizer
                        std::shared_ptr<data::Wavefunction>,
                        const std::vector<size_t>&, const std::vector<size_t>&> {
  public:
+  // Preserve the inherited name used by derived constructor initializers.
+  using Localizer
+      [[deprecated("Localizer is deprecated; use OrbitalLocalizer instead.")]] =
+          OrbitalLocalizer;
+
   /**
    * @brief Default constructor
    */
@@ -191,6 +196,12 @@ class OrbitalLocalizer
  */
 struct OrbitalLocalizerFactory
     : public AlgorithmFactory<OrbitalLocalizer, OrbitalLocalizerFactory> {
+  // Preserve the inherited name used by derived constructor initializers.
+  using LocalizerFactory
+      [[deprecated("LocalizerFactory is deprecated; use "
+                   "OrbitalLocalizerFactory instead.")]] =
+          OrbitalLocalizerFactory;
+
   static std::string algorithm_type_name() { return "orbital_localizer"; }
   static void register_default_instances();
   static std::string default_algorithm_name() { return "qdk_pipek_mezey"; }

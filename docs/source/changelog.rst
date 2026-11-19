@@ -93,12 +93,6 @@ Bug fixes:
 - Cache plugin discovery failures are logged instead of being swallowed
 - Corrected exponent rendering in the controlled-IQPE tutorial diagram
 
-Deprecated aliases:
-
-- Python ``qdk_chemistry.algorithms.Localizer`` is available again as a
-  deprecated alias of ``OrbitalLocalizer`` for source-snapshot compatibility.
-  Access, including through a wildcard import, emits a ``DeprecationWarning``.
-
 Version 2.1.0
 =============
 

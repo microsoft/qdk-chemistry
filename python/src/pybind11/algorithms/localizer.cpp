@@ -196,11 +196,10 @@ Returns:
   localizer.def("hash", &OrbitalLocalizer::hash, py::arg("wavefunction"),
                 py::arg("loc_indices_a"), py::arg("loc_indices_b"));
 
-  // Factory class binding - creates LocalizerFactory class
-  // with static methods
   qdk::chemistry::python::bind_algorithm_factory<
       OrbitalLocalizerFactory, OrbitalLocalizer, LocalizerBase>(
-      m, "LocalizerFactory");
+      m, "OrbitalLocalizerFactory");
+  m.attr("LocalizerFactory") = m.attr("OrbitalLocalizerFactory");
 
   localizer.def("__repr__", [](const OrbitalLocalizer &) {
     return "<qdk_chemistry.algorithms.OrbitalLocalizer>";
@@ -350,8 +349,8 @@ Initializes a natural orbital transformer with default settings.
 )");
 
   // Bind concrete microsoft::GaugeFixingLocalizer implementation
-  py::class_<microsoft::GaugeFixingLocalizer, Localizer, py::smart_holder>(
-      m, "QdkGaugeFixingLocalizer", R"(
+  py::class_<microsoft::GaugeFixingLocalizer, OrbitalLocalizer,
+             py::smart_holder>(m, "QdkGaugeFixingLocalizer", R"(
 QDK gauge-fixing orbital localizer.
 
 Orbitals with equal occupation numbers span a well-defined subspace without
@@ -381,8 +380,8 @@ Initializes a gauge-fixing localizer with default settings.
 )");
 
   // Bind concrete microsoft::ActiveSpaceQIOLocalizer implementation
-  py::class_<microsoft::ActiveSpaceQIOLocalizer, Localizer, py::smart_holder>(
-      m, "QdkActiveSpaceQIOLocalizer", R"(
+  py::class_<microsoft::ActiveSpaceQIOLocalizer, OrbitalLocalizer,
+             py::smart_holder>(m, "QdkActiveSpaceQIOLocalizer", R"(
 QDK quantum-information orbital (QIO) active-space localizer.
 
 Rotates restricted active orbitals to minimize the total single-orbital entropy

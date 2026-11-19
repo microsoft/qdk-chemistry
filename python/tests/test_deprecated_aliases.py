@@ -165,6 +165,13 @@ class TestLocalizerDeprecation:
             from qdk_chemistry.algorithms import Localizer  # noqa: PLC0415
         assert Localizer is OrbitalLocalizer
 
+    def test_localizer_alias_is_not_in_wildcard_export(self):
+        """Wildcard imports expose the canonical name, not the deprecated alias."""
+        namespace: dict[str, object] = {}
+        exec("from qdk_chemistry.algorithms import *", namespace)
+        assert "Localizer" not in namespace
+        assert namespace["OrbitalLocalizer"] is OrbitalLocalizer
+
     def test_deprecated_localizer_alias_supports_subclassing(self):
         """A subclass using the old base name remains constructible."""
         with pytest.warns(DeprecationWarning, match=r"'qdk_chemistry\.algorithms\.Localizer' is deprecated"):

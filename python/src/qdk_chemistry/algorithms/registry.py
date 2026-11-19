@@ -765,10 +765,10 @@ def _register_cpp_factories():
         GeometryOptimizerFactory,
         HamiltonianConstructorFactory,
         HamiltonianFactorizationFactory,
-        LocalizerFactory,
         MultiConfigurationCalculatorFactory,
         MultiConfigurationScfFactory,
         NuclearDerivativeCalculatorFactory,
+        OrbitalLocalizerFactory,
         PopulationAnalyzerFactory,
         ProjectedMultiConfigurationCalculatorFactory,
         ScfSolverFactory,
@@ -781,7 +781,7 @@ def _register_cpp_factories():
     register_factory(GeometryOptimizerFactory)
     register_factory(HamiltonianConstructorFactory)
     register_factory(HamiltonianFactorizationFactory)
-    register_factory(LocalizerFactory)
+    register_factory(OrbitalLocalizerFactory)
     register_factory(MultiConfigurationCalculatorFactory)
     register_factory(MultiConfigurationScfFactory)
     register_factory(NuclearDerivativeCalculatorFactory)

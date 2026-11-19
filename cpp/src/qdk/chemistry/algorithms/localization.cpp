@@ -215,7 +215,8 @@ void OrbitalLocalizerFactory::register_default_instances() {
   QDK_LOG_TRACE_ENTERING();
 
   OrbitalLocalizerFactory::register_instance(&make_pipek_mezey_localizer);
-  OrbitalLocalizerFactory::register_instance(&make_mp2_natural_orbital_localizer);
+  OrbitalLocalizerFactory::register_instance(
+      &make_mp2_natural_orbital_localizer);
   OrbitalLocalizerFactory::register_instance(&make_natural_orbital_localizer);
   OrbitalLocalizerFactory::register_instance(&make_gauge_fixing_localizer);
   OrbitalLocalizerFactory::register_instance(&make_active_space_qio_localizer);

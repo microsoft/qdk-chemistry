@@ -63,7 +63,7 @@ class GaugeFixingLocalizerSettings : public data::Settings {
  * separate objective from finding the natural orbitals, so the two are
  * composed rather than combined: run @ref NaturalOrbitalLocalizer first.
  */
-class GaugeFixingLocalizer : public Localizer {
+class GaugeFixingLocalizer : public OrbitalLocalizer {
  public:
   GaugeFixingLocalizer() {
     _settings = std::make_unique<GaugeFixingLocalizerSettings>();

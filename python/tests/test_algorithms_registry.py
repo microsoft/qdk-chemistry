@@ -10,7 +10,7 @@ from unittest.mock import MagicMock
 import numpy as np
 import pytest
 
-from qdk_chemistry._core._algorithms import ScfSolverFactory
+from qdk_chemistry._core._algorithms import LocalizerFactory, OrbitalLocalizerFactory, ScfSolverFactory
 from qdk_chemistry.algorithms import ScfSolver, registry
 from qdk_chemistry.data import AlgorithmRef
 from qdk_chemistry.plugins import DuplicateRegistrationError
@@ -31,6 +31,13 @@ except ImportError:
 # Algorithm types that ship as an interface only, with no registered implementation
 # and therefore an empty default name. Remove entries here as implementations land.
 INTERFACE_ONLY_TYPES = {"effective_hamiltonian_constructor"}
+
+
+def test_orbital_localizer_factory_compatibility():
+    """The legacy binding still refers to the canonical registered factory."""
+    assert LocalizerFactory is OrbitalLocalizerFactory
+    assert OrbitalLocalizerFactory.__name__ == "OrbitalLocalizerFactory"
+    assert registry.available("orbital_localizer") == OrbitalLocalizerFactory.available()
 
 
 def test_algorithm_wrapper_forwards_remote_execution_options(monkeypatch):
