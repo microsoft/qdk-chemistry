@@ -104,7 +104,6 @@ namespace QDKChemistry.Utils.MPSSequential {
             "The initial state must cover the first site and a power-of-two part of the bond register."
         );
         let rotationBitPrecision = Length(phaseGradient);
-        use angleReg = Qubit[rotationBitPrecision];
 
         // `initReg` is little-endian with the bond in its low qubits, so amplitude index
         // physical · 2ᵏ + bond is exactly the register value it prepares.
@@ -119,9 +118,13 @@ namespace QDKChemistry.Utils.MPSSequential {
             phaseGradient
         );
 
-        for siteIdx in 0..numSites - 2 {
-            let newSite = MPSSiteQubits(state, numSites, siteToOrbitalOrder[siteIdx + 1]);
-            applySite(siteDecompositions[siteIdx], ancilla, newSite, phaseGradient, angleReg);
+        // Allocated after the initial load, which holds its own angle register.
+        {
+            use angleReg = Qubit[rotationBitPrecision];
+            for siteIdx in 0..numSites - 2 {
+                let newSite = MPSSiteQubits(state, numSites, siteToOrbitalOrder[siteIdx + 1]);
+                applySite(siteDecompositions[siteIdx], ancilla, newSite, phaseGradient, angleReg);
+            }
         }
         ApplyMPSFermionicOrderSigns(siteToOrbitalOrder, state);
     }

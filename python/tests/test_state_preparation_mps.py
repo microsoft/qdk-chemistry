@@ -452,6 +452,29 @@ def test_multi_site_mps_matches_contraction(method):
 
 
 @_METHODS
+def test_six_site_identity_order_signs_match_contraction(method):
+    """A six-site identity-order MPS, whose signs use the parity ladder, prepares its signed contraction."""
+    rng = np.random.default_rng(6)
+    tensors = []
+    for site in range(6):
+        # Alternating (u, d) and (0, 2) superpositions give configurations with both fermionic signs.
+        values = np.zeros(4)
+        values[[1, 2] if site % 2 == 0 else [0, 3]] = rng.uniform(0.5, 1.0, 2)
+        tensors.append((values / np.linalg.norm(values)).reshape(1, 4, 1))
+    mps = make_mps(tensors)
+    target = _target_state(mps)
+    assert (target < 0).any()
+    assert (target > 0).any()
+    operation, site_struct = _QSHARP_OPERATIONS[method]
+    with use_qsharp_context(create_qsharp_context()):
+        data = preparation_data(mps, method)
+        params = data.to_qsharp_params(rotation_bit_precision=_AGREEMENT_PRECISION)
+        probability, state = simulate_mps_preparation(operation, site_struct, params, data.num_sites, data.ancilla_bits)
+    assert probability > 1 - _AGREEMENT_TOLERANCE
+    assert np.abs(np.vdot(target, state)) ** 2 > 1 - _AGREEMENT_TOLERANCE
+
+
+@_METHODS
 def test_shared_phase_gradient_prepares_target(method):
     """Without its own gradient the circuit acts on [state | gradient], prepares the MPS and restores the gradient."""
     mps = make_mps(_random_right_canonical_tensors([1, 4, 3, 2, 1], 4, seed=11), site_to_orbital_order=(2, 0, 3, 1))
