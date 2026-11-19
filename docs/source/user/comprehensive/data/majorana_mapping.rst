@@ -33,7 +33,7 @@ The :class:`~qdk_chemistry.data.MajoranaMapping` supports both forms:
 - :py:meth:`~qdk_chemistry.data.MajoranaMapping.bilinear` — the unified primitive available on every encoding.
 - :py:meth:`~qdk_chemistry.data.MajoranaMapping.majorana` — the additional capability provided by Majorana-atomic encodings; gated by :py:attr:`~qdk_chemistry.data.MajoranaMapping.is_majorana_atomic`.
 
-Majorana-atomic mappings are constructed from a Pauli-string table (the constructor or factory methods).
+Majorana-atomic mappings are constructed from a Pauli-string table (the constructor or factory methods) and derive each bilinear from it on demand.
 Bilinear-only mappings are constructed via :py:meth:`~qdk_chemistry.data.MajoranaMapping.from_bilinears`.
 
 Convention
