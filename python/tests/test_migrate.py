@@ -307,6 +307,43 @@ def test_other_unitary_containers_need_no_migration(tmp_path):
         migrate.convert_file(src, tmp_path / "new.unitary_representation.json")
 
 
+@pytest.mark.parametrize(
+    ("source_format", "output_format"),
+    [("json", "json"), ("json", "hdf5"), ("hdf5", "json"), ("hdf5", "hdf5")],
+)
+def test_hubbard_plaquette(tmp_path, source_format, output_format):
+    """A plaquette evolution written before its Trotter order was stored migrates as second order."""
+    old = {
+        "version": "0.1.0",
+        "container_type": "hubbard_plaquette",
+        "width": 4,
+        "height": 4,
+        "interaction_angle": 0.1,
+        "constant_shift": 0.3,
+        "hopping_angle": 0.2,
+        "step_reps": 3,
+        "scale": 1.5,
+    }
+    src = tmp_path / f"old.unitary_representation.{'json' if source_format == 'json' else 'h5'}"
+    dst = tmp_path / f"new.unitary_representation.{'json' if output_format == 'json' else 'h5'}"
+    if source_format == "json":
+        src.write_text(json.dumps(old))
+    else:
+        with h5py.File(src, "w") as handle:
+            handle.attrs.update({"version": "0.1.0", "container_type": "hubbard_plaquette", "payload": json.dumps(old)})
+    with pytest.raises(RuntimeError, match=r"qdk_chemistry\.migrate"):
+        UnitaryRepresentation.from_file(src, source_format)
+
+    migrate.convert_file(src, dst)
+    restored = UnitaryRepresentation.from_file(dst, output_format).get_container()
+    assert restored.to_json() == {**old, "version": "0.2.0", "order": 2}
+
+    with pytest.raises(migrate.MigrationError, match="No migration step"):
+        migrate.convert_file(
+            dst, tmp_path / f"again.unitary_representation.{'json' if output_format == 'json' else 'h5'}"
+        )
+
+
 # --------------------------------------------------------------------------- #
 # Orbitals
 # --------------------------------------------------------------------------- #

@@ -222,7 +222,8 @@ A translated, scaled, rotated or renumbered square lattice is rejected.
 The hopping term splits into two layers of disjoint four-site plaquettes, :math:`P` and :math:`G`, each of which is evolved exactly :cite:`Campbell2022`.
 The interaction is taken in its particle-hole symmetric form :math:`U \sum_i (n_{i\uparrow} - 1/2)(n_{i\downarrow} - 1/2)`, whose Jordan-Wigner image is pure :math:`ZZ`.
 Each second-order step is the symmetric product :math:`P^{1/2} I^{1/2} G I^{1/2} P^{1/2}`, the "PIG" ordering of :cite:`Apel2026`.
-The half-angle pink layers of neighbouring steps merge into one full-angle layer, so a repeated evolution emits a single half-angle pink layer only at each end.
+Higher even orders compose it by Suzuki's recursion :cite:`Suzuki1992`.
+The half-angle pink layers of neighbouring steps merge into one layer, so a repeated evolution emits a single half-angle pink layer only at each end.
 The modes are likewise routed into pink order once at each end, so every pink plaquette stays local and only the gold layers route.
 Setting ``num_electrons`` records the scalar offset to the described model, with its on-site energy :math:`\epsilon` and interaction :math:`U \sum_i n_{i\uparrow} n_{i\downarrow}`, so that phase estimation reports that model's energy.
 
@@ -233,7 +234,7 @@ Setting ``container_type`` to ``"pauli_product_formula"`` instead emits every fe
 The ``num_electrons`` shift then becomes an identity term in the circuit, so the phase-estimation window must cover the described model's energy rather than the particle-hole symmetric one.
 Prefer ``"cswap_pauli_sequence"``, which applies the formula uncontrolled; ``"pauli_sequence"`` controls every swap and butterfly rotation as well, so it is costlier and mainly useful for compatibility.
 
-The number of steps can be set directly (``num_divisions``) or estimated from ``target_accuracy`` with Campbell's error constant for the related IPG ordering :cite:`Campbell2022`.
+The number of steps can be set directly (``num_divisions``) or estimated from ``target_accuracy`` with Campbell's error constant for the related IPG ordering :cite:`Campbell2022` at order 2, or a commutator bound :cite:`Schubert2023` at order 4.
 
 .. rubric:: Settings
 
@@ -246,13 +247,13 @@ The number of steps can be set directly (``num_divisions``) or estimated from ``
      - Description
    * - ``order``
      - int
-     - Trotter order. Only 2 is supported. Default is 2.
+     - Trotter order, a positive even integer. Default is 2.
    * - ``num_electrons``
      - int
      - Electron count for the scalar shift to the estimated energy. When set to -1 (default), the particle-hole symmetric model's energy is reported.
    * - ``target_accuracy``
      - float
-     - Energy error budget that sizes the automatic step count. When set to 0.0 (default), automatic step-count estimation is disabled.
+     - Energy error budget that sizes the automatic step count at order 2 or 4. When set to 0.0 (default), automatic step-count estimation is disabled.
    * - ``num_divisions``
      - int
      - Explicit number of plaquette Trotter steps. When set to 0 (default), determined from ``target_accuracy``; otherwise the larger of the two is used.

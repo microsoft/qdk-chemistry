@@ -1,4 +1,4 @@
-"""Second-order plaquette Trotterization for the uniform Fermi-Hubbard model."""
+"""Plaquette Trotterization for the uniform Fermi-Hubbard model."""
 
 # --------------------------------------------------------------------------------------------
 # Copyright (c) Microsoft Corporation. All rights reserved.
@@ -13,6 +13,9 @@ from functools import cache
 import numpy as np
 
 from qdk_chemistry.algorithms.hamiltonian_unitary_builder.base import TimeEvolutionBuilder, TimeEvolutionSettings
+from qdk_chemistry.algorithms.hamiltonian_unitary_builder.time_evolution.hubbard_plaquette_trotter_error import (
+    hubbard_plaquette_commutator_bound,
+)
 from qdk_chemistry.data import FermiHubbardModelHamiltonianDescription, LatticeGeometry
 from qdk_chemistry.data.unitary_representation.base import UnitaryRepresentation
 from qdk_chemistry.data.unitary_representation.containers.hubbard_plaquette import HubbardPlaquetteContainer
@@ -77,6 +80,7 @@ def _hopping_layers(kappa: float, blocks: list[list[int]], order: list[int]) -> 
 def _plaquette_product_formula(
     width: int,
     height: int,
+    trotter_order: int,
     interaction_angle: float,
     hopping_angle: float,
     phase: float,
@@ -90,10 +94,11 @@ def _plaquette_product_formula(
     Args:
         width: Number of lattice columns.
         height: Number of lattice rows.
+        trotter_order: The Trotter order of each step.
         interaction_angle: The ``Z_s Z_{s+M}`` angle of one full interaction layer.
         hopping_angle: The hopping angle ``kappa`` of one full tiling layer.
         phase: The total scalar phase, applied as one identity term.
-        step_reps: The number of second-order steps.
+        step_reps: The number of steps.
         scale: The evolution time used for eigenvalue-phase conversion.
 
     Returns:
@@ -106,19 +111,25 @@ def _plaquette_product_formula(
     # As in Q#, a hopping-free model skips the routing into pink order.
     order = QSHARP_UTILS.HubbardPlaquette.TilingOrder(pink, 2 * sites) if hopping_angle != 0.0 else identity
     route = _fswap_layers(QSHARP_UTILS.HubbardPlaquette.RoutingSwaps(identity, order, True)[1])
-    half_interaction = (
-        [[ExponentiatedPauliTerm({s: "Z", s + sites: "Z"}, 0.5 * interaction_angle) for s in range(sites)]]
-        if interaction_angle != 0.0
-        else []
-    )
-    middle = [*half_interaction, *_hopping_layers(hopping_angle, gold, order), *half_interaction]
-    half_pink = _hopping_layers(0.5 * hopping_angle, pink, order)
+    fractions = QSHARP_UTILS.HubbardPlaquette.SuzukiStageFractions(trotter_order)
+    middle: list[_Layer] = []
+    for stage, fraction in enumerate(fractions):
+        half_angle = 0.5 * fraction * interaction_angle
+        half_interaction = (
+            [[ExponentiatedPauliTerm({s: "Z", s + sites: "Z"}, half_angle) for s in range(sites)]]
+            if interaction_angle != 0.0
+            else []
+        )
+        middle += [*half_interaction, *_hopping_layers(fraction * hopping_angle, gold, order), *half_interaction]
+        if stage + 1 < len(fractions):
+            middle += _hopping_layers(0.5 * (fraction + fractions[stage + 1]) * hopping_angle, pink, order)
+    half_pink = _hopping_layers(0.5 * fractions[0] * hopping_angle, pink, order)
 
     scalar = [[ExponentiatedPauliTerm({}, phase)]] if phase != 0.0 else []
     prefix = [*scalar, *route, *half_pink]
     last, unroute = [*middle, *half_pink], _adjoint(route)
     if step_reps > 1:
-        sections = (prefix, [*middle, *_hopping_layers(hopping_angle, pink, order)], [*last, *unroute])
+        sections = (prefix, [*middle, *_hopping_layers(fractions[0] * hopping_angle, pink, order)], [*last, *unroute])
     else:
         sections = (prefix, last, unroute)
 
@@ -144,14 +155,14 @@ class HubbardPlaquetteTrotterSettings(TimeEvolutionSettings):
     def __init__(self):
         """Initialize the plaquette-specific settings."""
         super().__init__()
-        self._set_default("order", "int", 2, "The Trotter decomposition order; only 2 is supported.")
+        self._set_default("order", "int", 2, "The Trotter decomposition order, a positive even integer.")
         self._set_default(
             "target_accuracy",
             "double",
             0.0,
-            "Energy error budget that sizes the automatic plaquette step count (0.0 means disabled). The number "
-            "of Trotter steps comes from Campbell's IPG error constant, an estimate for the emitted PIG ordering "
-            "rather than a guarantee.",
+            "Energy error budget that sizes the automatic plaquette step count at orders 2 and 4 (0.0 means "
+            "disabled). At order 2 the number of Trotter steps comes from Campbell's IPG error constant, an "
+            "estimate for the emitted PIG ordering rather than a guarantee.",
         )
         self._set_default(
             "num_divisions",
@@ -196,9 +207,10 @@ class HubbardPlaquetteTrotter(TimeEvolutionBuilder):
     The ``num_electrons`` shift then becomes an identity term in the circuit, so the phase-estimation window must
     cover the described model's energy rather than the particle-hole symmetric one.
 
-    The plaquette decomposition, its error constant, and the exact four-mode plaquette
+    The plaquette decomposition, its second-order error constant, and the exact four-mode plaquette
     evolution are Campbell's :cite:`Campbell2022`. The factor ordering and the step-count
-    rule follow the later compilation of the same algorithm in :cite:`Apel2026`.
+    rule follow the later compilation of the same algorithm in :cite:`Apel2026`. Higher even orders
+    follow Suzuki's recursion :cite:`Suzuki1992`.
     """
 
     def __init__(
@@ -216,22 +228,21 @@ class HubbardPlaquetteTrotter(TimeEvolutionBuilder):
         """Initialize the builder.
 
         Args:
-            order: Trotter decomposition order. Only 2 is supported.
+            order: Trotter decomposition order, a positive even integer.
             num_electrons: Electron count for the scalar shift to the estimated energy; ``None`` skips it.
             time: The evolution time. Defaults to 0.0.
-            target_accuracy: Energy error budget that sizes the automatic step count; see ``_step_count`` for why
-                it is an estimate rather than a guarantee. Use 0.0 to disable.
+            target_accuracy: Energy error budget that sizes the automatic step count at order 2 or 4; 0.0 disables it.
             num_divisions: Number of Trotter steps. Max of this and the auto value is used.
             power: The power to raise the unitary to. Defaults to 1.
             power_strategy: Strategy for ``U^power``: ``"rescale"`` or ``"repeat"``.
             container_type: Output container, ``"hubbard_plaquette"`` or ``"pauli_product_formula"``.
 
         Raises:
-            ValueError: If *order* is anything other than 2.
+            ValueError: If *order* is not a positive even integer.
 
         """
-        if order != 2:
-            raise ValueError(f"HubbardPlaquetteTrotter supports order 2 only, got {order}.")
+        if order <= 0 or order % 2:
+            raise ValueError(f"HubbardPlaquetteTrotter supports positive even orders, got {order}.")
 
         super().__init__()
         settings = HubbardPlaquetteTrotterSettings()
@@ -390,6 +401,9 @@ class HubbardPlaquetteTrotter(TimeEvolutionBuilder):
         Trotter error comes only from splitting :math:`H_I`, :math:`H_h^p`, and :math:`H_h^g`; each layer
         is applied exactly.
 
+        Higher even orders compose this step by Suzuki's recursion :cite:`Suzuki1992`, merging the pink
+        halves of neighbouring steps in the same way.
+
         Args:
             model: The Fermi-Hubbard model on a periodic square lattice.
 
@@ -399,7 +413,7 @@ class HubbardPlaquetteTrotter(TimeEvolutionBuilder):
 
         Raises:
             TypeError: If *model* is not a ``FermiHubbardModelHamiltonianDescription``.
-            ValueError: If the order is not 2, the lattice is not a periodic square lattice, or
+            ValueError: If the order is invalid, the lattice is not a periodic square lattice, or
                 ``num_electrons`` is neither -1 nor a valid electron count for the lattice.
 
         """
@@ -409,8 +423,8 @@ class HubbardPlaquetteTrotter(TimeEvolutionBuilder):
                 f"got {type(model).__name__}."
             )
         order = self._settings.get("order")
-        if order != 2:
-            raise ValueError(f"HubbardPlaquetteTrotter supports order 2 only, got {order}.")
+        if order <= 0 or order % 2:
+            raise ValueError(f"HubbardPlaquetteTrotter supports positive even orders, got {order}.")
 
         # 1. Geometry
         width, height = self._lattice_geometry(model.lattice)
@@ -445,6 +459,7 @@ class HubbardPlaquetteTrotter(TimeEvolutionBuilder):
                 container=_plaquette_product_formula(
                     width,
                     height,
+                    order,
                     interaction_angle=pair_angle * delta_time,
                     hopping_angle=2.0 * hopping * delta_time,
                     phase=shift * delta_time * step_reps,
@@ -461,6 +476,7 @@ class HubbardPlaquetteTrotter(TimeEvolutionBuilder):
                 hopping_angle=2.0 * hopping * delta_time,
                 step_reps=step_reps,
                 scale=time * power_repetitions,
+                order=order,
             )
         )
 
@@ -539,7 +555,7 @@ class HubbardPlaquetteTrotter(TimeEvolutionBuilder):
     ) -> int:
         """Determine the number of Trotter steps from the plaquette-specific error constant.
 
-        ``W_PLAQ <= W_SO2 + W_extra2``, Eq. (20) of :cite:`Campbell2022`.
+        At order 2, ``W <= W_SO2 + W_extra2``, Eq. (20) of :cite:`Campbell2022`.
 
         This constant is derived for the "IPG" factor ordering (interaction outermost), while the circuit
         this builder emits uses the "PIG" ordering based on Sec. 4.8.2 of :cite:`Apel2026`.
@@ -553,15 +569,17 @@ class HubbardPlaquetteTrotter(TimeEvolutionBuilder):
             W_extra2 = (3/24) ||[[R^p, R^g], R^g]||
             W_SO2 <= (uτ^2 / 6) * L^2 * (√5+8) + (u^2τ / 24) ||H_h||
 
-        The number of Trotter steps is determined by::
+        At order 4, ``W`` is :func:`hubbard_plaquette_commutator_bound`.
 
-            r = ceil(sqrt(W_PLAQ T^3 / (2 sin(eps_TS T / 2)))),
+        The number of Trotter steps of order p is determined by::
+
+            r = ceil((W T^(p+1) / (2 sin(eps_TS T / 2)))^(1/p)),
 
         where T is the total evolution time, s = T/r the duration of a single Trotter step, and eps_TS the
         energy error budget for the Suzuki-Trotter approximation.
 
-        A single step of size s carries unitary error ``||Delta U|| <= W_PLAQ s^3``.
-        Summing r steps of size s = T/r by subadditivity gives ``||Delta U|| <= W_PLAQ T^3 / r^2``.
+        A single step of size s carries unitary error ``||Delta U|| <= W s^(p+1)``.
+        Summing r steps of size s = T/r by subadditivity gives ``||Delta U|| <= W T^(p+1) / r^p``.
         The induced error in the estimated energy then satisfies ``|Delta E| <= (2/T) arcsin(||Delta U|| / 2)``.
 
         Args:
@@ -574,6 +592,9 @@ class HubbardPlaquetteTrotter(TimeEvolutionBuilder):
         Returns:
             The number of Trotter steps, at least one.
 
+        Raises:
+            ValueError: If ``target_accuracy`` is set above order 4.
+
         """
         num_divisions = self._settings.get("num_divisions")
         manual = num_divisions if num_divisions > 0 else 1
@@ -582,24 +603,34 @@ class HubbardPlaquetteTrotter(TimeEvolutionBuilder):
         if target_accuracy <= 0.0:
             return manual
 
-        num_sites = width * height
+        order = self._settings.get("order")
         hopping = abs(hopping)
         interaction = abs(interaction)
 
-        hopping_norm = self._hopping_trace_norm(width, height) * hopping
-        commutator_norm = self._commutator_trace_norm(width, height) * hopping**3
+        if order == 2:
+            num_sites = width * height
+            hopping_norm = self._hopping_trace_norm(width, height) * hopping
+            commutator_norm = self._commutator_trace_norm(width, height) * hopping**3
 
-        w_so2 = (
-            interaction * hopping**2 / 6.0 * num_sites * (math.sqrt(5.0) + 8.0) + interaction**2 / 24.0 * hopping_norm
-        )
-        w_extra2 = 3.0 / 24.0 * commutator_norm
-        w_plaquette = w_so2 + w_extra2
+            w_so2 = (
+                interaction * hopping**2 / 6.0 * num_sites * (math.sqrt(5.0) + 8.0)
+                + interaction**2 / 24.0 * hopping_norm
+            )
+            w_extra2 = 3.0 / 24.0 * commutator_norm
+            w_plaquette = w_so2 + w_extra2
+        elif order == 4:
+            w_plaquette = hubbard_plaquette_commutator_bound(width, height, order, hopping, interaction)
+        else:
+            raise ValueError(
+                f"HubbardPlaquetteTrotter sizes steps from target_accuracy only up to order 4, got order {order}."
+            )
 
         duration = abs(time)
         if w_plaquette <= 0.0 or duration == 0.0:
             automatic = 1
         else:
             phase = min(target_accuracy * duration, math.pi)
-            automatic = max(1, math.ceil(math.sqrt(w_plaquette * duration**3 / (2.0 * math.sin(phase / 2.0)))))
+            ratio = w_plaquette * duration ** (order + 1) / (2.0 * math.sin(phase / 2.0))
+            automatic = max(1, math.ceil(ratio ** (1.0 / order)))
         Logger.debug(f"HubbardPlaquetteTrotter: bound gives r={automatic}, manual is {manual}.")
         return max(manual, automatic)
