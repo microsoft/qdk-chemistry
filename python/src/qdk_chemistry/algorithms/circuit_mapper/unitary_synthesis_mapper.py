@@ -100,7 +100,7 @@ class UnitarySynthesisMapper(CircuitMapper):
     r"""Base mapper that synthesizes a real isometry :math:`M` on little-endian qubits from a UnitaryMatrixContainer.
 
     Subclasses set ``_qsharp_prefix`` of the ``QDKChemistry.Utils.IsometrySynthesis`` entry points and implement
-    :meth:`_synthesize`; the input is the low ``num_input_qubits`` qubits, the others start in :math:`|0\rangle`,
+    ``_synthesize``; the input is the low ``num_input_qubits`` qubits, the others start in :math:`|0\rangle`,
     and all rotations use quantized Givens angles :cite:`Clements2016` applied by phase-gradient addition.
     """
 
