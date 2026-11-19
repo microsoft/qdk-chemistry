@@ -183,7 +183,7 @@ class MatrixProductStatePreparation(StatePreparation):
             except ValueError as error:
                 raise ValueError(f"{_DESCRIPTION} requires isometric sites; site {index} is not: {error}") from error
             unitary = UnitaryRepresentation(container)
-            syntheses.append(mapper.run(unitary)._qsharp_factory.parameter["synthesis"])  # noqa: SLF001
+            syntheses.append(mapper.synthesize(unitary))
             right_factor = mapper.right_factor(unitary) if isinstance(mapper, DenseUnitarySynthesisMapper) else None
         syntheses.reverse()
 
