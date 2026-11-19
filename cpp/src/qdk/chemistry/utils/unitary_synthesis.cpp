@@ -310,16 +310,15 @@ void commute_signs(GivensDecomposition& givens) {
 }
 
 // Absorbs the signs of states pair and pair + 1 into a covering rotation via
-// G(θ ± π) = -G(θ), returning false when no layer covers the pair.
-bool absorb_sign_pair(GivensDecomposition& givens, std::size_t pair) {
+// G(θ ± π) = -G(θ), returning false when no layer covers the pair; ends[layer]
+// is one past the layer's last rotation.
+bool absorb_sign_pair(GivensDecomposition& givens, std::size_t pair,
+                      std::vector<std::size_t>& ends) {
   const auto parity = static_cast<std::uint8_t>(pair % 2);
   const auto slot = pair / 2;
   const auto num_layers = givens.layer_angles.size();
   const auto covers = [&](std::size_t layer, std::size_t from) {
-    const auto& angles = givens.layer_angles[layer];
-    return givens.layer_shifted[layer] == parity && from < angles.size() &&
-           std::any_of(angles.begin() + static_cast<std::ptrdiff_t>(from),
-                       angles.end(), is_rotation);
+    return givens.layer_shifted[layer] == parity && from < ends[layer];
   };
   auto chosen = num_layers;
   for (std::size_t layer = 0; layer < num_layers && chosen == num_layers;
@@ -350,8 +349,12 @@ bool absorb_sign_pair(GivensDecomposition& givens, std::size_t pair) {
       angles[(pair + 1) / 2] = -angles[(pair + 1) / 2];
     }
   }
-  auto& angle = givens.layer_angles[chosen][slot];
-  angle = angle > 0.0 ? angle - std::numbers::pi : angle + std::numbers::pi;
+  auto& angles = givens.layer_angles[chosen];
+  angles[slot] = angles[slot] > 0.0 ? angles[slot] - std::numbers::pi
+                                    : angles[slot] + std::numbers::pi;
+  while (ends[chosen] > 0 && !is_rotation(angles[ends[chosen] - 1])) {
+    --ends[chosen];
+  }
   givens.phases[pair] ^= 1;
   givens.phases[pair + 1] ^= 1;
   return true;
@@ -371,17 +374,24 @@ void absorb_signs(GivensDecomposition& givens, const std::vector<bool>& used) {
       last_unused = index;
     }
   }
+  // Negation keeps rotations, so only a θ ∓ π on a layer's last one moves ends.
+  std::vector<std::size_t> ends;
+  for (const auto& angles : givens.layer_angles) {
+    ends.push_back(static_cast<std::size_t>(
+        angles.rend() -
+        std::find_if(angles.rbegin(), angles.rend(), is_rotation)));
+  }
   // Each sign is carried pair by pair to the right, then to the left.
   const auto forward_end = last_unused.value_or(size - 1);
   for (std::size_t index = 0; index < forward_end; ++index) {
-    if (givens.phases[index] != 0 && absorb_sign_pair(givens, index) &&
+    if (givens.phases[index] != 0 && absorb_sign_pair(givens, index, ends) &&
         !used[index + 1]) {
       givens.phases[index + 1] = 0;
     }
   }
   for (auto index = size - 1; first_unused && index > *first_unused; --index) {
-    if (givens.phases[index] != 0 && absorb_sign_pair(givens, index - 1) &&
-        !used[index - 1]) {
+    if (givens.phases[index] != 0 &&
+        absorb_sign_pair(givens, index - 1, ends) && !used[index - 1]) {
       givens.phases[index - 1] = 0;
     }
   }

@@ -40,6 +40,7 @@ namespace QDKChemistry.Utils.UnitarySynthesis {
     import QDKChemistry.Utils.SelectSwap.SelectSwap2D;
     import QDKChemistry.Utils.SelectSwap.SelectSwapAliased;
     import QDKChemistry.Utils.SelectSwap.SelectSwapForwardCost;
+    import QDKChemistry.Utils.UnaryIteration.AddressQubits;
 
     /// Givens representation U = D · L_{m-1} ⋯ L_0 of a real orthogonal matrix, mirroring the
     /// C++ `qdk::chemistry::utils::GivensDecomposition`, where layer L_j applies
@@ -126,7 +127,8 @@ namespace QDKChemistry.Utils.UnitarySynthesis {
         }
         adjoint (...) {
             let measured = ResultArrayAsBoolArray(ForEach(MResetX, target));
-            ApplyBranchPhaseFixup(measured, data, true, [flag] + address);
+            // The load reads only the address prefix that enumerates `data`.
+            ApplyBranchPhaseFixup(measured, data, true, [flag] + address[...AddressQubits(Length(data)) - 1]);
         }
     }
 

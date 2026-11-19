@@ -143,6 +143,24 @@ class UnitarySynthesisMapper(CircuitMapper):
             )
         return requested
 
+    def synthesize(self, unitary: UnitaryRepresentation) -> dict[str, Any]:
+        """Return the fields of the Q# ``{_qsharp_prefix}Synthesis`` struct without building a Q# operation.
+
+        Args:
+            unitary: The unitary representation holding a UnitaryMatrixContainer.
+
+        Returns:
+            dict[str, Any]: The struct fields, including ``maxSwapBits``, that ``run`` passes to Q#.
+
+        Raises:
+            ValueError: If the container or the settings are invalid for the matrix.
+
+        """
+        container = self._container(unitary)
+        synthesis = self._synthesize(container, self._num_input_qubits(container))
+        synthesis["maxSwapBits"] = self._settings.get("max_lookup_swap_bits")
+        return synthesis
+
     def _run_impl(self, unitary: UnitaryRepresentation) -> Circuit:
         """Synthesize the circuit of the isometry in ``unitary``.
 
@@ -156,11 +174,10 @@ class UnitarySynthesisMapper(CircuitMapper):
             ValueError: If the container or the settings are invalid for the matrix.
 
         """
+        synthesis = self.synthesize(unitary)
         container = self._container(unitary)
         num_input_qubits = self._num_input_qubits(container)
         rotation_bit_precision = self._settings.get("rotation_bit_precision")
-        synthesis = self._synthesize(container, num_input_qubits)
-        synthesis["maxSwapBits"] = self._settings.get("max_lookup_swap_bits")
         # The order matches the Q# Params structs and the positional arguments of Make*Circuit.
         parameter: dict[str, Any] = {
             "synthesis": synthesis,
