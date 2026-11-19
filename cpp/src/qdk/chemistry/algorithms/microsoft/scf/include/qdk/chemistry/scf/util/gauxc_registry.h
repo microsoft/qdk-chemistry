@@ -77,29 +77,27 @@ class GAUXCRegistry {
 };
 
 /**
- * @brief Clear cached GauXC instances when the scope exits.
- *
- * A failed SCF can leave a cached integrator that is invalid for a later basis.
+ * @brief Clear the entire shared GauXC registry on scope exit.
  */
 class ScopedGAUXCCacheCleanup {
  public:
-  ~ScopedGAUXCCacheCleanup() { clear(); }
-
-  void clear() {
-    if (active_) {
-      active_ = false;
-      GAUXCRegistry::clear();
-    }
-  }
-
+  /// @brief Establish a cleanup scope without modifying the registry.
   ScopedGAUXCCacheCleanup() = default;
-  ScopedGAUXCCacheCleanup(const ScopedGAUXCCacheCleanup&) = delete;
-  ScopedGAUXCCacheCleanup& operator=(const ScopedGAUXCCacheCleanup&) = delete;
-  ScopedGAUXCCacheCleanup(ScopedGAUXCCacheCleanup&&) = delete;
-  ScopedGAUXCCacheCleanup& operator=(ScopedGAUXCCacheCleanup&&) = delete;
 
- private:
-  bool active_ = true;
+  /// @brief Destroy all cached GauXC instances and invalidate pointers to them.
+  ~ScopedGAUXCCacheCleanup() { GAUXCRegistry::clear(); }
+
+  /// @brief Copy construction is disabled.
+  ScopedGAUXCCacheCleanup(const ScopedGAUXCCacheCleanup&) = delete;
+
+  /// @brief Copy assignment is disabled.
+  ScopedGAUXCCacheCleanup& operator=(const ScopedGAUXCCacheCleanup&) = delete;
+
+  /// @brief Move construction is disabled.
+  ScopedGAUXCCacheCleanup(ScopedGAUXCCacheCleanup&&) = delete;
+
+  /// @brief Move assignment is disabled.
+  ScopedGAUXCCacheCleanup& operator=(ScopedGAUXCCacheCleanup&&) = delete;
 };
 
 }  // namespace qdk::chemistry::scf::util
