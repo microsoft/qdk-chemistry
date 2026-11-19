@@ -130,11 +130,7 @@ class ControlledPSPMapper(ControlledCircuitMapper):
             reflection_op = QSHARP_UTILS.PrepSelPrep.MakeAncillaReflectionOp(num_system_qubits, num_block_ancillas)
             step_op = QSHARP_UTILS.PrepSelPrep.MakeWalkOp(step_op, reflection_op)
 
-        repeated_op = QSHARP_UTILS.CircuitComposition.MakeRepeatedOp(
-            "ControlledPSPWalk" if use_quantum_walk else "ControlledPrepSelPrep",
-            step_op,
-            container.power,
-        )
+        repeated_op = QSHARP_UTILS.CircuitComposition.MakeRepeatedOp(step_op, container.power)
         controlled_op = QSHARP_UTILS.CircuitComposition.MakeControlledOp(repeated_op)
 
         qsharp_factory = QsharpFactoryData(

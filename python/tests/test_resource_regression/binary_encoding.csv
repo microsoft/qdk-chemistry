@@ -1,0 +1,3 @@
+,numQubits,tCount,rotationCount,cczCount,measurementCount
+ozone,10,7,7,9,0
+ozone_without_negative_controls,10,7,7,5,0

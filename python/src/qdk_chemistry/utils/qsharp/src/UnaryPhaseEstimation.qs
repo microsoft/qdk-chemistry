@@ -10,7 +10,7 @@ namespace QDKChemistry.Utils.UnaryPhaseEstimation {
     import Std.ResourceEstimation.EnableMemoryComputeArchitecture;
     import Std.ResourceEstimation.IsResourceEstimating;
     import Std.ResourceEstimation.LeastRecentlyUsed;
-    import Std.ResourceEstimation.RepeatEstimates;
+    import QDKChemistry.Utils.Loop.ResourceEstimateLoopAdjoint;
     import QDKChemistry.Utils.UnaryIteration.AddressQubits;
     import QDKChemistry.Utils.UnaryIteration.UnaryIterationWithControl;
 
@@ -70,11 +70,9 @@ namespace QDKChemistry.Utils.UnaryPhaseEstimation {
         if IsResourceEstimating() {
             UnaryIterationWithControl(phaseReg, numQueries + 1, (slot, selected) => {
                 if slot == 0 {
-                    within {
-                        RepeatEstimates(numQueries);
-                    } apply {
-                        ApplySignedPowerSlot(applyBlockEncoding, applyReflection, true, selected, allQubits);
-                    }
+                    ResourceEstimateLoopAdjoint(numQueries, 2, _ =>
+                        ApplySignedPowerSlot(applyBlockEncoding, applyReflection, true, selected, allQubits)
+                    );
                 } elif slot == numQueries {
                     ApplySignedPowerSlot(applyBlockEncoding, applyReflection, false, selected, allQubits);
                 }

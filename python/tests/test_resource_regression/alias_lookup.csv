@@ -1,0 +1,4 @@
+,numQubits,cczCount,ccixCount,tCount,rotationCount,measurementCount
+forward,199,504,0,0,0,525
+adjoint,115,83,0,0,0,104
+round_trip,199,587,0,0,0,629

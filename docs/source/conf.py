@@ -113,6 +113,8 @@ autodoc_typehints = (
 autodoc_typehints_format = (
     "short"  # Use shorter type names (e.g., List instead of typing.List)
 )
+# QDK's Rust enum reports "builtins" instead of its public module.
+autodoc_type_aliases = {"ErrorComposition": "qdk.qre.ErrorComposition"}
 autodoc_member_order = "bysource"  # Document members in the order they appear in source
 autoclass_content = "class"  # "class", "both", or "init"
 autodoc_docstring_signature = (
