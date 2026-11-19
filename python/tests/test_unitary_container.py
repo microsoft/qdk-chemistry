@@ -1,4 +1,4 @@
-"""Test time evolution container functionality in QDK/Chemistry."""
+"""Tests for the unitary representation containers in QDK/Chemistry."""
 
 # --------------------------------------------------------------------------------------------
 # Copyright (c) Microsoft Corporation. All rights reserved.
@@ -8,11 +8,15 @@
 import copy
 import json
 import pickle
+import tracemalloc
 
 import h5py
 import numpy as np
 import pytest
+from scipy import sparse
+from scipy.stats import ortho_group, unitary_group
 
+from qdk_chemistry.data import UnitaryMatrixContainer, UnitaryRepresentation
 from qdk_chemistry.data.unitary_representation.containers.pauli_product_formula import (
     ExponentiatedPauliTerm,
     PauliProductFormulaContainer,
@@ -417,3 +421,236 @@ class TestPauliProductFormulaContainer:
         assert combined.step_reps == 1
         assert combined.prefix_terms == combined.suffix_terms == ()
         assert combined.step_terms == (phase, x, z, x, z, ExponentiatedPauliTerm(x.pauli_term, 0.375), phase)
+
+
+def _block_sparse(seed: int, phased: bool = False) -> sparse.csc_array:
+    """Return a row-permuted 8x8 block-diagonal orthogonal matrix, with distinct row phases when `phased`."""
+    blocks = [sparse.coo_array(ortho_group.rvs(2, random_state=seed)), ortho_group.rvs(4, random_state=seed + 1)]
+    matrix = sparse.block_diag([*blocks, [[1.0]], [[-1.0]]], format="csc")[np.random.default_rng(seed).permutation(8)]
+    if phased:
+        matrix = sparse.csc_array(np.diag(np.exp(1j * np.arange(1, 9)))) @ matrix
+    return sparse.csc_array(matrix)
+
+
+class TestUnitaryMatrixContainer:
+    """Tests for UnitaryMatrixContainer."""
+
+    @pytest.mark.parametrize(("rows", "cols"), [(2, 1), (2, 2), (4, 3), (8, 8)])
+    def test_dense_isometry(self, rows, cols):
+        """Orthonormal columns, to within rounding, are copied in and stored read-only as float64."""
+        matrix = ortho_group.rvs(rows, random_state=rows + cols)[:, :cols]
+        expected = matrix.copy()
+        container = UnitaryMatrixContainer(matrix)
+        matrix[0, 0] = 5.0
+
+        assert (container.type, container.num_qubits, container.num_columns) == (
+            "unitary_matrix",
+            rows.bit_length() - 1,
+            cols,
+        )
+        assert container.is_square == (rows == cols)
+        assert not container.is_sparse
+        assert container.matrix.dtype == np.float64
+        assert not container.matrix.flags.writeable
+        np.testing.assert_array_equal(container.to_dense(), expected)
+        UnitaryMatrixContainer(expected + 1e-12)
+        assert UnitaryMatrixContainer(np.eye(4, dtype=int)[[2, 0, 3, 1]]).matrix.dtype == np.float64
+
+    @pytest.mark.parametrize("stored_sparse", [False, True], ids=["dense", "sparse"])
+    def test_matrix_is_returned_by_copy(self, stored_sparse):
+        """Mutating the returned matrix leaves the container, its hash and its JSON unchanged."""
+        expected = _block_sparse(4).toarray()
+        container = UnitaryMatrixContainer(sparse.csc_array(expected) if stored_sparse else expected)
+        content_hash, serialized = container.content_hash(), container.to_json()
+        returned = container.matrix
+        if stored_sparse:
+            returned.data[:] = 0.0
+            returned.indices[:] = 0
+        else:
+            assert not returned.flags.writeable
+            returned.setflags(write=True)
+            returned[:] = 0.0
+
+        np.testing.assert_array_equal(container.to_dense(), expected)
+        assert container.content_hash() == content_hash
+        assert container.to_json() == serialized
+
+    @pytest.mark.parametrize("kind", ["csc_array", "csr_matrix", "coo_array"])
+    def test_sparse_is_canonical_csc(self, kind):
+        """Any SciPy sparse input is stored as a canonical CSC array without explicit zeros."""
+        dense = _block_sparse(3).toarray()
+        container = UnitaryMatrixContainer(getattr(sparse, kind)(dense))
+
+        assert container.is_sparse
+        assert isinstance(container.matrix, sparse.csc_array)
+        assert container.matrix.has_canonical_format
+        assert container.matrix.nnz == np.count_nonzero(dense)
+        np.testing.assert_array_equal(container.to_dense(), dense)
+
+    def test_wide_sparse_stays_sparse(self):
+        """Validating and combining a 12-qubit signed permutation never forms a dense 4096x4096 array."""
+        dimension = 1 << 12
+        permutation = np.random.default_rng(0).permutation(dimension)
+        signs = np.where(permutation % 2 == 0, 1.0, -1.0)
+        matrix = sparse.csc_array((signs, permutation, np.arange(dimension + 1)), shape=(dimension, dimension))
+        column = np.random.default_rng(1).normal(size=(dimension, 1))
+        column /= np.linalg.norm(column)
+        tracemalloc.start()
+        try:
+            combined = UnitaryMatrixContainer(column).combine(UnitaryMatrixContainer(matrix))
+            _, peak = tracemalloc.get_traced_memory()
+        finally:
+            tracemalloc.stop()
+
+        np.testing.assert_array_equal(combined.to_dense(), matrix @ column)
+        # A dense 4096x4096 float64 array alone takes 128 MiB.
+        assert peak < 8 * 1024 * 1024, f"peak was {peak / 2**20:.1f} MiB"
+
+    @pytest.mark.parametrize("stored_sparse", [False, True], ids=["dense", "sparse"])
+    def test_complex(self, stored_sparse):
+        """Complex input is stored as complex128, or as float64 when its imaginary part is round-off."""
+        matrix = _block_sparse(3, phased=True) if stored_sparse else unitary_group.rvs(8, random_state=3)[:, :5]
+        container = UnitaryMatrixContainer(matrix)
+        assert not container.is_real
+        assert container.is_sparse == stored_sparse
+        assert container.matrix.dtype == np.complex128
+        np.testing.assert_array_equal(container.to_dense(), matrix.toarray() if stored_sparse else matrix)
+
+        real = _block_sparse(6) if stored_sparse else ortho_group.rvs(8, random_state=6)
+        for imaginary, expect_real in ((0.0, True), (1e-15, True), (1e-12, False)):
+            noisy = real.astype(np.complex128)
+            (noisy.data if stored_sparse else noisy)[:] += 1j * imaginary
+            container = UnitaryMatrixContainer(noisy)
+            assert container.is_real == expect_real
+            if expect_real:
+                assert container.matrix.dtype == np.float64
+                assert container.content_hash() == UnitaryMatrixContainer(real).content_hash()
+
+    @pytest.mark.parametrize(
+        ("matrix", "error", "match"),
+        [
+            (np.array([["a", "b"], ["c", "d"]]), TypeError, "numeric"),
+            (np.array([[None, 1], [1, None]]), TypeError, "numeric"),
+            (np.ones(4) / 2, ValueError, "two-dimensional"),
+            (np.eye(3), ValueError, "power-of-two row count"),
+            (np.eye(1), ValueError, "power-of-two row count"),
+            (np.zeros((4, 0)), ValueError, "between 1 and 4 columns"),
+            (np.vstack([np.eye(2), np.zeros((2, 2))]).T, ValueError, "between 1 and 2 columns"),
+            (np.full((2, 2), np.nan), ValueError, "finite"),
+            (np.array([[1.0, 1.0], [0.0, 1.0]]), ValueError, "orthonormal"),
+            (2.0 * np.eye(2), ValueError, "orthonormal"),
+            (sparse.csc_array(np.diag([1.0, 0.5])), ValueError, "orthonormal"),
+            (sparse.csc_array(np.array([[1.0, 1.0], [0.0, 1.0]]) / [1.0, np.sqrt(2.0)]), ValueError, "orthonormal"),
+            # Complex orthogonal (M^T M = I) but not unitary, so validation must conjugate.
+            (
+                np.array([[np.cosh(0.5), 1j * np.sinh(0.5)], [-1j * np.sinh(0.5), np.cosh(0.5)]]),
+                ValueError,
+                "orthonormal",
+            ),
+            (sparse.csc_array(np.array([[1.0, 1j], [0.0, 1.0]]) / [1.0, np.sqrt(2.0)]), ValueError, "orthonormal"),
+        ],
+    )
+    def test_rejects_invalid(self, matrix, error, match):
+        """Non-numeric input raises TypeError, and invalid shapes, entries or columns raise ValueError."""
+        with pytest.raises(error, match=match):
+            UnitaryMatrixContainer(matrix)
+
+    @pytest.fixture(params=["dense", "sparse", "dense-isometry", "sparse-isometry", "dense-complex", "sparse-complex"])
+    def matrix_container(self, request):
+        """A container of each storage format, square, isometric and complex."""
+        matrix = _block_sparse(5, phased=request.param.endswith("complex"))
+        if "-" in request.param:
+            matrix = sparse.csc_array(matrix[:, :3])
+        return UnitaryMatrixContainer(matrix if request.param.startswith("sparse") else matrix.toarray())
+
+    def test_roundtrip(self, matrix_container, tmp_path):
+        """JSON, HDF5 and file round trips, directly and through UnitaryRepresentation, preserve the matrix exactly."""
+        data = json.loads(json.dumps(matrix_container.to_json()))
+        assert data["container_type"] == "unitary_matrix"
+        restored = [UnitaryMatrixContainer.from_json(data), UnitaryRepresentation.from_json(data).get_container()]
+        with h5py.File(tmp_path / "unitary.h5", "w") as file:
+            UnitaryRepresentation(matrix_container).to_hdf5(file.create_group("unitary"))
+        with h5py.File(tmp_path / "unitary.h5", "r") as file:
+            restored.append(UnitaryMatrixContainer.from_hdf5(file["unitary"]))
+            restored.append(UnitaryRepresentation.from_hdf5(file["unitary"]).get_container())
+        for file_format in ("json", "hdf5"):
+            path = tmp_path / f"matrix.unitary_matrix_container.{file_format}"
+            matrix_container.to_file(path, file_format)
+            restored.append(UnitaryMatrixContainer.from_file(path, file_format))
+
+        for result in restored:
+            assert isinstance(result, UnitaryMatrixContainer)
+            assert result.is_sparse == matrix_container.is_sparse
+            assert result.matrix.dtype == matrix_container.matrix.dtype
+            np.testing.assert_array_equal(result.to_dense(), matrix_container.to_dense())
+            assert result.content_hash() == matrix_container.content_hash()
+
+    def test_unknown_format_raises(self):
+        """An unknown storage format in the serialized data is rejected."""
+        data = UnitaryMatrixContainer(np.eye(2)).to_json()
+        data["format"] = "banded"
+        with pytest.raises(ValueError, match="storage format"):
+            UnitaryMatrixContainer.from_json(data)
+
+    @pytest.mark.parametrize("stored_sparse", [False, True], ids=["dense", "sparse"])
+    def test_content_hash(self, stored_sparse):
+        """Equal inputs hash equally, storage changes the hash, and signed zeros hash like +0.0 through JSON."""
+        matrix = _block_sparse(9)
+        assert UnitaryMatrixContainer(matrix).content_hash() == UnitaryMatrixContainer(matrix.copy()).content_hash()
+        assert UnitaryMatrixContainer(matrix).content_hash() != UnitaryMatrixContainer(matrix.toarray()).content_hash()
+
+        signed = np.array([[complex(-0.0, 1.0), complex(1.0, -0.0)], [complex(1.0, -0.0), complex(-0.0, 1.0)]])
+        signed /= np.sqrt(2.0)
+        unsigned = signed + 0.0
+        if stored_sparse:
+            signed, unsigned = sparse.csc_array(signed), sparse.csc_array(unsigned)
+        container = UnitaryMatrixContainer(signed)
+        restored = UnitaryMatrixContainer.from_json(json.loads(json.dumps(container.to_json())))
+        assert container.content_hash() == UnitaryMatrixContainer(unsigned).content_hash()
+        assert restored.content_hash() == container.content_hash()
+
+    @pytest.mark.parametrize(
+        ("first", "second"),
+        [
+            (ortho_group.rvs(4, random_state=1)[:, :2], ortho_group.rvs(4, random_state=2)),
+            (_block_sparse(1), _block_sparse(2)),
+            (_block_sparse(3), ortho_group.rvs(8, random_state=4)),
+            (ortho_group.rvs(8, random_state=4), _block_sparse(3)),
+            (ortho_group.rvs(8, random_state=7)[:, :3], np.diag(np.exp(1j * np.arange(1, 9)))),
+        ],
+        ids=["dense", "sparse", "sparse-then-dense", "dense-then-sparse", "real-then-complex"],
+    )
+    def test_combine(self, first, second):
+        """``a.combine(b)`` is ``b @ a``, sparse only when both are sparse and complex when either is complex."""
+        combined = UnitaryMatrixContainer(first).combine(UnitaryMatrixContainer(second))
+        assert combined.is_sparse == (sparse.issparse(first) and sparse.issparse(second))
+        assert combined.is_real == (np.isrealobj(first) and np.isrealobj(second))
+        expected = sparse.csc_array(second) @ sparse.csc_array(first)
+        np.testing.assert_allclose(combined.to_dense(), expected.toarray(), atol=1e-14)
+
+    def test_combine_rejects_mismatch(self):
+        """Different widths, a non-square second factor or another container type are rejected."""
+        container = UnitaryMatrixContainer(np.eye(4))
+        with pytest.raises(ValueError, match="2 and 1 qubits"):
+            container.combine(UnitaryMatrixContainer(np.eye(2)))
+        with pytest.raises(ValueError, match="square"):
+            container.combine(UnitaryMatrixContainer(np.eye(4)[:, :2]))
+        other = PauliProductFormulaContainer([ExponentiatedPauliTerm({0: "X"}, 0.1)], 1, 2)
+        with pytest.raises(TypeError, match="PauliProductFormulaContainer"):
+            container.combine(other)
+
+    def test_summary_and_representation(self):
+        """The summary names the kind, width, shape and storage, and the representation reports the width."""
+        assert UnitaryMatrixContainer(np.eye(4)).get_summary() == "Real orthogonal matrix (2 qubits, 4x4, dense)"
+        summary = UnitaryRepresentation(UnitaryMatrixContainer(_block_sparse(4)[:, :3])).get_summary()
+        assert summary.startswith("Real isometry (3 qubits, 8x3, sparse, ")
+        phases = np.diag(np.exp(1j * np.arange(4)))
+        assert UnitaryMatrixContainer(phases).get_summary() == "Complex unitary matrix (2 qubits, 4x4, dense)"
+        summary = UnitaryMatrixContainer(_block_sparse(4, phased=True)[:, :3]).get_summary()
+        assert summary.startswith("Complex isometry (3 qubits, 8x3, sparse, ")
+
+        representation = UnitaryRepresentation(UnitaryMatrixContainer(np.eye(8)[:, :3]))
+        assert representation.get_container_type() == "unitary_matrix"
+        assert representation.get_num_qubits() == representation.get_num_system_qubits() == 3
+        with pytest.raises(NotImplementedError):
+            representation.get_container().eigenvalue_from_phase(0.25)

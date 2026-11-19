@@ -25,34 +25,14 @@ _ORTHONORMALITY_TOLERANCE = 1.0e-8  # Per-column Frobenius norm of M^H M - I, as
 
 
 class UnitaryMatrixContainer(UnitaryContainer):
-    r"""Container for a unitary matrix, or the leading columns of one, stored dense or sparse.
-
-    The matrix :math:`M` has :math:`2^n` rows for an :math:`n`-qubit register and
-    :math:`1 \le m \le 2^n` orthonormal columns. A square :math:`M` is a unitary. Otherwise
-    :math:`M` is an isometry, and any circuit that synthesizes it realizes a unitary :math:`U`
-    whose first :math:`m` columns equal :math:`M`; the other columns of :math:`U` are
-    unspecified.
-
-    Entry ``matrix[r, c]`` is :math:`\langle r | U | c \rangle` for little-endian basis
-    states: bit :math:`k` of the index is qubit :math:`k` of the register. Column :math:`c < m`
-    is therefore the image of the register value :math:`c`, so an isometry with
-    :math:`m \le 2^{n-k}` columns maps the low :math:`n - k` qubits, with the high :math:`k`
-    qubits in :math:`|0\rangle`, into the full register.
-
-    Entries may be real or complex. A matrix whose imaginary parts are all zero is stored as
-    float64, so :attr:`is_real` depends only on the values; any other matrix with complex
-    entries is stored as complex128. Sparse input is stored as a canonical
-    :class:`scipy.sparse.csc_array` without explicit zeros.
+    """Unitary matrix, or its leading orthonormal columns, on a little-endian register, stored dense or sparse.
 
     Args:
-        matrix: Matrix with orthonormal columns, as a NumPy array or a SciPy sparse array or
-            matrix.
+        matrix: Matrix with :math:`2^n` rows and orthonormal columns, as a NumPy array or SciPy sparse matrix.
 
     Raises:
         TypeError: If the matrix is not numeric.
-        ValueError: If the matrix is not two-dimensional or finite, its row count is not a
-            power of two of at least two, it has no columns or more columns than rows, or its
-            columns are not orthonormal.
+        ValueError: If the matrix has an invalid shape, non-finite entries or non-orthonormal columns.
 
     """
 
@@ -60,12 +40,7 @@ class UnitaryMatrixContainer(UnitaryContainer):
 
     @staticmethod
     def data_type_name() -> str:
-        """Return the wire-format identifier for unitary matrix containers.
-
-        Returns:
-            ``"unitary_matrix_container"``.
-
-        """
+        """Return the wire-format identifier ``"unitary_matrix_container"``."""
         return "unitary_matrix_container"
 
     def __init__(self, matrix: np.ndarray | sparse.sparray | sparse.spmatrix) -> None:
@@ -90,8 +65,8 @@ class UnitaryMatrixContainer(UnitaryContainer):
         array = np.asarray(matrix)
         is_complex = cls._is_complex_dtype(array.dtype)
         array = np.array(array, dtype=np.complex128 if is_complex else np.float64, order="C")
-        if is_complex and not np.any(array.imag):
-            array = np.ascontiguousarray(array.real)
+        # Adding zero turns -0.0 into +0.0, which JSON serialization of complex values does not keep.
+        array = np.ascontiguousarray(np.real_if_close(array) + 0.0)
         array.setflags(write=False)
         return array
 
@@ -101,10 +76,7 @@ class UnitaryMatrixContainer(UnitaryContainer):
         is_complex = cls._is_complex_dtype(matrix.dtype)
         array = sparse.csc_array(matrix, dtype=np.complex128 if is_complex else np.float64, copy=True)
         array.sum_duplicates()
-        if is_complex and not np.any(array.data.imag):
-            array = sparse.csc_array(
-                (np.ascontiguousarray(array.data.real), array.indices, array.indptr), shape=array.shape
-            )
+        array = sparse.csc_array((np.real_if_close(array.data) + 0.0, array.indices, array.indptr), shape=array.shape)
         array.eliminate_zeros()
         array.sort_indices()
         return array
@@ -144,13 +116,7 @@ class UnitaryMatrixContainer(UnitaryContainer):
 
     @property
     def matrix(self) -> np.ndarray | sparse.csc_array:
-        """Return a copy of the stored matrix, as a read-only NumPy array or a SciPy CSC array.
-
-        The dtype is float64 when :attr:`is_real` holds and complex128 otherwise. Both storages
-        are copied to keep the validated container immutable: a read-only NumPy view can be
-        made writable again with ``setflags(write=True)``, and SciPy sparse arrays cannot be
-        made read-only.
-        """
+        """Return a copy of the stored matrix, read-only when dense, so the container stays immutable."""
         if self.is_sparse:
             return self._matrix.copy()
         matrix = self._matrix.copy()
@@ -183,21 +149,13 @@ class UnitaryMatrixContainer(UnitaryContainer):
         return int(self._matrix.shape[0]).bit_length() - 1
 
     def to_dense(self) -> np.ndarray:
-        """Return the matrix as a NumPy array.
-
-        Returns:
-            numpy.ndarray: A float64 or complex128 copy with :math:`2^n` rows and :math:`m`
-            columns.
-
-        """
+        """Return a dense float64 or complex128 copy of the matrix."""
         if self.is_sparse:
             return self._matrix.toarray()
         return np.array(self._matrix)
 
     def eigenvalue_from_phase(self, phase_fraction: float) -> float:
-        """Converting phases to eigenvalues is not supported.
-
-        The container holds a unitary with no associated Hamiltonian.
+        """Raise NotImplementedError, since the container has no Hamiltonian.
 
         Args:
             phase_fraction: Measured phase fraction.
@@ -209,19 +167,17 @@ class UnitaryMatrixContainer(UnitaryContainer):
         raise NotImplementedError("UnitaryMatrixContainer has no Hamiltonian to recover eigenvalues for.")
 
     def combine(self, other: UnitaryContainer) -> UnitaryMatrixContainer:
-        """Append a square unitary after this one.
+        """Return ``other.matrix @ self.matrix``, stored sparse only when both factors are sparse.
 
         Args:
             other: Square container on the same register, applied after this one.
 
         Returns:
-            UnitaryMatrixContainer: The product ``other.matrix @ self.matrix``, stored sparse
-            when both inputs are sparse. Mixed storage multiplies the stored matrices directly,
-            so the sparse factor is never densified.
+            UnitaryMatrixContainer: The product.
 
         Raises:
-            TypeError: If ``other`` is not a :class:`~qdk_chemistry.data.UnitaryMatrixContainer`.
-            ValueError: If ``other`` is not square or acts on a different register width.
+            TypeError: If ``other`` is not a :class:`UnitaryMatrixContainer`.
+            ValueError: If ``other`` is not square or has a different register width.
 
         """
         if not isinstance(other, UnitaryMatrixContainer):
@@ -254,10 +210,7 @@ class UnitaryMatrixContainer(UnitaryContainer):
         """Convert the container to a JSON dictionary.
 
         Returns:
-            dict: The container type, the storage format, the shape, and either the dense rows
-            or the CSC arrays ``data``, ``indices``, and ``indptr``. Complex values are written
-            in the ``real``/``imag`` form of
-            :func:`~qdk_chemistry.utils.serialization.complex_array_to_json`.
+            dict: The storage format, the shape, and the dense rows or the CSC arrays.
 
         """
         data: dict[str, Any] = {

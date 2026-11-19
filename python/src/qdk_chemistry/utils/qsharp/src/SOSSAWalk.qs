@@ -145,8 +145,8 @@ namespace QDKChemistry.Utils.SOSSAWalk {
     /// Angles `first..last` of the DQ table, quantized and concatenated low-index first; the
     /// resident word is the whole range `0..N-2`.
     ///
-    /// The gated Givens rotation is built as the controlled CRy(2θ) = Ry(θ)·CNOT·Ry(-θ)·CNOT
-    /// from two uncontrolled Ry(θ), so each word is the `QuantizeRyAngle` word of the half-angle θ.
+    /// Each word is the `QuantizeRyAngle` word of the half-angle θ, since the gated Givens
+    /// rotation is built as CRy(2θ) = Ry(θ)·CNOT·Ry(-θ)·CNOT.
     internal function BuildDQRotationBatch(
         params : SelectParams,
         N : Int,

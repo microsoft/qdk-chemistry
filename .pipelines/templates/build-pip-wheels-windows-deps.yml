@@ -1,7 +1,7 @@
 parameters:
 - name: march
   type: string
-  default: x86-64-v3
+  default: AVX2
 - name: buildType
   type: string
   default: Release
@@ -98,6 +98,9 @@ steps:
       cpp/manifest/qdk-chemistry/cgmanifest.json |
       external/macis/manifest/cgmanifest.json |
       cpp/cmake/patches/**/* |
+      cpp/cmake/sequant.cmake |
+      cpp/cmake/sequant/**/* |
+      external/macis/src/lobpcgxx/CMakeLists.txt |
       .pipelines/toolchains/windows.cmake |
       "$(DEPS_FINGERPRINT)"
     path: $(System.DefaultWorkingDirectory)/deps-install-msvc

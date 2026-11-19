@@ -112,7 +112,7 @@ if (-not $SkipPrereqs) {
         Write-Host "This requires an elevated (admin) PowerShell and will take several minutes."
         Write-Host ""
 
-        $installerUrl = "https://aka.ms/vs/17/release/vs_BuildTools.exe"
+        $installerUrl = "https://aka.ms/vs/stable/vs_buildtools.exe"
         $installerPath = "$env:TEMP\vs_BuildTools.exe"
 
         if (-not (Test-Path $installerPath)) {

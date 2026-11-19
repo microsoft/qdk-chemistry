@@ -82,7 +82,7 @@ jobs:
         - os-name: macOS
           runner: macos-26-xlarge
           build-parallel: 5
-          uarch: native
+          uarch: armv8-a
           python-version: '3.13'
           cpp-omp-threads: 4
           cpp-test-workers: 3
@@ -213,7 +213,7 @@ jobs:
           ${{ env.EXACHEM_INSTALL_PREFIX }}
         key: >-
           cpp-deps-${{ runner.os }}-${{ matrix.uarch }}-
-          ${{ hashFiles('cpp/manifest/qdk-chemistry/cgmanifest.json', 'external/macis/manifest/cgmanifest.json', '.pipelines/install-scripts/common.sh', '.pipelines/install-scripts/install-cpp-deps.sh', '.pipelines/install-scripts/install-blaspp.sh', '.pipelines/install-scripts/install-lapackpp.sh', '.pipelines/install-scripts/exachem/**') }}
+          ${{ hashFiles('cpp/manifest/qdk-chemistry/cgmanifest.json', 'external/macis/manifest/cgmanifest.json', '.pipelines/install-scripts/common.sh', '.pipelines/install-scripts/install-cpp-deps.sh', '.pipelines/install-scripts/install-blaspp.sh', '.pipelines/install-scripts/install-lapackpp.sh', '.pipelines/install-scripts/install-sequant.sh', '.pipelines/install-scripts/exachem/**', 'cpp/cmake/patches/**', 'cpp/cmake/sequant.cmake', 'cpp/cmake/sequant/**') }}
 
     - name: Add C++ deps prefix to CMake search path
       run: |
@@ -268,6 +268,10 @@ jobs:
             bash ${{ github.workspace }}/.pipelines/install-scripts/exachem/install-exachem.sh
         fi
 
+        CMAKE_BUILD_PARALLEL_LEVEL="$jobs" \
+          bash ${{ github.workspace }}/.pipelines/install-scripts/install-sequant.sh \
+          "${{ env.CPP_DEPS_PREFIX }}" "$MARCH"
+
     - name: Save C++ dependencies and ExaChem cache
       if: steps.cache-cpp-deps.outputs.cache-hit != 'true'
       uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
@@ -277,7 +281,7 @@ jobs:
           ${{ env.EXACHEM_INSTALL_PREFIX }}
         key: >-
           cpp-deps-${{ runner.os }}-${{ matrix.uarch }}-
-          ${{ hashFiles('cpp/manifest/qdk-chemistry/cgmanifest.json', 'external/macis/manifest/cgmanifest.json', '.pipelines/install-scripts/common.sh', '.pipelines/install-scripts/install-cpp-deps.sh', '.pipelines/install-scripts/install-blaspp.sh', '.pipelines/install-scripts/install-lapackpp.sh', '.pipelines/install-scripts/exachem/**') }}
+          ${{ hashFiles('cpp/manifest/qdk-chemistry/cgmanifest.json', 'external/macis/manifest/cgmanifest.json', '.pipelines/install-scripts/common.sh', '.pipelines/install-scripts/install-cpp-deps.sh', '.pipelines/install-scripts/install-blaspp.sh', '.pipelines/install-scripts/install-lapackpp.sh', '.pipelines/install-scripts/install-sequant.sh', '.pipelines/install-scripts/exachem/**', 'cpp/cmake/patches/**', 'cpp/cmake/sequant.cmake', 'cpp/cmake/sequant/**') }}
 
     - name: Configure C++ CMake build
       run: |
@@ -311,7 +315,7 @@ jobs:
 
         echo "=== Running C++ Tests ==="
         set +e
-        if [ "$QDK_UARCH" == "native" ]; then # Exclude particular test on macOS builds
+        if [ "${{ matrix.os-name }}" == "macOS" ]; then
           ctest -j "$CTEST_WORKERS" --output-on-failure --verbose --timeout 600 --output-junit ${{ github.workspace }}/test-results/ctest_results.xml -E "MACIS_SERIAL_TEST|AtomInitGuessEnergyConvergence"
         else
           ctest -j "$CTEST_WORKERS" --output-on-failure --verbose --timeout 600 --output-junit ${{ github.workspace }}/test-results/ctest_results.xml -E "MACIS_SERIAL_TEST"
@@ -637,10 +641,14 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        compiler: [msvc, clang-cl]
+        include:
+        - compiler: msvc
+          uarch: AVX2
+        - compiler: clang-cl
+          uarch: x86-64-v3
     env:
       VCPKG_TRIPLET: x64-windows-static-md
-      QDK_UARCH: x86-64-v3
+      QDK_UARCH: ${{ matrix.uarch }}
       CTEST_WORKERS: '12'
       OMP_NUM_THREADS: '4'
       PYTHON_TEST_WORKERS: '8'
@@ -720,7 +728,7 @@ jobs:
         # relocatable ${_IMPORT_PREFIX} form), so runners on this pool that mount the
         # workspace under different drives cannot share a deps-install cache entry.
         key: >-
-          windows-deps-${{ matrix.compiler }}-${{ env.VCPKG_TRIPLET }}-vs${{ steps.env.outputs.toolset }}-${{ env.DEPS_CACHE_VERSION }}-${{ github.workspace }}-${{ steps.deps-fp.outputs.fingerprint }}-${{ hashFiles('cpp/manifest/qdk-chemistry/cgmanifest.json', 'external/macis/manifest/cgmanifest.json', 'cpp/cmake/patches/**', '.pipelines/toolchains/windows.cmake', 'vcpkg.json', 'vcpkg-configuration.json', 'vcpkg-overlay/**') }}
+          windows-deps-${{ matrix.compiler }}-${{ env.VCPKG_TRIPLET }}-vs${{ steps.env.outputs.toolset }}-${{ env.DEPS_CACHE_VERSION }}-${{ github.workspace }}-${{ steps.deps-fp.outputs.fingerprint }}-${{ hashFiles('cpp/manifest/qdk-chemistry/cgmanifest.json', 'external/macis/manifest/cgmanifest.json', 'cpp/cmake/patches/**', 'cpp/cmake/sequant.cmake', 'cpp/cmake/sequant/**', 'external/macis/src/lobpcgxx/CMakeLists.txt', '.pipelines/toolchains/windows.cmake', 'vcpkg.json', 'vcpkg-configuration.json', 'vcpkg-overlay/**') }}
 
     - name: Install C++ dependencies
       if: steps.cache-vcpkg.outputs.cache-hit != 'true' || steps.cache-deps.outputs.cache-hit != 'true'
@@ -746,7 +754,7 @@ jobs:
       with:
         path: deps-install-${{ matrix.compiler }}
         key: >-
-          windows-deps-${{ matrix.compiler }}-${{ env.VCPKG_TRIPLET }}-vs${{ steps.env.outputs.toolset }}-${{ env.DEPS_CACHE_VERSION }}-${{ github.workspace }}-${{ steps.deps-fp.outputs.fingerprint }}-${{ hashFiles('cpp/manifest/qdk-chemistry/cgmanifest.json', 'external/macis/manifest/cgmanifest.json', 'cpp/cmake/patches/**', '.pipelines/toolchains/windows.cmake', 'vcpkg.json', 'vcpkg-configuration.json', 'vcpkg-overlay/**') }}
+          windows-deps-${{ matrix.compiler }}-${{ env.VCPKG_TRIPLET }}-vs${{ steps.env.outputs.toolset }}-${{ env.DEPS_CACHE_VERSION }}-${{ github.workspace }}-${{ steps.deps-fp.outputs.fingerprint }}-${{ hashFiles('cpp/manifest/qdk-chemistry/cgmanifest.json', 'external/macis/manifest/cgmanifest.json', 'cpp/cmake/patches/**', 'cpp/cmake/sequant.cmake', 'cpp/cmake/sequant/**', 'external/macis/src/lobpcgxx/CMakeLists.txt', '.pipelines/toolchains/windows.cmake', 'vcpkg.json', 'vcpkg-configuration.json', 'vcpkg-overlay/**') }}
 
     - name: Configure CMake
       shell: pwsh
@@ -865,14 +873,18 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        compiler: [msvc, clang-cl]
+        include:
+        - compiler: msvc
+          uarch: armv8.0
+        - compiler: clang-cl
+          uarch: armv8-a
     env:
       VCPKG_TRIPLET: arm64-windows-static-md
+      # MSVC and clang-cl use different spellings for the ARMv8-A baseline.
+      QDK_UARCH: ${{ matrix.uarch }}
       CTEST_WORKERS: '12'
       OMP_NUM_THREADS: '4'
       PYTHON_TEST_WORKERS: '8'
-      # Leave QDK_UARCH unset: MSVC has no generic ARM64 /arch value, and
-      # clang-cl auto-detects armv8-a.
       # Bump to force a rebuild of the cached dependencies.
       DEPS_CACHE_VERSION: v2
       CMAKE_POLICY_VERSION_MINIMUM: '3.5'
@@ -882,18 +894,6 @@ jobs:
       with:
         submodules: recursive
         persist-credentials: false
-
-    - name: Install Visual Studio 2026 Build Tools
-      if: matrix.compiler == 'msvc'
-      shell: pwsh
-      run: |
-        $vsInstaller = "$env:RUNNER_TEMP\vs_buildtools.exe"
-        Invoke-WebRequest https://aka.ms/vs/18/stable/vs_buildtools.exe -OutFile $vsInstaller
-        & $vsInstaller --quiet --wait --norestart --add Microsoft.VisualStudio.Workload.VCTools `
-            --add Microsoft.VisualStudio.Component.VC.Tools.ARM64 --add Microsoft.VisualStudio.Component.VC.CMake.Project `
-            --add Microsoft.VisualStudio.Component.VC.Llvm.Clang --add Microsoft.VisualStudio.Component.Windows11SDK.26100 | Out-Null
-        if ($LASTEXITCODE -notin 0, 3010) { throw "vs_buildtools.exe failed ($LASTEXITCODE)" }
-        $global:LASTEXITCODE = 0  # 3010 only requests a reboot
 
     - name: Set up ${{ matrix.compiler }} environment (ARM64)
       id: env
@@ -967,7 +967,7 @@ jobs:
         # relocatable ${_IMPORT_PREFIX} form), so runners on this pool that mount the
         # workspace under different drives cannot share a deps-install cache entry.
         key: >-
-          windows-deps-${{ matrix.compiler }}-${{ env.VCPKG_TRIPLET }}-vs${{ steps.env.outputs.toolset }}-${{ env.DEPS_CACHE_VERSION }}-${{ github.workspace }}-${{ steps.deps-fp.outputs.fingerprint }}-${{ hashFiles('cpp/manifest/qdk-chemistry/cgmanifest.json', 'external/macis/manifest/cgmanifest.json', 'cpp/cmake/patches/**', '.pipelines/toolchains/windows.cmake', 'vcpkg.json', 'vcpkg-configuration.json', 'vcpkg-overlay/**') }}
+          windows-deps-${{ matrix.compiler }}-${{ env.VCPKG_TRIPLET }}-vs${{ steps.env.outputs.toolset }}-${{ env.DEPS_CACHE_VERSION }}-${{ github.workspace }}-${{ steps.deps-fp.outputs.fingerprint }}-${{ hashFiles('cpp/manifest/qdk-chemistry/cgmanifest.json', 'external/macis/manifest/cgmanifest.json', 'cpp/cmake/patches/**', 'cpp/cmake/sequant.cmake', 'cpp/cmake/sequant/**', 'external/macis/src/lobpcgxx/CMakeLists.txt', '.pipelines/toolchains/windows.cmake', 'vcpkg.json', 'vcpkg-configuration.json', 'vcpkg-overlay/**') }}
 
     - name: Install C++ dependencies
       if: steps.cache-vcpkg.outputs.cache-hit != 'true' || steps.cache-deps.outputs.cache-hit != 'true'
@@ -994,7 +994,7 @@ jobs:
       with:
         path: deps-install-${{ matrix.compiler }}
         key: >-
-          windows-deps-${{ matrix.compiler }}-${{ env.VCPKG_TRIPLET }}-vs${{ steps.env.outputs.toolset }}-${{ env.DEPS_CACHE_VERSION }}-${{ github.workspace }}-${{ steps.deps-fp.outputs.fingerprint }}-${{ hashFiles('cpp/manifest/qdk-chemistry/cgmanifest.json', 'external/macis/manifest/cgmanifest.json', 'cpp/cmake/patches/**', '.pipelines/toolchains/windows.cmake', 'vcpkg.json', 'vcpkg-configuration.json', 'vcpkg-overlay/**') }}
+          windows-deps-${{ matrix.compiler }}-${{ env.VCPKG_TRIPLET }}-vs${{ steps.env.outputs.toolset }}-${{ env.DEPS_CACHE_VERSION }}-${{ github.workspace }}-${{ steps.deps-fp.outputs.fingerprint }}-${{ hashFiles('cpp/manifest/qdk-chemistry/cgmanifest.json', 'external/macis/manifest/cgmanifest.json', 'cpp/cmake/patches/**', 'cpp/cmake/sequant.cmake', 'cpp/cmake/sequant/**', 'external/macis/src/lobpcgxx/CMakeLists.txt', '.pipelines/toolchains/windows.cmake', 'vcpkg.json', 'vcpkg-configuration.json', 'vcpkg-overlay/**') }}
 
     - name: Configure CMake
       shell: pwsh
@@ -1005,6 +1005,7 @@ jobs:
         $depsInstall = "${{ github.workspace }}\deps-install-${{ matrix.compiler }}"
         $vcpkgInstalled = "${{ github.workspace }}\vcpkg_installed\${{ env.VCPKG_TRIPLET }}"
         cmake -S cpp -B "cpp/build-${{ matrix.compiler }}" -GNinja `
+          "-DQDK_UARCH=${{ env.QDK_UARCH }}" `
           -DQDK_CHEMISTRY_ENABLE_COVERAGE=OFF `
           -DQDK_CHEMISTRY_ENABLE_MPI=OFF `
           -DMACIS_ENABLE_TESTS=OFF `

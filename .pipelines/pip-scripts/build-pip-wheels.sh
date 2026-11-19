@@ -131,7 +131,7 @@ python3 --version
 python3 -m pip install --upgrade pip
 
 # This is necessary for 1ES Geneva telemetry during the Linux builds.
-python3 -m pip install -r .pipelines/requirements.txt
+python3 -m pip install -r .pipelines/requirements.in
 
 # Snapshot the full env and feed it to a dry-run `pip install --report` so
 # Component Governance's PipReportDetector sees every package in buildenv.
@@ -224,7 +224,7 @@ elif [ "$MAC_BUILD" == "ON" ]; then
     export CMAKE_CXX_FLAGS="-fPIC -Os -fvisibility=hidden -target arm64-apple-darwin"
     python3 -m build --wheel \
         -C build-dir="build/{wheel_tag}" \
-        -C cmake.define.QDK_UARCH=native \
+        -C cmake.define.QDK_UARCH="${MARCH}" \
         -C cmake.define.BUILD_SHARED_LIBS=OFF \
         -C cmake.define.QDK_CHEMISTRY_ENABLE_MPI=OFF \
         -C cmake.define.QDK_ENABLE_OPENMP=OFF \

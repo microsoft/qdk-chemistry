@@ -7,15 +7,18 @@ namespace QDKChemistry.TestUtils.IsometrySynthesisTests {
     import QDKChemistry.Utils.IsometrySynthesis.PermutationData;
     import QDKChemistry.Utils.IsometrySynthesis.PermutationViaQROAM;
 
-    /// Returns an operation that applies Ry(prepAngles[k]) to qubit k of a little-endian
-    /// register and then the permutation |i⟩ → |permutation[i]⟩.
-    function TestMakePermutationOp(permutation : Int[], prepAngles : Double[]) : Qubit[] => Unit {
+    /// Returns an operation that prepares Ry(prepAngles) and applies |i⟩ → |permutation[i]⟩, or its inverse.
+    function TestMakePermutationOp(permutation : Int[], prepAngles : Double[], maxSwapBits : Int, inverse : Bool) : Qubit[] => Unit {
         (qs) => {
             for k in IndexRange(prepAngles) {
                 Ry(prepAngles[k], qs[k]);
             }
-            let (forward, inverse) = PermutationData(permutation, Length(qs));
-            PermutationViaQROAM(forward, inverse, qs);
+            let (forwardData, inverseData) = PermutationData(permutation, Length(qs));
+            if inverse {
+                Adjoint PermutationViaQROAM(forwardData, inverseData, maxSwapBits, qs);
+            } else {
+                PermutationViaQROAM(forwardData, inverseData, maxSwapBits, qs);
+            }
         }
     }
 }

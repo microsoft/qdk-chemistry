@@ -24,6 +24,8 @@ namespace QDKChemistry.Utils.UnitarySynthesis {
     import Std.Convert.IntAsBoolArray;
     import Std.Convert.ResultArrayAsBoolArray;
     import Std.Diagnostics.Fact;
+    import Std.Math.MaxI;
+    import Std.Math.MinI;
     import Std.Math.PI;
     import Std.Measurement.MResetX;
     import Std.ResourceEstimation.BeginEstimateCaching;
@@ -34,15 +36,15 @@ namespace QDKChemistry.Utils.UnitarySynthesis {
     import QDKChemistry.Utils.PhaseGradient.RyViaPhaseGradient;
     import QDKChemistry.Utils.SelectSwap.ApplyBranchPhaseFixup;
     import QDKChemistry.Utils.SelectSwap.ComputeOptimalSwapBits;
+    import QDKChemistry.Utils.SelectSwap.MeasurementUnlookupCost;
     import QDKChemistry.Utils.SelectSwap.SelectSwap2D;
     import QDKChemistry.Utils.SelectSwap.SelectSwapAliased;
     import QDKChemistry.Utils.SelectSwap.SelectSwapForwardCost;
 
     /// Givens representation U = D · L_{m-1} ⋯ L_0 of a real orthogonal matrix, mirroring the
-    /// C++ `qdk::chemistry::utils::GivensDecomposition`.
-    ///
-    /// Layer L_j rotates adjacent basis states by G(θ) = [[cos θ, -sin θ], [sin θ, cos θ]] on
-    /// the pairs (0, 1), (2, 3), …, or (1, 2), (3, 4), … when shifted. D = diag(±1).
+    /// C++ `qdk::chemistry::utils::GivensDecomposition`, where layer L_j applies
+    /// G(θ) = [[cos θ, -sin θ], [sin θ, cos θ]] to the pairs (0, 1), (2, 3), … or, when shifted,
+    /// (1, 2), (3, 4), … and D = diag(±1).
     struct GivensDecomposition {
         /// Rotation angles θ of each layer, by increasing pair index.
         layerAngles : Double[][],
@@ -54,8 +56,7 @@ namespace QDKChemistry.Utils.UnitarySynthesis {
 
     /// `GivensDecomposition` with each layer quantized into a Select table.
     struct QuantizedGivensDecomposition {
-        /// `layers[i][k]` is the `QuantizeRyAngles` word of Ry(2θ) for the k-th angle of layer
-        /// i, without trailing zero words; addresses past the end get the identity.
+        /// `QuantizeRyAngles` words of Ry(2θ) per layer, without trailing zero words.
         layers : Bool[][][],
         layerShifted : Bool[],
         /// Empty applies no signs.
@@ -64,7 +65,7 @@ namespace QDKChemistry.Utils.UnitarySynthesis {
         maxSwapBits : Int,
     }
 
-    /// Drops the trailing all-zero words of a quantized angle table, whose rotations are the identity.
+    /// Drops the trailing all-zero words, which are identity rotations, of a quantized angle table.
     function TrimZeroWords(words : Bool[][]) : Bool[][] {
         mutable length = Length(words);
         while length > 0 and not Any(bit -> bit, words[length - 1]) {
@@ -105,9 +106,8 @@ namespace QDKChemistry.Utils.UnitarySynthesis {
         trimmedCost + 2 * addressBits < paddedCost
     }
 
-    /// Loads `data[address]` into the clean `target` when `flag` is |1⟩ and leaves it zero
-    /// otherwise. The adjoint erases `target` by X-basis measurement and a phase fixup on
-    /// `flag` and `address`, so the lookup is never run backwards.
+    /// Loads `data[address]` into the clean `target` when `flag` is |1⟩, with an adjoint that
+    /// erases it by measurement.
     operation LoadAngleWord(
         data : Bool[][],
         maxSwapBits : Int,
@@ -133,7 +133,6 @@ namespace QDKChemistry.Utils.UnitarySynthesis {
     /// Sets `flag` to the AND of `controls` and, when `guarded`, of `address < bound`.
     operation ComputeLoadFlag(controls : Qubit[], guarded : Bool, bound : Int, address : Qubit[], flag : Qubit) : Unit is Adj {
         if guarded {
-            // Fires when bound > address.
             if IsEmpty(controls) {
                 ApplyIfGreaterL(X, IntAsBigInt(bound), address, flag);
             } else {
@@ -145,8 +144,7 @@ namespace QDKChemistry.Utils.UnitarySynthesis {
     }
 
     /// Applies Ry(4π·data[a]/2^b) to `targetQubit` for each state |a⟩ of the little-endian
-    /// `address`, loading the word from `QuantizeRyAngles` into the clean b-qubit `angleReg`.
-    /// Addresses at or past `Length(data)` get the identity.
+    /// `address`, with the identity past `Length(data)` and a clean b-qubit `angleReg`.
     operation ApplyMultiplexedRy(
         data : Bool[][],
         maxSwapBits : Int,
@@ -158,15 +156,8 @@ namespace QDKChemistry.Utils.UnitarySynthesis {
         ApplyControlledMultiplexedRy(data, maxSwapBits, address, [], targetQubit, phaseGradient, angleReg);
     }
 
-    /// `ApplyMultiplexedRy` that rotates only when every qubit of `controls` is |1⟩.
-    ///
-    /// Only the lookup is controlled, since a zero angle register already gives the identity.
-    /// This is cheaper than `Controlled ApplyMultiplexedRy`, which also controls the adder.
-    /// The lookup is erased by measurement for every swap width (`LoadAngleWord`, or the
-    /// adjoint of `SelectSwap2D` for an uncontrolled full table). A table shorter than the
-    /// address space is either zero-padded or, when cheaper (`UseAddressGuard`), loaded only
-    /// under an `address < Length(data)` flag so that no other word reaches `angleReg`.
-    /// `maxSwapBits` caps the swap network width, trading Toffolis for scratch qubits.
+    /// `ApplyMultiplexedRy` that rotates only when every qubit of `controls` is |1⟩, controlling
+    /// only the lookup, which is cheaper than `Controlled ApplyMultiplexedRy`.
     operation ApplyControlledMultiplexedRy(
         data : Bool[][],
         maxSwapBits : Int,
@@ -205,15 +196,9 @@ namespace QDKChemistry.Utils.UnitarySynthesis {
         }
     }
 
-    /// Applies D = diag((-1)^{f(x)}) on a little-endian register, with `phases[x]` = f(x).
-    ///
-    /// The Möbius transform over GF(2) gives f(x) = ⊕_S c_S ∏_{i∈S} x_i, and each nonzero c_S
-    /// becomes a Z, CZ, CCZ, … gate on the qubits in S. The constant c_∅ is the global sign
-    /// -I = R(PauliI, 2π). D is its own inverse.
-    ///
-    /// Controlled on the qubits C, the phase is AND(C) · f(x) = ⊕_S c_S ∏_{i∈S∪C} x_i, so each
-    /// gate also acts on C and c_∅ becomes a Z, CZ, … on C alone. Only the 2^n table of the
-    /// register is transformed, so the classical cost does not grow with the number of controls.
+    /// Applies D = diag((-1)^{phases[x]}) on a little-endian register by multi-controlled Z gates
+    /// from the Möbius transform of `phases`, or by the measurement-based sign fixup of Berry et
+    /// al. (Quantum 3, 208 (2019)) when that needs fewer Toffolis.
     operation ApplyPhasePolynomial(phases : Bool[], register : Qubit[]) : Unit is Adj + Ctl {
         body (...) {
             Controlled ApplyPhasePolynomial([], (phases, register));
@@ -221,6 +206,7 @@ namespace QDKChemistry.Utils.UnitarySynthesis {
         adjoint self;
         controlled (controls, ...) {
             let n = Length(register);
+            let numControls = Length(controls);
             Fact(IsEmpty(phases) or Length(phases) == 1 <<< n, "Phase data needs one entry per basis state of the register.");
             // In-place Möbius butterfly; bit i of index s marks qubit i of the monomial S.
             mutable coeffs = phases;
@@ -231,31 +217,54 @@ namespace QDKChemistry.Utils.UnitarySynthesis {
                     }
                 }
             }
-            for s in Where(c -> c, coeffs) {
-                let qubits = Subarray(Where(b -> b, IntAsBoolArray(s, n)), register) + controls;
-                if IsEmpty(qubits) {
-                    Fact(n > 0, "A constant sign needs a nonempty register to carry it.");
-                    R(PauliI, 2.0 * PI(), register[0]);
+            let monomials = Mapped(s -> Subarray(Where(b -> b, IntAsBoolArray(s, n)), register), Where(c -> c, coeffs));
+            // Toffolis of an X or Z on a target with m controls, as Q# decomposes it.
+            let gateCost = m -> MaxI(0, 2 * m - 3);
+            mutable polynomialCost = 0;
+            for qubits in monomials {
+                set polynomialCost += gateCost(Length(qubits) + numControls - 1);
+            }
+            // The lookup reads AND(controls) from one control or from a computed flag.
+            let lookupCost = MeasurementUnlookupCost(n + MinI(numControls, 1)) + (numControls > 1 ? 2 * gateCost(numControls) | 0);
+            if lookupCost < polynomialCost {
+                if numControls == 0 {
+                    // The erasure fixes signs relative to phases[0], which is applied as -I.
+                    use marker = Qubit();
+                    X(marker);
+                    H(marker);
+                    Adjoint Select(Mapped(phase -> [phase != phases[0]], phases), register, [marker]);
+                    Reset(marker);
+                    if phases[0] {
+                        R(PauliI, 2.0 * PI(), register[0]);
+                    }
+                } elif numControls == 1 {
+                    ApplyBranchPhaseFixup([true], Mapped(phase -> [phase], phases), true, controls + register);
                 } else {
-                    Controlled Z(Most(qubits), Tail(qubits));
+                    use flag = Qubit();
+                    within {
+                        Controlled X(controls, flag);
+                    } apply {
+                        ApplyBranchPhaseFixup([true], Mapped(phase -> [phase], phases), true, [flag] + register);
+                    }
+                }
+            } else {
+                for qubits in monomials {
+                    let gateQubits = qubits + controls;
+                    if IsEmpty(gateQubits) {
+                        Fact(n > 0, "A constant sign needs a nonempty register to carry it.");
+                        R(PauliI, 2.0 * PI(), register[0]);
+                    } else {
+                        Controlled Z(Most(gateQubits), Tail(gateQubits));
+                    }
                 }
             }
         }
         controlled adjoint self;
     }
 
-    /// Applies the real unitary U = D · L_{m-1} ⋯ L_0 of `givens` to `target`, controlled on
-    /// every qubit of `controls` (none applies it unconditionally).
-    ///
-    /// `target` is most significant qubit first. Its last qubit is the active qubit of every
-    /// layer and the others address the angle lookup, so a block-diagonal unitary is applied
-    /// by passing the block-selecting qubits first. Each layer loads its angles with
-    /// `ApplyControlledMultiplexedRy` and rotates through the phase gradient (Berry et al., PRX Quantum 6,
-    /// 020327, https://doi.org/10.1103/PRXQuantum.6.020327; Clements et al.,
-    /// arXiv:1603.08788), and D is applied by `ApplyPhasePolynomial`.
-    ///
-    /// Only the angle lookups and D are controlled: with a control in |0⟩ the angle register
-    /// stays zero, Ry(0) = I, and the shift/unshift pair of each shifted layer cancels.
+    /// Applies the real unitary of `givens`, controlled on `controls`, to the most-significant-first
+    /// `target` with phase-gradient Givens layers (Berry et al., PRX Quantum 6, 020327; Clements et
+    /// al., arXiv:1603.08788), where leading block-selecting qubits give a block-diagonal unitary.
     operation ApplyRealUnitaryViaGivens(
         givens : QuantizedGivensDecomposition,
         controls : Qubit[],
@@ -268,24 +277,48 @@ namespace QDKChemistry.Utils.UnitarySynthesis {
         Fact(IsEmpty(givens.phases) or Length(givens.phases) == 1 <<< n, "Givens phase data needs one entry per basis state of the target register.");
         Fact(n > 0 or IsEmpty(givens.layers), "Givens rotation layers need a nonempty target register.");
 
-        // Layers differ only in data, so cache the shifted and unshifted circuits. The key holds
-        // every width that sets a layer's cost, so compositions at other precisions or table
-        // sizes are counted separately.
+        // Layers differ only in data, so the cache key holds every width that sets a layer's cost.
         for (layer, shifted) in Zipped(givens.layers, givens.layerShifted) {
-            // A layer without nonzero words is the identity.
             if not IsEmpty(layer) {
                 let cacheName = $"GivensLayer_c{Length(controls)}_g{Length(phaseGradient)}_a{Length(angleReg)}_d{Length(layer)}_s{givens.maxSwapBits}";
-                if BeginEstimateCaching(cacheName, 2 * n + (shifted ? 1 | 0)) {
-                    // Decrementing maps the shifted pairs (1, 2), (3, 4), … onto (0, 1), (2, 3), ….
-                    within {
-                        if shifted { AddConstant(-1, Reversed(target)); }
-                    } apply {
-                        ApplyControlledMultiplexedRy(layer, givens.maxSwapBits, Reversed(Most(target)), controls, Tail(target), phaseGradient, angleReg);
-                    }
-                    EndEstimateCaching();
-                }
+                ApplyGivensLayer(cacheName, layer, shifted, givens.maxSwapBits, controls, target, phaseGradient, angleReg);
             }
         }
         Controlled ApplyPhasePolynomial(controls, (givens.phases, Reversed(target)));
+    }
+
+    /// Applies one layer of `ApplyRealUnitaryViaGivens`, estimated once per `cacheName` and shift
+    /// with an explicit adjoint so that `EndEstimateCaching` follows the layer.
+    operation ApplyGivensLayer(
+        cacheName : String,
+        layer : Bool[][],
+        shifted : Bool,
+        maxSwapBits : Int,
+        controls : Qubit[],
+        target : Qubit[],
+        phaseGradient : Qubit[],
+        angleReg : Qubit[]
+    ) : Unit is Adj {
+        body ... {
+            if BeginEstimateCaching(cacheName, 2 * Length(target) + (shifted ? 1 | 0)) {
+                // Decrementing maps the shifted pairs (1, 2), (3, 4), … onto (0, 1), (2, 3), ….
+                within {
+                    if shifted { AddConstant(-1, Reversed(target)); }
+                } apply {
+                    ApplyControlledMultiplexedRy(layer, maxSwapBits, Reversed(Most(target)), controls, Tail(target), phaseGradient, angleReg);
+                }
+                EndEstimateCaching();
+            }
+        }
+        adjoint ... {
+            if BeginEstimateCaching(cacheName, 2 * Length(target) + (shifted ? 1 | 0)) {
+                within {
+                    if shifted { AddConstant(-1, Reversed(target)); }
+                } apply {
+                    Adjoint ApplyControlledMultiplexedRy(layer, maxSwapBits, Reversed(Most(target)), controls, Tail(target), phaseGradient, angleReg);
+                }
+                EndEstimateCaching();
+            }
+        }
     }
 }

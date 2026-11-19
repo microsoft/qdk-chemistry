@@ -911,10 +911,11 @@ def _register_python_algorithms():
         QdkSparseStateSimulator,
     )
     from qdk_chemistry.algorithms.circuit_mapper import (  # noqa: PLC0415
+        BlockSparseUnitarySynthesisMapper,
+        DenseUnitarySynthesisMapper,
         PauliSequenceMapper,
         PSPMapper,
         SOSSAMapper,
-        UnitarySynthesisMapper,
     )
     from qdk_chemistry.algorithms.controlled_circuit_mapper import (  # noqa: PLC0415
         ControlledPauliSequenceMapper,
@@ -1015,7 +1016,8 @@ def _register_python_algorithms():
     register(lambda: ControlledSwapPauliSequenceMapper())
     register(lambda: SOSSAMapper())
     register(lambda: ControlledSOSSAMapper())
-    register(lambda: UnitarySynthesisMapper())
+    register(lambda: DenseUnitarySynthesisMapper())
+    register(lambda: BlockSparseUnitarySynthesisMapper())
     register(lambda: SOSSABuilder())
     register(lambda: SumOfSquaresQubitMapper())
     register(lambda: EulerIntegrator())
