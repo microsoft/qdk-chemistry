@@ -14,6 +14,9 @@ iqpe = create("phase_estimation", "qdk_iterative")
 
 # Or create the standard QFT-based variant
 qpe = create("phase_estimation", "qdk_standard")
+
+# Or create robust phase estimation for a geometric Hadamard-test schedule
+rpe = create("phase_estimation", "qdk_robust")
 # end-cell-create
 ################################################################################
 
@@ -53,6 +56,31 @@ qpe = create("phase_estimation", "qdk_standard")
 qpe.settings().set("shots", 100)
 qpe.settings().set("qpe_circuit_builder", qpe_circuit_builder)
 # end-cell-configure-standard
+################################################################################
+
+################################################################################
+# start-cell-configure-robust
+# Configure robust phase estimation through its QPE builder and nested scheduler
+experiment_scheduler = AlgorithmRef(
+    "rpe_experiment_scheduler",
+    "qdk",
+    target_accuracy=0.5,
+    epsilon_unitary=0.85,  # Independent dimensionless Trotter sizing tolerance (default: 0.85).
+    seed=42,
+    unitary_builder=AlgorithmRef("hamiltonian_unitary_builder", "trotter", order=2),
+)
+robust_circuit_builder = AlgorithmRef(
+    "qpe_circuit_builder",
+    "qdk_robust",
+    experiment_scheduler=experiment_scheduler,
+)
+rpe = create("phase_estimation", "qdk_robust")
+rpe.settings().set("qpe_circuit_builder", robust_circuit_builder)
+rpe.settings().set(
+    "circuit_executor",
+    AlgorithmRef("circuit_executor", "qdk_full_state_simulator", seed=42),
+)
+# end-cell-configure-robust
 ################################################################################
 
 ################################################################################
@@ -130,12 +158,70 @@ print(result.get_summary())
 ################################################################################
 
 ################################################################################
+# start-cell-run-robust
+rpe_result = rpe.run(circuit, qubit_ham)
+print(rpe_result.get_summary())
+# end-cell-run-robust
+################################################################################
+
+################################################################################
+# start-cell-robust-preview
+from qdk_chemistry.algorithms.base import create_from_ref
+
+builder = create(
+    "qpe_circuit_builder",
+    "qdk_robust",
+    experiment_scheduler=experiment_scheduler,
+)
+scheduler = create_from_ref(builder.settings(), "experiment_scheduler")
+schedule = scheduler.run(qubit_ham)
+
+print(schedule.get_summary())
+
+# Stream only the circuit pair needed for execution or resource estimation.
+first_spec, x_circuit, y_circuit = next(
+    builder.iter_build(schedule, circuit, qubit_ham)
+)
+x_application = x_circuit.get_qre_application()
+y_application = y_circuit.get_qre_application()
+print(first_spec.round_index, first_spec.draw_index, first_spec.shots)
+print(x_application, y_application)
+# end-cell-robust-preview
+################################################################################
+
+################################################################################
+# start-cell-robust-replay
+from pathlib import Path
+from tempfile import TemporaryDirectory
+
+from qdk_chemistry.data import RobustPhaseEstimationCircuitSet
+
+circuit_set = RobustPhaseEstimationCircuitSet(
+    schedule=schedule,
+    state_preparation=circuit,
+    qubit_hamiltonian=qubit_ham,
+)
+
+with TemporaryDirectory() as replay_directory:
+    replay_path = (
+        Path(replay_directory) / "example.robust_phase_estimation_circuit_set.json"
+    )
+    circuit_set.to_file(replay_path, "json")
+    restored = RobustPhaseEstimationCircuitSet.from_file(replay_path, "json")
+    rebound = restored.rebind(circuit)
+    replay_result = rpe.execute_circuit_set(rebound)
+
+print(replay_result.get_summary())
+# end-cell-robust-replay
+################################################################################
+
+################################################################################
 # start-cell-list-implementations
 from qdk_chemistry.algorithms import registry
 
 # List all registered phase estimation implementations
 implementations = registry.available("phase_estimation")
-print(implementations)  # e.g. ['qdk_iterative', 'qdk_standard']
+print(implementations)  # e.g. ['qdk_iterative', 'qdk_standard', 'qdk_robust']
 # end-cell-list-implementations
 ################################################################################
 
