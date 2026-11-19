@@ -4,9 +4,12 @@
 
 #include <gtest/gtest.h>
 
+#include <cmath>
 #include <filesystem>
+#include <numeric>
 #include <qdk/chemistry/algorithms/active_space.hpp>
 #include <qdk/chemistry/data/symmetry/spin_channel_indices.hpp>
+#include <qdk/chemistry/data/symmetry/symmetry_blocked_tensor.hpp>
 #include <qdk/chemistry/data/wavefunction_containers/state_vector.hpp>
 
 #include "ut_common.hpp"
@@ -110,7 +113,7 @@ TEST_F(ActiveSpaceTest, ActiveSpaceSelector_MetaData) {
 
 TEST_F(ActiveSpaceTest, Factory) {
   auto available_selectors = ActiveSpaceSelectorFactory::available();
-  EXPECT_EQ(available_selectors.size(), 4);
+  EXPECT_EQ(available_selectors.size(), 5);
   EXPECT_TRUE(std::find(available_selectors.begin(), available_selectors.end(),
                         "qdk_valence") != available_selectors.end());
   EXPECT_TRUE(std::find(available_selectors.begin(), available_selectors.end(),
@@ -119,6 +122,8 @@ TEST_F(ActiveSpaceTest, Factory) {
                         "qdk_autocas") != available_selectors.end());
   EXPECT_TRUE(std::find(available_selectors.begin(), available_selectors.end(),
                         "qdk_autocas_eos") != available_selectors.end());
+  EXPECT_TRUE(std::find(available_selectors.begin(), available_selectors.end(),
+                        "qdk_qicas") != available_selectors.end());
   EXPECT_THROW(ActiveSpaceSelectorFactory::create("nonexistent_selector"),
                std::runtime_error);
   EXPECT_NO_THROW(ActiveSpaceSelectorFactory::register_instance(
@@ -144,6 +149,162 @@ TEST_F(ActiveSpaceTest, Factory) {
   // already removed)
   EXPECT_FALSE(ActiveSpaceSelectorFactory::unregister_instance(
       "_test_active_space_selector"));
+}
+
+static std::shared_ptr<Wavefunction> make_qicas_test_wavefunction(
+    std::size_t existing_inactive_orbitals = 0) {
+  constexpr std::size_t n = 4;
+  Eigen::VectorXd occupations(n);
+  occupations << 0.9, 0.7, 0.3, 0.1;
+
+  Eigen::MatrixXd rotation = Eigen::MatrixXd::Identity(n, n);
+  const double cosine = std::cos(0.35);
+  const double sine = std::sin(0.35);
+  for (std::size_t p = 0; p + 1 < n; p += 2) {
+    const auto i = static_cast<Eigen::Index>(p);
+    const auto j = static_cast<Eigen::Index>(p + 1);
+    const Eigen::VectorXd column_i = rotation.col(i);
+    const Eigen::VectorXd column_j = rotation.col(j);
+    rotation.col(i) = cosine * column_i + sine * column_j;
+    rotation.col(j) = -sine * column_i + cosine * column_j;
+  }
+  const Eigen::MatrixXd one_rdm =
+      rotation * occupations.asDiagonal() * rotation.transpose();
+
+  auto element = [&](std::size_t p, std::size_t q) {
+    return one_rdm(static_cast<Eigen::Index>(p), static_cast<Eigen::Index>(q));
+  };
+  Eigen::VectorXd alpha_beta(n * n * n * n);
+  Eigen::VectorXd same_spin(n * n * n * n);
+  for (std::size_t i = 0; i < n; ++i) {
+    for (std::size_t j = 0; j < n; ++j) {
+      for (std::size_t k = 0; k < n; ++k) {
+        for (std::size_t l = 0; l < n; ++l) {
+          const auto index =
+              static_cast<Eigen::Index>(((i * n + j) * n + k) * n + l);
+          alpha_beta(index) = element(i, k) * element(j, l);
+          same_spin(index) =
+              element(i, k) * element(j, l) - element(i, l) * element(j, k);
+        }
+      }
+    }
+  }
+
+  const std::size_t total_orbitals = n + existing_inactive_orbitals;
+  const Eigen::MatrixXd coefficients =
+      Eigen::MatrixXd::Identity(total_orbitals, total_orbitals);
+  const Eigen::MatrixXd overlap =
+      Eigen::MatrixXd::Identity(total_orbitals, total_orbitals);
+  auto basis_set =
+      testing::create_random_basis_set(total_orbitals, "qicas-test");
+  std::vector<std::size_t> active(n);
+  std::iota(active.begin(), active.end(), existing_inactive_orbitals);
+  std::vector<std::size_t> inactive(existing_inactive_orbitals);
+  std::iota(inactive.begin(), inactive.end(), 0);
+  auto orbitals = std::make_shared<Orbitals>(
+      coefficients, std::nullopt, std::make_optional(overlap), basis_set,
+      testing::restricted_index_set(total_orbitals, active),
+      testing::restricted_index_set(total_orbitals, inactive));
+
+  Eigen::VectorXd ci_coefficients(2);
+  ci_coefficients << 0.9, std::sqrt(1.0 - 0.81);
+  std::vector<Configuration> determinants{
+      Configuration::from_spin_half_string("2200"),
+      Configuration::from_spin_half_string("0022")};
+  return std::make_shared<Wavefunction>(std::make_unique<StateVectorContainer>(
+      ContainerTypes::VectorVariant(ci_coefficients), determinants, orbitals,
+      std::optional<ContainerTypes::MatrixVariant>(std::nullopt),
+      std::optional<ContainerTypes::MatrixVariant>(
+          ContainerTypes::MatrixVariant(one_rdm)),
+      std::optional<ContainerTypes::MatrixVariant>(
+          ContainerTypes::MatrixVariant(one_rdm)),
+      std::optional<ContainerTypes::VectorVariant>(std::nullopt),
+      std::optional<ContainerTypes::VectorVariant>(
+          ContainerTypes::VectorVariant(same_spin)),
+      std::optional<ContainerTypes::VectorVariant>(
+          ContainerTypes::VectorVariant(alpha_beta)),
+      std::optional<ContainerTypes::VectorVariant>(
+          ContainerTypes::VectorVariant(same_spin))));
+}
+
+TEST_F(ActiveSpaceTest, QICASSelectsOptimizedTargetSpace) {
+  auto selector = ActiveSpaceSelectorFactory::create("qdk_qicas");
+  selector->settings().set("num_active_electrons", 2);
+  selector->settings().set("num_active_orbitals", 2);
+  selector->settings().set("max_cycles", 20);
+
+  auto result = selector->run(make_qicas_test_wavefunction());
+  ASSERT_NE(result, nullptr);
+  const auto result_orbitals = result->get_orbitals();
+  const auto active =
+      spin_channel_indices(result_orbitals->active_indices(), axes::alpha());
+  const auto inactive =
+      spin_channel_indices(result_orbitals->inactive_indices(), axes::alpha());
+  EXPECT_EQ(active, std::vector<std::size_t>({1, 2}));
+  EXPECT_EQ(inactive, std::vector<std::size_t>({0}));
+  EXPECT_EQ(result->get_active_num_electrons(),
+            (std::make_pair<std::size_t, std::size_t>(1, 1)));
+  EXPECT_FALSE(result_orbitals->has_energies());
+
+  const auto& coefficients =
+      result_orbitals->coefficients()->block({axes::alpha(), axes::alpha()});
+  EXPECT_TRUE((coefficients.transpose() * coefficients)
+                  .isApprox(Eigen::MatrixXd::Identity(4, 4), 1e-12));
+  EXPECT_GT((coefficients - Eigen::MatrixXd::Identity(4, 4)).norm(), 1e-6);
+}
+
+TEST_F(ActiveSpaceTest, QICASPreservesExistingInactiveOrbitals) {
+  auto selector = ActiveSpaceSelectorFactory::create("qdk_qicas");
+  selector->settings().set("num_active_electrons", 2);
+  selector->settings().set("num_active_orbitals", 2);
+  selector->settings().set("max_cycles", 20);
+
+  auto result = selector->run(make_qicas_test_wavefunction(1));
+  const auto result_orbitals = result->get_orbitals();
+  const auto active =
+      spin_channel_indices(result_orbitals->active_indices(), axes::alpha());
+  const auto inactive =
+      spin_channel_indices(result_orbitals->inactive_indices(), axes::alpha());
+  EXPECT_EQ(active, std::vector<std::size_t>({2, 3}));
+  EXPECT_EQ(inactive, std::vector<std::size_t>({0, 1}));
+  EXPECT_EQ(result->get_active_num_electrons(),
+            (std::make_pair<std::size_t, std::size_t>(1, 1)));
+  EXPECT_EQ(result->get_total_num_electrons(),
+            (std::make_pair<std::size_t, std::size_t>(3, 3)));
+}
+
+TEST_F(ActiveSpaceTest, QICASRequiresCorrelatedWindowRdms) {
+  auto selector = ActiveSpaceSelectorFactory::create("qdk_qicas");
+  selector->settings().set("num_active_electrons", 2);
+  selector->settings().set("num_active_orbitals", 2);
+
+  Eigen::MatrixXd coefficients = Eigen::MatrixXd::Identity(4, 4);
+  auto basis_set = testing::create_random_basis_set(4, "qicas-test");
+  auto orbitals = std::make_shared<Orbitals>(
+      coefficients, std::nullopt, std::nullopt, basis_set,
+      testing::restricted_index_set(4, {0, 1, 2, 3}),
+      testing::restricted_index_set(4, {}));
+  Eigen::VectorXd ci_coefficients(2);
+  ci_coefficients << 0.9, std::sqrt(1.0 - 0.81);
+  std::vector<Configuration> determinants{
+      Configuration::from_spin_half_string("2200"),
+      Configuration::from_spin_half_string("0022")};
+  auto wavefunction =
+      std::make_shared<Wavefunction>(std::make_unique<StateVectorContainer>(
+          ContainerTypes::VectorVariant(ci_coefficients), determinants,
+          orbitals, std::optional<ContainerTypes::MatrixVariant>(std::nullopt),
+          std::optional<ContainerTypes::VectorVariant>(std::nullopt)));
+
+  EXPECT_THROW(selector->run(wavefunction), std::invalid_argument);
+}
+
+TEST_F(ActiveSpaceTest, QICASValidatesTargetSettings) {
+  auto selector = ActiveSpaceSelectorFactory::create("qdk_qicas");
+  auto wavefunction = make_qicas_test_wavefunction();
+
+  selector->settings().set("num_active_electrons", 3);
+  selector->settings().set("num_active_orbitals", 2);
+  EXPECT_THROW(selector->run(wavefunction), std::invalid_argument);
 }
 
 TEST_F(ActiveSpaceTest, Occupation) {
