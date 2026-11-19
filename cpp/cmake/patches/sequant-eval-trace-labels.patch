@@ -1,23 +1,86 @@
-# Build the BTAS/TAPP evaluation trace labels only when tracing is compiled in.
-# ords_to_labels() runs eagerly as a log_btas()/log_tapp() argument, so with
-# tracing off it still inserts into annot_label()'s unsynchronized static map,
-# which races when several threads evaluate expressions at once.
+# Make SeQuant's evaluation trace safe when several threads evaluate at once:
+# - ords_to_labels() is an eager log_btas()/log_tapp() argument, so it now
+#   defers labelling until a record is actually written;
+# - annot_label() serializes its process-wide map, keeping each label stable
+#   across threads and log lines;
+# - write_log() serializes the records written to the shared eval stream.
 diff --git a/SeQuant/core/eval/result.hpp b/SeQuant/core/eval/result.hpp
 --- a/SeQuant/core/eval/result.hpp
 +++ b/SeQuant/core/eval/result.hpp
-@@ -153,10 +153,14 @@ inline std::string annot_label(std::int64_t key) noexcept {
+@@ -21,6 +21,8 @@
+ #include <any>
+ #include <cstdint>
+ #include <memory>
++#include <mutex>
++#include <ostream>
+ #include <string>
+ #include <utility>
+ 
+@@ -145,18 +147,33 @@ std::string ords_to_annot(RngOfOrdinals const& ords) {
+ /// global and monotonic so the same hash gets the same label across log
+ /// lines, which makes a trace easy to follow.
+ inline std::string annot_label(std::int64_t key) noexcept {
++  static std::mutex mutex;
+   static container::unordered_map<std::int64_t, std::string> labels;
+   static std::size_t next_id = 0;
++  std::scoped_lock lock{mutex};
+   if (auto it = labels.find(key); it != labels.end()) return it->second;
+   auto name = "i" + std::to_string(next_id++);
+   return labels.emplace(key, std::move(name)).first->second;
  }
  
++/// Labels an annot when streamed, so a record that is not written makes none.
  template <typename RngOfOrdinals>
 -std::string ords_to_labels(RngOfOrdinals const& ords) {
-+std::string ords_to_labels([[maybe_unused]] RngOfOrdinals const& ords) {
-+#ifdef SEQUANT_EVAL_TRACE
-   return join_strings<std::string>(ords, ",", [](auto x) {
-     return annot_label(static_cast<std::int64_t>(x));
-   });
-+#else
-+  return {};
-+#endif
+-  return join_strings<std::string>(ords, ",", [](auto x) {
+-    return annot_label(static_cast<std::int64_t>(x));
+-  });
++struct OrdinalLabels {
++  RngOfOrdinals const& ords;
++
++  friend std::ostream& operator<<(std::ostream& os, OrdinalLabels const& l) {
++    char const* separator = "";
++    for (auto const& x : l.ords) {
++      os << separator << annot_label(static_cast<std::int64_t>(x));
++      separator = ",";
++    }
++    return os;
++  }
++};
++
++template <typename RngOfOrdinals>
++OrdinalLabels<RngOfOrdinals> ords_to_labels(RngOfOrdinals const& ords) {
++  return {ords};
  }
  
  template <typename... Args>
+diff --git a/SeQuant/core/logger.hpp b/SeQuant/core/logger.hpp
+--- a/SeQuant/core/logger.hpp
++++ b/SeQuant/core/logger.hpp
+@@ -10,6 +10,7 @@
+ #include <cstddef>
+ #include <functional>
+ #include <iostream>
++#include <mutex>
+ 
+ namespace sequant {
+ 
+@@ -101,9 +102,18 @@ struct Logger : public Singleton<Logger> {
+   }
+ };
+ 
++namespace detail {
++/// Keeps each record whole when several threads write to the eval stream.
++inline std::mutex& log_mutex() noexcept {
++  static std::mutex mutex;
++  return mutex;
++}
++}  // namespace detail
++
+ template <typename... Args>
+ void write_log(Logger& l, Args const&... args) noexcept {
+   if (l.eval.stream) {
++    std::scoped_lock lock{detail::log_mutex()};
+     ((*l.eval.stream << args), ...);
+     (*l.eval.stream).flush();
+   }

@@ -5,6 +5,7 @@
 #include <gtest/gtest.h>
 
 #include <Eigen/Dense>
+#include <algorithm>
 #include <memory>
 #include <optional>
 #include <qdk/chemistry/algorithms/effective_hamiltonian.hpp>
@@ -86,7 +87,15 @@ TEST(EffectiveHamiltonianConstructorTest, MetaData) {
 }
 
 TEST(EffectiveHamiltonianConstructorTest, Factory) {
-  EXPECT_TRUE(EffectiveHamiltonianConstructorFactory::available().empty());
+  const auto available = EffectiveHamiltonianConstructorFactory::available();
+  EXPECT_NE(std::find(available.begin(), available.end(), "qdk_ducc"),
+            available.end());
+  auto default_constructor = EffectiveHamiltonianConstructorFactory::create();
+  ASSERT_NE(default_constructor, nullptr);
+  EXPECT_EQ(default_constructor->name(), "qdk_ducc");
+  auto ducc = EffectiveHamiltonianConstructorFactory::create("qdk_ducc");
+  ASSERT_NE(ducc, nullptr);
+  EXPECT_EQ(ducc->type_name(), "effective_hamiltonian_constructor");
   EXPECT_THROW(
       EffectiveHamiltonianConstructorFactory::create("nonexistent_constructor"),
       std::runtime_error);
@@ -142,6 +151,23 @@ TEST(EffectiveHamiltonianConstructorTest,
   TestEffectiveHamiltonianConstructor constructor;
   EXPECT_NO_THROW(
       constructor._validate_inputs(reference, hamiltonian, p_indices));
+}
+
+TEST(EffectiveHamiltonianConstructorTest, AcceptsEquivalentModelOrbitals) {
+  // Separately constructed model orbitals, as after deserialization.
+  auto hamiltonian = make_hamiltonian(std::make_shared<ModelOrbitals>(
+      testing::restricted_index_set(2, {0, 1})));
+  auto reference = make_wavefunction(std::make_shared<ModelOrbitals>(
+      testing::restricted_index_set(2, {0, 1})));
+  auto p_indices = testing::restricted_index_set(2, {0});
+  TestEffectiveHamiltonianConstructor constructor;
+  EXPECT_NO_THROW(
+      constructor._validate_inputs(reference, hamiltonian, p_indices));
+
+  auto larger = make_wavefunction(std::make_shared<ModelOrbitals>(
+      testing::restricted_index_set(3, {0, 1})));
+  EXPECT_THROW(constructor._validate_inputs(larger, hamiltonian, p_indices),
+               std::invalid_argument);
 }
 
 TEST(EffectiveHamiltonianConstructorTest, TreatsPIndicesAsAbsoluteIndices) {
