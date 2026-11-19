@@ -876,14 +876,18 @@ class TestControlledSOSSAMapper:
 
 
 @pytest.mark.parametrize(
-    ("select_algorithm", "prepare_consumes_gradient"),
+    ("select_algorithm", "prepare_consumes_gradient", "recompute_outer_registers"),
     [
-        pytest.param("qrom_phase_gradient", False, id="gradient_walk"),
-        pytest.param("qrom_phase_gradient", True, id="gradient_walk_and_prep"),
-        pytest.param("direct", False, id="gradient_free_walk"),
+        pytest.param("qrom_phase_gradient", False, False, id="gradient_walk"),
+        pytest.param("qrom_phase_gradient", True, False, id="gradient_walk_and_prep"),
+        pytest.param("direct", False, False, id="gradient_free_walk"),
+        pytest.param("direct", False, True, id="gradient_free_walk_recomputed_from_xo"),
+        pytest.param("qrom_phase_gradient", False, True, id="gradient_walk_recomputed_from_xo"),
     ],
 )
-def test_controlled_walk_qpe_measures_the_walk_phase(select_algorithm, prepare_consumes_gradient):
+def test_controlled_walk_qpe_measures_the_walk_phase(
+    select_algorithm, prepare_consumes_gradient, recompute_outer_registers
+):
     """Standard QPE through the controlled SOSSA walk measures phi or 1 - phi exactly."""
     walk = {
         "unitary_builder": AlgorithmRef("hamiltonian_unitary_builder", "sossa"),
@@ -894,6 +898,7 @@ def test_controlled_walk_qpe_measures_the_walk_phase(select_algorithm, prepare_c
             inner_prepare_algorithm="direct",
             select_algorithm=select_algorithm,
             rotation_bit_precision=_EXACT_PHASE_ROTATION_BITS,
+            recompute_outer_registers=recompute_outer_registers,
         ),
     }
     three_eighths = _exact_walk_phase_problem(3.0 / 8.0, prepare_consumes_gradient)
