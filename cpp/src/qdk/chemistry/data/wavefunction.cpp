@@ -973,6 +973,72 @@ void WavefunctionContainer::_deserialize_rdms_from_hdf5(H5::Group& group) {
   }
 }
 
+namespace {
+
+using RowMajorMatrix =
+    Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic, Eigen::RowMajor>;
+
+// Entropy matrices are stored row-major with explicit dimensions.
+void entropy_matrix_to_json(nlohmann::json& j, const std::string& key,
+                            const Eigen::MatrixXd& matrix) {
+  j[key + "_rows"] = matrix.rows();
+  j[key + "_cols"] = matrix.cols();
+  std::vector<double> data(matrix.size());
+  Eigen::Map<RowMajorMatrix>(data.data(), matrix.rows(), matrix.cols()) =
+      matrix;
+  j[key] = data;
+}
+
+std::optional<Eigen::MatrixXd> entropy_matrix_from_json(
+    const nlohmann::json& j, const std::string& key) {
+  if (!j.contains(key)) return std::nullopt;
+  std::vector<double> data = j.at(key);
+  const auto rows = j.value(key + "_rows", static_cast<Eigen::Index>(0));
+  const auto cols = j.value(key + "_cols", static_cast<Eigen::Index>(0));
+  // An empty matrix (a zero dimension and no data) is valid.
+  const bool matches =
+      rows >= 0 && cols >= 0 &&
+      (rows == 0 ? data.empty()
+                 : data.size() / static_cast<std::size_t>(rows) ==
+                           static_cast<std::size_t>(cols) &&
+                       data.size() % static_cast<std::size_t>(rows) == 0);
+  if (!matches) {
+    throw std::runtime_error("Serialized " + key +
+                             " dimensions do not match its data.");
+  }
+  return Eigen::MatrixXd(Eigen::Map<RowMajorMatrix>(data.data(), rows, cols));
+}
+
+void entropy_matrix_to_hdf5(H5::Group& group, const std::string& name,
+                            const Eigen::MatrixXd& matrix) {
+  hsize_t dims[2] = {static_cast<hsize_t>(matrix.rows()),
+                     static_cast<hsize_t>(matrix.cols())};
+  H5::DataSpace space(2, dims);
+  H5::DataSet dataset =
+      group.createDataSet(name, H5::PredType::NATIVE_DOUBLE, space);
+  // Eigen is column-major; transpose to row-major for HDF5
+  const RowMajorMatrix row_major = matrix;
+  dataset.write(row_major.data(), H5::PredType::NATIVE_DOUBLE);
+}
+
+std::optional<Eigen::MatrixXd> entropy_matrix_from_hdf5(
+    H5::Group& group, const std::string& name) {
+  if (!group.nameExists(name)) return std::nullopt;
+  H5::DataSet dataset = group.openDataSet(name);
+  H5::DataSpace space = dataset.getSpace();
+  if (space.getSimpleExtentNdims() != 2) {
+    throw std::runtime_error("Serialized " + name +
+                             " must be a two-dimensional dataset.");
+  }
+  hsize_t dims[2];
+  space.getSimpleExtentDims(dims);
+  RowMajorMatrix row_major(dims[0], dims[1]);
+  dataset.read(row_major.data(), H5::PredType::NATIVE_DOUBLE);
+  return Eigen::MatrixXd(row_major);
+}
+
+}  // namespace
+
 void WavefunctionContainer::_serialize_entropies_to_json(
     nlohmann::json& j) const {
   QDK_LOG_TRACE_ENTERING();
@@ -983,14 +1049,11 @@ void WavefunctionContainer::_serialize_entropies_to_json(
         _entropies.single_orbital->data() + _entropies.single_orbital->size());
   }
   if (_entropies.mutual_information) {
-    const auto& mi = *_entropies.mutual_information;
-    j["mutual_information_rows"] = mi.rows();
-    j["mutual_information_cols"] = mi.cols();
-    std::vector<double> mi_data(mi.rows() * mi.cols());
-    Eigen::Map<
-        Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic, Eigen::RowMajor>>(
-        mi_data.data(), mi.rows(), mi.cols()) = mi;
-    j["mutual_information"] = mi_data;
+    entropy_matrix_to_json(j, "mutual_information",
+                           *_entropies.mutual_information);
+  }
+  if (_entropies.two_orbital) {
+    entropy_matrix_to_json(j, "two_orbital_entropies", *_entropies.two_orbital);
   }
 }
 
@@ -1074,20 +1137,10 @@ std::unique_ptr<WavefunctionContainer> WavefunctionContainer::from_json(
       entropies.single_orbital =
           Eigen::Map<Eigen::VectorXd>(soe_data.data(), soe_data.size());
     }
-    if (j.contains("mutual_information")) {
-      std::vector<double> mi_data = j["mutual_information"];
-      Eigen::Index mi_rows =
-          j.value("mutual_information_rows", static_cast<Eigen::Index>(0));
-      Eigen::Index mi_cols =
-          j.value("mutual_information_cols", static_cast<Eigen::Index>(0));
-      if (mi_rows > 0 && mi_cols > 0 &&
-          static_cast<size_t>(mi_rows * mi_cols) == mi_data.size()) {
-        entropies.mutual_information =
-            Eigen::Map<Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic,
-                                     Eigen::RowMajor>>(mi_data.data(), mi_rows,
-                                                       mi_cols);
-      }
-    }
+    entropies.mutual_information =
+        entropy_matrix_from_json(j, "mutual_information");
+    entropies.two_orbital =
+        entropy_matrix_from_json(j, "two_orbital_entropies");
 
     // Legacy container_type values "cas" and "sci" are accepted here to
     // support forward-looking back-compat: once the deferred 0.1.0 reader is
@@ -1875,16 +1928,12 @@ void WavefunctionContainer::to_hdf5(H5::Group& group) const {
                         H5::PredType::NATIVE_DOUBLE);
     }
     if (_entropies.mutual_information) {
-      const auto& mi = *_entropies.mutual_information;
-      hsize_t mi_dims[2] = {static_cast<hsize_t>(mi.rows()),
-                            static_cast<hsize_t>(mi.cols())};
-      H5::DataSpace mi_space(2, mi_dims);
-      H5::DataSet mi_dataset = group.createDataSet(
-          "mutual_information", H5::PredType::NATIVE_DOUBLE, mi_space);
-      // Eigen is column-major; transpose to row-major for HDF5
-      Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic, Eigen::RowMajor>
-          mi_row_major = mi;
-      mi_dataset.write(mi_row_major.data(), H5::PredType::NATIVE_DOUBLE);
+      entropy_matrix_to_hdf5(group, "mutual_information",
+                             *_entropies.mutual_information);
+    }
+    if (_entropies.two_orbital) {
+      entropy_matrix_to_hdf5(group, "two_orbital_entropies",
+                             *_entropies.two_orbital);
     }
 
   } catch (const H5::Exception& e) {
@@ -2002,16 +2051,10 @@ std::unique_ptr<WavefunctionContainer> WavefunctionContainer::from_hdf5(
       soe_dataset.read(soe_vec.data(), H5::PredType::NATIVE_DOUBLE);
       entropies.single_orbital = soe_vec;
     }
-    if (group.nameExists("mutual_information")) {
-      H5::DataSet mi_dataset = group.openDataSet("mutual_information");
-      H5::DataSpace mi_space = mi_dataset.getSpace();
-      hsize_t mi_dims[2];
-      mi_space.getSimpleExtentDims(mi_dims);
-      Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic, Eigen::RowMajor>
-          mi_row_major(mi_dims[0], mi_dims[1]);
-      mi_dataset.read(mi_row_major.data(), H5::PredType::NATIVE_DOUBLE);
-      entropies.mutual_information = Eigen::MatrixXd(mi_row_major);
-    }
+    entropies.mutual_information =
+        entropy_matrix_from_hdf5(group, "mutual_information");
+    entropies.two_orbital =
+        entropy_matrix_from_hdf5(group, "two_orbital_entropies");
 
     if (container_type == "state_vector" || container_type == "cas" ||
         container_type == "sci" || container_type == "sd") {

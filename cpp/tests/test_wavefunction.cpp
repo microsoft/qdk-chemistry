@@ -2,6 +2,7 @@
 // Licensed under the MIT License. See LICENSE.txt in the project root for
 // license information.
 
+#include <H5Cpp.h>
 #include <gtest/gtest.h>
 
 #include <Eigen/Dense>
@@ -417,6 +418,78 @@ TEST_F(WavefunctionCoreTest, LazyTwoOrbitalEntropyFromS1AndMutualInfo) {
   EXPECT_TRUE(wf.has_two_orbital_entropies());
   EXPECT_TRUE(wf.get_two_orbital_entropies().isApprox(expected_s2,
                                                       testing::wf_tolerance));
+}
+
+TEST_F(WavefunctionCoreTest, TwoOrbitalEntropiesSurviveSerialization) {
+  // Supplied two-orbital entropies are stored, even without the single-orbital
+  // entropies needed to convert them to mutual information.
+  auto test_orbitals = testing::create_test_orbitals();
+  Wavefunction::DeterminantVector dets = {
+      Configuration::from_spin_half_string("20")};
+  Eigen::VectorXd coeffs(1);
+  coeffs << 1.0;
+  Eigen::MatrixXd s2(2, 2);
+  s2 << 0.0, 0.8, 0.8, 0.0;
+  OrbitalEntropies entropies;
+  entropies.two_orbital = s2;
+  Wavefunction wf(std::make_unique<StateVectorContainer>(
+      coeffs, dets, test_orbitals, std::nullopt, std::nullopt,
+      Wavefunction::DEFAULT_SECTOR, entropies));
+  const std::string filename =
+      "test_wavefunction_two_orbital_entropies.wavefunction.h5";
+  wf.to_hdf5_file(filename);
+  std::vector<std::shared_ptr<const Wavefunction>> restored;
+  restored.push_back(Wavefunction::from_hdf5_file(filename));
+  std::remove(filename.c_str());
+  restored.push_back(Wavefunction::from_json(wf.to_json()));
+  for (const auto& copy : restored) {
+    ASSERT_TRUE(copy->has_two_orbital_entropies());
+    EXPECT_TRUE(copy->get_two_orbital_entropies().isApprox(s2));
+  }
+}
+
+TEST_F(WavefunctionCoreTest, RejectsMalformedSerializedEntropies) {
+  auto test_orbitals = testing::create_test_orbitals();
+  Wavefunction::DeterminantVector dets = {
+      Configuration::from_spin_half_string("20")};
+  Eigen::VectorXd coeffs(1);
+  coeffs << 1.0;
+  OrbitalEntropies entropies;
+  entropies.mutual_information = Eigen::MatrixXd::Constant(2, 2, 0.2);
+  const StateVectorContainer container(coeffs, dets, test_orbitals,
+                                       std::nullopt, std::nullopt,
+                                       Wavefunction::DEFAULT_SECTOR, entropies);
+
+  // Dimensions that do not match the data are an error, not a silent drop.
+  auto json = container.to_json();
+  ASSERT_TRUE(json.contains("mutual_information"));
+  EXPECT_NO_THROW(WavefunctionContainer::from_json(json));
+  json["mutual_information_rows"] = 3;
+  EXPECT_THROW(WavefunctionContainer::from_json(json), std::runtime_error);
+
+  // An empty matrix, as the writer stores it, still loads.
+  json["mutual_information_rows"] = 0;
+  json["mutual_information_cols"] = 0;
+  json["mutual_information"] = std::vector<double>{};
+  EXPECT_NO_THROW(WavefunctionContainer::from_json(json));
+
+  // A dataset of the wrong rank is rejected before its extent is read.
+  const std::string filename =
+      "test_wavefunction_malformed_entropies.wavefunction.h5";
+  {
+    H5::H5File file(filename, H5F_ACC_TRUNC);
+    H5::Group root = file.openGroup("/");
+    container.to_hdf5(root);
+    EXPECT_NO_THROW(WavefunctionContainer::from_hdf5(root));
+    root.unlink("mutual_information");
+    const std::vector<double> flat(4, 0.2);
+    const hsize_t size = flat.size();
+    H5::DataSpace space(1, &size);
+    root.createDataSet("mutual_information", H5::PredType::NATIVE_DOUBLE, space)
+        .write(flat.data(), H5::PredType::NATIVE_DOUBLE);
+    EXPECT_THROW(WavefunctionContainer::from_hdf5(root), std::runtime_error);
+  }
+  std::remove(filename.c_str());
 }
 
 // ---- Single-particle sectors ----------------------------------------------
