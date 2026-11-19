@@ -5,6 +5,19 @@ The :class:`~qdk_chemistry.algorithms.OrbitalLocalizer` algorithm in QDK/Chemist
 Following QDK/Chemistry's :doc:`algorithm design principles <../design/index>`, it takes a :class:`~qdk_chemistry.data.Wavefunction` instance with reference orbitals as input and produces a new :class:`~qdk_chemistry.data.Wavefunction` instance with transformed orbitals as output.
 For more information about this pattern, see the :doc:`Factory Pattern <factory_pattern>` documentation.
 
+In C++, use ``OrbitalLocalizer`` and ``OrbitalLocalizerFactory`` as the
+canonical public names. The legacy ``Localizer`` and ``LocalizerFactory`` names
+remain available as deprecated source aliases. Existing binaries must be
+rebuilt because the canonical C++ class and factory symbols have changed.
+Update any forward declarations of the old class names or include the header
+that defines the aliases instead.
+
+In Python, explicit imports of ``qdk_chemistry.algorithms.Localizer`` and
+attribute access through ``algorithms.Localizer`` still return
+``OrbitalLocalizer`` with a ``DeprecationWarning``. The alias supports
+subclassing but is not exported by wildcard imports. The registry key
+``"orbital_localizer"`` is unchanged.
+
 Overview
 --------
 

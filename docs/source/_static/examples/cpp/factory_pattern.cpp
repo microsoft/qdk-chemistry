@@ -17,7 +17,7 @@ auto structure = Structure::from_xyz("2\n\nH 0.0 0.0 0.0\nH 0.0 0.0 1.4");
 auto scf_solver = ScfSolverFactory::create();
 
 // Create an orbital localizer using a specific implementation
-auto localizer = LocalizerFactory::create("qdk_pipek_mezey");
+auto localizer = OrbitalLocalizerFactory::create("qdk_pipek_mezey");
 
 // Configure the SCF solver and run
 auto [E_scf, wfn] = scf_solver->run(structure, 0, 1, "cc-pvdz");
@@ -39,7 +39,7 @@ for (const auto& name : scf_methods) {
 }
 
 // List available localizer implementations
-auto localizer_methods = LocalizerFactory::available();
+auto localizer_methods = OrbitalLocalizerFactory::available();
 std::cout << "Available localizers:" << std::endl;
 for (const auto& name : localizer_methods) {
   std::cout << "  - " << name << std::endl;
@@ -62,7 +62,7 @@ for (const auto& name : mc_methods) {
 // Show default implementation for each factory type
 std::cout << "Default SCF solver: " << ScfSolverFactory::default_name()
           << std::endl;
-std::cout << "Default localizer: " << LocalizerFactory::default_name()
+std::cout << "Default localizer: " << OrbitalLocalizerFactory::default_name()
           << std::endl;
 std::cout << "Default Hamiltonian constructor: "
           << HamiltonianConstructorFactory::default_name() << std::endl;
