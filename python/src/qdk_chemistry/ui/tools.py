@@ -18,7 +18,7 @@ import inspect
 import itertools
 import json
 import math
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Any
 
@@ -3297,7 +3297,7 @@ def check_remote_job(
     if job.submitted_at:
         try:
             submitted_dt = datetime.fromisoformat(job.submitted_at)
-            delta = datetime.now(timezone.utc) - submitted_dt
+            delta = datetime.now(UTC) - submitted_dt
             hours, remainder = divmod(int(delta.total_seconds()), 3600)
             minutes, seconds = divmod(remainder, 60)
             elapsed = f"{hours}h {minutes}m {seconds}s"

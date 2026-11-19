@@ -70,6 +70,7 @@ import qdk_chemistry.constants  # noqa: E402
 from qdk_chemistry._core import DuplicateRegistrationError as _DuplicateRegistrationError  # noqa: E402
 from qdk_chemistry._core import QDKChemistryConfig  # noqa: E402
 from qdk_chemistry.utils import Logger, telemetry_events  # noqa: E402
+from qdk_chemistry.utils._stubgen import run_stub_generator as _run_stub_generator  # noqa: E402
 from qdk_chemistry.utils.telemetry import TELEMETRY_ENABLED  # noqa: E402
 
 if TELEMETRY_ENABLED:
@@ -289,21 +290,7 @@ def _generate_stubs_on_first_import() -> None:
             if core_dir.exists() and core_dir.is_dir():
                 shutil.rmtree(core_dir)
 
-            subprocess.run(
-                [
-                    sys.executable,
-                    "-m",
-                    "pybind11_stubgen",
-                    "_core",
-                    "-o",
-                    ".",
-                ],
-                check=False,
-                capture_output=True,
-                text=True,
-                encoding="utf-8",
-                cwd=str(chemistry_dir),
-            )
+            _run_stub_generator(chemistry_dir)
 
             # Remove any newly created stub files that weren't there before
             new_stubs = set(qdk_dir.rglob("*.pyi")) - existing_stubs

@@ -22,6 +22,7 @@ from qiskit_nature.second_q.mappers import (
 from qdk_chemistry.algorithms.qubit_mapper import QubitMapper, QubitMapperSettings
 from qdk_chemistry.data import Hamiltonian, QubitOperator
 from qdk_chemistry.data._spin_channels import spin_channel_indices
+from qdk_chemistry.data._two_body_symmetry import fourfold_average, reversal_average
 from qdk_chemistry.data.enums.fermion_mode_order import FermionModeOrder
 from qdk_chemistry.data.symmetry import axes
 from qdk_chemistry.utils import Logger
@@ -122,6 +123,7 @@ class QiskitQubitMapper(QubitMapper):
 
         Raises:
             NotImplementedError: If ``mapping.base_encoding`` is not a supported Qiskit encoding.
+            ValueError: If the Hamiltonian is not Hermitian.
 
         """
         Logger.trace_entering()
@@ -135,26 +137,34 @@ class QiskitQubitMapper(QubitMapper):
                 f"Supported encodings: {sorted(_SUPPORTED_ENCODINGS.keys())}."
             )
 
+        if not hamiltonian.is_hermitian():
+            raise ValueError(
+                "Qiskit's raw-integral interface represents only Hermitian Hamiltonians. "
+                "Use the 'qdk' or 'openfermion' qubit mapper instead."
+            )
+
         h1_a, h1_b = hamiltonian.get_one_body_integrals()
         h2_aa, h2_ab, h2_bb = hamiltonian.get_two_body_integrals()
         num_orbs = len(spin_channel_indices(hamiltonian.get_orbitals().active_indices(), axes.alpha()))
         is_restricted = hamiltonian.get_orbitals().is_restricted()
+        shape = (num_orbs, num_orbs, num_orbs, num_orbs)
+        consumer = "Qiskit qubit mapper"
 
+        # Pass the Hermitian part, in physicist order.
         if is_restricted:
             electronic_hamiltonian = ElectronicEnergy.from_raw_integrals(
-                h1_a=h1_a, h2_aa=h2_aa.reshape(num_orbs, num_orbs, num_orbs, num_orbs)
+                h1_a=h1_a,
+                h2_aa=fourfold_average(h2_aa.reshape(shape), consumer).transpose(0, 2, 3, 1),
+                auto_index_order=False,
             )
         else:
-            # h2_ab is eri_aabb in chemist notation: (aa|bb).
-            # Qiskit's h2_ba parameter expects (bb|aa) = eri_aabb transposed.
-            # By Coulomb symmetry (pq|rs)=(rs|pq), this is eri_aabb[r,s,p,q].
-            h2_ab_4d = h2_ab.reshape(num_orbs, num_orbs, num_orbs, num_orbs)
             electronic_hamiltonian = ElectronicEnergy.from_raw_integrals(
                 h1_a=h1_a,
-                h2_aa=h2_aa.reshape(num_orbs, num_orbs, num_orbs, num_orbs),
+                h2_aa=fourfold_average(h2_aa.reshape(shape), f"{consumer} (alpha-alpha block)").transpose(0, 2, 3, 1),
                 h1_b=h1_b,
-                h2_bb=h2_bb.reshape(num_orbs, num_orbs, num_orbs, num_orbs),
-                h2_ba=h2_ab_4d.transpose(2, 3, 0, 1),
+                h2_bb=fourfold_average(h2_bb.reshape(shape), f"{consumer} (beta-beta block)").transpose(0, 2, 3, 1),
+                h2_ba=reversal_average(h2_ab.reshape(shape), f"{consumer} (alpha-beta block)").transpose(2, 0, 1, 3),
+                auto_index_order=False,
             )
 
         fermionic_op = electronic_hamiltonian.second_q_op()

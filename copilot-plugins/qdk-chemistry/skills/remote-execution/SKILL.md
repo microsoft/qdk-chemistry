@@ -17,6 +17,14 @@ A `Job` supports `check()`, `wait()`, `fetch()`, `cancel()`, `save()`, and
 `load()`. Pass `job_dir` to `submit` to save the job record automatically;
 without it, the SDK returns an in-memory job that can be saved explicitly.
 
+Loaded jobs reconnect using the backend's current runtime defaults, not the
+connection parameters recorded in the saved file. For custom connections,
+create a backend with `create_remote(...)` and
+attach it with `job.attach_backend(backend)` before checking, fetching or
+canceling the job. The caller is responsible for trusting that configuration:
+it selects authenticated request destinations, and its trustworthiness is not
+verified.
+
 MCP `run_*` tools accept `remote`, `remote_config`, and `remote_timeout` when
 the selected algorithm supports remote execution. A submitted call returns a
 job identifier. `check_remote_job`, `retrieve_remote_results`,
@@ -50,6 +58,14 @@ keyword inputs, and content hashes into a manifest. Data objects are written as
 separate files referenced by that manifest. The backend transfers the manifest
 and inputs, invokes the algorithm remotely, and transfers output files back.
 Nested algorithm-reference settings remain nested in the manifest.
+
+The caller and deployment operator are responsible for trusting cache/job
+writers and controlling their write access; the protocol does not verify either.
+Writers can forge results, replace payloads, or select algorithms and settings
+for workers to execute. A shared cache means storage is reachable from multiple
+machines, not that it isolates mutually untrusted users. Content hashes and
+manifest type tags do not authenticate files or make native deserialization
+safe for attacker-written payloads.
 
 ## Backends
 

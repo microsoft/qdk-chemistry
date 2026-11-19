@@ -905,6 +905,9 @@ static void calculate_pseudo_canonical_orbital_block(
     Eigen::VectorXd& eigenvalues, const int eigenvalue_start_index,
     Eigen::Block<RowMajorMatrix> transformed_orbitals,
     const int num_atomic_orbitals, const int num_molecular_orbitals) {
+  if (block_size == 0) {
+    return;
+  }
   lapack::syev(lapack::Job::Vec, lapack::Uplo::Lower, block_size,
                input_block_output_eigenvectors.data(), block_size,
                eigenvalues.data() + eigenvalue_start_index);
@@ -942,6 +945,9 @@ static void rotate_gradient_to_pseudo_canonical_basis(
     const int start_index, const int num_rows, const int num_cols,
     const RowMajorMatrix& u_left, const RowMajorMatrix& u_right,
     Eigen::Ref<Eigen::VectorXd> transformed_vector) {
+  if (num_rows == 0 || num_cols == 0) {
+    return;
+  }
   RowMajorMatrix current_matrix = Eigen::Map<const RowMajorMatrix>(
       current_vector.data() + start_index, num_rows, num_cols);
   RowMajorMatrix temp_matrix = RowMajorMatrix::Zero(num_rows, num_cols);

@@ -42,9 +42,10 @@ from qdk_chemistry.data import (
     StateVectorContainer,
     Wavefunction,
 )
+from qdk_chemistry.utils import Logger
 from qdk_chemistry.utils.qsharp import create_qsharp_context
 
-from .helpers import create_test_orbitals
+from .helpers import create_fourfold_test_hamiltonian, create_test_orbitals
 
 # Dynamically add the build directory to Python path
 # This ensures the _core module can be found regardless of platform
@@ -164,6 +165,15 @@ def unrestricted_orbital():
 
 
 @pytest.fixture
+def warn_logger():
+    """Temporarily set logger to warn level, restoring on teardown."""
+    prev_level = Logger.get_global_level()
+    Logger.set_global_level("warn")
+    yield
+    Logger.set_global_level(prev_level)
+
+
+@pytest.fixture
 def temp_directory():
     """Create a temporary directory for file-based tests."""
     with tempfile.TemporaryDirectory() as tmpdir:
@@ -195,6 +205,12 @@ def hamiltonian_10e6o(test_data_files_path):
     n_spatial = classical_hamiltonian.get_one_body_integrals()[0].shape[0]
     mapping = MajoranaMapping.jordan_wigner(num_modes=2 * n_spatial)
     return mapper.run(classical_hamiltonian, mapping)
+
+
+@pytest.fixture(params=[True, False], ids=["rhf", "uhf"])
+def fourfold_hamiltonian(request):
+    """Random fourfold, non-eightfold Hamiltonian and its independent occupation-basis matrix."""
+    return create_fourfold_test_hamiltonian(3, request.param)
 
 
 @pytest.fixture

@@ -10,8 +10,14 @@ import pytest
 
 from qdk_chemistry import algorithms
 from qdk_chemistry.constants import ANGSTROM_TO_BOHR
-from qdk_chemistry.data import Structure
+from qdk_chemistry.data import HamiltonianType, Structure
 
+from .helpers import (
+    create_dense_test_hamiltonian,
+    fermionic_reference_matrix,
+    fourfold_average,
+    non_fourfold_perturbation,
+)
 from .reference_tolerances import (
     ci_energy_tolerance,
     entropy_tol,
@@ -230,3 +236,49 @@ class TestMCCalculator:
         np.testing.assert_allclose(s1, s1_expected, atol=entropy_tol)
         np.testing.assert_allclose(s2, s2_expected, atol=entropy_tol)
         np.testing.assert_allclose(mi, mi_expected, atol=entropy_tol)
+
+
+def _non_fourfold_restricted(kind):
+    """Restricted tensors that are Hermitian but not exchange-symmetric, or not Hermitian."""
+    random = np.random.default_rng(706)
+    one_body = random.normal(size=(3, 3))
+    one_body = (one_body + one_body.T) / 2
+    fourfold = fourfold_average(random.normal(size=(3,) * 4))
+    perturbation = non_fourfold_perturbation(random.normal(size=(3,) * 4), kind)
+    return one_body, fourfold, fourfold + 0.5 * perturbation
+
+
+@pytest.mark.parametrize("solver", ["macis_cas", "macis_asci"])
+def test_macis_fourfold_energy_matches_reference(solver):
+    """MACIS solves fourfold, non-eightfold tensors exactly, including same-spin terms."""
+    one_body, fourfold, _tensor = _non_fourfold_restricted("exchange")
+    reference = fermionic_reference_matrix(one_body, one_body, fourfold, fourfold, fourfold)
+    sector = [
+        state for state in range(len(reference)) if (state & 7).bit_count() == 2 and (state >> 3).bit_count() == 1
+    ]
+    hamiltonian = create_dense_test_hamiltonian(one_body, fourfold, core_energy=0.375)
+    energy, _wavefunction = algorithms.create("multi_configuration_calculator", solver).run(hamiltonian, 2, 1)
+    assert energy == pytest.approx(np.linalg.eigvalsh(reference[np.ix_(sector, sector)].real)[0] + 0.375, abs=1e-10)
+
+
+@pytest.mark.usefixtures("warn_logger")
+@pytest.mark.parametrize("solver", ["macis_cas", "macis_asci"])
+@pytest.mark.parametrize("kind", ["exchange", "hermiticity"])
+def test_macis_uses_hermitian_part_of_restricted_tensor(solver, kind, capfd):
+    """MACIS solves the Hermitian part, which neither perturbation changes; only the non-Hermitian one warns."""
+    one_body, fourfold, tensor = _non_fourfold_restricted(kind)
+    calculator = algorithms.create("multi_configuration_calculator", solver)
+    expected, _wavefunction = calculator.run(create_dense_test_hamiltonian(one_body, fourfold), 1, 1)
+    capfd.readouterr()
+    energy, _wavefunction = calculator.run(create_dense_test_hamiltonian(one_body, tensor), 1, 1)
+    assert energy == pytest.approx(expected, abs=1e-10)
+    assert ("Hermitian part" in capfd.readouterr().out) == (kind == "hermiticity")
+
+
+@pytest.mark.parametrize("solver", ["macis_cas", "macis_asci"])
+def test_macis_rejects_non_hermitian_hamiltonian(solver):
+    """MACIS assumes a Hermitian Hamiltonian."""
+    one_body, fourfold, _tensor = _non_fourfold_restricted("exchange")
+    hamiltonian = create_dense_test_hamiltonian(one_body, fourfold, hamiltonian_type=HamiltonianType.NonHermitian)
+    with pytest.raises(RuntimeError, match="non-Hermitian"):
+        algorithms.create("multi_configuration_calculator", solver).run(hamiltonian, 1, 1)

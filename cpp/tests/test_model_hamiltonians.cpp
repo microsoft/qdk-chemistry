@@ -200,6 +200,31 @@ TEST_F(ModelHamiltonianTest, PPPChainPotentialAndChargeOnly) {
               testing::numerical_zero_tolerance);
 }
 
+TEST_F(ModelHamiltonianTest, PPPAsymmetricPotentialUsesSymmetricPart) {
+  const int n = 3;
+  auto lattice = LatticeGraph::chain(n);
+  Eigen::MatrixXd V(n, n);
+  V << 0.0, 0.7, 0.0, 0.3, 0.0, 0.5, 0.4, 0.5, 0.0;
+  const Eigen::VectorXd z = Eigen::VectorXd::LinSpaced(n, 0.5, 1.5);
+  const Eigen::MatrixXd V_symmetric = 0.5 * (V + V.transpose());
+
+  auto [h1, h2, offset] = model_hamiltonians::detail::_build_ppp_integrals(
+      lattice, 0.0, 1.0, 2.0, V, z);
+  auto [h1_sym, h2_sym, offset_sym] =
+      model_hamiltonians::detail::_build_ppp_integrals(lattice, 0.0, 1.0, 2.0,
+                                                       V_symmetric, z);
+
+  EXPECT_TRUE(Eigen::MatrixXd(h1).isApprox(Eigen::MatrixXd(h1_sym),
+                                           testing::numerical_zero_tolerance));
+  EXPECT_TRUE(testing_detail::to_dense_h2(h2, n).isApprox(
+      testing_detail::to_dense_h2(h2_sym, n),
+      testing::numerical_zero_tolerance));
+  EXPECT_NEAR(offset, offset_sym, testing::numerical_zero_tolerance);
+  // (00|22) is stored although V(0, 2) is zero.
+  EXPECT_DOUBLE_EQ(h2.at({0, 0, 2, 2}), 0.2);
+  EXPECT_DOUBLE_EQ(h2.at({2, 2, 0, 0}), 0.2);
+}
+
 TEST_F(ModelHamiltonianTest, OhnoPotentialTest) {
   const int n = 4;
   auto lattice = LatticeGraph::chain(n);

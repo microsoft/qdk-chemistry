@@ -18,7 +18,7 @@ Most users should start with the PyPI install.
 
 ### Prerequisites
 
-- Python 3.10 or newer
+- Python 3.11 or newer
 - pip (on Ubuntu/Debian you may need `sudo apt install python3-pip python3-venv`)
 
 Prebuilt wheels are published for the following platforms:
@@ -169,8 +169,7 @@ pytest python/tests
 ### Notes for Windows Users
 
 Windows is a supported platform on both x86_64 and arm64: the project is built and tested on both
-architectures in CI, and wheels are published for both (x86_64 from Python 3.10, arm64 from Python
-3.11, which is the first version CPython ships a win-arm64 build for). The following caveats apply
+architectures in CI, and wheels are published for both from Python 3.11 onwards. The following caveats apply
 to native Windows installs; none of them apply under
 [WSL](https://learn.microsoft.com/windows/wsl/install).
 
@@ -254,7 +253,7 @@ QDK/Chemistry requires both a C and a C++ compiler supporting the ISO C++20 stan
 |-----------------|-----------------|----------|
 | GNU  | 13+ | Linux |
 | AppleClang | 17+ | macOS |
-| MSVC | Visual Studio 2022 Build Tools | Windows |
+| MSVC | Visual Studio 2026 Build Tools | Windows |
 | clang-cl | 17+ | Windows |
 
 **NOTE**: Before installing dependencies on Ubuntu/Debian, update package indices with:
@@ -270,20 +269,20 @@ sudo dnf makecache
 ```
 
 On Windows, dependencies come from two places: the compiler, CMake, and Ninja ship with the
-Visual Studio 2022 Build Tools, and the C++ libraries come from
+Visual Studio 2026 Build Tools, and the C++ libraries come from
 [vcpkg](https://learn.microsoft.com/vcpkg/). The Windows column below gives the vcpkg port name for
 each library; they are all declared in [`vcpkg.json`](vcpkg.json), so a single
 `vcpkg install --overlay-ports=vcpkg-overlay/ports` resolves the whole set.
 
 | Dependency | Description | Requirements | Source Location | Ubuntu / Debian | Redhat | Windows |
 |------------|-------------|--------------------|-----------------|-----------------|---------|-----------------|
-| Python 3 | Python interpreter and package tools | Version 3.10+ | [source](https://www.python.org/) | `apt install python3 python3-pip python3-venv` | `dnf install python3 python3-pip` | `winget install --id Python.Python.3.12 -e -s winget` |
-| CMake | Build system manager | Version > 3.15 | [source](https://github.com/Kitware/CMake) | `apt install cmake` | `dnf install cmake` | VS Build Tools |
+| Python 3 | Python interpreter and package tools | Version 3.11+ | [source](https://www.python.org/) | `apt install python3 python3-pip python3-venv` | `dnf install python3 python3-pip` | `winget install --id Python.Python.3.12 -e -s winget` |
+| CMake | Build system manager | Version 3.28+ | [source](https://github.com/Kitware/CMake) | `apt install cmake` | `dnf install cmake` | VS Build Tools |
 | Ninja | Build tool used for the Windows builds | N/A | [source](https://github.com/ninja-build/ninja) | `apt install ninja-build` | `dnf install ninja-build` | VS Build Tools |
 | Eigen | C++ linear algebra templates | Version > 3.4.0 | [source](https://libeigen.gitlab.io/) | `apt install libeigen3-dev` | `dnf install eigen3-devel` | `eigen3` |
 | LAPACK | C library for linear algebra. See [this note](#note-on-lapack-usage) for further information | N/A | e.g. [source](https://github.com/OpenMathLib/OpenBLAS) | e.g. `apt install libopenblas-dev` | e.g. `dnf install openblas-devel`| `openblas` |
 | HDF5 | A portable data file library | Version > 1.12 + C++ bindings | [source](https://www.hdfgroup.org/download-hdf5/) | `apt install libhdf5-serial-dev` | `dnf install hdf5-devel`| `hdf5[cpp]` |
-| Boost | A collection of useful C++ libraries | Version > 1.80 | [source](https://github.com/boostorg/wiki/wiki/Getting-Started%3A-Overview) | `apt install libboost-all-dev` | `dnf install boost-devel` | `boost-headers`, `boost-container-hash`, `boost-dynamic-bitset`, `boost-sort` |
+| Boost | A collection of useful C++ libraries | Version > 1.80 (1.85+ with MSVC), including the compiled Locale, Random, and Regex libraries | [source](https://github.com/boostorg/wiki/wiki/Getting-Started%3A-Overview) | `apt install libboost-all-dev` | `dnf install boost-devel` | `boost-headers`, `boost-container`, `boost-container-hash`, `boost-dynamic-bitset`, `boost-hana`, `boost-interval`, `boost-locale`, `boost-multiprecision`, `boost-numeric-conversion`, `boost-random`, `boost-range`, `boost-regex`, `boost-sort`, `boost-spirit` |
 
 See [Python dependencies](#python-dependencies) for a list of dependencies installed by `pip`.
 
@@ -297,11 +296,11 @@ sudo apt install python3 python3-pip python3-venv cmake ninja-build libeigen3-de
 
 #### Quick install (Windows)
 
-Install the Visual Studio 2022 Build Tools with the C++ workload, which also provides CMake and
+Install the Visual Studio 2026 Build Tools with the C++ workload, which also provides CMake and
 Ninja:
 
 ```powershell
-winget install --id Microsoft.VisualStudio.2022.BuildTools -e -s winget `
+winget install --id Microsoft.VisualStudio.BuildTools -e -s winget `
     --override "--quiet --wait --norestart --add Microsoft.VisualStudio.Workload.VCTools --includeRecommended"
 ```
 
@@ -324,10 +323,14 @@ These dependencies are automatically downloaded and built by the CMake build sys
 | Libecpint | A C++ library for molecular integrals involving [effective core potentials](https://en.wikipedia.org/wiki/Pseudopotential) | v1.0.7 | [source](https://github.com/robashaw/libecpint) | `apt install libecpint-dev` | N/A | N/A |
 | GauXC | A C++ library for molecular integrals on numerical grids | v1.0 | [source](https://github.com/wavefunction91/gauxc) | N/A | N/A | N/A |
 | MACIS | A C++ library for configuration interaction methods | N/A | [source](https://github.com/wavefunction91/macis) | N/A | N/A | N/A |
+| SeQuant | A C++ library for symbolic tensor algebra in many-body methods | be93107 | [source](https://github.com/ValeevGroup/SeQuant) | N/A | N/A | N/A |
+| BTAS | A C++ tensor library, used as SeQuant's numerical backend | 5b435cf | [source](https://github.com/BTAS/btas) | N/A | N/A | N/A |
 
 **NOTE**: As Libint and GauXC exhibit very long build times, it is **strongly encouraged** that these dependencies are separately installed to avoid excessive build costs. See the [Libint2](https://github.com/evaleev/libint) and [GauXC](https://github.com/wavefunction91/gauxc) project documentation for build instructions.
 
 **NOTE**: The source code of MACIS is included in the `external` directory of QDK/Chemistry. `MACIS` carries its own set of dependencies which are automatically managed by the `MACIS` build system. While building `MACIS` and its dependencies can be time consuming, it is strongly encouraged to allow the QDK/Chemistry build system handle this dependency to ensure proper interaction of up- and down-stream components.
+
+**NOTE**: SeQuant is built from source at its pinned revision, with BTAS as its numerical backend. BTAS uses the BLAS++/LAPACK++ libraries that `MACIS` brings in. Builds with `QDK_ALLOW_DEPENDENCY_FETCH=OFF` use an installed SeQuant instead: install the standalone project [`cpp/cmake/sequant`](cpp/cmake/sequant/CMakeLists.txt), which applies the same pins and patches, into the prefix that holds BLAS++/LAPACK++.
 
 ### Note on LAPACK Usage
 
@@ -389,7 +392,7 @@ cd ..
 
 **Windows (PowerShell):**
 
-Run from a **Developer PowerShell for VS 2022** so that the compiler is on `PATH`, with the vcpkg
+Run from a Visual Studio 2026 **Developer PowerShell** so that the compiler is on `PATH`, with the vcpkg
 dependencies already installed. The [build scripts](#building-on-windows) do both for you.
 
 ```powershell
@@ -557,7 +560,7 @@ cmake --build cpp/build
 
 **Windows (PowerShell):**
 
-From a Developer PowerShell for VS 2022, with the vcpkg dependencies already installed:
+From a Visual Studio 2026 Developer PowerShell, with the vcpkg dependencies already installed:
 
 ```powershell
 cd C:\full\path\to\qdk-chemistry

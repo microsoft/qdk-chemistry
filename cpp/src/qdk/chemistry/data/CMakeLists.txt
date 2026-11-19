@@ -1,5 +1,7 @@
 target_sources(chemistry PRIVATE
     ansatz.cpp
+    auxiliary_basis.cpp
+    basis_library.cpp
     basis_set.cpp
     configuration.cpp
     lattice_geometry.cpp
@@ -21,6 +23,7 @@ target_sources(chemistry PRIVATE
     nuclear_hessian.cpp
     pauli_operator.cpp
     settings.cpp
+    shell.cpp
     stability_result.cpp
     structure.cpp
     symmetry/symmetry.cpp
@@ -31,5 +34,6 @@ target_sources(chemistry PRIVATE
     tapering.cpp
     wavefunction.cpp
     wavefunction_containers/amplitude_container.cpp
+    wavefunction_containers/mps_wavefunction.cpp
     wavefunction_containers/state_vector.cpp
 )

@@ -51,7 +51,7 @@ SymmetryBlockedSparseMap<Rank, Scalar>::from_json(const nlohmann::json& j) {
     for (const auto& e : entry.at("entries")) {
       IndexTuple idx{};
       for (std::size_t i = 0; i < Rank; ++i) {
-        idx[i] = e.at(i).template get<unsigned>();
+        idx[i] = detail::json_integer<unsigned>(e.at(i));
       }
       (*sparse_block)[idx] = e.at(Rank).template get<Scalar>();
     }

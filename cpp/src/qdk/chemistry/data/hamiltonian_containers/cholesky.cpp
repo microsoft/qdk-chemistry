@@ -21,6 +21,7 @@
 #include "../filename_utils.hpp"
 #include "../hdf5_serialization.hpp"
 #include "../json_serialization.hpp"
+#include "../two_body_symmetry.hpp"
 
 namespace qdk::chemistry::data {
 
@@ -173,6 +174,16 @@ void CholeskyHamiltonianContainer::_build_four_center_cache() const {
       blas::gemm(blas::Layout::ColMajor, blas::Op::NoTrans, blas::Op::Trans,
                  norb2, norb2, naux, 1.0, three_right.data(), norb2,
                  three_left.data(), norb2, 0.0, out, norb2);
+    }
+    // Pair-symmetric factors give integrals with the symmetry of real-orbital
+    // ones; impose it exactly so consumers can read them in place.
+    if (detail::factors_are_pair_symmetric(three_left.data(), norb, naux) &&
+        detail::factors_are_pair_symmetric(three_right.data(), norb, naux)) {
+      if (&three_left == &three_right) {
+        detail::eightfold_symmetrize(out, norb);
+      } else {
+        detail::pair_symmetrize(out, norb);
+      }
     }
     return four_center;
   };

@@ -78,7 +78,7 @@
 - Readout ancillas:
 - Simulator seed range:
 - Complete-run bitstring counts:
-- Most frequent bitstring:
+- Modal bitstring:
 - Measured active-space energy and units:
 - Core energy added after phase estimation:
 - Total molecular energy estimate and units:

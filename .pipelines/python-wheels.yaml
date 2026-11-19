@@ -44,24 +44,22 @@ parameters:
   - name: windows_x86_64
     os: windows
     arch: x86_64
-    march: x86-64-v3
+    march: AVX2
     imageName: windows-2025-1espt
   - name: windows_aarch64
     os: windows
     arch: aarch64
-    march: armv8-a
+    march: armv8.0
     imageName: windows-2025-arm64-1espt
   displayName: Target platforms
 - name: pythonVersions
   type: stringList
   values:
-  - 3.10
   - 3.11
   - 3.12
   - 3.13
   - 3.14
   default:
-  - 3.10
   - 3.11
   - 3.12
   - 3.13
@@ -79,6 +77,15 @@ parameters:
   type: boolean
   default: true
   displayName: Run slow tests
+- name: testWorkers
+  type: object
+  default:
+    linux_x86_64: 48
+    linux_aarch64: 16
+    macos_arm64: 5
+    windows_x86_64: 48
+    windows_aarch64: 16
+  displayName: Pytest workers per platform
 
 variables:
 - group: QdkChemistry
@@ -119,7 +126,7 @@ extends:
       displayName: Build C++ Deps and Python Wheels
       jobs:
       # Windows C++ dependency build (vcpkg + FetchContent targets).
-      # Runs once so the 5 parallel Python-version wheel jobs share a single
+      # Runs once so the parallel Python-version wheel jobs share a single
       # warm cache entry instead of each rebuilding deps independently.
       # Gated on windows_x86_64 being present in the matrix, so overriding the matrix (e.g. Linux-only) doesn't
       # waste a Windows agent on an unused dependency build.
@@ -169,7 +176,7 @@ extends:
         - ${{ if eq(target.name, 'windows_aarch64') }}:
           - job: Build_windows_aarch64_deps
             pool:
-              name: aqe-1es-Dpds_v6-arm-pool
+              name: $(CPU_POOL_ARM_WINDOWS)
               demands:
               - ImageOverride -equals ${{ target.imageName }}
               os: windows
@@ -194,14 +201,14 @@ extends:
           ${{ elseif eq(target.name, 'windows_aarch64') }}:
             dependsOn: Build_windows_aarch64_deps
             pool:
-              name: aqe-1es-Dpds_v6-arm-pool
+              name: $(CPU_POOL_ARM_WINDOWS)
               demands:
               - ImageOverride -equals ${{ target.imageName }}
               os: ${{ target.os }}
               hostArchitecture: Arm64
           ${{ elseif eq(target.name, 'linux_aarch64') }}:
             pool:
-              name: aqe-1es-Dpsd_v5-arm-pool
+              name: $(CPU_POOL_ARM_LINUX)
               demands:
               - ImageOverride -equals ${{ target.imageName }}
               os: ${{ target.os }}
@@ -225,11 +232,9 @@ extends:
           strategy:
             matrix:
               ${{ each py in parameters.pythonVersions }}:
-                # CPython ships win-arm64 builds only from 3.11 onwards.
-                ${{ if not(and(eq(target.name, 'windows_aarch64'), eq(py, '3.10'))) }}:
-                  Py${{ py }}:
-                    pythonVersion: ${{ py }}
-            maxParallel: 5
+                Py${{ py }}:
+                  pythonVersion: ${{ py }}
+            maxParallel: 4
           displayName: Build ${{ target.march }} ${{ target.os }} wheels
           variables:
             # Must stay a literal value: ADO's variables: block doesn't expand $VAR.
@@ -274,6 +279,7 @@ extends:
                 imageTag: linux/amd64
                 pythonVersion: $(pythonVersion)
                 runSlowTests: ${{ parameters.runSlowTests }}
+                testWorkers: ${{ parameters.testWorkers[target.name] }}
                 exachemRequired: true
                 condition: succeeded()
 
@@ -299,6 +305,7 @@ extends:
                 imageTag: linux/arm64/v8
                 pythonVersion: $(pythonVersion)
                 runSlowTests: ${{ parameters.runSlowTests }}
+                testWorkers: ${{ parameters.testWorkers[target.name] }}
                 condition: succeeded()
 
           # Build - macOS ARM64
@@ -321,6 +328,7 @@ extends:
                 pythonVersion: $(pythonVersion)
                 macBuild: ON
                 runSlowTests: ${{ parameters.runSlowTests }}
+                testWorkers: ${{ parameters.testWorkers[target.name] }}
                 condition: succeeded()
 
           # Build - Windows (x86_64 and ARM64)
@@ -341,9 +349,19 @@ extends:
               parameters:
                 pythonVersion: $(pythonVersion)
                 runSlowTests: ${{ parameters.runSlowTests }}
+                testWorkers: ${{ parameters.testWorkers[target.name] }}
                 condition: succeeded()
                 ${{ if eq(target.name, 'windows_aarch64') }}:
                   arch: arm64
+
+          - task: PublishTestResults@2
+            displayName: Publish Python test results
+            condition: succeededOrFailed()
+            continueOnError: true
+            inputs:
+              testResultsFormat: JUnit
+              testResultsFiles: $(System.DefaultWorkingDirectory)/python/test-results/pytest_report.xml
+              testRunTitle: ${{ target.name }} Python $(pythonVersion)
 
           # SBoM Manifest Generator Task requires we transfer ownership of the wheel directory
           # back to the original base image user (Linux/macOS only; not needed on Windows).
@@ -400,9 +418,6 @@ extends:
           isProduction: true
           inputs:     # Declare all build artifacts to be consumed in the release job
           - input: pipelineArtifact
-            artifactName: linux-x86_64-wheels-python3.10
-            targetPath: $(System.DefaultWorkingDirectory)/artifacts/linux-x86_64-wheels-python3.10
-          - input: pipelineArtifact
             artifactName: linux-x86_64-wheels-python3.11
             targetPath: $(System.DefaultWorkingDirectory)/artifacts/linux-x86_64-wheels-python3.11
           - input: pipelineArtifact
@@ -414,9 +429,6 @@ extends:
           - input: pipelineArtifact
             artifactName: linux-x86_64-wheels-python3.14
             targetPath: $(System.DefaultWorkingDirectory)/artifacts/linux-x86_64-wheels-python3.14
-          - input: pipelineArtifact
-            artifactName: linux-aarch64-wheels-python3.10
-            targetPath: $(System.DefaultWorkingDirectory)/artifacts/linux-aarch64-wheels-python3.10
           - input: pipelineArtifact
             artifactName: linux-aarch64-wheels-python3.11
             targetPath: $(System.DefaultWorkingDirectory)/artifacts/linux-aarch64-wheels-python3.11
@@ -430,9 +442,6 @@ extends:
             artifactName: linux-aarch64-wheels-python3.14
             targetPath: $(System.DefaultWorkingDirectory)/artifacts/linux-aarch64-wheels-python3.14
           - input: pipelineArtifact
-            artifactName: macos-aarch64-wheels-python3.10
-            targetPath: $(System.DefaultWorkingDirectory)/artifacts/macos-aarch64-wheels-python3.10
-          - input: pipelineArtifact
             artifactName: macos-aarch64-wheels-python3.11
             targetPath: $(System.DefaultWorkingDirectory)/artifacts/macos-aarch64-wheels-python3.11
           - input: pipelineArtifact
@@ -445,9 +454,6 @@ extends:
             artifactName: macos-aarch64-wheels-python3.14
             targetPath: $(System.DefaultWorkingDirectory)/artifacts/macos-aarch64-wheels-python3.14
           - input: pipelineArtifact
-            artifactName: windows-x86_64-wheels-python3.10
-            targetPath: $(System.DefaultWorkingDirectory)/artifacts/windows-x86_64-wheels-python3.10
-          - input: pipelineArtifact
             artifactName: windows-x86_64-wheels-python3.11
             targetPath: $(System.DefaultWorkingDirectory)/artifacts/windows-x86_64-wheels-python3.11
           - input: pipelineArtifact
@@ -459,7 +465,6 @@ extends:
           - input: pipelineArtifact
             artifactName: windows-x86_64-wheels-python3.14
             targetPath: $(System.DefaultWorkingDirectory)/artifacts/windows-x86_64-wheels-python3.14
-          # No 3.10 entry: CPython ships win-arm64 builds only from 3.11 onwards.
           - input: pipelineArtifact
             artifactName: windows-aarch64-wheels-python3.11
             targetPath: $(System.DefaultWorkingDirectory)/artifacts/windows-aarch64-wheels-python3.11

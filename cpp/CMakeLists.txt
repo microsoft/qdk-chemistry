@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 3.15)
+cmake_minimum_required(VERSION 3.28)
 
 # Read version from VERSION file at repo root
 set(_VERSION_FILE "${CMAKE_CURRENT_SOURCE_DIR}/../VERSION")
@@ -52,6 +52,8 @@ endif()
 project(qdk VERSION ${QDK_VERSION} LANGUAGES CXX C)
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
+# Nothing here uses C++20 modules; skip the per-source scan the 3.28 policies enable.
+set(CMAKE_CXX_SCAN_FOR_MODULES OFF)
 
 if(APPLE AND NOT DEFINED CMAKE_MACOSX_RPATH)
     set(CMAKE_MACOSX_RPATH ON CACHE BOOL "Use macOS RPATH" FORCE)
@@ -142,6 +144,10 @@ else()
     endif()
 endif()
 
+# SeQuant, with its BTAS numerical backend. BTAS must reuse the MSVC-patched
+# BLAS++/LAPACK++ from MACIS, hence after MACIS.
+include(cmake/sequant.cmake)
+
 # Enable CUDA for GPU bindings in QDK Chemistry
 if(QDK_CHEMISTRY_ENABLE_GPU)
     enable_language(CUDA)
@@ -169,6 +175,8 @@ target_link_libraries(chemistry PUBLIC
     nlohmann_json::nlohmann_json
     macis::macis
 )
+# No public header includes SeQuant.
+target_link_libraries(chemistry PRIVATE SeQuant::SeQuant)
 
 # Conditionally link OpenMP
 if(QDK_ENABLE_OPENMP)
@@ -298,6 +306,13 @@ install(EXPORT chemistryTargets
 
 # Create config files
 include(CMakePackageConfigHelpers)
+
+# Where kit-cmake (via an in-tree BTAS) installed the blaspp_headers export, relative to qdkConfig.
+FetchContent_GetProperties(BTAS)
+if(btas_POPULATED)
+    get_directory_property(QDK_BLASPP_HEADERS_DIR DIRECTORY "${btas_SOURCE_DIR}" DEFINITION blaspp_install_configdir)
+    cmake_path(RELATIVE_PATH QDK_BLASPP_HEADERS_DIR BASE_DIRECTORY lib/cmake/qdk)
+endif()
 
 configure_package_config_file(
     "${CMAKE_CURRENT_SOURCE_DIR}/cmake/qdkConfig.cmake.in"

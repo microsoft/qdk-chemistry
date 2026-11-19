@@ -5,6 +5,7 @@
 #include "qdk/chemistry/scf/core/scf_algorithm.h"
 
 #include <qdk/chemistry/scf/config.h>
+#include <qdk/chemistry/scf/util/qr_pseudoinverse.h>
 
 #include <cmath>
 #include <cstdint>
@@ -254,10 +255,14 @@ void SCFAlgorithm::build_rohf_f_p_matrix(const RowMajorMatrix& F,
   QDK_LOG_TRACE_ENTERING();
   const int num_atomic_orbitals = static_cast<int>(C.rows());
   const int num_molecular_orbitals = static_cast<int>(C.cols());
-  if (num_atomic_orbitals != num_molecular_orbitals) {
+  if (num_molecular_orbitals == 0 ||
+      num_molecular_orbitals > num_atomic_orbitals || nelec_beta < 0 ||
+      nelec_alpha < nelec_beta || nelec_alpha > num_molecular_orbitals ||
+      F.rows() != 2 * num_atomic_orbitals || F.cols() != num_atomic_orbitals ||
+      P.rows() != 2 * num_atomic_orbitals || P.cols() != num_atomic_orbitals) {
     throw std::invalid_argument(
-        "ROHF build requires number of atomic orbitals to equal number of "
-        "molecular orbitals!");
+        "ROHF build requires compatible AO spin blocks and occupations "
+        "within the retained MO space.");
   }
 
   total_density =
@@ -324,42 +329,14 @@ void SCFAlgorithm::build_rohf_f_p_matrix(const RowMajorMatrix& F,
   copy_block(F_up_mo, nd, nd + ns, ns, nv);
   copy_block(F_up_mo, nd + ns, nd, nv, ns);
 
-  // Transform the effective Fock matrix back to AO basis by solving
-  // C^{-T} * F_MO * C^{-1} = F_AO
-  // We use LAPACK's getrf/getrs to solve the linear systems involving C^T and
-  // C without explicitly inverting C
-  const int matrix_dim = num_molecular_orbitals;
-  using ColMajorMatrix =
-      Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic, Eigen::ColMajor>;
-  // LAPACK expects column-major layout, so we copy the row-major data into a
-  // column-major matrix without transposing the logical layout
-  ColMajorMatrix Ct =
-      Eigen::Map<const ColMajorMatrix>(C.data(), matrix_dim, C.rows());
-  // F_MO is symmetric, so we can use it directly as the right-hand side
-  // without transposing
-  ColMajorMatrix temp_rhs = effective_F_mo;
-  std::vector<int64_t> ipiv(matrix_dim);
-
-  auto info =
-      lapack::getrf(matrix_dim, matrix_dim, Ct.data(), matrix_dim, ipiv.data());
-  if (info != 0) {
-    throw std::runtime_error("getrf failed while factorizing C^T");
-  }
-
-  info = lapack::getrs(lapack::Op::NoTrans, matrix_dim, matrix_dim, Ct.data(),
-                       matrix_dim, ipiv.data(), temp_rhs.data(), matrix_dim);
-  if (info != 0) {
-    throw std::runtime_error("getrs failed while solving C^T X = F_mo");
-  }
-
-  temp_rhs.transposeInPlace();
-  info = lapack::getrs(lapack::Op::NoTrans, matrix_dim, matrix_dim, Ct.data(),
-                       matrix_dim, ipiv.data(), temp_rhs.data(), matrix_dim);
-  if (info != 0) {
-    throw std::runtime_error("getrs failed while solving C^T X = M^T");
-  }
-
-  effective_fock = temp_rhs.transpose();
+  // Lift only the retained operator; discarded AO components are not
+  // recoverable.
+  const RowMajorMatrix C_plus = qr_pseudoinverse(C);
+  similarity_transform(blas::Layout::RowMajor, num_atomic_orbitals,
+                       num_molecular_orbitals, 1.0, C_plus.data(),
+                       num_atomic_orbitals, effective_F_mo.data(),
+                       num_molecular_orbitals, 0.0, effective_fock.data(),
+                       num_atomic_orbitals, &atba_workspace);
   if (!effective_fock.isApprox(effective_fock.transpose())) {
     QDK_LOGGER().warn(
         "Effective Fock matrix in AO is far from symmetric. Symmetrizing...");

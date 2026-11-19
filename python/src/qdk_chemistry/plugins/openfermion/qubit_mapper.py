@@ -18,9 +18,10 @@ import numpy as np
 import openfermion as of
 
 from qdk_chemistry.algorithms.qubit_mapper import QubitMapper, QubitMapperSettings
+from qdk_chemistry.data._two_body_symmetry import fourfold_average, reversal_average
 from qdk_chemistry.data.enums.fermion_mode_order import FermionModeOrder
 from qdk_chemistry.plugins.openfermion.conversion import (
-    hamiltonian_to_interaction_operator,
+    _interaction_operator,
     qubit_operator_to_qubit_hamiltonian,
 )
 from qdk_chemistry.utils import Logger
@@ -75,7 +76,8 @@ class OpenFermionQubitMapper(QubitMapper):
 
     Both restricted (RHF) and unrestricted (UHF) Hamiltonians are supported.
     For unrestricted systems, separate alpha/beta spin channels are handled
-    via ``hamiltonian_to_interaction_operator``.
+    via ``hamiltonian_to_interaction_operator``. The two-body integrals of a
+    Hermitian Hamiltonian enter as for the native mapper.
 
     Supported base encodings:
         - ``"jordan-wigner"`` → ``openfermion.transforms.jordan_wigner``
@@ -199,7 +201,23 @@ def _build_blocked_fermion_operator(hamiltonian: Hamiltonian) -> of.FermionOpera
 
     """
     # Start from the correct interleaved InteractionOperator
-    iop = hamiltonian_to_interaction_operator(hamiltonian)
+    h1_alpha, h1_beta = hamiltonian.get_one_body_integrals()
+    norb = h1_alpha.shape[0]
+    h2_aaaa, h2_aabb, h2_bbbb = (
+        np.reshape(tensor, (norb, norb, norb, norb)) for tensor in hamiltonian.get_two_body_integrals()
+    )
+    restricted = hamiltonian.is_restricted()
+    if hamiltonian.is_hermitian():
+        consumer = "OpenFermion qubit mapper"
+        if restricted:
+            h2_aaaa = fourfold_average(h2_aaaa, consumer)
+        else:
+            h2_aaaa = fourfold_average(h2_aaaa, f"{consumer} (alpha-alpha block)")
+            h2_aabb = reversal_average(h2_aabb, f"{consumer} (alpha-beta block)")
+            h2_bbbb = fourfold_average(h2_bbbb, f"{consumer} (beta-beta block)")
+    iop = _interaction_operator(
+        (h1_alpha, h1_beta), (h2_aaaa, h2_aabb, h2_bbbb), hamiltonian.get_core_energy(), restricted
+    )
 
     n_so = iop.n_qubits
     n_spatial = n_so // 2

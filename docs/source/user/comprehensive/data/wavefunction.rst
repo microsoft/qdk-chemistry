@@ -132,6 +132,14 @@ The same container holds coupled cluster amplitudes when tagged as ``CCSD``:
       :start-after: // start-cell-create-cc
       :end-before: // end-cell-create-cc
 
+MPS wavefunction container
+~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+:class:`~qdk_chemistry.data.MPSContainer` stores a matrix product state (MPS), for example the result of a density matrix renormalization group (DMRG) calculation.
+It holds one :class:`~qdk_chemistry.data.MPSSite` per active orbital, each an optionally symmetry-blocked rank-3 tensor with left-bond, physical, and right-bond indices, together with the order of the orbitals along the chain and an optional orthogonality center.
+It is pure storage: the sites are not expanded into determinants, so coefficient-, determinant-, norm-, overlap-, and occupation-based accessors raise.
+Particle counts and RDMs are available only if they are passed to the constructor.
+
 Properties
 ~~~~~~~~~~
 
@@ -140,7 +148,7 @@ The :class:`~qdk_chemistry.data.Wavefunction` class provides access to various q
 
 .. list-table:: Property availability by container type
    :header-rows: 1
-   :widths: 30 15 15 15 15 15
+   :widths: 30 15 15 15 15 15 15
 
    * - Property
      - Slater determinant
@@ -148,11 +156,13 @@ The :class:`~qdk_chemistry.data.Wavefunction` class provides access to various q
      - :term:`SCI`
      - :term:`MP2`
      - Coupled cluster
+     - MPS
 
    * - **Coefficients**
      - ✓
      - ✓
      - ✓
+     - ✗
      - ✗
      - ✗
 
@@ -162,6 +172,7 @@ The :class:`~qdk_chemistry.data.Wavefunction` class provides access to various q
      - ✓
      - ✗
      - ✗
+     - ✗
 
    * - **Electron counts**
      - ✓
@@ -169,6 +180,7 @@ The :class:`~qdk_chemistry.data.Wavefunction` class provides access to various q
      - ✓
      - ✓
      - ✓
+     - ✓†
 
    * - **Orbital occupations**
      - ✓
@@ -176,6 +188,7 @@ The :class:`~qdk_chemistry.data.Wavefunction` class provides access to various q
      - ✓
      - ✗
      - ✓
+     - ✗
 
    * - **1-RDMs (spin-dependent)**
      - ✓
@@ -183,6 +196,7 @@ The :class:`~qdk_chemistry.data.Wavefunction` class provides access to various q
      - ✓
      - ✗
      - ✓
+     - ✓†
 
    * - **1-RDMs (spin-traced)**
      - ✓
@@ -190,6 +204,7 @@ The :class:`~qdk_chemistry.data.Wavefunction` class provides access to various q
      - ✓
      - ✗
      - ✓
+     - ✓†
 
    * - **2-RDMs (spin-dependent)**
      - ✓
@@ -197,6 +212,7 @@ The :class:`~qdk_chemistry.data.Wavefunction` class provides access to various q
      - ✓*
      - ✗
      - ✓
+     - ✓†
 
    * - **2-RDMs (spin-traced)**
      - ✓
@@ -204,6 +220,7 @@ The :class:`~qdk_chemistry.data.Wavefunction` class provides access to various q
      - ✓*
      - ✗
      - ✓
+     - ✓†
 
    * - **Orbital entropies**
      - ✓
@@ -211,6 +228,7 @@ The :class:`~qdk_chemistry.data.Wavefunction` class provides access to various q
      - ✓*
      - ✗
      - ✓
+     - ✓†
 
    * - **T1/T2 amplitudes**
      - ✗
@@ -218,6 +236,7 @@ The :class:`~qdk_chemistry.data.Wavefunction` class provides access to various q
      - ✗
      - ✓
      - ✓
+     - ✗
 
    * - **Overlap calculations**
      - ✗
@@ -225,10 +244,12 @@ The :class:`~qdk_chemistry.data.Wavefunction` class provides access to various q
      - ✗
      - ✗
      - ✗
+     - ✗
 
    * - **Norm calculations**
      - ✓
      - ✓
+     - ✗
      - ✗
      - ✗
      - ✗
@@ -243,6 +264,8 @@ Legend:
 - ✗ Not available (method not implemented)
 
 - ✓* Implemented and available only if 2-RDMs were provided during construction
+
+- ✓† Available only if the required particle counts or RDMs were provided during construction
 
 Accessing wavefunction data
 ---------------------------

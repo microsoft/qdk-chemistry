@@ -79,10 +79,10 @@ if [ "$MAC_BUILD" == "OFF" ]; then # Build/install Linux dependencies
     # We use BLIS/libflame as the BLAS/LAPACK vendors to prevent symbol collisions
     # with qiskit's shared OpenBLAS
     echo "Downloading and installing BLIS..."
-    bash .pipelines/install-scripts/install-blis.sh /usr/local ${MARCH} "${CFLAGS}"
+    bash .pipelines/install-scripts/install-blis.sh /usr/local "${MARCH}" "${CFLAGS}"
 
     echo "Downloading and installing libflame..."
-    bash .pipelines/install-scripts/install-libflame.sh /usr/local ${MARCH} "${CFLAGS}"
+    bash .pipelines/install-scripts/install-libflame.sh /usr/local "${MARCH}" "${CFLAGS}"
 
 elif [ "$MAC_BUILD" == "ON" ]; then
     # --- Apple Silicon Rosetta self-heal -----------------------------------------
@@ -116,7 +116,7 @@ elif [ "$MAC_BUILD" == "ON" ]; then
 fi
 
 echo "Installing HDF5..."
-bash .pipelines/install-scripts/install-hdf5.sh /usr/local ${BUILD_TYPE} ${PWD} "${CFLAGS}" ${MAC_BUILD}
+bash .pipelines/install-scripts/install-hdf5.sh /usr/local "${BUILD_TYPE}" "${PWD}" "${CFLAGS}" "${MAC_BUILD}"
 
 # Bootstrap Anaconda's `conda` and create the build env. See header of the
 # sourced script for full rationale (CFSClean / ms-ensureconda platform gaps /
@@ -131,7 +131,7 @@ python3 --version
 python3 -m pip install --upgrade pip
 
 # This is necessary for 1ES Geneva telemetry during the Linux builds.
-python3 -m pip install -r .pipelines/requirements.txt
+python3 -m pip install -r .pipelines/requirements.in
 
 # Snapshot the full env and feed it to a dry-run `pip install --report` so
 # Component Governance's PipReportDetector sees every package in buildenv.
@@ -167,12 +167,12 @@ if [ "$MAC_BUILD" == "OFF" ]; then
     export CMAKE_BUILD_PARALLEL_LEVEL=$(nproc)
     python3 -m build --wheel \
         -C build-dir="build/{wheel_tag}" \
-        -C cmake.define.QDK_UARCH=${MARCH} \
+        -C cmake.define.QDK_UARCH="${MARCH}" \
         -C cmake.define.BUILD_SHARED_LIBS=OFF \
         -C cmake.define.QDK_CHEMISTRY_ENABLE_MPI=OFF \
         -C cmake.define.QDK_ENABLE_OPENMP=OFF \
-        -C cmake.define.QDK_CHEMISTRY_ENABLE_COVERAGE=${ENABLE_COVERAGE} \
-        -C cmake.define.BUILD_TESTING=${BUILD_TESTING} \
+        -C cmake.define.QDK_CHEMISTRY_ENABLE_COVERAGE="${ENABLE_COVERAGE}" \
+        -C cmake.define.BUILD_TESTING="${BUILD_TESTING}" \
         -C cmake.define.CMAKE_C_FLAGS="${CMAKE_C_FLAGS}" \
         -C cmake.define.CMAKE_CXX_FLAGS="${CMAKE_CXX_FLAGS}"
 
@@ -224,12 +224,12 @@ elif [ "$MAC_BUILD" == "ON" ]; then
     export CMAKE_CXX_FLAGS="-fPIC -Os -fvisibility=hidden -target arm64-apple-darwin"
     python3 -m build --wheel \
         -C build-dir="build/{wheel_tag}" \
-        -C cmake.define.QDK_UARCH=native \
+        -C cmake.define.QDK_UARCH="${MARCH}" \
         -C cmake.define.BUILD_SHARED_LIBS=OFF \
         -C cmake.define.QDK_CHEMISTRY_ENABLE_MPI=OFF \
         -C cmake.define.QDK_ENABLE_OPENMP=OFF \
-        -C cmake.define.QDK_CHEMISTRY_ENABLE_COVERAGE=${ENABLE_COVERAGE} \
-        -C cmake.define.BUILD_TESTING=${BUILD_TESTING} \
+        -C cmake.define.QDK_CHEMISTRY_ENABLE_COVERAGE="${ENABLE_COVERAGE}" \
+        -C cmake.define.BUILD_TESTING="${BUILD_TESTING}" \
         -C cmake.define.CMAKE_C_FLAGS="${CMAKE_C_FLAGS}" \
         -C cmake.define.CMAKE_CXX_FLAGS="${CMAKE_CXX_FLAGS}" \
         -C cmake.define.CMAKE_PREFIX_PATH="/opt/homebrew"

@@ -1,9 +1,8 @@
 """Migrate the ``sparse`` Hamiltonian container serialization to the current version.
 
-Only the two-body payload changed: the legacy flat ``two_body_integrals_sparse``
-list of ``[p, q, r, s, value]`` entries became a ``SymmetryBlockedSparseMap``.
-The (restricted) one-body sparse triplet list and the scalar metadata are
-schema-stable. Sparse model Hamiltonians carry no orbitals.
+The flat ``two_body_integrals_sparse`` list became a ``SymmetryBlockedSparseMap`` in 0.2.0. Version 0.3.0
+reads two-body entries literally, so Hermitian containers are migrated to store every member of each 8-fold
+class, as the qubit mapper read them; non-Hermitian containers keep their entries.
 """
 
 # --------------------------------------------------------------------------------------------
@@ -18,19 +17,32 @@ import numpy as np
 
 from . import _io, _sbt
 
-CONTAINER_VERSION = "0.2.0"
+CONTAINER_VERSION = "0.3.0"
+EIGHTFOLD_VERSIONS = ("0.1.0", "0.2.0")
+
+# Eigen's default isApprox precision, as in the library's symmetry checks.
+_PRECISION = 1e-12
+
+
+def step_key(version: str) -> str:
+    """Key of ``version`` in the Hamiltonian ``STEPS``; the sparse container versions on its own."""
+    return f"sparse {version}"
 
 
 def from_json_doc(container: dict) -> dict:
-    """Normalize a parsed legacy sparse container JSON object into an old-doc."""
+    """Normalize a parsed sparse container JSON object into an old-doc."""
+    two_body = container.get("two_body_integrals_sparse")
+    if "two_body_integrals" in container:
+        two_body = _sbt.sparse_rank4_entries(container["two_body_integrals"])
     return {
         "_source_version": str(container.get("version")),
+        "_step_key": step_key(str(container.get("version"))),
         "container_type": "sparse",
         "core_energy": container.get("core_energy", 0.0),
         "type": container.get("type", "Hermitian"),
         "num_orbitals": int(container["num_orbitals"]),
         "one_body_sparse": container.get("one_body_integrals_alpha_sparse"),
-        "two_body_sparse": container.get("two_body_integrals_sparse"),
+        "two_body_sparse": two_body,
     }
 
 
@@ -55,7 +67,7 @@ def _read_scalar_int(node: h5py.Group | h5py.Dataset, name: str) -> int | None:
 
 
 def from_hdf5_group(container: h5py.Group) -> dict:
-    """Normalize a legacy sparse container HDF5 group into an old-doc."""
+    """Normalize a sparse container HDF5 group, whose layout 0.2.0 kept, into an old-doc."""
     metadata = container["metadata"]
     one_body_ds = container.get("one_body_integrals_alpha_sparse")
     two_body_ds = container.get("two_body_integrals_sparse")
@@ -93,6 +105,7 @@ def from_hdf5_group(container: h5py.Group) -> dict:
 
     return {
         "_source_version": _io.read_attr(container, "version"),
+        "_step_key": step_key(_io.read_attr(container, "version")),
         "container_type": "sparse",
         "core_energy": float(_io.read_attr(metadata, "core_energy", 0.0)),
         "type": _io.read_attr(metadata, "type", "Hermitian"),
@@ -102,10 +115,59 @@ def from_hdf5_group(container: h5py.Group) -> dict:
     }
 
 
+def _eightfold_orbit(p: int, q: int, r: int, s: int) -> set:
+    """Positions related to ``(pq|rs)`` by the 8-fold permutation group."""
+    return {
+        (p, q, r, s),
+        (q, p, r, s),
+        (p, q, s, r),
+        (q, p, s, r),
+        (r, s, p, q),
+        (s, r, p, q),
+        (r, s, q, p),
+        (s, r, q, p),
+    }
+
+
+def _fill_eightfold_classes(entries) -> list:
+    """Store every member of each 8-fold class, with the value earlier versions mapped."""
+    classes: dict[tuple, dict[tuple, float]] = {}
+    for p, q, r, s, value in entries:
+        key = (int(p), int(q), int(r), int(s))
+        classes.setdefault(min(_eightfold_orbit(*key)), {})[key] = float(value)
+    filled: list[list] = []
+    difference = stored_norm = written_norm = 0.0
+    worst_change = 0.0
+    conflict = ""
+    for canonical, stored in sorted(classes.items()):
+        # The canonical position is also the smallest, which earlier mappers preferred.
+        first = min(stored)
+        for key, value in stored.items():
+            change = abs(value - stored[first])
+            difference += change**2
+            stored_norm += value**2
+            written_norm += stored[first] ** 2
+            if change > worst_change:
+                worst_change = change
+                conflict = f"{first} and {key} of one 8-fold permutation class differ ({stored[first]} vs {value})"
+        filled.extend([*member, stored[first]] for member in sorted(_eightfold_orbit(*canonical)))
+    # Eigen's isApprox: ||stored - written|| <= p min(||stored||, ||written||).
+    if difference > _PRECISION**2 * min(stored_norm, written_norm):
+        raise ValueError(
+            f"Two-body entries {conflict}. Sparse containers before version {CONTAINER_VERSION} "
+            "read every class as 8-fold symmetric, so the file cannot be migrated unambiguously."
+        )
+    return filled
+
+
 def to_new_json(old: dict) -> dict:
     """Build the migrated sparse container JSON object from a normalized old-doc."""
     norb = old["num_orbitals"]
     one_body = old.get("one_body_sparse") or []
+    two_body = old.get("two_body_sparse") or []
+    # The 8-fold reading only ever applied to Hermitian integrals.
+    if old.get("type", "Hermitian") != "NonHermitian":
+        two_body = _fill_eightfold_classes(two_body)
     return {
         "version": CONTAINER_VERSION,
         "container_type": "sparse",
@@ -115,5 +177,5 @@ def to_new_json(old: dict) -> dict:
         "num_orbitals": norb,
         "has_one_body_integrals": len(one_body) > 0,
         "one_body_integrals_alpha_sparse": [[int(r), int(c), float(v)] for r, c, v in one_body],
-        "two_body_integrals": _sbt.sparse_rank4_dict(old.get("two_body_sparse") or [], norb),
+        "two_body_integrals": _sbt.sparse_rank4_dict(two_body, norb),
     }

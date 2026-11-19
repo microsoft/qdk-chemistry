@@ -61,6 +61,12 @@ find_dependency(LAPACK REQUIRED)
 find_dependency(gauxc REQUIRED)
 find_dependency(Threads REQUIRED)
 
+# An in-tree BTAS's config looks for blaspp_headers beside BLAS++, which may live outside this prefix.
+if(NOT "@QDK_BLASPP_HEADERS_DIR@" STREQUAL "")
+  include("${CMAKE_CURRENT_LIST_DIR}/@QDK_BLASPP_HEADERS_DIR@/blaspp_headers-targets.cmake")
+endif()
+find_dependency(SeQuant REQUIRED)
+
 if(QDK_CHEMISTRY_ENABLE_DFTD3)
   find_dependency(s-dftd3 REQUIRED)
 endif()

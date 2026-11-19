@@ -2412,7 +2412,7 @@ def cmd_remote_run(args: argparse.Namespace) -> None:
                         "settings": inputs.get("settings", {}),
                     },
                     status="retrieved",
-                    submitted_at=datetime.datetime.now(datetime.timezone.utc).isoformat(),
+                    submitted_at=datetime.datetime.now(datetime.UTC).isoformat(),
                     run_hash=run_hash,
                     output_hashes=output_hashes,
                 )
