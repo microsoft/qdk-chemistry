@@ -8,6 +8,7 @@ r"""QDK/Chemistry implementation of the Sum of Squares Spectral Amplification (S
 from math import ceil, isfinite, isnan, log2, nan, sqrt
 
 import numpy as np
+from scipy.sparse import csr_matrix
 
 from qdk_chemistry.algorithms.hamiltonian_unitary_builder.base import (
     HamiltonianUnitaryBuilder,
@@ -41,10 +42,11 @@ class SOSSABuilderSettings(HamiltonianUnitaryBuilderSettings):
         Attributes:
             reference_ground_state_energy: Reference total ground-state energy E_gs.
             reference_energy_gap: Reference gap E_gap above the sum-of-squares shift.
+            variational_bound_determinants: Determinants spanning a Rayleigh-Ritz upper bound on E_gs.
 
-        Both settings are optional and mutually exclusive: each defaults to NaN, meaning unset,
-        and they are alternative ways to compute the `lambda_eff`. Leaving both unset leaves
-        `lambda_eff` unset.
+        The three settings are optional and mutually exclusive: the first two default to NaN and
+        the last to an empty list, meaning unset, and they are alternative ways to compute the
+        `lambda_eff`. Leaving all unset leaves `lambda_eff` unset.
 
         """
         super().__init__()
@@ -61,6 +63,16 @@ class SOSSABuilderSettings(HamiltonianUnitaryBuilderSettings):
             nan,
             "Reference energy gap. Mutually exclusive with 'reference_ground_state_energy'.",
         )
+        self._set_default(
+            "variational_bound_determinants",
+            "vector<string>",
+            [],
+            "Occupation strings over '0', 'u', 'd' and '2' (one character per spatial orbital of the "
+            "factorized Hamiltonian) whose span gives a Rayleigh-Ritz upper bound E_ub >= E_gs on the "
+            "encoded Hamiltonian; lambda_eff then uses E_gap = min(E_ub - E_SOS, Lambda), which keeps it an "
+            "upper bound on the true lambda_eff. Empty disables it. "
+            "Mutually exclusive with the two reference settings.",
+        )
 
 
 class SOSSABuilder(HamiltonianUnitaryBuilder):
@@ -71,6 +83,7 @@ class SOSSABuilder(HamiltonianUnitaryBuilder):
         power: int = 1,
         reference_ground_state_energy: float = nan,
         reference_energy_gap: float = nan,
+        variational_bound_determinants: list[str] | None = None,
     ):
         """Initialize the SOSSA builder.
 
@@ -83,6 +96,9 @@ class SOSSABuilder(HamiltonianUnitaryBuilder):
                 ``reference_energy_gap``.
             reference_energy_gap: Reference gap E_gap = E_gs - E_SOS, an alternative to
                 ``reference_ground_state_energy`` for the same purpose. Defaults to NaN.
+            variational_bound_determinants: Occupation strings (e.g. ``"2u00"``) whose span gives
+                a variational upper bound on E_gs of the encoded Hamiltonian, the tighter bound of
+                :cite:`Shirobokov2026`. Defaults to ``None``, which disables it.
 
         """
         super().__init__()
@@ -90,6 +106,8 @@ class SOSSABuilder(HamiltonianUnitaryBuilder):
         self._settings.set("power", power)
         self._settings.set("reference_ground_state_energy", reference_ground_state_energy)
         self._settings.set("reference_energy_gap", reference_energy_gap)
+        if variational_bound_determinants is not None:
+            self._settings.set("variational_bound_determinants", list(variational_bound_determinants))
 
     def _run_impl(self, qubit_hamiltonian: QubitOperator) -> UnitaryRepresentation:
         """Build the SOSSA block encoding from qubit operator.
@@ -124,6 +142,8 @@ class SOSSABuilder(HamiltonianUnitaryBuilder):
             meta.energy_shift,
             self._settings.get("reference_ground_state_energy"),
             self._settings.get("reference_energy_gap"),
+            sossa=sossa,
+            variational_bound_determinants=list(self._settings.get("variational_bound_determinants")),
         )
 
         one_body_rotation_angles = sossa.one_body.angles
@@ -365,6 +385,9 @@ def _resolve_lambda_eff(
     energy_shift: float,
     reference_ground_state_energy: float,
     reference_energy_gap: float,
+    *,
+    sossa: SumOfSquaresContainer,
+    variational_bound_determinants: list[str],
 ) -> float | None:
     """Derive λ_eff from whichever reference energy was supplied.
 
@@ -376,34 +399,130 @@ def _resolve_lambda_eff(
         E_gap = E_gs - E_SOS,
         λ_eff = √(E_gap (2Λ - E_gap)).
 
+    With ``variational_bound_determinants``, E_gs is replaced by the variational upper bound
+    E_ub ≥ E_gs of :cite:`Shirobokov2026`: the lowest Rayleigh-Ritz eigenvalue of the encoded
+    Hamiltonian over the span of those determinants, evaluated directly from the SOS factors, with the
+    gap clamped to Λ so that λ_eff stays an upper bound.
+
     Args:
         normalization: Block-encoding normalization Λ.
         energy_shift: The sum-of-squares shift E_SOS (includes core energy).
         reference_ground_state_energy: Total E_gs, or NaN when unset.
         reference_energy_gap: E_gap, or NaN when unset.
+        sossa: The sum-of-squares operator whose factors define the encoded Hamiltonian.
+        variational_bound_determinants: Occupation strings spanning the Rayleigh-Ritz space, or empty.
 
     Returns:
-        The effective normalization, or ``None`` when neither reference energy was supplied.
+        The effective normalization, or ``None`` when no reference energy was supplied.
 
     Raises:
-        ValueError: If both reference energies are supplied, or if the resulting gap falls
-            outside the open interval (0, 2Λ), where λ_eff is undefined.
+        ValueError: If more than one reference is supplied, if a determinant string is malformed,
+            repeated or in another particle sector, or if the resulting gap falls outside the open
+            interval (0, 2Λ), where λ_eff is undefined.
 
     """
     has_energy = not isnan(reference_ground_state_energy)
     has_gap = not isnan(reference_energy_gap)
-    if has_energy and has_gap:
+    has_determinants = bool(variational_bound_determinants)
+    if has_energy + has_gap + has_determinants > 1:
         raise ValueError(
-            "The SOSSA builder accepts 'reference_ground_state_energy' or 'reference_energy_gap', not both."
+            "The SOSSA builder accepts only one of 'reference_ground_state_energy', 'reference_energy_gap' "
+            "and 'variational_bound_determinants'."
         )
-    if not has_energy and not has_gap:
+    if not has_energy and not has_gap and not has_determinants:
         return None
 
-    gap = reference_energy_gap if has_gap else reference_ground_state_energy - energy_shift
+    if has_determinants:
+        num_orbitals = sossa.metadata.num_spatial_orbitals
+        determinants: list[tuple[int, int]] = []
+        for occupation in variational_bound_determinants:
+            if len(occupation) != num_orbitals or set(occupation) - set("0ud2"):
+                raise ValueError(
+                    f"variational_bound_determinants entry {occupation!r} must have one of '0', 'u', 'd', '2' "
+                    f"per spatial orbital ({num_orbitals})."
+                )
+            determinants.append(
+                (
+                    sum(1 << p for p, s in enumerate(occupation) if s in "u2"),
+                    sum(1 << p for p, s in enumerate(occupation) if s in "d2"),
+                )
+            )
+        if len(set(determinants)) != len(determinants):
+            raise ValueError("variational_bound_determinants must not repeat a determinant.")
+        if len({(a.bit_count(), b.bit_count()) for a, b in determinants}) != 1:
+            raise ValueError("variational_bound_determinants must all share one (alpha, beta) electron count.")
+        index = {det: i for i, det in enumerate(determinants)}
+
+        # A Givens angle row θ encodes the unit vector u(θ) with u_j = cos θ_j ∏_{k<j} sin θ_k.
+        def orbital(angles: np.ndarray) -> np.ndarray:
+            """Return the unit vector whose Givens elimination gives ``angles``."""
+            vector = np.zeros(num_orbitals)
+            remainder = 1.0
+            for j, theta in enumerate(angles):
+                vector[j] = remainder * np.cos(theta)
+                remainder *= np.sin(theta)
+            vector[-1] = remainder
+            return vector
+
+        def number(vector: np.ndarray, det: tuple[int, int]) -> dict[tuple[int, int], float]:
+            """Apply the spin-summed number operator of orbital ``vector`` to determinant ``det``."""
+            result: dict[tuple[int, int], float] = {}
+            for spin in (0, 1):
+                occupied = det[spin]
+                for q in range(num_orbitals):
+                    if not occupied >> q & 1:
+                        continue
+                    result[det] = result.get(det, 0.0) + vector[q] ** 2
+                    for p in range(num_orbitals):
+                        if occupied >> p & 1:
+                            continue
+                        low, high = min(p, q), max(p, q)
+                        sign = -1.0 if (occupied & ((1 << high) - (1 << (low + 1)))).bit_count() % 2 else 1.0
+                        moved = occupied ^ (1 << q) ^ (1 << p)
+                        target = (moved, det[1]) if spin == 0 else (det[0], moved)
+                        result[target] = result.get(target, 0.0) + sign * vector[p] * vector[q]
+            return result
+
+        hamiltonian = np.zeros((len(determinants), len(determinants)))
+        num_positive = sossa.metadata.num_positive_one_body_terms
+        # One-body squares are w n_k (D1) or w (2 - n_k) (Q1), with w = 4|c_X|^2 the eigenvalue magnitude.
+        for row, (angles, coeffs) in enumerate(zip(sossa.one_body.angles, sossa.one_body.coeffs, strict=True)):
+            weight = 4.0 * abs(coeffs[0]) ** 2
+            sign = 1.0 if row < num_positive else -1.0
+            for j, det in enumerate(determinants):
+                if row >= num_positive:
+                    hamiltonian[j, j] += 2.0 * weight
+                for target, amplitude in number(orbital(angles), det).items():
+                    if target in index:
+                        hamiltonian[index[target], j] += sign * weight * amplitude
+        # Spin-free squares are ½ G², G = (c_B + Σ_b c_b) I - Σ_b c_b L_b, so ⟨i|G²|j⟩ = ⟨G i|G j⟩.
+        num_bases, num_copies = sossa.metadata.num_bases, sossa.metadata.num_copies
+        basis_orbitals = [orbital(angles) for angles in sossa.two_body.angles]
+        for row, coeffs in enumerate(np.real(sossa.two_body.coeffs)):
+            rank = row // num_copies
+            targets: dict[tuple[int, int], int] = {}
+            entries: list[tuple[int, int, float]] = []
+            for j, det in enumerate(determinants):
+                image = {det: coeffs[num_bases] + float(np.sum(coeffs[:num_bases]))}
+                for basis in range(num_bases):
+                    for target, amplitude in number(basis_orbitals[rank * num_bases + basis], det).items():
+                        image[target] = image.get(target, 0.0) - coeffs[basis] * amplitude
+                entries.extend(
+                    (targets.setdefault(target, len(targets)), j, amplitude) for target, amplitude in image.items()
+                )
+            rows, cols, amplitudes = zip(*entries, strict=True)
+            images = csr_matrix((amplitudes, (rows, cols)), shape=(len(targets), len(determinants)))
+            hamiltonian += 0.5 * (images.T @ images).toarray()
+        # E_ub ≥ E_gs only bounds λ_eff from above while E_ub - E_SOS ≤ Λ, where λ_eff peaks at Λ.
+        gap = min(float(np.linalg.eigvalsh(0.5 * (hamiltonian + hamiltonian.T))[0]), normalization)
+    else:
+        gap = reference_energy_gap if has_gap else reference_ground_state_energy - energy_shift
     two_lambda = 2.0 * normalization
     if not 0.0 < gap < two_lambda:
         source = (
-            f"reference_energy_gap {reference_energy_gap!r}"
+            f"variational_bound_determinants {variational_bound_determinants!r}"
+            if has_determinants
+            else f"reference_energy_gap {reference_energy_gap!r}"
             if has_gap
             else (
                 f"reference_ground_state_energy {reference_ground_state_energy!r} relative to the "

@@ -4,14 +4,27 @@
 
 namespace QDKChemistry.TestUtils.SOSSAWalkTests {
     import Std.Arrays.All;
+    import Std.Arrays.Filtered;
+    import Std.Arrays.MappedOverRange;
+    import Std.Arrays.Reversed;
+    import Std.Arrays.Subarray;
+    import Std.Arrays.Zipped;
+    import Std.Canon.ApplyControlledOnInt;
     import Std.Canon.ApplyToEachCA;
     import Std.Canon.ApplyXorInPlace;
+    import Std.Convert.IntAsDouble;
     import Std.Core.Length;
     import Std.Diagnostics.DumpMachine;
     import Std.Math.MaxI;
+    import Std.Math.Sqrt;
     import Std.Measurement.MeasureEachZ;
+    import Std.StatePreparation.PreparePureStateD;
+    import Std.TableLookup.Select;
     import QDKChemistry.Utils.PhaseGradient.PreparePhaseGradientState;
     import QDKChemistry.Utils.SelectSwapDirty.SelectSwapDirtyBorrowedQubits;
+    import QDKChemistry.Utils.SOSSAWalk.AmortizedRotationWordSweep;
+    import QDKChemistry.Utils.SOSSAWalk.ApplyGivensRotationWords;
+    import QDKChemistry.Utils.SOSSAWalk.ComputeSpinParity;
     import QDKChemistry.Utils.SOSSAWalk.ControlledSelectWithUnlookup;
     import QDKChemistry.Utils.SOSSAWalk.LoadRotationWord;
     import QDKChemistry.Utils.SOSSAWalk.SelectImpl;
@@ -37,6 +50,17 @@ namespace QDKChemistry.TestUtils.SOSSAWalkTests {
         xoValue : Int,
         bValue : Int,
         usePhaseGradient : Bool,
+    ) : Unit {
+        TestSelectOnSystemState(selectData, xoValue, bValue, usePhaseGradient, []);
+    }
+
+    /// Runs SELECT on |1,0,...> when `systemAngles` is empty, else on an entangled Ry/CNOT/Rz system state.
+    operation TestSelectOnSystemState(
+        selectData : SelectParams,
+        xoValue : Int,
+        bValue : Int,
+        usePhaseGradient : Bool,
+        systemAngles : Double[],
     ) : Unit {
         let numOrbitals = selectData.numOrbitals;
         let numPositiveOneBody = selectData.numPositiveOneBody;
@@ -80,7 +104,19 @@ namespace QDKChemistry.TestUtils.SOSSAWalkTests {
             ApplyXorInPlace(rValue, innerReg[frStart + 2..frStart + nFR - 1]);
         }
 
-        X(systemReg[0]);
+        if Length(systemAngles) == 0 {
+            X(systemReg[0]);
+        } else {
+            for q in 0..nSystem - 1 {
+                Ry(systemAngles[q], systemReg[q]);
+            }
+            for q in 0..nSystem - 2 {
+                CNOT(systemReg[q], systemReg[q + 1]);
+            }
+            for q in 0..nSystem - 1 {
+                Rz(systemAngles[nSystem + q], systemReg[q]);
+            }
+        }
 
         if usePhaseGradient {
             within {
@@ -94,6 +130,64 @@ namespace QDKChemistry.TestUtils.SOSSAWalkTests {
 
         DumpMachine();
         ResetAll(qs);
+    }
+
+    /// Applies SELECT once, forward only, to a label-entangled superposition over (x_o, b, spins, system, reference).
+    /// Row l of `loadTable` holds the [x_o | b | free-rider] word that the label value l loads.
+    /// The word is erased again before the dump, so only the label, spins, system, reference and gradient remain.
+    operation TestSelectOnEntangledInput(
+        selectData : SelectParams,
+        loadTable : Bool[][],
+        numLabelQubits : Int,
+        labelAngles : Double[],
+        spinAngles : Double[],
+        systemAngles : Double[],
+        numReference : Int,
+        usePhaseGradient : Bool,
+    ) : Unit {
+        let N = selectData.numOrbitals;
+        let bBits = MaxI(1, AddressQubits(selectData.numBases + 1));
+        let nLoad = Length(loadTable[0]);
+        let xoBits = nLoad - bBits - selectData.numFreeRiderBits;
+        let nGradient = if usePhaseGradient { selectData.rotationBitPrecision } else { 0 };
+        use label = Qubit[numLabelQubits];
+        use spinReg = Qubit[2];
+        use systemReg = Qubit[2 * N];
+        use reference = Qubit[numReference];
+        use gradientReg = Qubit[nGradient];
+        use loaded = Qubit[nLoad];
+
+        for i in 0..numLabelQubits - 1 {
+            Ry(labelAngles[i], label[i]);
+            T(label[i]);
+        }
+        for i in 0..1 {
+            Ry(spinAngles[i], spinReg[i]);
+            S(spinReg[i]);
+        }
+        for q in 0..numReference - 1 {
+            H(reference[q]);
+            CNOT(reference[q], systemReg[q]);
+        }
+        for q in 0..2 * N - 1 {
+            Ry(systemAngles[q], systemReg[q]);
+            T(systemReg[q]);
+        }
+
+        Select(loadTable, label, loaded);
+        if usePhaseGradient {
+            within {
+                PreparePhaseGradientState(gradientReg);
+            } apply {
+                SelectImpl(selectData, true, loaded[0..xoBits - 1], loaded[xoBits...], spinReg, systemReg, gradientReg);
+            }
+        } else {
+            SelectImpl(selectData, false, loaded[0..xoBits - 1], loaded[xoBits...], spinReg, systemReg, []);
+        }
+        Select(loadTable, label, loaded);
+
+        DumpMachine();
+        ResetAll(label + spinReg + systemReg + reference + gradientReg + loaded);
     }
 
     function TestShouldLoadFreeRiderSeparately(
@@ -121,6 +215,7 @@ namespace QDKChemistry.TestUtils.SOSSAWalkTests {
         borrowDirty : Bool,
         sfSwapBits : Int,
         dqSwapBits : Int,
+        useSkewTree : Bool,
     ) : Bool {
         use isSF = Qubit();
         use sfAddress = Qubit[numSFAddressQubits];
@@ -140,8 +235,8 @@ namespace QDKChemistry.TestUtils.SOSSAWalkTests {
         let conjugated = addressReg + dirty;
 
         ApplyToEachCA(H, conjugated);
-        ControlledSelectWithUnlookup(sfData, dqData, sfSwapBits, dqSwapBits, sfAddress, dqAddress, isSF, dirty, target);
-        Adjoint ControlledSelectWithUnlookup(sfData, dqData, sfSwapBits, dqSwapBits, sfAddress, dqAddress, isSF, dirty, target);
+        ControlledSelectWithUnlookup(sfData, dqData, sfSwapBits, dqSwapBits, useSkewTree, [], sfAddress, dqAddress, isSF, dirty, target);
+        Adjoint ControlledSelectWithUnlookup(sfData, dqData, sfSwapBits, dqSwapBits, useSkewTree, [], sfAddress, dqAddress, isSF, dirty, target);
         ApplyToEachCA(H, conjugated);
 
         let results = MeasureEachZ(conjugated + target);
@@ -154,7 +249,157 @@ namespace QDKChemistry.TestUtils.SOSSAWalkTests {
         use isSF = Qubit();
         use address = Qubit[AddressQubits(Length(data))];
         use target = Qubit[Length(data[0])];
-        LoadRotationWord(data, numSwapBits, address, isSF, [], target);
+        LoadRotationWord(data, numSwapBits, false, [], address, isSF, [], target);
         ResetAll(target);
+    }
+
+    /// Runs the amortized sweep with `loaded` tables on Bell-paired lenders, copying each batch
+    /// word into its own record, then erases the records with `expected`; true when all returns to zero.
+    operation TestAmortizedSweepRecordsEachBatch(
+        loadedSF : Bool[][][],
+        loadedDQ : Bool[][][],
+        expectedSF : Bool[][][],
+        expectedDQ : Bool[][][],
+        order : Int[],
+        sfSwapBits : Int,
+        dqSwapBits : Int,
+        numLenders : Int,
+        measure : Bool,
+        runAdjoint : Bool,
+    ) : Bool {
+        let width = Length(loadedSF[0][0]);
+        let numBatches = Length(loadedSF);
+        use isSF = Qubit();
+        use sfAddress = Qubit[AddressQubits(Length(loadedSF[0]))];
+        use dqAddress = Qubit[AddressQubits(Length(loadedDQ[0]))];
+        use lenders = Qubit[numLenders];
+        use references = Qubit[numLenders];
+        use records = Qubit[numBatches * width];
+        let conjugated = [isSF] + sfAddress + dqAddress + references;
+
+        ApplyToEachCA(H, conjugated);
+        // Bell pairs expose any lender left flipped or phased once the pairing is undone.
+        ApplyToEachCA(CNOT, Zipped(references, lenders));
+        let copy = (t, word) => ApplyToEachCA(CNOT, Zipped(word, records[t * width..(t + 1) * width - 1]));
+        if runAdjoint {
+            Adjoint AmortizedRotationWordSweep(loadedSF, loadedDQ, order, sfSwapBits, dqSwapBits, sfAddress, dqAddress, isSF, lenders, measure, copy);
+        } else {
+            AmortizedRotationWordSweep(loadedSF, loadedDQ, order, sfSwapBits, dqSwapBits, sfAddress, dqAddress, isSF, lenders, measure, copy);
+        }
+        for t in 0..numBatches - 1 {
+            let record = records[t * width..(t + 1) * width - 1];
+            Controlled Select([isSF], (expectedSF[t], sfAddress, record));
+            within { X(isSF); } apply {
+                Controlled Select([isSF], (expectedDQ[t], dqAddress, record));
+            }
+        }
+        ApplyToEachCA(CNOT, Zipped(references, lenders));
+        ApplyToEachCA(H, conjugated);
+
+        let results = MeasureEachZ(conjugated + lenders + records);
+        ResetAll(conjugated + lenders + records);
+        All(result -> result == Zero, results)
+    }
+
+    /// Applies SELECT to unequal superpositions of every valid (x_o, b) and both spins, with the system Choi-entangled to a reference.
+    operation TestSelectOnEntangledState(selectData : SelectParams) : Unit {
+        let numOrbitals = selectData.numOrbitals;
+        let numOuterValues = numOrbitals + selectData.numRanks * selectData.numCopies;
+        let xoBits = MaxI(1, AddressQubits(numOuterValues));
+        let bBits = MaxI(1, AddressQubits(selectData.numBases + 1));
+        let nFR = selectData.numFreeRiderBits;
+        use outerReg = Qubit[xoBits];
+        use innerReg = Qubit[bBits + nFR];
+        use spinReg = Qubit[2];
+        use systemReg = Qubit[2 * numOrbitals];
+        use reference = Qubit[2 * numOrbitals];
+        use gradientReg = Qubit[selectData.rotationBitPrecision];
+
+        PreparePureStateD(MappedOverRange(i -> i < numOuterValues ? Sqrt(IntAsDouble(i + 1)) | 0.0, 0..(1 <<< xoBits) - 1), Reversed(outerReg));
+        PreparePureStateD(MappedOverRange(i -> i <= selectData.numBases ? Sqrt(IntAsDouble(i + 2)) | 0.0, 0..(1 <<< bBits) - 1), Reversed(innerReg[0..bBits - 1]));
+        for xo in 0..numOuterValues - 1 {
+            let rValue = xo >= numOrbitals ? (xo - numOrbitals) / selectData.numCopies | 0;
+            let frValue = (xo >= numOrbitals ? 1 | 0) + (xo >= selectData.numPositiveOneBody ? 2 | 0) + 4 * rValue;
+            ApplyControlledOnInt(xo, ApplyXorInPlace(frValue, _), outerReg, innerReg[bBits..bBits + nFR - 1]);
+        }
+        Ry(0.7, spinReg[0]);
+        Ry(1.9, spinReg[1]);
+        for (ref, sys) in Zipped(reference, systemReg) {
+            H(ref);
+            CNOT(ref, sys);
+        }
+
+        within {
+            PreparePhaseGradientState(gradientReg);
+        } apply {
+            SelectImpl(selectData, true, outerReg, innerReg, spinReg, systemReg, gradientReg);
+        }
+
+        DumpMachine();
+        ResetAll(outerReg + innerReg + spinReg + systemReg + reference + gradientReg);
+    }
+
+    /// Dumps an entangled input after the parity-phase spin swap over all pairs but `skipPair`, N controlled SWAPs and the inverse preparation.
+    operation TestSpinParitySwapRoundTrip(numPairs : Int, skipPair : Int) : Unit {
+        use spin = Qubit();
+        use down = Qubit[numPairs];
+        use up = Qubit[numPairs];
+        use reference = Qubit[2 * numPairs];
+        use parity = Qubit();
+        let kept = Filtered(i -> i != skipPair, MappedOverRange(i -> i, 0..numPairs - 1));
+
+        Ry(0.9, spin);
+        for (ref, sys) in Zipped(reference, down + up) {
+            H(ref);
+            CNOT(ref, sys);
+        }
+        Ry(0.4, up[0]);
+        within {
+            ComputeSpinParity(Subarray(kept, down), Subarray(kept, up), parity);
+        } apply {
+            CZ(spin, parity);
+        }
+        for (d, u) in Zipped(down, up) {
+            Controlled SWAP([spin], (d, u));
+        }
+        Adjoint Ry(0.4, up[0]);
+        for (ref, sys) in Zipped(reference, down + up) {
+            CNOT(ref, sys);
+            H(ref);
+        }
+        Adjoint Ry(0.9, spin);
+
+        DumpMachine();
+        ResetAll([spin] + down + up + reference + [parity]);
+
+    }
+
+    /// Applies the controlled `op` with its control in |+⟩, after flipping the `flipped` qubits, Choi-entangling the
+    /// `entangled` ones with a reference and preparing the trailing phase gradient, then dumps the state.
+    operation TestApplyControlledOnPartialChoiState(
+        op : (Qubit, Qubit[]) => Unit is Adj,
+        numQubits : Int,
+        numGradientQubits : Int,
+        entangled : Int[],
+        flipped : Int[],
+    ) : Unit {
+        use qs = Qubit[numQubits];
+        use reference = Qubit[Length(entangled)];
+        use control = Qubit();
+        for index in flipped {
+            X(qs[index]);
+        }
+        for (ref, index) in Zipped(reference, entangled) {
+            H(ref);
+            CNOT(ref, qs[index]);
+        }
+        H(control);
+        within {
+            PreparePhaseGradientState(qs[numQubits - numGradientQubits...]);
+        } apply {
+            op(control, qs);
+        }
+        DumpMachine();
+        ResetAll(qs + reference + [control]);
     }
 }
