@@ -203,7 +203,7 @@ class UnitarySynthesisMapper(CircuitMapper):
 
 
 class DenseUnitarySynthesisMapper(UnitarySynthesisMapper):
-    """Isometry synthesis by cosine-sine decompositions :cite:`Rupprecht2026` that adds at most two qubits."""
+    """Isometry synthesis by cosine-sine decompositions :cite:`Berry2025,Rupprecht2026` that adds at most two qubits."""
 
     _qsharp_prefix = "DenseIsometry"
     _max_added_qubits = 2
@@ -256,7 +256,7 @@ class DenseUnitarySynthesisMapper(UnitarySynthesisMapper):
 
 
 class BlockSparseUnitarySynthesisMapper(UnitarySynthesisMapper):
-    """Isometry synthesis as QROAM-loaded permutations :cite:`Berry2025` around a block-diagonal orthogonal matrix."""
+    """Isometry synthesis as QROAM permutations around a block-diagonal orthogonal matrix :cite:`Rupprecht2026`."""
 
     _qsharp_prefix = "SparseIsometry"
 
