@@ -486,7 +486,6 @@ ScfCalculationResult ScfSolver::_run_with_options(
 #ifdef _OPENMP
   if (old_max_threads != 1) omp_set_num_threads(old_max_threads);
 #endif
-  gauxc_cache_cleanup.clear();
 
   // Handle Return
   if (!context.result.converged) {
