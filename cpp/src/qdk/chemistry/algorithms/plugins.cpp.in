@@ -2,63 +2,32 @@
 // Licensed under the MIT License. See LICENSE.txt in the project root for
 // license information.
 
-// Configured by cpp/CMakeLists.txt with the plugins that add-ons declare
-// through qdk_add_plugin().
+// Configured by cpp/cmake/qdk-addons.cmake with the plugins that add-ons
+// declare through qdk_add_plugin().
 
-#include <atomic>
 #include <exception>
 #include <initializer_list>
-#include <mutex>
 #include <qdk/chemistry/algorithms/algorithm.hpp>
 #include <qdk/chemistry/utils/logger.hpp>
 #include <utility>
-#include <vector>
 
 @QDK_PLUGIN_DECLARATIONS@
 namespace qdk::chemistry::algorithms::detail {
 
-void initialize_registry(std::atomic<bool>& ready, bool& started,
-                         void (*register_default_instances)()) {
-  static std::recursive_mutex mutex;
-  static int depth = 0;
-  static bool plugins_loaded = false;
-  // Registries initialized since the outermost initialization began
-  static std::vector<std::atomic<bool>*> initialized;
-
-  std::lock_guard<std::recursive_mutex> lock(mutex);
-  // Initialized, or being initialized by this thread
-  if (started) return;
-  started = true;
-  initialized.push_back(&ready);
-
-  // The registries become ready together, when the outermost initialization
-  // ends.
-  struct Scope {
-    Scope() { ++depth; }
-    ~Scope() {
-      if (--depth == 0) {
-        for (auto* registry_ready : initialized) {
-          registry_ready->store(true, std::memory_order_release);
-        }
-        initialized.clear();
-      }
-    }
-  } scope;
-
-  register_default_instances();
-  if (depth == 1 && !plugins_loaded) {
-    plugins_loaded = true;
-    for (const auto& [name, plugin] :
-         std::initializer_list<std::pair<const char*, void (*)()>>{
-             @QDK_PLUGIN_ENTRIES@}) {
-      try {
-        plugin();
-      } catch (const std::exception& e) {
-        QDK_LOGGER().warn("Failed to load QDK/Chemistry plugin '{}': {}", name,
-                          e.what());
-      } catch (...) {
-        QDK_LOGGER().warn("Failed to load QDK/Chemistry plugin '{}'", name);
-      }
+void load_plugins() {
+  static bool loaded = false;
+  if (loaded) return;
+  loaded = true;
+  for (const auto& [name, plugin] :
+       std::initializer_list<std::pair<const char*, void (*)()>>{
+           @QDK_PLUGIN_ENTRIES@}) {
+    try {
+      plugin();
+    } catch (const std::exception& e) {
+      QDK_LOGGER().warn("Failed to load QDK/Chemistry plugin '{}': {}", name,
+                        e.what());
+    } catch (...) {
+      QDK_LOGGER().warn("Failed to load QDK/Chemistry plugin '{}'", name);
     }
   }
 }

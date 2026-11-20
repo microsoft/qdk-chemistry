@@ -165,6 +165,7 @@ pybind11_add_module(_core
     src/pybind11/data/stability_result.cpp
     src/pybind11/data/nuclear_gradients.cpp
     src/pybind11/data/nuclear_hessian.cpp
+    src/pybind11/data/two_body_kernel.cpp
     src/pybind11/data/pauli_operator.cpp
     src/pybind11/data/majorana_mapping.cpp
     src/pybind11/data/serialization.cpp

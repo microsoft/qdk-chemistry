@@ -11,9 +11,9 @@
 #include <qdk/chemistry/scf/util/gauxc_registry.h>
 #include <qdk/chemistry/scf/util/libint2_util.h>
 
-#include <array>
+#include <algorithm>
+#include <cmath>
 #include <numeric>
-#include <optional>
 #include <qdk/chemistry/algorithms/jk_builder.hpp>
 #include <qdk/chemistry/data/wavefunction_containers/state_vector.hpp>
 #include <qdk/chemistry/utils/logger.hpp>
@@ -87,9 +87,19 @@ std::pair<int, int> calculate_electron_counts(
 }
 
 /// ERI engine of the SCF building J, K, and their gradients with nested J/K
-/// builders, which take the exchange operator of the first call
+/// builders, J with the Coulomb kernel and K with the kernels of the exchange
+/// operator v = alpha / r + beta erfc(omega r) / r
 class JKBuilderERI : public qcs::ERI {
  public:
+  /**
+   * @brief Construct the engine of the SCF from its J/K builders
+   *
+   * @param qdk_basis_set Basis set of the SCF
+   * @param jk_builder Builder of J and K
+   * @param jk_gradient_builder Builder of the gradients of E_J and E_K
+   * @param basis_set Basis set of the SCF in the internal format
+   * @param cfg Configuration of the SCF
+   */
   JKBuilderERI(
       std::shared_ptr<data::BasisSet> qdk_basis_set,
       std::unique_ptr<algorithms::JKBuilder> jk_builder,
@@ -98,59 +108,123 @@ class JKBuilderERI : public qcs::ERI {
       : ERI(cfg.scf_orbital_type, cfg.eri.eri_threshold, basis_set, cfg.mpi),
         _qdk_basis_set(std::move(qdk_basis_set)),
         _jk_builder(std::move(jk_builder)),
-        _jk_gradient_builder(std::move(jk_gradient_builder)) {}
+        _jk_gradient_builder(std::move(jk_gradient_builder)),
+        _coulomb(std::make_shared<const data::CoulombKernel>()) {}
 
-  // The builders return complete matrices, so the MPI reduction of
-  // ERI::build_JK is skipped.
+  /**
+   * @brief Build J and K of the SCF's density matrices with the J/K builder
+   *
+   * The builders return complete matrices, so the MPI reduction of
+   * ERI::build_JK is skipped.
+   *
+   * @param P Density matrices of the SCF
+   * @param J Coulomb matrices, overwritten unless null
+   * @param K Exchange matrices, overwritten unless null
+   * @param alpha Coefficient of the full-range exchange operator
+   * @param beta Coefficient of the short-range exchange operator
+   * @param omega Range-separation parameter
+   */
   void build_JK(const double* P, double* J, double* K, double alpha,
                 double beta, double omega) override {
     build_JK_impl_(P, J, K, alpha, beta, omega);
   }
 
+  /**
+   * @brief Build the gradients of E_J and E_K with the J/K gradient builder
+   *
+   * @param P Density matrices of the SCF
+   * @param dJ Gradient of E_J, 3 x atoms row-major, overwritten unless null
+   * @param dK Gradient of E_K, as dJ
+   * @param alpha Coefficient of the full-range exchange operator
+   * @param beta Coefficient of the short-range exchange operator
+   * @param omega Range-separation parameter
+   */
   void get_gradients(const double* P, double* dJ, double* dK, double alpha,
                      double beta, double omega) override {
-    set_exchange_operator(alpha, beta, omega);
-    auto [coulomb, exchange] =
-        _jk_gradient_builder->run(_qdk_basis_set, spin_densities(P, true));
-    copy_gradients(coulomb, dJ);
-    copy_gradients(exchange, dK);
+    run_builder(*_jk_gradient_builder, spin_densities(P, true), dJ, dK,
+                3 * basis_set_.mol->n_atoms, alpha, beta, omega,
+                [this](const auto& gradients, double* d, double scale) {
+                  add_gradients(gradients, d, scale);
+                });
   }
 
  protected:
+  /// @copydoc build_JK
   void build_JK_impl_(const double* P, double* J, double* K, double alpha,
                       double beta, double omega) override {
-    set_exchange_operator(alpha, beta, omega);
-    auto [coulomb, exchange] =
-        _jk_builder->run(_qdk_basis_set, spin_densities(P, false));
-    copy_spin_blocks(coulomb, J);
-    copy_spin_blocks(exchange, K);
+    const size_t n = basis_set_.num_atomic_orbitals;
+    run_builder(*_jk_builder, spin_densities(P, false), J, K,
+                (has_spin_split_density() ? 2 : 1) * n * n, alpha, beta, omega,
+                [this](const auto& X, double* Y, double scale) {
+                  add_spin_blocks(X, Y, scale);
+                });
   }
 
+  /// @brief Not provided by J/K builders @throws std::runtime_error Always
   void quarter_trans_impl(size_t, const double*, double*) override {
     throw std::runtime_error(
         "J/K builders do not provide quarter transformations");
   }
 
  private:
-  void set_exchange_operator(double alpha, double beta, double omega) {
-    const std::array<double, 3> exchange_operator{alpha, beta, omega};
-    if (!_exchange_operator) {
-      for (auto* settings :
-           {&_jk_builder->settings(), &_jk_gradient_builder->settings()}) {
-        settings->set("alpha", alpha);
-        settings->set("beta", beta);
-        settings->set("omega", omega);
+  /**
+   * @brief Run a builder for J with the Coulomb kernel and K with the fewest
+   * kernels of the exchange operator, J along with the first kernel
+   *
+   * @param builder J/K builder or J/K gradient builder
+   * @param densities Density matrices of the SCF
+   * @param J Coulomb result, overwritten unless null
+   * @param K Exchange result, overwritten unless null
+   * @param size Size of J and K
+   * @param alpha Coefficient of the full-range exchange operator
+   * @param beta Coefficient of the short-range exchange operator
+   * @param omega Range-separation parameter
+   * @param add Adds a scaled builder result to J or K
+   */
+  template <class Builder, class Add>
+  void run_builder(
+      Builder& builder,
+      const std::shared_ptr<const data::SymmetryBlockedTensor<2>>& densities,
+      double* J, double* K, size_t size, double alpha, double beta,
+      double omega, const Add& add) const {
+    // v = alpha / r + beta erfc(omega r) / r as coefficients and kernels
+    std::vector<std::pair<double, std::shared_ptr<const data::TwoBodyKernel>>>
+        terms;
+    const bool range_separated =
+        std::abs(beta) > 1e-12 && std::abs(omega) > 1e-12;
+    if (K && range_separated && alpha == 0.0) {
+      terms.emplace_back(
+          beta, std::make_shared<const data::ErfcCoulombKernel>(omega));
+    } else if (K) {
+      if (alpha + beta != 0.0) terms.emplace_back(alpha + beta, _coulomb);
+      if (range_separated) {
+        terms.emplace_back(
+            -beta, std::make_shared<const data::ErfCoulombKernel>(omega));
       }
-      _exchange_operator = exchange_operator;
-    } else if (*_exchange_operator != exchange_operator) {
-      throw std::logic_error(
-          "The J/K builders of an SCF take a single exchange operator");
+    }
+    if (J) std::fill_n(J, size, 0.0);
+    if (K) std::fill_n(K, size, 0.0);
+    for (size_t i = 0; i < std::max<size_t>(terms.size(), J ? 1 : 0); ++i) {
+      const auto j_kernel = i == 0 && J ? _coulomb : nullptr;
+      const auto k_kernel = i < terms.size() ? terms[i].second : nullptr;
+      auto [coulomb, exchange] =
+          builder.run(_qdk_basis_set, j_kernel, k_kernel, densities);
+      if (j_kernel) add(coulomb, J, 1.0);
+      if (k_kernel) add(exchange, K, terms[i].first);
     }
   }
 
-  // The SCF's single density matrix is passed to builds unscaled, since it
-  // expects J and K of that matrix, and to gradients halved, since there it is
-  // the total density.
+  /**
+   * @brief The SCF's density matrices as a spin-diagonal tensor
+   *
+   * The SCF's single density matrix is passed to builds unscaled, since it
+   * expects J and K of that matrix, and to gradients halved, since there it is
+   * the total density.
+   *
+   * @param P Density matrices of the SCF
+   * @param total Whether a single density matrix is the total density
+   * @return The density matrices of the spin blocks
+   */
   std::shared_ptr<const data::SymmetryBlockedTensor<2>> spin_densities(
       const double* P, bool total) const {
     const size_t n = basis_set_.num_atomic_orbitals;
@@ -164,10 +238,17 @@ class JKBuilderERI : public qcs::ERI {
                                            restricted));
   }
 
-  void copy_spin_blocks(
-      const std::shared_ptr<const data::SymmetryBlockedTensor<2>>& X,
-      double* Y) const {
-    if (!Y) return;
+  /**
+   * @brief Add the scaled spin blocks of a builder result to an SCF buffer
+   *
+   * @param X Builder result
+   * @param Y SCF buffer
+   * @param scale Scale of X
+   * @throws std::runtime_error If X has no n x n spin blocks
+   */
+  void add_spin_blocks(
+      const std::shared_ptr<const data::SymmetryBlockedTensor<2>>& X, double* Y,
+      double scale) const {
     const size_t n = basis_set_.num_atomic_orbitals;
     for (size_t s = 0; s < (has_spin_split_density() ? 2u : 1u); ++s) {
       const auto spin = s == 0 ? data::axes::alpha() : data::axes::beta();
@@ -179,13 +260,20 @@ class JKBuilderERI : public qcs::ERI {
                                  "' returned no " + std::to_string(n) + " x " +
                                  std::to_string(n) + " spin blocks");
       }
-      Eigen::Map<Eigen::MatrixXd>(Y + s * n * n, n, n) = *block;
+      Eigen::Map<Eigen::MatrixXd>(Y + s * n * n, n, n) += scale * *block;
     }
   }
 
-  void copy_gradients(const std::shared_ptr<data::NuclearGradients>& gradients,
-                      double* d) const {
-    if (!d) return;
+  /**
+   * @brief Add a scaled gradient builder result to an SCF buffer
+   *
+   * @param gradients Builder result
+   * @param d SCF buffer, 3 x atoms row-major
+   * @param scale Scale of gradients
+   * @throws std::runtime_error If gradients is not of every atom
+   */
+  void add_gradients(const std::shared_ptr<data::NuclearGradients>& gradients,
+                     double* d, double scale) const {
     const size_t num_atoms = basis_set_.mol->n_atoms;
     if (!gradients ||
         static_cast<size_t>(gradients->get_values().size()) != 3 * num_atoms) {
@@ -194,14 +282,15 @@ class JKBuilderERI : public qcs::ERI {
           "' returned no gradients of " + std::to_string(num_atoms) + " atoms");
     }
     using Gradient = Eigen::Matrix<double, 3, Eigen::Dynamic, Eigen::RowMajor>;
-    Eigen::Map<Gradient>(d, 3, num_atoms) = Eigen::Map<const Eigen::Matrix3Xd>(
-        gradients->get_values().data(), 3, num_atoms);
+    Eigen::Map<Gradient>(d, 3, num_atoms) +=
+        scale * Eigen::Map<const Eigen::Matrix3Xd>(
+                    gradients->get_values().data(), 3, num_atoms);
   }
 
   std::shared_ptr<data::BasisSet> _qdk_basis_set;
   std::unique_ptr<algorithms::JKBuilder> _jk_builder;
   std::unique_ptr<algorithms::JKGradientBuilder> _jk_gradient_builder;
-  std::optional<std::array<double, 3>> _exchange_operator;
+  std::shared_ptr<const data::TwoBodyKernel> _coulomb;
 };
 
 ScfCalculationResult ScfSolver::_run_with_options(

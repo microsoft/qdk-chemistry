@@ -6,17 +6,19 @@
 
 #include <qdk/chemistry/utils/logger.hpp>
 #include <stdexcept>
+#include <utility>
 
 #include "incore_impl.h"
 
 namespace qdk::chemistry::scf {
 
 ERIINCORE::ERIINCORE(SCFOrbitalType scf_orbital_type, BasisSet& basis_set,
-                     ParallelConfig _mpi, double omega)
+                     ParallelConfig _mpi, double omega,
+                     std::shared_ptr<const data::TwoBodyKernel> kernel)
     : ERI(scf_orbital_type, 0.0, basis_set, _mpi),
       eri_impl_(incore::ERI::make_incore_eri(
           scf_orbital_type == SCFOrbitalType::Restricted ? 1 : 2, basis_set,
-          _mpi, omega)) {
+          _mpi, omega, std::move(kernel))) {
   QDK_LOG_TRACE_ENTERING();
 }
 

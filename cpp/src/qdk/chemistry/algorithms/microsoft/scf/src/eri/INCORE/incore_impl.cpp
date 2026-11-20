@@ -8,6 +8,7 @@
 
 #include <qdk/chemistry/utils/logger.hpp>
 #include <stdexcept>
+#include <utility>
 #ifdef QDK_CHEMISTRY_ENABLE_GPU
 #include <cuda_runtime.h>
 #include <qdk/chemistry/scf/util/gpu/cuda_helper.h>
@@ -27,12 +28,13 @@
 namespace qdk::chemistry::scf::incore {
 
 ERI::ERI(size_t spin_density_factor, const BasisSet& basis, ParallelConfig mpi,
-         double omega) {
+         double omega, std::shared_ptr<const data::TwoBodyKernel> kernel) {
   QDK_LOG_TRACE_ENTERING();
 
   spin_density_factor_ = spin_density_factor;
   obs_ = libint2_util::convert_to_libint_basisset(basis);
   omega_ = omega;
+  kernel_ = std::move(kernel);
   basis_mode_ = basis.mode;
   mpi_ = mpi;
 
@@ -63,16 +65,19 @@ void ERI::generate_eri_() {
     QDK_LOGGER().debug("Generating ERIs via Libint2 {}",
                        is_rsx ? "omega = " + std::to_string(omega_) : "");
 #if (QDK_CHEMISTRY_INCORE_ERI_STRATEGY & INCORE_ERI_GEN_DEBUG) > 0
-  h_eri_ =
-      libint2_util::debug_eri(basis_mode_, obs_, 0.0, loc_i_st_, loc_i_en_);
+  h_eri_ = libint2_util::debug_eri(basis_mode_, obs_, *kernel_, loc_i_st_,
+                                   loc_i_en_);
   if (is_rsx)
-    h_eri_erf_ = libint2_util::debug_eri(basis_mode_, obs_, omega_, loc_i_st_,
-                                         loc_i_en_);
+    h_eri_erf_ = libint2_util::debug_eri(basis_mode_, obs_,
+                                         data::ErfCoulombKernel(omega_),
+                                         loc_i_st_, loc_i_en_);
 #else
-  h_eri_ = libint2_util::opt_eri(basis_mode_, obs_, 0.0, loc_i_st_, loc_i_en_);
+  h_eri_ =
+      libint2_util::opt_eri(basis_mode_, obs_, *kernel_, loc_i_st_, loc_i_en_);
   if (is_rsx)
     h_eri_erf_ =
-        libint2_util::opt_eri(basis_mode_, obs_, omega_, loc_i_st_, loc_i_en_);
+        libint2_util::opt_eri(basis_mode_, obs_, data::ErfCoulombKernel(omega_),
+                              loc_i_st_, loc_i_en_);
 #endif
 
 #if (QDK_CHEMISTRY_INCORE_ERI_STRATEGY & INCORE_ERI_CON_HOST) > 0 || \
@@ -305,12 +310,13 @@ ERI::~ERI() noexcept {
 #endif
 };
 
-std::unique_ptr<ERI> ERI::make_incore_eri(size_t spin_density_factor,
-                                          const BasisSet& basis,
-                                          ParallelConfig mpi, double omega) {
+std::unique_ptr<ERI> ERI::make_incore_eri(
+    size_t spin_density_factor, const BasisSet& basis, ParallelConfig mpi,
+    double omega, std::shared_ptr<const data::TwoBodyKernel> kernel) {
   QDK_LOG_TRACE_ENTERING();
 
-  return std::make_unique<ERI>(spin_density_factor, basis, mpi, omega);
+  return std::make_unique<ERI>(spin_density_factor, basis, mpi, omega,
+                               std::move(kernel));
 }
 
 }  // namespace qdk::chemistry::scf::incore

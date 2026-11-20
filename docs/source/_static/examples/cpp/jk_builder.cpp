@@ -23,6 +23,8 @@ class TimedJKBuilder : public JKBuilder {
   std::pair<std::shared_ptr<const SymmetryBlockedTensor<2>>,
             std::shared_ptr<const SymmetryBlockedTensor<2>>>
   _run_impl(std::shared_ptr<BasisSet> basis_set,
+            std::shared_ptr<const TwoBodyKernel> j_kernel,
+            std::shared_ptr<const TwoBodyKernel> k_kernel,
             std::shared_ptr<const SymmetryBlockedTensor<2>> densities)
       const override {
     if (!_qdk) {
@@ -30,7 +32,7 @@ class TimedJKBuilder : public JKBuilder {
       _qdk->settings().update(*_settings);
     }
     const auto start = std::chrono::steady_clock::now();
-    auto result = _qdk->run(basis_set, densities);
+    auto result = _qdk->run(basis_set, j_kernel, k_kernel, densities);
     seconds +=
         std::chrono::duration<double>(std::chrono::steady_clock::now() - start)
             .count();
@@ -78,13 +80,26 @@ H   -0.758602    0.000000    0.504284
   const Eigen::MatrixXd P_alpha =
       orbitals->calculate_ao_density_matrix(occupations);
 
-  // J and K of the closed-shell spin densities (restricted: one alpha block)
+  // J and K of the closed-shell density matrices (restricted: one alpha block)
   auto densities = std::make_shared<const SymmetryBlockedTensor<2>>(
       make_spin_diagonal_rank2_sbt(P_alpha, P_alpha, true));
-  auto [J, K] = JKBuilderFactory::create()->run(basis_set, densities);
+  auto coulomb = std::make_shared<const CoulombKernel>();
+  auto [J, K] =
+      JKBuilderFactory::create()->run(basis_set, coulomb, coulomb, densities);
   const auto& J_alpha = J->block({axes::alpha(), axes::alpha()});
   std::cout << "Coulomb energy: "
             << 2.0 * (P_alpha.array() * J_alpha.array()).sum() << " Hartree"
+            << std::endl;
+
+  // Long-range exchange only: a null kernel skips J
+  auto K_lr =
+      JKBuilderFactory::create()
+          ->run(basis_set, nullptr,
+                std::make_shared<const ErfCoulombKernel>(0.4), densities)
+          .second;
+  const auto& K_lr_alpha = K_lr->block({axes::alpha(), axes::alpha()});
+  std::cout << "Long-range exchange energy: "
+            << -(P_alpha.array() * K_lr_alpha.array()).sum() << " Hartree"
             << std::endl;
   // end-cell-build
   // --------------------------------------------------------------------------------------------

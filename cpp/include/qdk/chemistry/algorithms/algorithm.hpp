@@ -4,10 +4,10 @@
 
 #pragma once
 
-#include <atomic>
 #include <cstdint>
 #include <functional>
 #include <memory>
+#include <mutex>
 #include <optional>
 #include <stdexcept>
 #include <string>
@@ -210,20 +210,19 @@ struct DeprecationAccess {
   }
 };
 
+/// Serializes access to the registries of the algorithm factories
+inline std::recursive_mutex registry_mutex;
+
+/// Depth of nested first uses of the registries
+inline int registry_depth = 0;
+
 /**
- * @brief Initialize the registry of an algorithm factory on its first use.
+ * @brief Run the plugins of the add-ons built into the library, once.
  *
- * Registers the factory's built-in implementations and, at the end of the
- * outermost initialization, runs the plugins of the add-ons built into the
- * library, once. Initialization is serialized across threads and re-entrant
- * on the initializing thread.
- *
- * @param ready Set once the registry is initialized
- * @param started Whether initialization of the registry has started
- * @param register_default_instances Registers the built-in implementations
+ * A plugin that throws is reported as a warning, and the other plugins still
+ * run. Called with registry_mutex held.
  */
-void initialize_registry(std::atomic<bool>& ready, bool& started,
-                         void (*register_default_instances)());
+void load_plugins();
 }  // namespace detail
 
 /**
@@ -490,11 +489,16 @@ class AlgorithmFactory {
    */
   static std::unordered_map<std::string, functor_type>& registry() {
     static std::unordered_map<std::string, functor_type> instance;
-    static std::atomic<bool> ready{false};
-    static bool started = false;
-    if (!ready.load(std::memory_order_acquire)) {
-      detail::initialize_registry(ready, started,
-                                  &Derived::register_default_instances);
+    // The first use registers the built-in implementations and, at the end of
+    // the outermost first use, the plugins; other threads wait for both.
+    std::lock_guard<std::recursive_mutex> lock(detail::registry_mutex);
+    static bool initialized = false;
+    if (!initialized) {
+      initialized = true;
+      ++detail::registry_depth;
+      Derived::register_default_instances();
+      if (detail::registry_depth == 1) detail::load_plugins();
+      --detail::registry_depth;
     }
     return instance;
   }

@@ -37,6 +37,7 @@ energy, wavefunction = scf_solver.run(
 # start-cell-build
 import numpy as np
 
+from qdk_chemistry.data import CoulombKernel, ErfCoulombKernel
 from qdk_chemistry.data.symmetry import (
     SymmetryLabel,
     axes,
@@ -49,13 +50,23 @@ occupations = np.zeros(orbitals.get_num_molecular_orbitals())
 occupations[:5] = 1.0
 density_alpha = orbitals.calculate_ao_density_matrix(occupations)
 
-# J and K of the closed-shell spin densities (restricted: one alpha block)
+# J and K of the closed-shell density matrices (restricted: one alpha block)
+densities = make_spin_diagonal_rank2_sbt(density_alpha)
 coulomb, exchange = create("jk_builder").run(
-    basis_set, make_spin_diagonal_rank2_sbt(density_alpha)
+    basis_set, CoulombKernel(), CoulombKernel(), densities
 )
 alpha = SymmetryLabel([axes.alpha()])
 coulomb_alpha = coulomb.block([alpha, alpha])
 print(f"Coulomb energy: {2.0 * np.sum(density_alpha * coulomb_alpha):.6f} Hartree")
+
+# Long-range exchange only: a None kernel skips J
+_, exchange_lr = create("jk_builder").run(
+    basis_set, None, ErfCoulombKernel(omega=0.4), densities
+)
+exchange_lr_alpha = exchange_lr.block([alpha, alpha])
+print(
+    f"Long-range exchange energy: {-np.sum(density_alpha * exchange_lr_alpha):.6f} Hartree"
+)
 # end-cell-build
 ################################################################################
 
@@ -79,14 +90,15 @@ class TimedJKBuilder(JKBuilder):
     def name(self):
         return "timed"
 
-    def _run_impl(self, basis_set, densities):
+    def _run_impl(self, basis_set, j_kernel, k_kernel, densities):
         if self._qdk is None:
-            keys = ("eri_threshold", "alpha", "beta", "omega")
             self._qdk = create(
-                "jk_builder", "qdk", **{key: self.settings().get(key) for key in keys}
+                "jk_builder",
+                "qdk",
+                eri_threshold=self.settings().get("eri_threshold"),
             )
         start = time.perf_counter()
-        result = self._qdk.run(basis_set, densities)
+        result = self._qdk.run(basis_set, j_kernel, k_kernel, densities)
         TimedJKBuilder.seconds += time.perf_counter() - start
         return result
 
@@ -104,9 +116,9 @@ TimedJKPlugin().register(PluginRegistrar())
 
 scf_solver = create("scf_solver")
 scf_solver.settings().set("jk_builder", AlgorithmRef("jk_builder", "timed"))
-energy, wavefunction = scf_solver.run(
+energy, _ = scf_solver.run(
     structure, charge=0, spin_multiplicity=1, basis_or_guess="cc-pvdz"
 )
-print(f"J/K builds: {TimedJKBuilder.seconds:.3f} s")
+print(f"SCF energy: {energy:.10f} Eh, J/K builds: {TimedJKBuilder.seconds:.3f} s")
 # end-cell-custom
 ################################################################################

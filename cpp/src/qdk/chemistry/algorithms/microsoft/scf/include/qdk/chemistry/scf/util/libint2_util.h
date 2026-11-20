@@ -8,6 +8,7 @@
 
 #include <libint2.hpp>
 #include <memory>
+#include <qdk/chemistry/data/two_body_kernel.hpp>
 
 namespace qdk::chemistry::scf::libint2_util {
 
@@ -31,29 +32,77 @@ using qdk::chemistry::scf::Shell;
 ::libint2::Shell convert_to_libint_shell(const Shell& shell, bool pure);
 
 /**
+ * @brief Construct a Libint2 engine for the integrals of a two-body kernel
+ * @param kernel Two-body kernel
+ * @param obs Orbital basis set
+ * @param deriv Derivative order
+ * @return Engine for the integrals of kernel
+ * @throws std::invalid_argument If Libint2 does not provide the kernel
+ */
+::libint2::Engine make_eri_engine(const data::TwoBodyKernel& kernel,
+                                  const ::libint2::BasisSet& obs, int deriv);
+
+/**
+ * @brief Compute a shell quartet of two-electron integrals of the engine's
+ * kernel, as constructed by make_eri_engine
+ * @tparam Deriv Derivative order of the engine
+ * @param engine Engine, whose results receive the integrals
+ * @param s1 First bra shell
+ * @param s2 Second bra shell
+ * @param s3 First ket shell
+ * @param s4 Second ket shell
+ * @param sp12 Precomputed data of the bra shell pair, if any
+ * @param sp34 Precomputed data of the ket shell pair, if any
+ */
+template <size_t Deriv>
+void compute_eri(::libint2::Engine& engine, const ::libint2::Shell& s1,
+                 const ::libint2::Shell& s2, const ::libint2::Shell& s3,
+                 const ::libint2::Shell& s4,
+                 const ::libint2::ShellPair* sp12 = nullptr,
+                 const ::libint2::ShellPair* sp34 = nullptr) {
+  using ::libint2::BraKet;
+  using ::libint2::Operator;
+  switch (engine.oper()) {
+    case Operator::erf_coulomb:
+      engine.compute2<Operator::erf_coulomb, BraKet::xx_xx, Deriv>(
+          s1, s2, s3, s4, sp12, sp34);
+      break;
+    case Operator::erfc_coulomb:
+      engine.compute2<Operator::erfc_coulomb, BraKet::xx_xx, Deriv>(
+          s1, s2, s3, s4, sp12, sp34);
+      break;
+    default:
+      engine.compute2<Operator::coulomb, BraKet::xx_xx, Deriv>(s1, s2, s3, s4,
+                                                               sp12, sp34);
+  }
+}
+
+/**
  * @brief Compute ERI integrals with debug-level checks
  * @param basis_mode atomic orbital type (cartesian/spherical)
  * @param obs Orbital basis set
- * @param omega Range-separation parameter for long-range integrals
+ * @param kernel Two-body kernel of the integrals
  * @param i_lo Starting atomic orbital index
  * @param i_hi Ending atomic orbital index
  * @return ERI integral buffer
  */
 std::unique_ptr<double[]> debug_eri(BasisMode basis_mode,
                                     const ::libint2::BasisSet& obs,
-                                    double omega, size_t i_lo, size_t i_hi);
+                                    const data::TwoBodyKernel& kernel,
+                                    size_t i_lo, size_t i_hi);
 
 /**
  * @brief Compute ERI integrals with optimized screening
  * @param basis_mode atomic orbital type (cartesian/spherical)
  * @param obs Orbital basis set
- * @param omega Range-separation parameter for long-range integrals
+ * @param kernel Two-body kernel of the integrals
  * @param i_lo Starting atomic orbital index
  * @param i_hi Ending atomic orbital index
  * @return ERI integral buffer
  */
 std::unique_ptr<double[]> opt_eri(BasisMode basis_mode,
-                                  const ::libint2::BasisSet& obs, double omega,
+                                  const ::libint2::BasisSet& obs,
+                                  const data::TwoBodyKernel& kernel,
                                   size_t i_lo, size_t i_hi);
 
 /**

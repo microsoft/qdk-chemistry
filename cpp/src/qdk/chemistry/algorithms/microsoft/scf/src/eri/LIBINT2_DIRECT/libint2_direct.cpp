@@ -17,6 +17,7 @@
 #include <blas.hh>
 #include <stdexcept>
 #include <unordered_set>
+#include <utility>
 #include <vector>
 
 #include "util/timer.h"
@@ -179,6 +180,9 @@ class ERI {
   shellpair_list_t splist_;   ///< Pre-computed shell pair list for screening
   shellpair_data_t spdata_;   ///< Shell pair geometric data and bounds
   RowMajorMatrix K_schwarz_;  ///< Schwarz screening matrix for integral bounds
+  std::shared_ptr<const data::TwoBodyKernel>
+      kernel_;  ///< Two-body kernel of J and of the exchange scaled by
+                ///< alpha + beta
 
  public:
   /**
@@ -197,18 +201,26 @@ class ERI {
    *        shell quartets during J/K builds and quarter transformations
    * @param shell_pair_threshold Overlap-based shell pair pre-screening
    *        threshold
+   * @param kernel Two-body kernel of J and of the exchange scaled by
+   *        alpha + beta, whose integrals the Coulomb Schwarz bounds must
+   *        bound, as they do for the erf and erfc kernels
    *
+   * @throws std::invalid_argument If Libint2 does not provide the kernel
    * @note Construction involves significant overhead due to screening setup
    * @note Shell pair and Schwarz data is computed using OpenMP parallelization
    */
   ERI(size_t spin_density_factor, qdk::chemistry::scf::BasisSet& basis_set,
-      bool use_atomics, double eri_threshold, double shell_pair_threshold)
+      bool use_atomics, double eri_threshold, double shell_pair_threshold,
+      std::shared_ptr<const data::TwoBodyKernel> kernel)
       : spin_density_factor_(spin_density_factor),
         use_thread_local_buffers_(!use_atomics),
         eri_threshold_(eri_threshold),
         n_atoms_(basis_set.mol->n_atoms),
-        obs_(libint2_util::convert_to_libint_basisset(basis_set)) {
+        obs_(libint2_util::convert_to_libint_basisset(basis_set)),
+        kernel_(std::move(kernel)) {
     QDK_LOG_TRACE_ENTERING();
+    // Rejects a kernel without Libint2 integrals before the screening setup
+    libint2_util::make_eri_engine(*kernel_, obs_, 0);
 
     shell2bf_ = obs_.shell2bf();
     sh2atom_.reserve(basis_set.shells.size());
@@ -298,12 +310,11 @@ class ERI {
 #else
     const int nthreads = 1;
 #endif
-    std::vector<::libint2::Engine> engines_coulomb(nthreads);
-    engines_coulomb[0] = ::libint2::Engine(::libint2::Operator::coulomb,
-                                           obs_.max_nprim(), obs_.max_l(), 0);
-    engines_coulomb[0].set(::libint2::ScreeningMethod::Original);
-    engines_coulomb[0].set_precision(engine_precision);
-    for (int i = 1; i < nthreads; ++i) engines_coulomb[i] = engines_coulomb[0];
+    std::vector<::libint2::Engine> engines(nthreads);
+    engines[0] = libint2_util::make_eri_engine(*kernel_, obs_, 0);
+    engines[0].set(::libint2::ScreeningMethod::Original);
+    engines[0].set_precision(engine_precision);
+    for (int i = 1; i < nthreads; ++i) engines[i] = engines[0];
 
     std::vector<::libint2::Engine> engines_erf;
     if (need_erf_exchange) {
@@ -347,7 +358,7 @@ class ERI {
 #else
       const auto thread_id = 0;
 #endif
-      auto& engine = engines_coulomb[thread_id];
+      auto& engine = engines[thread_id];
       const auto& buf = engine.results();
       auto* engine_erf = need_erf_exchange ? &engines_erf[thread_id] : nullptr;
       const auto& buf_erf = need_erf_exchange ? engine_erf->results() : buf;
@@ -417,9 +428,8 @@ class ERI {
               auto s1234_deg = s12_deg * s34_deg * s12_34_deg;
 
               // Compute the integral shell quartet
-              engine.compute2<::libint2::Operator::coulomb,
-                              ::libint2::BraKet::xx_xx, 0>(
-                  obs_[s1], obs_[s2], obs_[s3], obs_[s4], sp12_data, sp34_data);
+              libint2_util::compute_eri<0>(engine, obs_[s1], obs_[s2], obs_[s3],
+                                           obs_[s4], sp12_data, sp34_data);
 
               // Coarse integral screening
               const auto* buf_1234 = buf[0];
@@ -431,13 +441,13 @@ class ERI {
                     sp34_data);
                 buf_erf_1234 = buf_erf[0];
               }
-              const bool has_coulomb = buf_1234 != nullptr;
+              const bool has_kernel = buf_1234 != nullptr;
               const bool has_erf = buf_erf_1234 != nullptr;
-              if (!has_coulomb && !has_erf) continue;
+              if (!has_kernel && !has_erf) continue;
 
-              // J uses the Coulomb operator; range-separated ERF contributes
-              // only to exchange below.
-              if (J && has_coulomb)
+              // J uses the kernel; range-separated ERF contributes only to
+              // exchange below.
+              if (J && has_kernel)
                 for (size_t idm = 0; idm < num_density_matrices; ++idm) {
                   auto* J_cur =
                       use_thread_local_buffers_
@@ -568,7 +578,7 @@ class ERI {
               };
 
               // Contract shell quartet (K)
-              contract_K_buffer(has_coulomb ? buf_1234 : nullptr,
+              contract_K_buffer(has_kernel ? buf_1234 : nullptr,
                                 exchange_scale);
               contract_K_buffer(has_erf ? buf_erf_1234 : nullptr, -beta);
 
@@ -614,7 +624,7 @@ class ERI {
           }
 
     // Symmetrize K. Exchange scaling is applied during contraction so that
-    // range-separated exchange can combine Coulomb and erf operators.
+    // range-separated exchange can combine the kernel and erf operators.
     if (K)
       for (size_t idm = 0; idm < num_density_matrices; ++idm)
         for (size_t i = 0; i < num_atomic_orbitals; ++i)
@@ -660,13 +670,13 @@ class ERI {
     const size_t nsh = obs_.size();
     const bool is_rsx = std::abs(omega) > 1e-12;
     const double exchange_scale = alpha + beta;
-    const bool need_coulomb_exchange =
+    const bool need_kernel_exchange =
         dK != nullptr && std::abs(exchange_scale) > 1e-12;
     const bool need_erf_exchange =
         dK != nullptr && is_rsx && std::abs(beta) > 1e-12;
-    const bool need_coulomb = dJ != nullptr || need_coulomb_exchange;
+    const bool need_kernel = dJ != nullptr || need_kernel_exchange;
     const bool need_J = dJ != nullptr;
-    const bool need_K = need_coulomb_exchange || need_erf_exchange;
+    const bool need_K = need_kernel_exchange || need_erf_exchange;
 
     std::vector<double> dJ_buffer;
     std::vector<double> dK_buffer;
@@ -737,8 +747,7 @@ class ERI {
     const int nthreads = 1;
 #endif
     std::vector<::libint2::Engine> engines(
-        nthreads, ::libint2::Engine(::libint2::Operator::coulomb,
-                                    obs_.max_nprim(), obs_.max_l(), 1));
+        nthreads, libint2_util::make_eri_engine(*kernel_, obs_, 1));
     for (auto& engine : engines) {
       engine.set(::libint2::BraKet::xx_xx);
       engine.set(::libint2::ScreeningMethod::Original);
@@ -811,10 +820,9 @@ class ERI {
             eri_threshold_)
           continue;
 
-        if (need_coulomb) {
-          engine.compute2<::libint2::Operator::coulomb,
-                          ::libint2::BraKet::xx_xx, 1>(
-              obs_[s1], obs_[s2], obs_[s3], obs_[s4], sp12_data, sp34_data);
+        if (need_kernel) {
+          libint2_util::compute_eri<1>(engine, obs_[s1], obs_[s2], obs_[s3],
+                                       obs_[s4], sp12_data, sp34_data);
         }
         if (need_erf_exchange) {
           engine_erf->compute2<::libint2::Operator::erf_coulomb,
@@ -822,9 +830,9 @@ class ERI {
               obs_[s1], obs_[s2], obs_[s3], obs_[s4], sp12_data, sp34_data);
         }
 
-        const bool has_coulomb = need_coulomb && buf[0] != nullptr;
+        const bool has_kernel = need_kernel && buf[0] != nullptr;
         const bool has_erf = need_erf_exchange && buf_erf[0] != nullptr;
-        if (!has_coulomb && !has_erf) continue;
+        if (!has_kernel && !has_erf) continue;
 
         for (int d = 0; d < 12; ++d) {
           const int center = d / 3;
@@ -834,14 +842,14 @@ class ERI {
                            : center == 2 ? sh2atom_[s3]
                                          : sh2atom_[s4];
           const size_t coord = static_cast<size_t>(atom) + xyz * n_atoms_;
-          const auto* shset = has_coulomb ? buf[d] : nullptr;
+          const auto* shset = has_kernel ? buf[d] : nullptr;
           const auto* shset_erf = has_erf ? buf_erf[d] : nullptr;
           const bool contract_J = need_J && shset != nullptr;
-          const bool contract_K_coulomb =
+          const bool contract_K_kernel =
               need_K && shset != nullptr && exchange_scale != 0.0;
           const bool contract_K_erf =
               need_K && shset_erf != nullptr && beta != 0.0;
-          if (!contract_J && !contract_K_coulomb && !contract_K_erf) continue;
+          if (!contract_J && !contract_K_kernel && !contract_K_erf) continue;
 
           double dJ_coord = 0.0;
           if (contract_J) {
@@ -947,12 +955,11 @@ class ERI {
 #else
     const int nthreads = 1;
 #endif
-    std::vector<::libint2::Engine> engines_coulomb(nthreads);
-    engines_coulomb[0] = ::libint2::Engine(::libint2::Operator::coulomb,
-                                           obs_.max_nprim(), obs_.max_l(), 0);
-    engines_coulomb[0].set(::libint2::ScreeningMethod::Original);
-    engines_coulomb[0].set_precision(engine_precision);
-    for (int i = 1; i < nthreads; ++i) engines_coulomb[i] = engines_coulomb[0];
+    std::vector<::libint2::Engine> engines(nthreads);
+    engines[0] = libint2_util::make_eri_engine(*kernel_, obs_, 0);
+    engines[0].set(::libint2::ScreeningMethod::Original);
+    engines[0].set_precision(engine_precision);
+    for (int i = 1; i < nthreads; ++i) engines[i] = engines[0];
 
     // Thread-local accumulation buffers for reproducibility
     std::vector<std::vector<double>> out_local(0);
@@ -972,7 +979,7 @@ class ERI {
 #else
       const auto thread_id = 0;
 #endif
-      auto& engine = engines_coulomb[thread_id];
+      auto& engine = engines[thread_id];
       const auto& buf = engine.results();
 
       // Get pointer to thread-local buffer
@@ -1022,9 +1029,8 @@ class ERI {
               const auto n4 = obs_[s4].size();
 
               // Compute the integral shell quartet
-              engine.compute2<::libint2::Operator::coulomb,
-                              ::libint2::BraKet::xx_xx, 0>(
-                  obs_[s1], obs_[s2], obs_[s3], obs_[s4], sp12_data, sp34_data);
+              libint2_util::compute_eri<0>(engine, obs_[s1], obs_[s2], obs_[s3],
+                                           obs_[s4], sp12_data, sp34_data);
 
               // Coarse integral screening
               const auto buf_1234 = buf[0];
@@ -1173,14 +1179,15 @@ class ERI {
 
 }  // namespace libint2::direct
 
-LIBINT2_DIRECT::LIBINT2_DIRECT(SCFOrbitalType scf_orbital_type,
-                               BasisSet& basis_set, ParallelConfig _mpi,
-                               bool use_atomics, double eri_threshold,
-                               double shell_pair_threshold)
+LIBINT2_DIRECT::LIBINT2_DIRECT(
+    SCFOrbitalType scf_orbital_type, BasisSet& basis_set, ParallelConfig _mpi,
+    bool use_atomics, double eri_threshold, double shell_pair_threshold,
+    std::shared_ptr<const data::TwoBodyKernel> kernel)
     : ERI(scf_orbital_type, eri_threshold, basis_set, _mpi),
       eri_impl_(libint2::direct::ERI::make_libint2_direct_eri(
           scf_orbital_type == SCFOrbitalType::Restricted ? 1 : 2, basis_set,
-          use_atomics, eri_threshold, shell_pair_threshold)) {
+          use_atomics, eri_threshold, shell_pair_threshold,
+          std::move(kernel))) {
   QDK_LOG_TRACE_ENTERING();
   if (_mpi.world_size > 1) throw std::runtime_error("LIBINT2_DIRECT + MPI NYI");
 }

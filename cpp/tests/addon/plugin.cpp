@@ -10,9 +10,10 @@
 #include <utility>
 
 namespace qdk_test_addon {
-namespace {
 
 using namespace qdk::chemistry;
+
+namespace detail {
 
 class TestJKBuilder : public algorithms::JKBuilder {
  public:
@@ -24,6 +25,8 @@ class TestJKBuilder : public algorithms::JKBuilder {
             std::shared_ptr<const data::SymmetryBlockedTensor<2>>>
   _run_impl(
       std::shared_ptr<data::BasisSet>,
+      std::shared_ptr<const data::TwoBodyKernel>,
+      std::shared_ptr<const data::TwoBodyKernel>,
       std::shared_ptr<const data::SymmetryBlockedTensor<2>>) const override {
     throw std::logic_error("The test add-on J/K builder does not build J/K");
   }
@@ -32,12 +35,12 @@ class TestJKBuilder : public algorithms::JKBuilder {
   std::string _name;
 };
 
-}  // namespace
+}  // namespace detail
 
 // Registers a J/K builder under the name of the built-in one
 void register_duplicate() {
   algorithms::JKBuilderFactory::register_instance(
-      [] { return std::make_unique<TestJKBuilder>("qdk"); });
+      [] { return std::make_unique<detail::TestJKBuilder>("qdk"); });
 }
 
 void throw_non_standard() { throw 42; }
@@ -49,7 +52,7 @@ void register_plugin() {
     throw std::runtime_error("The built-in SCF solver is not registered");
   }
   algorithms::JKBuilderFactory::register_instance(
-      [] { return std::make_unique<TestJKBuilder>("test_addon"); });
+      [] { return std::make_unique<detail::TestJKBuilder>("test_addon"); });
 }
 
 }  // namespace qdk_test_addon

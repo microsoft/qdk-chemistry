@@ -26,6 +26,7 @@ void bind_stability(py::module& m);
 void bind_stability_result(py::module& m);
 void bind_nuclear_gradients(py::module& m);
 void bind_nuclear_hessian(py::module& m);
+void bind_two_body_kernel(py::module& m);
 void bind_settings(py::module& m);
 void bind_structure(py::module& m);
 void bind_basis_set(py::module& m);
@@ -101,6 +102,7 @@ PYBIND11_MODULE(_core, m) {
   bind_stability_result(data);
   bind_nuclear_gradients(data);
   bind_nuclear_hessian(data);
+  bind_two_body_kernel(data);
   bind_pauli_operator(data);
   bind_majorana_mapping(
       data);  // Depends on SparsePauliWord from pauli_operator

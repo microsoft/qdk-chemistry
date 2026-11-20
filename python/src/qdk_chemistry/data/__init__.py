@@ -17,12 +17,15 @@ Exposed classes are:
 - :class:`Circuit`: Quantum circuit information.
 - :class:`Configuration`: Electronic configuration state information.
 - :class:`ConfigurationSet`: Collection of electronic configurations with associated orbital information.
+- :class:`CoulombKernel`: The Coulomb kernel 1/r of a two-electron operator.
 - :class:`DataClass`: Base data class.
 - :class:`DFTHCHamiltonianContainer`: Container for double-factorized tensor hypercontraction Hamiltonians.
 - :class:`EdgeLabel`: Geometric shell and optional semantic flavor of a lattice graph edge.
 - :class:`ElectronicStructureSettings`: Specialized settings for electronic structure calculations.
 - :class:`Element`: Represents a chemical element with its properties.
 - :class:`EnergyExpectationResult`: Result for Hamiltonian energy expectation value and variance.
+- :class:`ErfCoulombKernel`: The long-range Coulomb kernel erf(omega r)/r of a two-electron operator.
+- :class:`ErfcCoulombKernel`: The short-range Coulomb kernel erfc(omega r)/r of a two-electron operator.
 - :class:`FermiHubbardModelHamiltonianDescription`: Fermi-Hubbard model on a lattice.
 - :class:`Hamiltonian`: Quantum mechanical Hamiltonian operator representation.
 - :class:`HamiltonianContainer`: Abstract base class for different Hamiltonian storage formats.
@@ -53,6 +56,7 @@ Exposed classes are:
 - :class:`Symmetries`: Physical symmetries of an electronic state.
 - :class:`TermPartition`: Index-based partition of Hamiltonian terms.
   See :class:`FlatPartition` and :class:`LayeredPartition`.
+- :class:`TwoBodyKernel`: Abstract base class for the interaction kernels of two-electron operators.
 - :class:`TwoBodyPermutationGroup`: Permutation group of sparse two-body symmetry representatives (FourFold, EightFold).
 - :class:`UnitaryRepresentation`: Unitary representation.
 - :class:`UnitaryContainer`: Abstract base class for different unitary representations.
@@ -87,10 +91,13 @@ from qdk_chemistry._core.data import (
     CholeskyHamiltonianContainer,
     Configuration,
     ConfigurationSet,
+    CoulombKernel,
     DFTHCHamiltonianContainer,
     EdgeLabel,
     ElectronicStructureSettings,
     Element,
+    ErfcCoulombKernel,
+    ErfCoulombKernel,
     Hamiltonian,
     HamiltonianContainer,
     HamiltonianType,
@@ -116,6 +123,7 @@ from qdk_chemistry._core.data import (
     StateVectorContainer,
     Structure,
     TaperingSpecification,
+    TwoBodyKernel,
     TwoBodyPermutationGroup,
     Wavefunction,
     WavefunctionContainer,
@@ -166,6 +174,7 @@ __all__ = [
     "CircuitExecutorData",
     "Configuration",
     "ConfigurationSet",
+    "CoulombKernel",
     "DFTHCHamiltonianContainer",
     "DataClass",
     "DrivenContainer",
@@ -174,6 +183,8 @@ __all__ = [
     "ElectronicStructureSettings",
     "Element",
     "EnergyExpectationResult",
+    "ErfCoulombKernel",
+    "ErfcCoulombKernel",
     "FermiHubbardModelHamiltonianDescription",
     "FermionModeOrder",
     "FlatPartition",
@@ -218,6 +229,7 @@ __all__ = [
     "TermPartition",
     "TimeDependentQubitHamiltonian",
     "TimeDependentQubitHamiltonianContainer",
+    "TwoBodyKernel",
     "TwoBodyPermutationGroup",
     "UnitaryContainer",
     "UnitaryRepresentation",
