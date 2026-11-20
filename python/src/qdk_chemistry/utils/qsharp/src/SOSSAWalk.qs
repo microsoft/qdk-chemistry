@@ -1367,7 +1367,7 @@ namespace QDKChemistry.Utils.SOSSAWalk {
 
     /// One fermionic Givens step on modes (p, c): Ry(4π·x/2^b) on p controlled on c, made from a single
     /// adder of `word` into the phase gradient controlled on c (:cite:`Low2026` FIG. 39, Lemma 6), costing
-    /// 2b - 1 Toffolis with b - 1 `clean` ancillas or 3b - 2 without (Takahashi-Tani-Kunihiro ripple carry).
+    /// 2b - 1 Toffolis with b - 1 `clean` ancillas (Gidney) or 3b - 2 without (Muñoz-Coreas-Thapliyal), as in Lemma 7.
     internal operation ApplyControlledAdderGivensStep(
         p : Int,
         c : Int,
