@@ -179,7 +179,8 @@ orthogonal matrix, joining columns that share a nonzero row.
 Args:
     isometry (numpy.ndarray | scipy.sparse.sparray | scipy.sparse.spmatrix):
         Matrix with orthonormal columns and at least as many rows as columns,
-        whose duplicate entries are summed.
+        whose duplicate entries are summed and whose blocks are realized as
+        their polar factors.
 
 Returns:
     SparseIsometrySynthesis: Permutations and block-diagonal Givens data.
