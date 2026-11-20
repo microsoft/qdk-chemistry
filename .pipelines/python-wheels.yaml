@@ -56,11 +56,9 @@ parameters:
   type: stringList
   values:
   - '3.11'
-  - '3.12'
   default:
   - '3.11'
-  - '3.12'
-  displayName: Python build versions (3.12 builds an ABI3 wheel for 3.12+)
+  displayName: Python build version (one ABI3 wheel for standard CPython 3.11+)
 - name: publishEsrp
   type: boolean
   default: false
@@ -352,15 +350,10 @@ extends:
             clean: all
           strategy:
             matrix:
-              ${{ if containsValue(parameters.pythonVersions, '3.11') }}:
-                Py311:
-                  pythonVersion: '3.11'
+              ${{ each testPython in split('3.11,3.12,3.13,3.14', ',') }}:
+                Py${{ replace(testPython, '.', '') }}:
+                  pythonVersion: ${{ testPython }}
                   wheelPythonVersion: '3.11'
-              ${{ if containsValue(parameters.pythonVersions, '3.12') }}:
-                ${{ each testPython in split('3.12,3.13,3.14', ',') }}:
-                  Py${{ replace(testPython, '.', '') }}:
-                    pythonVersion: ${{ testPython }}
-                    wheelPythonVersion: '3.12'
             maxParallel: 4
           displayName: Test ${{ target.os }} ${{ target.arch }} wheels
           templateContext:

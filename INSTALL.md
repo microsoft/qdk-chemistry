@@ -42,7 +42,10 @@ simplest option when you need PySCF.
 > **NOTE:** Commands below are given for Linux/macOS (`bash`) and Windows (PowerShell). Where the
 > Linux/macOS commands use `python3`, use `python` on Windows.
 
-CPython 3.12 and newer share a `cp312-abi3` wheel per platform. Python 3.11 uses a version-specific wheel.
+Standard (GIL-enabled) CPython 3.11 and newer share a `cp311-abi3` QDK Chemistry
+wheel per platform and architecture. Pip installs the matching `nanobind-backend`
+wheel for your interpreter. The backend and other dependencies must also support
+your Python version.
 
 ### Step 1: Create a virtual environment
 

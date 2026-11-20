@@ -40,6 +40,7 @@ dependencies = [
   "ruamel-yaml>=0.18.10",
   "qdk[jupyter]>=1.34.0",
   "nanobind>=3.1.0",
+  "nanobind-backend>=1.0",
   "h5py>=3.0.0",
 ]
 description = "Quantum Development Kit - Chemistry Library"
@@ -310,8 +311,8 @@ CMAKE_BUILD_PARALLEL_LEVEL = "4"
 packages = ["src/qdk_chemistry"]
 install-dir = "qdk_chemistry"
 exclude = ["**/.no-stubgen"]
-# Python 3.12+ shares one stable-ABI wheel; 3.11 retains a native ABI tag.
-py-api = "cp312"
+# Split-mode frontend; pip selects the interpreter-specific backend.
+py-api = "cp311"
 
 [tool.scikit-build.cmake.define]
 BUILD_SHARED_LIBS = "OFF"

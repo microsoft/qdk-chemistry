@@ -143,7 +143,7 @@ find_package(nanobind 3.1 CONFIG REQUIRED)
 
 # Create the Python extension module
 nanobind_add_module(_core
-    STABLE_ABI
+    BACKEND_MODULE nanobind_backend
     src/nanobind/data/data_class.cpp
     src/nanobind/data/symmetry/symmetry.cpp
     src/nanobind/data/symmetry/symmetry_blocked_scalar.cpp
