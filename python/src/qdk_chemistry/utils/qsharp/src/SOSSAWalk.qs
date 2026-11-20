@@ -1367,7 +1367,8 @@ namespace QDKChemistry.Utils.SOSSAWalk {
 
     /// One fermionic Givens step on modes (p, c): Ry(4π·x/2^b) on p controlled on c, made from a single
     /// adder of `word` into the phase gradient controlled on c (:cite:`Low2026` FIG. 39, Lemma 6), costing
-    /// 2b - 1 Toffolis with b - 1 `clean` ancillas (Gidney) or 3b - 2 without (Muñoz-Coreas-Thapliyal), as in Lemma 7.
+    /// 2b - 2 Toffolis with b - 1 `clean` ancillas (Gidney) or 3b - 3 without (Muñoz-Coreas-Thapliyal), one below
+    /// Lemma 7 because the gradient's |−⟩ top qubit makes its controlled flip a CZ.
     internal operation ApplyControlledAdderGivensStep(
         p : Int,
         c : Int,
@@ -1408,14 +1409,10 @@ namespace QDKChemistry.Utils.SOSSAWalk {
                         CNOT(clean[i - 1], clean[i]);
                     }
                 }
+                // The gradient's top qubit is |−⟩, so flipping it on ctrl·(a ⊕ c) is the phase CZ(ctrl, a ⊕ c).
+                CZ(ctrl, a[n - 1]);
                 if n > 1 {
-                    within {
-                        CNOT(clean[n - 2], a[n - 1]);
-                    } apply {
-                        CCNOT(ctrl, a[n - 1], g[n - 1]);
-                    }
-                } else {
-                    CCNOT(ctrl, a[0], g[0]);
+                    CZ(ctrl, clean[n - 2]);
                 }
                 for i in n - 2..-1..0 {
                     if i > 0 {
@@ -1439,7 +1436,11 @@ namespace QDKChemistry.Utils.SOSSAWalk {
                     CCNOT(g[i], a[i], a[i + 1]);
                 }
                 for i in n - 1..-1..1 {
-                    CCNOT(ctrl, a[i], g[i]);
+                    if i == n - 1 {
+                        CZ(ctrl, a[i]);
+                    } else {
+                        CCNOT(ctrl, a[i], g[i]);
+                    }
                     CCNOT(g[i - 1], a[i - 1], a[i]);
                 }
                 for i in 1..n - 2 {
@@ -1448,7 +1449,11 @@ namespace QDKChemistry.Utils.SOSSAWalk {
                 for i in 1..n - 1 {
                     CNOT(a[i], g[i]);
                 }
-                CCNOT(ctrl, a[0], g[0]);
+                if n == 1 {
+                    CZ(ctrl, a[0]);
+                } else {
+                    CCNOT(ctrl, a[0], g[0]);
+                }
             }
         }
     }

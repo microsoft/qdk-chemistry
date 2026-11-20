@@ -185,8 +185,9 @@ def _sossa_mapper_setting_defaults() -> tuple[tuple[Any, ...], ...]:
             "How the 'qrom_phase_gradient' SELECT applies each Givens rotation; 'direct' ignores it. "
             "'two_adders' builds the controlled RY(2θ) from two uncontrolled phase-gradient adders of a "
             "half-angle word (arXiv:2605.30455 FIG. 40). 'controlled_adder' uses one controlled adder of a "
-            "full-angle word (FIG. 39, Lemma 6): 2b-1 Toffolis on b-1 clean ancillas, or 3b-2 with none, "
-            "where streamed batches (max_givens_rotation_batches > 1) erase each word right after its step and "
+            "full-angle word (FIG. 39, Lemma 6): 2b-2 Toffolis on b-1 clean ancillas, or 3b-3 with none, one "
+            "below Lemma 7 because the gradient's top qubit is |->, so its controlled flip is a CZ. Streamed batches "
+            "(max_givens_rotation_batches > 1) erase each word right after its step and "
             "reuse its qubits as the next step's ancillas, so only each batch's first step is ancilla-free. "
             "The full-angle word has the precision of a 'two_adders' word one bit wider. Works with either "
             "givens_rotation_layout.",
