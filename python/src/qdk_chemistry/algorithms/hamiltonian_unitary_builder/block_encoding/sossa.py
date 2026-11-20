@@ -8,6 +8,7 @@ r"""QDK/Chemistry implementation of the Sum of Squares Spectral Amplification (S
 from math import ceil, isfinite, isnan, log2, nan, sqrt
 
 import numpy as np
+from scipy.sparse import csr_matrix
 
 from qdk_chemistry.algorithms.hamiltonian_unitary_builder.base import (
     HamiltonianUnitaryBuilder,
@@ -509,10 +510,9 @@ def _resolve_lambda_eff(
                 entries.extend(
                     (targets.setdefault(target, len(targets)), j, amplitude) for target, amplitude in image.items()
                 )
-            images = np.zeros((len(targets), len(determinants)))
-            for t, j, amplitude in entries:
-                images[t, j] = amplitude
-            hamiltonian += 0.5 * images.T @ images
+            rows, cols, amplitudes = zip(*entries, strict=True)
+            images = csr_matrix((amplitudes, (rows, cols)), shape=(len(targets), len(determinants)))
+            hamiltonian += 0.5 * (images.T @ images).toarray()
         # E_ub ≥ E_gs only bounds λ_eff from above while E_ub - E_SOS ≤ Λ, where λ_eff peaks at Λ.
         gap = min(float(np.linalg.eigvalsh(0.5 * (hamiltonian + hamiltonian.T))[0]), normalization)
     else:
