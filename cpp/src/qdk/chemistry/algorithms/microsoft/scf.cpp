@@ -4,15 +4,20 @@
 
 #include "scf.hpp"
 
+#include <qdk/chemistry/scf/core/eri.h>
 #include <qdk/chemistry/scf/core/molecule.h>
 #include <qdk/chemistry/scf/core/scf.h>
 #include <qdk/chemistry/scf/scf/scf_solver.h>
 #include <qdk/chemistry/scf/util/gauxc_registry.h>
 #include <qdk/chemistry/scf/util/libint2_util.h>
 
+#include <algorithm>
+#include <cmath>
 #include <numeric>
+#include <qdk/chemistry/algorithms/jk_builder.hpp>
 #include <qdk/chemistry/data/wavefunction_containers/state_vector.hpp>
 #include <qdk/chemistry/utils/logger.hpp>
+#include <vector>
 
 #ifdef _OPENMP
 #include <omp.h>
@@ -38,16 +43,26 @@ ScfSettings::ScfSettings()
   set_default("gdm_max_diis_iteration", 50);
   set_default("gdm_bfgs_history_size_limit", 50);
   set_default("fock_reset_steps", 1073741824);
-  set_default("eri_use_atomics", false);
   set_default("eri_threshold", -1.0);
-  set_default("shell_pair_threshold", 1e-12,
-              "Overlap-based shell pair pre-screening threshold. Shell "
-              "pairs with overlap norm below this value are excluded.");
+  set_default("jk_builder", data::AlgorithmRef("jk_builder", "qdk"),
+              "J/K builder for the Coulomb and exchange matrices");
+  set_default("jk_gradient_builder",
+              data::AlgorithmRef("jk_gradient_builder", "qdk"),
+              "J/K gradient builder for the nuclear gradients of the Coulomb "
+              "and exchange energies");
+  // Settings of earlier releases, forwarded to the J/K builders
   set_default("eri_method", std::string("direct"),
-              "ERI evaluation method: 'direct' computes integrals on-the-fly, "
-              "'incore' stores all integrals in memory",
+              "Deprecated: set eri_method in the jk_builder",
               data::ListConstraint<std::string>{
-                  {std::vector<std::string>{"direct", "incore"}}});
+                  {std::vector<std::string>{"direct", "incore"}}},
+              false);
+  set_default("eri_use_atomics", false,
+              "Deprecated: set eri_use_atomics in the jk_builder", std::nullopt,
+              false);
+  set_default("shell_pair_threshold", 1e-12,
+              "Deprecated: set shell_pair_threshold in the jk_builder and "
+              "jk_gradient_builder",
+              std::nullopt, false);
   set_default("relativity", std::string(""),
               "Relativistic treatment: '' for nonrelativistic, "
               "'sf-x2c' for spin-free X2C with basis decontraction and "
@@ -70,6 +85,213 @@ std::pair<int, int> calculate_electron_counts(
   int n_beta = total_electrons - n_alpha;
   return {n_alpha, n_beta};
 }
+
+/// ERI engine of the SCF building J, K, and their gradients with nested J/K
+/// builders, J with the Coulomb kernel and K with the kernels of the exchange
+/// operator v = alpha / r + beta erfc(omega r) / r
+class JKBuilderERI : public qcs::ERI {
+ public:
+  /**
+   * @brief Construct the engine of the SCF from its J/K builders
+   *
+   * @param qdk_basis_set Basis set of the SCF
+   * @param jk_builder Builder of J and K
+   * @param jk_gradient_builder Builder of the gradients of E_J and E_K
+   * @param basis_set Basis set of the SCF in the internal format
+   * @param cfg Configuration of the SCF
+   */
+  JKBuilderERI(
+      std::shared_ptr<data::BasisSet> qdk_basis_set,
+      std::unique_ptr<algorithms::JKBuilder> jk_builder,
+      std::unique_ptr<algorithms::JKGradientBuilder> jk_gradient_builder,
+      qcs::BasisSet& basis_set, const qcs::SCFConfig& cfg)
+      : ERI(cfg.scf_orbital_type, cfg.eri.eri_threshold, basis_set, cfg.mpi),
+        _qdk_basis_set(std::move(qdk_basis_set)),
+        _jk_builder(std::move(jk_builder)),
+        _jk_gradient_builder(std::move(jk_gradient_builder)),
+        _coulomb(std::make_shared<const data::CoulombKernel>()) {}
+
+  /**
+   * @brief Build J and K of the SCF's density matrices with the J/K builder
+   *
+   * The builders return complete matrices, so the MPI reduction of
+   * ERI::build_JK is skipped.
+   *
+   * @param P Density matrices of the SCF
+   * @param J Coulomb matrices, overwritten unless null
+   * @param K Exchange matrices, overwritten unless null
+   * @param alpha Coefficient of the full-range exchange operator
+   * @param beta Coefficient of the short-range exchange operator
+   * @param omega Range-separation parameter
+   */
+  void build_JK(const double* P, double* J, double* K, double alpha,
+                double beta, double omega) override {
+    build_JK_impl_(P, J, K, alpha, beta, omega);
+  }
+
+  /**
+   * @brief Build the gradients of E_J and E_K with the J/K gradient builder
+   *
+   * @param P Density matrices of the SCF
+   * @param dJ Gradient of E_J, 3 x atoms row-major, overwritten unless null
+   * @param dK Gradient of E_K, as dJ
+   * @param alpha Coefficient of the full-range exchange operator
+   * @param beta Coefficient of the short-range exchange operator
+   * @param omega Range-separation parameter
+   */
+  void get_gradients(const double* P, double* dJ, double* dK, double alpha,
+                     double beta, double omega) override {
+    run_builder(*_jk_gradient_builder, spin_densities(P, true), dJ, dK,
+                3 * basis_set_.mol->n_atoms, alpha, beta, omega,
+                [this](const auto& gradients, double* d, double scale) {
+                  add_gradients(gradients, d, scale);
+                });
+  }
+
+ protected:
+  /// @copydoc build_JK
+  void build_JK_impl_(const double* P, double* J, double* K, double alpha,
+                      double beta, double omega) override {
+    const size_t n = basis_set_.num_atomic_orbitals;
+    run_builder(*_jk_builder, spin_densities(P, false), J, K,
+                (has_spin_split_density() ? 2 : 1) * n * n, alpha, beta, omega,
+                [this](const auto& X, double* Y, double scale) {
+                  add_spin_blocks(X, Y, scale);
+                });
+  }
+
+  /// @brief Not provided by J/K builders @throws std::runtime_error Always
+  void quarter_trans_impl(size_t, const double*, double*) override {
+    throw std::runtime_error(
+        "J/K builders do not provide quarter transformations");
+  }
+
+ private:
+  /**
+   * @brief Run a builder for J with the Coulomb kernel and K with the fewest
+   * kernels of the exchange operator, J along with the first kernel
+   *
+   * @param builder J/K builder or J/K gradient builder
+   * @param densities Density matrices of the SCF
+   * @param J Coulomb result, overwritten unless null
+   * @param K Exchange result, overwritten unless null
+   * @param size Size of J and K
+   * @param alpha Coefficient of the full-range exchange operator
+   * @param beta Coefficient of the short-range exchange operator
+   * @param omega Range-separation parameter
+   * @param add Adds a scaled builder result to J or K
+   */
+  template <class Builder, class Add>
+  void run_builder(
+      Builder& builder,
+      const std::shared_ptr<const data::SymmetryBlockedTensor<2>>& densities,
+      double* J, double* K, size_t size, double alpha, double beta,
+      double omega, const Add& add) const {
+    // v = alpha / r + beta erfc(omega r) / r as coefficients and kernels
+    std::vector<std::pair<double, std::shared_ptr<const data::TwoBodyKernel>>>
+        terms;
+    const bool range_separated =
+        std::abs(beta) > 1e-12 && std::abs(omega) > 1e-12;
+    if (K && range_separated && alpha == 0.0) {
+      terms.emplace_back(
+          beta, std::make_shared<const data::ErfcCoulombKernel>(omega));
+    } else if (K) {
+      if (alpha + beta != 0.0) terms.emplace_back(alpha + beta, _coulomb);
+      if (range_separated) {
+        terms.emplace_back(
+            -beta, std::make_shared<const data::ErfCoulombKernel>(omega));
+      }
+    }
+    if (J) std::fill_n(J, size, 0.0);
+    if (K) std::fill_n(K, size, 0.0);
+    for (size_t i = 0; i < std::max<size_t>(terms.size(), J ? 1 : 0); ++i) {
+      const auto j_kernel = i == 0 && J ? _coulomb : nullptr;
+      const auto k_kernel = i < terms.size() ? terms[i].second : nullptr;
+      auto [coulomb, exchange] =
+          builder.run(_qdk_basis_set, j_kernel, k_kernel, densities);
+      if (j_kernel) add(coulomb, J, 1.0);
+      if (k_kernel) add(exchange, K, terms[i].first);
+    }
+  }
+
+  /**
+   * @brief The SCF's density matrices as a spin-diagonal tensor
+   *
+   * The SCF's single density matrix is passed to builds unscaled, since it
+   * expects J and K of that matrix, and to gradients halved, since there it is
+   * the total density.
+   *
+   * @param P Density matrices of the SCF
+   * @param total Whether a single density matrix is the total density
+   * @return The density matrices of the spin blocks
+   */
+  std::shared_ptr<const data::SymmetryBlockedTensor<2>> spin_densities(
+      const double* P, bool total) const {
+    const size_t n = basis_set_.num_atomic_orbitals;
+    const bool restricted = !has_spin_split_density();
+    const double scale = restricted && total ? 0.5 : 1.0;
+    const Eigen::Map<const Eigen::MatrixXd> P_alpha(P, n, n);
+    const Eigen::Map<const Eigen::MatrixXd> P_beta(restricted ? P : P + n * n,
+                                                   n, n);
+    return std::make_shared<const data::SymmetryBlockedTensor<2>>(
+        data::make_spin_diagonal_rank2_sbt(scale * P_alpha, scale * P_beta,
+                                           restricted));
+  }
+
+  /**
+   * @brief Add the scaled spin blocks of a builder result to an SCF buffer
+   *
+   * @param X Builder result
+   * @param Y SCF buffer
+   * @param scale Scale of X
+   * @throws std::runtime_error If X has no n x n spin blocks
+   */
+  void add_spin_blocks(
+      const std::shared_ptr<const data::SymmetryBlockedTensor<2>>& X, double* Y,
+      double scale) const {
+    const size_t n = basis_set_.num_atomic_orbitals;
+    for (size_t s = 0; s < (has_spin_split_density() ? 2u : 1u); ++s) {
+      const auto spin = s == 0 ? data::axes::alpha() : data::axes::beta();
+      const auto* block =
+          X && X->has_block({spin, spin}) ? &X->block({spin, spin}) : nullptr;
+      if (!block || static_cast<size_t>(block->rows()) != n ||
+          static_cast<size_t>(block->cols()) != n) {
+        throw std::runtime_error("J/K builder '" + _jk_builder->name() +
+                                 "' returned no " + std::to_string(n) + " x " +
+                                 std::to_string(n) + " spin blocks");
+      }
+      Eigen::Map<Eigen::MatrixXd>(Y + s * n * n, n, n) += scale * *block;
+    }
+  }
+
+  /**
+   * @brief Add a scaled gradient builder result to an SCF buffer
+   *
+   * @param gradients Builder result
+   * @param d SCF buffer, 3 x atoms row-major
+   * @param scale Scale of gradients
+   * @throws std::runtime_error If gradients is not of every atom
+   */
+  void add_gradients(const std::shared_ptr<data::NuclearGradients>& gradients,
+                     double* d, double scale) const {
+    const size_t num_atoms = basis_set_.mol->n_atoms;
+    if (!gradients ||
+        static_cast<size_t>(gradients->get_values().size()) != 3 * num_atoms) {
+      throw std::runtime_error(
+          "J/K gradient builder '" + _jk_gradient_builder->name() +
+          "' returned no gradients of " + std::to_string(num_atoms) + " atoms");
+    }
+    using Gradient = Eigen::Matrix<double, 3, Eigen::Dynamic, Eigen::RowMajor>;
+    Eigen::Map<Gradient>(d, 3, num_atoms) +=
+        scale * Eigen::Map<const Eigen::Matrix3Xd>(
+                    gradients->get_values().data(), 3, num_atoms);
+  }
+
+  std::shared_ptr<data::BasisSet> _qdk_basis_set;
+  std::unique_ptr<algorithms::JKBuilder> _jk_builder;
+  std::unique_ptr<algorithms::JKGradientBuilder> _jk_gradient_builder;
+  std::shared_ptr<const data::TwoBodyKernel> _coulomb;
+};
 
 ScfCalculationResult ScfSolver::_run_with_options(
     std::shared_ptr<data::Structure> structure, int charge, int multiplicity,
@@ -271,14 +493,6 @@ ScfCalculationResult ScfSolver::_run_with_options(
           ? qcs::DensityInitializationMethod::UserProvided
           : qcs::DensityInitializationMethod::Atom;
 
-  // Configure ERI method from settings
-  std::string eri_method = _settings->get<std::string>("eri_method");
-  if (eri_method == "direct") {
-    ms_scf_config->eri.method = qcs::ERIMethod::Libint2Direct;
-  } else {  // Must be "incore" due to ListConstraint validation
-    ms_scf_config->eri.method = qcs::ERIMethod::Incore;
-  }
-
   double eri_threshold = _settings->get<double>("eri_threshold");
   if (eri_threshold > 0.0) {
     ms_scf_config->eri.eri_threshold = eri_threshold;
@@ -288,11 +502,43 @@ ScfCalculationResult ScfSolver::_run_with_options(
     ms_scf_config->eri.eri_threshold =
         convergence_threshold * eri_threshold_multiplier;
   }
-  ms_scf_config->eri.use_atomics = _settings->get<bool>("eri_use_atomics");
-  ms_scf_config->eri.shell_pair_threshold =
-      _settings->get<double>("shell_pair_threshold");
   ms_scf_config->k_eri = ms_scf_config->eri;
   ms_scf_config->grad_eri = ms_scf_config->eri;
+  // Deprecated settings that differ from their defaults
+  std::vector<std::string> deprecated_settings;
+  if (_settings->get<std::string>("eri_method") != "direct") {
+    deprecated_settings.push_back("eri_method");
+  }
+  if (_settings->get<bool>("eri_use_atomics")) {
+    deprecated_settings.push_back("eri_use_atomics");
+  }
+  if (_settings->get<double>("shell_pair_threshold") != 1e-12) {
+    deprecated_settings.push_back("shell_pair_threshold");
+  }
+  for (const auto& key : deprecated_settings) {
+    QDK_LOGGER().warn(
+        "The '{}' setting of the qdk SCF solver is deprecated and will be "
+        "removed in a future release; set it in the jk_builder or "
+        "jk_gradient_builder AlgorithmRef instead",
+        key);
+  }
+  ms_scf_config->eri_factory = [this, qdk_raw_basis_set, deprecated_settings](
+                                   qcs::BasisSet& basis_set,
+                                   const qcs::SCFConfig& cfg) {
+    auto jk_builder = _create_nested<JKBuilderFactory>("jk_builder");
+    auto jk_gradient_builder =
+        _create_nested<JKGradientBuilderFactory>("jk_gradient_builder");
+    for (auto* settings :
+         {&jk_builder->settings(), &jk_gradient_builder->settings()}) {
+      settings->set("eri_threshold", cfg.eri.eri_threshold);
+      for (const auto& key : deprecated_settings) {
+        if (settings->has(key)) settings->set(key, _settings->get(key));
+      }
+    }
+    return std::make_shared<JKBuilderERI>(
+        qdk_raw_basis_set, std::move(jk_builder),
+        std::move(jk_gradient_builder), basis_set, cfg);
+  };
 
   ms_scf_config->fock_reset_steps = _settings->get<int64_t>("fock_reset_steps");
 
@@ -315,13 +561,6 @@ ScfCalculationResult ScfSolver::_run_with_options(
       _settings->get<int64_t>("gdm_max_diis_iteration");
   ms_scf_config->scf_algorithm.gdm_config.gdm_bfgs_history_size_limit =
       _settings->get<int64_t>("gdm_bfgs_history_size_limit");
-  if (ms_scf_config->eri.method == qcs::ERIMethod::Incore) {
-#ifdef QDK_CHEMISTRY_ENABLE_HGP
-    ms_scf_config->grad_eri.method = qcs::ERIMethod::HGP;
-#else
-    ms_scf_config->grad_eri.method = qcs::ERIMethod::Libint2Direct;
-#endif
-  }
 
   // Configure OpenMP thread count if specified
 #ifdef _OPENMP

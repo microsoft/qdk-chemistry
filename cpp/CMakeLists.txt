@@ -79,6 +79,7 @@ set_property(CACHE QDK_CHEMISTRY_LOG_LEVEL PROPERTY STRINGS "0" "1" "2" "3" "4" 
 option(QDK_ALLOW_DEPENDENCY_FETCH "Allow fetching of dependencies"     ON)
 option(QDK_CHEMISTRY_ENABLE_MPI "Enable MPI Bindings for QDK Chemistry"  OFF)
 option(QDK_EMBED_RESOURCE_LOCATION "Point to embedded (permanent) resource location" ON)
+set(QDK_ADDONS_DIR "" CACHE PATH "Directory of an add-on to build into the library (see cmake/qdk-addons.cmake)")
 
 # Enable OpenMP by default, except on Apple platforms with AppleClang and on
 # Windows (OpenMP + MSVC/clang-cl is not currently supported).
@@ -234,10 +235,8 @@ set_target_properties(chemistry PROPERTIES POSITION_INDEPENDENT_CODE ON)
 # Determine export variables
 set(QDK_DEP_EXPORTS "" CACHE STRING "QDK Chemistry Exported Dependencies" FORCE)
 
-# Include Addons
-if(QDK_ADDONS_DIR)
-  add_subdirectory(${QDK_ADDONS_DIR} addons)
-endif()
+# Add-on and its plugins
+include(cmake/qdk-addons.cmake)
 
 get_target_property(_imported nlohmann_json::nlohmann_json IMPORTED)
 get_target_property(_aliased nlohmann_json::nlohmann_json ALIASED_TARGET)

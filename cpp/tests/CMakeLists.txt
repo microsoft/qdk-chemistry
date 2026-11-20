@@ -49,6 +49,13 @@ configure_file(${QDK_SCF_TEST_DIR}/test_config.h.in ${PROJECT_BINARY_DIR}/tests/
 # Collect all test source files
 file(GLOB_RECURSE TEST_SOURCES "test_*.cpp")
 
+# The test add-on's test needs the add-on built into the library
+list(REMOVE_ITEM TEST_SOURCES ${CMAKE_CURRENT_SOURCE_DIR}/addon/test_plugins.cpp)
+get_property(_qdk_plugins GLOBAL PROPERTY QDK_PLUGINS)
+if("qdk_test_addon::register_plugin" IN_LIST _qdk_plugins)
+    list(APPEND TEST_SOURCES ${CMAKE_CURRENT_SOURCE_DIR}/addon/test_plugins.cpp)
+endif()
+
 list(APPEND TEST_SOURCES
     ${QDK_SCF_TEST_DIR}/int1e_test.cpp
     ${QDK_SCF_TEST_DIR}/basis_test.cpp

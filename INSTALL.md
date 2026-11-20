@@ -600,6 +600,7 @@ Where possible, the official CMake documentation is linked for further informati
 |`QDK_CHEMISTRY_ENABLE_COVERAGE` | Enable coverage reports. Requires a `Debug` or `RelWithDebInfo` build and a GNU/Clang compiler; under MSVC the build warns and continues without coverage instrumentation | Bool | `False` | `True` |
 |`QDK_CHEMISTRY_ENABLE_LONG_TESTS` | Enable long running tests (useful on HPC architectures) | Bool | `False` | `True` |
 |`QDK_ENABLE_OPENMP` | Enable OpenMP support. Off by default on Windows and on macOS with AppleClang | Bool | `True` (`False` on Windows / AppleClang) | `False` |
+|`QDK_ADDONS_DIR` | Directory of an add-on to build into the library, whose plugins register additional algorithm implementations. See [`cpp/cmake/qdk-addons.cmake`](cpp/cmake/qdk-addons.cmake) | Path | N/A | User defined |
 
 #### Note on CMake Lists from the Command Line
 

@@ -291,14 +291,14 @@ This hybrid approach combines the speed of :term:`DIIS` for typical systems with
      - float
      - ``-1.0``
      - Electron repulsion integral screening threshold (negative = auto)
-   * - ``shell_pair_threshold``
-     - float
-     - ``1e-12``
-     - Overlap-based shell pair pre-screening threshold. Shell pairs with overlap norm below this value are excluded.
-   * - ``eri_use_atomics``
-     - bool
-     - ``False``
-     - Use atomic operations for :term:`ERI` computation
+   * - ``jk_builder``
+     - AlgorithmRef
+     - ``AlgorithmRef("jk_builder", "qdk")``
+     - :doc:`J/K builder <jk_builder>` for the Coulomb and exchange matrices, including the :term:`ERI` evaluation settings of the ``qdk`` builder
+   * - ``jk_gradient_builder``
+     - AlgorithmRef
+     - ``AlgorithmRef("jk_gradient_builder", "qdk")``
+     - :doc:`J/K gradient builder <jk_builder>` for the nuclear gradients of the Coulomb and exchange energies
    * - ``relativity``
      - string
      - ``""``
@@ -307,6 +307,9 @@ This hybrid approach combines the speed of :term:`DIIS` for typical systems with
      - int
      - ``1073741824``
      - Number of steps between Fock matrix resets
+
+The ``eri_method``, ``eri_use_atomics``, and ``shell_pair_threshold`` settings are deprecated; the solver forwards them to its :doc:`J/K builders <jk_builder>` with a warning.
+Set them in the ``jk_builder`` and ``jk_gradient_builder`` references instead.
 
 .. _qdk-stabilized-scf-native:
 

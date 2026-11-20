@@ -41,6 +41,7 @@ std::shared_ptr<ERI> ERI::create(BasisSet& basis_set, const SCFConfig& cfg,
   nvtx3::scoped_range r{nvtx3::rgb{127, 0, 255}, "ERI::create"};
 #endif
   AutoTimer t("ERI::create");
+  if (cfg.eri_factory) return cfg.eri_factory(basis_set, cfg);
   switch (cfg.eri.method) {
 #ifdef QDK_CHEMISTRY_ENABLE_RYS
     case ERIMethod::Rys:
@@ -53,15 +54,17 @@ std::shared_ptr<ERI> ERI::create(BasisSet& basis_set, const SCFConfig& cfg,
           cfg.scf_orbital_type, cfg.eri.eri_threshold, basis_set, cfg.mpi);
 #endif
     case ERIMethod::Incore:
-      return std::make_shared<ERIINCORE>(cfg.scf_orbital_type, basis_set,
-                                         cfg.mpi, omega);
+      return std::make_shared<ERIINCORE>(
+          cfg.scf_orbital_type, basis_set, cfg.mpi, omega,
+          std::make_shared<const data::CoulombKernel>());
     case ERIMethod::SnK:
       return std::make_shared<SNK>(cfg.scf_orbital_type, basis_set,
                                    cfg.snk_input, cfg.exc.xc_name, cfg.mpi);
     case ERIMethod::Libint2Direct:
       return std::make_shared<LIBINT2_DIRECT>(
           cfg.scf_orbital_type, basis_set, cfg.mpi, cfg.eri.use_atomics,
-          cfg.eri.eri_threshold, cfg.eri.shell_pair_threshold);
+          cfg.eri.eri_threshold, cfg.eri.shell_pair_threshold,
+          std::make_shared<const data::CoulombKernel>());
     default:
       throw std::runtime_error("Invalid ERI Method");
   }

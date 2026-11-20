@@ -165,6 +165,7 @@ pybind11_add_module(_core
     src/pybind11/data/stability_result.cpp
     src/pybind11/data/nuclear_gradients.cpp
     src/pybind11/data/nuclear_hessian.cpp
+    src/pybind11/data/two_body_kernel.cpp
     src/pybind11/data/pauli_operator.cpp
     src/pybind11/data/majorana_mapping.cpp
     src/pybind11/data/serialization.cpp
@@ -184,6 +185,7 @@ pybind11_add_module(_core
     src/pybind11/algorithms/dynamical_correlation_calculator.cpp
     src/pybind11/algorithms/effective_hamiltonian.cpp
     src/pybind11/algorithms/hamiltonian_factorization.cpp
+    src/pybind11/algorithms/jk_builder.cpp
     src/pybind11/algorithms/double_factorization.cpp
     src/pybind11/algorithms/davidson_solver.cpp
     src/pybind11/algorithms/syev_solver.cpp

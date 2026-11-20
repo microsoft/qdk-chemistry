@@ -36,8 +36,8 @@ class ERI {
   /// Orbital basis set in libint2 format for integral engine
   libint2::BasisSet obs_;
 
-  /// Host memory storage for 4-center ERIs (N⁴ doubles, may be NULL on GPU-only
-  /// builds)
+  /// Host memory storage for 4-center ERIs of kernel_ (N⁴ doubles, may be NULL
+  /// on GPU-only builds)
   std::unique_ptr<double[]> h_eri_;
 
   /// Host memory for erf-attenuated ERIs (NULL if omega=0, N⁴ doubles
@@ -46,6 +46,9 @@ class ERI {
 
   /// Range-separation parameter ω (0.0 for standard Coulomb)
   double omega_;
+
+  /// Two-body kernel of h_eri_
+  std::shared_ptr<const data::TwoBodyKernel> kernel_;
 
   // MPI distribution: Each rank stores integral shells in range [loc_i_st_,
   // loc_i_en_)
@@ -112,7 +115,7 @@ class ERI {
    * @see ERIINCORE for public API documentation
    */
   ERI(size_t spin_density_factor, const BasisSet& basis, ParallelConfig mpi,
-      double omega);
+      double omega, std::shared_ptr<const data::TwoBodyKernel> kernel);
 
   /**
    * @brief Build Coulomb (J) and exchange (K) matrices from density matrix
@@ -151,13 +154,14 @@ class ERI {
    * @param basis Orbital basis set
    * @param mpi MPI configuration
    * @param omega Range-separation parameter in bohr⁻¹
+   * @param kernel Two-body kernel of the stored integrals
    * @return Unique pointer to newly created ERI implementation
    *
    * @note Prefer using this factory over direct construction
    */
-  static std::unique_ptr<ERI> make_incore_eri(size_t spin_density_factor,
-                                              const BasisSet& basis,
-                                              ParallelConfig mpi, double omega);
+  static std::unique_ptr<ERI> make_incore_eri(
+      size_t spin_density_factor, const BasisSet& basis, ParallelConfig mpi,
+      double omega, std::shared_ptr<const data::TwoBodyKernel> kernel);
 };
 
 /**

@@ -15,6 +15,7 @@ All algorithms follow a :doc:`factory pattern <factory_pattern>` design, allowin
    expectation_estimator
    hamiltonian_constructor
    hamiltonian_factorization
+   jk_builder
    localizer
    mc_calculator
    mcscf
@@ -50,6 +51,12 @@ The following table summarizes the available algorithm classes in QDK/Chemistry 
    * - :doc:`ScfSolver <scf_solver>`
      - Mean-field (:term:`HF`/:term:`DFT`) calculations
      - Structure → Orbitals
+   * - :doc:`JKBuilder <jk_builder>`
+     - Mean-field Coulomb and exchange matrices of density matrices
+     - BasisSet, kernels, densities → J, K
+   * - :doc:`JKGradientBuilder <jk_builder>`
+     - Nuclear gradients of the mean-field Coulomb and exchange energies
+     - BasisSet, kernels, densities → NuclearGradients
    * - :doc:`OrbitalLocalizer <localizer>`
      - Orbital transformations
      - Orbitals → Orbitals

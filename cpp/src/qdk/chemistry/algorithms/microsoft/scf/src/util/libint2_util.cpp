@@ -5,6 +5,7 @@
 #include <qdk/chemistry/scf/util/libint2_util.h>
 
 #include <qdk/chemistry/utils/logger.hpp>
+#include <stdexcept>
 
 #ifdef _OPENMP
 #include <omp.h>
@@ -36,8 +37,33 @@ libint2::BasisSet convert_to_libint_basisset(const BasisSet& o) {
   return libint2::BasisSet(shells);
 }
 
+libint2::Engine make_eri_engine(const data::TwoBodyKernel& kernel,
+                                const libint2::BasisSet& obs, int deriv) {
+  QDK_LOG_TRACE_ENTERING();
+  if (dynamic_cast<const data::CoulombKernel*>(&kernel)) {
+    return libint2::Engine(libint2::Operator::coulomb, obs.max_nprim(),
+                           obs.max_l(), deriv);
+  }
+  if (const auto* erf = dynamic_cast<const data::ErfCoulombKernel*>(&kernel)) {
+    libint2::Engine engine(libint2::Operator::erf_coulomb, obs.max_nprim(),
+                           obs.max_l(), deriv);
+    engine.set_params(erf->get_omega());
+    return engine;
+  }
+  if (const auto* erfc =
+          dynamic_cast<const data::ErfcCoulombKernel*>(&kernel)) {
+    libint2::Engine engine(libint2::Operator::erfc_coulomb, obs.max_nprim(),
+                           obs.max_l(), deriv);
+    engine.set_params(erfc->get_omega());
+    return engine;
+  }
+  throw std::invalid_argument("Libint2 does not provide integrals of " +
+                              kernel.get_summary());
+}
+
 std::unique_ptr<double[]> debug_eri(BasisMode basis_mode,
-                                    const libint2::BasisSet& obs, double omega,
+                                    const libint2::BasisSet& obs,
+                                    const data::TwoBodyKernel& kernel,
                                     size_t i_lo, size_t i_hi) {
   QDK_LOG_TRACE_ENTERING();
   const size_t num_atomic_orbitals = obs.nbf();
@@ -69,30 +95,13 @@ std::unique_ptr<double[]> debug_eri(BasisMode basis_mode,
     }
   }
 
-  bool is_erf = std::abs(omega) > 1e-12;
-
-  libint2::Engine engine;
-
-  if (is_erf) {
-    engine = libint2::Engine(libint2::Operator::erf_coulomb, obs.max_nprim(),
-                             obs.max_l(), 0);
-    engine.set_params(omega);
-  } else {
-    engine = libint2::Engine(libint2::Operator::coulomb, obs.max_nprim(),
-                             obs.max_l(), 0);
-  }
+  auto engine = make_eri_engine(kernel, obs, 0);
 
   for (size_t i = ish_st; i < ish_en; ++i)
     for (size_t j = 0; j < nshells; ++j)
       for (size_t k = 0; k < nshells; ++k)
         for (size_t l = 0; l < nshells; ++l) {
-          if (is_erf)
-            engine.compute2<libint2::Operator::erf_coulomb,
-                            libint2::BraKet::xx_xx, 0>(obs[i], obs[j], obs[k],
-                                                       obs[l]);
-          else
-            engine.compute2<libint2::Operator::coulomb, libint2::BraKet::xx_xx,
-                            0>(obs[i], obs[j], obs[k], obs[l]);
+          compute_eri<0>(engine, obs[i], obs[j], obs[k], obs[l]);
 
           auto data = engine.results()[0];
           if (data) {
@@ -126,7 +135,8 @@ std::unique_ptr<double[]> debug_eri(BasisMode basis_mode,
 }
 
 std::unique_ptr<double[]> opt_eri(BasisMode basis_mode,
-                                  const libint2::BasisSet& obs, double omega,
+                                  const libint2::BasisSet& obs,
+                                  const data::TwoBodyKernel& kernel,
                                   size_t i_lo, size_t i_hi) {
   QDK_LOG_TRACE_ENTERING();
   const size_t num_atomic_orbitals = obs.nbf();
@@ -142,18 +152,7 @@ std::unique_ptr<double[]> opt_eri(BasisMode basis_mode,
   const size_t nshells = obs.size();
   auto shell2bf = obs.shell2bf();
 
-  bool is_erf = std::abs(omega) > 1e-12;
-
-  libint2::Engine base_engine;
-
-  if (is_erf) {
-    base_engine = libint2::Engine(libint2::Operator::erf_coulomb,
-                                  obs.max_nprim(), obs.max_l(), 0);
-    base_engine.set_params(omega);
-  } else {
-    base_engine = libint2::Engine(libint2::Operator::coulomb, obs.max_nprim(),
-                                  obs.max_l(), 0);
-  }
+  const auto base_engine = make_eri_engine(kernel, obs, 0);
 
 #ifdef _OPENMP
   int nthreads = omp_get_max_threads();
@@ -200,14 +199,7 @@ std::unique_ptr<double[]> opt_eri(BasisMode basis_mode,
             ijkl++;  // Only increment the counter for local integrals
 
             if (ijkl % nthreads == thread_id) {
-              if (is_erf)
-                engine.compute2<libint2::Operator::erf_coulomb,
-                                libint2::BraKet::xx_xx, 0>(obs[i], obs[j],
-                                                           obs[k], obs[l]);
-              else
-                engine.compute2<libint2::Operator::coulomb,
-                                libint2::BraKet::xx_xx, 0>(obs[i], obs[j],
-                                                           obs[k], obs[l]);
+              compute_eri<0>(engine, obs[i], obs[j], obs[k], obs[l]);
 
               auto data = buf[0];
               if (data) {

@@ -9,6 +9,7 @@
 
 #include <cstring>
 #include <memory>
+#include <qdk/chemistry/data/two_body_kernel.hpp>
 #include <vector>
 
 namespace qdk::chemistry::scf {
@@ -49,12 +50,16 @@ class ERIINCORE : public ERI {
    * @param basis_set Atomic orbital basis set for integral evaluation
    * @param mpi MPI parallelization configuration
    * @param omega Range-separation parameter (0.0 for standard Coulomb operator)
+   * @param kernel Two-body kernel of J and of the exchange scaled by
+   * alpha + beta
    *
    * @throws std::bad_alloc if insufficient memory to store all integrals
    * @throws std::runtime_error if integral computation fails
+   * @throws std::invalid_argument if Libint2 does not provide the kernel
    */
   ERIINCORE(SCFOrbitalType scf_orbital_type, BasisSet& basis_set,
-            ParallelConfig mpi, double omega);
+            ParallelConfig mpi, double omega,
+            std::shared_ptr<const data::TwoBodyKernel> kernel);
 
   /**
    * @brief Destructor - releases all stored integral data

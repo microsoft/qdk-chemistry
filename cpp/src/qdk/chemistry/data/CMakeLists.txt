@@ -32,6 +32,7 @@ target_sources(chemistry PRIVATE
     symmetry/symmetry_blocked_tensor.cpp
     symmetry/symmetry_blocked_index_set.cpp
     tapering.cpp
+    two_body_kernel.cpp
     wavefunction.cpp
     wavefunction_containers/amplitude_container.cpp
     wavefunction_containers/mps_wavefunction.cpp

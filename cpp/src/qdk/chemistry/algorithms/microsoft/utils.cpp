@@ -296,6 +296,15 @@ qdk::chemistry::data::BasisSet convert_basis_set_to_qdk(
 std::shared_ptr<qcs::BasisSet> convert_basis_set_from_qdk(
     const qdk::chemistry::data::BasisSet& qdk_basis_set, bool normalize) {
   QDK_LOG_TRACE_ENTERING();
+  const auto& shells = qdk_basis_set.get_shells();
+  if (qdk_basis_set.get_atomic_orbital_type() ==
+          qdk::chemistry::data::AOType::Cartesian &&
+      std::any_of(shells.begin(), shells.end(), [](const auto& shell) {
+        return shell.get_angular_momentum() > 1;
+      })) {
+    throw std::invalid_argument(
+        "QDK/Chemistry does not support Cartesian d and higher shells");
+  }
   // Create internal Molecule from the structure
   auto structure = qdk_basis_set.get_structure();
   auto mol = convert_to_molecule(*structure, 0,

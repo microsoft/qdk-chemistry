@@ -62,6 +62,7 @@ from qdk_chemistry._core.data.symmetry import (
     SymmetryProduct,
     axes,
     axis_name_to_string,
+    make_spin_diagonal_rank2_sbt,
 )
 
 __all__ = [
@@ -85,6 +86,7 @@ __all__ = [
     "SymmetryProduct",
     "axes",
     "axis_name_to_string",
+    "make_spin_diagonal_rank2_sbt",
     "spin_index_set",
 ]
 

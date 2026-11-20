@@ -9,6 +9,7 @@
 #include <qdk/chemistry/algorithms/geometry_optimization.hpp>
 #include <qdk/chemistry/algorithms/hamiltonian.hpp>
 #include <qdk/chemistry/algorithms/hamiltonian_factorization.hpp>
+#include <qdk/chemistry/algorithms/jk_builder.hpp>
 #include <qdk/chemistry/algorithms/localization.hpp>
 #include <qdk/chemistry/algorithms/mc.hpp>
 #include <qdk/chemistry/algorithms/mcscf.hpp>
@@ -26,5 +27,6 @@
 #include <qdk/chemistry/data/orbitals.hpp>
 #include <qdk/chemistry/data/stability_result.hpp>
 #include <qdk/chemistry/data/structure.hpp>
+#include <qdk/chemistry/data/two_body_kernel.hpp>
 #include <qdk/chemistry/data/wavefunction.hpp>
 #include <qdk/chemistry/utils/model_hamiltonians.hpp>

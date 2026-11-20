@@ -12,7 +12,7 @@ import pytest
 
 from qdk_chemistry import algorithms
 from qdk_chemistry.constants import ANGSTROM_TO_BOHR
-from qdk_chemistry.data import Structure
+from qdk_chemistry.data import AlgorithmRef, Structure
 from qdk_chemistry.utils import Logger
 
 from .reference_tolerances import (
@@ -307,7 +307,7 @@ class TestScfSolver:
         scf_solver.settings().set("enable_gdm", False)
         scf_solver.settings().set("method", "hf")
         scf_solver.settings().set("scf_type", "restricted")
-        scf_solver.settings().set("eri_method", "incore")
+        scf_solver.settings().set("jk_builder", AlgorithmRef("jk_builder", "qdk", eri_method="incore"))
 
         energy, wavefunction = scf_solver.run(oh_structure, 0, 2, "sto-3g")
         orbitals = wavefunction.get_orbitals()

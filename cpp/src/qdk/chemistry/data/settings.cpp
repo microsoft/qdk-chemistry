@@ -11,6 +11,8 @@
 #include <qdk/chemistry/data/settings.hpp>
 #include <qdk/chemistry/utils/logger.hpp>
 #include <sstream>
+#include <utility>
+#include <vector>
 
 #include "filename_utils.hpp"
 #include "hdf5_error_handling.hpp"
@@ -56,18 +58,23 @@ void AlgorithmRef::_resolve_settings() {
   if (!create_default_settings || algorithm_type_.empty()) {
     return;
   }
-  // Guard against re-entrant calls during factory initialisation.
-  static thread_local bool resolving = false;
-  if (resolving) {
+  // Guard against cycles: a reference to an algorithm whose defaults are being
+  // resolved on this thread is left unresolved. References nested in the
+  // resolved settings are resolved in turn.
+  static thread_local std::vector<std::pair<std::string, std::string>>
+      resolving;
+  const std::pair<std::string, std::string> key{algorithm_type_,
+                                                algorithm_name_};
+  if (std::find(resolving.begin(), resolving.end(), key) != resolving.end()) {
     return;
   }
-  resolving = true;
+  resolving.push_back(key);
   try {
     settings_ = create_default_settings(algorithm_type_, algorithm_name_);
   } catch (...) {
     settings_ = nullptr;
   }
-  resolving = false;
+  resolving.pop_back();
 }
 
 // ---------------------------------------------------------------------------

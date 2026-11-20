@@ -7,6 +7,7 @@
 #include <cstdint>
 #include <functional>
 #include <memory>
+#include <mutex>
 #include <optional>
 #include <stdexcept>
 #include <string>
@@ -208,6 +209,20 @@ struct DeprecationAccess {
     return algorithm._deprecation_message();
   }
 };
+
+/// Serializes access to the registries of the algorithm factories
+inline std::recursive_mutex registry_mutex;
+
+/// Depth of nested first uses of the registries
+inline int registry_depth = 0;
+
+/**
+ * @brief Run the plugins of the add-ons built into the library, once.
+ *
+ * A plugin that throws is reported as a warning, and the other plugins still
+ * run. Called with registry_mutex held.
+ */
+void load_plugins();
 }  // namespace detail
 
 /**
@@ -474,11 +489,16 @@ class AlgorithmFactory {
    */
   static std::unordered_map<std::string, functor_type>& registry() {
     static std::unordered_map<std::string, functor_type> instance;
+    // The first use registers the built-in implementations and, at the end of
+    // the outermost first use, the plugins; other threads wait for both.
+    std::lock_guard<std::recursive_mutex> lock(detail::registry_mutex);
     static bool initialized = false;
     if (!initialized) {
-      // Ensure at least one implementation is registered
       initialized = true;
+      ++detail::registry_depth;
       Derived::register_default_instances();
+      if (detail::registry_depth == 1) detail::load_plugins();
+      --detail::registry_depth;
     }
     return instance;
   }

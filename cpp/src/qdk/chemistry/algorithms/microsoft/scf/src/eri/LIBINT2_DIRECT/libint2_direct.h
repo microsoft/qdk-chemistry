@@ -9,6 +9,7 @@
 
 #include <cstring>
 #include <memory>
+#include <qdk/chemistry/data/two_body_kernel.hpp>
 #include <vector>
 
 namespace qdk::chemistry::scf {
@@ -46,13 +47,17 @@ class LIBINT2_DIRECT : public ERI {
    * shell quartets during J/K builds and quarter transformations.
    * @param shell_pair_threshold Overlap-based shell pair pre-screening
    * threshold.
+   * @param kernel Two-body kernel of J and of the exchange scaled by
+   * alpha + beta
    *
    * @throws std::runtime_error if Libint2 initialization fails
    * @throws std::runtime_error if screening matrix computation fails
+   * @throws std::invalid_argument if Libint2 does not provide the kernel
    */
   LIBINT2_DIRECT(SCFOrbitalType scf_orbital_type, BasisSet& basis_set,
                  ParallelConfig mpi, bool use_atomics, double eri_threshold,
-                 double shell_pair_threshold);
+                 double shell_pair_threshold,
+                 std::shared_ptr<const data::TwoBodyKernel> kernel);
 
   /**
    * @brief Destructor
