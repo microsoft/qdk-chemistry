@@ -166,7 +166,7 @@ def _sossa_mapper_setting_defaults() -> tuple[tuple[Any, ...], ...]:
             "generator type, rank, spin and b == B flags from x_o and b instead of loading a free-rider word "
             "and keeping them live (Low et al. 2026, Appendix E2). It frees the 2 + ceil(log2 R) free-rider qubits "
             "and the spin and b == B flags, but pads the rank to a power of two, which lengthens the outer and inner "
-            "tables and can widen x_o by a bit.",
+            "tables and can widen x_o by a bit. It needs at least one spin-free copy.",
         ),
         (
             "givens_rotation_layout",
@@ -577,6 +577,11 @@ class SOSSAMapper(CircuitMapper):
 
         if self._settings.get("recompute_outer_registers"):
             meta = container.metadata
+            if meta.num_copies == 0:
+                raise ValueError(
+                    "recompute_outer_registers recomputes the spin-free flag and rank from x_o, so it needs at "
+                    "least one spin-free copy, got num_copies=0."
+                )
             num_orbitals = meta.num_spatial_orbitals
             num_sf = meta.num_ranks * meta.num_copies
             rank_span = 1 << container.layout.rank_bits

@@ -15,8 +15,13 @@ from qdk.test_utils import dump_operation_on_state
 from qdk_chemistry.algorithms.circuit_mapper import SOSSAMapper
 from qdk_chemistry.algorithms.circuit_mapper.sossa_mapper import _compressed_givens_angles
 from qdk_chemistry.algorithms.hamiltonian_unitary_builder.block_encoding.sossa import SOSSABuilder
-from qdk_chemistry.data import AlgorithmRef, Circuit, DFTHCHamiltonianContainer
+from qdk_chemistry.data import AlgorithmRef, Circuit, DFTHCHamiltonianContainer, QubitOperator
 from qdk_chemistry.data.circuit import CircuitMetadata
+from qdk_chemistry.data.qubit_operator.containers.sum_of_squares import (
+    RotatedPaulis,
+    SumOfSquaresContainer,
+    SumOfSquaresMetadata,
+)
 from qdk_chemistry.data.unitary_representation.base import UnitaryRepresentation
 from qdk_chemistry.data.unitary_representation.containers.sossa import SOSSABlockEncodingContainer
 from qdk_chemistry.utils.qsharp import QSHARP_UTILS, get_qsharp_context, use_qsharp_context
@@ -1376,6 +1381,22 @@ class TestOptInSettingValidation:
             mapper.settings().set(key, value)
         with pytest.raises(ValueError, match=message):
             mapper.run(_build_sossa_unitary(num_orbitals=3))
+
+    def test_recompute_rejects_operators_without_spin_free_copies(self):
+        """Recompute reads the spin-free flag and rank from x_o, so a sum of squares with no copy is refused."""
+        operator = QubitOperator(
+            container=SumOfSquaresContainer(
+                RotatedPaulis(np.full((2, 1), 0.3), np.tile([0.2, 0.2j], (2, 1)), ("X", "Y")),
+                RotatedPaulis(np.zeros((3, 1)), np.zeros((0, 2)), ("Z",)),
+                "jordan-wigner",
+                "blocked",
+                SumOfSquaresMetadata(2, 3, 1, 0, 2, -1.5),
+            )
+        )
+        mapper = _make_sossa_mapper(outer_algorithm="dense_pure_state", inner_algorithm="direct")
+        mapper.settings().set("recompute_outer_registers", True)
+        with pytest.raises(ValueError, match="needs at least one spin-free copy"):
+            mapper.run(SOSSABuilder().run(operator))
 
 
 class TestMaxSwapAddressBitsSetting:
