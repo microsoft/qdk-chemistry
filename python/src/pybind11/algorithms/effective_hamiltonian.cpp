@@ -8,6 +8,7 @@
 #include <qdk/chemistry/algorithms/effective_hamiltonian.hpp>
 
 #include "factory_bindings.hpp"
+#include "qdk/chemistry/algorithms/microsoft/effective_hamiltonian/swpt2.hpp"
 
 namespace py = pybind11;
 using namespace qdk::chemistry::algorithms;
@@ -186,4 +187,38 @@ Returns:
       EffectiveHamiltonianConstructorFactory, EffectiveHamiltonianConstructor,
       EffectiveHamiltonianConstructorBase>(
       m, "EffectiveHamiltonianConstructorFactory");
+
+  py::class_<microsoft::SchriefferWolffPT2Constructor,
+             EffectiveHamiltonianConstructor, py::smart_holder>(
+      m, "QdkSchriefferWolffPT2Constructor", R"(
+Second-order Schrieffer-Wolff downfold of the window's external orbitals onto
+the kept space ``P`` (``p_indices``).
+
+Emits ``P exp(S) H exp(-S) P`` through second order, truncated to two-body, for
+a generator ``S`` regularized by ``regularizer_flow``, with semicanonical
+generalized-Fock denominators; three-body terms are folded with the reference
+1-RDM. Restricted input gives a spin-free result, unrestricted input an
+unrestricted one. The emitted two-body integrals are 4-fold, not 8-fold,
+symmetric. The factory name is ``"qdk_swpt2"``.
+
+Typical usage:
+
+.. code-block:: python
+
+    import qdk_chemistry.algorithms as alg
+
+    downfolder = alg.create("effective_hamiltonian_constructor", "qdk_swpt2")
+    h_eff = downfolder.run(reference, window_hamiltonian, p_indices)
+
+See Also:
+    :class:`EffectiveHamiltonianConstructor`
+    :class:`qdk_chemistry.data.Wavefunction`
+    :class:`qdk_chemistry.data.Hamiltonian`
+)")
+      .def(py::init<>(), R"(
+Default constructor.
+
+Initializes a Schrieffer-Wolff PT2 downfold with the regularizer enabled by
+default. Set ``regularizer_flow`` to 0 for unregularized second-order PT.
+)");
 }
