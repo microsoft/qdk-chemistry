@@ -31,7 +31,7 @@ namespace QDKChemistry.Utils.IsometrySynthesis {
     import Std.TableLookup.Select;
     import QDKChemistry.Utils.PhaseGradient.PreparePhaseGradientState;
     import QDKChemistry.Utils.PhaseGradient.QuantizeRyAngles;
-    import QDKChemistry.Utils.SelectSwap.ComputeOptimalSwapBits;
+    import QDKChemistry.Utils.SelectSwap.ComputeOptimalLambda2D;
     import QDKChemistry.Utils.SelectSwap.SelectSwap2D;
     import QDKChemistry.Utils.UnitarySynthesis.ApplyControlledMultiplexedRy;
     import QDKChemistry.Utils.UnitarySynthesis.ApplyMultiplexedRy;
@@ -53,7 +53,7 @@ namespace QDKChemistry.Utils.IsometrySynthesis {
         blockGivens : GivensDecomposition,
         /// V on the input register, or empty when V is omitted or no qubit is added.
         rightFactorGivens : GivensDecomposition[],
-        /// Widest swap network of the angle lookups, -1 for the Toffoli-optimal width.
+        /// Widest swap network of the angle lookups, -1 to let each loader's cost model choose.
         maxSwapBits : Int,
     }
 
@@ -66,7 +66,7 @@ namespace QDKChemistry.Utils.IsometrySynthesis {
         rowPermutation : Int[],
         /// Block-diagonal B.
         blockGivens : GivensDecomposition,
-        /// Widest swap network of the angle lookups, -1 for the Toffoli-optimal width.
+        /// Widest swap network of the angle lookups, -1 to let each loader's cost model choose.
         maxSwapBits : Int,
     }
 
@@ -98,7 +98,7 @@ namespace QDKChemistry.Utils.IsometrySynthesis {
     }
 
     /// Applies |i⟩ → |P(i)⟩, with P and P⁻¹ given as little-endian bit strings, by a QROAM
-    /// load of at most `maxSwapBits` swap bits (-1 for Toffoli-optimal) and a measurement-based
+    /// load of at most `maxSwapBits` swap bits (-1 to let the loader's cost model choose) and a measurement-based
     /// unlookup.
     operation PermutationViaQROAM(
         permTargets : Bool[][],
@@ -108,7 +108,7 @@ namespace QDKChemistry.Utils.IsometrySynthesis {
     ) : Unit is Adj {
         body (...) {
             use loaded = Qubit[Length(target)];
-            let swapBits = ComputeOptimalSwapBits(Length(permTargets), Length(target), maxSwapBits);
+            let swapBits = ComputeOptimalLambda2D(1, Length(permTargets), Length(target), true, maxSwapBits);
             SelectSwap2D([permTargets], swapBits, true, [], target, [], loaded);
             ApplyToEachA(SWAP, Zipped(target, loaded));
             Adjoint Select(invPermTargets, target, loaded);
