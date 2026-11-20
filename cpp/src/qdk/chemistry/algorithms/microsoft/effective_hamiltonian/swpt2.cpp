@@ -149,6 +149,11 @@ std::shared_ptr<data::Orbitals> relabeled_orbitals(
     inactive[label] =
         std::vector<std::uint32_t>(emit_inactive.begin(), emit_inactive.end());
 
+  auto inactive_set = std::make_shared<const data::SymmetryBlockedIndexSet>(
+      p_indices->symmetries(), p_indices->extents(), std::move(inactive));
+  if (dynamic_cast<const data::ModelOrbitals*>(&ref_orbitals))
+    return std::make_shared<data::ModelOrbitals>(p_indices, inactive_set);
+
   std::optional<Eigen::MatrixXd> overlap;
   if (ref_orbitals.has_overlap_matrix())
     overlap = ref_orbitals.get_overlap_matrix();
@@ -157,9 +162,7 @@ std::shared_ptr<data::Orbitals> relabeled_orbitals(
   return std::make_shared<data::Orbitals>(
       ref_orbitals.coefficients(),
       ref_orbitals.has_energies() ? ref_orbitals.energies() : nullptr, overlap,
-      basis, p_indices,
-      std::make_shared<const data::SymmetryBlockedIndexSet>(
-          p_indices->symmetries(), p_indices->extents(), std::move(inactive)));
+      basis, p_indices, inactive_set);
 }
 
 /// Window roles chosen by the folding policy, plus the rounding diagnostics a

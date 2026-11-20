@@ -182,7 +182,7 @@ treatment below.
 The kept space :math:`P` comes from ``p_indices`` alone; the reference supplies only
 :math:`\gamma^\sigma`. Any restricted or unrestricted orbital set qualifies, canonical or not,
 such as RHF, ROHF, CAS, localized or natural orbitals. It must share the input Hamiltonian's
-molecular-orbital basis and keep every singly occupied orbital in its active space, and the
+orbital basis and keep every singly occupied orbital in its active space, and the
 input Hamiltonian's inactive orbitals must be exactly its core orbitals outside :math:`W`. For
 unrestricted orbitals, the input Hamiltonian's active space, ``p_indices`` and the reference
 active space must select the same orbitals in both spins. Every orbital in
@@ -192,6 +192,9 @@ The rounding perturbs the mean field the active space feels, so
 ``max_folded_occupation_deviation`` bounds it, and a singly occupied orbital must be kept in
 :math:`P`. The active space keeps the remaining electrons; the downfold is rejected if either
 spin is left with fewer than zero or more electrons than active orbitals.
+
+Model Hamiltonians using ``ModelOrbitals`` do not require basis coefficients.
+Their output retains ``ModelOrbitals`` with the updated active and inactive spaces.
 
 The commutator generates three-body terms that the emitted two-body operator cannot carry.
 Reference-1-RDM pair contractions reduce these to lower-rank terms :cite:`Kutzelnigg1997`.

@@ -21,6 +21,7 @@
 #include <qdk/chemistry/algorithms/mc.hpp>
 #include <qdk/chemistry/algorithms/scf.hpp>
 #include <qdk/chemistry/data/ansatz.hpp>
+#include <qdk/chemistry/data/hamiltonian_containers/canonical_four_center.hpp>
 #include <qdk/chemistry/data/orbitals.hpp>
 #include <qdk/chemistry/data/structure.hpp>
 #include <qdk/chemistry/data/symmetry/spin_channel_indices.hpp>
@@ -227,6 +228,61 @@ TEST(SchriefferWolffPT2Test, SettingsKnobs) {
                             testing::restricted_index_set(
                                 1, std::vector<std::size_t>{0})),
                std::invalid_argument);
+}
+
+TEST(SchriefferWolffPT2Test, PreservesModelOrbitals) {
+  namespace qcd = qdk::chemistry::data;
+  constexpr int norb = 6;
+  const auto window_indices =
+      testing::restricted_index_set(norb, {0, 1, 2, 3, 4, 5});
+  const auto empty_indices = testing::restricted_index_set(norb, {});
+  const auto p_indices = testing::restricted_index_set(norb, {1, 2, 3, 4});
+  const auto inactive_indices = testing::restricted_index_set(norb, {0});
+  const auto model_orbitals =
+      std::make_shared<qcd::ModelOrbitals>(window_indices, empty_indices);
+  const auto coefficient_orbitals = std::make_shared<qcd::Orbitals>(
+      Eigen::MatrixXd::Identity(norb, norb), std::nullopt, std::nullopt,
+      testing::create_random_basis_set(norb), window_indices, empty_indices);
+
+  Eigen::MatrixXd one_body = Eigen::MatrixXd::Zero(norb, norb);
+  Eigen::VectorXd two_body = Eigen::VectorXd::Zero(norb * norb * norb * norb);
+  for (int i = 0; i < norb; ++i) {
+    two_body(sw::idx4(i, i, i, i, norb)) = 4.0;
+    if (i + 1 < norb) one_body(i, i + 1) = one_body(i + 1, i) = -1.0;
+  }
+  const auto downfold = [&](const std::shared_ptr<qcd::Orbitals>& orbitals) {
+    auto reference = std::make_shared<qcd::Wavefunction>(
+        std::make_unique<qcd::StateVectorContainer>(
+            qcd::Configuration::from_spin_half_string("222000"), orbitals));
+    auto window = std::make_shared<qcd::Hamiltonian>(
+        std::make_unique<qcd::CanonicalFourCenterHamiltonianContainer>(
+            one_body, two_body, orbitals, 0.0, Eigen::MatrixXd::Zero(0, 0)));
+    return EffectiveHamiltonianConstructorFactory::create("qdk_swpt2")
+        ->run(reference, window, p_indices);
+  };
+  const auto expected = downfold(coefficient_orbitals);
+  const auto result = downfold(model_orbitals);
+  const auto restored = qcd::Hamiltonian::from_json(result->to_json());
+  for (const auto& output : {result, restored}) {
+    const auto orbitals = output->get_orbitals();
+    ASSERT_NE(std::dynamic_pointer_cast<qcd::ModelOrbitals>(orbitals), nullptr);
+    EXPECT_TRUE(orbitals->is_restricted());
+    EXPECT_EQ(orbitals->get_num_molecular_orbitals(), norb);
+    EXPECT_EQ(orbitals->active_indices()->to_json(), p_indices->to_json());
+    EXPECT_EQ(orbitals->inactive_indices()->to_json(),
+              inactive_indices->to_json());
+    EXPECT_NEAR(output->get_core_energy(), expected->get_core_energy(), 1e-12);
+    EXPECT_NEAR((std::get<0>(output->get_one_body_integrals()) -
+                 std::get<0>(expected->get_one_body_integrals()))
+                    .cwiseAbs()
+                    .maxCoeff(),
+                0.0, 1e-12);
+    EXPECT_NEAR((std::get<0>(output->get_two_body_integrals()) -
+                 std::get<0>(expected->get_two_body_integrals()))
+                    .cwiseAbs()
+                    .maxCoeff(),
+                0.0, 1e-12);
+  }
 }
 
 // SCF -> window Hamiltonian over W -> CAS reference over P -> SW-PT2 -> CAS on
