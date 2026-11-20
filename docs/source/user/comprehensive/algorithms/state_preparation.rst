@@ -296,7 +296,7 @@ Every later site isometry maps the left bond held in the bond register to the qu
 The nested ``unitary_synthesis`` setting holds an :class:`~qdk_chemistry.data.AlgorithmRef` to the ``unitary_synthesis_dense`` (:class:`~qdk_chemistry.algorithms.circuit_mapper.DenseUnitarySynthesisMapper`) or ``unitary_synthesis_block_sparse`` (:class:`~qdk_chemistry.algorithms.circuit_mapper.BlockSparseUnitarySynthesisMapper`) circuit mapper, which selects the dense or block-sparse synthesis of every site isometry.
 The preparer sets the mapper's ``num_input_qubits`` to the bond register width.
 For the dense mapper it also sets ``omit_right_factor`` and absorbs the right factor of each site isometry into the preceding site, or into site 0.
-The mapper's ``max_lookup_swap_bits`` setting caps the swap network of the rotation-angle lookups, trading Toffoli gates for scratch qubits; the default ``-1`` picks the Toffoli-optimal width.
+The mapper's ``max_swap_address_bits`` setting caps the swap network of the rotation-angle lookups, trading Toffoli gates for scratch qubits; the default ``-1`` lets each lookup's cost model choose the width.
 A final layer of CZ gates applies the fermionic sign of reordering the creation operators from chain order, α before β on each site, into qubit order.
 
 .. tab:: Python API
