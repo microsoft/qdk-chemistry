@@ -60,7 +60,8 @@ def _sossa_mapper_setting_defaults() -> tuple[tuple[Any, ...], ...]:
             "SELECT algorithm ('qrom_phase_gradient', 'one_hot' or 'direct'). 'one_hot' (arXiv:2611.09822) "
             "loads one qubit per distinct nonzero Givens angle vector plus a b == B flag instead of the "
             "(N-1)*rotation_bit_precision angle word, and fans each angle word out of it with CNOTs; it "
-            "requires max_givens_rotation_batches = 1.",
+            "loads that one-hot row with the same lookup as the angle word, so it saves qubits rather than "
+            "Toffolis, and it requires max_givens_rotation_batches = 1.",
             ["qrom_phase_gradient", "one_hot", "direct"],
         ),
         (
@@ -96,7 +97,9 @@ def _sossa_mapper_setting_defaults() -> tuple[tuple[Any, ...], ...]:
             False,
             "Reduce every Givens angle of the 'qrom_phase_gradient' or 'one_hot' SELECT into [0, pi) so each word "
             "stores rotation_bit_precision - 2 bits (rotation_bit_precision - 1 with givens_step 'controlled_adder') "
-            ":cite:`Caesura2025`.",
+            ":cite:`Caesura2025`. With the 'one_hot' SELECT and givens_step 'controlled_adder' the word is "
+            "zero-padded back to the gradient width, so it saves no qubits and only removes the extra Toffolis "
+            "of one_hot_vector_pairing.",
         ),
         (
             "coefficient_bit_precision",
@@ -127,9 +130,10 @@ def _sossa_mapper_setting_defaults() -> tuple[tuple[Any, ...], ...]:
             "uses none. 'select' is a plain "
             "unary-iteration lookup; 'select_swap' is "
             "a clean QROAM that cuts Toffolis but allocates scratch. 'dirty_select_swap' runs the same "
-            "network on borrowed dirty qubits that are provably idle across the load, so it costs no "
-            "width at all, but it pays roughly two to three times the Toffolis of the clean network at "
-            "equal width. 'skew_tree' behaves like 'select_swap' except that each unswapped Givens "
+            "network on borrowed dirty qubits that are provably idle across the load, so it allocates no "
+            "scratch, which narrows the circuit only when that scratch sets the peak width, but it pays roughly "
+            "two to three times the Toffolis of the clean network at equal width. 'skew_tree' behaves like "
+            "'select_swap' except that each unswapped Givens "
             "rotation load walks a skew tree over the in-range (B+1)*R addresses instead of padding the "
             "low address field to a power of two, saving Toffolis when neither B+1 nor R is a power of "
             "two. Every method falls back to a plain lookup at shapes where its own cost model "
@@ -193,7 +197,8 @@ def _sossa_mapper_setting_defaults() -> tuple[tuple[Any, ...], ...]:
             "How the 'qrom_phase_gradient' SELECT applies each Givens rotation; 'direct' ignores it. "
             "'two_adders' builds the controlled RY(2θ) from two uncontrolled phase-gradient adders of a "
             "half-angle word (arXiv:2605.30455 FIG. 40). 'controlled_adder' uses one controlled adder of a "
-            "full-angle word (FIG. 39, Lemma 6): 2b-2 Toffolis on b-1 clean ancillas, or 3b-3 with none, one "
+            "full-angle word, the fused adder of arXiv:2501.06165 Fig. 3(b) (arXiv:2605.30455 FIG. 39, "
+            "Lemma 6): 2b-2 Toffolis on b-1 clean ancillas, or 3b-3 with none, one "
             "below Lemma 7 because the gradient's top qubit is |->, so its controlled flip is a CZ. Streamed batches "
             "(max_givens_rotation_batches > 1) erase each word right after its step and "
             "reuse its qubits as the next step's ancillas, so only each batch's first step is ancilla-free. "

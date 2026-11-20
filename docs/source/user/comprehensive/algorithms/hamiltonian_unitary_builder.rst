@@ -586,13 +586,13 @@ Circuit precision and shared registers
      - Inner PREPARE implementation: ``"direct"``, ``"controlled_alias_sampling"``, or ``"one_hot"``, which decodes :math:`x_o` once per block encoding into a one-hot register and loads the alias word by unary iteration over :math:`b` alone :cite:`Shirobokov2026`. Default: ``"controlled_alias_sampling"``.
    * - ``select_algorithm``
      - str
-     - SELECT implementation: ``"direct"``, ``"qrom_phase_gradient"``, or ``"one_hot"``. ``"one_hot"`` loads a one-hot vector index and fans it out into one angle word; it requires ``max_givens_rotation_batches`` of 1. Default: ``"qrom_phase_gradient"``.
+     - SELECT implementation: ``"direct"``, ``"qrom_phase_gradient"``, or ``"one_hot"``. ``"one_hot"`` loads a one-hot vector index and fans it out into one angle word; it loads that index with the same lookup as the angle word, so it saves qubits rather than Toffolis, and it requires ``max_givens_rotation_batches`` of 1. Default: ``"qrom_phase_gradient"``.
    * - ``one_hot_vector_pairing``
      - bool
      - Let each ``"one_hot"`` SELECT qubit stand for two angle vectors, chosen by one more qubit :cite:`Shirobokov2026`, which halves the one-hot register for at most one more Toffoli per Givens step (none with ``compressed_angle_representation``). Requires ``givens_step`` ``"controlled_adder"``. Default: ``False``.
    * - ``spin_swap``
      - str
-     - Spin-sector swap in SELECT: ``"controlled_swap"`` or ``"bell_parity"``, which applies a CZ against the singlet parity of each orbital pair. Default: ``"controlled_swap"``.
+     - Spin-sector swap in SELECT: ``"controlled_swap"`` or ``"bell_parity"``, which applies one CZ against the parity of all orbital pairs' singlet indicators :cite:`Shirobokov2026`. One parity serves both swaps that meet between SELECT and its adjoint, so a block encoding pays :math:`3N` rather than :math:`4N` Toffolis, except with ``recompute_outer_registers`` or the ``"one_hot"`` inner PREPARE, which pay :math:`4N`. Default: ``"controlled_swap"``.
    * - ``coefficient_bit_precision``
      - int
      - Alias-sampling coefficient precision, from 1 through 30. Default: 10.
@@ -601,19 +601,19 @@ Circuit precision and shared registers
      - Givens-rotation angle precision, from 1 through 30. Default: 10.
    * - ``compressed_angle_representation``
      - bool
-     - Reduce every Givens angle into :math:`[0, \pi)` so each QROM angle word stores ``rotation_bit_precision - 2`` bits at the same precision :cite:`Caesura2025`. With ``givens_step`` ``"controlled_adder"`` the word keeps ``rotation_bit_precision - 1`` bits. Requires the ``"qrom_phase_gradient"`` or ``"one_hot"`` SELECT, the ``"sweep"`` Givens layout, and ``rotation_bit_precision`` of at least 3 (2 with ``"controlled_adder"``). Default: ``False``.
+     - Reduce every Givens angle into :math:`[0, \pi)` so each QROM angle word stores ``rotation_bit_precision - 2`` bits at the same precision :cite:`Caesura2025`. With ``givens_step`` ``"controlled_adder"`` the word keeps ``rotation_bit_precision - 1`` bits; with the ``"one_hot"`` SELECT as well, the word is zero-padded back to the gradient width, so it saves no qubits and only removes the extra Toffolis of ``one_hot_vector_pairing``. Requires the ``"qrom_phase_gradient"`` or ``"one_hot"`` SELECT, the ``"sweep"`` Givens layout, and ``rotation_bit_precision`` of at least 3 (2 with ``"controlled_adder"``). Default: ``False``.
    * - ``givens_rotation_layout``
      - str
      - Arrangement of SELECT's :math:`N - 1` Givens rotations: ``"sweep"`` (rotation depth :math:`N - 1`) or ``"tree"`` (rotation depth :math:`\lceil \log_2 N \rceil`). Default: ``"sweep"``.
    * - ``givens_step``
      - str
-     - How each Givens rotation applies its angle word: ``"two_adders"`` or ``"controlled_adder"``, which uses one controlled adder on a full-angle word and matches ``"two_adders"`` one bit wider. Default: ``"two_adders"``.
+     - How each Givens rotation applies its angle word: ``"two_adders"`` or ``"controlled_adder"``, which uses one controlled adder on a full-angle word (the fused adder of :cite:`Caesura2025`) and matches ``"two_adders"`` one bit wider. Default: ``"two_adders"``.
    * - ``max_givens_rotation_batches``
      - int
      - Upper bound :math:`J` on the passes SELECT makes over the :math:`N - 1` Givens angles. A larger :math:`J` narrows the rotation register at one extra table lookup per batch in each direction, so use it only when qubits are the binding constraint. Default: 1.
    * - ``lookup_method``
      - str
-     - How the Givens and inner alias-sampling tables are loaded: ``"select"``, ``"select_swap"`` (clean QROAM), ``"dirty_select_swap"``, or ``"skew_tree"``. ``"dirty_select_swap"`` borrows idle qubits instead of allocating scratch, but costs roughly two to three times the Toffolis of ``"select_swap"``, so use it only to minimize width. ``"skew_tree"`` behaves like ``"select_swap"`` but walks a skew tree over the in-range addresses of each unswapped Givens load; it saves Toffolis only when neither :math:`B + 1` nor :math:`R` is a power of two :cite:`Low2026`. Default: ``"select_swap"``.
+     - How the Givens and inner alias-sampling tables are loaded: ``"select"``, ``"select_swap"`` (clean QROAM), ``"dirty_select_swap"``, or ``"skew_tree"``. ``"dirty_select_swap"`` borrows idle qubits instead of allocating scratch, but costs roughly two to three times the Toffolis of ``"select_swap"``; it narrows the circuit only when that scratch sets the peak width, so check the qubit count before choosing it. ``"skew_tree"`` behaves like ``"select_swap"`` but walks a skew tree over the in-range addresses of each unswapped Givens load; it saves Toffolis only when neither :math:`B + 1` nor :math:`R` is a power of two :cite:`Low2026`. Default: ``"select_swap"``.
    * - ``recompute_outer_registers``
      - bool
      - Reorder the outer index so SELECT recomputes the generator type, rank, spin, and :math:`b = B` flags from :math:`x_o` and :math:`b` instead of loading a free-rider word :cite:`Low2026`. Default: ``False``.
