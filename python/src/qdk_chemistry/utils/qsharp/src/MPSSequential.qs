@@ -151,8 +151,9 @@ namespace QDKChemistry.Utils.MPSSequential {
         PrepareMPSOnRegister(numStateQubits, numAncillaQubits, rotationBitPrecision, prepare, _)
     }
 
-    /// Applies `prepare(state, ancilla, phaseGradient)` to `state` with phase gradient and bond
-    /// registers allocated here; see `PrepareMPSOnRegister`.
+    /// Applies `prepare(state, ancilla, phaseGradient)` to the first `numStateQubits` qubits of
+    /// `state`, leaving any later ones untouched, with phase gradient and bond registers allocated
+    /// here; see `PrepareMPSOnRegister`.
     internal operation PrepareMPSOnState(
         numStateQubits : Int,
         numAncillaQubits : Int,
@@ -164,7 +165,7 @@ namespace QDKChemistry.Utils.MPSSequential {
         within {
             PreparePhaseGradientState(phaseGradient);
         } apply {
-            PrepareMPSOnRegister(numStateQubits, numAncillaQubits, rotationBitPrecision, prepare, state + phaseGradient);
+            PrepareMPSOnRegister(numStateQubits, numAncillaQubits, rotationBitPrecision, prepare, state[...numStateQubits - 1] + phaseGradient);
         }
     }
 

@@ -498,6 +498,19 @@ def test_shared_phase_gradient_prepares_target(method):
     assert np.abs(np.vdot(target, output[:, 0])) ** 2 > 1 - _AGREEMENT_TOLERANCE
 
 
+def test_operation_leaves_later_system_qubits_untouched():
+    """With its own gradient the operation prepares the MPS on the first qubits of a wider system register."""
+    mps = _fixture_mps("mps_spin", _identity_order("mps_spin"))
+    # Wavefunction takes ownership of the container, so contract it first.
+    target = _target_state(mps)
+    circuit = create("state_prep", "matrix_product_state", rotation_bit_precision=_AGREEMENT_PRECISION).run(
+        Wavefunction(mps)
+    )
+    output = apply_operation(circuit._qsharp_op, np.eye(1, 2 << circuit.num_qubits).ravel()).reshape(-1, 2)
+    np.testing.assert_allclose(output[:, 1], 0.0, atol=1e-8, err_msg="the extra system qubit was changed")
+    assert np.abs(np.vdot(target, output[:, 0])) ** 2 > 1 - _AGREEMENT_TOLERANCE
+
+
 def _two_site_tensors(amplitudes: dict[tuple[int, int], float]):
     """Right-canonical two-site tensors of the state with the given ``(physical0, physical1)`` amplitudes."""
     psi = np.zeros((4, 4))
