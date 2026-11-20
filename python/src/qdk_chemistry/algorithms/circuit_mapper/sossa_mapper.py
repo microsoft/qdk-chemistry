@@ -64,6 +64,14 @@ def _sossa_mapper_setting_defaults() -> tuple[tuple[Any, ...], ...]:
             ["qrom_phase_gradient", "one_hot", "direct"],
         ),
         (
+            "one_hot_vector_pairing",
+            "bool",
+            False,
+            "Let each 'one_hot' SELECT qubit stand for two angle vectors, chosen by one more qubit "
+            "(arXiv:2611.09822 Eq. 23), which halves the one-hot register for one more Toffoli per Givens "
+            "step, or none with compressed_angle_representation; requires givens_step 'controlled_adder'.",
+        ),
+        (
             "spin_swap",
             "string",
             "controlled_swap",
@@ -375,6 +383,11 @@ class SOSSAMapper(CircuitMapper):
                 "select_algorithm 'one_hot' keeps one qubit per angle vector resident and does not stream "
                 f"Givens angle batches, so max_givens_rotation_batches must be 1, got {max_givens_rotation_batches}"
             )
+        one_hot_pairs = bool(self._settings.get("one_hot_vector_pairing"))
+        if one_hot_pairs and (algorithm != "one_hot" or self._settings.get("givens_step") != "controlled_adder"):
+            raise ValueError(
+                "one_hot_vector_pairing needs select_algorithm 'one_hot' and givens_step 'controlled_adder'"
+            )
 
         spin_parity = self._settings.get("spin_swap") == "bell_parity"
         recompute = bool(self._settings.get("recompute_outer_registers"))
@@ -435,6 +448,7 @@ class SOSSAMapper(CircuitMapper):
             "oneHotAngles": one_hot_angles,
             "oneHotDQIndex": one_hot_dq_index,
             "oneHotSFIndex": one_hot_sf_index,
+            "oneHotPairedVectors": one_hot_pairs,
             "bellParitySpinSwap": spin_parity,
             # The mapper only embeds SELECT in the walk, which applies the shared trailing parity swap.
             "walkSharesSpinParity": shared_spin_parity,

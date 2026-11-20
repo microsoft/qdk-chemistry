@@ -664,6 +664,7 @@ class TestSelectFullFidelity:
         givens_tree: bool = False,
         givens_controlled_adder: bool = False,
         one_hot: bool = False,
+        one_hot_pairs: bool = False,
     ) -> dict:
         rng = np.random.default_rng(42 + N)
 
@@ -714,6 +715,7 @@ class TestSelectFullFidelity:
             "oneHotAngles": one_body.tolist() + two_body[:num_sf_rows].tolist() if one_hot else [],
             "oneHotDQIndex": list(range(N)) if one_hot else [],
             "oneHotSFIndex": [N + row for row in range(num_sf_rows)] + [-1] * num_ranks if one_hot else [],
+            "oneHotPairedVectors": one_hot_pairs,
             "bellParitySpinSwap": False,
             "walkSharesSpinParity": False,
         }
@@ -1120,7 +1122,7 @@ class TestSelectFullFidelity:
 
     @pytest.mark.parametrize("lookup_method", ["select", "dirty_select_swap", "skew_tree"])
     def test_controlled_adder_matches_on_entangled_outer_indices(self, qsharp_test_context, lookup_method):
-        """Resident and streamed controlled-adder SELECTs match the two-adder SELECT on superposed x_o and b."""
+        """Every controlled-adder SELECT matches the two-adder SELECT on superposed x_o and b."""
         num_orbitals = 4
         xo_of = list(range(num_orbitals + 2))
         kwargs: dict[str, Any] = {"num_ranks": 2, "lookup_method": lookup_method}
@@ -1132,23 +1134,22 @@ class TestSelectFullFidelity:
             return state[:: 1 << bits]
 
         reference = run(self._select_data(num_orbitals, 4, **kwargs), 4)
+        configs: list[dict[str, Any]] = [
+            {"rotation_batch_size": batch, "measure_angle_words": measure}
+            for batch, measure in ((0, False), (1, False), (1, True), (2, False))
+        ] + [{"one_hot": True}, {"one_hot": True, "one_hot_pairs": True}]
         checked = 0
-        for batch, measure in ((0, False), (1, False), (1, True), (2, False)):
-            data = self._select_data(
-                num_orbitals,
-                3,
-                rotation_batch_size=batch,
-                measure_angle_words=measure,
-                givens_controlled_adder=True,
-                **kwargs,
-            )
+        for config in configs:
+            data = self._select_data(num_orbitals, 3, givens_controlled_adder=True, **config, **kwargs)
             # Erasure outcomes differ between runs, so repeat each configuration.
             for _ in range(2):
-                assert abs(np.vdot(reference, run(data, 3))) == pytest.approx(1.0, abs=1e-9), (batch, measure)
+                assert abs(np.vdot(reference, run(data, 3))) == pytest.approx(1.0, abs=1e-9), config
                 checked += 1
-        assert checked == 8
-        data["OneBodyRotationAngles"][0] = data["OneBodyRotationAngles"][1]
-        assert abs(np.vdot(reference, run(data, 3))) < 1 - 1e-6
+            # Negative control: copying one angle vector over another must change the state.
+            key = "oneHotAngles" if config.get("one_hot") else "OneBodyRotationAngles"
+            data[key][0] = data[key][1]
+            assert abs(np.vdot(reference, run(data, 3))) < 1 - 1e-6, config
+        assert checked == 12
 
     @pytest.mark.parametrize("N", [2, 3, 5, 8, 20, 54])
     def test_givens_tree_is_a_log_depth_spanning_tree(self, qsharp_test_context, N):  # noqa: N803
@@ -1202,8 +1203,9 @@ class TestOptInBlockEncodings:
                 "lookup_method": "skew_tree",
                 "compressed_angle_representation": True,
             },
+            {"givens_step": "controlled_adder", "select_algorithm": "one_hot", "one_hot_vector_pairing": True},
         ],
-        ids=["one_hot_inner", "one_hot_select", "bell_parity", "recompute", "compressed", "combined"],
+        ids=["one_hot_inner", "one_hot_select", "bell_parity", "recompute", "compressed", "combined", "one_hot_pairs"],
     )
     def test_block_matches_the_default_and_detects_corrupted_data(self, qsharp_test_context, settings):
         """Each opt-in gives exactly the default controlled-walk block on two erasure runs; corrupted data breaks it."""
@@ -1354,6 +1356,22 @@ class TestSOSSAWalkLogicalCounts:
         if batches == 1:
             assert adder["cczCount"] + adder["ccixCount"] < default["cczCount"] + default["ccixCount"]
 
+    def test_one_hot_vector_pairing_halves_the_one_hot_register(self):
+        """Pairing 11 one-hot vectors frees 4 qubits, and with compressed words it adds no Toffolis."""
+        unitary = _build_sossa_unitary(5, 3, 2, 2)
+        for compressed in (False, True):
+            counts = []
+            for paired in (False, True):
+                mapper = _make_sossa_mapper()
+                mapper.settings().set("givens_step", "controlled_adder")
+                mapper.settings().set("select_algorithm", "one_hot")
+                mapper.settings().set("compressed_angle_representation", compressed)
+                mapper.settings().set("one_hot_vector_pairing", paired)
+                counts.append(_logical_counts(mapper, unitary))
+            assert counts[0]["numQubits"] - counts[1]["numQubits"] == 4
+            if compressed:
+                assert counts[1]["cczCount"] + counts[1]["ccixCount"] <= counts[0]["cczCount"] + counts[0]["ccixCount"]
+
     def test_amortized_batch_lookups_run_on_a_plain_select(self):
         """Amortizing plain-Select batches keeps the width and trades the measured unlookups for one closing lookup."""
         unitary = _build_sossa_unitary(num_orbitals=4)
@@ -1404,10 +1422,14 @@ class TestOptInSettingValidation:
                 {"compressed_angle_representation": True, "givens_rotation_layout": "tree"},
                 "needs givens_rotation_layout 'sweep'",
             ),
+            (
+                {"one_hot_vector_pairing": True, "select_algorithm": "one_hot"},
+                "one_hot_vector_pairing needs select_algorithm 'one_hot' and givens_step 'controlled_adder'",
+            ),
         ],
     )
     def test_it_rejects_unsupported_combinations(self, settings, message):
-        """One-hot SELECT keeps angles resident, and compressed words need a QROM SELECT, the sweep and enough bits."""
+        """One-hot SELECT and its pairing, and compressed words, reject the settings they cannot build."""
         mapper = _make_sossa_mapper()
         for key, value in settings.items():
             mapper.settings().set(key, value)

@@ -16,11 +16,13 @@
 namespace QDKChemistry.Utils.SOSSAWalk {
 
     import Std.Arrays.All;
+    import Std.Arrays.Any;
     import Std.Arrays.Chunks;
     import Std.Arrays.Filtered;
     import Std.Arrays.Flattened;
     import Std.Arrays.Fold;
     import Std.Arrays.ForEach;
+    import Std.Arrays.IndexRange;
     import Std.Arrays.IsEmpty;
     import Std.Arrays.Mapped;
     import Std.Arrays.MappedOverRange;
@@ -128,6 +130,8 @@ namespace QDKChemistry.Utils.SOSSAWalk {
         oneHotSFIndex : Int[],
         /// Whether spin swaps apply a Bell-basis parity phase (arXiv:2611.09822) instead of N controlled SWAPs.
         bellParitySpinSwap : Bool,
+        /// Whether each one-hot SELECT qubit stands for two angle vectors, chosen by one more qubit (:cite:`Shirobokov2026` Eq. 23).
+        oneHotPairedVectors : Bool,
         /// Whether SELECT leaves its trailing parity swap to the walk, which shares it with the following SELECT†.
         walkSharesSpinParity : Bool,
     }
@@ -1123,11 +1127,16 @@ namespace QDKChemistry.Utils.SOSSAWalk {
 
         if Length(params.oneHotDQIndex) > 0 {
             // One-hot SELECT (arXiv:2611.09822): load one qubit per distinct angle vector plus the b == B
-            // flag, then fan each angle word out of the one-hot register with CNOTs.
+            // flag, then fan each angle word out of the one-hot register with CNOTs. Paired, qubit q stands
+            // for vectors 2q and 2q + 1 and one more qubit says which (:cite:`Shirobokov2026` Eq. 23).
             let numVectors = Length(params.oneHotAngles);
+            let paired = params.oneHotPairedVectors;
+            Fact(not paired or params.givensControlledAdder, "Paired one-hot vectors need the controlled-adder Givens step");
+            let numSlots = paired ? (numVectors + 1) / 2 | numVectors;
+            let numSelect = paired ? 1 | 0;
             // The b == B flag rides on the SF row only when there is a flag qubit to receive it.
             let numFlags = Length(bEqBQubit);
-            let oneHotRow = (v, flag) -> MappedOverRange(i -> i == v, 0..numVectors - 1) + (numFlags > 0 ? [flag] | []);
+            let oneHotRow = (v, flag) -> MappedOverRange(i -> v >= 0 and i == (paired ? v / 2 | v), 0..numSlots - 1) + (paired ? [v >= 0 and v % 2 == 1] | []) + (numFlags > 0 ? [flag] | []);
             let dqData = MappedOverRange(xo -> oneHotRow(params.oneHotDQIndex[xo], false), 0..N - 1);
             let rSlots = 1 <<< Length(rBits);
             let bSlots = 1 <<< bBits;
@@ -1140,28 +1149,47 @@ namespace QDKChemistry.Utils.SOSSAWalk {
                 },
                 0..(if rankFirst { numBp1 * rSlots } else { R * bSlots }) - 1
             );
-            use oneHot = Qubit[numVectors + numFlags];
+            use oneHot = Qubit[numSlots + numSelect + numFlags];
             within {
                 ControlledSelectWithUnlookup(sfData, dqData, 0, 0, params.useSkewTree, sfFields, sfAddress, dqAddress, isSF, [], oneHot);
             } apply {
                 within {
                     for flag in bEqBQubit {
-                        CNOT(oneHot[numVectors], flag);
+                        CNOT(oneHot[numSlots + numSelect], flag);
                     }
                     for j in numRotAngles - 1..-1..0 {
-                        use word = Qubit[wordBits];
-                        within {
-                            for v in 0..numVectors - 1 {
+                        let words = MappedOverRange(
+                            v -> {
                                 let angles = params.oneHotAngles[v];
-                                let bits = IntAsBoolArray(QuantizeGivensAngle(j < Length(angles) ? angles[j] | 0.0, bRot, params.givensControlledAdder), wordBits);
-                                for k in 0..wordBits - 1 {
-                                    if bits[k] {
-                                        CNOT(oneHot[v], word[k]);
+                                IntAsBoolArray(QuantizeGivensAngle(j < Length(angles) ? angles[j] | 0.0, bRot, params.givensControlledAdder), wordBits)
+                            },
+                            0..numVectors - 1
+                        );
+                        if paired {
+                            let (p, c) = pairs[j];
+                            ApplyPairedOneHotGivensStep(
+                                p,
+                                c,
+                                sysRegDown,
+                                oneHot[0..numSlots - 1],
+                                oneHot[numSlots],
+                                MappedOverRange(q -> words[2 * q], 0..numSlots - 1),
+                                MappedOverRange(q -> 2 * q + 1 < numVectors ? words[2 * q + 1] | [false, size = wordBits], 0..numSlots - 1),
+                                phaseGradientReg
+                            );
+                        } else {
+                            use word = Qubit[wordBits];
+                            within {
+                                for v in 0..numVectors - 1 {
+                                    for k in 0..wordBits - 1 {
+                                        if words[v][k] {
+                                            CNOT(oneHot[v], word[k]);
+                                        }
                                     }
                                 }
+                            } apply {
+                                ApplyGivensRotationWords(word, j, j, wordBits, pairs, sysRegDown, phaseGradientReg, params.givensControlledAdder);
                             }
-                        } apply {
-                            ApplyGivensRotationWords(word, j, j, wordBits, pairs, sysRegDown, phaseGradientReg, params.givensControlledAdder);
                         }
                     }
                 } apply {
@@ -1385,17 +1413,7 @@ namespace QDKChemistry.Utils.SOSSAWalk {
         let a = word + pad;
         let g = phaseGradientReg;
         within {
-            for s in p + 1..c - 1 {
-                CZ(sysRegDown[s], sysRegDown[c]);
-            }
-            CNOT(sysRegDown[p], sysRegDown[c]);
-            // The RyViaPhaseGradient basis change, so g += ctrl·x applies Ry(4π·x/2^b) when ctrl is set.
-            Adjoint S(sysRegDown[p]);
-            H(sysRegDown[p]);
-            X(sysRegDown[p]);
-            for k in 0..n - 1 {
-                CNOT(sysRegDown[p], g[k]);
-            }
+            GivensPhaseGradientFrame(p, c, sysRegDown, g);
         } apply {
             if Length(clean) >= n - 1 {
                 // Carries c_{i+1} = maj(a_i, g_i, c_i) are ANDed into `clean`, then g_i ^= ctrl·(a_i ⊕ c_i) unwinds them.
@@ -1453,6 +1471,108 @@ namespace QDKChemistry.Utils.SOSSAWalk {
                     CZ(ctrl, a[0]);
                 } else {
                     CCNOT(ctrl, a[0], g[0]);
+                }
+            }
+        }
+    }
+
+    /// Basis change around a phase-gradient Givens step on modes (p, c), after which adding x into the
+    /// gradient while c is set applies Ry(4π·x/2^b) on p (the RyViaPhaseGradient frame with a CZ string).
+    internal operation GivensPhaseGradientFrame(p : Int, c : Int, sysRegDown : Qubit[], phaseGradientReg : Qubit[]) : Unit is Adj {
+        for s in p + 1..c - 1 {
+            CZ(sysRegDown[s], sysRegDown[c]);
+        }
+        CNOT(sysRegDown[p], sysRegDown[c]);
+        Adjoint S(sysRegDown[p]);
+        H(sysRegDown[p]);
+        X(sysRegDown[p]);
+        for g in phaseGradientReg {
+            CNOT(sysRegDown[p], g);
+        }
+    }
+
+    /// One controlled-adder Givens step whose full-angle word comes from a paired one-hot register: bit k
+    /// enters the gradient as (c ⊕ u ⊕ x1)(u ⊕ x0) ⊕ x01 with u = c·s (:cite:`Shirobokov2026` Eq. 23), where
+    /// x0, x1 and x01 are the parities of the `oneHotPairs` qubits whose first, second or both words set it,
+    /// then one uncontrolled adder costs b - 2 Toffolis, for 2b - 1 per step or one less per always-zero bit.
+    internal operation ApplyPairedOneHotGivensStep(
+        p : Int,
+        c : Int,
+        sysRegDown : Qubit[],
+        oneHotPairs : Qubit[],
+        second : Qubit,
+        firstWords : Bool[][],
+        secondWords : Bool[][],
+        phaseGradientReg : Qubit[],
+    ) : Unit is Adj {
+        let n = Length(phaseGradientReg);
+        let ctrl = sysRegDown[c];
+        let g = phaseGradientReg;
+        within {
+            GivensPhaseGradientFrame(p, c, sysRegDown, g);
+        } apply {
+            use u = Qubit();
+            use t = Qubit[n];
+            within {
+                AND(ctrl, second, u);
+                for k in 0..n - 1 {
+                    if Any(word -> k < Length(word) and word[k], firstWords + secondWords) {
+                        within {
+                            CNOT(u, ctrl);
+                            for q in IndexRange(oneHotPairs) {
+                                if secondWords[q][k] {
+                                    CNOT(oneHotPairs[q], ctrl);
+                                }
+                                if firstWords[q][k] {
+                                    CNOT(oneHotPairs[q], u);
+                                }
+                            }
+                        } apply {
+                            AND(u, ctrl, t[k]);
+                        }
+                        for q in IndexRange(oneHotPairs) {
+                            if firstWords[q][k] and secondWords[q][k] {
+                                CNOT(oneHotPairs[q], t[k]);
+                            }
+                        }
+                    }
+                }
+            } apply {
+                // Gidney's adder of t into g; carry[i] holds c_{i+1} and g[i], t[i] hold g ⊕ c_i, t ⊕ c_i while it is live.
+                use carry = Qubit[MaxI(0, n - 2)];
+                for i in 0..n - 2 {
+                    if i > 0 {
+                        CNOT(carry[i - 1], t[i]);
+                        CNOT(carry[i - 1], g[i]);
+                    }
+                    if i < n - 2 {
+                        AND(t[i], g[i], carry[i]);
+                        if i > 0 {
+                            CNOT(carry[i - 1], carry[i]);
+                        }
+                    }
+                }
+                // The gradient's top qubit is |−⟩, so flipping it on t ⊕ c_{n-1} is a phase, and
+                // c_{n-1} = c_{n-2} ⊕ (t ⊕ c_{n-2})(g ⊕ c_{n-2}) needs no Toffoli.
+                Z(t[n - 1]);
+                if n > 1 {
+                    CZ(t[n - 2], g[n - 2]);
+                }
+                if n > 2 {
+                    Z(carry[n - 3]);
+                }
+                for i in n - 2..-1..0 {
+                    if i < n - 2 {
+                        if i > 0 {
+                            CNOT(carry[i - 1], carry[i]);
+                        }
+                        Adjoint AND(t[i], g[i], carry[i]);
+                    }
+                    CNOT(t[i], g[i]);
+                    if i > 0 {
+                        CNOT(carry[i - 1], t[i]);
+                        CNOT(carry[i - 1], g[i]);
+                    }
                 }
             }
         }

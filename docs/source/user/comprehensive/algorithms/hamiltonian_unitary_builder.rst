@@ -587,6 +587,9 @@ Circuit precision and shared registers
    * - ``select_algorithm``
      - str
      - SELECT implementation: ``"direct"``, ``"qrom_phase_gradient"``, or ``"one_hot"``. ``"one_hot"`` loads a one-hot vector index and fans it out into one angle word; it requires ``max_givens_rotation_batches`` of 1. Default: ``"qrom_phase_gradient"``.
+   * - ``one_hot_vector_pairing``
+     - bool
+     - Let each ``"one_hot"`` SELECT qubit stand for two angle vectors, chosen by one more qubit :cite:`Shirobokov2026`, which halves the one-hot register for at most one more Toffoli per Givens step (none with ``compressed_angle_representation``). Requires ``givens_step`` ``"controlled_adder"``. Default: ``False``.
    * - ``spin_swap``
      - str
      - Spin-sector swap in SELECT: ``"controlled_swap"`` or ``"bell_parity"``, which applies a CZ against the singlet parity of each orbital pair. Default: ``"controlled_swap"``.
