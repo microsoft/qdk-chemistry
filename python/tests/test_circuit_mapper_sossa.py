@@ -1118,6 +1118,38 @@ class TestSelectFullFidelity:
         assert abs(np.vdot(run(6, use_phase_gradient=False), wrong)) < 0.9
         assert abs(np.vdot(run(3), run(3, rotation_batch_size=1, givens_controlled_adder=True))) < 0.99
 
+    @pytest.mark.parametrize("lookup_method", ["select", "dirty_select_swap", "skew_tree"])
+    def test_controlled_adder_matches_on_entangled_outer_indices(self, qsharp_test_context, lookup_method):
+        """Resident and streamed controlled-adder SELECTs match the two-adder SELECT on superposed x_o and b."""
+        num_orbitals = 4
+        xo_of = list(range(num_orbitals + 2))
+        kwargs: dict[str, Any] = {"num_ranks": 2, "lookup_method": lookup_method}
+
+        def run(data, bits):
+            state = self._run_entangled_select(
+                qsharp_test_context, data, xo_of, 3, use_phase_gradient=True, num_reference=2
+            )
+            return state[:: 1 << bits]
+
+        reference = run(self._select_data(num_orbitals, 4, **kwargs), 4)
+        checked = 0
+        for batch, measure in ((0, False), (1, False), (1, True), (2, False)):
+            data = self._select_data(
+                num_orbitals,
+                3,
+                rotation_batch_size=batch,
+                measure_angle_words=measure,
+                givens_controlled_adder=True,
+                **kwargs,
+            )
+            # Erasure outcomes differ between runs, so repeat each configuration.
+            for _ in range(2):
+                assert abs(np.vdot(reference, run(data, 3))) == pytest.approx(1.0, abs=1e-9), (batch, measure)
+                checked += 1
+        assert checked == 8
+        data["OneBodyRotationAngles"][0] = data["OneBodyRotationAngles"][1]
+        assert abs(np.vdot(reference, run(data, 3))) < 1 - 1e-6
+
     @pytest.mark.parametrize("N", [2, 3, 5, 8, 20, 54])
     def test_givens_tree_is_a_log_depth_spanning_tree(self, qsharp_test_context, N):  # noqa: N803
         """Tree pairs span all orbitals in ceil(log2 N) layers of disjoint Jordan-Wigner spans; the sweep needs N-1."""
