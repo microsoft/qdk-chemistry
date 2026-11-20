@@ -598,7 +598,7 @@ Circuit precision and shared registers
      - Givens-rotation angle precision, from 1 through 30. Default: 10.
    * - ``compressed_angle_representation``
      - bool
-     - Reduce every Givens angle into :math:`[0, \pi)` so each QROM angle word stores ``rotation_bit_precision - 2`` bits at the same precision :cite:`Caesura2025`. With ``givens_step`` ``"controlled_adder"`` the word keeps ``rotation_bit_precision - 1`` bits. Requires the ``"qrom_phase_gradient"`` or ``"one_hot"`` SELECT, the ``"sweep"`` Givens layout, and ``rotation_bit_precision`` of at least 3 (2 with ``"controlled_adder"``). Not yet available: ``True`` raises ``NotImplementedError`` after these checks, because the reduced one-body (D1/Q1) angle chains do not yet reproduce the block encoding. Default: ``False``.
+     - Reduce every Givens angle into :math:`[0, \pi)` so each QROM angle word stores ``rotation_bit_precision - 2`` bits at the same precision :cite:`Caesura2025`. With ``givens_step`` ``"controlled_adder"`` the word keeps ``rotation_bit_precision - 1`` bits. Requires the ``"qrom_phase_gradient"`` or ``"one_hot"`` SELECT, the ``"sweep"`` Givens layout, and ``rotation_bit_precision`` of at least 3 (2 with ``"controlled_adder"``). Default: ``False``.
    * - ``givens_rotation_layout``
      - str
      - Arrangement of SELECT's :math:`N - 1` Givens rotations: ``"sweep"`` (rotation depth :math:`N - 1`) or ``"tree"`` (rotation depth :math:`\lceil \log_2 N \rceil`). Default: ``"sweep"``.
@@ -614,9 +614,9 @@ Circuit precision and shared registers
    * - ``recompute_outer_registers``
      - bool
      - Reorder the outer index so SELECT recomputes the generator type, rank, spin, and :math:`b = B` flags from :math:`x_o` and :math:`b` instead of loading a free-rider word :cite:`Low2026`. Default: ``False``.
-   * - ``amortize_dirty_lookups``
+   * - ``amortize_batch_lookups``
      - bool
-     - With ``max_givens_rotation_batches`` above 1 and ``lookup_method`` ``"dirty_select_swap"``, load and unload all angle batches in :math:`J + 1` telescoping lookups instead of :math:`2J`. Default: ``False``.
+     - With ``max_givens_rotation_batches`` above 1, load and unload all angle batches in :math:`J + 1` telescoping lookups instead of :math:`2J`, each XORing the next batch onto the previous one. With ``"dirty_select_swap"`` a lookup borrows idle qubits as swap workspace when the batch fits; otherwise it is a plain controlled lookup. Default: ``False``.
    * - ``measure_angle_words``
      - bool
      - With ``max_givens_rotation_batches`` above 1, erase each streamed angle word by measurement right after its rotation. Default: ``False``.

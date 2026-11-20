@@ -88,8 +88,7 @@ def _sossa_mapper_setting_defaults() -> tuple[tuple[Any, ...], ...]:
             False,
             "Reduce every Givens angle of the 'qrom_phase_gradient' or 'one_hot' SELECT into [0, pi) so each word "
             "stores rotation_bit_precision - 2 bits (rotation_bit_precision - 1 with givens_step 'controlled_adder') "
-            ":cite:`Caesura2025`. Not yet available: True raises NotImplementedError once the SELECT, layout and "
-            "precision checks pass, because the reduced D1/Q1 chains do not yet reproduce the block encoding.",
+            ":cite:`Caesura2025`.",
         ),
         (
             "coefficient_bit_precision",
@@ -144,12 +143,13 @@ def _sossa_mapper_setting_defaults() -> tuple[tuple[Any, ...], ...]:
             (-1, 30),
         ),
         (
-            "amortize_dirty_lookups",
+            "amortize_batch_lookups",
             "bool",
             False,
-            "When the Givens angles are streamed in J > 1 batches with lookup_method "
-            "'dirty_select_swap', load and unload all batches in J + 1 telescoping lookups on the idle "
-            "spin-up register instead of 2J. It needs 'dirty_select_swap' and does nothing at J = 1.",
+            "When the Givens angles are streamed in J > 1 batches, load and unload all batches in J + 1 "
+            "telescoping lookups instead of 2J, each round XORing the next batch onto the previous one. With "
+            "lookup_method 'dirty_select_swap' a round borrows the idle spin-up register as swap workspace when "
+            "the batch word fits in it; otherwise it is a plain controlled Select. It does nothing at J = 1.",
         ),
         (
             "measure_angle_words",
@@ -195,16 +195,18 @@ def _sossa_mapper_setting_defaults() -> tuple[tuple[Any, ...], ...]:
     )
 
 
-def _compressed_givens_angles(angles: np.ndarray, rot_bits: int) -> tuple[np.ndarray, np.ndarray]:
+def _compressed_givens_angles(angles: np.ndarray, rot_bits: int) -> np.ndarray:
     r"""Reduce each row of quantized Givens angles into :math:`[0, \pi)` with the compression of :cite:`Caesura2025`.
+
+    A row may leave a sign on mode 0, but the walk applies SELECT and SELECT† on the same :math:`x_o`, so it squares
+    to one.
 
     Args:
         angles: Givens angle table, one row of :math:`N-1` angles per rotated mode.
         rot_bits: Width of the uncompressed angle word.
 
     Returns:
-        The reduced angles, each an exact multiple of :math:`4\pi / 2^{b}` whose word is below :math:`2^{b-2}`,
-        and per row whether the reduced chain leaves a :math:`Z` on mode 0.
+        The reduced angles, each an exact multiple of :math:`4\pi / 2^{b}` whose word is below :math:`2^{b-2}`.
 
     """
     full = 1 << (rot_bits - 1)
@@ -213,7 +215,6 @@ def _compressed_givens_angles(angles: np.ndarray, rot_bits: int) -> tuple[np.nda
     # Q# Round sends exact halves toward zero; working on its words adds no quantization error.
     words = (np.sign(scaled) * np.ceil(np.abs(scaled) - 0.5)).astype(np.int64) % full
     reduced = np.zeros_like(words)
-    flips = np.zeros(len(words), dtype=bool)
     for row_index, row in enumerate(words):
         # Shifting angle j by pi leaves Z_j Z_{j+1} on the output side, and the Z_{j+1} moved past gate j + 1
         # negates its angle, so the sweep's first-applied (last) angle is reduced first.
@@ -222,8 +223,7 @@ def _compressed_givens_angles(angles: np.ndarray, rot_bits: int) -> tuple[np.nda
             word = (-int(row[j]) if negate else int(row[j])) % full
             negate = word >= half
             reduced[row_index, j] = word - half if negate else word
-        flips[row_index] = negate
-    return reduced * (4.0 * np.pi / 2**rot_bits), flips
+    return reduced * (4.0 * np.pi / 2**rot_bits)
 
 
 class SOSSAMapperSettings(Settings):
@@ -385,6 +385,11 @@ class SOSSAMapper(CircuitMapper):
         two_body_angles = container.select.two_body_rotation_angles
         compressed = bool(self._settings.get("compressed_angle_representation"))
         controlled_adder = self._settings.get("givens_step") == "controlled_adder"
+        if compressed:
+            # The controlled adder's words sit on the one-bit-finer grid of the full angle.
+            grid_bits = rot_bits + int(controlled_adder)
+            one_body_angles = _compressed_givens_angles(np.asarray(one_body_angles), grid_bits)
+            two_body_angles = _compressed_givens_angles(np.asarray(two_body_angles), grid_bits)
 
         one_hot_angles: list[list[float]] = []
         one_hot_dq_index: list[int] = []
@@ -418,7 +423,7 @@ class SOSSAMapper(CircuitMapper):
             "rotationBatchSize": -(-num_angles // max_givens_rotation_batches),
             "borrowDirty": self._borrow_dirty,
             "maxSwapBits": self._max_swap_address_bits,
-            "amortizeDirtyLookups": bool(self._settings.get("amortize_dirty_lookups")),
+            "amortizeBatchLookups": bool(self._settings.get("amortize_batch_lookups")),
             "measureAngleWords": bool(self._settings.get("measure_angle_words")),
             "useSkewTree": self._settings.get("lookup_method") == "skew_tree",
             "recomputeOuterRegisters": recompute,
@@ -545,7 +550,6 @@ class SOSSAMapper(CircuitMapper):
 
         Raises:
             ValueError: If the layout reserves free-rider bits but the container carries no free-rider table.
-            NotImplementedError: If ``compressed_angle_representation`` is set.
 
         """
         algorithm = self._settings.get("select_algorithm")
@@ -570,12 +574,6 @@ class SOSSAMapper(CircuitMapper):
                     f"compressed_angle_representation drops {dropped_bits} of the rotation_bit_precision bits, "
                     f"so it needs at least {dropped_bits + 1}, got {rot_bits}."
                 )
-            # The Caesura reduction is exact on the SF rows, but it changes the D1/Q1 terms of a reference block
-            # beyond what any inner-PREPARE sign absorbs, so it stays disabled until that is resolved.
-            raise NotImplementedError(
-                "compressed_angle_representation is not yet available: the reduced one-body (D1/Q1) angle chains "
-                "do not reproduce the uncompressed block encoding."
-            )
 
         if self._settings.get("recompute_outer_registers"):
             meta = container.metadata
@@ -625,10 +623,6 @@ class SOSSAMapper(CircuitMapper):
             0 if lookup_method == "select" else int(self._settings.get("max_swap_address_bits"))
         )
         self._borrow_dirty = lookup_method == "dirty_select_swap"
-        if self._settings.get("amortize_dirty_lookups") and not self._borrow_dirty:
-            raise ValueError(
-                f"amortize_dirty_lookups requires lookup_method 'dirty_select_swap', got '{lookup_method}'"
-            )
         inner_prepare_op, free_rider_op = self._build_inner_oracles(container)
         ops = {
             "outerPrepareOp": outer_prepare_circuit._qsharp_op,  # noqa: SLF001

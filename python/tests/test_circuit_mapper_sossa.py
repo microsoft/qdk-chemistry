@@ -653,7 +653,7 @@ class TestSelectFullFidelity:
         rotation_batch_size: int = 0,
         lookup_method: str = "select",
         max_swap_address_bits: int = -1,
-        amortize_dirty_lookups: bool = False,
+        amortize_batch_lookups: bool = False,
         measure_angle_words: bool = False,
         angle_words: str = "default",
         givens_tree: bool = False,
@@ -672,8 +672,8 @@ class TestSelectFullFidelity:
         if angle_words == "compressed":
             # Mirrors SOSSAMapper._build_select: full-angle words reduce on the one-bit-finer grid.
             grid_bits = rotation_bit_precision + int(givens_controlled_adder)
-            one_body = _compressed_givens_angles(one_body, grid_bits)[0]
-            two_body = _compressed_givens_angles(two_body, grid_bits)[0]
+            one_body = _compressed_givens_angles(one_body, grid_bits)
+            two_body = _compressed_givens_angles(two_body, grid_bits)
         elif angle_words == "truncated":
             # Negative control: keep the low rotation_bit_precision - 2 bits of each word without reducing the angle.
             step = 4.0 * np.pi / 2**rotation_bit_precision
@@ -697,7 +697,7 @@ class TestSelectFullFidelity:
             # Mirrors SOSSAMapper._run_impl: "select" is a swap network capped at width 0.
             "borrowDirty": lookup_method == "dirty_select_swap",
             "maxSwapBits": 0 if lookup_method == "select" else max_swap_address_bits,
-            "amortizeDirtyLookups": amortize_dirty_lookups,
+            "amortizeBatchLookups": amortize_batch_lookups,
             "measureAngleWords": measure_angle_words,
             "useSkewTree": lookup_method == "skew_tree",
             "recomputeOuterRegisters": False,
@@ -844,6 +844,8 @@ class TestSelectFullFidelity:
             ("dirty_select_swap", True, True),
             ("skew_tree", False, False),
             ("skew_tree", False, True),
+            ("select", True, False),
+            ("select", True, True),
         ],
     )
     def test_streamed_rotation_angles_match_the_resident_register(
@@ -886,7 +888,7 @@ class TestSelectFullFidelity:
                             num_orbitals,
                             rotation_batch_size=batch,
                             lookup_method=lookup_method,
-                            amortize_dirty_lookups=amortize,
+                            amortize_batch_lookups=amortize,
                             measure_angle_words=measure,
                             **kwargs,
                         ),
@@ -961,7 +963,7 @@ class TestSelectFullFidelity:
                 {
                     "lookup_method": "dirty_select_swap",
                     "rotation_batch_size": 2,
-                    "amortize_dirty_lookups": True,
+                    "amortize_batch_lookups": True,
                     "measure_angle_words": True,
                 },
                 0,
@@ -1155,14 +1157,16 @@ class TestOptInBlockEncodings:
             {"select_algorithm": "one_hot"},
             {"spin_swap": "bell_parity"},
             {"recompute_outer_registers": True},
+            {"compressed_angle_representation": True},
             {
                 "givens_step": "controlled_adder",
                 "select_algorithm": "one_hot",
                 "spin_swap": "bell_parity",
                 "lookup_method": "skew_tree",
+                "compressed_angle_representation": True,
             },
         ],
-        ids=["one_hot_inner", "one_hot_select", "bell_parity", "recompute", "combined"],
+        ids=["one_hot_inner", "one_hot_select", "bell_parity", "recompute", "compressed", "combined"],
     )
     def test_block_matches_the_default_and_detects_corrupted_data(self, qsharp_test_context, settings):
         """Each opt-in gives exactly the default controlled-walk block on two erasure runs; corrupted data breaks it."""
@@ -1281,11 +1285,12 @@ class TestSOSSAWalkLogicalCounts:
         [
             ("recompute_outer_registers", True, (3, 2, 2, 1), 5),
             ("recompute_outer_registers", True, (5, 3, 2, 2), 6),
+            ("compressed_angle_representation", True, (5, 3, 2, 2), 8),
             ("givens_rotation_layout", "tree", (5, 2, 1, 1), 0),
         ],
     )
     def test_opt_in_qubit_savings(self, setting, value, dims, saved_qubits):
-        """Recomputing from x_o frees 4 + ceil(log2 R) qubits, and the tree layout keeps every count of the sweep."""
+        """Recomputing frees 4 + ceil(log2 R) qubits, compression 2 per angle, and the tree keeps the sweep's counts."""
         unitary = _build_sossa_unitary(*dims)
         default = _logical_counts(_make_sossa_mapper(), unitary)
         mapper = _make_sossa_mapper()
@@ -1312,6 +1317,19 @@ class TestSOSSAWalkLogicalCounts:
         if batches == 1:
             assert adder["cczCount"] + adder["ccixCount"] < default["cczCount"] + default["ccixCount"]
 
+    def test_amortized_batch_lookups_run_on_a_plain_select(self):
+        """Amortizing plain-Select batches keeps the width and trades the measured unlookups for one closing lookup."""
+        unitary = _build_sossa_unitary(num_orbitals=4)
+        counts = {}
+        for amortize in (False, True):
+            mapper = _make_sossa_mapper()
+            mapper.settings().set("lookup_method", "select")
+            mapper.settings().set("max_givens_rotation_batches", 2)
+            mapper.settings().set("amortize_batch_lookups", amortize)
+            counts[amortize] = _logical_counts(mapper, unitary)
+        assert counts[True]["numQubits"] == counts[False]["numQubits"]
+        assert counts[True]["measurementCount"] < counts[False]["measurementCount"]
+
 
 class TestMaxGivensRotationBatchesSetting:
     """The ``max_givens_rotation_batches`` setting's one bound the settings range cannot see."""
@@ -1336,7 +1354,6 @@ class TestOptInSettingValidation:
     @pytest.mark.parametrize(
         ("settings", "message"),
         [
-            ({"amortize_dirty_lookups": True}, "amortize_dirty_lookups requires lookup_method 'dirty_select_swap'"),
             (
                 {"select_algorithm": "one_hot", "max_givens_rotation_batches": 2},
                 r"select_algorithm 'one_hot'.*max_givens_rotation_batches must be 1",
@@ -1353,7 +1370,7 @@ class TestOptInSettingValidation:
         ],
     )
     def test_it_rejects_unsupported_combinations(self, settings, message):
-        """Amortizing needs the dirty loader, one-hot SELECT keeps angles resident, and compressed words need QROM."""
+        """One-hot SELECT keeps angles resident, and compressed words need a QROM SELECT, the sweep and enough bits."""
         mapper = _make_sossa_mapper()
         for key, value in settings.items():
             mapper.settings().set(key, value)

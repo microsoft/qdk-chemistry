@@ -97,8 +97,8 @@ namespace QDKChemistry.Utils.SOSSAWalk {
         borrowDirty : Bool,
         /// Cap on any walk QROAM's swap width: -1 lets each selector choose, 0 forces plain `Select`.
         maxSwapBits : Int,
-        /// Whether streamed batches share J + 1 telescoping lookups on `sysRegUp` (:cite:`Low2026` E3).
-        amortizeDirtyLookups : Bool,
+        /// Whether streamed batches share J + 1 telescoping lookups, borrowing `sysRegUp` when `borrowDirty` (:cite:`Low2026` E3).
+        amortizeBatchLookups : Bool,
         /// Whether each streamed angle word is erased by measurement right after its rotation.
         measureAngleWords : Bool,
         /// Whether unswapped Givens-angle loads use a box-restricted skew tree instead of `Select`.
@@ -1192,7 +1192,7 @@ namespace QDKChemistry.Utils.SOSSAWalk {
                     action();
                 }
             }
-        } elif params.amortizeDirtyLookups {
+        } elif params.amortizeBatchLookups {
             let numBatches = (numRotAngles + batch - 1) / batch;
             let width = batch * wordBits;
             let sfTables = MappedOverRange(
