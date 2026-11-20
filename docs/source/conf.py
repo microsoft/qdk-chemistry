@@ -10,6 +10,7 @@ import re
 import shutil
 import sys
 from contextlib import suppress
+from functools import wraps
 from pathlib import Path
 
 # -----------------------------------------------------------------------------
@@ -125,7 +126,7 @@ autodoc_mock_imports = [  # Configure autodoc to handle C++ extension modules an
     "qdk_chemistry.libmacis",
     "qdk_chemistry.libchemistry",
     "qdk_chemistry.libsparsexx",
-    "pybind11_builtins",
+    "nanobind",
     "qiskit",
     "qiskit_nature",
     "qiskit_aer",
@@ -186,7 +187,7 @@ suppress_warnings = [
     "ref.ref",  # sphinx does not like bools for some reason
     "ref.identifier:*breathe_api_autogen*",  # Suppress warnings about duplicate object descriptions from imported classes
     "toc.not_included",  # Suppress warnings about toctree entries not included in the documentation
-    "*pybind11_detail*",  # Suppress warnings about pybind11 internal implementation details
+    "*nanobind*",  # Suppress warnings about nanobind internal implementation details
 ]
 nitpicky = True  # Enable nitpicky mode to catch all warnings/errors
 nitpick_ignore_regex = [
@@ -229,7 +230,7 @@ nitpick_ignore_regex = [
     (r"py:class", r"qdk_chemistry\.data\.tapering\.TaperingSpecification"),
     (r"py:class", r"qdk::chemistry::data::SumPauliOperatorExpression"),
     (r"py:class", r"qdk::chemistry::algorithms::HamiltonianConstructor"),
-    (r"py:class", r"^SumPauliOperatorExpression$"),
+    (r"py:class", r"^(?:qdk_chemistry\.data\.)?SumPauliOperatorExpression$"),
     (r"py:class", r"qsharp\..*"),  # qsharp has no intersphinx inventory
     (r"py:class", r"qdk\..*"),  # qdk has no intersphinx inventory
     (r"py:class", r"mcp\..*"),  # MCP has no intersphinx inventory
@@ -290,6 +291,12 @@ def autodoc_skip_imports(app, what, name, obj, skip, options):
 
 _MODULE_ALIAS_RULES: tuple[tuple[str, str], ...] = (
     ("qdk_chemistry._core._algorithms", "qdk_chemistry.algorithms"),
+    ("qdk_chemistry._core.data.symmetry", "qdk_chemistry.data.symmetry"),
+    (
+        "qdk_chemistry._core.utils.model_hamiltonians",
+        "qdk_chemistry.utils.model_hamiltonians",
+    ),
+    ("qdk_chemistry._core.utils", "qdk_chemistry.utils"),
     ("qdk_chemistry._core.data", "qdk_chemistry.data"),
     ("qdk_chemistry._core.", "qdk_chemistry."),
     ("qdk_chemistry._algorithms", "qdk_chemistry.algorithms"),
@@ -297,12 +304,14 @@ _MODULE_ALIAS_RULES: tuple[tuple[str, str], ...] = (
 
 
 def _rewrite_internal_module_path(text: str) -> str:
-    """Map internal module paths to their public equivalents."""
+    """Map binding annotations to public names and valid Python type syntax."""
     rewritten = text
     for old, new in _MODULE_ALIAS_RULES:
         if old in rewritten:
             rewritten = rewritten.replace(old, new)
-    return rewritten
+    # Nanobind's dtype/shape/order metadata is not valid Python type syntax.
+    # Keep ndarray itself so Sphinx can parse enclosing tuples and unions.
+    return re.sub(r"\b(numpy\.ndarray)\[\w+=[^\[\]]*\]", r"\1", rewritten)
 
 
 def normalize_autodoc_signature(
@@ -331,7 +340,7 @@ def normalize_autodoc_docstring(app, what, name, obj, options, lines):
     """Rewrite internal module references that appear inside docstrings."""
     for idx, line in enumerate(lines):
         rewritten = _rewrite_internal_module_path(line)
-        # Escape '*args' and '**kwargs' in pybind11 auto-generated signature
+        # Escape '*args' and '**kwargs' in nanobind auto-generated signature
         # lines so Sphinx/reST does not treat them as emphasis/bold markup.
         # Negative lookbehind avoids double-escaping already-escaped instances.
         rewritten = re.sub(r"(?<!\\)\*\*kwargs", r"\\**kwargs", rewritten)
@@ -340,12 +349,24 @@ def normalize_autodoc_docstring(app, what, name, obj, options, lines):
             lines[idx] = rewritten
 
 
+def _documentable_native_function(function, public_module):
+    """Expose a native function to autodoc without changing runtime bindings."""
+
+    @wraps(function)
+    def wrapped(*args, **kwargs):
+        return function(*args, **kwargs)
+
+    wrapped.__module__ = public_module
+    wrapped.__doc__ = _rewrite_internal_module_path(function.__doc__ or "")
+    return wrapped
+
+
 def normalize_public_export_modules():
-    """Give pybind11 exports their public module names before Sphinx inspects them."""
+    """Give nanobind exports their public module names before Sphinx inspects them."""
     for internal_mod, public_mod in _MODULE_ALIAS_RULES:
         if internal_mod.endswith("."):
             continue  # prefix-only rewrite, nothing to alias
-        # Importing the public module loads the private pybind11 module whose
+        # Importing the public module loads the private nanobind module whose
         # exported objects need public names in the generated documentation.
         pub = importlib.import_module(public_mod)
         if internal_mod not in sys.modules:
@@ -355,8 +376,32 @@ def normalize_public_export_modules():
             obj = getattr(pub, name, None)
             module_name = getattr(obj, "__module__", "")
             if isinstance(module_name, str) and module_name.startswith(internal_mod):
-                with suppress(AttributeError):
-                    obj.__module__ = public_mod  # docs-only shim
+                if hasattr(obj, "__nb_signature__"):
+                    # nb_func is not an inspect routine and its __module__ is
+                    # read-only. Wrap only public exports during docs builds.
+                    setattr(pub, name, _documentable_native_function(obj, public_mod))
+                else:
+                    with suppress(AttributeError):
+                        obj.__module__ = public_mod  # docs-only shim
+
+
+def resolve_deprecated_qubit_alias(app, env, node, contnode):
+    """Link the deprecated constructor's private class to its public replacement."""
+    if (
+        node.get("refdomain") == "py"
+        and node.get("reftarget")
+        == "qdk_chemistry.data.qubit_operator._DeprecatedQubitHamiltonian"
+    ):
+        return env.get_domain("py").resolve_xref(
+            env,
+            node["refdoc"],
+            app.builder,
+            "class",
+            "qdk_chemistry.data.qubit_operator.QubitOperator",
+            node,
+            contnode,
+        )
+    return None
 
 
 # Sphinx 9 resolves type annotations while initializing extensions, before the
@@ -563,11 +608,21 @@ def setup(app):
     import sys
     import typing
 
-    sys.modules["typing"] = typing  # Ensure typing module is available to pybind
+    from sphinx.domains.python import PyMethod
+
+    class BindingMethod(PyMethod):
+        """Normalize every overload, not just autodoc's first signature."""
+
+        def handle_signature(self, sig, signode):
+            return super().handle_signature(_rewrite_internal_module_path(sig), signode)
+
+    sys.modules["typing"] = typing  # Ensure typing module is available to nanobind
+    app.add_directive_to_domain("py", "method", BindingMethod, override=True)
     app.connect("autodoc-skip-member", autodoc_skip_imports)
     app.connect("autodoc-process-signature", normalize_autodoc_signature)
     app.connect("autodoc-process-docstring", normalize_autodoc_docstring)
     app.connect("autodoc-process-docstring", process_breathe_docstring)
+    app.connect("missing-reference", resolve_deprecated_qubit_alias)
     # Transform :cite:`key` markers in Doxygen/Breathe content before reference resolution
     # Using doctree-read so pending_xref nodes get resolved by bibtex extension
     app.connect("doctree-read", transform_doctree_citations)

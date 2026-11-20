@@ -315,23 +315,13 @@ class QubitOperator(HamiltonianDescription):
         return cls(container=container)
 
 
-class _DeprecatedQubitOperatorAliasMeta(type(QubitOperator)):  # type: ignore[misc]
-    """Metaclass that makes the deprecated alias behave like :class:`QubitOperator` for type checks."""
-
-    def __instancecheck__(cls, instance: object) -> bool:
-        """Report any :class:`QubitOperator` instance as an instance of the alias."""
-        return isinstance(instance, QubitOperator)
-
-    def __subclasscheck__(cls, subclass: type) -> bool:
-        """Report any :class:`QubitOperator` subclass as a subclass of the alias."""
-        return issubclass(subclass, QubitOperator)
+if TYPE_CHECKING:
+    QubitHamiltonian = QubitOperator
 
 
-class QubitHamiltonian(QubitOperator, metaclass=_DeprecatedQubitOperatorAliasMeta):
-    """Deprecated alias for :class:`QubitOperator`."""
-
-    def __init__(self, *args: Any, **kwargs: Any) -> None:
-        """Construct a :class:`QubitOperator`, warning that ``QubitHamiltonian`` is deprecated."""
+def __getattr__(name: str) -> type[QubitOperator]:
+    """Resolve the deprecated class name without wrapping the actual type."""
+    if name == "QubitHamiltonian":
         warnings.warn(
             "'QubitHamiltonian' has been renamed to 'QubitOperator' and is deprecated; it will be "
             "removed in a future release. Replace 'QubitHamiltonian' with 'QubitOperator' "
@@ -339,4 +329,5 @@ class QubitHamiltonian(QubitOperator, metaclass=_DeprecatedQubitOperatorAliasMet
             DeprecationWarning,
             stacklevel=2,
         )
-        super().__init__(*args, **kwargs)
+        return QubitOperator
+    raise AttributeError(f"module '{__name__}' has no attribute '{name}'")

@@ -643,6 +643,15 @@ class TestAlgorithmClasses:
         assert t2_ab.shape == (1,)
         assert np.isclose(t2_ab[0], 0.005)
 
+    @pytest.mark.parametrize("missing", [0, 1, 2])
+    def test_effective_hamiltonian_validates_null_inputs(self, missing):
+        """Null inputs reach the constructor's documented validation helper."""
+        constructor = MockEffectiveHamiltonianConstructor()
+        inputs = [create_test_wavefunction(), create_test_hamiltonian(2), spin_index_set(2, [0], [0])]
+        inputs[missing] = None
+        with pytest.raises(ValueError, match="must not be null"):
+            constructor.run(*inputs)
+
     def test_effective_hamiltonian_constructor_inheritance(self):
         """Test that EffectiveHamiltonianConstructor can be inherited from Python."""
         constructor = MockEffectiveHamiltonianConstructor()
