@@ -69,11 +69,12 @@ class UnitarySynthesisMapperSettings(Settings):
             (-1, 62),
         )
         self._set_default(
-            "max_lookup_swap_bits",
+            "max_swap_address_bits",
             "int",
             -1,
-            "Widest QROAM swap network, in address bits, of the table lookups; "
-            "-1 picks the Toffoli-optimal width and 0 uses a plain Select.",
+            "Upper bound on the address width k of each QROAM swap network of the table lookups; "
+            "-1 leaves each loader's cost model to choose, 0 forces plain select, "
+            "and a positive value limits each loader to widths at or below it.",
             (-1, 30),
         )
 
@@ -158,7 +159,7 @@ class UnitarySynthesisMapper(CircuitMapper):
         """
         container = self._container(unitary)
         synthesis = self._synthesize(container, self._num_input_qubits(container))
-        synthesis["maxSwapBits"] = self._settings.get("max_lookup_swap_bits")
+        synthesis["maxSwapBits"] = self._settings.get("max_swap_address_bits")
         return synthesis
 
     def _run_impl(self, unitary: UnitaryRepresentation) -> Circuit:
@@ -203,7 +204,7 @@ class UnitarySynthesisMapper(CircuitMapper):
 
 
 class DenseUnitarySynthesisMapper(UnitarySynthesisMapper):
-    """Isometry synthesis by cosine-sine decompositions :cite:`Rupprecht2026` that adds at most two qubits."""
+    """Isometry synthesis by cosine-sine decompositions :cite:`Berry2025,Rupprecht2026` that adds at most two qubits."""
 
     _qsharp_prefix = "DenseIsometry"
     _max_added_qubits = 2
@@ -256,7 +257,7 @@ class DenseUnitarySynthesisMapper(UnitarySynthesisMapper):
 
 
 class BlockSparseUnitarySynthesisMapper(UnitarySynthesisMapper):
-    """Isometry synthesis as QROAM-loaded permutations :cite:`Berry2025` around a block-diagonal orthogonal matrix."""
+    """Isometry synthesis as QROAM permutations around a block-diagonal orthogonal matrix :cite:`Rupprecht2026`."""
 
     _qsharp_prefix = "SparseIsometry"
 

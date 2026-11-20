@@ -421,6 +421,12 @@ TEST(UnitarySynthesisTest, ReconstructsSparseIsometries) {
   target(4, 3) = 1.0;
   Eigen::MatrixXd perturbed = target;
   perturbed(4, 3) += 1.5e-8;
+  // A block inside its own tolerance is also replaced by its polar factor.
+  Eigen::MatrixXd symmetric = random_orthogonal(3, 42);
+  symmetric += symmetric.transpose().eval();
+  symmetric *= 1.0e-9 / symmetric.norm();
+  perturbed.topLeftCorner(3, 3) = target.topLeftCorner(3, 3) *
+                                  (Eigen::MatrixXd::Identity(3, 3) + symmetric);
   SCOPED_TRACE("within tolerance");
   expect_sparse_reconstruction(block_sparse_isometry_synthesis(perturbed),
                                target);

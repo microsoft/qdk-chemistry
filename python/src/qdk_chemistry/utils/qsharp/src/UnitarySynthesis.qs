@@ -35,6 +35,7 @@ namespace QDKChemistry.Utils.UnitarySynthesis {
     import QDKChemistry.Utils.PhaseGradient.QuantizeRyAngles;
     import QDKChemistry.Utils.PhaseGradient.RyViaPhaseGradient;
     import QDKChemistry.Utils.SelectSwap.ApplyBranchPhaseFixup;
+    import QDKChemistry.Utils.SelectSwap.ComputeOptimalLambda2D;
     import QDKChemistry.Utils.SelectSwap.ComputeOptimalSwapBits;
     import QDKChemistry.Utils.SelectSwap.MeasurementUnlookupCost;
     import QDKChemistry.Utils.SelectSwap.SelectSwap2D;
@@ -62,7 +63,7 @@ namespace QDKChemistry.Utils.UnitarySynthesis {
         layerShifted : Bool[],
         /// Empty applies no signs.
         phases : Bool[],
-        /// Widest swap network of the angle lookups, -1 for the Toffoli-optimal width.
+        /// Widest swap network of the angle lookups, -1 to let each loader's cost model choose.
         maxSwapBits : Int,
     }
 
@@ -174,7 +175,7 @@ namespace QDKChemistry.Utils.UnitarySynthesis {
             let guarded = UseAddressGuard(Length(data), Length(address), numBits, maxSwapBits);
             let table = guarded ? data | Padded(-(1 <<< Length(address)), [false, size = numBits], data);
             if not guarded and IsEmpty(controls) {
-                let swapBits = ComputeOptimalSwapBits(Length(table), numBits, maxSwapBits);
+                let swapBits = ComputeOptimalLambda2D(1, Length(table), numBits, true, maxSwapBits);
                 within {
                     SelectSwap2D([table], swapBits, true, [], address, [], angleReg);
                 } apply {

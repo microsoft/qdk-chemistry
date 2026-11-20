@@ -649,14 +649,9 @@ void complete_blocks(std::vector<ColumnGroup>& groups, Eigen::Index left) {
       if (!(block_residual <= tolerance)) {
         continue;
       }
-      const bool project = !is_isometry(rectangle);
-      if (size == width && !project) {
-        continue;
-      }
+      // Every block is replaced by its polar factor, as on the dense path.
       const auto svd = singular_value_decomposition(rectangle.transpose());
-      if (project) {
-        rectangle = svd.v.leftCols(width) * svd.u.transpose();
-      }
+      rectangle = svd.v.leftCols(width) * svd.u.transpose();
       group.block.rightCols(size - width) = svd.v.rightCols(size - width);
     } catch (...) {
       errors[index] = std::current_exception();

@@ -114,7 +114,8 @@ Eigen::MatrixXd dense_isometry_right_factor(const Eigen::MatrixXd& isometry,
  * nonzero row.
  *
  * @param isometry Matrix with orthonormal columns and at least as many rows as
- * columns, whose duplicate entries are summed.
+ * columns, whose duplicate entries are summed and whose blocks are realized as
+ * their polar factors.
  * @throws std::invalid_argument If the matrix is empty, wider than tall, or
  * not a finite isometry.
  * @throws std::runtime_error If a numerical factorization breaks down.
