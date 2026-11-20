@@ -60,8 +60,10 @@ def _sossa_mapper_setting_defaults() -> tuple[tuple[Any, ...], ...]:
             "SELECT algorithm ('qrom_phase_gradient', 'one_hot' or 'direct'). 'one_hot' (arXiv:2611.09822) "
             "loads one qubit per distinct nonzero Givens angle vector plus a b == B flag instead of the "
             "(N-1)*rotation_bit_precision angle word, and fans each angle word out of it with CNOTs; it "
-            "loads that one-hot row with the same lookup as the angle word, so it saves qubits rather than "
-            "Toffolis, and it requires max_givens_rotation_batches = 1.",
+            "loads that one-hot row with the same lookup as the angle word, so it does not save Toffolis "
+            "and saves qubits only when the distinct-vector register and lookup scratch are narrower than "
+            "the binary angle-word implementation; many distinct vectors can make it wider, and it requires "
+            "max_givens_rotation_batches = 1.",
             ["qrom_phase_gradient", "one_hot", "direct"],
         ),
         (
@@ -138,7 +140,8 @@ def _sossa_mapper_setting_defaults() -> tuple[tuple[Any, ...], ...]:
             "low address field to a power of two, saving Toffolis when neither B+1 nor R is a power of "
             "two. Every method falls back to a plain lookup at shapes where its own cost model "
             "says no network pays. 'select_swap', 'dirty_select_swap' and 'skew_tree' choose their swap "
-            "widths under max_swap_address_bits.",
+            "widths under max_swap_address_bits; amortize_batch_lookups bypasses the clean QROAM and skew tree "
+            "for streamed Givens loads.",
             ["select", "select_swap", "dirty_select_swap", "skew_tree"],
         ),
         (
@@ -158,8 +161,10 @@ def _sossa_mapper_setting_defaults() -> tuple[tuple[Any, ...], ...]:
             "amortize_batch_lookups",
             "bool",
             False,
-            "When the Givens angles are streamed in J > 1 batches, load and unload all batches in J + 1 "
-            "telescoping lookups instead of 2J, each round XORing the next batch onto the previous one. With "
+            "When the Givens angles are streamed in J > 1 batches, telescope consecutive lookups "
+            "(J + 1 instead of 2J without measure_angle_words), each round XORing the next batch onto the previous one. "
+            "This bypasses clean select_swap and skew_tree for the angle loads and can increase Toffolis despite fewer "
+            "lookup rounds, since measurement-based unlookups are cheaper than forward loads. With "
             "lookup_method 'dirty_select_swap' a round borrows the idle spin-up register as swap workspace when "
             "the batch word fits in it; otherwise it is a plain controlled Select. It does nothing at J = 1.",
         ),
@@ -168,7 +173,9 @@ def _sossa_mapper_setting_defaults() -> tuple[tuple[Any, ...], ...]:
             "bool",
             False,
             "When the Givens angles are streamed in J > 1 batches, erase each angle word by measurement "
-            "right after its rotation, so its qubits are released within the sweep. It does nothing at J = 1.",
+            "right after its rotation; without amortize_batch_lookups its qubits are released within the sweep, "
+            "but with amortization the word stays allocated through the final phase fix-up and peak qubits can "
+            "increase. It does nothing at J = 1.",
         ),
         (
             "recompute_outer_registers",

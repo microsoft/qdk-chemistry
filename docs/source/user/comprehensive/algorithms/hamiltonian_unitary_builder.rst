@@ -523,8 +523,8 @@ generator rows remain valid when the total normalization is positive.
 Reference energies and query precision
 """""""""""""""""""""""""""""""""""""""
 
-The builder accepts either ``reference_ground_state_energy`` (a total
-energy) or ``reference_energy_gap``:
+The builder accepts one of ``reference_ground_state_energy`` (a total
+energy), ``reference_energy_gap``, or ``variational_bound_determinants``:
 
 .. math::
 
@@ -532,8 +532,18 @@ energy) or ``reference_energy_gap``:
    \lambda_{\mathrm{eff}}
    = \sqrt{E_{\mathrm{gap}}(2\Lambda-E_{\mathrm{gap}})}.
 
-A supplied reference must satisfy :math:`0<E_{\mathrm{gap}}<2\Lambda`.
-Without either reference, the block encoding can still be built, but
+``variational_bound_determinants`` supplies distinct occupation strings with
+one character per spatial orbital: ``0`` (empty), ``u`` (alpha), ``d`` (beta),
+or ``2`` (doubly occupied), all sharing the same alpha and beta electron counts.
+The builder computes the lowest Rayleigh--Ritz energy :math:`E_{\mathrm{ub}}`
+in their span and uses :math:`E_{\mathrm{gap}}=\min(E_{\mathrm{ub}}-E_{\mathrm{shift}},\Lambda)`
+to bound :math:`\lambda_{\mathrm{eff}}` from above in that particle-number sector
+:cite:`Shirobokov2026`.
+The cap at :math:`\Lambda` keeps the bound conservative, returning
+:math:`\lambda_{\mathrm{eff}}=\Lambda` when it applies.
+
+The resulting gap must satisfy :math:`0<E_{\mathrm{gap}}<2\Lambda`.
+The three settings are mutually exclusive; without any of them, the block encoding can still be built, but
 accessing ``lambda_eff`` for a query-count estimate raises an error.
 
 The factor container's ``get_lambda()``, the mapped normalization
@@ -586,7 +596,7 @@ Circuit precision and shared registers
      - Inner PREPARE implementation: ``"direct"``, ``"controlled_alias_sampling"``, or ``"one_hot"``, which decodes :math:`x_o` once per block encoding into a one-hot register and loads the alias word by unary iteration over :math:`b` alone :cite:`Shirobokov2026`. Default: ``"controlled_alias_sampling"``.
    * - ``select_algorithm``
      - str
-     - SELECT implementation: ``"direct"``, ``"qrom_phase_gradient"``, or ``"one_hot"``. ``"one_hot"`` loads a one-hot vector index and fans it out into one angle word; it loads that index with the same lookup as the angle word, so it saves qubits rather than Toffolis, and it requires ``max_givens_rotation_batches`` of 1. Default: ``"qrom_phase_gradient"``.
+     - SELECT implementation: ``"direct"``, ``"qrom_phase_gradient"``, or ``"one_hot"``. ``"one_hot"`` loads a one-hot vector index and fans it out into one angle word; it loads that index with the same lookup as the angle word, so it does not save Toffolis and saves qubits only when the distinct-vector register and lookup scratch are narrower than the binary angle-word implementation. Many distinct vectors can make it wider. Requires ``max_givens_rotation_batches`` of 1. Default: ``"qrom_phase_gradient"``.
    * - ``one_hot_vector_pairing``
      - bool
      - Let each ``"one_hot"`` SELECT qubit stand for two angle vectors, chosen by one more qubit :cite:`Shirobokov2026`, which halves the one-hot register for at most one more Toffoli per Givens step (none with ``compressed_angle_representation``). Requires ``givens_step`` ``"controlled_adder"``. Default: ``False``.
@@ -613,16 +623,16 @@ Circuit precision and shared registers
      - Upper bound :math:`J` on the passes SELECT makes over the :math:`N - 1` Givens angles. A larger :math:`J` narrows the rotation register at one extra table lookup per batch in each direction, so use it only when qubits are the binding constraint. Default: 1.
    * - ``lookup_method``
      - str
-     - How the Givens and inner alias-sampling tables are loaded: ``"select"``, ``"select_swap"`` (clean QROAM), ``"dirty_select_swap"``, or ``"skew_tree"``. ``"dirty_select_swap"`` borrows idle qubits instead of allocating scratch, but costs roughly two to three times the Toffolis of ``"select_swap"``; it narrows the circuit only when that scratch sets the peak width, so check the qubit count before choosing it. ``"skew_tree"`` behaves like ``"select_swap"`` but walks a skew tree over the in-range addresses of each unswapped Givens load; it saves Toffolis only when neither :math:`B + 1` nor :math:`R` is a power of two :cite:`Low2026`. Default: ``"select_swap"``.
+     - How the Givens and inner alias-sampling tables are loaded: ``"select"``, ``"select_swap"`` (clean QROAM), ``"dirty_select_swap"``, or ``"skew_tree"``. ``"dirty_select_swap"`` borrows idle qubits instead of allocating scratch, but costs roughly two to three times the Toffolis of ``"select_swap"``; it narrows the circuit only when that scratch sets the peak width, so check the qubit count before choosing it. ``"skew_tree"`` behaves like ``"select_swap"`` but walks a skew tree over the in-range addresses of each unswapped Givens load; it saves Toffolis only when neither :math:`B + 1` nor :math:`R` is a power of two :cite:`Low2026`. ``amortize_batch_lookups`` bypasses the clean QROAM and skew tree for streamed Givens loads. Default: ``"select_swap"``.
    * - ``recompute_outer_registers``
      - bool
      - Reorder the outer index so SELECT recomputes the generator type, rank, spin, and :math:`b = B` flags from :math:`x_o` and :math:`b` instead of loading a free-rider word :cite:`Low2026`. Default: ``False``.
    * - ``amortize_batch_lookups``
      - bool
-     - With ``max_givens_rotation_batches`` above 1, load and unload all angle batches in :math:`J + 1` telescoping lookups instead of :math:`2J`, each XORing the next batch onto the previous one. With ``"dirty_select_swap"`` a lookup borrows idle qubits as swap workspace when the batch fits; otherwise it is a plain controlled lookup. Default: ``False``.
+     - With ``max_givens_rotation_batches`` above 1, telescope consecutive angle lookups (:math:`J + 1` instead of :math:`2J` without ``measure_angle_words``), each XORing the next batch onto the previous one. This bypasses clean ``"select_swap"`` and ``"skew_tree"`` for angle loads and can increase Toffolis despite fewer lookup rounds, since measurement-based unlookups are cheaper than forward loads. With ``"dirty_select_swap"`` a lookup borrows idle qubits as swap workspace when the batch fits; otherwise it is a plain controlled lookup. Default: ``False``.
    * - ``measure_angle_words``
      - bool
-     - With ``max_givens_rotation_batches`` above 1, erase each streamed angle word by measurement right after its rotation. Default: ``False``.
+     - With ``max_givens_rotation_batches`` above 1, erase each streamed angle word by measurement right after its rotation. Without ``amortize_batch_lookups`` its qubits are released within the sweep; with amortization the word stays allocated through the final phase fix-up and peak qubits can increase. Default: ``False``.
 
 ``coefficient_bit_precision`` and ``rotation_bit_precision`` control
 different approximations and do not define a total energy-error budget.
