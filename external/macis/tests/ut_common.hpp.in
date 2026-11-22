@@ -30,6 +30,12 @@
 
 #cmakedefine REF_DATA_PREFIX "@REF_DATA_PREFIX@"
 const std::string water_ccpvdz_fcidump = REF_DATA_PREFIX "/h2o.ccpvdz.fci.dat";
+const std::string hubbard_2site_fcidump =
+    REF_DATA_PREFIX "/hubbard.2site.fci.dat";
+const std::string hubbard_2site_indices_first_fcidump =
+    REF_DATA_PREFIX "/hubbard.2site.indices_first.fci.dat";
+const std::string out_of_range_fcidump =
+    REF_DATA_PREFIX "/out_of_range.fci.dat";
 const std::string water_ccpvdz_rdms_fname =
     REF_DATA_PREFIX "/h2o.ccpvdz.cas88.rdms.bin";
 const std::string water_ccpvdz_rowptr_fname =

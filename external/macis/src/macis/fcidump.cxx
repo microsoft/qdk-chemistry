@@ -66,50 +66,63 @@ auto fcidump_line(const std::vector<std::string>& tokens) {
 
 enum FCIDumpFormat { IntegralFirst, IndicesFirst, Invalid };
 
-FCIDumpFormat detect_fcidump_format(const std::string& line) {
-  // Skip empty lines and lines with only whitespace
-  if (line.empty() || line.find_first_not_of(" \t\n\r") == std::string::npos) {
-    return FCIDumpFormat::Invalid;
-  }
+bool is_fcidump_index(const std::string& token) {
+  return !token.empty() &&
+         std::all_of(token.begin(), token.end(),
+                     [](unsigned char c) { return std::isdigit(c); });
+}
 
-  // Tokenize the line
+// The column order of a line: the one whose four index columns hold
+// non-negative integers. Invalid if both orders do (e.g. "4 1 1 1 1") or
+// neither does.
+FCIDumpFormat detect_fcidump_format(const std::string& line) {
   auto tokens = split(line, "\\s+");
   if (tokens.size() != 5) {
     return FCIDumpFormat::Invalid;
   }
 
-  // Check if first token is a float (contains '.' or scientific notation)
-  bool first_is_float = is_float(tokens[0]);
-  // Check if last token is a float
-  bool last_is_float = is_float(tokens[4]);
+  const bool integral_first =
+      std::all_of(tokens.begin() + 1, tokens.end(), is_fcidump_index);
+  const bool indices_first =
+      std::all_of(tokens.begin(), tokens.end() - 1, is_fcidump_index);
+  if (integral_first == indices_first) {
+    return FCIDumpFormat::Invalid;
+  }
+  return integral_first ? FCIDumpFormat::IntegralFirst
+                        : FCIDumpFormat::IndicesFirst;
+}
 
-  // If first token is float and last is not, then format is: integral p q r s
-  if (first_is_float && !last_is_float) {
-    return FCIDumpFormat::IntegralFirst;
-  }
-  // If last token is float and first is not, then format is: p q r s integral
-  else if (!first_is_float && last_is_float) {
-    return FCIDumpFormat::IndicesFirst;
-  }
-  // If both or neither are floats, we need to be more careful
-  else {
-    // Try to parse as integers - if the first 4 tokens can be parsed as
-    // valid orbital indices (positive integers), assume indices first format
-    try {
-      for (int i = 0; i < 4; i++) {
-        int idx = std::stoi(tokens[i]);
-        if (idx < 0) {
-          // Negative indices suggest this might be integral first format
-          return FCIDumpFormat::IntegralFirst;
-        }
-      }
-      // All first 4 tokens are non-negative integers, assume indices first
-      return FCIDumpFormat::IndicesFirst;
-    } catch (const std::exception&) {
-      // If parsing first 4 as integers fails, assume integral first
-      return FCIDumpFormat::IntegralFirst;
+// The column order of the integral lines of an FCIDUMP file: that of the first
+// line that decides it, else the standard order (integral first)
+FCIDumpFormat fcidump_format(const std::string& content) {
+  const char* ptr = content.c_str();
+  const char* end = ptr + content.length();
+  std::string line;
+  bool header_passed = false;
+  while (ptr < end) {
+    const char* line_end = std::find(ptr, end, '\n');
+    line.assign(ptr, line_end);
+    ptr = line_end + 1;
+
+    if (!header_passed) {
+      header_passed = line.find("&END") != std::string::npos;
+      continue;
+    }
+    const auto format = detect_fcidump_format(line);
+    if (format != FCIDumpFormat::Invalid) {
+      return format;
     }
   }
+  return FCIDumpFormat::IntegralFirst;
+}
+
+// The zero-based orbital of a one-based FCIDUMP index
+int32_t fcidump_orbital(int32_t index, size_t norb) {
+  if (index < 1 || static_cast<size_t>(index) > norb) {
+    throw std::runtime_error("FCIDUMP orbital index " + std::to_string(index) +
+                             " is outside [1, " + std::to_string(norb) + "]");
+  }
+  return index - 1;
 }
 
 auto fcidump_line_integral_first(const std::string& line) {
@@ -257,8 +270,7 @@ double read_fcidump_core(std::string fname) {
   const char* end = ptr + content.length();
   std::string line;
   bool header_passed = false;
-  bool format_detected = false;
-  auto format = FCIDumpFormat::Invalid;
+  const auto format = fcidump_format(content);
 
   while (ptr < end) {
     const char* line_end = std::find(ptr, end, '\n');
@@ -271,14 +283,6 @@ double read_fcidump_core(std::string fname) {
         header_passed = true;
       }
       continue;
-    } else if (!format_detected) {
-      // Detect format
-      format = detect_fcidump_format(line);
-      if (format == FCIDumpFormat::Invalid) {
-        continue;  // Skip invalid lines
-      }
-
-      format_detected = true;
     }
 
     auto [valid, p, q, r, s, integral] = fcidump_line(format, line);
@@ -315,8 +319,7 @@ void read_fcidump_1body(std::string fname, col_major_span<double, 2> T) {
   const char* end = ptr + content.length();
   std::string line;
   bool header_passed = false;
-  bool format_detected = false;
-  auto format = FCIDumpFormat::Invalid;
+  const auto format = fcidump_format(content);
 
   while (ptr < end) {
     const char* line_end = std::find(ptr, end, '\n');
@@ -329,14 +332,6 @@ void read_fcidump_1body(std::string fname, col_major_span<double, 2> T) {
         header_passed = true;
       }
       continue;
-    } else if (!format_detected) {
-      // Detect format
-      format = detect_fcidump_format(line);
-      if (format == FCIDumpFormat::Invalid) {
-        continue;  // Skip invalid lines
-      }
-
-      format_detected = true;
     }
 
     auto [valid, p, q, r, s, integral] = fcidump_line(format, line);
@@ -344,8 +339,8 @@ void read_fcidump_1body(std::string fname, col_major_span<double, 2> T) {
 
     auto lc = line_classification(p, q, r, s);
     if (lc == LineClassification::OneBody) {
-      p--;
-      q--;
+      p = fcidump_orbital(p, norb);
+      q = fcidump_orbital(q, norb);
       T(p, q) = integral;
       T(q, p) = integral;
     }
@@ -384,8 +379,7 @@ void read_fcidump_2body(std::string fname, col_major_span<double, 4> V) {
   const char* end = ptr + content.length();
   std::string line;
   bool header_passed = false;
-  bool format_detected = false;
-  auto format = FCIDumpFormat::Invalid;
+  const auto format = fcidump_format(content);
 
   while (ptr < end) {
     const char* line_end = std::find(ptr, end, '\n');
@@ -398,14 +392,6 @@ void read_fcidump_2body(std::string fname, col_major_span<double, 4> V) {
         header_passed = true;
       }
       continue;
-    } else if (!format_detected) {
-      // Detect format
-      format = detect_fcidump_format(line);
-      if (format == FCIDumpFormat::Invalid) {
-        continue;  // Skip invalid lines
-      }
-
-      format_detected = true;
     }
 
     auto [valid, p, q, r, s, integral] = fcidump_line(format, line);
@@ -413,10 +399,10 @@ void read_fcidump_2body(std::string fname, col_major_span<double, 4> V) {
 
     auto lc = line_classification(p, q, r, s);
     if (lc == LineClassification::TwoBody) {
-      p--;
-      q--;
-      r--;
-      s--;
+      p = fcidump_orbital(p, norb);
+      q = fcidump_orbital(q, norb);
+      r = fcidump_orbital(r, norb);
+      s = fcidump_orbital(s, norb);
       V(p, q, r, s) = integral;  // (pq|rs)
       V(p, q, s, r) = integral;  // (pq|sr)
       V(q, p, r, s) = integral;  // (qp|rs)
@@ -605,8 +591,7 @@ void read_fcidump_all(std::string fname, double* T, size_t LDT, double* V,
 
   std::string line;
   bool header_passed = false;
-  bool format_detected = false;
-  auto format = FCIDumpFormat::Invalid;
+  const auto format = fcidump_format(content);
 
   // Parse line by line manually
   const char* ptr = content.c_str();
@@ -625,13 +610,6 @@ void read_fcidump_all(std::string fname, double* T, size_t LDT, double* V,
         header_passed = true;
       }
       continue;
-    } else if (!format_detected) {
-      // Detect format
-      format = detect_fcidump_format(line);
-      if (format == FCIDumpFormat::Invalid) {
-        continue;  // Skip invalid lines
-      }
-      format_detected = true;
     }
 
     // Parse the line
@@ -647,16 +625,16 @@ void read_fcidump_all(std::string fname, double* T, size_t LDT, double* V,
       E_core = integral;
     } else if (lc == LineClassification::OneBody) {
       // One-body term
-      p--;
-      q--;
+      p = fcidump_orbital(p, norb);
+      q = fcidump_orbital(q, norb);
       T[p + q * LDT] = integral;
       T[q + p * LDT] = integral;
     } else if (lc == LineClassification::TwoBody) {
       // Two-body term
-      p--;
-      q--;
-      r--;
-      s--;
+      p = fcidump_orbital(p, norb);
+      q = fcidump_orbital(q, norb);
+      r = fcidump_orbital(r, norb);
+      s = fcidump_orbital(s, norb);
 
       V[p + q * LDV + r * LDV2 + s * LDV3] = integral;  // (pq|rs)
       V[p + q * LDV + s * LDV2 + r * LDV3] = integral;  // (pq|sr)
