@@ -77,6 +77,7 @@ double asci_pt2_constraint(ASCISettings asci_settings,
   auto world_rank = comm_rank(comm);
   auto world_size = comm_size(comm);
   auto logger = spdlog::get("asci_pt2");
+  const detail::asci_diagonals diagonals(ham_gen);
   if (!logger) {
     logger = world_rank ? spdlog::null_logger_mt("asci_pt2")
                         : spdlog::stdout_color_mt("asci_pt2");
@@ -320,31 +321,31 @@ double asci_pt2_constraint(ASCISettings asci_settings,
             generate_constraint_singles_contributions_ss(
                 c, w, con, occ_alpha, occ_beta, orb_ens_alpha.data(), T_pq,
                 norb, G_red, norb, V_red, norb, h_el_tol, h_diag, E_ASCI,
-                ham_gen, asci_pairs);
+                diagonals, asci_pairs);
 
             // AAAA excitations
             generate_constraint_doubles_contributions_ss(
                 c, w, con, occ_alpha, occ_beta, orb_ens_alpha.data(), V_pqrs,
-                norb, h_el_tol, h_diag, E_ASCI, ham_gen, asci_pairs);
+                norb, h_el_tol, h_diag, E_ASCI, diagonals, asci_pairs);
 
             // AABB excitations
             generate_constraint_doubles_contributions_os(
                 c, w, con, occ_alpha, occ_beta, vir_beta, orb_ens_alpha.data(),
                 orb_ens_beta.data(), V_pqrs, norb, h_el_tol, h_diag, E_ASCI,
-                ham_gen, asci_pairs);
+                diagonals, asci_pairs);
 
             if (alpha_satisfies_con) {
               // BB excitations
               append_singles_asci_contributions<Spin::Beta>(
                   c, w, beta_det, occ_beta, vir_beta, occ_alpha,
                   orb_ens_beta.data(), T_pq, norb, G_red, norb, V_red, norb,
-                  h_el_tol, h_diag, E_ASCI, ham_gen, asci_pairs);
+                  h_el_tol, h_diag, E_ASCI, diagonals, asci_pairs);
 
               // BBBB excitations
               append_ss_doubles_asci_contributions<Spin::Beta>(
                   c, w, beta_det, alpha_det, occ_beta, vir_beta, occ_alpha,
                   orb_ens_beta.data(), V_pqrs, norb, h_el_tol, h_diag, E_ASCI,
-                  ham_gen, asci_pairs);
+                  diagonals, asci_pairs);
 
               // No excitation (push inf to remove from list)
               asci_pairs.push_back(
@@ -380,7 +381,7 @@ double asci_pt2_constraint(ASCISettings asci_settings,
                                                   asci_pairs_con.end());
         pair_size = std::distance(asci_pairs_con.begin(), uit);
         for (auto it = asci_pairs_con.begin(); it != uit; ++it) {
-          if (!std::isinf(it->c_times_matel)) {
+          if (!it->is_core()) {
             EPT2_local += it->pt2();
             NPT2_local++;
           }
@@ -460,31 +461,31 @@ double asci_pt2_constraint(ASCISettings asci_settings,
             generate_constraint_singles_contributions_ss(
                 c, w, con, occ_alpha, occ_beta, orb_ens_alpha.data(), T_pq,
                 norb, G_red, norb, V_red, norb, h_el_tol, h_diag, E_ASCI,
-                ham_gen, asci_pairs);
+                diagonals, asci_pairs);
 
             // AAAA excitations
             generate_constraint_doubles_contributions_ss(
                 c, w, con, occ_alpha, occ_beta, orb_ens_alpha.data(), V_pqrs,
-                norb, h_el_tol, h_diag, E_ASCI, ham_gen, asci_pairs);
+                norb, h_el_tol, h_diag, E_ASCI, diagonals, asci_pairs);
 
             // AABB excitations
             generate_constraint_doubles_contributions_os(
                 c, w, con, occ_alpha, occ_beta, vir_beta, orb_ens_alpha.data(),
                 orb_ens_beta.data(), V_pqrs, norb, h_el_tol, h_diag, E_ASCI,
-                ham_gen, asci_pairs);
+                diagonals, asci_pairs);
 
             if (alpha_satisfies_con) {
               // BB excitations
               append_singles_asci_contributions<Spin::Beta>(
                   c, w, beta_det, occ_beta, vir_beta, occ_alpha,
                   orb_ens_beta.data(), T_pq, norb, G_red, norb, V_red, norb,
-                  h_el_tol, h_diag, E_ASCI, ham_gen, asci_pairs);
+                  h_el_tol, h_diag, E_ASCI, diagonals, asci_pairs);
 
               // BBBB excitations
               append_ss_doubles_asci_contributions<Spin::Beta>(
                   c, w, beta_det, alpha_det, occ_beta, vir_beta, occ_alpha,
                   orb_ens_beta.data(), V_pqrs, norb, h_el_tol, h_diag, E_ASCI,
-                  ham_gen, asci_pairs);
+                  diagonals, asci_pairs);
 
               // No excitation (push inf to remove from list)
               asci_pairs.push_back(
@@ -525,7 +526,7 @@ double asci_pt2_constraint(ASCISettings asci_settings,
           auto uit = sort_and_accumulate_asci_pairs(asci_pairs.begin(),
                                                     asci_pairs.end());
           for (auto it = asci_pairs.begin(); it != uit; ++it) {
-            if (!std::isinf(it->c_times_matel)) {
+            if (!it->is_core()) {
               EPT2_local += it->pt2();
               NPT2_local++;
             }

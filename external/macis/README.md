@@ -137,6 +137,27 @@ FetchContent_MakeAvailable( macis )
 target_link_libraries( my_target PUBLIC macis::macis )
 ```
 
+### ASCI contribution records
+
+`macis::asci_contrib` stores the unscaled numerator `c_times_matel` and the
+binary64 energy difference `h_diag = E0 - Hqq`. When that difference overflows,
+`h_diag` is signed infinity and the fourth member, `half_gap`, stores the finite
+half-difference (zero when unused). Use `rv()` for the signed selection amplitude
+and `pt2()` for the energy contribution; dividing the raw fields can lose a
+finite result. Duplicate determinants sum their numerators before scoring.
+The wider gap range does not extend the numerator accumulator: individual
+numerators and their partial sums must still fit in a finite `double`. A
+fragile incremental diagonal is checked against the occupied determinant,
+not evaluated with arbitrary-precision integral summation.
+An exactly cancelled numerator contributes zero even at resonance; a nonzero
+coupling at a true zero gap has infinite score and is not a core marker.
+
+Code using the former three-member record must be rebuilt. Three-value
+aggregate initialization still works for representable gaps. Use named members
+instead of three-element structured bindings, update any stored or exchanged
+record layout, and use `from_energies(state, numerator, E0, Hqq)` to construct
+a contribution when the difference might overflow.
+
 ### Influential CMake Variables
 
 | Variable Name | Description | Default |

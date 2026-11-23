@@ -394,7 +394,7 @@ size_t constraint_histogram(WfnType det, size_t n_os_singles,
  * @param[in] h_el_tol Threshold for matrix element magnitude
  * @param[in] root_diag Root diagonal correction term
  * @param[in] E0 Reference energy
- * @param[in] ham_gen Hamiltonian generator for fast diagonal evaluation
+ * @param[in] diagonals Hamiltonian and roundoff scale for diagonal evaluation
  * @param[in,out] asci_contributions Container to store the computed
  * contributions
  */
@@ -405,7 +405,7 @@ void generate_constraint_singles_contributions_ss(
     const std::vector<uint32_t>& occ_othr, const double* eps,
     const double* T_pq, const size_t LDT, const double* G_kpq, const size_t LDG,
     const double* V_kpq, const size_t LDV, double h_el_tol, double root_diag,
-    double E0, HamiltonianGeneratorBase<double>& ham_gen,
+    double E0, const detail::asci_diagonals& diagonals,
     asci_contrib_container<WfnType>& asci_contributions) {
   using wfn_traits = wavefunction_traits<WfnType>;
   using constraint_traits = typename ConType::constraint_traits;
@@ -444,9 +444,10 @@ void generate_constraint_singles_contributions_ss(
       h_el *= sign;
 
       // Compute Fast Diagonal Matrix Element
-      auto h_diag = ham_gen.fast_diag_single(eps[i], eps[a], i, a, root_diag);
-      asci_contributions.push_back(asci_contrib<WfnType>::from_energies(
-          ex_det, coeff * h_el, E0, h_diag));
+      auto h_diag =
+          diagonals.ham.fast_diag_single(eps[i], eps[a], i, a, root_diag);
+      asci_contributions.push_back(
+          diagonals.contribution(ex_det, coeff * h_el, E0, h_diag));
     }
   }
 }
@@ -474,7 +475,7 @@ void generate_constraint_singles_contributions_ss(
  * @param[in] h_el_tol Threshold for matrix element magnitude
  * @param[in] root_diag Root diagonal correction term
  * @param[in] E0 Reference energy
- * @param[in] ham_gen Hamiltonian generator for fast diagonal evaluation
+ * @param[in] diagonals Hamiltonian and roundoff scale for diagonal evaluation
  * @param[in,out] asci_contributions Container to store the computed
  * contributions
  */
@@ -490,7 +491,7 @@ void generate_constraint_doubles_contributions_ss(
     const std::vector<uint32_t>& occ_same,
     const std::vector<uint32_t>& occ_othr, const double* eps, const double* V,
     const size_t LDV, double h_el_tol, double root_diag, double E0,
-    HamiltonianGeneratorBase<double>& ham_gen,
+    const detail::asci_diagonals& diagonals,
     asci_contrib_container<WfnType>& asci_contributions,
     std::vector<typename ConType::constraint_type>& O_buf,
     std::vector<typename ConType::constraint_type>& V_buf,
@@ -546,10 +547,10 @@ void generate_constraint_doubles_contributions_ss(
       auto h_el = sign * G_aibj;
 
       // Evaluate fast diagonal matrix element
-      auto h_diag = ham_gen.fast_diag_ss_double(eps[i], eps[j], eps[a], eps[b],
-                                                i, j, a, b, root_diag);
-      asci_contributions.push_back(asci_contrib<WfnType>::from_energies(
-          full_ex, coeff * h_el, E0, h_diag));
+      auto h_diag = diagonals.ham.fast_diag_ss_double(
+          eps[i], eps[j], eps[a], eps[b], i, j, a, b, root_diag);
+      asci_contributions.push_back(
+          diagonals.contribution(full_ex, coeff * h_el, E0, h_diag));
     }
   }
 }
@@ -561,14 +562,14 @@ void generate_constraint_doubles_contributions_ss(
     const std::vector<uint32_t>& occ_same,
     const std::vector<uint32_t>& occ_othr, const double* eps, const double* V,
     const size_t LDV, double h_el_tol, double root_diag, double E0,
-    HamiltonianGeneratorBase<double>& ham_gen,
+    const detail::asci_diagonals& diagonals,
     asci_contrib_container<WfnType>& asci_contributions) {
   using constraint_type = typename ConType::constraint_type;
   std::vector<constraint_type> O_buf, V_buf;
   std::vector<uint32_t> virt_ind_buf, occ_ind_buf;
   generate_constraint_doubles_contributions_ss(
       coeff, det, constraint, occ_same, occ_othr, eps, V, LDV, h_el_tol,
-      root_diag, E0, ham_gen, asci_contributions, O_buf, V_buf, virt_ind_buf,
+      root_diag, E0, diagonals, asci_contributions, O_buf, V_buf, virt_ind_buf,
       occ_ind_buf);
 }
 
@@ -596,7 +597,7 @@ void generate_constraint_doubles_contributions_ss(
  * @param[in] h_el_tol Threshold for matrix element magnitude
  * @param[in] root_diag Root diagonal correction term
  * @param[in] E0 Reference energy
- * @param[in] ham_gen Hamiltonian generator for fast diagonal evaluation
+ * @param[in] diagonals Hamiltonian and roundoff scale for diagonal evaluation
  * @param[in,out] asci_contributions Container to store the computed
  * contributions
  */
@@ -607,7 +608,7 @@ void generate_constraint_doubles_contributions_os(
     const std::vector<uint32_t>& occ_othr,
     const std::vector<uint32_t>& vir_othr, const double* eps_same,
     const double* eps_othr, const double* V, const size_t LDV, double h_el_tol,
-    double root_diag, double E0, HamiltonianGeneratorBase<double>& ham_gen,
+    double root_diag, double E0, const detail::asci_diagonals& diagonals,
     asci_contrib_container<WfnType>& asci_contributions) {
   using wfn_traits = wavefunction_traits<WfnType>;
   using constraint_traits = typename ConType::constraint_traits;
@@ -656,11 +657,11 @@ void generate_constraint_doubles_contributions_os(
           // Finalize Matrix Element
           auto h_el = sign * V_aibj;
 
-          auto h_diag =
-              ham_gen.fast_diag_os_double(eps_same[i], eps_othr[j], eps_same[a],
-                                          eps_othr[b], i, j, a, b, root_diag);
-          asci_contributions.push_back(asci_contrib<WfnType>::from_energies(
-              ex_det, coeff * h_el, E0, h_diag));
+          auto h_diag = diagonals.ham.fast_diag_os_double(
+              eps_same[i], eps_othr[j], eps_same[a], eps_othr[b], i, j, a, b,
+              root_diag);
+          asci_contributions.push_back(
+              diagonals.contribution(ex_det, coeff * h_el, E0, h_diag));
         }  // BJ
 
     }  // A

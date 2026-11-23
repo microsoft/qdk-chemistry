@@ -8,6 +8,7 @@
  */
 
 #pragma once
+#include <algorithm>
 #include <cmath>
 #include <limits>
 #include <macis/hamiltonian_generator.hpp>
@@ -41,20 +42,18 @@ struct asci_contrib {
   /// @brief Product of coefficient and matrix element with the generating
   /// P-space state
   double c_times_matel;
-  /// @brief E0 - <Q|H|Q>, or half that gap if it exceeds the double range
+  /// @brief E0 - <Q|H|Q>, including signed infinity on overflow
   double h_diag;
-  bool half_gap = false;
+  /// @brief Half the gap if the difference of finite energies overflows
+  double half_gap = 0;
 
   /// Keep the numerator unscaled so duplicate states can sum it before PT2.
   static asci_contrib from_energies(WfnT state, double numerator, double E0,
                                     double diagonal) {
-    constexpr double half_max = std::numeric_limits<double>::max() / 2;
-    if (std::abs(E0) > half_max || std::abs(diagonal) > half_max) {
-      const double half = std::midpoint(E0, -diagonal);
-      if (std::isfinite(half) && std::abs(half) > half_max)
-        return {state, numerator, half, true};
-    }
-    return {state, numerator, E0 - diagonal};
+    const double gap = E0 - diagonal;
+    if (std::isinf(gap) && std::isfinite(E0) && std::isfinite(diagonal))
+      return {state, numerator, gap, std::midpoint(E0, -diagonal)};
+    return {state, numerator, gap};
   }
 
   /**
@@ -62,8 +61,16 @@ struct asci_contrib {
    * @return The ratio c_times_matel / (E0 - <Q|H|Q>)
    */
   auto rv() const {
-    return (half_gap ? 0.5 * c_times_matel : c_times_matel) / h_diag;
+    if (half_gap != 0) [[unlikely]]
+      return (0.5 * c_times_matel) / half_gap;
+    if (h_diag == 0 && c_times_matel == 0) [[unlikely]]
+      return 0.;
+    return c_times_matel / h_diag;
   }
+
+  /// Core determinants are marked in the numerator, not in the score:
+  /// a coupled external determinant can legitimately have infinite score.
+  bool is_core() const { return std::isinf(c_times_matel); }
 
   /**
    * @brief Calculate the second-order perturbation theory contribution
@@ -82,6 +89,60 @@ struct asci_contrib {
 /// @brief Container type for storing multiple ASCI contributions
 template <typename WfnT>
 using asci_contrib_container = std::vector<asci_contrib<WfnT>>;
+
+namespace detail {
+
+struct asci_diagonals {
+  const HamiltonianGeneratorBase<double>& ham;
+  double roundoff;
+
+  // Compute once per search/PT2 call. Include spectator integrals: neither
+  // E0 nor the fast diagonal bounds the intermediates that produced it.
+  asci_diagonals(const HamiltonianGeneratorBase<double>& h) : ham(h) {
+    const size_t n = h.norb();
+    double scale = 0;
+    for (size_t i = 0; i < n; ++i)
+      scale = std::max(scale, std::abs(h.T()[i + i * n]));
+    for (size_t i = 0; i < n * n; ++i)
+      scale =
+          std::max({scale, std::abs(h.G2_red()[i]), std::abs(h.V2_red()[i])});
+    // A direct sum has <= 3n²+2n terms. The fast update also uses up to
+    // four orbital sums (<= 3n+2 terms each) and 12 pair corrections.
+    // m terms of size <= scale have a summation error of order m² eps scale.
+    const double m = 3. * n * n + 2. * n + 4. * (3. * n + 2.) + 12.;
+    roundoff = (m * m * std::numeric_limits<double>::epsilon()) * scale;
+  }
+
+  template <typename WfnT>
+#if __has_cpp_attribute(gnu::cold)
+  [[gnu::cold]]
+#endif
+  asci_contrib<WfnT> checked_contribution(WfnT state, double numerator,
+                                          double E0, double diagonal,
+                                          double gap) const {
+    // Validate a fragile gap, never round it to zero. The direct sum can
+    // itself overflow, in which case prefer a finite fast result.
+    if (!std::isfinite(diagonal) || std::abs(gap) <= roundoff) {
+      using traits = wavefunction_traits<WfnT>;
+      const double direct =
+          ham.matrix_element_diag(bits_to_indices(traits::alpha_string(state)),
+                                  bits_to_indices(traits::beta_string(state)));
+      if (std::isfinite(direct) || !std::isfinite(diagonal)) diagonal = direct;
+    }
+    return asci_contrib<WfnT>::from_energies(state, numerator, E0, diagonal);
+  }
+
+  template <typename WfnT>
+  asci_contrib<WfnT> contribution(WfnT state, double numerator, double E0,
+                                  double diagonal) const {
+    const double gap = E0 - diagonal;
+    if (std::isfinite(gap) && std::abs(gap) > roundoff) [[likely]]
+      return {state, numerator, gap};
+    return checked_contribution(state, numerator, E0, diagonal, gap);
+  }
+};
+
+}  // namespace detail
 
 /**
  * @brief Generate single excitation ASCI contributions for a given spin
@@ -110,7 +171,7 @@ using asci_contrib_container = std::vector<asci_contrib<WfnT>>;
  * @param[in] h_el_tol Threshold for matrix element magnitude
  * @param[in] root_diag Root diagonal correction term
  * @param[in] E0 Reference energy
- * @param[in] ham_gen Hamiltonian generator for fast diagonal evaluation
+ * @param[in] diagonals Hamiltonian and roundoff scale for diagonal evaluation
  * @param[in,out] asci_contributions Container to store the computed
  * contributions
  */
@@ -122,7 +183,7 @@ void append_singles_asci_contributions(
     const std::vector<uint32_t>& occ_othr, const double* eps_same,
     const double* T_pq, const size_t LDT, const double* G_kpq, const size_t LDG,
     const double* V_kpq, const size_t LDV, double h_el_tol, double root_diag,
-    double E0, const HamiltonianGeneratorBase<double>& ham_gen,
+    double E0, const detail::asci_diagonals& diagonals,
     asci_contrib_container<WfnType>& asci_contributions) {
   using wfn_traits = wavefunction_traits<WfnType>;
   const auto LDG2 = LDG * LDG;
@@ -148,12 +209,12 @@ void append_singles_asci_contributions(
       h_el *= sign;
 
       // Calculate fast diagonal matrix element
-      auto h_diag =
-          ham_gen.fast_diag_single(eps_same[i], eps_same[a], i, a, root_diag);
+      auto h_diag = diagonals.ham.fast_diag_single(eps_same[i], eps_same[a], i,
+                                                   a, root_diag);
 
       // Append to return values
-      asci_contributions.push_back(asci_contrib<WfnType>::from_energies(
-          ex_det, coeff * h_el, E0, h_diag));
+      asci_contributions.push_back(
+          diagonals.contribution(ex_det, coeff * h_el, E0, h_diag));
 
     }  // Loop over single extitations
 }
@@ -183,7 +244,7 @@ void append_singles_asci_contributions(
  * @param[in] h_el_tol Threshold for matrix element magnitude
  * @param[in] root_diag Root diagonal correction term
  * @param[in] E0 Reference energy
- * @param[in] ham_gen Hamiltonian generator for fast diagonal evaluation
+ * @param[in] diagonals Hamiltonian and roundoff scale for diagonal evaluation
  * @param[in,out] asci_contributions Container to store the computed
  * contributions
  */
@@ -193,8 +254,7 @@ void append_ss_doubles_asci_contributions(
     SpinWfnType state_other, const std::vector<uint32_t>& ss_occ,
     const std::vector<uint32_t>& vir, const std::vector<uint32_t>& os_occ,
     const double* eps_same, const double* V, size_t LDV, double h_el_tol,
-    double root_diag, double E0,
-    const HamiltonianGeneratorBase<double>& ham_gen,
+    double root_diag, double E0, const detail::asci_diagonals& diagonals,
     asci_contrib_container<WfnType>& asci_contributions) {
   using wfn_traits = wavefunction_traits<WfnType>;
   using spin_wfn_traits = wavefunction_traits<SpinWfnType>;
@@ -236,13 +296,13 @@ void append_ss_doubles_asci_contributions(
           auto h_el = sign * G_aibj;
 
           // Evaluate fast diagonal matrix element
-          auto h_diag =
-              ham_gen.fast_diag_ss_double(eps_same[i], eps_same[j], eps_same[a],
-                                          eps_same[b], i, j, a, b, root_diag);
+          auto h_diag = diagonals.ham.fast_diag_ss_double(
+              eps_same[i], eps_same[j], eps_same[a], eps_same[b], i, j, a, b,
+              root_diag);
 
           // Append {det, c*h_el}
-          asci_contributions.push_back(asci_contrib<WfnType>::from_energies(
-              ex_det, coeff * h_el, E0, h_diag));
+          asci_contributions.push_back(
+              diagonals.contribution(ex_det, coeff * h_el, E0, h_diag));
 
         }  // Restricted BJ loop
     }  // AI Loop
@@ -273,7 +333,7 @@ void append_ss_doubles_asci_contributions(
  * @param[in] h_el_tol Threshold for matrix element magnitude
  * @param[in] root_diag Root diagonal correction term
  * @param[in] E0 Reference energy
- * @param[in] ham_gen Hamiltonian generator for fast diagonal evaluation
+ * @param[in] diagonals Hamiltonian and roundoff scale for diagonal evaluation
  * @param[in,out] asci_contributions Container to store the computed
  * contributions
  */
@@ -285,8 +345,7 @@ void append_os_doubles_asci_contributions(
     const std::vector<uint32_t>& vir_alpha,
     const std::vector<uint32_t>& vir_beta, const double* eps_alpha,
     const double* eps_beta, const double* V, size_t LDV, double h_el_tol,
-    double root_diag, double E0,
-    const HamiltonianGeneratorBase<double>& ham_gen,
+    double root_diag, double E0, const detail::asci_diagonals& diagonals,
     asci_contrib_container<WfnType>& asci_contributions) {
   using wfn_traits = wavefunction_traits<WfnType>;
   const size_t LDV2 = LDV * LDV;
@@ -313,12 +372,12 @@ void append_os_doubles_asci_contributions(
           auto h_el = sign * V_aibj;
 
           // Evaluate fast diagonal element
-          auto h_diag = ham_gen.fast_diag_os_double(eps_alpha[i], eps_beta[j],
-                                                    eps_alpha[a], eps_beta[b],
-                                                    i, j, a, b, root_diag);
+          auto h_diag = diagonals.ham.fast_diag_os_double(
+              eps_alpha[i], eps_beta[j], eps_alpha[a], eps_beta[b], i, j, a, b,
+              root_diag);
 
-          asci_contributions.push_back(asci_contrib<WfnType>::from_energies(
-              ex_det, coeff * h_el, E0, h_diag));
+          asci_contributions.push_back(
+              diagonals.contribution(ex_det, coeff * h_el, E0, h_diag));
         }  // BJ loop
     }  // AI loop
 }
