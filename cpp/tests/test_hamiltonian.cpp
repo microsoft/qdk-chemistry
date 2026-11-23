@@ -3357,6 +3357,32 @@ TEST_F(CholeskyTest, O2_Unrestricted_Comparison) {
   }
 }
 
+TEST_F(CholeskyTest, SingleBatchMatchesIncore) {
+  // With one batch holding every shell pair, only cholesky_span_factor keeps
+  // the batch from taking round-off dominated pivots; without it, this
+  // largest ERI error is ~2e-4.
+  auto scf_factory = ScfSolverFactory::create("qdk");
+  scf_factory->settings().set("method", "hf");
+  auto [energy, wavefunction] =
+      scf_factory->run(testing::create_water_structure(), 0, 1, "cc-pvtz");
+  auto orbitals = wavefunction->get_orbitals();
+
+  auto ham_incore_factory = HamiltonianConstructorFactory::create("qdk");
+  ham_incore_factory->settings().set("eri_method", "incore");
+  auto ham_incore = ham_incore_factory->run(orbitals);
+
+  auto ham_chol_factory = HamiltonianConstructorFactory::create("qdk_cholesky");
+  ham_chol_factory->settings().set("cholesky_tolerance",
+                                   testing::integral_tolerance);
+  ham_chol_factory->settings().set("cholesky_gemm_batch_cols",
+                                   static_cast<size_t>(1000000));
+  auto ham_chol = ham_chol_factory->run(orbitals);
+
+  const auto& aaaa_incore = std::get<0>(ham_incore->get_two_body_integrals());
+  const auto& aaaa_chol = std::get<0>(ham_chol->get_two_body_integrals());
+  EXPECT_LT((aaaa_incore - aaaa_chol).cwiseAbs().maxCoeff(), 1e-9);
+}
+
 TEST_F(HamiltonianTest, DataTypeName) {
   // Test that Hamiltonian has the correct data type name
   Hamiltonian h(std::make_unique<CanonicalFourCenterHamiltonianContainer>(

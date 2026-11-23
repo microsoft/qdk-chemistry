@@ -57,19 +57,24 @@ namespace detail {
  * where L^K are the Cholesky vectors and K is the Cholesky rank.
  *
  * @param basis_set QDK basis set for the molecule
- * @param threshold Cholesky decomposition threshold controlling accuracy
+ * @param threshold Cholesky decomposition threshold controlling accuracy;
+ *        raised to the round-off level of the largest ERI diagonal if smaller
  * @param eri_threshold ERI screening threshold for skipping negligible
  *        shell quartets during integral evaluation
+ * @param target_gemm_cols Target number of ERI columns per batch
+ * @param span_factor Pivots of a batch must be at least this fraction of the
+ *        largest remaining diagonal (0 disables the restriction)
  * @return Tuple of (pointer to array of Cholesky vectors stored in column-major
  *         order with dimensions (num_aos * num_aos) × num_vectors, number of
  *         Cholesky vectors generated (rank))
  */
 std::tuple<std::vector<double>, size_t> compute_cholesky_vectors(
     qdk::chemistry::scf::BasisSet& basis_set, double threshold,
-    double eri_threshold, size_t target_gemm_cols) {
+    double eri_threshold, size_t target_gemm_cols, double span_factor) {
   QDK_LOG_TRACE_ENTERING();
   QDK_LOGGER().info("Cholesky decomposition threshold: {}", threshold);
   QDK_LOGGER().info("ERI screening threshold: {}", eri_threshold);
+  QDK_LOGGER().info("Cholesky span factor: {}", span_factor);
 
   using qdk::chemistry::scf::RowMajorMatrix;
 
@@ -92,17 +97,6 @@ std::tuple<std::vector<double>, size_t> compute_cholesky_vectors(
   // Cholesky decomposition (rank is bounded by num_aos*(num_aos+1)/2)
   const size_t max_rank = num_aos * (num_aos + 1) / 2;
   QDK_LOGGER().debug("Maximum possible Cholesky rank: {}", max_rank);
-
-  // Fix threshold to (= sqrt(max_rank) * eps), to prevent numerical noise.
-  const double min_threshold = std::sqrt(static_cast<double>(max_rank)) *
-                               std::numeric_limits<double>::epsilon();
-  if (threshold < min_threshold) {
-    QDK_LOGGER().warn(
-        "Cholesky threshold {:.2e} set to {:.2e} (= sqrt({}) * eps) to prevent "
-        "noise.",
-        threshold, min_threshold, max_rank);
-    threshold = min_threshold;
-  }
 
   // map shell pair to index
   auto shell_pair_index = [num_shell_pairs](size_t s1, size_t s2) {
@@ -209,6 +203,26 @@ std::tuple<std::vector<double>, size_t> compute_cholesky_vectors(
   }
 #endif
 
+  // Round-off in the residual diagonals and columns scales with the largest
+  // diagonal (up to ~1e4 for steep core functions of heavy elements). Below
+  // sqrt(max_rank) * eps * that diagonal, new vectors would only amplify noise.
+  double D_max_initial = 0.0;
+  for (const auto sp_index : active_shell_pairs) {
+    const auto& diag = D_shell_pair[sp_index];
+    D_max_initial =
+        std::max(D_max_initial, *std::max_element(diag.begin(), diag.end()));
+  }
+  const double min_threshold = std::sqrt(static_cast<double>(max_rank)) *
+                               std::numeric_limits<double>::epsilon() *
+                               std::max(1.0, D_max_initial);
+  if (threshold < min_threshold) {
+    QDK_LOGGER().warn(
+        "Cholesky threshold {:.2e} set to {:.2e} (= sqrt({}) * eps * largest "
+        "diagonal {:.2e}) to prevent noise.",
+        threshold, min_threshold, max_rank, D_max_initial);
+    threshold = min_threshold;
+  }
+
   // Target number of GEMM columns per batched orthogonalization call.
   // Amortizes memory-bandwidth cost of reading L_data by combining multiple
   // shell pairs into one GEMM. Auto-adapts to basis set: small shells (s,p)
@@ -252,12 +266,17 @@ std::tuple<std::vector<double>, size_t> compute_cholesky_vectors(
       QDK_LOGGER().debug("{:>13} | {}", current_col, D_max);
       break;
     }
+    // A pivot far below the largest remaining diagonal is dominated by
+    // round-off, which forming its vector (dividing by its square root)
+    // amplifies. A batch therefore only takes pivots within the span of the
+    // largest remaining diagonal; smaller ones wait for later batches.
+    const double pivot_threshold = std::max(threshold, span_factor * D_max);
 
     // Accumulate shell pairs until we reach the target column count
     size_t n_batch = 0;
     size_t total_n_cols = 0;
     for (size_t b = 0; b < sp_list.size(); ++b) {
-      if (sp_list[b].max_diag < threshold) break;
+      if (sp_list[b].max_diag < pivot_threshold) break;
       const size_t n1 = obs[sp_list[b].s1].size();
       const size_t n2 = obs[sp_list[b].s2].size();
       total_n_cols += n1 * n2;
@@ -384,7 +403,7 @@ std::tuple<std::vector<double>, size_t> compute_cholesky_vectors(
           const size_t local_index = local_i * be.n2 + local_j;
           const double D_val = D_shell_pair[be.sp_index][local_index];
 
-          if (D_val < threshold) continue;
+          if (D_val < pivot_threshold) continue;
 
           double Q_max = std::sqrt(1.0 / D_val);
           std::vector<double> L_col_vec(num_aos2);
@@ -719,8 +738,10 @@ std::shared_ptr<data::Hamiltonian> CholeskyHamiltonianConstructor::_run_impl(
 
   // get cholesky vectors
   size_t gemm_batch_cols = _settings->get<size_t>("cholesky_gemm_batch_cols");
+  double span_factor = _settings->get<double>("cholesky_span_factor");
   auto [output, num_cholesky_vectors] = detail::compute_cholesky_vectors(
-      *internal_basis_set, cholesky_tol, eri_tol, gemm_batch_cols);
+      *internal_basis_set, cholesky_tol, eri_tol, gemm_batch_cols,
+      span_factor);
 
   // map output to Eigen matrix
   Eigen::Map<const Eigen::MatrixXd> L_ao(

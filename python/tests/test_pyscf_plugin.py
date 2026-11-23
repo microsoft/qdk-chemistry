@@ -3297,3 +3297,62 @@ class TestQDKChemistryPySCFBasisConversion:
 
         qdk_energy, _ = algorithms.create("scf_solver", "qdk").run(structure, 0, 1, qdk_basis)
         assert np.isclose(qdk_energy, energy, rtol=float_comparison_relative_tolerance, atol=10 * scf_energy_tolerance)
+
+
+@pytest.fixture(scope="module")
+def uranyl_x2c_orbitals_and_direct_hamiltonian():
+    """Run X2C RHF for bent UO2^2+ (U from PySCF's dyall-v3z) and build the direct Hamiltonian as reference."""
+    uranium_basis = [[shell[0], *shell[2:]] for shell in pyscf.gto.basis.load("dyall-v3z", "U")]
+    angle = np.deg2rad(165.0)
+    offset = np.array([15.0, -15.0, -25.0])
+    positions = offset + np.array(
+        [[0.0, 0.0, 0.0], [0.0, 0.0, 1.65], [1.67 * np.sin(angle), 0.0, 1.67 * np.cos(angle)]]
+    )
+    mol = pyscf.gto.M(
+        atom=[(symbol, tuple(position)) for symbol, position in zip(["U", "O", "O"], positions, strict=True)],
+        charge=2,
+        basis={"U": uranium_basis, "O": "cc-pvtz"},
+        verbose=0,
+    )
+    structure = Structure(symbols=["U", "O", "O"], coordinates=mol.atom_coords())
+    basis = pyscf_mol_to_qdk_basis(mol, structure, "U:dyall-v3z,O:cc-pvtz")
+    solver = algorithms.create("scf_solver", "qdk", method="hf", relativity="sf-x2c", enable_gdm=False)
+    _, wavefunction = solver.run(structure, 2, 1, basis)
+    selector = algorithms.create(
+        "active_space_selector", "qdk_valence", num_active_electrons=16, num_active_orbitals=24
+    )
+    orbitals = selector.run(wavefunction).get_orbitals()
+    direct = algorithms.create(
+        "hamiltonian_constructor", "qdk", eri_method="direct", eri_use_atomics=True, relativity="sf-x2c"
+    )
+    return orbitals, direct.run(orbitals)
+
+
+@pytest.mark.slow
+@pytest.mark.parametrize(
+    ("cholesky_tolerance", "cholesky_span_factor"),
+    [
+        (1e-12, 1e-2),
+        (1e-8, 0.0),
+    ],
+)
+def test_uranyl_cholesky_matches_direct(
+    uranyl_x2c_orbitals_and_direct_hamiltonian, cholesky_tolerance, cholesky_span_factor
+):
+    """Cholesky X2C integrals of a heavy-element molecule match the direct ones."""
+    orbitals, direct = uranyl_x2c_orbitals_and_direct_hamiltonian
+    cholesky = algorithms.create(
+        "hamiltonian_constructor",
+        "qdk_cholesky",
+        relativity="sf-x2c",
+        cholesky_tolerance=cholesky_tolerance,
+        cholesky_span_factor=cholesky_span_factor,
+    ).run(orbitals)
+    atol = 1e-6
+    np.testing.assert_allclose(
+        cholesky.get_one_body_integrals()[0], direct.get_one_body_integrals()[0], rtol=0.0, atol=atol
+    )
+    np.testing.assert_allclose(
+        cholesky.get_two_body_integrals()[0], direct.get_two_body_integrals()[0], rtol=0.0, atol=atol
+    )
+    assert abs(cholesky.get_core_energy() - direct.get_core_energy()) < atol
