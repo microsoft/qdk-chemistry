@@ -485,6 +485,132 @@ TEST_CASE("Constraints") {
   }
 }
 
+static void check_asci_range(macis::matrix_span<double> T,
+                             macis::rank4_span<double> V,
+                             std::vector<macis::wfn_t<64>> dets,
+                             const std::vector<double>& C,
+                             macis::wfn_t<64> external, double score,
+                             double pt2) {
+  // The integral generator uses the default logger, which other tests drop.
+  if (!spdlog::default_logger())
+    spdlog::set_default_logger(spdlog::null_logger_mt(""));
+  macis::DoubleLoopHamiltonianGenerator<macis::wfn_t<64>> ham_gen(T, V);
+  const size_t norb = T.extent(0);
+  const double E0 = ham_gen.matrix_element(dets[0], dets[0]);
+  macis::ASCISettings settings;
+  settings.pair_size_max = 16;
+  settings.rv_prune_tol = 0;
+
+  auto selected = macis::asci_search(
+      settings, dets.size() + 1, dets.begin(), dets.end(), E0, C, norb,
+      ham_gen.T(), ham_gen.G_red(), ham_gen.V_red(), ham_gen.V(),
+      ham_gen MACIS_MPI_CODE(, MPI_COMM_SELF));
+  CHECK(std::count(selected.begin(), selected.end(), external) ==
+        (std::isfinite(score) ? 1 : 0));
+
+  auto ordinary = macis::asci_contributions_standard(
+      settings, dets.begin(), dets.end(), E0, C, norb, ham_gen.T(),
+      ham_gen.G_red(), ham_gen.V_red(), ham_gen.V(), ham_gen);
+  macis::sort_and_accumulate_asci_pairs(ordinary);
+  auto masked = macis::asci_contributions_constraint(
+      settings, dets.size() + 1, dets.begin(), dets.end(), E0, C, norb,
+      ham_gen.T(), ham_gen.G_red(), ham_gen.V_red(), ham_gen.V(),
+      ham_gen MACIS_MPI_CODE(, MPI_COMM_SELF));
+  for (const auto* pairs : {&ordinary, &masked}) {
+    const auto it =
+        std::find_if(pairs->begin(), pairs->end(),
+                     [&](const auto& p) { return p.state == external; });
+    REQUIRE(it != pairs->end());
+    CHECK(it->rv() == score);
+    CHECK(it->pt2() == pt2);
+  }
+#ifdef MACIS_ENABLE_MPI
+  settings.pt2_bigcon_thresh = 0;
+  CHECK(macis::asci_pt2_constraint(settings, dets.begin(), dets.end(), E0, C,
+                                   norb, ham_gen.T(), ham_gen.G_red(),
+                                   ham_gen.V_red(), ham_gen.V(), ham_gen,
+                                   MPI_COMM_SELF) == pt2);
+#endif
+}
+
+TEST_CASE("ASCI selection and PT2 across the double energy range",
+          "[asci][range]") {
+  constexpr size_t n = 5;
+  constexpr double s = 0x1p1023;
+  std::vector<double> t(n * n), v(n * n * n * n);
+  macis::matrix_span<double> T(t.data(), n, n);
+  macis::rank4_span<double> V(v.data(), n, n, n, n);
+  // One active electron and two uncoupled spectators for the triplet search.
+  std::vector<macis::wfn_t<64>> dets = {0b11001};
+  std::vector<double> C = {1};
+  T(0, 0) = -s;
+  T(2, 2) = s;
+  T(0, 2) = T(2, 0) = 0x1p512;
+  double score = -0x1p-512, pt2 = -1;
+  SECTION("negative gap") {}
+  SECTION("positive gap") {
+    std::swap(T(0, 0), T(2, 2));
+    score = -score;
+    pt2 = 1;
+  }
+  SECTION("large finite PT2") {
+    T(0, 2) = T(2, 0) = s / 4;
+    score = -0.125;
+    pt2 = -s / 32;
+  }
+  SECTION("two core determinants couple to the same external state") {
+    dets.emplace_back(0b11010);
+    C = {0.5, 0.5};
+    T(1, 1) = T(0, 0);
+    T(1, 2) = T(2, 1) = T(0, 2);
+    T(0, 1) = T(1, 0) = 1;  // each core also generates the other's sentinel
+  }
+  SECTION("finite gap but the fast diagonal's intermediate sum overflows") {
+    T(0, 0) = s;
+    T(2, 2) = 1.5 * s;
+    T(0, 2) = T(2, 0) = 0x1p511;
+    score = -0x1p-511;
+    pt2 = -1;
+  }
+  SECTION("finite PT2 despite an overflowing amplitude") {
+    T(0, 0) = 0;
+    T(2, 2) = 0x1p-1025;
+    T(0, 2) = T(2, 0) = 0.5;
+    score = -std::numeric_limits<double>::infinity();
+    pt2 = -s;
+  }
+  SECTION("a true zero gap is not regularized") {
+    T(2, 2) = T(0, 0);
+    score = pt2 = std::numeric_limits<double>::infinity();
+  }
+  check_asci_range(T, V, dets, C, 0b11100, score, pt2);
+}
+
+TEST_CASE("ASCI double excitations across the double energy range",
+          "[asci][range]") {
+  constexpr size_t n = 6;
+  constexpr double s = 0x1p1023;
+  std::vector<double> t(n * n), v(n * n * n * n);
+  macis::matrix_span<double> T(t.data(), n, n);
+  macis::rank4_span<double> V(v.data(), n, n, n, n);
+  // 0,1 -> 2,3: both the partial diagonal (-1.5s - 0.75s) and the
+  // denominator (-1.5s - s) overflow. Only (20|31) and its symmetries couple.
+  T(0, 0) = -1.5 * s;
+  T(2, 2) = -0.75 * s;
+  T(3, 3) = 1.75 * s;
+  for (auto [i, a] : {std::pair{0, 2}, std::pair{2, 0}})
+    for (auto [j, b] : {std::pair{1, 3}, std::pair{3, 1}})
+      V(a, i, b, j) = V(b, j, a, i) = 1.25 * s;
+  SECTION("same spin") {
+    check_asci_range(T, V, {0b010011}, {1}, 0b011100, -0.5, -0.625 * s);
+  }
+  SECTION("opposite spin") {
+    using traits = macis::wavefunction_traits<macis::wfn_t<64>>;
+    check_asci_range(T, V, {traits::from_spin(0b110001, 0b0010)}, {1},
+                     traits::from_spin(0b110100, 0b1000), -0.5, -0.625 * s);
+  }
+}
+
 TEST_CASE("ASCI") {
   MACIS_MPI_CODE(MPI_Barrier(MPI_COMM_WORLD);)
   using macis::NumActive;

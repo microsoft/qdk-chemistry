@@ -8,9 +8,29 @@
  */
 
 #pragma once
+#include <algorithm>
+#include <array>
+#include <cmath>
 #include <macis/hamiltonian_generator.hpp>
 
 namespace macis {
+namespace detail {
+
+// Keep the usual addition order unless it overflows on finite inputs. In
+// that case cancel opposite signs before adding terms of the same sign.
+template <typename... Terms>
+double fast_diagonal_sum(Terms... terms) {
+  const double sum = (... + terms);
+  if (!std::isinf(sum) || !(std::isfinite(terms) && ...)) return sum;
+  std::array<double, sizeof...(Terms)> ordered{terms...};
+  std::sort(ordered.begin(), ordered.end());
+  auto lo = ordered.begin(), hi = ordered.end();
+  double result = 0;
+  while (lo != hi) result += result < 0 ? *--hi : *lo++;
+  return result;
+}
+
+}  // namespace detail
 
 template <typename Scalar>
 double HamiltonianGeneratorBase<Scalar>::single_orbital_en(
@@ -56,8 +76,9 @@ double HamiltonianGeneratorBase<Scalar>::fast_diag_single(
     // These refer to original determinant
     double hol_en, double par_en, uint32_t orb_hol, uint32_t orb_par,
     double orig_det_Hii) const {
-  return orig_det_Hii + par_en - hol_en - G2_red_(orb_par, orb_hol) -
-         G2_red_(orb_hol, orb_par);
+  return detail::fast_diagonal_sum(orig_det_Hii, par_en, -hol_en,
+                                   -G2_red_(orb_par, orb_hol),
+                                   -G2_red_(orb_hol, orb_par));
 }
 
 template <typename Scalar>
@@ -76,13 +97,14 @@ double HamiltonianGeneratorBase<Scalar>::fast_diag_ss_double(
     double hol1_en, double hol2_en, double par1_en, double par2_en,
     uint32_t orb_hol1, uint32_t orb_hol2, uint32_t orb_par1, uint32_t orb_par2,
     double orig_det_Hii) const {
-  return orig_det_Hii + par1_en + par2_en - hol1_en - hol2_en +
-         G2_red_(orb_hol1, orb_hol2) + G2_red_(orb_hol2, orb_hol1) +
-         G2_red_(orb_par1, orb_par2) + G2_red_(orb_par2, orb_par1) -
-         G2_red_(orb_par1, orb_hol1) - G2_red_(orb_hol1, orb_par1) -
-         G2_red_(orb_par2, orb_hol1) - G2_red_(orb_hol1, orb_par2) -
-         G2_red_(orb_par1, orb_hol2) - G2_red_(orb_hol2, orb_par1) -
-         G2_red_(orb_par2, orb_hol2) - G2_red_(orb_hol2, orb_par2);
+  return detail::fast_diagonal_sum(
+      orig_det_Hii, par1_en, par2_en, -hol1_en, -hol2_en,
+      G2_red_(orb_hol1, orb_hol2), G2_red_(orb_hol2, orb_hol1),
+      G2_red_(orb_par1, orb_par2), G2_red_(orb_par2, orb_par1),
+      -G2_red_(orb_par1, orb_hol1), -G2_red_(orb_hol1, orb_par1),
+      -G2_red_(orb_par2, orb_hol1), -G2_red_(orb_hol1, orb_par2),
+      -G2_red_(orb_par1, orb_hol2), -G2_red_(orb_hol2, orb_par1),
+      -G2_red_(orb_par2, orb_hol2), -G2_red_(orb_hol2, orb_par2));
 }
 
 template <typename Scalar>
@@ -105,11 +127,12 @@ double HamiltonianGeneratorBase<Scalar>::fast_diag_os_double(
     double en_holu, double en_hold, double en_paru, double en_pard,
     uint32_t orb_holu, uint32_t orb_hold, uint32_t orb_paru, uint32_t orb_pard,
     double orig_det_Hii) const {
-  return orig_det_Hii + en_paru + en_pard - en_holu - en_hold +
-         V2_red_(orb_holu, orb_hold) + V2_red_(orb_paru, orb_pard) -
-         G2_red_(orb_paru, orb_holu) - G2_red_(orb_holu, orb_paru) -
-         G2_red_(orb_pard, orb_hold) - G2_red_(orb_hold, orb_pard) -
-         V2_red_(orb_paru, orb_hold) - V2_red_(orb_holu, orb_pard);
+  return detail::fast_diagonal_sum(
+      orig_det_Hii, en_paru, en_pard, -en_holu, -en_hold,
+      V2_red_(orb_holu, orb_hold), V2_red_(orb_paru, orb_pard),
+      -G2_red_(orb_paru, orb_holu), -G2_red_(orb_holu, orb_paru),
+      -G2_red_(orb_pard, orb_hold), -G2_red_(orb_hold, orb_pard),
+      -V2_red_(orb_paru, orb_hold), -V2_red_(orb_holu, orb_pard));
 }
 
 template <typename Scalar>

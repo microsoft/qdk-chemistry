@@ -8,9 +8,12 @@
  */
 
 #pragma once
+#include <cmath>
+#include <limits>
 #include <macis/hamiltonian_generator.hpp>
 #include <macis/sd_operations.hpp>
 #include <macis/types.hpp>
+#include <numeric>
 
 namespace macis {
 
@@ -27,8 +30,7 @@ namespace macis {
  * 1. The Q-space determinant
  * 2. <Q|H|P> * c_P, the product of the Hamiltonian matrix element and the
  * coefficient of the P-space determinant
- * 3. The diagonal Hamiltonian matrix element for the Q-space determinant:
- * <Q|H|Q>
+ * 3. The denominator E0 - <Q|H|Q>
  *
  * @tparam WfnT Wavefunction type representing the quantum state
  */
@@ -39,20 +41,42 @@ struct asci_contrib {
   /// @brief Product of coefficient and matrix element with the generating
   /// P-space state
   double c_times_matel;
-  /// @brief <Q|H|Q> diagonal matrix element
+  /// @brief E0 - <Q|H|Q>, or half that gap if it exceeds the double range
   double h_diag;
+  bool half_gap = false;
+
+  /// Keep the numerator unscaled so duplicate states can sum it before PT2.
+  static asci_contrib from_energies(WfnT state, double numerator, double E0,
+                                    double diagonal) {
+    constexpr double half_max = std::numeric_limits<double>::max() / 2;
+    if (std::abs(E0) > half_max || std::abs(diagonal) > half_max) {
+      const double half = std::midpoint(E0, -diagonal);
+      if (std::isfinite(half) && std::abs(half) > half_max)
+        return {state, numerator, half, true};
+    }
+    return {state, numerator, E0 - diagonal};
+  }
 
   /**
    * @brief Calculate the ratio value for perturbative selection
-   * @return The ratio c_times_matel / h_diag
+   * @return The ratio c_times_matel / (E0 - <Q|H|Q>)
    */
-  auto rv() const { return c_times_matel / h_diag; }
+  auto rv() const {
+    return (half_gap ? 0.5 * c_times_matel : c_times_matel) / h_diag;
+  }
 
   /**
    * @brief Calculate the second-order perturbation theory contribution
    * @return The PT2 energy contribution (rv() * c_times_matel)
    */
-  auto pt2() const { return rv() * c_times_matel; }
+  auto pt2() const {
+    const double ratio = rv();
+    // For a tiny nonzero gap the ratio alone can overflow even when the
+    // energy is finite. In this case a numerator below one squares safely.
+    if (std::isinf(ratio) && h_diag != 0 && std::abs(c_times_matel) < 1)
+      return (c_times_matel * c_times_matel) / h_diag;
+    return ratio * c_times_matel;
+  }
 };
 
 /// @brief Container type for storing multiple ASCI contributions
@@ -128,7 +152,8 @@ void append_singles_asci_contributions(
           ham_gen.fast_diag_single(eps_same[i], eps_same[a], i, a, root_diag);
 
       // Append to return values
-      asci_contributions.push_back({ex_det, coeff * h_el, E0 - h_diag});
+      asci_contributions.push_back(asci_contrib<WfnType>::from_energies(
+          ex_det, coeff * h_el, E0, h_diag));
 
     }  // Loop over single extitations
 }
@@ -216,7 +241,8 @@ void append_ss_doubles_asci_contributions(
                                           eps_same[b], i, j, a, b, root_diag);
 
           // Append {det, c*h_el}
-          asci_contributions.push_back({ex_det, coeff * h_el, E0 - h_diag});
+          asci_contributions.push_back(asci_contrib<WfnType>::from_energies(
+              ex_det, coeff * h_el, E0, h_diag));
 
         }  // Restricted BJ loop
     }  // AI Loop
@@ -291,7 +317,8 @@ void append_os_doubles_asci_contributions(
                                                     eps_alpha[a], eps_beta[b],
                                                     i, j, a, b, root_diag);
 
-          asci_contributions.push_back({ex_det, coeff * h_el, E0 - h_diag});
+          asci_contributions.push_back(asci_contrib<WfnType>::from_energies(
+              ex_det, coeff * h_el, E0, h_diag));
         }  // BJ loop
     }  // AI loop
 }

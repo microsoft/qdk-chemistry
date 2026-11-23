@@ -445,9 +445,8 @@ void generate_constraint_singles_contributions_ss(
 
       // Compute Fast Diagonal Matrix Element
       auto h_diag = ham_gen.fast_diag_single(eps[i], eps[a], i, a, root_diag);
-      // h_el /= (E0 - h_diag);
-
-      asci_contributions.push_back({ex_det, coeff * h_el, E0 - h_diag});
+      asci_contributions.push_back(asci_contrib<WfnType>::from_energies(
+          ex_det, coeff * h_el, E0, h_diag));
     }
   }
 }
@@ -549,9 +548,8 @@ void generate_constraint_doubles_contributions_ss(
       // Evaluate fast diagonal matrix element
       auto h_diag = ham_gen.fast_diag_ss_double(eps[i], eps[j], eps[a], eps[b],
                                                 i, j, a, b, root_diag);
-      // h_el /= (E0 - h_diag);
-
-      asci_contributions.push_back({full_ex, coeff * h_el, E0 - h_diag});
+      asci_contributions.push_back(asci_contrib<WfnType>::from_energies(
+          full_ex, coeff * h_el, E0, h_diag));
     }
   }
 }
@@ -661,9 +659,8 @@ void generate_constraint_doubles_contributions_os(
           auto h_diag =
               ham_gen.fast_diag_os_double(eps_same[i], eps_othr[j], eps_same[a],
                                           eps_othr[b], i, j, a, b, root_diag);
-          // h_el /= (E0 - h_diag);
-
-          asci_contributions.push_back({ex_det, coeff * h_el, E0 - h_diag});
+          asci_contributions.push_back(asci_contrib<WfnType>::from_energies(
+              ex_det, coeff * h_el, E0, h_diag));
         }  // BJ
 
     }  // A

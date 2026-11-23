@@ -250,7 +250,7 @@ inline void gram_schmidt(int64_t N, int64_t K, const double* V_old, int64_t LDV,
  * @param[in] max_m  Maximum dimension of the Davidson subspace
  * @param[in] op     Matrix-vector operation functor
  * @param[in] D      Diagonal elements for preconditioning
- * @param[in] tol    Convergence tolerance for residual norm
+ * @param[in] tol    Absolute convergence tolerance for the residual norm
  * @param[in,out] X  Input: initial guess vector, Output: converged eigenvector
  * @param[in] min_abs_denominator  Minimum absolute value for preconditioner
  * denominator to avoid division by zero
@@ -348,6 +348,8 @@ auto davidson(int64_t N, int64_t max_m, const Functor& op, const double* D,
       converged = true;
       break;
     }
+    // No further Ritz solve can use a correction once the subspace is full.
+    if (k == max_m) break;
 
     // Compute new vector
     // (D - LAM(0)*I) * W = -R ==> W = -(D - LAM(0)*I)**-1 * R
