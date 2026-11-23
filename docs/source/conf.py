@@ -385,25 +385,6 @@ def normalize_public_export_modules():
                         obj.__module__ = public_mod  # docs-only shim
 
 
-def resolve_deprecated_qubit_alias(app, env, node, contnode):
-    """Link the deprecated constructor's private class to its public replacement."""
-    if (
-        node.get("refdomain") == "py"
-        and node.get("reftarget")
-        == "qdk_chemistry.data.qubit_operator._DeprecatedQubitHamiltonian"
-    ):
-        return env.get_domain("py").resolve_xref(
-            env,
-            node["refdoc"],
-            app.builder,
-            "class",
-            "qdk_chemistry.data.qubit_operator.QubitOperator",
-            node,
-            contnode,
-        )
-    return None
-
-
 # Sphinx 9 resolves type annotations while initializing extensions, before the
 # ``builder-inited`` event. Normalize exports as part of loading this config so
 # autodoc and sphinx-autodoc-typehints both see the same public object names.
@@ -622,7 +603,6 @@ def setup(app):
     app.connect("autodoc-process-signature", normalize_autodoc_signature)
     app.connect("autodoc-process-docstring", normalize_autodoc_docstring)
     app.connect("autodoc-process-docstring", process_breathe_docstring)
-    app.connect("missing-reference", resolve_deprecated_qubit_alias)
     # Transform :cite:`key` markers in Doxygen/Breathe content before reference resolution
     # Using doctree-read so pending_xref nodes get resolved by bibtex extension
     app.connect("doctree-read", transform_doctree_citations)

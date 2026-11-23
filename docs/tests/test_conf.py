@@ -124,10 +124,8 @@ def test_native_functions_and_aliases_build_without_warnings(
         ".. py:class:: tuple\n\n"
         ".. py:class:: float\n\n"
         ".. py:class:: int\n\n"
-        ".. py:class:: qdk_chemistry.data.qubit_operator.QubitOperator\n\n"
         f".. automodule:: {public_name}\n   :members:\n\n"
         f":func:`{public_name}.arrays`\n\n"
-        ":class:`qdk_chemistry.data.qubit_operator._DeprecatedQubitHamiltonian`\n\n"
         ":class:`qdk_chemistry.data.SumPauliOperatorExpression`\n"
     )
     warnings = io.StringIO()
@@ -149,4 +147,3 @@ def test_native_functions_and_aliases_build_without_warnings(
     assert objects[f"{public_name}.NativeMethods.get_arrays"].objtype == "method"
     html = (tmp_path / "_build" / "index.html").read_text()
     assert "writable=False" not in html
-    assert "#qdk_chemistry.data.qubit_operator.QubitOperator" in html

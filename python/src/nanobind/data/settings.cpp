@@ -78,7 +78,7 @@ nb::object setting_value_to_python(const SettingValue &value) {
                              std::is_same_v<ValueType, double>) {
           return nb::float_(variant_value);
         } else if constexpr (std::is_same_v<ValueType, std::string>) {
-          return nb::str(variant_value.c_str());
+          return nb::cast(variant_value);
         } else if constexpr (std::is_same_v<ValueType, std::vector<int64_t>>) {
           return nb::cast(variant_value);
         } else if constexpr (std::is_same_v<ValueType, std::vector<uint64_t>>) {
