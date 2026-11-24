@@ -3357,10 +3357,9 @@ TEST_F(CholeskyTest, O2_Unrestricted_Comparison) {
   }
 }
 
-TEST_F(CholeskyTest, SingleBatchMatchesIncore) {
+TEST_F(CholeskyTest, SingleBatchNeedsSpanFactor) {
   // With one batch holding every shell pair, only cholesky_span_factor keeps
-  // the batch from taking round-off dominated pivots; without it, this
-  // largest ERI error is ~2e-4.
+  // the batch from taking round-off dominated pivots.
   auto scf_factory = ScfSolverFactory::create("qdk");
   scf_factory->settings().set("method", "hf");
   auto [energy, wavefunction] =
@@ -3370,17 +3369,27 @@ TEST_F(CholeskyTest, SingleBatchMatchesIncore) {
   auto ham_incore_factory = HamiltonianConstructorFactory::create("qdk");
   ham_incore_factory->settings().set("eri_method", "incore");
   auto ham_incore = ham_incore_factory->run(orbitals);
-
-  auto ham_chol_factory = HamiltonianConstructorFactory::create("qdk_cholesky");
-  ham_chol_factory->settings().set("cholesky_tolerance",
-                                   testing::integral_tolerance);
-  ham_chol_factory->settings().set("cholesky_gemm_batch_cols",
-                                   static_cast<size_t>(1000000));
-  auto ham_chol = ham_chol_factory->run(orbitals);
-
   const auto& aaaa_incore = std::get<0>(ham_incore->get_two_body_integrals());
-  const auto& aaaa_chol = std::get<0>(ham_chol->get_two_body_integrals());
-  EXPECT_LT((aaaa_incore - aaaa_chol).cwiseAbs().maxCoeff(), 1e-9);
+
+  auto max_eri_error = [&](std::optional<double> span_factor) {
+    auto ham_chol_factory =
+        HamiltonianConstructorFactory::create("qdk_cholesky");
+    ham_chol_factory->settings().set("cholesky_tolerance",
+                                     testing::integral_tolerance);
+    ham_chol_factory->settings().set("cholesky_gemm_batch_cols",
+                                     static_cast<size_t>(1000000));
+    if (span_factor) {
+      ham_chol_factory->settings().set("cholesky_span_factor", *span_factor);
+    }
+    auto ham_chol = ham_chol_factory->run(orbitals);
+    const auto& aaaa_chol = std::get<0>(ham_chol->get_two_body_integrals());
+    return (aaaa_incore - aaaa_chol).cwiseAbs().maxCoeff();
+  };
+
+  // Default span factor: accurate (~4e-11).
+  EXPECT_LT(max_eri_error(std::nullopt), 1e-9);
+  // Span restriction disabled: the unstable decomposition is off by ~1e-5.
+  EXPECT_GT(max_eri_error(0.0), 1e-7);
 }
 
 TEST_F(HamiltonianTest, DataTypeName) {
