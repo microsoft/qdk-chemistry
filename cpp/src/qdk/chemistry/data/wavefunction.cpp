@@ -10,6 +10,7 @@
 #include <fstream>
 #include <map>
 #include <memory>
+#include <limits>
 #include <numeric>
 #include <qdk/chemistry/data/symmetry/spin_channel_indices.hpp>
 #include <qdk/chemistry/data/wavefunction.hpp>
@@ -798,6 +799,100 @@ double WavefunctionContainer::compute_s_squared() const {
          0.25 * (aaaa_ijji + bbbb_ijji) - 0.5 * aabb_iijj;
 }
 
+void WavefunctionContainer::_validate_rdms_sizes() const {
+  const auto orbitals = get_orbitals();
+  if (!orbitals) {
+    throw std::invalid_argument(
+        "Wavefunction RDM validation requires an orbital basis.");
+  }
+
+  const std::size_t n =
+      spin_channel_indices(orbitals->active_indices(), axes::alpha()).size();
+  if (n > static_cast<std::size_t>(std::numeric_limits<Eigen::Index>::max())) {
+    throw std::invalid_argument("Active orbital count exceeds Eigen limits.");
+  }
+  if (n != 0 && n > std::numeric_limits<std::size_t>::max() / n) {
+    throw std::invalid_argument("Active orbital count is too large to validate.");
+  }
+  const std::size_t n_squared = n * n;
+  if (n_squared != 0 &&
+      n_squared > std::numeric_limits<std::size_t>::max() / n_squared) {
+    throw std::invalid_argument("Active orbital count is too large to validate.");
+  }
+  const std::size_t n_fourth = n_squared * n_squared;
+  const auto eigen_n = static_cast<Eigen::Index>(n);
+
+  const auto matrix_matches = [eigen_n](const MatrixVariant& matrix) {
+    return std::visit(
+        [eigen_n](const auto& value) {
+          return value.rows() == eigen_n && value.cols() == eigen_n;
+        },
+        matrix);
+  };
+  const auto tensor_extents_match = [n](const auto& tensor) {
+    for (const auto& axis_extents : tensor.extents()) {
+      std::size_t total = 0;
+      for (const auto& [label, extent] : axis_extents) {
+        (void) label;
+        if (extent > n - total) {
+          return false;
+        }
+        total += extent;
+      }
+      if (total != n) {
+        return false;
+      }
+    }
+    return true;
+  };
+
+  if (_one_rdm_spin_traced &&
+      !matrix_matches(*_one_rdm_spin_traced)) {
+    throw std::invalid_argument(
+        "Spin-traced 1-RDM dimensions must match the active orbital count.");
+  }
+  if (_two_rdm_spin_traced) {
+    const auto size = std::visit(
+        [](const auto& value) { return static_cast<std::size_t>(value.size()); },
+        *_two_rdm_spin_traced);
+    if (size != n_fourth) {
+      throw std::invalid_argument(
+          "Spin-traced 2-RDM size must equal the fourth power of the active "
+          "orbital count.");
+    }
+  }
+  if (_active_one_rdm &&
+      !std::visit(tensor_extents_match, *_active_one_rdm)) {
+    throw std::invalid_argument(
+        "Active spin-dependent 1-RDM dimensions must match the active orbital "
+        "count.");
+  }
+  if (_active_two_rdm &&
+      !std::visit(tensor_extents_match, *_active_two_rdm)) {
+    throw std::invalid_argument(
+        "Active spin-dependent 2-RDM dimensions must match the active orbital "
+        "count.");
+  }
+
+  if (_entropies.single_orbital &&
+      _entropies.single_orbital->size() != eigen_n) {
+    throw std::invalid_argument(
+        "Single-orbital entropy size must match the active orbital count.");
+  }
+  if (_entropies.two_orbital &&
+      (_entropies.two_orbital->rows() != eigen_n ||
+       _entropies.two_orbital->cols() != eigen_n)) {
+    throw std::invalid_argument(
+        "Two-orbital entropy dimensions must match the active orbital count.");
+  }
+  if (_entropies.mutual_information &&
+      (_entropies.mutual_information->rows() != eigen_n ||
+       _entropies.mutual_information->cols() != eigen_n)) {
+    throw std::invalid_argument(
+        "Mutual-information dimensions must match the active orbital count.");
+  }
+}
+
 void WavefunctionContainer::_clear_rdms() const {
   QDK_LOG_TRACE_ENTERING();
   _one_rdm_spin_traced.reset();
@@ -879,6 +974,7 @@ void WavefunctionContainer::_deserialize_rdms_from_json(
           std::move(*SymmetryBlockedTensor<4>::from_json(tensor)));
     }
   }
+  _validate_rdms_sizes();
 }
 
 void WavefunctionContainer::_serialize_rdms_to_hdf5(H5::Group& group) const {
@@ -971,6 +1067,7 @@ void WavefunctionContainer::_deserialize_rdms_from_hdf5(H5::Group& group) {
           std::move(*SymmetryBlockedTensor<4>::from_hdf5(tensor)));
     }
   }
+  _validate_rdms_sizes();
 }
 
 void WavefunctionContainer::_serialize_entropies_to_json(
