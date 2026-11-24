@@ -19,26 +19,36 @@
 namespace QDKChemistry.Utils.IsometrySynthesis {
 
     import Std.Arrays.Any;
+    import Std.Arrays.ForEach;
     import Std.Arrays.IndexRange;
     import Std.Arrays.IsEmpty;
     import Std.Arrays.Mapped;
+    import Std.Arrays.MappedOverRange;
     import Std.Arrays.Reversed;
     import Std.Arrays.Zipped;
     import Std.Canon.ApplyToEachA;
+    import Std.Convert.BoolArrayAsInt;
     import Std.Convert.IntAsBoolArray;
+    import Std.Convert.ResultArrayAsBoolArray;
     import Std.Diagnostics.Fact;
     import Std.Math.PI;
-    import Std.TableLookup.Select;
+    import Std.Measurement.MResetX;
     import QDKChemistry.Utils.PhaseGradient.PreparePhaseGradientState;
     import QDKChemistry.Utils.PhaseGradient.QuantizeRyAngles;
     import QDKChemistry.Utils.SelectSwap.ComputeOptimalLambda2D;
-    import QDKChemistry.Utils.SelectSwap.SelectSwap2D;
     import QDKChemistry.Utils.UnitarySynthesis.ApplyControlledMultiplexedRy;
+    import QDKChemistry.Utils.UnitarySynthesis.ApplyGivensLayersDeferred;
     import QDKChemistry.Utils.UnitarySynthesis.ApplyMultiplexedRy;
+    import QDKChemistry.Utils.UnitarySynthesis.ApplyMultiplexedRyDeferred;
     import QDKChemistry.Utils.UnitarySynthesis.ApplyRealUnitaryViaGivens;
+    import QDKChemistry.Utils.UnitarySynthesis.ApplySignTable;
     import QDKChemistry.Utils.UnitarySynthesis.GivensDecomposition;
+    import QDKChemistry.Utils.UnitarySynthesis.LoadWordDeferred;
+    import QDKChemistry.Utils.UnitarySynthesis.MeasuredParity;
     import QDKChemistry.Utils.UnitarySynthesis.QuantizeGivensDecomposition;
+    import QDKChemistry.Utils.UnitarySynthesis.QuantizedGivensDecomposition;
     import QDKChemistry.Utils.UnitarySynthesis.TrimZeroWords;
+    import QDKChemistry.Utils.UnitarySynthesis.XorSigns;
 
     /// Circuit data of a dense real isometry, mirroring the C++
     /// `qdk::chemistry::utils::DenseIsometrySynthesis`, applied as
@@ -107,27 +117,44 @@ namespace QDKChemistry.Utils.IsometrySynthesis {
         target : Qubit[]
     ) : Unit is Adj {
         body (...) {
-            use loaded = Qubit[Length(target)];
-            let swapBits = ComputeOptimalLambda2D(1, Length(permTargets), Length(target), true, maxSwapBits);
-            SelectSwap2D([permTargets], swapBits, true, [], target, [], loaded);
-            ApplyToEachA(SWAP, Zipped(target, loaded));
-            Adjoint Select(invPermTargets, target, loaded);
+            ApplySignTable(ApplyPermutationDeferred(permTargets, invPermTargets, maxSwapBits, target, [false, size = Length(permTargets)]), target);
         }
         adjoint (...) {
             PermutationViaQROAM(invPermTargets, permTargets, maxSwapBits, target);
         }
     }
 
-    /// Applies a dense isometry to the little-endian `input` and the `added` qubits in |0⟩,
-    /// using the prepared `phaseGradient` and a clean `angleReg` of the same length.
-    operation ApplyDenseIsometry(
+    /// `PermutationViaQROAM` without its sign fixups, applied to a register carrying the pending `signs`,
+    /// which it returns permuted and with the measured-out loads added.
+    internal operation ApplyPermutationDeferred(
+        permTargets : Bool[][],
+        invPermTargets : Bool[][],
+        maxSwapBits : Int,
+        target : Qubit[],
+        signs : Bool[]
+    ) : Bool[] {
+        use loaded = Qubit[Length(target)];
+        let swapBits = ComputeOptimalLambda2D(1, Length(permTargets), Length(target), true, maxSwapBits);
+        let loadSigns = LoadWordDeferred(permTargets, swapBits, target, [], loaded);
+        ApplyToEachA(SWAP, Zipped(target, loaded));
+        // `loaded` now holds P⁻¹ of the permuted state.
+        let measured = ResultArrayAsBoolArray(ForEach(MResetX, loaded));
+        MappedOverRange(
+            state -> {
+                let source = BoolArrayAsInt(invPermTargets[state]);
+                (signs[source] != loadSigns[source % Length(loadSigns)]) != MeasuredParity(measured, invPermTargets[state])
+            },
+            IndexRange(signs)
+        )
+    }
+
+    /// Returns the quantized rotations, mixing unitaries, right factors and block unitary of a dense isometry.
+    internal function QuantizeDenseIsometry(
         synthesis : DenseIsometrySynthesis,
-        input : Qubit[],
-        added : Qubit[],
-        phaseGradient : Qubit[],
-        angleReg : Qubit[]
-    ) : Unit is Adj {
-        let numAdded = Length(added);
+        numInput : Int,
+        numAdded : Int,
+        rotationBitPrecision : Int
+    ) : (Bool[][][], QuantizedGivensDecomposition[], QuantizedGivensDecomposition[], QuantizedGivensDecomposition) {
         Fact(numAdded <= 2, "Dense isometry synthesis adds at most two qubits.");
         Fact(
             Length(synthesis.rotationAngles) == (numAdded == 2 ? 3 | numAdded),
@@ -138,44 +165,96 @@ namespace QDKChemistry.Utils.IsometrySynthesis {
             "Dense isometry data needs two mixing unitaries for two added qubits and none otherwise."
         );
         Fact(Length(synthesis.rightFactorGivens) <= 1, "Dense isometry data has at most one right factor.");
-        let rotationBitPrecision = Length(phaseGradient);
-        let inputDim = 1 <<< Length(input);
+        Fact(numAdded > 0 or IsEmpty(synthesis.rightFactorGivens), "Dense isometry data has no right factor without added qubits.");
+        let inputDim = 1 <<< numInput;
         // A Givens layer on an n-qubit register is addressed by its n - 1 upper qubits.
         let inputAddresses = inputDim / 2;
         let blockAddresses = (inputDim <<< numAdded) / 2;
         let maxSwapBits = synthesis.maxSwapBits;
         let quantize = givens -> QuantizeGivensDecomposition(givens, inputAddresses, rotationBitPrecision, maxSwapBits);
-        let rotations = Mapped(angles -> TrimZeroWords(QuantizeRyAngles(angles, rotationBitPrecision)), synthesis.rotationAngles);
-        let mixingGivens = Mapped(quantize, synthesis.mixingGivens);
-        let rightFactorGivens = Mapped(quantize, synthesis.rightFactorGivens);
-        let blockGivens = QuantizeGivensDecomposition(synthesis.blockGivens, blockAddresses, rotationBitPrecision, maxSwapBits);
+        (
+            Mapped(angles -> TrimZeroWords(QuantizeRyAngles(angles, rotationBitPrecision)), synthesis.rotationAngles),
+            Mapped(quantize, synthesis.mixingGivens),
+            Mapped(quantize, synthesis.rightFactorGivens),
+            QuantizeGivensDecomposition(synthesis.blockGivens, blockAddresses, rotationBitPrecision, maxSwapBits)
+        )
+    }
 
-        // The Givens operations take most-significant-first registers, hence `Reversed(input)`.
-        for givens in rightFactorGivens {
-            if IsEmpty(input) {
-                // V is the 1 × 1 sign ±1, a global sign with no input qubit to carry it.
-                if Any(flip -> flip, givens.phases) {
-                    R(PauliI, 2.0 * PI(), added[0]);
-                }
+    /// Applies a dense isometry to the little-endian `input` and the `added` qubits in |0⟩,
+    /// using the prepared `phaseGradient` and a clean `angleReg` of the same length.
+    /// The forward circuit fixes the measured-out loads together with the signs of the Givens unitaries in one
+    /// final lookup, plus one after UCR₁ for two added qubits.
+    operation ApplyDenseIsometry(
+        synthesis : DenseIsometrySynthesis,
+        input : Qubit[],
+        added : Qubit[],
+        phaseGradient : Qubit[],
+        angleReg : Qubit[]
+    ) : Unit is Adj {
+        body (...) {
+            let numAdded = Length(added);
+            let (rotations, mixingGivens, rightFactorGivens, blockGivens) = QuantizeDenseIsometry(synthesis, Length(input), numAdded, Length(phaseGradient));
+            let maxSwapBits = synthesis.maxSwapBits;
+            // The Givens operations take most-significant-first registers, hence `Reversed(input)`.
+            if numAdded == 0 {
+                ApplyRealUnitaryViaGivens(blockGivens, [], Reversed(input), phaseGradient, angleReg);
             } else {
-                ApplyRealUnitaryViaGivens(givens, [], Reversed(input), phaseGradient, angleReg);
+                // Pending signs are indexed by the little-endian value of `input`, then of the added qubits they depend on.
+                mutable signs = [false, size = 1 <<< Length(input)];
+                for givens in rightFactorGivens {
+                    set signs = ApplyGivensLayersDeferred(givens, false, [], Reversed(input), phaseGradient, angleReg, signs);
+                }
+                set signs = XorSigns(signs, ApplyMultiplexedRyDeferred(rotations[0], maxSwapBits, input, [], added[0], phaseGradient, angleReg));
+                if numAdded == 2 {
+                    let q0 = added[0];
+                    let q1 = added[1];
+                    CNOT(q1, q0);
+                    set signs = ApplyGivensLayersDeferred(mixingGivens[0], false, [q0], Reversed(input), phaseGradient, angleReg, signs + signs);
+                    set signs = XorSigns(signs, ApplyMultiplexedRyDeferred(rotations[1], maxSwapBits, input, [q0], q1, phaseGradient, angleReg));
+                    // The next CNOT would make the signs depend on q0 while W₁ is controlled by q1.
+                    ApplySignTable(signs, input + [q0]);
+                    CNOT(q1, q0);
+                    let afterMixing = ApplyGivensLayersDeferred(mixingGivens[1], false, [q1], Reversed(input), phaseGradient, angleReg, [false, size = 2 <<< Length(input)]);
+                    let pending = XorSigns(afterMixing, ApplyMultiplexedRyDeferred(rotations[2], maxSwapBits, input, [q1], q0, phaseGradient, angleReg));
+                    let half = 1 <<< Length(input);
+                    set signs = pending[...half - 1] + pending[...half - 1] + pending[half...] + pending[half...];
+                } else {
+                    set signs = signs + signs;
+                }
+                // The joint register Reversed(input + added) selects block q, or block 2·q1 + q0, of B.
+                ApplySignTable(ApplyGivensLayersDeferred(blockGivens, false, [], Reversed(input + added), phaseGradient, angleReg, signs), input + added);
             }
         }
-        if numAdded > 0 {
-            ApplyMultiplexedRy(rotations[0], maxSwapBits, input, added[0], phaseGradient, angleReg);
+        adjoint (...) {
+            // Each component is inverted on its own, since deferred signs would meet spectator added qubits.
+            let numAdded = Length(added);
+            let (rotations, mixingGivens, rightFactorGivens, blockGivens) = QuantizeDenseIsometry(synthesis, Length(input), numAdded, Length(phaseGradient));
+            let maxSwapBits = synthesis.maxSwapBits;
+            Adjoint ApplyRealUnitaryViaGivens(blockGivens, [], Reversed(input + added), phaseGradient, angleReg);
+            if numAdded == 2 {
+                let q0 = added[0];
+                let q1 = added[1];
+                Adjoint ApplyControlledMultiplexedRy(rotations[2], maxSwapBits, input, [q1], q0, phaseGradient, angleReg);
+                Adjoint ApplyRealUnitaryViaGivens(mixingGivens[1], [q1], Reversed(input), phaseGradient, angleReg);
+                CNOT(q1, q0);
+                Adjoint ApplyControlledMultiplexedRy(rotations[1], maxSwapBits, input, [q0], q1, phaseGradient, angleReg);
+                Adjoint ApplyRealUnitaryViaGivens(mixingGivens[0], [q0], Reversed(input), phaseGradient, angleReg);
+                CNOT(q1, q0);
+            }
+            if numAdded > 0 {
+                Adjoint ApplyMultiplexedRy(rotations[0], maxSwapBits, input, added[0], phaseGradient, angleReg);
+            }
+            for givens in rightFactorGivens {
+                if IsEmpty(input) {
+                    // V is the 1 × 1 sign ±1, a global sign with no input qubit to carry it.
+                    if Any(flip -> flip, givens.phases) {
+                        R(PauliI, 2.0 * PI(), added[0]);
+                    }
+                } else {
+                    Adjoint ApplyRealUnitaryViaGivens(givens, [], Reversed(input), phaseGradient, angleReg);
+                }
+            }
         }
-        if numAdded == 2 {
-            let q0 = added[0];
-            let q1 = added[1];
-            CNOT(q1, q0);
-            ApplyRealUnitaryViaGivens(mixingGivens[0], [q0], Reversed(input), phaseGradient, angleReg);
-            ApplyControlledMultiplexedRy(rotations[1], maxSwapBits, input, [q0], q1, phaseGradient, angleReg);
-            CNOT(q1, q0);
-            ApplyRealUnitaryViaGivens(mixingGivens[1], [q1], Reversed(input), phaseGradient, angleReg);
-            ApplyControlledMultiplexedRy(rotations[2], maxSwapBits, input, [q1], q0, phaseGradient, angleReg);
-        }
-        // The joint register Reversed(input + added) selects block q, or block 2·q1 + q0, of B.
-        ApplyRealUnitaryViaGivens(blockGivens, [], Reversed(input + added), phaseGradient, angleReg);
     }
 
     /// Applies a sparse isometry U = P_r · B · P_c to the little-endian register `input + added`,
@@ -187,7 +266,23 @@ namespace QDKChemistry.Utils.IsometrySynthesis {
         phaseGradient : Qubit[],
         angleReg : Qubit[]
     ) : Unit is Adj {
-        let target = input + added;
+        body (...) {
+            ApplySparseIsometryInDirection(synthesis, false, input + added, phaseGradient, angleReg);
+        }
+        adjoint (...) {
+            ApplySparseIsometryInDirection(synthesis, true, input + added, phaseGradient, angleReg);
+        }
+    }
+
+    /// Applies `ApplySparseIsometry`, or its adjoint when `reverse`, fixing all measured-out loads and the signs
+    /// of B in one final lookup.
+    internal operation ApplySparseIsometryInDirection(
+        synthesis : SparseIsometrySynthesis,
+        reverse : Bool,
+        target : Qubit[],
+        phaseGradient : Qubit[],
+        angleReg : Qubit[]
+    ) : Unit {
         let totalBits = Length(target);
         Fact(
             Length(synthesis.columnPermutation) == 1 <<< totalBits and Length(synthesis.rowPermutation) == 1 <<< totalBits,
@@ -196,11 +291,13 @@ namespace QDKChemistry.Utils.IsometrySynthesis {
         let (colPermData, colInvPermData) = PermutationData(synthesis.columnPermutation, totalBits);
         let (rowPermData, rowInvPermData) = PermutationData(synthesis.rowPermutation, totalBits);
         let blockGivens = QuantizeGivensDecomposition(synthesis.blockGivens, 1 <<< (totalBits - 1), Length(phaseGradient), synthesis.maxSwapBits);
-
-        PermutationViaQROAM(colPermData, colInvPermData, synthesis.maxSwapBits, target);
+        // U† = P_c⁻¹ · B† · P_r⁻¹.
+        let ((firstPerm, firstInv), (lastPerm, lastInv)) = reverse ? ((rowInvPermData, rowPermData), (colInvPermData, colPermData)) | ((colPermData, colInvPermData), (rowPermData, rowInvPermData));
+        mutable signs = ApplyPermutationDeferred(firstPerm, firstInv, synthesis.maxSwapBits, target, [false, size = 1 <<< totalBits]);
         // The Givens layers act on the most-significant-first view of the register.
-        ApplyRealUnitaryViaGivens(blockGivens, [], Reversed(target), phaseGradient, angleReg);
-        PermutationViaQROAM(rowPermData, rowInvPermData, synthesis.maxSwapBits, target);
+        set signs = ApplyGivensLayersDeferred(blockGivens, reverse, [], Reversed(target), phaseGradient, angleReg, signs);
+        set signs = ApplyPermutationDeferred(lastPerm, lastInv, synthesis.maxSwapBits, target, signs);
+        ApplySignTable(signs, target);
     }
 
     /// Applies `isometry` to `qs` = `[input | added | phaseGradient]`, whose last
