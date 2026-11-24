@@ -3392,6 +3392,44 @@ TEST_F(CholeskyTest, SingleBatchNeedsSpanFactor) {
   EXPECT_GT(max_eri_error(0.0), 1e-7);
 }
 
+TEST_F(CholeskyTest, NoiseFloorScalesWithLargestDiagonal) {
+  // Tolerances below sqrt(max_rank) * eps * (largest ERI diagonal) are raised
+  // to that floor. For water/cc-pVTZ (max_rank 1711, largest diagonal 4.87)
+  // the floor is 4.5e-14; without the diagonal factor it would be 9.2e-15.
+  auto scf_factory = ScfSolverFactory::create("qdk");
+  scf_factory->settings().set("method", "hf");
+  auto [energy, wavefunction] =
+      scf_factory->run(testing::create_water_structure(), 0, 1, "cc-pvtz");
+  auto orbitals = wavefunction->get_orbitals();
+
+  auto run_cholesky = [&](double tolerance) {
+    auto ham_chol_factory =
+        HamiltonianConstructorFactory::create("qdk_cholesky");
+    ham_chol_factory->settings().set("cholesky_tolerance", tolerance);
+    return ham_chol_factory->run(orbitals);
+  };
+  auto num_cholesky_vectors = [](const Hamiltonian& hamiltonian) {
+    return hamiltonian.get_container<CholeskyHamiltonianContainer>()
+        .get_three_center_integrals()
+        .first.cols();
+  };
+
+  // A tolerance between the unscaled and the scaled floor is raised to the
+  // same floor as a tolerance of zero.
+  auto ham_zero = run_cholesky(0.0);
+  auto ham_between = run_cholesky(2e-14);
+  EXPECT_EQ(num_cholesky_vectors(*ham_zero),
+            num_cholesky_vectors(*ham_between));
+
+  // The raised tolerance still gives accurate integrals.
+  auto ham_incore_factory = HamiltonianConstructorFactory::create("qdk");
+  ham_incore_factory->settings().set("eri_method", "incore");
+  auto ham_incore = ham_incore_factory->run(orbitals);
+  const auto& aaaa_incore = std::get<0>(ham_incore->get_two_body_integrals());
+  const auto& aaaa_zero = std::get<0>(ham_zero->get_two_body_integrals());
+  EXPECT_LT((aaaa_incore - aaaa_zero).cwiseAbs().maxCoeff(), 1e-9);
+}
+
 TEST_F(HamiltonianTest, DataTypeName) {
   // Test that Hamiltonian has the correct data type name
   Hamiltonian h(std::make_unique<CanonicalFourCenterHamiltonianContainer>(
