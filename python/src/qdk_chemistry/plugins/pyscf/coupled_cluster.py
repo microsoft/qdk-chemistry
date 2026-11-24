@@ -45,7 +45,7 @@ from pyscf import cc
 
 from qdk_chemistry.algorithms import DynamicalCorrelationCalculator
 from qdk_chemistry.data import AmplitudeContainer, AmplitudeType, Settings, Wavefunction
-from qdk_chemistry.plugins.pyscf.conversion import hamiltonian_to_scf
+from qdk_chemistry.plugins.pyscf.conversion import hamiltonian_to_scf, spin_blocked_ao2mofn
 from qdk_chemistry.utils import Logger
 
 __all__ = ["PyscfCoupledClusterCalculator", "PyscfCoupledClusterSettings"]
@@ -68,7 +68,7 @@ class PyscfCoupledClusterSettings(Settings):
         diis_start_cycle (int): The step to start DIIS. Default is 0.
         direct (bool): AO-direct CCSD; must be False, as the integrals come from the Hamiltonian. Default is False.
         async_io (bool): Allow for asynchronous function execution. Default is True.
-        incore_complete (bool): Avoid all I/O; if False, the integrals must still fit in max_memory. Default is True.
+        incore_complete (bool): Avoid all I/O. Default is True.
         frozen (int or list): If integer is given, the inner-most orbitals are frozen from CC amplitudes.
             Given the orbital indices (0-based) in a list, both occupied and virtual orbitals can be frozen in the
             CC calculation.
@@ -171,9 +171,15 @@ class PyscfCoupledClusterCalculator(DynamicalCorrelationCalculator):
         pyscf_cc.diis_start_cycle = int(self._settings.get("diis_start_cycle"))
         pyscf_cc.direct = bool(self._settings.get("direct"))
         pyscf_cc.async_io = bool(self._settings.get("async_io"))
+        if hamiltonian.is_unrestricted():
+            # Transform each spin block in its own half rather than over the doubled basis.
+            ao2mofn = spin_blocked_ao2mofn(pyscf_scf)
+            pyscf_cc.ao2mo = lambda mo_coeff=None: cc.uccsd._make_eris_incore(pyscf_cc, mo_coeff, ao2mofn)  # noqa: SLF001
+        # Build the integrals while PySCF's own in-core flag holds; the setting then only moves DIIS and intermediates.
+        eris = pyscf_cc.ao2mo()
         pyscf_cc.incore_complete = bool(self._settings.get("incore_complete"))
 
-        pyscf_cc.kernel()
+        pyscf_cc.kernel(eris=eris)
         if not pyscf_cc.converged:
             raise RuntimeError("CCSD calculation did not converge")
 
@@ -254,7 +260,7 @@ class PyscfCoupledClusterCalculator(DynamicalCorrelationCalculator):
 
         # Compute bra wavefunction (lambda/gamma amplitudes) if requested
         if compute_bra:
-            pyscf_cc.solve_lambda()
+            pyscf_cc.solve_lambda(eris=eris)
             if not pyscf_cc.converged_lambda:
                 raise RuntimeError("Lambda equation solver did not converge")
 

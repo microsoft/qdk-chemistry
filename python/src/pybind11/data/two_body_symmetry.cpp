@@ -38,21 +38,25 @@ Integrals shaped_like(const Integrals& integrals, const double* values) {
 }
 
 /// `integrals` symmetrized by `symmetrize`, for a consumer that takes them only
-/// if they have `symmetry` to isApprox precision, as measured by `compare`.
-template <class Compare, class Symmetrize>
+/// if they have `symmetry`, i.e. equal the result to isApprox precision.
+template <class Symmetrize>
 Integrals required_symmetrized(const Integrals& integrals,
                                const std::string& consumer,
-                               const std::string& symmetry, Compare compare,
+                               const std::string& symmetry,
                                Symmetrize symmetrize) {
   const std::size_t n = orbital_count(integrals);
-  detail::require_finite_two_body(integrals.data(), n * n * n * n, consumer);
-  if (const auto comparison = compare(integrals.data(), n);
-      !comparison.approx()) {
+  const std::size_t count = n * n * n * n;
+  detail::require_finite_two_body(integrals.data(), count, consumer);
+  Integrals symmetrized = shaped_like(integrals, integrals.data());
+  symmetrize(symmetrized.mutable_data(), n);
+  const double* input = integrals.data();
+  const double* output = symmetrized.data();
+  detail::TwoBodyComparison comparison;
+  for (std::size_t i = 0; i < count; ++i) comparison.add(input[i], output[i]);
+  if (!comparison.approx()) {
     throw py::value_error(
         detail::not_symmetric_error(consumer, symmetry, comparison).what());
   }
-  Integrals symmetrized = shaped_like(integrals, integrals.data());
-  symmetrize(symmetrized.mutable_data(), n);
   return symmetrized;
 }
 
@@ -91,7 +95,6 @@ if they are not Hermitian.
       "_required_eightfold_symmetrized",
       [](const Integrals& integrals, const std::string& consumer) {
         return required_symmetrized(integrals, consumer, "8-fold",
-                                    detail::eightfold_comparison,
                                     detail::eightfold_symmetrize);
       },
       R"(
@@ -103,8 +106,8 @@ Average of integrals over their 8-fold permutation classes. Raises
   data.def(
       "_required_pair_symmetrized",
       [](const Integrals& integrals, const std::string& consumer) {
-        return required_symmetrized(integrals, consumer, "pair",
-                                    detail::pair_comparison,
+        return required_symmetrized(integrals, consumer,
+                                    "(pq|rs) = (qp|rs) = (pq|sr)",
                                     detail::pair_symmetrize);
       },
       R"(

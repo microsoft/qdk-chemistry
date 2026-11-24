@@ -19,7 +19,8 @@ Molecular and model orbitals with equal integrals therefore give equal PySCF ref
 PySCF stores one value per 8-fold permutation class of the two-electron integrals (per pair class for the alpha-beta block),
 so integrals without that symmetry, such as downfolded ones, are rejected.
 Active-space effective Hamiltonians are not supported by this conversion.
-The PySCF reference has no AO basis, so PySCF methods that need one, such as density fitting, do not apply to it.
+The PySCF reference has no AO basis, so PySCF methods that need one, such as density fitting, do not apply to it;
+for those, build the molecule from the orbitals' basis set with :func:`~qdk_chemistry.plugins.pyscf.conversion.basis_to_pyscf_mol`.
 
 Using the HamiltonianConstructor
 ---------------------------------

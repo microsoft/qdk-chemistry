@@ -29,6 +29,7 @@ from .reference_tolerances import (
 try:
     import pyscf
     import pyscf.ao2mo
+    import pyscf.cc
     import pyscf.fci
     import pyscf.gto
     import pyscf.lo
@@ -52,6 +53,7 @@ if PYSCF_AVAILABLE:
         orbitals_to_scf,
         orbitals_to_scf_from_n_electrons_and_multiplicity,
         pyscf_mol_to_qdk_basis,
+        spin_blocked_ao2mofn,
         structure_to_pyscf_atom_labels,
     )
     from qdk_chemistry.plugins.pyscf.mcscf import _mcsolver_to_fcisolver
@@ -2590,6 +2592,20 @@ class TestPyscfPlugin:
             with pytest.raises(ValueError, match="Occupied orbitals must precede"):
                 hamiltonian_to_scf(reference, np.array([1.0, 0.0, 0.0, 0.0]), np.array([0.0, 1.0, 0.0, 0.0]))
 
+    def test_hamiltonian_to_scf_keeps_spin_occupations(self) -> None:
+        """Each spin keeps its occupations, also for a beta majority and for boolean masks."""
+        orbitals = data.ModelOrbitals(4, SymmetryProduct([axes.spin(1, True)]))
+        hamiltonian = data.Hamiltonian(
+            data.CanonicalFourCenterHamiltonianContainer(
+                np.diag([-1.0, -0.5, 0.5, 1.0]), np.zeros(4**4), orbitals, 0.0, np.eye(4)
+            )
+        )
+        alpha, beta = np.array([1, 0, 0, 0]), np.array([1, 1, 0, 0])
+        assert pyscf.cc.CCSD(hamiltonian_to_scf(hamiltonian, alpha, beta)).nocc == (1, 2)
+        for occupations in ((alpha, beta), (beta, beta)):
+            masks = hamiltonian_to_scf(hamiltonian, *(occupation.astype(bool) for occupation in occupations))
+            np.testing.assert_array_equal(masks.mo_occ, hamiltonian_to_scf(hamiltonian, *occupations).mo_occ)
+
     @pytest.mark.parametrize("defect", ["fourfold", "non-finite"])
     def test_hamiltonian_to_scf_rejects_model_two_body_without_eightfold_symmetry(self, defect: str) -> None:
         """PySCF reads one member per 8-fold class, so other model tensors would give wrong energies."""
@@ -2613,18 +2629,27 @@ class TestPyscfPlugin:
         with pytest.raises(ValueError, match="8-fold" if defect == "fourfold" else "non-finite"):
             hamiltonian_to_scf(hamiltonian, occupation, occupation)
 
-    @pytest.mark.parametrize("defect", ["asymmetric", "non-finite"])
-    def test_hamiltonian_to_scf_rejects_invalid_one_body_integrals(self, defect: str) -> None:
-        """PySCF takes the core Hamiltonian as a finite symmetric matrix."""
-        one_body = np.diag([-1.0, -0.5, 0.5])
-        one_body[0, 1] = np.nan if defect == "non-finite" else 0.2
+    def test_hamiltonian_to_scf_passes_symmetric_part_of_one_body_integrals(self) -> None:
+        """Hermitian Hamiltonians pass the symmetric part of finite one-body integrals; others are rejected."""
         orbitals = data.ModelOrbitals(3, SymmetryProduct([axes.spin(1, True)]))
-        hamiltonian = data.Hamiltonian(
-            data.CanonicalFourCenterHamiltonianContainer(one_body, np.zeros(3**4), orbitals, 0.0, np.eye(3))
-        )
         occupation = np.array([1.0, 0.0, 0.0])
-        with pytest.raises(ValueError, match="One-body integrals must be finite and symmetric"):
-            hamiltonian_to_scf(hamiltonian, occupation, occupation)
+
+        def to_scf(one_body, hamiltonian_type=data.HamiltonianType.Hermitian):
+            hamiltonian = data.Hamiltonian(
+                data.CanonicalFourCenterHamiltonianContainer(
+                    one_body, np.zeros(3**4), orbitals, 0.0, np.eye(3), hamiltonian_type
+                )
+            )
+            return hamiltonian_to_scf(hamiltonian, occupation, occupation)
+
+        one_body = np.diag([-1.0, -0.5, 0.5])
+        one_body[0, 1] = 0.2
+        np.testing.assert_array_equal(to_scf(one_body).get_hcore(), (one_body + one_body.T) / 2)
+        with pytest.raises(ValueError, match="non-Hermitian"):
+            to_scf(one_body, data.HamiltonianType.NonHermitian)
+        one_body[0, 1] = np.nan
+        with pytest.raises(ValueError, match="One-body integrals must be finite"):
+            to_scf(one_body)
 
     def test_hamiltonian_to_scf_passes_model_two_body_class_averages(self) -> None:
         """A 4-fold part within ``isApprox`` precision is averaged away; a larger one is rejected."""
@@ -2681,8 +2706,49 @@ class TestPyscfPlugin:
 
         eri = pyscf.ao2mo.restore(1, to_scf(1e-13)._eri, 2 * norb)
         np.testing.assert_allclose(eri[:norb, :norb, norb:, norb:], paired, atol=1e-14, rtol=0)
-        with pytest.raises(ValueError, match="requires pair two-body permutation symmetry"):
+        with pytest.raises(ValueError, match=r"\(pq\|rs\) = \(qp\|rs\) = \(pq\|sr\) permutation symmetry"):
             to_scf(1e-11)
+
+    def test_hamiltonian_to_scf_spin_blocked_reference_keeps_spins_in_scf(self) -> None:
+        """SCF on the spin-blocked reference keeps each spin in its half and reproduces the SCF energy."""
+        _, wavefunction = algorithms.create("scf_solver", "pyscf").run(create_water_structure(), 1, 2, "sto-3g")
+        hamiltonian = algorithms.create("hamiltonian_constructor").run(wavefunction.get_orbitals())
+        assert hamiltonian.is_unrestricted()
+        norb = wavefunction.get_orbitals().get_num_molecular_orbitals()
+        mf = hamiltonian_to_scf(hamiltonian, *wavefunction.get_total_orbital_occupations())
+        reference_energy = mf.energy_tot()
+        assert np.isclose(mf.kernel(), reference_energy, rtol=0.0, atol=scf_energy_tolerance)
+        assert not np.any(mf.mo_coeff[0][norb:])
+        assert not np.any(mf.mo_coeff[1][:norb])
+
+    def test_spin_blocked_ao2mofn_matches_pyscf_transformation(self) -> None:
+        """Transforming each spin block in its half equals PySCF's transformation over the doubled basis."""
+        norb = 3
+        random = np.random.default_rng(796)
+
+        def symmetrized(*swaps):
+            tensor = random.normal(size=(norb,) * 4)
+            for swap in swaps:
+                tensor = (tensor + tensor.transpose(swap)) / 2
+            return tensor
+
+        pair_swaps = ((1, 0, 2, 3), (0, 1, 3, 2))
+        aaaa, bbbb = (symmetrized(*pair_swaps, (2, 3, 0, 1)) for _ in range(2))
+        aabb = symmetrized(*pair_swaps)
+        empty = np.empty((0, 0))
+        orbitals = data.ModelOrbitals(norb, SymmetryProduct([axes.spin(1, False)]))
+        hamiltonian = data.Hamiltonian(
+            data.CanonicalFourCenterHamiltonianContainer(
+                np.eye(norb), np.eye(norb), aaaa.ravel(), aabb.ravel(), bbbb.ravel(), orbitals, 0.0, empty, empty
+            )
+        )
+        reference = hamiltonian_to_scf(hamiltonian, np.array([1.0, 0.0, 0.0]), np.array([1.0, 0.0, 0.0]))
+        ao2mofn = spin_blocked_ao2mofn(reference)
+        coefficients = [random.normal(size=(2 * norb, count)) for count in (2, 3, 1, 2)]
+        expected = pyscf.ao2mo.general(reference._eri, coefficients, compact=False)
+        np.testing.assert_allclose(ao2mofn(tuple(coefficients)), expected, rtol=0.0, atol=1e-12)
+        expected = pyscf.ao2mo.general(reference._eri, (coefficients[1],) * 4, compact=False)
+        np.testing.assert_allclose(ao2mofn(coefficients[1]), expected, rtol=0.0, atol=1e-12)
 
     @pytest.mark.parametrize(
         ("multiplicity", "configuration", "nelec"),
@@ -2715,8 +2781,12 @@ class TestPyscfPlugin:
         energy, _, _ = calculator.run(Ansatz(data.Hamiltonian(container), reference))
         assert np.isclose(energy, exact, rtol=0.0, atol=ci_energy_tolerance)
 
-    def test_pyscf_coupled_cluster_integral_settings(self) -> None:
-        """AO-direct CCSD needs an AO basis, which the reference lacks; disk I/O for DIIS and intermediates works."""
+    def test_pyscf_coupled_cluster_integral_settings(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        """AO-direct CCSD needs an AO basis, which the reference lacks.
+
+        ``incore_complete=False`` moves only DIIS and intermediates to disk, even when ``max_memory`` is small.
+        """
+        monkeypatch.setattr(pyscf.gto.Mole, "max_memory", 1)  # MB, too little for in-core integrals by PySCF's estimate
         one_body = np.array([[-1.0, -0.15], [-0.15, 0.2]])
         two_body = np.zeros((2,) * 4)
         two_body[0, 0, 0, 0] = two_body[1, 1, 1, 1] = 0.4
