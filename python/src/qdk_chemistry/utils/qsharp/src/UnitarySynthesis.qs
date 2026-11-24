@@ -9,6 +9,7 @@ namespace QDKChemistry.Utils.UnitarySynthesis {
     import Std.Arrays.All;
     import Std.Arrays.Any;
     import Std.Arrays.Chunks;
+    import Std.Arrays.Flattened;
     import Std.Arrays.ForEach;
     import Std.Arrays.IndexRange;
     import Std.Arrays.IsEmpty;
@@ -44,7 +45,7 @@ namespace QDKChemistry.Utils.UnitarySynthesis {
     import QDKChemistry.Utils.SelectSwap.SelectSwapAliased;
     import QDKChemistry.Utils.SelectSwap.SelectSwapForwardCost;
     import QDKChemistry.Utils.SelectSwap.SwapDataOutputs;
-    import QDKChemistry.Utils.SelectSwap.SwapPermutedTable;
+    import QDKChemistry.Utils.SelectSwap.SwapNetworkPermutation;
     import QDKChemistry.Utils.UnaryIteration.AddressQubits;
 
     /// Givens representation U = D · L_{m-1} ⋯ L_0 of a real orthogonal matrix, mirroring the
@@ -315,7 +316,23 @@ namespace QDKChemistry.Utils.UnitarySynthesis {
                 Controlled CNOT(controls, (source, copy));
             }
             let measured = ResultArrayAsBoolArray(ForEach(MResetX, scratch));
-            Mapped(word -> MeasuredParity(measured, word), SwapPermutedTable(flat, wordBits, swapBits, 1 <<< selectBits))
+            // Each parity pairs the measured chunks, moved back through the swap network, with the unswapped row.
+            let measuredChunks = Chunks(wordBits, measured);
+            let unswapped = MappedOverRange(
+                swap -> {
+                    let permutation = SwapNetworkPermutation(swapBits, swap);
+                    mutable chunks = measuredChunks;
+                    for position in IndexRange(permutation) {
+                        set chunks w/= permutation[position] <- measuredChunks[position];
+                    }
+                    Flattened(chunks)
+                },
+                0..(1 <<< swapBits) - 1
+            );
+            MappedOverRange(
+                state -> MeasuredParity(unswapped[state >>> selectBits], flat[state % (1 <<< selectBits)]),
+                0..(1 <<< addressBits) - 1
+            )
         }
     }
 
