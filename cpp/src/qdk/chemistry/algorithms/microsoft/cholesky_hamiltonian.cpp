@@ -740,8 +740,7 @@ std::shared_ptr<data::Hamiltonian> CholeskyHamiltonianConstructor::_run_impl(
   size_t gemm_batch_cols = _settings->get<size_t>("cholesky_gemm_batch_cols");
   double span_factor = _settings->get<double>("cholesky_span_factor");
   auto [output, num_cholesky_vectors] = detail::compute_cholesky_vectors(
-      *internal_basis_set, cholesky_tol, eri_tol, gemm_batch_cols,
-      span_factor);
+      *internal_basis_set, cholesky_tol, eri_tol, gemm_batch_cols, span_factor);
 
   // map output to Eigen matrix
   Eigen::Map<const Eigen::MatrixXd> L_ao(
