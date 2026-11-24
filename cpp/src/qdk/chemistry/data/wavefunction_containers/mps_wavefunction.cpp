@@ -365,6 +365,7 @@ MPSContainer::MPSContainer(
               std::size_t{});
   }
   _validate();
+  _validate_rdms_sizes();
 }
 
 void MPSContainer::_validate() const {
