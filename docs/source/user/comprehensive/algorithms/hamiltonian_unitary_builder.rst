@@ -315,7 +315,7 @@ Because the deterministic part removes the dominant terms from :math:`\lambda_R`
      - Coefficient threshold below which Pauli terms are discarded. Default is 1e-12.
    * - ``merge_duplicate_terms``
      - bool
-     - Fuse identical Pauli terms within consecutive commuting runs of the random block. Default is True.
+     - Fuse matching Pauli rotations within commuting runs, including deterministic rotations across step boundaries even when there is no random tail. Default is True.
    * - ``commutation_type``
      - str
      - Commutation check used when merging: ``"qubit_wise"`` (stricter) or ``"general"`` (default).

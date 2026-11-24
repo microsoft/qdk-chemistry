@@ -86,10 +86,9 @@ def _partial_state_trace_error(
         merge_duplicate_terms=False,
     )
     terms = hamiltonian.get_real_coefficients(tolerance=1e-12, sort_by_magnitude=True)
-    num_deterministic = builder._determine_num_deterministic(hamiltonian, terms, time)
+    num_deterministic, divisions = builder._resolve_split_and_divisions(hamiltonian, terms, time)
     deterministic_terms = terms[:num_deterministic]
     random_terms = terms[num_deterministic:]
-    divisions = builder._resolve_num_divisions(hamiltonian, time) if deterministic_terms else 1
     samples = builder._resolve_block_samples(random_terms, time, divisions)
     delta = time / divisions
     sweep_time = delta / 2.0 if trotter_order == 2 else delta
@@ -960,8 +959,22 @@ class TestPartiallyRandomizedAccuracyAwareStructure:
             time=time,
         )
         terms = hamiltonian.get_real_coefficients(tolerance=1e-12, sort_by_magnitude=True)
-        num_det = builder._determine_num_deterministic_cost_optimal(hamiltonian, terms, time)
+        num_det, _ = builder._resolve_split_and_divisions(hamiltonian, terms, time)
         assert num_det == expected_num_deterministic
+
+    def test_cost_optimal_split_sizes_steps_once(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        """Reusing split-search sizing preserves the seeded formula for the winning mixed split."""
+        hamiltonian = QubitOperator(["X", "Z", "Y"], [1.0, 0.5, 0.4])
+        settings = {"target_accuracy": 0.05, "time": 0.5, "num_random_samples": 1, "seed": 17}
+        automatic = PartiallyRandomized(weight_threshold=-1.0, **settings)
+        explicit = PartiallyRandomized(weight_threshold=0.5, **settings)
+        resolve_divisions = Mock(wraps=automatic._resolve_num_divisions)
+        monkeypatch.setattr(automatic, "_resolve_num_divisions", resolve_divisions)
+
+        actual = automatic.run(hamiltonian).get_container()
+
+        resolve_divisions.assert_called_once_with(hamiltonian, 0.5)
+        assert actual.to_json() == explicit.run(hamiltonian).get_container().to_json()
 
     @pytest.mark.parametrize(("trotter_order", "expected_rotations"), [(1, 2), (2, 4)])
     def test_cost_optimal_split_includes_random_sample_floor(
@@ -982,7 +995,7 @@ class TestPartiallyRandomizedAccuracyAwareStructure:
         )
         terms = hamiltonian.get_real_coefficients(tolerance=1e-12, sort_by_magnitude=True)
 
-        num_det = builder._determine_num_deterministic_cost_optimal(hamiltonian, terms, 1.0)
+        num_det, _ = builder._resolve_split_and_divisions(hamiltonian, terms, 1.0)
         container = builder.run(hamiltonian).get_container()
 
         assert num_det == 2
@@ -1004,7 +1017,7 @@ class TestPartiallyRandomizedAccuracyAwareStructure:
         one_deterministic = PartiallyRandomized(weight_threshold=0.5, **common)
 
         terms = hamiltonian.get_real_coefficients(tolerance=1e-12, sort_by_magnitude=True)
-        selected = automatic._determine_num_deterministic_cost_optimal(hamiltonian, terms, 1.0)
+        selected, _ = automatic._resolve_split_and_divisions(hamiltonian, terms, 1.0)
         automatic_size = len(automatic.run(hamiltonian).get_container().step_terms)
         one_deterministic_size = len(one_deterministic.run(hamiltonian).get_container().step_terms)
 
@@ -1035,7 +1048,7 @@ class TestPartiallyRandomizedAccuracyAwareStructure:
         }
         automatic = PartiallyRandomized(weight_threshold=-1.0, **common)
         terms = hamiltonian.get_real_coefficients(tolerance=1e-12, sort_by_magnitude=True)
-        selected = automatic._determine_num_deterministic_cost_optimal(hamiltonian, terms, 0.5)
+        selected, _ = automatic._resolve_split_and_divisions(hamiltonian, terms, 0.5)
 
         emitted_counts = []
         for ld in range(len(terms) + 1):
@@ -1066,7 +1079,7 @@ class TestPartiallyRandomizedAccuracyAwareStructure:
             time=time,
         )
         terms = hamiltonian.get_real_coefficients(tolerance=1e-12, sort_by_magnitude=True)
-        num_det = builder._determine_num_deterministic(hamiltonian, terms, time)
+        num_det, _ = builder._resolve_split_and_divisions(hamiltonian, terms, time)
         assert num_det == 3  # XX, YY, ZZ
 
 
@@ -1098,7 +1111,8 @@ class TestPartiallyRandomizedOutputAccuracy:
         )
         terms = hamiltonian.get_real_coefficients(tolerance=1e-12, sort_by_magnitude=True)
 
-        assert probe._determine_num_deterministic_cost_optimal(hamiltonian, terms, time) == 2
+        num_deterministic, _ = probe._resolve_split_and_divisions(hamiltonian, terms, time)
+        assert num_deterministic == 2
 
         err = _partial_state_trace_error(
             hamiltonian,

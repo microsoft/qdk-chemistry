@@ -277,6 +277,26 @@ For qDRIFT, a tighter nested ``target_accuracy`` can increase the sample count a
 The resolved count is recorded in the schedule and used by circuit construction and tangent energy correction.
 The sample ceiling applies to this resolved count and never clamps it or relaxes the requested accuracy.
 
+For qDRIFT at round :math:`k`, let :math:`t_k=2^k\tau` and let :math:`\lambda` be the coefficient one-norm.
+The minimum number of sampled rotations per circuit is
+
+.. math::
+
+  N_k = \left\lceil\max\left(2\cdot 4^k,\; 8(\lambda t_k/\pi)^2\right)\right\rceil.
+
+Automatic or shorter base times retain the original :math:`2,8,32,\ldots` ladder.
+Longer base times need more sampled rotations to keep the *early* round phases on the correct branch; a final tangent correction alone cannot undo a wrong branch choice.
+Replay uses the counts in the saved schedule, without resizing previously generated workloads.
+
+To see why the floor suffices in the noiseless model, assume an input eigenstate, no discarded Hamiltonian terms, :math:`\lambda>0`, and :math:`u=E/\lambda`.
+For :math:`N\ge N_k` independent rotations with step angle :math:`x=\lambda t_k/N`, the averaged signal is :math:`(\cos x-iu\sin x)^N`.
+The floor gives :math:`Nx^2\le\pi^2/8` and, since :math:`N\ge2`, :math:`x\le\pi/4`.
+For :math:`0\le u\le1`, concavity of arctangent gives :math:`ux\le\arctan(u\tan x)\le u\tan x`; negative energies follow by symmetry.
+On this interval :math:`\tan^2 y\le\tan y\le 4y/\pi`, so integration gives :math:`\tan x-x\le 2x^2/\pi`.
+The unwrapped phase therefore differs from :math:`-Et_k` by at most :math:`2Nx^2/\pi\le\pi/4`.
+At round zero its magnitude is at most :math:`\lambda\tau<\pi`; at each doubling it differs from twice the previous phase by at most :math:`3\pi/4<\pi`, so the nearest phase branch is unique.
+This bound concerns exact averaged signals, not individual draws, finite-shot noise, or error from discarding Hamiltonian terms.
+
 .. tab:: Python API
 
    .. literalinclude:: ../../../_static/examples/python/phase_estimation.py

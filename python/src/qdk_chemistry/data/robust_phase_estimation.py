@@ -31,15 +31,15 @@ __all__ = [
 
 
 @dataclass(frozen=True)
-class _AlgorithmConfiguration:
-    """Immutable serialized algorithm reference."""
+class _RpeBuilderConfiguration:
+    """Immutable builder reference saved in an RPE schedule."""
 
     algorithm_type: str
     algorithm_name: str
     settings_json: str
 
     @classmethod
-    def from_ref(cls, ref: AlgorithmRef) -> _AlgorithmConfiguration:
+    def from_ref(cls, ref: AlgorithmRef) -> _RpeBuilderConfiguration:
         """Snapshot a resolved algorithm reference.
 
         Args:
@@ -59,7 +59,7 @@ class _AlgorithmConfiguration:
         return cls(ref.algorithm_type, ref.algorithm_name, ref.settings.to_json())
 
     @classmethod
-    def from_json(cls, data: dict[str, Any]) -> _AlgorithmConfiguration:
+    def from_json(cls, data: dict[str, Any]) -> _RpeBuilderConfiguration:
         """Restore a serialized algorithm reference.
 
         Args:
@@ -326,8 +326,8 @@ class RobustPhaseEstimationSchedule(DataClass):
         self.energy_correction = str(energy_correction)
         self.requested_seed = int(requested_seed)
         self.root_seed = int(root_seed) if root_seed is not None else None
-        self._unitary_builder_configuration = _AlgorithmConfiguration.from_ref(unitary_builder_configuration)
-        self._hadamard_test_circuit_builder_configuration = _AlgorithmConfiguration.from_ref(
+        self._unitary_builder_configuration = _RpeBuilderConfiguration.from_ref(unitary_builder_configuration)
+        self._hadamard_test_circuit_builder_configuration = _RpeBuilderConfiguration.from_ref(
             hadamard_test_circuit_builder_configuration
         )
         self._validate_schedule()
@@ -601,7 +601,7 @@ class RobustPhaseEstimationSchedule(DataClass):
         try:
             values["rounds"] = tuple(RobustPhaseEstimationRound(**data) for data in values["rounds"])
             for key in ("unitary_builder_configuration", "hadamard_test_circuit_builder_configuration"):
-                values[key] = _AlgorithmConfiguration.from_json(values[key]).to_ref()
+                values[key] = _RpeBuilderConfiguration.from_json(values[key]).to_ref()
             return cls(**values)
         except TypeError as error:
             raise ValueError(f"Invalid schedule fields: {error}") from error

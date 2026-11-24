@@ -133,7 +133,7 @@ class PartiallyRandomizedSettings(TimeEvolutionSettings):
             "merge_duplicate_terms",
             "bool",
             True,
-            "Fuse identical Pauli terms across commuting factors, including step boundaries.",
+            "Fuse matching rotations in commuting runs, including deterministic rotations across steps.",
         )
         self._set_default(
             "commutation_type",
@@ -167,10 +167,11 @@ class PartiallyRandomized(QDrift):
     randomized part :math:`H_R` sandwiched in between. The first-order variant
     applies :math:`H_D` at full angle followed by :math:`H_R`.
 
-    Identical rotations can be fused across commuting factors, including step
-    boundaries. The resulting factors are scheduled into disjoint-support
-    layers without reversing the order of overlapping factors. Layer metadata
-    allows controlled circuit synthesis to share rotation rounds across a layer.
+    Identical rotations can be fused across commuting factors, including deterministic
+    rotations across step boundaries even when there is no random tail. The resulting
+    factors are scheduled into disjoint-support layers without reversing the order of
+    overlapping factors. Layer metadata allows controlled circuit synthesis to share
+    rotation rounds across a layer.
 
     An input :attr:`~qdk_chemistry.data.QubitOperator.term_partition` controls
     the deterministic sweep's order and layers after the magnitude-based split.
@@ -267,7 +268,7 @@ class PartiallyRandomized(QDrift):
                 Defaults to -1.
             tolerance: Threshold for filtering negligible coefficients.
                 Defaults to 1e-12.
-            merge_duplicate_terms: Fuse matching rotations across commuting factors, including step boundaries.
+            merge_duplicate_terms: Fuse matching rotations in commuting runs, even across deterministic steps.
             commutation_type: Commutation check used when merging duplicate
                 terms.  ``"qubit_wise"`` requires every single-qubit
                 pair to commute individually — stricter but always safe.
@@ -359,17 +360,8 @@ class PartiallyRandomized(QDrift):
                 )
             )
 
-        # Determine split between deterministic and random terms
-        num_deterministic = self._determine_num_deterministic(qubit_hamiltonian, real_terms, time)
-
-        # Split into H_D and H_R
-        deterministic_terms = real_terms[:num_deterministic]
+        num_deterministic, num_divisions = self._resolve_split_and_divisions(qubit_hamiltonian, real_terms, time)
         random_terms = real_terms[num_deterministic:]
-
-        # Size the outer Trotter step count r and the per-step sample count.
-        # With no deterministic terms there is no Trotter bias, so a single
-        # step suffices (the qDRIFT sample count alone controls accuracy).
-        num_divisions = self._resolve_num_divisions(qubit_hamiltonian, time) if deterministic_terms else 1
         num_block_samples = self._resolve_block_samples(random_terms, time, num_divisions)
 
         return UnitaryRepresentation(
@@ -760,54 +752,38 @@ class PartiallyRandomized(QDrift):
         per_step = math.ceil(num_total / num_divisions)
         return max(num_random_samples, per_step)
 
-    def _determine_num_deterministic(
+    def _resolve_split_and_divisions(
         self,
         qubit_hamiltonian: QubitOperator,
         terms: list[tuple[str, float]],
         time: float,
-    ) -> int:
-        """Determine how many terms to treat deterministically.
-
-        Precedence:
-
-        1. An explicit ``weight_threshold >= 0`` always wins: count the terms
-           whose magnitude meets the threshold.
-          2. Otherwise, when ``target_accuracy`` is set, pick the cost-optimal
-              split ``L_D`` that minimizes the pre-merge raw rotation count.
-        3. Otherwise, fall back to the legacy heuristic (top 10% by weight).
+    ) -> tuple[int, int]:
+        """Choose an explicit, cost-optimal, or top-ten-percent split and its outer step count.
 
         Args:
-            qubit_hamiltonian: The full Hamiltonian (used to size ``r`` for the
-                cost-optimal split).
-            terms: List of ``(label, coeff)`` sorted by ``|coeff|`` descending.
+            qubit_hamiltonian: The full Hamiltonian used to size the outer steps.
+            terms: Pauli labels and coefficients sorted by descending magnitude.
             time: The evolution time.
 
         Returns:
-            Number of terms to treat deterministically.
+            The number of deterministic terms and the number of outer steps (one for an all-random split).
 
         """
         weight_threshold: float = self._settings.get("weight_threshold")
         if weight_threshold >= 0.0:
-            # Count terms with |coeff| >= threshold; may be 0 (all-random)
-            return sum(1 for _, c in terms if abs(c) >= weight_threshold)
+            num_deterministic = sum(1 for _, coefficient in terms if abs(coefficient) >= weight_threshold)
+        elif self._settings.get("target_accuracy") > 0.0 and time != 0.0:
+            return self._cost_optimal_split(qubit_hamiltonian, terms, time)
+        else:
+            num_deterministic = min(len(terms), max(1, len(terms) // 10))
+        return num_deterministic, self._resolve_num_divisions(qubit_hamiltonian, time) if num_deterministic else 1
 
-        target_accuracy: float = self._settings.get("target_accuracy")
-        if target_accuracy > 0.0 and time != 0.0:
-            return self._determine_num_deterministic_cost_optimal(qubit_hamiltonian, terms, time)
-
-        # Default: top 10% of terms (at least 1, at most all but 1 for random)
-        num_deterministic = max(1, len(terms) // 10)
-        # Ensure at least some terms remain for random treatment
-        if num_deterministic >= len(terms):
-            num_deterministic = max(1, len(terms) - 1)
-        return num_deterministic
-
-    def _determine_num_deterministic_cost_optimal(
+    def _cost_optimal_split(
         self,
         qubit_hamiltonian: QubitOperator,
         terms: list[tuple[str, float]],
         time: float,
-    ) -> int:
+    ) -> tuple[int, int]:
         r"""Pick the split ``L_D`` minimizing the implemented raw rotation count.
 
         With terms sorted by descending weight, assigning the ``L_D`` largest to
@@ -832,7 +808,7 @@ class PartiallyRandomized(QDrift):
             time: The evolution time.
 
         Returns:
-            The cost-optimal number of deterministic terms (in ``[0, len(terms)]``).
+            The cost-optimal number of deterministic terms and the outer step count used to price that split.
 
         """
         order: int = self._settings.get("trotter_order")
@@ -854,7 +830,7 @@ class PartiallyRandomized(QDrift):
             if cost < best_cost:
                 best_cost = cost
                 best_ld = ld
-        return best_ld
+        return best_ld, deterministic_divisions if best_ld else 1
 
     def name(self) -> str:
         """Return the name of the unitary builder."""

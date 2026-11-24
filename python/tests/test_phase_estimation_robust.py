@@ -23,7 +23,6 @@ import pytest
 
 from qdk_chemistry import algorithms
 from qdk_chemistry.algorithms.base import create_from_ref
-from qdk_chemistry.algorithms.hamiltonian_unitary_builder.time_evolution.trotter import Trotter
 from qdk_chemistry.algorithms.phase_estimation.circuit_builder.robust_builder import (
     RobustPhaseEstimationCircuitBuilder,
 )
@@ -191,22 +190,6 @@ def _dense_from_pauli(pauli_strings: list[str], coefficients: list[float]) -> np
     return matrix
 
 
-def _has_robust_stack() -> bool:
-    """Return True when the registry can build the robust circuit stack."""
-    if not _HAS_QSHARP:
-        return False
-    try:
-        from qdk_chemistry.algorithms import create  # noqa: PLC0415
-
-        create("hadamard_test_circuit_builder", "qdk")
-        create("rpe_experiment_scheduler", "qdk")
-        create("qpe_circuit_builder", "qdk_robust")
-        create("phase_estimation", "qdk_robust")
-    except (KeyError, RuntimeError, ValueError):
-        return False
-    return True
-
-
 @dataclass(frozen=True)
 class _FakeUnitary:
     """Minimal unitary marker carrying the configured time and seed."""
@@ -215,7 +198,7 @@ class _FakeUnitary:
     seed: int | None
 
 
-class _FakeUnitaryBuilder(Trotter):
+class _FakeUnitaryBuilder:
     """Build fake unitaries and record exact settings."""
 
     def __init__(self, settings: Settings, records: list[dict[str, object]]) -> None:
@@ -433,14 +416,16 @@ def test_post_process_uses_experiment_identity_after_reordering() -> None:
     assert result.resolved_energy == pytest.approx(energy, abs=1e-6)
 
 
-def test_post_process_uses_effective_qdrift_samples() -> None:
-    """Tangent correction inverts the averaged signal using the executed sample count."""
-    energy = 0.3
-    hamiltonian = QubitOperator(pauli_strings=["Z", "I"], coefficients=[0.35, 0.65])
+@pytest.mark.parametrize("energy", [-0.2, 0.2])
+@pytest.mark.parametrize(("base_time", "nested_accuracy"), [(0.0, 0.25), (3.0, 0.0), (np.pi - 1e-3, 0.0), (3.0, 0.25)])
+def test_post_process_uses_effective_qdrift_samples(energy: float, base_time: float, nested_accuracy: float) -> None:
+    """Noiseless qDRIFT signals track the correct branch through the final tangent inversion."""
+    hamiltonian = QubitOperator(pauli_strings=["ZI", "IZ"], coefficients=[0.6, 0.4])
     circuit_set = _make_scheduler(
-        target_accuracy=0.5,
+        target_accuracy=0.1,
+        base_time=base_time,
         unitary_builder_name="qdrift",
-        unitary_builder_kwargs={"target_accuracy": 0.25},
+        unitary_builder_kwargs={"target_accuracy": nested_accuracy},
     ).run(hamiltonian)
     execution_results: list[_RpeExecutionResult] = []
     resolution = 1_000_000_000
@@ -1224,17 +1209,18 @@ def _registered_driver(
     )
 
 
-@pytest.mark.skipif(not _has_robust_stack(), reason="requires Q# and the registered robust circuit stack")
+@pytest.mark.skipif(not _HAS_QSHARP, reason="requires Q#")
 def test_robust_qpe_registered() -> None:
-    """The driver, standard builder variant, and scheduler resolve through the registry."""
+    """The robust driver, builders, and scheduler resolve through the registry."""
     from qdk_chemistry.algorithms import create  # noqa: PLC0415
 
+    assert create("hadamard_test_circuit_builder", "qdk").name() == "qdk"
     assert create("phase_estimation", "qdk_robust").name() == "qdk_robust"
     assert create("qpe_circuit_builder", "qdk_robust").name() == "qdk_robust"
     assert create("rpe_experiment_scheduler", "qdk").name() == "qdk"
 
 
-@pytest.mark.skipif(not _has_robust_stack(), reason="requires Q# and the registered robust circuit stack")
+@pytest.mark.skipif(not _HAS_QSHARP, reason="requires Q#")
 def test_robust_circuit_builder_direct_pair_supports_qre() -> None:
     """A streamed Q# pair supports QRE and a restored workload can be rebound."""
     from qdk.qre.application import QIRApplication, QSharpApplication  # noqa: PLC0415
@@ -1280,7 +1266,7 @@ def test_robust_circuit_builder_direct_pair_supports_qre() -> None:
     assert isinstance(rebound_y.get_qre_application(), QSharpApplication)
 
 
-@pytest.mark.skipif(not _has_robust_stack(), reason="requires Q# and the registered robust circuit stack")
+@pytest.mark.skipif(not _HAS_QSHARP, reason="requires Q#")
 def test_robust_qpe_deterministic_control_recovers_gse() -> None:
     """Exact commuting-term evolution and an exact ground state recover the GSE."""
     hamiltonian, ground_vector, ground_energy = _ground_state_problem()
@@ -1296,7 +1282,7 @@ def test_robust_qpe_deterministic_control_recovers_gse() -> None:
     assert result.resolved_energy == pytest.approx(ground_energy, abs=2e-3)
 
 
-@pytest.mark.skipif(not _has_robust_stack(), reason="requires Q# and the registered robust circuit stack")
+@pytest.mark.skipif(not _HAS_QSHARP, reason="requires Q#")
 @pytest.mark.slow
 @pytest.mark.skipif(
     not _RUN_SLOW_TESTS,

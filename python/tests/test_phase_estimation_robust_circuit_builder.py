@@ -51,7 +51,7 @@ class _FakeUnitary:
     seed: int | None
 
 
-class _FakeUnitaryBuilder(Trotter):
+class _FakeUnitaryBuilder:
     """Record one on-demand unitary construction."""
 
     def __init__(self, settings: Settings, records: list[dict[str, object]]) -> None:
@@ -123,11 +123,8 @@ def recording_builders(
     ("lambda_norm", "epsilon", "expected"),
     [(0.0, 1.0, 0), (0.5, 1.0, 0), (1.0, 1.0, 0), (1.01, 1.0, 1), (8.0, 1.0, 3), (8.01, 1.0, 4)],
 )
-def test_num_rounds(
-    rpe_problem: tuple[Circuit, QubitOperator], lambda_norm: float, epsilon: float, expected: int
-) -> None:
+def test_num_rounds(lambda_norm: float, epsilon: float, expected: int) -> None:
     """The workload includes the base round and the expected number of doubling rounds."""
-    state_preparation, _ = rpe_problem
     circuit_set = RobustPhaseEstimationExperimentScheduler(target_accuracy=epsilon, seed=7).run(
         QubitOperator(pauli_strings=["Z"], coefficients=np.array([lambda_norm]))
     )
@@ -180,9 +177,8 @@ def test_scheduler_rejects_nan_explicit_budget(rpe_problem: tuple[Circuit, Qubit
         scheduler.run(rpe_problem[1])
 
 
-def test_qdrift_schedule_formula_and_monotonicity(rpe_problem: tuple[Circuit, QubitOperator]) -> None:
+def test_qdrift_schedule_formula_and_monotonicity() -> None:
     """RPE shots decrease while qDRIFT samples increase over the ladder."""
-    state_preparation, _ = rpe_problem
     total_rounds = 5
     circuit_set = RobustPhaseEstimationExperimentScheduler(target_accuracy=1.0, seed=7).run(
         QubitOperator(pauli_strings=["Z"], coefficients=np.array([32.0]))
@@ -195,6 +191,48 @@ def test_qdrift_schedule_formula_and_monotonicity(rpe_problem: tuple[Circuit, Qu
     assert shots == sorted(shots, reverse=True)
     assert samples == sorted(samples)
     assert all(samples[round_index] == 2 ** (2 * round_index + 1) for round_index in range(total_rounds + 1))
+
+
+@pytest.mark.parametrize(
+    ("base_time", "counts"),
+    [(0.0, (2, 8, 32, 128, 512)), (1.0, (2, 8, 32, 128, 512)), (3.0, (8, 30, 117, 467))],
+)
+def test_qdrift_sample_floor_includes_base_time(base_time: float, counts: tuple[int, ...]) -> None:
+    """Only longer base times raise the reference floor; equality with the cap is allowed."""
+    scheduler = RobustPhaseEstimationExperimentScheduler(
+        target_accuracy=0.1, base_time=base_time, seed=7, max_qdrift_samples=counts[-1]
+    )
+    schedule = scheduler.run(QubitOperator(["ZI", "IZ"], [0.6, 0.4]))
+
+    assert tuple(round_data.scheduled_samples for round_data in schedule.rounds) == counts
+
+
+def test_qdrift_long_base_time_checks_scaled_ceiling() -> None:
+    """An explicit time may exceed the ceiling even when the old round-only floor fits."""
+    scheduler = RobustPhaseEstimationExperimentScheduler(target_accuracy=0.1, base_time=3.0, max_qdrift_samples=466)
+    with pytest.raises(ValueError, match="467 samples.*max_qdrift_samples=466"):
+        scheduler.run(QubitOperator(["ZI", "IZ"], [0.6, 0.4]))
+
+
+def test_qdrift_loading_preserves_legacy_sample_counts(
+    rpe_problem: tuple[Circuit, QubitOperator],
+    recording_builders: tuple[list[dict[str, object]], list[tuple[str, _FakeUnitary]]],
+) -> None:
+    """Replaying a long-time schedule constructs the saved draws without imposing the new floor."""
+    state_preparation, hamiltonian = rpe_problem
+    schedule = RobustPhaseEstimationExperimentScheduler(target_accuracy=0.1, base_time=3.0, seed=7).run(hamiltonian)
+    payload = schedule.to_json()
+    original_counts = (2, 8, 32, 128)
+    for round_data, count in zip(payload["rounds"], original_counts, strict=True):
+        round_data["scheduled_samples"] = count
+
+    restored = RobustPhaseEstimationSchedule.from_json(payload)
+    assert tuple(round_data.scheduled_samples for round_data in restored.rounds) == original_counts
+    assert restored.experiment_specs == schedule.experiment_specs
+    spec, _, _ = next(RobustPhaseEstimationCircuitBuilder().iter_build(restored, state_preparation, hamiltonian))
+    unitary_records, _ = recording_builders
+    assert unitary_records[0]["num_samples"] == original_counts[0]
+    assert unitary_records[0]["seed"] == spec.draw_seed
 
 
 @pytest.mark.parametrize("nested_accuracy", [0.0, 0.25, 10.0])
@@ -235,9 +273,8 @@ def test_qdrift_schedule_records_effective_samples(
     assert circuit_set.final_samples == circuit_set.rounds[-1].scheduled_samples
 
 
-def test_qdrift_schedule_rejects_default_oversized_workload(rpe_problem: tuple[Circuit, QubitOperator]) -> None:
+def test_qdrift_schedule_rejects_default_oversized_workload() -> None:
     """Default chemistry-scale sampling fails before constructing a huge circuit."""
-    state_preparation, _ = rpe_problem
     scheduler = RobustPhaseEstimationExperimentScheduler(seed=7)
     hamiltonian = QubitOperator(pauli_strings=["Z"], coefficients=[100.0])
 
@@ -286,9 +323,8 @@ def test_qdrift_schedule_limit_uses_effective_samples(rpe_problem: tuple[Circuit
         scheduler.run(rpe_problem[1])
 
 
-def test_qdrift_schedule_accepts_explicit_higher_sample_limit(rpe_problem: tuple[Circuit, QubitOperator]) -> None:
+def test_qdrift_schedule_accepts_explicit_higher_sample_limit() -> None:
     """An explicit ceiling permits a large metadata-only schedule without clamping."""
-    state_preparation, _ = rpe_problem
     scheduler = RobustPhaseEstimationExperimentScheduler(seed=7, max_qdrift_samples=2**35)
     hamiltonian = QubitOperator(pauli_strings=["Z"], coefficients=[100.0])
 
@@ -388,6 +424,21 @@ def test_scheduler_rejects_unrecognized_builder_name(rpe_problem: tuple[Circuit,
             scheduler.run(hamiltonian)
     finally:
         algorithms.unregister("hamiltonian_unitary_builder", "renamed_trotter_for_rpe_test")
+
+
+@pytest.mark.parametrize("overrides", [{}, {"order": 2}])
+def test_scheduler_records_resolved_default_builder(overrides: dict[str, int]) -> None:
+    """An empty unitary builder name dispatches and replays as the factory's default Trotter builder."""
+    hamiltonian = QubitOperator(["Z"], [1.0])
+
+    def schedule(name: str) -> RobustPhaseEstimationSchedule:
+        return RobustPhaseEstimationExperimentScheduler(
+            target_accuracy=0.5, seed=7, unitary_builder=AlgorithmRef("hamiltonian_unitary_builder", name, **overrides)
+        ).run(hamiltonian)
+
+    restored = RobustPhaseEstimationSchedule.from_json(schedule("").to_json())
+    assert restored.unitary_builder_configuration.algorithm_name == "trotter"
+    assert restored.to_json() == schedule("trotter").to_json()
 
 
 @pytest.mark.parametrize("builder_name", ["trotter", "qdrift", "partially_randomized"])
@@ -500,11 +551,8 @@ def test_registered_builder_name_preserves_rpe_policy(
         assert round_data.num_draws == (round_data.shots_per_basis if randomized else 1)
 
 
-def test_default_partial_randomized_random_cost_scales_quadratically(
-    rpe_problem: tuple[Circuit, QubitOperator],
-) -> None:
+def test_default_partial_randomized_random_cost_scales_quadratically() -> None:
     """Default PR sample growth follows the expected inverse-square RPE scaling."""
-    state_preparation, _ = rpe_problem
     hamiltonian = QubitOperator(pauli_strings=["X", "Z"], coefficients=[1.0, 0.5])
     random_rotation_counts: list[int] = []
 

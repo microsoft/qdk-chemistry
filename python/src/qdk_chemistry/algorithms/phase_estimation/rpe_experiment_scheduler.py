@@ -37,6 +37,12 @@ _RPE_BUILDER_CATEGORIES = {
 }
 
 
+def _round_sample_floor(round_index: int, base_time_ratio: float) -> int:
+    """Round the scaled qDRIFT ladder up without converting its potentially large integer counts to floats."""
+    numerator, denominator = max(1.0, base_time_ratio**2).as_integer_ratio()
+    return (2 ** (2 * round_index + 1) * numerator + denominator - 1) // denominator
+
+
 def _validate_unit_power(settings: Settings) -> None:
     """Require the RPE schedule to be the sole source of evolution powers.
 
@@ -246,7 +252,7 @@ class RobustPhaseEstimationExperimentScheduler(Algorithm):
                 f"'{unitary_ref.algorithm_type}/{unitary_ref.algorithm_name}' "
                 "does not represent supported time evolution. Block encodings and quantum walks are not supported."
             )
-        builder_name = unitary_ref.algorithm_name
+        builder_name = unitary_builder.name()
         if builder_name not in _RPE_BUILDER_CATEGORIES:
             supported = ", ".join(sorted(_RPE_BUILDER_CATEGORIES))
             raise ValueError(f"Unsupported RPE unitary builder {builder_name!r}. Supported builders: {supported}.")
@@ -261,8 +267,9 @@ class RobustPhaseEstimationExperimentScheduler(Algorithm):
         )
 
         lambda_norm = float(np.sum(np.abs(np.asarray(qubit_hamiltonian.coefficients, dtype=float))))
+        automatic_base_time = float((np.pi / 2.0) / lambda_norm) if lambda_norm > 0.0 else 1.0
         if base_time == 0.0:
-            base_time = float(np.pi / (2.0 * lambda_norm)) if lambda_norm > 0.0 else 1.0
+            base_time = automatic_base_time
         if base_time * lambda_norm >= np.pi:
             raise ValueError(
                 "base_time must satisfy base_time * lambda_norm < pi to avoid energy aliasing; "
@@ -279,8 +286,9 @@ class RobustPhaseEstimationExperimentScheduler(Algorithm):
             if lambda_norm == 0.0 or energy_resolution_scale <= epsilon_rpe
             else int(np.ceil(np.log2(energy_resolution_scale / epsilon_rpe)))
         )
+        base_time_ratio = base_time / automatic_base_time if category == "qdrift" and lambda_norm > 0.0 else 1.0
         if category == "qdrift":
-            final_scheduled_samples = 2 ** (2 * total_round + 1)
+            final_scheduled_samples = _round_sample_floor(total_round, base_time_ratio)
             if final_scheduled_samples > max_qdrift_samples:
                 raise ValueError(
                     f"qDRIFT round {total_round} requires at least {final_scheduled_samples} samples, exceeding "
@@ -300,7 +308,7 @@ class RobustPhaseEstimationExperimentScheduler(Algorithm):
         rounds: list[RobustPhaseEstimationRound] = []
         for round_index in range(total_round + 1):
             shots = int(np.ceil(np.e * (11 + 4 * (total_round - round_index))))
-            samples = 2 ** (2 * round_index + 1)
+            samples = _round_sample_floor(round_index, base_time_ratio)
             evolution_time = float((2**round_index) * base_time)
             if category == "qdrift" and unitary_settings.has("num_samples"):
                 if unitary_settings.has("target_accuracy") and unitary_builder.settings().get("target_accuracy") > 0.0:
@@ -354,7 +362,7 @@ class RobustPhaseEstimationExperimentScheduler(Algorithm):
             shared_settings["target_accuracy"] = epsilon_unitary
         shared_configuration = AlgorithmRef(
             unitary_ref.algorithm_type,
-            unitary_ref.algorithm_name,
+            builder_name,
             settings=Settings.from_json(json.dumps(shared_settings)),
         )
         return RobustPhaseEstimationSchedule(

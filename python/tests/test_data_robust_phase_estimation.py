@@ -24,7 +24,7 @@ from qdk_chemistry.data import (
     RobustPhaseEstimationSchedule,
     Settings,
 )
-from qdk_chemistry.data.robust_phase_estimation import _AlgorithmConfiguration, _HamiltonianSnapshot
+from qdk_chemistry.data.robust_phase_estimation import _HamiltonianSnapshot, _RpeBuilderConfiguration
 
 
 def _algorithm_ref(algorithm_type: str, algorithm_name: str, **values: object) -> AlgorithmRef:
@@ -202,7 +202,7 @@ def test_schedule_configuration_is_defensive() -> None:
 
 def test_data_configuration_has_no_algorithm_operations() -> None:
     """Data snapshots serialize references without constructing or configuring algorithms."""
-    configuration = _AlgorithmConfiguration.from_ref(_algorithm_ref("test", "test", value=1))
+    configuration = _RpeBuilderConfiguration.from_ref(_algorithm_ref("test", "test", value=1))
 
     for operation in ("create", "with_updates", "validate_unit_power", "has_setting"):
         assert not hasattr(configuration, operation)
