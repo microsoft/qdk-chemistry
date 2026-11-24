@@ -128,6 +128,7 @@ StateVectorContainer::StateVectorContainer(
         ") does not match the number of determinants (" +
         std::to_string(dets.size()) + ").");
   }
+  _validate_rdms_sizes();
 }
 
 StateVectorContainer::StateVectorContainer(
@@ -157,6 +158,7 @@ StateVectorContainer::StateVectorContainer(
         ") does not match the number of determinants (" +
         std::to_string(dets.size()) + ").");
   }
+  _validate_rdms_sizes();
 }
 
 // ---------------------------------------------------------------------------
