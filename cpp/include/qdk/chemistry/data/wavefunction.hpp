@@ -855,6 +855,9 @@ class WavefunctionContainer {
   /** @brief Clear cached RDMs */
   void _clear_rdms() const;
 
+  /** @brief Validate supplied RDM and entropy dimensions against active orbitals. */
+  void _validate_rdms_sizes() const;
+
   /**
    * @brief Serialize stored RDMs without computing missing ones.
    * @param j Container JSON receiving an optional "rdms" member.
