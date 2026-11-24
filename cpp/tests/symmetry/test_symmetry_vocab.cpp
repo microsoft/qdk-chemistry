@@ -63,6 +63,29 @@ TEST(SymmetryVocabTest, ParticleNumberValueAndAxis) {
                std::length_error);
 }
 
+// A total-spin label round-trips through JSON and never equals an S_z label.
+TEST(SymmetryVocabTest, TotalSpinValueRoundTripsAndDiffersFromProjection) {
+  const auto doublet = axes::total_spin_value(1);
+  EXPECT_EQ(doublet->axis(), AxisName::TotalSpin);
+  EXPECT_EQ(doublet->value(), 1u);
+  EXPECT_EQ(to_string(doublet->axis()), "total_spin");
+  EXPECT_FALSE(doublet->equals(SpinValue(1)));
+  EXPECT_FALSE(doublet->equals(TotalSpinValue(3)));
+  const auto restored = symmetry_axis_value_from_json(doublet->to_json());
+  EXPECT_TRUE(restored->equals(*doublet));
+  EXPECT_EQ(restored->hash(), doublet->hash());
+
+  const SymmetryAxis axis(AxisName::TotalSpin,
+                          {axes::total_spin_value(0), doublet}, false);
+  const SymmetryProduct product({axes::particle_number(2), axis});
+  EXPECT_EQ(*SymmetryProduct::from_json(product.to_json()), product);
+  const SymmetryLabel label({axes::particle_number_value(1), doublet});
+  EXPECT_EQ(SymmetryLabel::from_json(label.to_json()), label);
+  EXPECT_THROW(symmetry_axis_value_from_json(nlohmann::json::parse(
+                   R"({"kind": "total_spin", "two_s": -1})")),
+               std::runtime_error);
+}
+
 TEST(SymmetryVocabTest, RoundTripParticleNumberJsonAndHash) {
   const auto value = axes::particle_number_value(3);
   const auto json = value->to_json();

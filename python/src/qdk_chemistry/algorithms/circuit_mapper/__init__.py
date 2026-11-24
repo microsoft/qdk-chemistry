@@ -14,6 +14,8 @@ from .unitary_synthesis_mapper import (
     BlockSparseUnitarySynthesisMapperSettings,
     DenseUnitarySynthesisMapper,
     DenseUnitarySynthesisMapperSettings,
+    HouseholderUnitarySynthesisMapper,
+    HouseholderUnitarySynthesisMapperSettings,
     UnitarySynthesisMapper,
     UnitarySynthesisMapperSettings,
 )
@@ -24,6 +26,8 @@ __all__ = [
     "CircuitMapperFactory",
     "DenseUnitarySynthesisMapper",
     "DenseUnitarySynthesisMapperSettings",
+    "HouseholderUnitarySynthesisMapper",
+    "HouseholderUnitarySynthesisMapperSettings",
     "PSPMapper",
     "PSPMapperSettings",
     "PauliSequenceMapper",

@@ -138,6 +138,7 @@ MPS wavefunction container
 :class:`~qdk_chemistry.data.MPSContainer` stores a matrix product state (MPS), for example the result of a density matrix renormalization group (DMRG) calculation.
 It holds one :class:`~qdk_chemistry.data.MPSSite` per active orbital, each an optionally symmetry-blocked rank-3 tensor with left-bond, physical, and right-bond indices, together with the order of the orbitals along the chain and an optional orthogonality center.
 It is pure storage: the sites are not expanded into determinants, so coefficient-, determinant-, norm-, overlap-, and occupation-based accessors raise.
+Sites whose sector labels carry a total-spin axis (:class:`~qdk_chemistry.data.symmetry.TotalSpinValue`) store spin-adapted reduced tensors, in which each index stands for one spin multiplet and the physical basis is ``('0', 'u', '2')``, which the ``matrix_product_state`` preparation loads with the ``unitary_synthesis_householder`` circuit mapper.
 Particle counts and RDMs are available only if they are passed to the constructor.
 
 Properties

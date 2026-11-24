@@ -26,6 +26,11 @@ namespace qdk::chemistry::data {
  * sector labels must match the particle number, and for spin-half states the
  * spin projection, of the basis states they contain. Binary states are
  * spinless, so their labels must not have a spin axis.
+ *
+ * Labels with an SU(2) total-spin axis (AxisName::TotalSpin) mark reduced
+ * (Wigner-Eckart) tensors: every index stands for one spin multiplet, e.g.
+ * the physical basis ('0', 'u', '2') of sectors (N, 2S) = (0, 0), (1, 1),
+ * (2, 0), where 'u' represents the singly occupied doublet.
  */
 class MPSSite {
  public:

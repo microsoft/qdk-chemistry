@@ -158,7 +158,7 @@ def test_circuit_register_holds_two_qubits_per_site(active_space):
             lambda: Wavefunction(make_mps([_INITIAL_SITE, _IDENTITY_SITE])),
             {"unitary_synthesis": AlgorithmRef("circuit_mapper", "pauli_sequence")},
             TypeError,
-            "requires the unitary_synthesis_dense or unitary_synthesis_block_sparse circuit mapper",
+            "requires the unitary_synthesis_dense, unitary_synthesis_block_sparse or unitary_synthesis_householder",
             id="other-circuit-mapper",
         ),
         pytest.param(create_test_wavefunction, {}, TypeError, "requires an MPSContainer", id="non-mps-wavefunction"),
@@ -381,7 +381,7 @@ def test_six_site_identity_order_signs_match_contraction(qsharp_test_context, qs
     assert np.abs(np.vdot(target, state)) ** 2 > 1 - _AGREEMENT_TOLERANCE
 
 
-@_METHODS
+@pytest.mark.parametrize("method", ["dense", "block_sparse", "householder"])
 def test_shared_phase_gradient_prepares_target(method):
     """Without its own gradient the circuit acts on [state | gradient], prepares the MPS and restores the gradient."""
     mps = make_mps(_random_right_canonical_tensors([1, 4, 3, 2, 1], 4, seed=11), site_to_orbital_order=(2, 0, 3, 1))

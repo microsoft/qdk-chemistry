@@ -21,7 +21,8 @@ using qdk::chemistry::python::utils::to_string_path;
 void bind_symmetry(py::module& symmetry) {
   py::enum_<AxisName>(symmetry, "AxisName", "Symmetry axis identifier.")
       .value("Spin", AxisName::Spin)
-      .value("ParticleNumber", AxisName::ParticleNumber);
+      .value("ParticleNumber", AxisName::ParticleNumber)
+      .value("TotalSpin", AxisName::TotalSpin);
 
   symmetry.def(
       "axis_name_to_string", [](AxisName axis) { return to_string(axis); },
@@ -51,6 +52,14 @@ void bind_symmetry(py::module& symmetry) {
       .def(py::init<std::size_t>(), py::arg("number"))
       .def("value", &ParticleNumberValue::value,
            "The represented particle number.");
+
+  py::class_<TotalSpinValue, SymmetryAxisValue,
+             std::shared_ptr<TotalSpinValue>>(
+      symmetry, "TotalSpinValue",
+      "Concrete SU(2) total-spin axis value. The stored value is 2*S of one "
+      "spin multiplet.")
+      .def(py::init<unsigned>(), py::arg("two_s"))
+      .def("value", &TotalSpinValue::value, "The stored 2*S value.");
 
   py::class_<SymmetryAxis, DataClass, py::smart_holder>(
       symmetry, "SymmetryAxis",
@@ -234,4 +243,11 @@ void bind_symmetry(py::module& symmetry) {
             axes::particle_number_value(number));
       },
       py::arg("number"), "Construct a particle-number value.");
+  axes.def(
+      "total_spin_value",
+      [](unsigned two_s) {
+        return std::const_pointer_cast<TotalSpinValue>(
+            axes::total_spin_value(two_s));
+      },
+      py::arg("two_s"), "Construct a total-spin value carrying 2*S = two_s.");
 }

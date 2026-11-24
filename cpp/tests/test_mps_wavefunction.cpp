@@ -192,6 +192,51 @@ TEST_F(MPSContainerTest, RejectsPhysicalBasisThatContradictsSectorLabels) {
                std::invalid_argument);
 }
 
+// SU(2) physical labels must match each state's multiplet and survive JSON.
+TEST_F(MPSContainerTest, SpinAdaptedSiteLabelsMultiplets) {
+  using SBT = SymmetryBlockedTensor<3>;
+  const SymmetryAxis total_spin(
+      AxisName::TotalSpin,
+      {axes::total_spin_value(0), axes::total_spin_value(1)}, false);
+  auto symmetry = std::make_shared<const SymmetryProduct>(
+      SymmetryProduct({axes::particle_number(2), total_spin}));
+  const SymmetryLabel empty(
+      {axes::particle_number_value(0), axes::total_spin_value(0)});
+  const SymmetryLabel doublet(
+      {axes::particle_number_value(1), axes::total_spin_value(1)});
+  const SymmetryLabel pair(
+      {axes::particle_number_value(2), axes::total_spin_value(0)});
+  SBT::ExtentsArray extents;
+  extents[0] = {{empty, 1}};
+  extents[1] = {{empty, 1}, {doublet, 1}, {pair, 1}};
+  extents[2] = {{doublet, 1}};
+  auto tensor = std::make_shared<const MPSSite::TensorVariant>(
+      SBT({symmetry, symmetry, symmetry}, extents,
+          {{{empty, doublet, doublet},
+            std::make_shared<const Eigen::MatrixXd>(
+                Eigen::MatrixXd::Ones(1, 1))}}));
+  auto site_with = [&](const char* singly_occupied) {
+    return std::make_shared<const MPSSite>(
+        tensor,
+        MPSSite::SectorOrders{{{empty}, {empty, doublet, pair}, {doublet}}},
+        std::vector<Configuration>{
+            Configuration::from_spin_half_string("0"),
+            Configuration::from_spin_half_string(singly_occupied),
+            Configuration::from_spin_half_string("2")});
+  };
+  // One doublet reduced state stands for 'u' and 'd'; '2' is not a doublet.
+  EXPECT_NO_THROW(site_with("d"));
+  EXPECT_THROW(MPSSite(tensor, {{{empty}, {empty, pair, doublet}, {doublet}}},
+                       {Configuration::from_spin_half_string("0"),
+                        Configuration::from_spin_half_string("u"),
+                        Configuration::from_spin_half_string("2")}),
+               std::invalid_argument);
+  MPSContainer container({site_with("u")}, std::make_shared<ModelOrbitals>(1));
+  const auto restored = MPSContainer::from_json(container.to_json());
+  EXPECT_EQ(restored->sites()[0]->sector_orders(),
+            container.sites()[0]->sector_orders());
+}
+
 TEST_F(MPSContainerTest, SerializationAndClone) {
   Wavefunction original(make_container());
   H5::FileAccPropList access;

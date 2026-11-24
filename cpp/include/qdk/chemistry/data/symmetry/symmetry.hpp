@@ -25,7 +25,10 @@ enum class AxisName {
   Spin,
   /** @brief The particle-number axis carrying nonnegative particle-count
    *         labels represented by @ref ParticleNumberValue. */
-  ParticleNumber
+  ParticleNumber,
+  /** @brief The SU(2) total-spin axis carrying @ref TotalSpinValue labels,
+   *         one per spin multiplet. */
+  TotalSpin
 };
 
 /**
@@ -222,6 +225,47 @@ class ParticleNumberValue : public SymmetryAxisValue {
    * @throws std::runtime_error if @p j is missing the particle-number
    *         payload or it is not a nonnegative integer that fits
    *         std::size_t.
+   */
+  static std::shared_ptr<const SymmetryAxisValue> from_json(
+      const nlohmann::json& j);
+};
+
+/**
+ * @brief SU(2) total-spin label 2S of one spin multiplet.
+ *
+ * A sector with this label holds reduced (Wigner-Eckart) states, each
+ * standing for the 2S + 1 states of one multiplet.
+ */
+class TotalSpinValue : public SymmetryAxisValue {
+  unsigned _two_s;
+
+ public:
+  /**
+   * @brief Construct a total-spin label.
+   * @param two_s Twice the total spin S.
+   */
+  constexpr explicit TotalSpinValue(unsigned two_s) : _two_s(two_s) {}
+
+  /** @brief Twice the total spin S. */
+  constexpr unsigned value() const { return _two_s; }
+
+  /** @brief Always @ref AxisName::TotalSpin. */
+  AxisName axis() const override { return AxisName::TotalSpin; }
+  /**
+   * @brief Value-equality against another axis value.
+   * @param other Axis value to compare against.
+   * @return @c true iff @p other is a @ref TotalSpinValue with the same 2S.
+   */
+  bool equals(const SymmetryAxisValue& other) const override;
+  /** @brief Hash consistent with @ref equals. */
+  std::size_t hash() const override;
+  /** @brief Serialize 2S under the key @c two_s. */
+  nlohmann::json to_json() const override;
+  /**
+   * @brief Reconstruct a @ref TotalSpinValue from its JSON payload.
+   * @param j JSON object produced by @ref TotalSpinValue::to_json.
+   * @return Deserialized value typed as the polymorphic base.
+   * @throws std::runtime_error if 2S is missing or not a nonnegative integer.
    */
   static std::shared_ptr<const SymmetryAxisValue> from_json(
       const nlohmann::json& j);
@@ -850,6 +894,13 @@ std::shared_ptr<const SpinValue> spin_value(int two_ms);
  */
 std::shared_ptr<const ParticleNumberValue> particle_number_value(
     std::size_t number);
+
+/**
+ * @brief Construct a label for an SU(2) spin multiplet.
+ * @param two_s Twice the total spin S of the multiplet.
+ * @return Shared pointer to a total-spin label containing @p two_s.
+ */
+std::shared_ptr<const TotalSpinValue> total_spin_value(unsigned two_s);
 
 }  // namespace axes
 

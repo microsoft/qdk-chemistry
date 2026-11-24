@@ -913,6 +913,7 @@ def _register_python_algorithms():
     from qdk_chemistry.algorithms.circuit_mapper import (  # noqa: PLC0415
         BlockSparseUnitarySynthesisMapper,
         DenseUnitarySynthesisMapper,
+        HouseholderUnitarySynthesisMapper,
         PauliSequenceMapper,
         PSPMapper,
         SOSSAMapper,
@@ -1017,6 +1018,7 @@ def _register_python_algorithms():
     register(lambda: ControlledSOSSAMapper())
     register(lambda: DenseUnitarySynthesisMapper())
     register(lambda: BlockSparseUnitarySynthesisMapper())
+    register(lambda: HouseholderUnitarySynthesisMapper())
     # Must follow the unitary synthesis mappers, which its settings resolve by name at construction.
     register(lambda: MatrixProductStatePreparation())
     register(lambda: SOSSABuilder())

@@ -99,6 +99,15 @@ bool label_describes_state(const SymmetryLabel& label,
           return false;
         }
         break;
+      case AxisName::TotalSpin:
+        // One spatial orbital is a doublet when singly occupied, else a
+        // singlet; its spin-half basis state represents the whole multiplet.
+        if (state.bits_per_mode() != 2 ||
+            !value->equals(
+                TotalSpinValue(state.total_occupation() == 1 ? 1U : 0U))) {
+          return false;
+        }
+        break;
     }
   }
   return true;

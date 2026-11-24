@@ -25,7 +25,11 @@ from qdk_chemistry.utils.qsharp import QSHARP_UTILS, use_qsharp_context
 
 from .helpers import apply_operation, assert_states_match_up_to_global_phase
 
-_DENSE, _BLOCK_SPARSE = "unitary_synthesis_dense", "unitary_synthesis_block_sparse"
+_DENSE, _BLOCK_SPARSE, _HOUSEHOLDER = (
+    "unitary_synthesis_dense",
+    "unitary_synthesis_block_sparse",
+    "unitary_synthesis_householder",
+)
 # At the default 10 rotation bits every quantized angle is within 2^-10 of its target.
 _INFIDELITY_TOLERANCE = 1e-3
 
@@ -94,6 +98,8 @@ def _assert_realizes(circuit, matrix, seed: int, preimage=None) -> None:
         (_BLOCK_SPARSE, _block_sparse([4, 4, 3, 2, 1, 1, 1], seed=16).toarray()),
         (_BLOCK_SPARSE, ortho_group.rvs(4, random_state=8)),
         (_BLOCK_SPARSE, sparse.csc_array(sparse.block_diag([ortho_group.rvs(4, random_state=s) for s in (1, 2)]))),
+        *[(_HOUSEHOLDER, ortho_group.rvs(1 << n, random_state=30 + n + m)[:, :m]) for n, m in [(1, 1), (2, 3), (3, 2)]],
+        (_HOUSEHOLDER, np.array([[-0.6], [0.0], [0.8], [0.0]])),
     ],
 )
 def test_realizes_matrix(name, matrix):
@@ -107,6 +113,7 @@ def test_realizes_matrix(name, matrix):
         (_DENSE, ortho_group.rvs(8, random_state=3)[:, :2]),
         (_BLOCK_SPARSE, _block_sparse([2, 4, 1, 1], seed=4)),
         (_BLOCK_SPARSE, np.eye(8)),
+        (_HOUSEHOLDER, ortho_group.rvs(4, random_state=3)[:, :2]),
     ],
 )
 def test_exports_qir(name, matrix):
@@ -125,7 +132,7 @@ def test_explicit_input_register(name, num_input_qubits):
     _assert_realizes(circuit, matrix, seed=num_input_qubits)
 
 
-@pytest.mark.parametrize("name", [_DENSE, _BLOCK_SPARSE])
+@pytest.mark.parametrize("name", [_DENSE, _BLOCK_SPARSE, _HOUSEHOLDER])
 def test_shared_phase_gradient(name):
     """Without its own gradient the operation acts on [target | gradient] and restores the gradient."""
     matrix = _block_sparse([2, 4, 1, 1], seed=11)[:, :2]
@@ -157,7 +164,8 @@ def test_omit_right_factor(matrix):
 
 
 @pytest.mark.parametrize(
-    ("name", "settings"), [(_DENSE, {}), (_DENSE, {"omit_right_factor": True}), (_BLOCK_SPARSE, {})]
+    ("name", "settings"),
+    [(_DENSE, {}), (_DENSE, {"omit_right_factor": True}), (_BLOCK_SPARSE, {}), (_HOUSEHOLDER, {})],
 )
 def test_adjoint_inverts(qsharp_test_context, qsharp_test_utils, name, settings):
     """The adjoint maps ``M a`` back to the zero-padded input ``a``, or ``V a`` when ``V`` is omitted."""

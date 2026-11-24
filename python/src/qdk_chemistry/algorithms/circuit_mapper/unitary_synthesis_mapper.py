@@ -10,6 +10,8 @@ from __future__ import annotations
 from abc import abstractmethod
 from typing import TYPE_CHECKING, Any
 
+import numpy as np
+
 from qdk_chemistry._core.utils.unitary_synthesis import (
     block_sparse_isometry_synthesis,
     dense_isometry_right_factor,
@@ -23,8 +25,6 @@ from qdk_chemistry.utils.qsharp import QSHARP_UTILS
 from .base import CircuitMapper
 
 if TYPE_CHECKING:
-    import numpy as np
-
     from qdk_chemistry._core.utils.unitary_synthesis import GivensDecomposition
     from qdk_chemistry.data.unitary_representation.base import UnitaryRepresentation
 
@@ -33,6 +33,8 @@ __all__: list[str] = [
     "BlockSparseUnitarySynthesisMapperSettings",
     "DenseUnitarySynthesisMapper",
     "DenseUnitarySynthesisMapperSettings",
+    "HouseholderUnitarySynthesisMapper",
+    "HouseholderUnitarySynthesisMapperSettings",
     "UnitarySynthesisMapper",
     "UnitarySynthesisMapperSettings",
 ]
@@ -97,10 +99,14 @@ class BlockSparseUnitarySynthesisMapperSettings(UnitarySynthesisMapperSettings):
     """Settings for the BlockSparseUnitarySynthesisMapper."""
 
 
+class HouseholderUnitarySynthesisMapperSettings(UnitarySynthesisMapperSettings):
+    """Settings for the HouseholderUnitarySynthesisMapper."""
+
+
 class UnitarySynthesisMapper(CircuitMapper):
     r"""Base mapper that synthesizes a real isometry :math:`M` from a UnitaryMatrixContainer.
 
-    All rotations use quantized Givens angles :cite:`Clements2016` applied by phase-gradient addition.
+    All rotations use quantized angles applied by phase-gradient addition.
     """
 
     _qsharp_prefix: str
@@ -272,6 +278,60 @@ class BlockSparseUnitarySynthesisMapper(UnitarySynthesisMapper):
             "columnPermutation": synthesis.column_permutation,
             "rowPermutation": synthesis.row_permutation,
             "blockGivens": _givens_to_qsharp(synthesis.block_givens),
+        }
+
+
+class HouseholderUnitarySynthesisMapper(UnitarySynthesisMapper):
+    r"""Isometry synthesis as a product of Householder reflections, one per column :cite:`Low2024,Hennefarth2026`.
+
+    Column :math:`j` contributes the reflection about :math:`(|0\rangle|j\rangle - |1\rangle|v_j\rangle)/\sqrt{2}` on a
+    reflection ancilla and the target, where :math:`|v_j\rangle` is prepared by a state preparation controlled on the
+    ancilla, with QROAM-loaded rotation angles. The cost grows with the number of columns times their length, and the
+    method adds any number of qubits.
+    """
+
+    _qsharp_prefix = "HouseholderIsometry"
+
+    def __init__(self):
+        """Initialize the HouseholderUnitarySynthesisMapper."""
+        super().__init__()
+        self._settings = HouseholderUnitarySynthesisMapperSettings()
+
+    def name(self) -> str:
+        """Return ``unitary_synthesis_householder``."""
+        return "unitary_synthesis_householder"
+
+    @staticmethod
+    def column_preparation(amplitudes: np.ndarray) -> tuple[list[list[float]], list[bool]]:
+        """Return the state-preparation data of a real vector, padded to a power-of-two length.
+
+        Args:
+            amplitudes: Real amplitudes of the state to prepare.
+
+        Returns:
+            The Ry angles 2θ per level, the most significant bit first, with cos θ = sqrt(p_low / p) of the
+            probability tree; and the sign of each amplitude, empty when none is negative.
+
+        """
+        num_bits = (len(amplitudes) - 1).bit_length()
+        padded = np.zeros(1 << num_bits)
+        padded[: len(amplitudes)] = amplitudes
+        probabilities = np.square(padded)
+        angles = []
+        for level in range(num_bits):
+            tree = probabilities.reshape(1 << level, 2, -1).sum(axis=2)
+            total = tree.sum(axis=1)
+            ratio = np.divide(tree[:, 0], total, out=np.ones_like(total), where=total > 0)
+            angles.append((2.0 * np.arccos(np.sqrt(np.clip(ratio, 0.0, 1.0)))).tolist())
+        negative = padded < 0
+        return angles, negative.tolist() if negative.any() else []
+
+    def _synthesize(self, container: UnitaryMatrixContainer, num_input_qubits: int) -> dict[str, Any]:  # noqa: ARG002
+        """Return the fields of the Q# ``HouseholderIsometrySynthesis`` struct."""
+        columns = [self.column_preparation(column) for column in container.to_dense().T]
+        return {
+            "columnAngles": [angles for angles, _ in columns],
+            "columnSigns": [signs for _, signs in columns],
         }
 
 

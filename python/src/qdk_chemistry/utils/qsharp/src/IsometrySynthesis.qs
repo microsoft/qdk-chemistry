@@ -9,7 +9,7 @@
 /// state a of the n-qubit input register followed by the added qubits.
 ///
 /// Each `unitary_synthesis_*` circuit mapper uses these entry points with its prefix X
-/// (`DenseIsometry` or `SparseIsometry`):
+/// (`DenseIsometry`, `SparseIsometry` or `HouseholderIsometry`):
 /// - `XSynthesis` holds the circuit data from the C++ synthesis and the register widths;
 /// - `ApplyX(synthesis, input, added, phaseGradient, angleReg)` applies the isometry;
 /// - `MakeXOp(synthesis)` returns the operation on the target, with its own phase gradient;
@@ -32,8 +32,11 @@ namespace QDKChemistry.Utils.IsometrySynthesis {
     import Std.Convert.ResultArrayAsBoolArray;
     import Std.Diagnostics.Fact;
     import Std.Math.PI;
+    import Std.ResourceEstimation.BeginEstimateCaching;
+    import Std.ResourceEstimation.EndEstimateCaching;
     import Std.Measurement.MResetX;
     import QDKChemistry.Utils.PhaseGradient.PreparePhaseGradientState;
+    import QDKChemistry.Utils.SelectSwap.ApplyBranchPhaseFixup;
     import QDKChemistry.Utils.SelectSwap.ComputeOptimalLambda2D;
     import QDKChemistry.Utils.UnitarySynthesis.ApplyControlledMultiplexedRy;
     import QDKChemistry.Utils.UnitarySynthesis.ApplyGivensLayersDeferred;
@@ -87,6 +90,127 @@ namespace QDKChemistry.Utils.IsometrySynthesis {
         /// Qubits added to the input register, the high qubits of the target.
         numAddedQubits : Int,
         rotationBitPrecision : Int,
+    }
+
+    /// Circuit data of a real isometry applied as a product of Householder reflections, one per
+    /// column (Low, Kliuchnikov & Schaeffer, arXiv:1812.00954; Hennefarth et al., arXiv:2611.19728,
+    /// Sec. 3.1), with each column loaded by `PrepareControlledColumn`.
+    struct HouseholderIsometrySynthesis {
+        /// Ry angles 2θ of each column, indexed by column, level (most significant bit first) and address.
+        columnAngles : Double[][][],
+        /// Sign bit of each amplitude of each column, empty for a column without negative amplitudes.
+        columnSigns : Bool[][],
+        /// Widest swap network of the angle lookups, -1 to let each loader's cost model choose.
+        maxSwapBits : Int,
+        /// Qubits of the input register, the low qubits of the target.
+        numInputQubits : Int,
+        /// Qubits added to the input register, the high qubits of the target.
+        numAddedQubits : Int,
+        rotationBitPrecision : Int,
+    }
+
+    /// Prepares Σ_x a_x |x⟩ on the little-endian `target` in |0⟩ when `control` is |1⟩, by layers of
+    /// multiplexed Ry rotations from QROAM-loaded angles (Shende, Bullock & Markov) and a one-bit sign
+    /// lookup, the controlled LKS state preparation of Hennefarth et al., App. B.1.
+    operation PrepareControlledColumn(
+        levels : Double[][],
+        signs : Bool[],
+        maxSwapBits : Int,
+        control : Qubit,
+        target : Qubit[],
+        phaseGradient : Qubit[],
+        angleReg : Qubit[]
+    ) : Unit is Adj {
+        body (...) {
+            let msbFirst = Reversed(target);
+            for level in IndexRange(levels) {
+                // The address is the already-prepared high part of the target, read little-endian.
+                let table = QuantizeTrimmedRyAngles(levels[level], Length(angleReg));
+                ApplyControlledMultiplexedRy(table, maxSwapBits, Reversed(msbFirst[...level - 1]), [control], msbFirst[level], phaseGradient, angleReg);
+            }
+            if not IsEmpty(signs) {
+                ApplyBranchPhaseFixup([true], Mapped(sign -> [sign], signs), true, [control] + target[...Length(levels) - 1]);
+            }
+        }
+        adjoint (...) {
+            if not IsEmpty(signs) {
+                ApplyBranchPhaseFixup([true], Mapped(sign -> [sign], signs), true, [control] + target[...Length(levels) - 1]);
+            }
+            let msbFirst = Reversed(target);
+            for level in Length(levels) - 1..-1..0 {
+                let table = QuantizeTrimmedRyAngles(levels[level], Length(angleReg));
+                Adjoint ApplyControlledMultiplexedRy(table, maxSwapBits, Reversed(msbFirst[...level - 1]), [control], msbFirst[level], phaseGradient, angleReg);
+            }
+        }
+    }
+
+    /// Cache key of a column load: everything that sets its cost, including the trimmed angle tables.
+    function ColumnLoadCacheKey(levels : Double[][], signs : Bool[], maxSwapBits : Int, widths : Int[]) : String {
+        let lengths = MappedOverRange(level -> Length(QuantizeTrimmedRyAngles(levels[level], widths[0])), IndexRange(levels));
+        $"w{widths}_s{maxSwapBits}_l{lengths}_g{not IsEmpty(signs)}"
+    }
+
+    /// Reflects about (|0⟩|column⟩ - |1⟩|v⟩)/√2 on [reflect | target] (Eq. 17 of Hennefarth et al.), where
+    /// |column⟩ is written to `input` and v is prepared on `target` by `PrepareControlledColumn`.
+    operation ApplyHouseholderColumnReflection(
+        levels : Double[][],
+        signs : Bool[],
+        column : Int,
+        maxSwapBits : Int,
+        reflect : Qubit,
+        input : Qubit[],
+        target : Qubit[],
+        phaseGradient : Qubit[],
+        angleReg : Qubit[]
+    ) : Unit is Adj {
+        body (...) {
+            // Every column with the same key has the same cost, as the column index only sets CNOTs.
+            if BeginEstimateCaching($"HouseholderColumn_{ColumnLoadCacheKey(levels, signs, maxSwapBits, [Length(angleReg), Length(input), Length(target)])}", 0) {
+                within {
+                    Adjoint PrepareControlledColumn(levels, signs, maxSwapBits, reflect, target, phaseGradient, angleReg);
+                    Adjoint ApplyControlledOnInt(0, ApplyXorInPlace(column, _), [reflect], input);
+                    Z(reflect);
+                    H(reflect);
+                } apply {
+                    within {
+                        X(reflect);
+                    } apply {
+                        ApplyControlledOnInt(0, Z, target, reflect);
+                    }
+                }
+                EndEstimateCaching();
+            }
+        }
+        adjoint self;
+    }
+
+    /// Applies a Householder isometry to the little-endian `input` and the `added` qubits in |0⟩, with
+    /// the signature of `ApplyDenseIsometry`. The reflection ancilla ends in |0⟩ up to rotation
+    /// quantization error and is reset before release.
+    operation ApplyHouseholderIsometry(
+        synthesis : HouseholderIsometrySynthesis,
+        input : Qubit[],
+        added : Qubit[],
+        phaseGradient : Qubit[],
+        angleReg : Qubit[]
+    ) : Unit is Adj {
+        body (...) {
+            use reflect = Qubit();
+            for column in IndexRange(synthesis.columnAngles) {
+                ApplyHouseholderColumnReflection(synthesis.columnAngles[column], synthesis.columnSigns[column], column, synthesis.maxSwapBits, reflect, input, input + added, phaseGradient, angleReg);
+            }
+            X(reflect);
+            Reset(reflect);
+        }
+        adjoint (...) {
+            // The reflections are their own inverses, so the adjoint applies them in reverse order.
+            use reflect = Qubit();
+            X(reflect);
+            for column in Length(synthesis.columnAngles) - 1..-1..0 {
+                ApplyHouseholderColumnReflection(synthesis.columnAngles[column], synthesis.columnSigns[column], column, synthesis.maxSwapBits, reflect, input, input + added, phaseGradient, angleReg);
+            }
+            Reset(reflect);
+        }
     }
 
     /// Returns the bit-string tables of a permutation and of its inverse.
@@ -384,5 +508,33 @@ namespace QDKChemistry.Utils.IsometrySynthesis {
     operation MakeSparseIsometryCircuit(synthesis : SparseIsometrySynthesis) : Unit {
         use target = Qubit[synthesis.numInputQubits + synthesis.numAddedQubits];
         MakeSparseIsometryOp(synthesis)(target);
+    }
+
+    /// Returns `ApplyHouseholderIsometry` on the target, with its own phase gradient.
+    function MakeHouseholderIsometryOp(synthesis : HouseholderIsometrySynthesis) : Qubit[] => Unit is Adj {
+        ApplyIsometryOnTarget(
+            synthesis.numInputQubits,
+            synthesis.numAddedQubits,
+            synthesis.rotationBitPrecision,
+            ApplyHouseholderIsometry(synthesis, _, _, _, _),
+            _
+        )
+    }
+
+    /// Returns `ApplyHouseholderIsometry` on `[target | phaseGradient]`, as for dense isometries.
+    function MakeHouseholderIsometryOpWithPhaseGradient(synthesis : HouseholderIsometrySynthesis) : Qubit[] => Unit is Adj {
+        ApplyIsometryOnRegister(
+            synthesis.numInputQubits,
+            synthesis.numAddedQubits,
+            synthesis.rotationBitPrecision,
+            ApplyHouseholderIsometry(synthesis, _, _, _, _),
+            _
+        )
+    }
+
+    /// Circuit entry point for a Householder isometry, leaving the output on the allocated target.
+    operation MakeHouseholderIsometryCircuit(synthesis : HouseholderIsometrySynthesis) : Unit {
+        use target = Qubit[synthesis.numInputQubits + synthesis.numAddedQubits];
+        MakeHouseholderIsometryOp(synthesis)(target);
     }
 }

@@ -15,6 +15,7 @@ from scipy import sparse
 from qdk_chemistry.algorithms.circuit_mapper.unitary_synthesis_mapper import (
     BlockSparseUnitarySynthesisMapper,
     DenseUnitarySynthesisMapper,
+    HouseholderUnitarySynthesisMapper,
     UnitarySynthesisMapper,
 )
 from qdk_chemistry.data import (
@@ -28,6 +29,7 @@ from qdk_chemistry.data import (
     Wavefunction,
 )
 from qdk_chemistry.data.circuit import Circuit, CircuitMetadata, QsharpFactoryData
+from qdk_chemistry.data.symmetry import AxisName, SymmetryLabel
 from qdk_chemistry.utils.qsharp import QSHARP_UTILS
 
 from .state_preparation import StatePreparation
@@ -44,6 +46,24 @@ _PHYSICAL_BASES = {
     2: [Configuration.from_bitstring(state) for state in _PHYSICAL_BASIS_LABELS[2]],
     4: [Configuration.from_spin_half_string(state) for state in _PHYSICAL_BASIS_LABELS[4]],
 }
+
+
+# Spin-adapted sites use one reduced state per multiplet, (N, 2S) = (0, 0), (1, 1), (2, 0).
+_SPIN_ADAPTED_BASIS = [Configuration.from_spin_half_string(state) for state in ("0", "u", "2")]
+
+# Fusion channels j of Def. C.1 of arXiv:2611.19728: left sector offset (Δn, Δ2S), physical sector
+# (n_P, 2S_P) and channel code Γ = k + 2l of the (alpha, beta) qubits before the Clebsch-Gordan stage.
+_CHANNELS = (
+    ((0, 0), (0, 0), 0b00),
+    ((-2, 0), (2, 0), 0b11),
+    ((-1, -1), (1, 1), 0b01),
+    ((-1, 1), (1, 1), 0b10),
+)
+
+# Q# struct prefix of each site synthesis method.
+_QSHARP_NAMES = {"dense": "MPSSequential", "block_sparse": "MPSSparse", "householder": "MPSHouseholder"}
+
+_ISOMETRY_TOLERANCE = 1e-8
 
 
 class MatrixProductStatePreparationSettings(Settings):
@@ -65,8 +85,9 @@ class MatrixProductStatePreparationSettings(Settings):
             "unitary_synthesis",
             "algorithm_ref",
             AlgorithmRef("circuit_mapper", "unitary_synthesis_dense"),
-            "unitary_synthesis_dense or unitary_synthesis_block_sparse circuit mapper that synthesizes "
-            "every site isometry. Its num_input_qubits is set to the bond register width, its "
+            "unitary_synthesis_dense, unitary_synthesis_block_sparse or unitary_synthesis_householder circuit "
+            "mapper that synthesizes every site isometry; spin-adapted MPS require unitary_synthesis_householder. "
+            "Its num_input_qubits is set to the bond register width, its "
             "rotation_bit_precision to this algorithm's, and the dense mapper's omit_right_factor to True. "
             "Its allocate_phase_gradient is unused, as all sites share this algorithm's phase gradient.",
         )
@@ -91,6 +112,20 @@ class MatrixProductStatePreparation(StatePreparation):
     orbitals in the blocked Jordan-Wigner layout. Sites
     with the ``('0', '1')`` physical basis are spinless modes in the
     Jordan-Wigner layout.
+
+    A charge- and spin-adapted (U(1) x SU(2)) MPS is loaded from its reduced tensors following
+    :cite:`Hennefarth2026`, with the ``unitary_synthesis_householder`` mapper. Its sector labels carry a
+    particle-number and a total-spin axis, every site uses the reduced basis ``('0', 'u', '2')`` of
+    sectors :math:`(N, 2S) = (0, 0), (1, 1), (2, 0)`, and the tensors are left-canonical with the
+    orthogonality center on the last site, in the Clebsch-Gordan convention
+    :math:`T = A \otimes \langle S_L m_L; S_P m_P | S_R m_R \rangle` with ``'2'`` created as
+    :math:`a^\dagger_\alpha a^\dagger_\beta`, which block2 SU(2) MPS follow. The sites are loaded from the last
+    to the first. A bond register holds the multiplicity, :math:`N`, :math:`2S` and :math:`2M_S` of the bond.
+    Each site applies one Householder reflection per reduced column, covering every :math:`M_S` through a
+    comparator; the column is loaded over a contiguized index that comparators then decode into the left
+    sector and physical channel (App. A.2), and a data-independent Clebsch-Gordan rotation (App. C) restores
+    the spin projections, so the unfolded tensors are never loaded. The spin projection is
+    :math:`M_S = (N_\alpha - N_\beta) / 2` from the active particle counts, or :math:`M_S = S` without them.
     """
 
     def __init__(self):
@@ -115,12 +150,11 @@ class MatrixProductStatePreparation(StatePreparation):
                 Its validated site-to-orbital order is preserved.
 
         Returns:
-            The site synthesis method, ``"dense"`` or ``"block_sparse"``, and the fields of the Q#
-            ``MPSSequentialParams`` or ``MPSSparseParams`` struct.
+            The site synthesis method, ``"dense"``, ``"block_sparse"`` or ``"householder"``, and the fields
+            of the Q# ``MPSSequentialParams``, ``MPSSparseParams`` or ``MPSHouseholderParams`` struct.
 
         Raises:
-            TypeError: If the ``unitary_synthesis`` setting does not refer to a dense or block-sparse
-                unitary synthesis mapper.
+            TypeError: If the ``unitary_synthesis`` setting does not refer to a unitary synthesis mapper.
             ValueError: If the physical basis is unsupported, the MPS is complex,
                 the initial state has zero norm, or a synthesized site is not isometric.
 
@@ -202,21 +236,30 @@ class MatrixProductStatePreparation(StatePreparation):
 
         Raises:
             TypeError: If wavefunction is not an MPSContainer instance, or the ``unitary_synthesis``
-                setting does not refer to a dense or block-sparse unitary synthesis mapper.
-            ValueError: If the MPS is complex, not right-canonical with orthogonality
-                center zero, or does not use one of the ``('0', '1')`` and ``('0', 'u', 'd', '2')``
-                physical bases on every site.
+                setting does not refer to a unitary synthesis mapper supported for the MPS.
+            ValueError: If the MPS is complex, not right-canonical with orthogonality center zero (or,
+                when spin-adapted, left-canonical with center on the last site), or does not use one of
+                the ``('0', '1')``, ``('0', 'u', 'd', '2')`` and spin-adapted ``('0', 'u', '2')`` physical
+                bases on every site.
 
         """
         container = wavefunction.get_container()
         if not isinstance(container, MPSContainer):
             raise TypeError(f"MatrixProductStatePreparation requires an MPSContainer, got {type(container)}.")
-        if container.orthogonality_center() != 0:
-            raise ValueError(f"{_DESCRIPTION} requires a right-canonical MPS with center zero.")
-
-        method, params = self._generate_preparation_data(container)
+        if any(label.has(AxisName.TotalSpin) for site in container.sites() for label in site.physical_sector_order()):
+            two_projection = None
+            if container.has_active_num_particles():
+                num_alpha, num_beta = wavefunction.get_active_num_electrons()
+                two_projection = num_alpha - num_beta
+            name, params = "MPSSpinAdapted", self._generate_spin_adapted_data(container, two_projection)
+            num_state_qubits = 2 * params["numSites"]
+        else:
+            if container.orthogonality_center() != 0:
+                raise ValueError(f"{_DESCRIPTION} requires a right-canonical MPS with center zero.")
+            method, params = self._generate_preparation_data(container)
+            name = _QSHARP_NAMES[method]
+            num_state_qubits = params["numQubitsPerSite"] * params["numSites"]
         # The MPS circuits are Adaptive-only; the default shared context targets Adaptive_RIF.
-        name = "MPSSparse" if method == "block_sparse" else "MPSSequential"
         module = QSHARP_UTILS.MPSStatePrep
         qsharp_params = getattr(module, f"{name}Params")(**params)
         if self._settings.get("allocate_phase_gradient"):
@@ -233,16 +276,126 @@ class MatrixProductStatePreparation(StatePreparation):
             qsharp_factory=QsharpFactoryData(program=program, parameter={"params": params}),
             qsharp_op=qsharp_op,
             encoding="jordan-wigner",
-            num_qubits=params["numQubitsPerSite"] * params["numSites"] + num_gradient_ancillas,
+            num_qubits=num_state_qubits + num_gradient_ancillas,
             metadata=CircuitMetadata(num_phase_gradient_ancillas=num_gradient_ancillas),
         )
+
+    def _generate_spin_adapted_data(self, mps: MPSContainer, two_projection: int | None) -> dict[str, Any]:
+        """Return the fields of the Q# ``MPSSpinAdaptedParams`` struct of a spin-adapted MPS.
+
+        Each reduced column is contiguized over its fusion channels in ascending multiplicity (App. A.2 of
+        :cite:`Hennefarth2026`) and stored as the state-preparation data of the Householder mapper.
+
+        Args:
+            mps: Real, left-canonical MPS of reduced tensors with (particle number, total spin) labels.
+            two_projection: Twice the spin projection M_S to prepare, or None for M_S = S.
+
+        Returns:
+            The fields of the Q# ``MPSSpinAdaptedParams`` struct.
+
+        Raises:
+            TypeError: If the ``unitary_synthesis`` setting does not refer to the Householder mapper.
+            ValueError: If the MPS is complex, not spin-adapted or not left-canonical, or the spin
+                projection is incompatible with the total spin.
+
+        """
+        description = f"Spin-adapted {_DESCRIPTION}"
+        if mps.is_complex():
+            raise ValueError(f"{description} supports only real-valued MPS tensors.")
+        num_sites = mps.num_sites()
+        if mps.orthogonality_center() != num_sites - 1:
+            raise ValueError(f"{description} requires a left-canonical MPS with its center on the last site.")
+
+        def quantum_numbers(label: SymmetryLabel) -> tuple[int, int]:
+            if not (label.has(AxisName.ParticleNumber) and label.has(AxisName.TotalSpin)) or label.has(AxisName.Spin):
+                raise ValueError(f"{description} requires (particle number, total spin) sector labels.")
+            return label.get(AxisName.ParticleNumber).value(), label.get(AxisName.TotalSpin).value()
+
+        sites, bond_numbers, max_rows = [], set(), 1
+        for index, site in enumerate(mps.sites()):
+            if site.physical_basis() != _SPIN_ADAPTED_BASIS:
+                raise ValueError(f"{description} requires the reduced physical basis ('0', 'u', '2').")
+            left_extents, _, right_extents = (
+                {quantum_numbers(label): extent for label, extent in slot.items()} for slot in site.tensor().extents()
+            )
+            bond_numbers |= left_extents.keys() | right_extents.keys()
+            blocks = {
+                tuple(quantum_numbers(label) for label in labels): np.asarray(block)
+                for labels, block in site.tensor().blocks()
+            }
+            sectors = []
+            for right_label in site.right_sector_order():
+                right = quantum_numbers(right_label)
+                cases = []
+                for channel, ((dn, ds), physical, code) in enumerate(_CHANNELS):
+                    left = (right[0] + dn, right[1] + ds)
+                    block = blocks.get((left, physical, right))
+                    if block is not None:
+                        cases.append((left_extents[left], channel, left, code, block))
+                cases.sort(key=lambda case: case[:2])
+                matrix = np.concatenate([case[4] for case in cases]) if cases else np.zeros((0, right_extents[right]))
+                gram = matrix.T @ matrix
+                if not np.allclose(gram, np.eye(len(gram)), atol=_ISOMETRY_TOLERANCE):
+                    raise ValueError(
+                        f"{description} requires left-isometric reduced blocks (Eq. 21); site {index} "
+                        f"sector {right} deviates by {np.abs(gram - np.eye(len(gram))).max():.2e}."
+                    )
+                max_rows = max(max_rows, len(matrix))
+                columns = [HouseholderUnitarySynthesisMapper.column_preparation(column) for column in matrix.T]
+                sectors.append(
+                    {
+                        "numParticles": right[0],
+                        "twoSpin": right[1],
+                        "caseNumParticles": [case[2][0] for case in cases],
+                        "caseTwoSpin": [case[2][1] for case in cases],
+                        "caseCodes": [case[3] for case in cases],
+                        "caseMultiplicities": [case[0] for case in cases],
+                        "columnAngles": [angles for angles, _ in columns],
+                        "columnSigns": [signs for _, signs in columns],
+                    }
+                )
+            sites.append({"sectors": sectors})
+
+        left_boundary = list(mps.sites()[0].tensor().extents()[0])
+        right_boundary = list(mps.sites()[-1].tensor().extents()[2])
+        if len(left_boundary) != 1 or quantum_numbers(left_boundary[0]) != (0, 0):
+            raise ValueError(f"{description} requires the vacuum (0, 0) as the left boundary bond.")
+        if len(right_boundary) != 1:
+            raise ValueError(f"{description} requires a single (N, 2S) sector as the right boundary bond.")
+        num_particles, two_spin = quantum_numbers(right_boundary[0])
+        if two_projection is None:
+            two_projection = two_spin
+        if abs(two_projection) > two_spin or (two_spin - two_projection) % 2:
+            raise ValueError(f"{description} cannot prepare 2M_S = {two_projection} of a state with 2S = {two_spin}.")
+
+        max_two_spin = max(two_s for _, two_s in bond_numbers)
+        register_widths = [
+            max(1, (max_rows - 1).bit_length()),
+            max(1, max(n for n, _ in bond_numbers).bit_length()),
+            max(1, max_two_spin.bit_length()),
+            # Two's complement of 2m with |2m| <= 2S_max, so that a shift by 2S_R never wraps.
+            max_two_spin.bit_length() + 1,
+        ]
+        mapper, method = self._create_site_mapper(register_widths[0])
+        if method != "householder":
+            raise TypeError(
+                f"{description} requires the unitary_synthesis_householder circuit mapper, got '{mapper.name()}'."
+            )
+        return {
+            "numSites": num_sites,
+            "siteToOrbitalOrder": list(mps.site_to_orbital_order()),
+            "rotationBitPrecision": self._settings.get("rotation_bit_precision"),
+            "maxSwapBits": mapper.settings().get("max_swap_address_bits"),
+            "registerWidths": register_widths,
+            "target": [num_particles, two_spin, two_projection],
+            "sites": sites,
+        }
 
     def _create_site_mapper(self, ancilla_bits: int) -> tuple[UnitarySynthesisMapper, str]:
         """Return the nested site mapper, configured for the bond register, and its method.
 
         Raises:
-            TypeError: If the ``unitary_synthesis`` setting does not refer to a dense or block-sparse
-                unitary synthesis mapper.
+            TypeError: If the ``unitary_synthesis`` setting does not refer to a unitary synthesis mapper.
 
         """
         mapper = self._create_nested("unitary_synthesis")
@@ -251,10 +404,12 @@ class MatrixProductStatePreparation(StatePreparation):
             mapper.settings().update("omit_right_factor", True)
         elif isinstance(mapper, BlockSparseUnitarySynthesisMapper):
             method = "block_sparse"
+        elif isinstance(mapper, HouseholderUnitarySynthesisMapper):
+            method = "householder"
         else:
             raise TypeError(
-                f"{_DESCRIPTION} requires the unitary_synthesis_dense or unitary_synthesis_block_sparse "
-                f"circuit mapper, got {mapper.type_name()} '{mapper.name()}'."
+                f"{_DESCRIPTION} requires the unitary_synthesis_dense, unitary_synthesis_block_sparse or "
+                f"unitary_synthesis_householder circuit mapper, got {mapper.type_name()} '{mapper.name()}'."
             )
         # The bond register is the input register; the site qubits are the added qubits.
         mapper.settings().update("num_input_qubits", ancilla_bits)

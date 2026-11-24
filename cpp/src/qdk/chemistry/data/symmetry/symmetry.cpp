@@ -24,6 +24,8 @@ std::string to_string(AxisName axis) {
       return "spin";
     case AxisName::ParticleNumber:
       return "particle_number";
+    case AxisName::TotalSpin:
+      return "total_spin";
   }
   throw std::logic_error("Unknown AxisName value");
 }
@@ -88,6 +90,35 @@ std::shared_ptr<const SymmetryAxisValue> ParticleNumberValue::from_json(
   return std::make_shared<const ParticleNumberValue>(number.get<std::size_t>());
 }
 
+bool TotalSpinValue::equals(const SymmetryAxisValue& other) const {
+  const auto* total_spin = dynamic_cast<const TotalSpinValue*>(&other);
+  return total_spin != nullptr && total_spin->_two_s == _two_s;
+}
+
+std::size_t TotalSpinValue::hash() const {
+  utils::HashContext ctx;
+  hash_value(ctx, "total_spin_value");
+  hash_value(ctx, static_cast<int64_t>(AxisName::TotalSpin));
+  hash_value(ctx, static_cast<uint64_t>(_two_s));
+  return ctx.hash_code();
+}
+
+nlohmann::json TotalSpinValue::to_json() const {
+  return nlohmann::json{{"kind", to_string(axis())}, {"two_s", _two_s}};
+}
+
+std::shared_ptr<const SymmetryAxisValue> TotalSpinValue::from_json(
+    const nlohmann::json& j) {
+  const auto& two_s = j.at("two_s");
+  if (!two_s.is_number_integer() ||
+      (!two_s.is_number_unsigned() && two_s.get<std::int64_t>() < 0) ||
+      two_s.get<std::uint64_t>() > std::numeric_limits<unsigned>::max()) {
+    throw std::runtime_error(
+        "Total-spin label must be a nonnegative integer 2S.");
+  }
+  return std::make_shared<const TotalSpinValue>(two_s.get<unsigned>());
+}
+
 // ---------------------------------------------------------------------------
 // JSON dispatch (internal, no public registry)
 // ---------------------------------------------------------------------------
@@ -100,6 +131,9 @@ std::shared_ptr<const SymmetryAxisValue> symmetry_axis_value_from_json(
   }
   if (kind == "particle_number") {
     return ParticleNumberValue::from_json(j);
+  }
+  if (kind == "total_spin") {
+    return TotalSpinValue::from_json(j);
   }
   throw std::runtime_error("Unknown symmetry axis value kind '" + kind + "'.");
 }
@@ -123,6 +157,15 @@ void hash_value(qdk::chemistry::utils::HashContext& ctx,
           "Particle-number axis value has unexpected runtime type.");
     }
     hash_value(ctx, static_cast<uint64_t>(particle_number->value()));
+    return;
+  }
+  if (value.axis() == AxisName::TotalSpin) {
+    const auto* total_spin = dynamic_cast<const TotalSpinValue*>(&value);
+    if (total_spin == nullptr) {
+      throw std::runtime_error(
+          "Total-spin axis value has unexpected runtime type.");
+    }
+    hash_value(ctx, static_cast<uint64_t>(total_spin->value()));
     return;
   }
   throw std::logic_error("Unknown AxisName value");
@@ -279,6 +322,8 @@ std::shared_ptr<SymmetryAxis> SymmetryAxis::from_json(const nlohmann::json& j) {
       name = AxisName::Spin;
     } else if (name_str == to_string(AxisName::ParticleNumber)) {
       name = AxisName::ParticleNumber;
+    } else if (name_str == to_string(AxisName::TotalSpin)) {
+      name = AxisName::TotalSpin;
     } else {
       throw std::runtime_error("Unknown symmetry axis name '" + name_str +
                                "'.");
@@ -698,6 +743,10 @@ SymmetryAxis particle_number(std::size_t maximum_number) {
     labels.push_back(particle_number_value(number));
   }
   return SymmetryAxis(AxisName::ParticleNumber, std::move(labels), false);
+}
+
+std::shared_ptr<const TotalSpinValue> total_spin_value(unsigned two_s) {
+  return std::make_shared<const TotalSpinValue>(two_s);
 }
 
 }  // namespace axes

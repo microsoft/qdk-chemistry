@@ -63,6 +63,78 @@ mps_prep = create(
 ################################################################################
 
 ################################################################################
+# start-cell-spin-adapted-matrix-product-state
+import numpy as np
+from qdk_chemistry.data import (
+    Configuration,
+    ModelOrbitals,
+    MPSContainer,
+    MPSSite,
+    Wavefunction,
+)
+from qdk_chemistry.data import symmetry as sym
+
+# Sector labels (N, 2S) on a particle-number and a total-spin axis
+symmetries = sym.SymmetryProduct(
+    [
+        sym.axes.particle_number(2),
+        sym.SymmetryAxis(
+            sym.AxisName.TotalSpin,
+            [sym.TotalSpinValue(0), sym.TotalSpinValue(1)],
+            False,
+        ),
+    ]
+)
+empty, doublet, pair = (
+    sym.SymmetryLabel([sym.axes.particle_number_value(n), sym.TotalSpinValue(two_s)])
+    for n, two_s in ((0, 0), (1, 1), (2, 0))
+)
+physical = {empty: 1, doublet: 1, pair: 1}
+reduced_basis = [
+    Configuration.from_spin_half_string(state) for state in ("0", "u", "2")
+]
+
+# Two-orbital singlet: the first site is left-isometric, the last holds the normalized amplitudes
+first = sym.SymmetryBlockedTensorRank3(
+    [symmetries] * 3,
+    [{empty: 1}, physical, dict(physical)],
+    [((empty, label, label), np.ones((1, 1))) for label in (empty, doublet, pair)],
+)
+amplitudes = {empty: 0.1, doublet: 0.2, pair: -0.97}
+norm = np.linalg.norm(list(amplitudes.values()))
+last = sym.SymmetryBlockedTensorRank3(
+    [symmetries] * 3,
+    [dict(physical), physical, {pair: 1}],
+    [
+        ((empty, pair, pair), np.full((1, 1), amplitudes[empty] / norm)),
+        ((doublet, doublet, pair), np.full((1, 1), amplitudes[doublet] / norm)),
+        ((pair, empty, pair), np.full((1, 1), amplitudes[pair] / norm)),
+    ],
+)
+sites = [
+    MPSSite(
+        first, [empty], [empty, doublet, pair], [empty, doublet, pair], reduced_basis
+    ),
+    MPSSite(
+        last, [empty, doublet, pair], [empty, doublet, pair], [pair], reduced_basis
+    ),
+]
+# Left-canonical, with the orthogonality center on the last site
+mps = MPSContainer(sites, ModelOrbitals(2), None, 1)
+
+# Spin-adapted MPS are loaded with Householder site synthesis
+spin_adapted_prep = create(
+    "state_prep",
+    "matrix_product_state",
+    unitary_synthesis=AlgorithmRef(
+        "circuit_mapper", "unitary_synthesis_householder", max_swap_address_bits=0
+    ),
+)
+spin_adapted_circuit = spin_adapted_prep.run(Wavefunction(mps))
+# end-cell-spin-adapted-matrix-product-state
+################################################################################
+
+################################################################################
 # start-cell-run
 import numpy as np
 from qdk_chemistry.data import Structure
