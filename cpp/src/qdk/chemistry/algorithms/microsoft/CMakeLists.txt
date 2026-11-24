@@ -20,6 +20,7 @@ target_sources(chemistry PRIVATE
     macis_pmc.cpp
     mp2.cpp
     scf.cpp
+    sequant_evaluation.cpp
     stabilized_scf.cpp
     stability.cpp
     utils.cpp

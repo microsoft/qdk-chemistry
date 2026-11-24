@@ -15,6 +15,7 @@
 #include <qdk/chemistry/data/wavefunction_containers/state_vector.hpp>
 #include <stdexcept>
 #include <string>
+#include <tuple>
 #include <vector>
 
 #include "qdk/chemistry/algorithms/microsoft/effective_hamiltonian/ducc.hpp"
@@ -286,25 +287,39 @@ TEST_F(DuccTest, LevelTwoIsDeterministicAcrossWorkers) {
     }
   } restore;
   omp_set_dynamic(0);
-  omp_set_num_threads(1);
-  auto ham = hamiltonian(orbitals, one, opposite, 0.3);
-  auto reference = amplitudes(orbitals, "20", 0.12, -0.08, 0.09);
+  auto wide = std::make_shared<ModelOrbitals>(
+      testing::unrestricted_index_set(4, {0, 1, 2, 3}, {0, 1, 2, 3}));
+  Eigen::MatrixXd wide_one = Eigen::Vector4d(-1.2, -0.5, 0.3, 1.1).asDiagonal();
+  wide_one(0, 2) = wide_one(2, 0) = 0.03;
+  // Different alpha and beta target orbitals give each term several plans.
+  const std::vector<
+      std::tuple<std::shared_ptr<Hamiltonian>, std::shared_ptr<Wavefunction>,
+                 std::shared_ptr<const SymmetryBlockedIndexSet>>>
+      cases{{hamiltonian(orbitals, one, opposite, 0.3),
+             amplitudes(orbitals, "20", 0.12, -0.08, 0.09), target},
+            {hamiltonian(wide, wide_one, Eigen::VectorXd::Constant(256, 0.07),
+                         0.3),
+             amplitudes(wide, "2200", 0.12, -0.08, 0.09),
+             testing::unrestricted_index_set(4, {1, 2}, {0, 1})}};
   constructor.settings().set("level", int64_t{2});
-  auto expected = constructor.run(reference, ham, target);
-  for (int workers : {1, 2, 4}) {
-    SCOPED_TRACE(workers);
-    omp_set_num_threads(workers);
-    int observed_workers = 0;
+  for (const auto& [ham, reference, p_indices] : cases) {
+    omp_set_num_threads(1);
+    auto expected = constructor.run(reference, ham, p_indices);
+    for (int workers : {1, 2, 4}) {
+      SCOPED_TRACE(workers);
+      omp_set_num_threads(workers);
+      int observed_workers = 0;
 #pragma omp parallel
-    {
+      {
 #pragma omp single
-      observed_workers = omp_get_num_threads();
-    }
-    ASSERT_EQ(observed_workers, workers);
-    for (int repeat = 0; repeat < 3; ++repeat) {
-      SCOPED_TRACE(repeat);
-      auto result = constructor.run(reference, ham, target);
-      expect_integrals(*result, *expected, 0.0);
+        observed_workers = omp_get_num_threads();
+      }
+      ASSERT_EQ(observed_workers, workers);
+      for (int repeat = 0; repeat < 3; ++repeat) {
+        SCOPED_TRACE(repeat);
+        auto result = constructor.run(reference, ham, p_indices);
+        expect_integrals(*result, *expected, 0.0);
+      }
     }
   }
 }

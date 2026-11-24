@@ -24,12 +24,14 @@ from qdk_chemistry.algorithms import create
 from qdk_chemistry.data import (
     AmplitudeContainer,
     AmplitudeType,
+    Ansatz,
     CanonicalFourCenterHamiltonianContainer,
     Configuration,
     Hamiltonian,
     ModelOrbitals,
     Orbitals,
     StateVectorContainer,
+    Structure,
     Wavefunction,
 )
 from qdk_chemistry.data import (
@@ -37,6 +39,18 @@ from qdk_chemistry.data import (
 )
 
 from .helpers import create_test_basis_set
+from .reference_tolerances import ci_energy_tolerance
+
+try:
+    import pyscf  # noqa: F401
+
+    import qdk_chemistry.plugins.pyscf as pyscf_plugin
+
+    pyscf_plugin.load()
+
+    PYSCF_AVAILABLE = True
+except ImportError:
+    PYSCF_AVAILABLE = False
 
 _Array: TypeAlias = NDArray[np.float64]
 
@@ -323,6 +337,51 @@ def test_restricted_amplitude_conventions() -> None:
         )
         with pytest.raises(ValueError, match="Restricted DUCC"):
             run(Wavefunction(incompatible))
+    # Spin relations are checked with an absolute tolerance.
+    exact, negligible = (
+        AmplitudeContainer(orbitals, determinant, AmplitudeType.CoupledCluster, zeros, beta, doubles, zeros, zeros)
+        for beta in (zeros, np.array([1e-30]))
+    )
+    np.testing.assert_allclose(run(Wavefunction(negligible)), run(Wavefunction(exact)), atol=1e-12)
+
+
+def test_unrestricted_same_spin_storage() -> None:
+    """Same-spin doubles stored only for i < j, a < b match their antisymmetric completion."""
+    structure = Structure.from_xyz("4\nH4+\nH 0 0 0\nH 0 0 0.9\nH 0 0 1.8\nH 0 0 2.7\n")
+    _, hf = create("scf_solver").run(structure, charge=1, spin_multiplicity=2, basis_or_guess="sto-3g")
+    hamiltonian = create("hamiltonian_constructor").run(hf.get_orbitals())
+    _, mp2, _ = create("dynamical_correlation_calculator", "qdk_mp2_calculator").run(Ansatz(hamiltonian, hf))
+    native = mp2.get_container()
+    t1a, t1b = (np.asarray(t) for t in native.get_t1_amplitudes())
+    t2ab, t2aa, t2bb = (np.asarray(t) for t in native.get_t2_amplitudes())
+
+    def complete(stored: _Array, no: int) -> _Array:
+        """Antisymmetric completion of doubles stored only for i < j, a < b."""
+        t = stored.reshape(no, no, 4 - no, 4 - no)
+        return (t - t.transpose(1, 0, 2, 3) - t.transpose(0, 1, 3, 2) + t.transpose(1, 0, 3, 2)).ravel()
+
+    assert np.count_nonzero(t2aa) < np.count_nonzero(complete(t2aa, 2))
+    target = sym.spin_index_set(4, [1, 2], [1, 2], equivalent=False)
+
+    def integrals(wavefunction: Wavefunction, level: int) -> _Array:
+        """Core energy and all integral blocks of the DUCC output."""
+        constructor = create("effective_hamiltonian_constructor", "qdk_ducc", level=level)
+        result = constructor.run(wavefunction, hamiltonian, target)
+        blocks = (*result.get_one_body_integrals(), *result.get_two_body_integrals())
+        return np.concatenate([[result.get_core_energy()], *(np.ravel(block) for block in blocks)])
+
+    def expanded(same_spin: _Array) -> Wavefunction:
+        """The MP2 amplitudes with the given alpha same-spin doubles."""
+        return Wavefunction(
+            AmplitudeContainer(
+                hf.get_orbitals(), hf, native.get_amplitude_type(), t1a, t1b, t2ab, same_spin, complete(t2bb, 1)
+            )
+        )
+
+    for level in range(3):
+        np.testing.assert_allclose(integrals(mp2, level), integrals(expanded(complete(t2aa, 2)), level), atol=1e-12)
+    with pytest.raises(ValueError, match="same-spin doubles"):
+        integrals(expanded(np.abs(complete(t2aa, 2))), 1)
 
 
 def test_nonaufbau_reference_uses_occupied_orbital_positions() -> None:
@@ -375,3 +434,35 @@ def test_model_reference_restored_from_json() -> None:
         return _matrix(*_spin_integrals(result), result.get_core_energy())
 
     np.testing.assert_array_equal(run(Wavefunction.from_json(reference.to_json())), run(reference))
+
+
+_LIH = "2\nLiH\nLi 0 0 0\nH 0 0 1.595\n"
+_H2O = "3\nH2O\nO 0 0 0.117790\nH 0 0.756950 -0.471161\nH 0 -0.756950 -0.471161\n"
+
+
+@pytest.mark.skipif(not PYSCF_AVAILABLE, reason="PySCF not available")
+@pytest.mark.parametrize(
+    ("xyz", "active", "level", "reference"),
+    [
+        pytest.param(_LIH, [1, 2], 1, -7.8706560183, id="lih-cas22-level1"),
+        pytest.param(_LIH, [1, 2], 2, -7.8828224008, id="lih-cas22-level2"),
+        pytest.param(_LIH, [1, 2, 3], 1, -7.8705694522, id="lih-cas23-level1"),
+        pytest.param(_LIH, [1, 2, 3], 2, -7.8827929828, id="lih-cas23-level2"),
+        pytest.param(_H2O, [2, 3, 4, 5, 6], 1, -75.0074995411, id="h2o-cas65-level1"),
+        pytest.param(_H2O, [2, 3, 4, 5, 6], 2, -75.0130624402, id="h2o-cas65-level2"),
+    ],
+)
+def test_matches_exachem_reference(xyz: str, active: list[int], level: int, reference: float) -> None:
+    """CCSD-based DUCC energies in P agree with ExaChem's independent implementation."""
+    _, hf = create("scf_solver").run(Structure.from_xyz(xyz), charge=0, spin_multiplicity=1, basis_or_guess="sto-3g")
+    hamiltonian = create("hamiltonian_constructor").run(hf.get_orbitals())
+    ccsd = create("dynamical_correlation_calculator", "pyscf_coupled_cluster", store_amplitudes=True)
+    _, amplitudes, _ = ccsd.run(Ansatz(hamiltonian, hf))
+    nmo = hf.get_orbitals().get_num_molecular_orbitals()
+    target = sym.spin_index_set(nmo, active, active, equivalent=True)
+    constructor = create("effective_hamiltonian_constructor", "qdk_ducc", level=level)
+    result = constructor.run(amplitudes, hamiltonian, target)
+    occupied = sum(p < hf.get_total_num_electrons()[0] for p in active)
+    energy, _ = create("multi_configuration_calculator", "macis_cas").run(result, occupied, occupied)
+    # ExaChem's Cholesky-decomposed integrals limit the agreement to about 1e-7 Ha.
+    assert energy == pytest.approx(reference, abs=100 * ci_energy_tolerance)

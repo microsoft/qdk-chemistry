@@ -4,121 +4,92 @@
 
 #include "ducc.hpp"
 
-#include <btas/btas.h>
-#include <qdk/chemistry/scf/util/blas_threads.h>
-
 #include <Eigen/Dense>
-#include <SeQuant/core/binary_node.hpp>
 #include <SeQuant/core/context.hpp>
-#include <SeQuant/core/eval/backends/btas/eval_expr.hpp>
-#include <SeQuant/core/eval/backends/btas/result.hpp>
-#include <SeQuant/core/eval/eval.hpp>
-#include <SeQuant/core/expressions/tensor.hpp>
-#include <SeQuant/core/expressions/variable.hpp>
-#include <SeQuant/core/op.hpp>
-#include <SeQuant/core/optimize/optimize.hpp>
-#include <SeQuant/core/utility/indices.hpp>
+#include <SeQuant/core/expr.hpp>
 #include <SeQuant/core/wick.hpp>
 #include <SeQuant/domain/mbpt/context.hpp>
 #include <SeQuant/domain/mbpt/convention.hpp>
 #include <SeQuant/domain/mbpt/op.hpp>
-#include <SeQuant/domain/mbpt/spin.hpp>
 #include <SeQuant/domain/mbpt/vac_av.hpp>
 #include <algorithm>
 #include <array>
 #include <cmath>
 #include <cstddef>
 #include <cstdint>
-#include <exception>
-#include <initializer_list>
-#include <limits>
-#include <map>
 #include <mutex>
-#include <numeric>
 #include <optional>
 #include <qdk/chemistry/data/hamiltonian_containers/canonical_four_center.hpp>
 #include <qdk/chemistry/data/orbitals.hpp>
 #include <qdk/chemistry/data/symmetry/spin_channel_indices.hpp>
 #include <qdk/chemistry/data/wavefunction_containers/amplitude_container.hpp>
 #include <qdk/chemistry/utils/logger.hpp>
-#include <range/v3/range/conversion.hpp>
-#include <set>
+#include <span>
 #include <stdexcept>
-#include <string>
+#include <string_view>
 #include <unordered_map>
 #include <utility>
 #include <variant>
 #include <vector>
 
-#ifdef _OPENMP
-#include <omp.h>
-#endif
+#include "../sequant_evaluation.hpp"
 
 namespace qdk::chemistry::algorithms::microsoft {
 namespace {
 
-using namespace sequant;
-using BTensor = btas::Tensor<double>;
+using sequant_evaluation::index4;
+using sequant_evaluation::tensor_size;
 
-std::size_t tensor_size(std::initializer_list<std::size_t> dimensions) {
-  std::size_t size = 1;
-  for (const auto dimension : dimensions) {
-    if (dimension && size > std::vector<double>().max_size() / dimension)
-      throw std::length_error(
-          "DUCC tensor dimensions exceed addressable storage.");
-    size *= dimension;
-  }
-  return size;
-}
-
-std::size_t index4(std::size_t p, std::size_t q, std::size_t r, std::size_t s,
-                   std::size_t n) {
-  return ((p * n + q) * n + r) * n + s;
-}
-
+// Spin orbitals are ordered occupied alpha, occupied beta, virtual alpha,
+// virtual beta; spin 0 is alpha, so a.spin + c.spin picks the aa/ab/bb block.
 struct Orbital {
-  std::size_t spatial, amplitude;
+  std::size_t window_index, amplitude_index;
   int spin;
 };
 
 struct Input {
   std::size_t nmo = 0, nocc = 0;
   std::array<std::size_t, 2> occupied{}, virtuals{};
-  std::array<Eigen::MatrixXd, 2> fock;
+  std::array<Eigen::MatrixXd, 2> fock_blocks;
   std::array<const Eigen::VectorXd*, 3> eri{}, doubles{};
   std::array<const Eigen::VectorXd*, 2> singles{};
   std::vector<Orbital> orbitals;
   std::vector<bool> active;
-  std::array<std::vector<std::size_t>, 2> kept;
+  std::array<std::vector<std::size_t>, 2> kept, inactive;
   std::vector<std::size_t> output;
   bool restricted = false;
   double scalar = 0.0;
 
-  double chemist(std::size_t p, std::size_t q, std::size_t r,
-                 std::size_t s) const {
+  double chemist_eri(std::size_t p, std::size_t q, std::size_t r,
+                     std::size_t s) const {
     const auto &a = orbitals[p], &b = orbitals[q], &c = orbitals[r],
                &d = orbitals[s];
     if (a.spin != b.spin || c.spin != d.spin) return 0.0;
     if (a.spin == 1 && c.spin == 0)
-      return (*eri[1])[index4(c.spatial, d.spatial, a.spatial, b.spatial, nmo)];
-    return (*eri[a.spin + c.spin])[index4(a.spatial, b.spatial, c.spatial,
-                                          d.spatial, nmo)];
+      return (*eri[1])[index4(c.window_index, d.window_index, a.window_index,
+                              b.window_index, nmo)];
+    return (*eri[a.spin + c.spin])[index4(a.window_index, b.window_index,
+                                          c.window_index, d.window_index, nmo)];
   }
 
-  double two(std::size_t p, std::size_t q, std::size_t r, std::size_t s) const {
-    return chemist(p, r, q, s) - chemist(p, s, q, r);
+  double antisymmetrized_eri(std::size_t p, std::size_t q, std::size_t r,
+                             std::size_t s) const {
+    return chemist_eri(p, r, q, s) - chemist_eri(p, s, q, r);
   }
 
-  double one(std::size_t p, std::size_t q) const {
+  double fock(std::size_t p, std::size_t q) const {
     const auto &a = orbitals[p], &b = orbitals[q];
-    return a.spin == b.spin ? fock[a.spin](a.spatial, b.spatial) : 0.0;
+    return a.spin == b.spin
+               ? fock_blocks[a.spin](a.window_index, b.window_index)
+               : 0.0;
   }
 
   double t1(std::size_t a, std::size_t i) const {
     if (active[a] && active[i]) return 0.0;
     const auto &v = orbitals[a], &o = orbitals[i];
     if (v.spin != o.spin) return 0.0;
-    return (*singles[o.spin])[o.amplitude * virtuals[o.spin] + v.amplitude];
+    return (*singles[o.spin])[o.amplitude_index * virtuals[o.spin] +
+                              v.amplitude_index];
   }
 
   double t2(std::size_t a, std::size_t b, std::size_t i, std::size_t j) const {
@@ -132,35 +103,50 @@ struct Input {
                                virtuals[1] +
                            vb];
     };
+    const auto i_index = o.amplitude_index, j_index = p.amplitude_index,
+               a_index = v.amplitude_index, b_index = w.amplitude_index;
     if (o.spin == p.spin) {
       if (restricted)
-        return ab(o.amplitude, p.amplitude, v.amplitude, w.amplitude) -
-               ab(o.amplitude, p.amplitude, w.amplitude, v.amplitude);
-      return (*doubles[2 * o.spin])
-          [((o.amplitude * occupied[o.spin] + p.amplitude) * virtuals[o.spin] +
-            v.amplitude) *
+        return ab(i_index, j_index, a_index, b_index) -
+               ab(i_index, j_index, b_index, a_index);
+      if (i_index == j_index || a_index == b_index) return 0.0;
+      // Same-spin doubles may be stored only for i < j and a < b.
+      const auto [first, second] = std::minmax(i_index, j_index);
+      const auto [lower, upper] = std::minmax(a_index, b_index);
+      const double value = (*doubles[2 * o.spin])
+          [((first * occupied[o.spin] + second) * virtuals[o.spin] + lower) *
                virtuals[o.spin] +
-           w.amplitude];
+           upper];
+      return (i_index < j_index) == (a_index < b_index) ? value : -value;
     }
     if (o.spin == v.spin)
-      return o.spin == 0
-                 ? ab(o.amplitude, p.amplitude, v.amplitude, w.amplitude)
-                 : ab(p.amplitude, o.amplitude, w.amplitude, v.amplitude);
-    return o.spin == 0
-               ? -ab(o.amplitude, p.amplitude, w.amplitude, v.amplitude)
-               : -ab(p.amplitude, o.amplitude, v.amplitude, w.amplitude);
+      return o.spin == 0 ? ab(i_index, j_index, a_index, b_index)
+                         : ab(j_index, i_index, b_index, a_index);
+    return o.spin == 0 ? -ab(i_index, j_index, b_index, a_index)
+                       : -ab(j_index, i_index, a_index, b_index);
+  }
+
+  double leaf(std::wstring_view label,
+              std::span<const std::size_t> slots) const {
+    if (slots.size() != 2 && slots.size() != 4)
+      throw std::logic_error(
+          "DUCC supports only rank-one and rank-two leaves.");
+    if (label == L"f") return fock(slots[0], slots[1]);
+    if (label == L"g")
+      return antisymmetrized_eri(slots[0], slots[1], slots[2], slots[3]);
+    if (label != L"t")
+      throw std::logic_error("DUCC encountered an unsupported tensor label.");
+    // The adjoint amplitude lists its occupied indices first.
+    const bool adjoint = slots[0] < nocc;
+    if (slots.size() == 2)
+      return adjoint ? t1(slots[1], slots[0]) : t1(slots[0], slots[1]);
+    return adjoint ? t2(slots[2], slots[3], slots[0], slots[1])
+                   : t2(slots[0], slots[1], slots[2], slots[3]);
   }
 };
 
-const Context& evaluation_context() {
-  static const Context context(
-      {.index_basis_registry_shared_ptr =
-           mbpt::make_min_sr_spaces(mbpt::SpinConvention::Default),
-       .vacuum = Vacuum::SingleProduct});
-  return context;
-}
-
-ExprPtr normal_ordered_bch(int level) {
+sequant::ExprPtr normal_ordered_bch(int level) {
+  using namespace sequant;
   static std::mutex mutex;
   static std::array<ExprPtr, 3> cache;
   const std::lock_guard lock(mutex);
@@ -201,477 +187,39 @@ ExprPtr normal_ordered_bch(int level) {
   return cache[level]->clone();
 }
 
-char space_letter(const Index& index) {
-  const bool beta = mbpt::to_spin(index.space().qns()) == mbpt::Spin::beta;
-  switch (index.space().base_key().front()) {
-    case L'i':
-      return beta ? 'O' : 'o';
-    case L'a':
-      return beta ? 'V' : 'v';
-    case L'p':
-      return beta ? 'P' : 'p';
-    default:
-      throw std::logic_error("DUCC encountered an unsupported index space.");
-  }
-}
-
-class DataYielder {
- public:
-  explicit DataYielder(const Input& input) : _input(input) {}
-
-  void set_free(const container::svector<Index>& indices) const {
-    _free.clear();
-    for (const auto& index : indices)
-      _free.insert(std::wstring(index.full_label()));
-  }
-
-  void set_spins(const container::map<Index, Index>& indices) const {
-    _spins = indices;
-  }
-
-  std::vector<std::size_t> spin_range(const Index& index) const {
-    const auto spin = mbpt::to_spin(_spins.at(index).space().qns());
-    if (spin != mbpt::Spin::alpha && spin != mbpt::Spin::beta)
-      throw std::logic_error("DUCC numerical indices must have resolved spin.");
-    const auto space = index.space().base_key().front();
-    const bool free = _free.contains(std::wstring(index.full_label()));
-    std::vector<std::size_t> result;
-    for (std::size_t i = 0; i < _input.orbitals.size(); ++i) {
-      if (_input.orbitals[i].spin != (spin == mbpt::Spin::beta ? 1 : 0))
-        continue;
-      if ((space == L'i' && i >= _input.nocc) ||
-          (space == L'a' && i < _input.nocc))
-        continue;
-      if (!free || _input.active[i]) result.push_back(i);
-    }
-    return result;
-  }
-
-  ResultPtr operator()(sequant::meta::can_evaluate auto const& node) const {
-    if (node->result_type() != ResultType::Tensor)
-      return eval_result<ResultScalar<double>>(
-          node->as_constant().template value<double>());
-    const auto& tensor = node->expr()->template as<Tensor>();
-    std::vector<Index> indices(tensor.const_braket_indices().begin(),
-                               tensor.const_braket_indices().end());
-    const auto label = tensor.label();
-    std::string key(label.begin(), label.end());
-    for (const auto& index : indices) key += space_letter(_spins.at(index));
-    key += '#';
-    for (const auto& index : indices)
-      key += _free.contains(std::wstring(index.full_label())) ? 'A' : '-';
-    auto found = _cache.find(key);
-    if (found == _cache.end()) {
-      std::vector<std::vector<std::size_t>> ranges;
-      std::vector<std::size_t> extents;
-      for (const auto& index : indices) {
-        ranges.push_back(spin_range(index));
-        extents.push_back(ranges.back().size());
-      }
-      if (indices.size() != 2 && indices.size() != 4)
-        throw std::logic_error(
-            "DUCC supports only rank-one and rank-two leaves.");
-      if (indices.size() == 2)
-        tensor_size({extents[0], extents[1]});
-      else
-        tensor_size({extents[0], extents[1], extents[2], extents[3]});
-      BTensor block{btas::Range{extents}};
-      const bool cluster = label == L"t";
-      const bool adjoint_cluster =
-          cluster && indices.front().space().base_key().front() == L'i';
-      std::vector<std::size_t> position(indices.size(), 0);
-      for (std::size_t flat = 0; flat < block.size(); ++flat) {
-        std::array<std::size_t, 4> slots{};
-        for (std::size_t axis = 0; axis < indices.size(); ++axis) {
-          const auto source = adjoint_cluster
-                                  ? (axis + indices.size() / 2) % indices.size()
-                                  : axis;
-          slots[axis] = ranges[source][position[source]];
-        }
-        if (label == L"f")
-          block.data()[flat] = _input.one(slots[0], slots[1]);
-        else if (label == L"g")
-          block.data()[flat] =
-              _input.two(slots[0], slots[1], slots[2], slots[3]);
-        else if (cluster && indices.size() == 2)
-          block.data()[flat] = _input.t1(slots[0], slots[1]);
-        else if (cluster)
-          block.data()[flat] =
-              _input.t2(slots[0], slots[1], slots[2], slots[3]);
-        else
-          throw std::logic_error(
-              "DUCC encountered an unsupported tensor label.");
-        for (std::size_t axis = indices.size(); axis-- > 0;) {
-          if (++position[axis] < extents[axis]) break;
-          position[axis] = 0;
-        }
-      }
-      found =
-          _cache
-              .emplace(key,
-                       eval_result<ResultTensorBTAS<BTensor>>(std::move(block)))
-              .first;
-    }
-    // Canonicalization can permute antisymmetric leaf slots.
-    return node->canon_phase() == -1 ? found->second->mult_by_phase(-1)
-                                     : found->second;
-  }
-
- private:
-  const Input& _input;
-  mutable std::map<std::string, ResultPtr> _cache;
-  mutable container::map<Index, Index> _spins;
-  mutable std::set<std::wstring> _free;
-};
-
-struct SpinAssignment {
-  std::size_t plan, multiplicity;
-  container::map<Index, Index> indices;
-};
-
-struct PreparedContraction {
-  container::svector<Index> free;
-  container::svector<long> target;
-  std::vector<EvalNodeBTAS> plans;
-  std::vector<SpinAssignment> assignments;
-};
-
-PreparedContraction prepare_contraction(const ExprPtr& source,
-                                        const DataYielder& yield) {
-  const auto term = source->clone();
-  PreparedContraction result;
-  ExprPtr coefficient = ex<Product>(1, ExprPtrList{});
-  auto visit = [&](const ExprPtr& factor) {
-    if (factor.is<FNOperator>()) {
-      if (!result.free.empty() || factor.as<FNOperator>().ncreators() > 2)
-        throw std::logic_error("DUCC encountered an invalid Wick residual.");
-      for (const auto& op : factor.as<FNOperator>().creators())
-        result.free.push_back(op.index());
-      for (const auto& op : factor.as<FNOperator>().annihilators())
-        result.free.push_back(op.index());
-    } else
-      coefficient.as<Product>().append(1, factor, Product::Flatten::No);
-  };
-  if (term.is<Product>()) {
-    coefficient = ex<Product>(term.as<Product>().scalar(), ExprPtrList{});
-    for (const auto& factor : term.as<Product>().factors()) visit(factor);
-  } else
-    visit(term);
-  result.target = EvalExprBTAS::index_hash(result.free) |
-                  ranges::to<container::svector<long>>;
-  const auto used = get_used_indices<container::set<Index>>(coefficient);
-  const std::vector<Index> indices(used.begin(), used.end());
-  container::map<Index, std::size_t> positions;
-  for (std::size_t i = 0; i < indices.size(); ++i)
-    positions.emplace(indices[i], i);
-  using Endpoint = std::pair<std::size_t, int>;
-  std::vector<std::vector<Endpoint>> endpoints(indices.size());
-  std::vector<Symmetry> symmetries;
-  std::vector<std::vector<int>> constraints;
-  for (const auto& factor : coefficient.as<Product>().factors()) {
-    if (!factor.is<Tensor>()) continue;
-    const auto& tensor = factor.as<Tensor>();
-    const auto ordinal = symmetries.size();
-    symmetries.push_back(tensor.symmetry());
-    std::vector<int> row(indices.size(), 0);
-    for (const auto& index : tensor.bra()) {
-      ++row[positions.at(index)];
-      endpoints[positions.at(index)].emplace_back(ordinal, 0);
-    }
-    for (const auto& index : tensor.ket()) {
-      --row[positions.at(index)];
-      endpoints[positions.at(index)].emplace_back(ordinal, 1);
-    }
-    for (const auto& index : tensor.aux())
-      endpoints[positions.at(index)].emplace_back(ordinal, 2);
-    constraints.push_back(std::move(row));
-  }
-  std::vector<std::vector<std::size_t>> groups;
-  std::vector<std::size_t> previous(indices.size(), indices.size());
-  for (std::size_t i = 0; i < indices.size(); ++i) {
-    const auto& edge = endpoints[i];
-    if (indices[i].has_proto_indices() || edge.size() != 2 ||
-        edge[0].first == edge[1].first || edge[0].second == 2 ||
-        edge[1].second == 2 ||
-        std::find(result.free.begin(), result.free.end(), indices[i]) !=
-            result.free.end())
-      continue;
-    const auto symmetry = symmetries[edge[0].first];
-    if ((symmetry != Symmetry::Antisymm && symmetry != Symmetry::Symm) ||
-        symmetry != symmetries[edge[1].first])
-      continue;
-    auto group =
-        std::find_if(groups.begin(), groups.end(), [&](const auto& candidate) {
-          return indices[candidate.front()].space() == indices[i].space() &&
-                 endpoints[candidate.front()] == edge;
-        });
-    if (group == groups.end())
-      groups.push_back({i});
-    else {
-      previous[i] = group->back();
-      group->push_back(i);
-    }
-  }
-  yield.set_free(result.free);
-  std::vector<std::array<Index, 2>> spin_indices;
-  container::map<Index, Index> replacements;
-  for (const auto& index : indices) {
-    spin_indices.push_back(
-        {mbpt::make_spinalpha(index), mbpt::make_spinbeta(index)});
-    replacements.emplace(index, spin_indices.back()[0]);
-  }
-  std::map<std::vector<std::size_t>, std::size_t> plans;
-  std::vector<int> spins(indices.size(), 0);
-  auto enumerate = [&](auto&& self, std::size_t next) -> void {
-    for (const auto& row : constraints) {
-      int balance = 0, lower = 0, upper = 0;
-      for (std::size_t i = 0; i < row.size(); ++i) {
-        if (i < next)
-          balance += row[i] * spins[i];
-        else if (row[i] < 0)
-          lower += row[i];
-        else
-          upper += row[i];
-      }
-      if (balance + lower > 0 || balance + upper < 0) return;
-    }
-    if (next != indices.size()) {
-      for (int spin : {0, 1}) {
-        if (previous[next] != indices.size() && spin < spins[previous[next]])
-          continue;
-        spins[next] = spin;
-        self(self, next + 1);
-      }
-      return;
-    }
-    for (std::size_t i = 0; i < indices.size(); ++i)
-      replacements.at(indices[i]) = spin_indices[i][spins[i]];
-    yield.set_spins(replacements);
-    std::vector<std::size_t> dimensions;
-    for (const auto& index : indices) {
-      dimensions.push_back(yield.spin_range(index).size());
-      if (dimensions.back() == 0) return;
-    }
-    auto plan = plans.find(dimensions);
-    if (plan == plans.end()) {
-      OptimizeOptions options;
-      options.idx_to_extent = [&](const Index& index) {
-        return dimensions[positions.at(index)];
-      };
-      const auto optimized = sequant::optimize(coefficient, options);
-      const auto node = [&]() {
-        if (result.free.empty())
-          return binarize<EvalExprBTAS>(ResultExpr(Variable(L"E"), optimized));
-        const auto rank = result.free.size() / 2;
-        const Tensor target(
-            L"R",
-            bra(container::svector<Index>(result.free.begin(),
-                                          result.free.begin() + rank)),
-            ket(container::svector<Index>(result.free.begin() + rank,
-                                          result.free.end())),
-            Symmetry::Nonsymm);
-        return binarize<EvalExprBTAS>(ResultExpr(target, optimized));
-      }();
-      plan = plans.emplace(dimensions, result.plans.size()).first;
-      result.plans.push_back(node);
-    }
-    // Parallel equivalent edges contribute two cancelling permutation signs.
-    std::size_t multiplicity = 1;
-    for (const auto& group : groups) {
-      std::size_t beta = 0, choices = 1;
-      for (const auto i : group) beta += spins[i];
-      for (std::size_t k = 1; k <= beta; ++k)
-        choices = choices * (group.size() - beta + k) / k;
-      multiplicity *= choices;
-    }
-    result.assignments.push_back({plan->second, multiplicity, replacements});
-  };
-  enumerate(enumerate, 0);
-  for (const auto& index : result.free) (void)index.full_label();
-  return result;
-}
-
-struct ContractionOutput {
-  double scalar = 0.0;
-  std::vector<double> one, two;
-  explicit ContractionOutput(std::size_t n)
-      : one(tensor_size({n, n}), 0.0), two(tensor_size({n, n, n, n}), 0.0) {}
-};
-
-void contract(const PreparedContraction& term, const DataYielder& yield,
-              const std::vector<std::size_t>& local, std::size_t n,
-              ContractionOutput& output) {
-  yield.set_free(term.free);
-  for (const auto& assignment : term.assignments) {
-    yield.set_spins(assignment.indices);
-    const auto& node = term.plans[assignment.plan];
-    const auto weight = static_cast<double>(assignment.multiplicity);
-    if (term.free.empty()) {
-      output.scalar += weight * evaluate(node, yield)->get<double>();
-      continue;
-    }
-    const auto value = evaluate(node, term.target, yield);
-    const auto& block = value->get<BTensor>();
-    std::vector<std::vector<std::size_t>> ranges;
-    for (const auto& index : term.free) {
-      auto range = yield.spin_range(index);
-      for (auto& i : range) i = local.at(i);
-      ranges.push_back(std::move(range));
-    }
-    auto& target = term.free.size() == 2 ? output.one : output.two;
-    std::vector<std::size_t> position(term.free.size(), 0);
-    for (std::size_t flat = 0; flat < block.size(); ++flat) {
-      std::size_t address = 0;
-      for (std::size_t axis = 0; axis < term.free.size(); ++axis)
-        address = address * n + ranges[axis][position[axis]];
-      target.at(address) += weight * block.data()[flat];
-      for (std::size_t axis = term.free.size(); axis-- > 0;) {
-        if (++position[axis] < ranges[axis].size()) break;
-        position[axis] = 0;
-      }
-    }
-  }
-}
-
-ContractionOutput dress(const Input& input, int level) {
-  const auto n = input.output.size();
-  ContractionOutput total(n);
-  if (level > 0) {
-    const auto expression = normal_ordered_bch(level);
-    const auto scope = set_scoped_default_context(evaluation_context());
-    std::vector<ExprPtr> source;
-    if (expression.is<Sum>()) {
-      for (const auto& term : expression.as<Sum>().summands())
-        source.push_back(term);
-    } else
-      source.push_back(expression);
-    std::vector<std::size_t> local(input.orbitals.size(), n);
-    for (std::size_t i = 0; i < n; ++i) local[input.output[i]] = i;
-    const auto entries = 1 + total.one.size() + total.two.size();
-    const auto batch_size = std::max<std::size_t>(
-        1, std::min<std::size_t>(
-               256, (64 * 1024 * 1024) / sizeof(double) / entries));
-    std::size_t requested = 1;
-#ifdef _OPENMP
-    requested = static_cast<std::size_t>(omp_get_max_threads());
-#endif
-    const auto workers = std::max<std::size_t>(
-        1, std::min({requested, batch_size, source.size()}));
-    DataYielder planning_yield(input);
-    std::vector<DataYielder> yields;
-    yields.reserve(workers);
-    for (std::size_t i = 0; i < workers; ++i) yields.emplace_back(input);
-    const scf::util::ScopedBlasThreads blas_threads;
-    for (std::size_t begin = 0; begin < source.size(); begin += batch_size) {
-      const auto count = std::min(batch_size, source.size() - begin);
-      std::vector<PreparedContraction> jobs;
-      std::vector<ContractionOutput> results;
-      jobs.reserve(count);
-      results.reserve(count);
-      for (std::size_t i = 0; i < count; ++i) {
-        jobs.push_back(prepare_contraction(source[begin + i], planning_yield));
-        results.emplace_back(n);
-      }
-      std::exception_ptr failure;
-#ifdef _OPENMP
-#pragma omp parallel if (workers > 1) num_threads(workers)
-#endif
-      {
-        std::size_t worker = 0;
-#ifdef _OPENMP
-        worker = static_cast<std::size_t>(omp_get_thread_num());
-#pragma omp for schedule(dynamic, 1)
-#endif
-        for (std::size_t i = 0; i < count; ++i) {
-          try {
-            const auto worker_scope =
-                set_scoped_default_context(evaluation_context());
-            contract(jobs[i], yields[worker], local, n, results[i]);
-          } catch (...) {
-#ifdef _OPENMP
-#pragma omp critical(ducc_contraction_failure)
-#endif
-            {
-              if (!failure) failure = std::current_exception();
-            }
-          }
-        }
-      }
-      if (failure) std::rethrow_exception(failure);
-      // Term-order reduction is identical for serial and parallel evaluation.
-      for (const auto& result : results) {
-        total.scalar += result.scalar;
-        for (std::size_t i = 0; i < total.one.size(); ++i)
-          total.one[i] += result.one[i];
-        for (std::size_t i = 0; i < total.two.size(); ++i)
-          total.two[i] += result.two[i];
-      }
-    }
-  }
-  total.scalar += input.scalar;
-  for (std::size_t p = 0; p < n; ++p)
-    for (std::size_t q = 0; q < n; ++q) {
-      total.one[p * n + q] += input.one(input.output[p], input.output[q]);
-      for (std::size_t r = 0; r < n; ++r)
-        for (std::size_t s = 0; s < n; ++s)
-          total.two[index4(p, q, r, s, n)] +=
-              0.25 * input.two(input.output[p], input.output[q],
-                               input.output[r], input.output[s]);
-    }
-  const auto finite = [](double x) { return std::isfinite(x); };
-  if (!finite(total.scalar) ||
-      !std::all_of(total.one.begin(), total.one.end(), finite) ||
-      !std::all_of(total.two.begin(), total.two.end(), finite))
-    throw std::overflow_error("DUCC evaluation produced non-finite integrals.");
-  return total;
-}
-
-}  // namespace
-
-std::shared_ptr<data::Hamiltonian> DuccConstructor::_run_impl(
-    std::shared_ptr<data::Wavefunction> reference,
-    std::shared_ptr<data::Hamiltonian> hamiltonian,
-    std::shared_ptr<const data::SymmetryBlockedIndexSet> p_indices) const {
-  QDK_LOG_TRACE_ENTERING();
-  const auto level = _settings->get<int64_t>("level");
-  if (level < 0 || level > 2)
-    throw std::invalid_argument("DUCC level must be between 0 and 2.");
-  _validate_inputs(reference, hamiltonian, p_indices);
-  if (!reference->has_container_type<data::AmplitudeContainer>())
-    throw std::invalid_argument(
-        "DUCC requires an AmplitudeContainer reference.");
-  if (!hamiltonian->is_hermitian())
-    throw std::invalid_argument("DUCC requires a Hermitian Hamiltonian.");
-  const auto& amplitudes = reference->get_container<data::AmplitudeContainer>();
-  const auto determinant_reference = amplitudes.get_wavefunction();
-  _validate_inputs(determinant_reference, hamiltonian, p_indices);
+Input assemble_input(
+    const data::Wavefunction& reference,
+    const data::AmplitudeContainer& amplitudes,
+    const data::Hamiltonian& hamiltonian,
+    const std::shared_ptr<const data::SymmetryBlockedIndexSet>& p_indices) {
   if (!amplitudes.has_t1_amplitudes() || !amplitudes.has_t2_amplitudes())
     throw std::invalid_argument(
         "DUCC requires stored T1 and T2 amplitudes over the Hamiltonian "
         "window.");
+  const auto determinant_reference = amplitudes.get_wavefunction();
   const auto& determinants = determinant_reference->get_active_determinants();
   if (determinants.size() != 1)
     throw std::invalid_argument(
         "DUCC amplitudes must be relative to a single determinant.");
   const auto& determinant = determinants.front();
-  const auto orbitals = hamiltonian->get_orbitals();
+  const auto orbitals = hamiltonian.get_orbitals();
   Input input;
-  input.restricted = hamiltonian->is_restricted();
-  std::array<std::vector<std::size_t>, 2> window, kept, occupied, virtuals,
-      inactive;
+  input.restricted = hamiltonian.is_restricted();
+  std::array<std::vector<std::size_t>, 2> window, kept, occupied, virtuals;
   const std::array spins{data::axes::alpha(), data::axes::beta()};
   for (int spin = 0; spin < 2; ++spin) {
+    auto& inactive = input.inactive[spin];
     window[spin] =
         data::spin_channel_indices(orbitals->active_indices(), spins[spin]);
     kept[spin] = data::spin_channel_indices(p_indices, spins[spin]);
-    inactive[spin] =
+    inactive =
         data::spin_channel_indices(orbitals->inactive_indices(), spins[spin]);
     for (const auto& other :
-         {reference->get_orbitals(), determinant_reference->get_orbitals()}) {
+         {reference.get_orbitals(), determinant_reference->get_orbitals()}) {
       if (data::spin_channel_indices(other->active_indices(), spins[spin]) !=
               window[spin] ||
           data::spin_channel_indices(other->inactive_indices(), spins[spin]) !=
-              inactive[spin])
+              inactive)
         throw std::invalid_argument(
             "DUCC Hamiltonian, amplitudes, and determinant must have identical "
             "active windows and inactive cores.");
@@ -682,9 +230,9 @@ std::shared_ptr<data::Hamiltonian> DuccConstructor::_run_impl(
       (filled ? occupied[spin] : virtuals[spin]).push_back(i);
       if (filled && !std::binary_search(kept[spin].begin(), kept[spin].end(),
                                         window[spin][i]))
-        inactive[spin].push_back(window[spin][i]);
+        inactive.push_back(window[spin][i]);
     }
-    std::sort(inactive[spin].begin(), inactive[spin].end());
+    std::sort(inactive.begin(), inactive.end());
     input.occupied[spin] = occupied[spin].size();
     input.virtuals[spin] = virtuals[spin].size();
   }
@@ -699,7 +247,6 @@ std::shared_ptr<data::Hamiltonian> DuccConstructor::_run_impl(
         "P-space; use unrestricted orbitals for an open-shell reference.");
   input.nmo = window[0].size();
   input.nocc = occupied[0].size() + occupied[1].size();
-  tensor_size({2, input.nmo});
   const auto two_size =
       tensor_size({input.nmo, input.nmo, input.nmo, input.nmo});
   for (const auto& partition : {occupied, virtuals})
@@ -709,20 +256,20 @@ std::shared_ptr<data::Hamiltonian> DuccConstructor::_run_impl(
   input.active.resize(input.orbitals.size(), false);
   for (int spin = 0; spin < 2; ++spin)
     for (const auto global : kept[spin]) {
-      const auto spatial = static_cast<std::size_t>(
+      const auto window_index = static_cast<std::size_t>(
           std::lower_bound(window[spin].begin(), window[spin].end(), global) -
           window[spin].begin());
       for (std::size_t i = 0; i < input.orbitals.size(); ++i)
         if (input.orbitals[i].spin == spin &&
-            input.orbitals[i].spatial == spatial) {
+            input.orbitals[i].window_index == window_index) {
           input.kept[spin].push_back(i);
           input.active[i] = true;
         }
     }
   for (std::size_t i = 0; i < input.orbitals.size(); ++i)
     if (input.active[i]) input.output.push_back(i);
-  const auto [h1a, h1b] = hamiltonian->get_one_body_integrals();
-  const auto [gaa, gab, gbb] = hamiltonian->get_two_body_integrals();
+  const auto [h1a, h1b] = hamiltonian.get_one_body_integrals();
+  const auto [gaa, gab, gbb] = hamiltonian.get_two_body_integrals();
   input.eri = {&gaa, &gab, &gbb};
   for (const auto* block : input.eri)
     if (static_cast<std::size_t>(block->size()) != two_size ||
@@ -757,7 +304,7 @@ std::shared_ptr<data::Hamiltonian> DuccConstructor::_run_impl(
       real(t2bb, tensor_size({input.occupied[1], input.occupied[1],
                               input.virtuals[1], input.virtuals[1]}))};
   if (input.restricted) {
-    if (!input.singles[0]->isApprox(*input.singles[1], 1e-12))
+    if (((*input.singles[0] - *input.singles[1]).array().abs() > 1e-12).any())
       throw std::invalid_argument(
           "Restricted DUCC requires equal alpha/beta singles.");
     const auto no = input.occupied[0], nv = input.virtuals[0];
@@ -788,48 +335,119 @@ std::shared_ptr<data::Hamiltonian> DuccConstructor::_run_impl(
         throw std::invalid_argument(
             "Restricted DUCC same-spin doubles must match the spatial "
             "amplitudes or their antisymmetrization.");
+  } else {
+    for (int spin = 0; spin < 2; ++spin) {
+      const auto no = input.occupied[spin], nv = input.virtuals[spin];
+      const auto& same_spin = *input.doubles[2 * spin];
+      const auto at = [&](std::size_t i, std::size_t j, std::size_t a,
+                          std::size_t b) {
+        return same_spin[((i * no + j) * nv + a) * nv + b];
+      };
+      for (std::size_t i = 0; i < no; ++i)
+        for (std::size_t j = 0; j < no; ++j)
+          for (std::size_t a = 0; a < nv; ++a)
+            for (std::size_t b = 0; b < nv; ++b) {
+              const auto value = at(i, j, a, b);
+              if ((i < j && a < b) || std::abs(value) <= 1e-12) continue;
+              const double image = i == j || a == b
+                                       ? 0.0
+                                       : ((i < j) == (a < b) ? 1.0 : -1.0) *
+                                             at(std::min(i, j), std::max(i, j),
+                                                std::min(a, b), std::max(a, b));
+              if (std::abs(value - image) > 1e-12)
+                throw std::invalid_argument(
+                    "Unrestricted DUCC same-spin doubles must be "
+                    "antisymmetric or stored only for i < j and a < b.");
+            }
+    }
   }
-  input.fock = {h1a, h1b};
+  input.fock_blocks = {h1a, h1b};
   for (std::size_t p = 0; p < input.orbitals.size(); ++p)
     for (std::size_t q = 0; q < input.orbitals.size(); ++q) {
       const auto &a = input.orbitals[p], &b = input.orbitals[q];
       if (a.spin != b.spin) continue;
       for (std::size_t m = 0; m < input.nocc; ++m)
-        input.fock[a.spin](a.spatial, b.spatial) += input.two(p, m, q, m);
+        input.fock_blocks[a.spin](a.window_index, b.window_index) +=
+            input.antisymmetrized_eri(p, m, q, m);
     }
-  input.scalar = hamiltonian->get_core_energy();
+  input.scalar = hamiltonian.get_core_energy();
   for (std::size_t m = 0; m < input.nocc; ++m) {
     const auto& orbital = input.orbitals[m];
     const auto& h1 = orbital.spin == 0 ? h1a : h1b;
-    input.scalar +=
-        0.5 * (h1(orbital.spatial, orbital.spatial) + input.one(m, m));
+    input.scalar += 0.5 * (h1(orbital.window_index, orbital.window_index) +
+                           input.fock(m, m));
   }
-  const auto dressed = dress(input, static_cast<int>(level));
+  return input;
+}
+
+sequant_evaluation::NormalOrderedOperator dress(const Input& input, int level) {
+  const auto n = input.output.size();
+  sequant_evaluation::NormalOrderedOperator total;
+  if (level > 0) {
+    sequant_evaluation::SpinOrbitalSpace space;
+    for (std::size_t i = 0; i < input.orbitals.size(); ++i)
+      (i < input.nocc ? space.occupied : space.virtuals)[input.orbitals[i].spin]
+          .push_back(i);
+    space.target = input.output;
+    total = sequant_evaluation::evaluate(
+        normal_ordered_bch(level), space,
+        [&input](std::wstring_view label, std::span<const std::size_t> slots) {
+          return input.leaf(label, slots);
+        });
+  } else {
+    total.one_body.assign(tensor_size({n, n}), 0.0);
+    total.two_body.assign(tensor_size({n, n, n, n}), 0.0);
+  }
+  total.scalar += input.scalar;
+  for (std::size_t p = 0; p < n; ++p)
+    for (std::size_t q = 0; q < n; ++q) {
+      total.one_body[p * n + q] += input.fock(input.output[p], input.output[q]);
+      for (std::size_t r = 0; r < n; ++r)
+        for (std::size_t s = 0; s < n; ++s)
+          total.two_body[index4(p, q, r, s, n)] +=
+              0.25 * input.antisymmetrized_eri(input.output[p], input.output[q],
+                                               input.output[r],
+                                               input.output[s]);
+    }
+  const auto finite = [](double x) { return std::isfinite(x); };
+  if (!finite(total.scalar) ||
+      !std::all_of(total.one_body.begin(), total.one_body.end(), finite) ||
+      !std::all_of(total.two_body.begin(), total.two_body.end(), finite))
+    throw std::overflow_error("DUCC evaluation produced non-finite integrals.");
+  return total;
+}
+
+std::shared_ptr<data::Hamiltonian> assemble_output(
+    const sequant_evaluation::NormalOrderedOperator& dressed,
+    const Input& input, const std::shared_ptr<data::Orbitals>& orbitals,
+    const std::shared_ptr<const data::SymmetryBlockedIndexSet>& p_indices) {
   const auto n = input.output.size();
   std::vector<std::size_t> local(input.orbitals.size(), n), active_occupied;
   for (std::size_t i = 0; i < n; ++i) {
     local[input.output[i]] = i;
     if (input.output[i] < input.nocc) active_occupied.push_back(i);
   }
-  const auto two = [&](std::size_t p, std::size_t q, std::size_t r,
-                       std::size_t s) {
-    return dressed.two[index4(p, q, r, s, n)] -
-           dressed.two[index4(q, p, r, s, n)] -
-           dressed.two[index4(p, q, s, r, n)] +
-           dressed.two[index4(q, p, s, r, n)];
+  const auto dressed_two_body = [&](std::size_t p, std::size_t q, std::size_t r,
+                                    std::size_t s) {
+    return dressed.two_body[index4(p, q, r, s, n)] -
+           dressed.two_body[index4(q, p, r, s, n)] -
+           dressed.two_body[index4(p, q, s, r, n)] +
+           dressed.two_body[index4(q, p, s, r, n)];
   };
-  const auto one = [&](std::size_t p, std::size_t q) {
-    double value = dressed.one[p * n + q];
-    for (const auto m : active_occupied) value -= two(p, m, q, m);
+  const auto dressed_one_body = [&](std::size_t p, std::size_t q) {
+    double value = dressed.one_body[p * n + q];
+    for (const auto m : active_occupied) value -= dressed_two_body(p, m, q, m);
     return value;
   };
   double core = dressed.scalar;
   for (const auto m : active_occupied) {
-    core -= one(m, m);
-    for (const auto k : active_occupied) core -= 0.5 * two(m, k, m, k);
+    core -= dressed_one_body(m, m);
+    for (const auto k : active_occupied)
+      core -= 0.5 * dressed_two_body(m, k, m, k);
   }
-  for (auto& channel : input.kept)
-    for (auto& i : channel) i = local[i];
+  std::array<std::vector<std::size_t>, 2> kept;
+  for (int spin = 0; spin < 2; ++spin)
+    for (const auto i : input.kept[spin]) kept[spin].push_back(local[i]);
   const auto np = kept[0].size();
   std::array<Eigen::MatrixXd, 2> one_body;
   std::array<Eigen::VectorXd, 3> two_body;
@@ -837,13 +455,13 @@ std::shared_ptr<data::Hamiltonian> DuccConstructor::_run_impl(
     one_body[spin].resize(np, np);
     for (std::size_t p = 0; p < np; ++p)
       for (std::size_t q = 0; q < np; ++q)
-        one_body[spin](p, q) = one(input.kept[spin][p], input.kept[spin][q]);
+        one_body[spin](p, q) = dressed_one_body(kept[spin][p], kept[spin][q]);
   }
   // Only the antisymmetric part of same-spin interactions is defined.
   for (int channel = 0; channel < 3; ++channel) {
     if (input.restricted && channel != 1) continue;
-    const auto &left = input.kept[channel == 2 ? 1 : 0],
-               &right = input.kept[channel == 0 ? 0 : 1];
+    const auto &left = kept[channel == 2 ? 1 : 0],
+               &right = kept[channel == 0 ? 0 : 1];
     two_body[channel].resize(tensor_size({np, np, np, np}));
     for (std::size_t p = 0; p < np; ++p)
       for (std::size_t q = 0; q < np; ++q)
@@ -851,22 +469,23 @@ std::shared_ptr<data::Hamiltonian> DuccConstructor::_run_impl(
           for (std::size_t s = 0; s < np; ++s)
             two_body[channel][index4(p, q, r, s, np)] =
                 (channel == 1 ? 1.0 : 0.5) *
-                two(left[p], right[r], left[q], right[s]);
+                dressed_two_body(left[p], right[r], left[q], right[s]);
   }
   if (!std::isfinite(core) || !one_body[0].allFinite() ||
       !one_body[1].allFinite() || !two_body[0].allFinite() ||
       !two_body[1].allFinite() || !two_body[2].allFinite())
     throw std::overflow_error(
         "DUCC output assembly produced non-finite integrals.");
+  const std::array spins{data::axes::alpha(), data::axes::beta()};
   std::unordered_map<data::SymmetryLabel, std::vector<std::uint32_t>>
       inactive_map;
   if (p_indices->symmetries()->has_axis(data::AxisName::Spin)) {
     for (int spin = 0; spin < 2; ++spin)
       inactive_map[spins[spin]] = std::vector<std::uint32_t>(
-          inactive[spin].begin(), inactive[spin].end());
+          input.inactive[spin].begin(), input.inactive[spin].end());
   } else {
-    inactive_map[data::SymmetryLabel{}] =
-        std::vector<std::uint32_t>(inactive[0].begin(), inactive[0].end());
+    inactive_map[data::SymmetryLabel{}] = std::vector<std::uint32_t>(
+        input.inactive[0].begin(), input.inactive[0].end());
   }
   const auto inactive_indices =
       std::make_shared<const data::SymmetryBlockedIndexSet>(
@@ -895,6 +514,30 @@ std::shared_ptr<data::Hamiltonian> DuccConstructor::_run_impl(
       std::make_unique<data::CanonicalFourCenterHamiltonianContainer>(
           one_body[0], one_body[1], two_body[0], two_body[1], two_body[2],
           output_orbitals, core, empty_fock, empty_fock));
+}
+
+}  // namespace
+
+std::shared_ptr<data::Hamiltonian> DuccConstructor::_run_impl(
+    std::shared_ptr<data::Wavefunction> reference,
+    std::shared_ptr<data::Hamiltonian> hamiltonian,
+    std::shared_ptr<const data::SymmetryBlockedIndexSet> p_indices) const {
+  QDK_LOG_TRACE_ENTERING();
+  const auto level = _settings->get<int64_t>("level");
+  if (level < 0 || level > 2)
+    throw std::invalid_argument("DUCC level must be between 0 and 2.");
+  _validate_inputs(reference, hamiltonian, p_indices);
+  if (!reference->has_container_type<data::AmplitudeContainer>())
+    throw std::invalid_argument(
+        "DUCC requires an AmplitudeContainer reference.");
+  if (!hamiltonian->is_hermitian())
+    throw std::invalid_argument("DUCC requires a Hermitian Hamiltonian.");
+  const auto& amplitudes = reference->get_container<data::AmplitudeContainer>();
+  _validate_inputs(amplitudes.get_wavefunction(), hamiltonian, p_indices);
+  const auto input =
+      assemble_input(*reference, amplitudes, *hamiltonian, p_indices);
+  return assemble_output(dress(input, static_cast<int>(level)), input,
+                         hamiltonian->get_orbitals(), p_indices);
 }
 
 }  // namespace qdk::chemistry::algorithms::microsoft
