@@ -32,6 +32,27 @@ Prebuilt wheels are published for Linux (x86_64, arm64), macOS (Apple Silicon), 
 (x86_64, arm64). `WSL <https://learn.microsoft.com/windows/wsl/install>`_ is supported as well,
 and inside it you follow the Linux instructions.
 
+The wheels' native C++ code is built for these instruction-set targets:
+
+.. list-table::
+   :header-rows: 1
+
+   * - Platform
+     - ISA target
+   * - Linux x86_64
+     - ``x86-64-v3`` (includes AVX2, FMA, BMI1/2, F16C, LZCNT, and MOVBE)
+   * - Linux ARM64
+     - ``armv8-a``
+   * - macOS Apple Silicon
+     - ``armv8-a``
+   * - Windows x86_64
+     - ``AVX2`` (MSVC ``/arch:AVX2``)
+   * - Windows ARM64
+     - ``armv8.0`` (MSVC ``/arch:armv8.0``)
+
+These are the targets used to compile QDK/Chemistry's native code; bundled third-party
+libraries may have separate processor requirements.
+
 .. note::
 
    PySCF is the only package in the ``plugins`` extra and publishes no Windows wheels, so it is
