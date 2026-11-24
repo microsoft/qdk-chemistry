@@ -230,9 +230,11 @@ class TestGivensNetwork:
     # 6 rotation bits resolve each angle to O(2^-6), bounding the infidelity at O(2^-12).
     _ROTATION_BITS = 6
 
-    def _run(self, qsharp_test_context, qsharp_test_utils, givens, prep_angles, controls, inverse=False):
+    def _run(
+        self, qsharp_test_context, qsharp_test_utils, givens, prep_angles, controls, inverse=False, bits=_ROTATION_BITS
+    ):
         op = qsharp_test_utils.UnitarySynthesisTests.TestMakeGivensOp(
-            givens, prep_angles, list(controls), self._ROTATION_BITS, inverse
+            givens, prep_angles, list(controls), bits, inverse
         )
         num_controls, num_target = len(controls), len(prep_angles)
         state = np.array(dump_operation_on_state(op, num_controls + num_target, context=qsharp_test_context))
@@ -242,16 +244,29 @@ class TestGivensNetwork:
         return state[control_value]
 
     @pytest.mark.parametrize(
-        ("givens", "prep_angles", "controls", "inverse"),
+        ("givens", "prep_angles", "controls", "inverse", "bits"),
         [
             (
                 {"layerAngles": [[0.4], [0.9]], "layerShifted": [False, True], "phases": [True, False, True, False]},
                 [1.1, 0.7],
                 (),
                 False,
+                _ROTATION_BITS,
             ),
-            ({"layerAngles": [[0.6]], "layerShifted": [True], "phases": [False] * 4}, [0.8, 1.3], (True,), False),
-            ({"layerAngles": [[0.6]], "layerShifted": [True], "phases": [False] * 4}, [0.8, 1.3], (False,), False),
+            (
+                {"layerAngles": [[0.6]], "layerShifted": [True], "phases": [False] * 4},
+                [0.8, 1.3],
+                (True,),
+                False,
+                _ROTATION_BITS,
+            ),
+            (
+                {"layerAngles": [[0.6]], "layerShifted": [True], "phases": [False] * 4},
+                [0.8, 1.3],
+                (False,),
+                False,
+                _ROTATION_BITS,
+            ),
             (
                 {
                     "layerAngles": [[0.4, 0.2], [0.9], [0.3, 0.7], [0.5]],
@@ -261,15 +276,31 @@ class TestGivensNetwork:
                 [1.1, 0.7, 0.4],
                 (),
                 True,
+                _ROTATION_BITS,
+            ),
+            # 5-bit angles are exact, and 32-word layers load them through a swap network.
+            (
+                {
+                    "layerAngles": [
+                        (np.pi / 16 * ((5 * np.arange(32) + 3) % 32)).tolist(),
+                        (np.pi / 16 * ((7 * np.arange(31) + 1) % 32)).tolist(),
+                    ],
+                    "layerShifted": [False, True],
+                    "phases": (np.arange(64) % 3 == 0).tolist(),
+                },
+                [1.1, 0.7, 0.4, 0.9, 1.3, 0.2],
+                (),
+                False,
+                5,
             ),
         ],
-        ids=["signed-two-layer", "shifted-control-on", "shifted-control-off", "adjoint"],
+        ids=["signed-two-layer", "shifted-control-on", "shifted-control-off", "adjoint", "swap-network"],
     )
     def test_matches_reconstruction(
-        self, qsharp_test_context, qsharp_test_utils, givens, prep_angles, controls, inverse
+        self, qsharp_test_context, qsharp_test_utils, givens, prep_angles, controls, inverse, bits
     ):
         """The network, or its adjoint, matches its dense reconstruction exactly when every control is set."""
-        state = self._run(qsharp_test_context, qsharp_test_utils, givens, prep_angles, controls, inverse)
+        state = self._run(qsharp_test_context, qsharp_test_utils, givens, prep_angles, controls, inverse, bits)
         # Reconstruct D L_{m-1} ... L_0, most significant qubit first.
         unitary = np.eye(len(givens["phases"]))
         for angles, shifted in zip(givens["layerAngles"], givens["layerShifted"], strict=True):
