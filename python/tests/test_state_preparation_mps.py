@@ -511,6 +511,37 @@ def test_operation_leaves_later_system_qubits_untouched():
     assert np.abs(np.vdot(target, output[:, 0])) ** 2 > 1 - _AGREEMENT_TOLERANCE
 
 
+@_METHODS
+def test_operation_adjoint_returns_to_zero(method):
+    """Preparing an MPS with unequal bonds and a permuted order, then applying the adjoint, returns to ``|0>``."""
+    mps = make_mps(_random_right_canonical_tensors([1, 4, 3, 2, 1], 4, seed=11), site_to_orbital_order=(2, 0, 3, 1))
+    circuit = create(
+        "state_prep",
+        "matrix_product_state",
+        unitary_synthesis=synthesis_ref(method),
+        rotation_bit_precision=_AGREEMENT_PRECISION,
+    ).run(Wavefunction(mps))
+    context = get_qsharp_context()
+    if not hasattr(context.code, "_TestRoundTripOp"):
+        context.eval(
+            "function _TestRoundTripOp(op : Qubit[] => Unit is Adj) : Qubit[] => Unit {"
+            " qs => { op(qs); Adjoint op(qs); } }"
+        )
+    output = apply_operation(
+        context.code._TestRoundTripOp(circuit._qsharp_op), np.eye(1, 1 << circuit.num_qubits).ravel()
+    )
+    assert abs(output[0]) ** 2 > 1 - _AGREEMENT_TOLERANCE
+
+
+def test_initial_state_normalization_ignores_overall_scale():
+    """Scaling site zero by any finite nonzero factor leaves the prepared initial state unchanged."""
+    tensors = [np.asarray(t) for t in _fixture_site_tensors("mps_spin", _identity_order("mps_spin"))]
+    expected = preparation_data(make_mps(tensors)).initial_state_vec
+    for scale in (1e-16, 1e200):
+        scaled = preparation_data(make_mps([tensors[0] * scale, *tensors[1:]])).initial_state_vec
+        np.testing.assert_allclose(scaled, expected, atol=1e-14)
+
+
 def _two_site_tensors(amplitudes: dict[tuple[int, int], float]):
     """Right-canonical two-site tensors of the state with the given ``(physical0, physical1)`` amplitudes."""
     psi = np.zeros((4, 4))

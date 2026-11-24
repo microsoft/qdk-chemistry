@@ -196,13 +196,15 @@ class MatrixProductStatePreparation(StatePreparation):
         initial_bond_dim = 1 << (first_site.shape[1] - 1).bit_length()
         padded = np.zeros((first_site.shape[0], initial_bond_dim))
         padded[:, : first_site.shape[1]] = first_site
+        # Dividing by the largest amplitude first keeps the check and the norm independent of the overall scale.
         vector = padded.reshape(-1)
-        norm = np.linalg.norm(vector)
-        if not np.isfinite(norm) or norm <= 1e-15:
+        scale = np.max(np.abs(vector))
+        if not np.isfinite(scale) or scale == 0:
             raise ValueError("MPS initial state must contain finite amplitudes with nonzero norm.")
+        vector = vector / scale
 
         return MatrixProductStatePreparationData(
-            initial_state_vec=(vector / norm).tolist(),
+            initial_state_vec=(vector / np.linalg.norm(vector)).tolist(),
             site_to_orbital_order=mps.site_to_orbital_order(),
             num_sites=mps.num_sites(),
             num_qubits_per_site=(dimension - 1).bit_length(),
