@@ -142,6 +142,26 @@ def test_omit_right_factor(matrix):
     _assert_realizes(mapper.run(representation), matrix, seed=1, preimage=right_factor)
 
 
+@pytest.mark.parametrize(
+    ("name", "settings"), [(_DENSE, {}), (_DENSE, {"omit_right_factor": True}), (_BLOCK_SPARSE, {})]
+)
+def test_adjoint_inverts(qsharp_test_context, qsharp_test_utils, name, settings):
+    """The adjoint maps ``M a`` back to the zero-padded input ``a``, or ``V a`` when ``V`` is omitted."""
+    matrix = ortho_group.rvs(8, random_state=21)[:, :2]
+    representation = _representation(matrix)
+    coefficients = np.random.default_rng(21).normal(size=2)
+    coefficients /= np.linalg.norm(coefficients)
+    preimage = create("circuit_mapper", _DENSE).right_factor(representation) if settings else np.eye(2)
+    expected = np.zeros(8)
+    expected[: len(preimage)] = preimage @ coefficients
+    reverse = _bit_reversal(3)
+    with use_qsharp_context(qsharp_test_context):
+        circuit = create("circuit_mapper", name, **settings).run(representation)
+        op = qsharp_test_utils.IsometrySynthesisTests.TestMakeAdjointOp(circuit._qsharp_op)
+        output = apply_operation(op, (matrix @ coefficients)[reverse])
+    assert abs(np.vdot(expected, output[reverse])) ** 2 > 1 - _INFIDELITY_TOLERANCE
+
+
 def test_right_factor_reuses_last_run(monkeypatch):
     """After ``run`` the dense mapper returns a copy of the synthesized ``V`` without factorizing again."""
     spy = Mock(wraps=dense_isometry_right_factor)
