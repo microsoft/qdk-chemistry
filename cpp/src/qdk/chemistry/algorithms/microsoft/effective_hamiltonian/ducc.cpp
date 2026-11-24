@@ -24,6 +24,7 @@
 #include <qdk/chemistry/data/symmetry/spin_channel_indices.hpp>
 #include <qdk/chemistry/data/wavefunction_containers/amplitude_container.hpp>
 #include <qdk/chemistry/utils/logger.hpp>
+#include <qdk/chemistry/utils/tensor_index.hpp>
 #include <span>
 #include <stdexcept>
 #include <string_view>
@@ -37,8 +38,8 @@
 namespace qdk::chemistry::algorithms::microsoft {
 namespace {
 
-using sequant_evaluation::index4;
-using sequant_evaluation::tensor_size;
+using utils::index4;
+using utils::tensor_size;
 
 // Spin orbitals are ordered occupied alpha, occupied beta, virtual alpha,
 // virtual beta; spin 0 is alpha, so a.spin + c.spin picks the aa/ab/bb block.
@@ -281,6 +282,8 @@ Input assemble_input(
         block->cols() != block->rows() || !block->allFinite())
       throw std::invalid_argument(
           "DUCC requires finite one-body integrals matching W.");
+  if (!std::isfinite(hamiltonian.get_core_energy()))
+    throw std::invalid_argument("DUCC requires a finite core energy.");
   const auto [t1a, t1b] = amplitudes.get_t1_amplitudes();
   const auto [t2ab, t2aa, t2bb] = amplitudes.get_t2_amplitudes();
   const auto real = [](const data::ContainerTypes::VectorVariant& value,
@@ -383,7 +386,8 @@ Input assemble_input(
 sequant_evaluation::NormalOrderedOperator dress(const Input& input, int level) {
   const auto n = input.output.size();
   sequant_evaluation::NormalOrderedOperator total;
-  if (level > 0) {
+  // Every amplitude is internal when P is the whole window.
+  if (level > 0 && n < input.orbitals.size()) {
     sequant_evaluation::SpinOrbitalSpace space;
     for (std::size_t i = 0; i < input.orbitals.size(); ++i)
       (i < input.nocc ? space.occupied : space.virtuals)[input.orbitals[i].spin]

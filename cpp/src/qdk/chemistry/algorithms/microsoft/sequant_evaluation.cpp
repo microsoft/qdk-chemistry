@@ -21,16 +21,21 @@
 #include <SeQuant/domain/mbpt/convention.hpp>
 #include <SeQuant/domain/mbpt/spin.hpp>
 #include <algorithm>
+#include <atomic>
 #include <compare>
+#include <condition_variable>
 #include <cstdint>
 #include <exception>
 #include <map>
+#include <mutex>
+#include <optional>
+#include <qdk/chemistry/utils/tensor_index.hpp>
 #include <range/v3/range/conversion.hpp>
-#include <set>
 #include <stdexcept>
 #include <string>
 #include <tuple>
 #include <unordered_map>
+#include <unordered_set>
 #include <utility>
 
 #ifdef _OPENMP
@@ -39,23 +44,14 @@
 
 namespace qdk::chemistry::algorithms::microsoft::sequant_evaluation {
 
-std::size_t tensor_size(std::span<const std::size_t> extents) {
-  std::size_t size = 1;
-  for (const auto extent : extents) {
-    if (extent && size > std::vector<double>().max_size() / extent)
-      throw std::length_error("Tensor extents exceed addressable storage.");
-    size *= extent;
-  }
-  return size;
-}
+using utils::tensor_size;
 
 namespace {
 
 using namespace sequant;
 using BTensor = btas::Tensor<double>;
 
-constexpr std::size_t terms_per_worker = 16;
-constexpr std::size_t result_buffer_bytes = std::size_t{64} << 20;
+constexpr std::size_t terms_ahead_per_worker = 4;
 
 const Context& evaluation_context() {
   static const Context context(
@@ -100,9 +96,21 @@ Slot slot(const Index& resolved, bool residual) {
 class IndexRanges {
  public:
   explicit IndexRanges(const SpinOrbitalSpace& space) {
+    std::unordered_set<std::size_t> listed;
+    for (const auto* lists : {&space.occupied, &space.virtuals})
+      for (const auto& orbitals : *lists)
+        for (const auto orbital : orbitals)
+          if (!listed.insert(orbital).second)
+            throw std::invalid_argument(
+                "SeQuant evaluation requires each spin orbital in exactly one "
+                "occupied or virtual list.");
     std::unordered_map<std::size_t, std::size_t> position;
     for (std::size_t i = 0; i < space.target.size(); ++i)
-      position.emplace(space.target[i], i);
+      if (!listed.contains(space.target[i]) ||
+          !position.emplace(space.target[i], i).second)
+        throw std::invalid_argument(
+            "SeQuant evaluation requires distinct target spin orbitals from "
+            "the occupied and virtual lists.");
     for (int spin = 0; spin < 2; ++spin) {
       _all[0][spin] = space.occupied[spin];
       _all[1][spin] = space.virtuals[spin];
@@ -139,7 +147,7 @@ struct LeafKey {
   auto operator<=>(const LeafKey&) const = default;
 };
 
-using LeafStore = std::map<LeafKey, ResultPtr>;
+using TermLeaves = std::map<LeafKey, ResultPtr>;
 
 /// One spin assignment of a term: its plan in PreparedContraction::plans, its
 /// spin-summation multiplicity and the spin-resolved version of each index.
@@ -174,47 +182,114 @@ LeafKey leaf_key(const EvalExprBTAS& leaf, const SpinAssignment& assignment,
 /// Leaf blocks of one spin assignment, for sequant::evaluate.
 class AssignmentLeaves {
  public:
-  AssignmentLeaves(const LeafStore& store, const SpinAssignment& assignment,
+  AssignmentLeaves(const TermLeaves& leaves, const SpinAssignment& assignment,
                    const container::svector<Index>& free)
-      : _store(store), _assignment(assignment), _free(free) {}
+      : _leaves(leaves), _assignment(assignment), _free(free) {}
 
   ResultPtr operator()(sequant::meta::can_evaluate auto const& node) const {
     if (node->result_type() != ResultType::Tensor)
       return eval_result<ResultScalar<double>>(
           node->as_constant().template value<double>());
-    const auto& block = _store.at(leaf_key(*node, _assignment, _free));
+    const auto& block = _leaves.at(leaf_key(*node, _assignment, _free));
     // Canonicalization can permute antisymmetric leaf slots.
     return node->canon_phase() == -1 ? block->mult_by_phase(-1) : block;
   }
 
  private:
-  const LeafStore& _store;
+  const TermLeaves& _leaves;
   const SpinAssignment& _assignment;
   const container::svector<Index>& _free;
 };
 
-ResultPtr build_leaf(const LeafKey& key, const IndexRanges& index_ranges,
-                     const LeafElement& element) {
-  std::vector<const std::vector<std::size_t>*> axes;
-  std::vector<std::size_t> extents;
-  for (const auto& slot : key.slots) {
-    axes.push_back(&index_ranges.orbitals(slot));
-    extents.push_back(axes.back()->size());
+/// Leaf blocks shared by all workers. Each block is built on first use, by all
+/// workers that request it before it is complete.
+class LeafStore {
+ public:
+  LeafStore(const IndexRanges& index_ranges, const LeafElement& element)
+      : _index_ranges(index_ranges), _element(element) {}
+
+  ResultPtr block(const LeafKey& key) {
+    Entry* entry = nullptr;
+    {
+      const std::lock_guard lock(_mutex);
+      entry = &_entries[key];
+    }
+    std::call_once(entry->allocated, [&] { allocate(*entry, key); });
+    for (auto slice = entry->next++; slice < entry->slices;
+         slice = entry->next++) {
+      try {
+        fill(*entry, key.label, slice);
+      } catch (...) {
+        const std::lock_guard lock(entry->mutex);
+        if (!entry->failure) entry->failure = std::current_exception();
+      }
+      if (++entry->filled == entry->slices) finish(*entry);
+    }
+    std::unique_lock lock(entry->mutex);
+    entry->complete.wait(lock, [&] { return entry->done; });
+    if (entry->failure) std::rethrow_exception(entry->failure);
+    return entry->block;
   }
-  tensor_size(extents);
-  BTensor block{btas::Range{extents}};
-  std::vector<std::size_t> position(axes.size(), 0), orbitals(axes.size());
-  for (std::size_t flat = 0; flat < block.size(); ++flat) {
-    for (std::size_t axis = 0; axis < axes.size(); ++axis)
-      orbitals[axis] = (*axes[axis])[position[axis]];
-    block.data()[flat] = element(key.label, orbitals);
-    for (std::size_t axis = axes.size(); axis-- > 0;) {
-      if (++position[axis] < extents[axis]) break;
-      position[axis] = 0;
+
+ private:
+  /// A block filled in slices over the first half of its slots.
+  struct Entry {
+    std::once_flag allocated;
+    std::vector<const std::vector<std::size_t>*> axes;
+    BTensor values;
+    std::size_t slices = 0;
+    std::atomic<std::size_t> next = 0, filled = 0;
+    std::mutex mutex;
+    std::condition_variable complete;
+    bool done = false;
+    ResultPtr block;
+    std::exception_ptr failure;
+  };
+
+  void allocate(Entry& entry, const LeafKey& key) const {
+    std::vector<std::size_t> extents;
+    for (const auto& slot : key.slots) {
+      entry.axes.push_back(&_index_ranges.orbitals(slot));
+      extents.push_back(entry.axes.back()->size());
+    }
+    tensor_size(extents);
+    entry.values = BTensor{btas::Range{extents}};
+    entry.slices = tensor_size(std::span(extents).first(extents.size() / 2));
+  }
+
+  void fill(Entry& entry, std::wstring_view label, std::size_t slice) const {
+    const auto rank = entry.axes.size(), lead = rank / 2;
+    const auto size = entry.values.size() / entry.slices;
+    std::vector<std::size_t> position(rank, 0), orbitals(rank);
+    for (std::size_t axis = lead, rest = slice; axis-- > 0;
+         rest /= entry.axes[axis]->size())
+      position[axis] = rest % entry.axes[axis]->size();
+    auto* values = entry.values.data() + slice * size;
+    for (std::size_t flat = 0; flat < size; ++flat) {
+      for (std::size_t axis = 0; axis < rank; ++axis)
+        orbitals[axis] = (*entry.axes[axis])[position[axis]];
+      values[flat] = _element(label, orbitals);
+      for (std::size_t axis = rank; axis-- > lead;) {
+        if (++position[axis] < entry.axes[axis]->size()) break;
+        position[axis] = 0;
+      }
     }
   }
-  return eval_result<ResultTensorBTAS<BTensor>>(std::move(block));
-}
+
+  static void finish(Entry& entry) {
+    const std::lock_guard lock(entry.mutex);
+    if (!entry.failure)
+      entry.block =
+          eval_result<ResultTensorBTAS<BTensor>>(std::move(entry.values));
+    entry.done = true;
+    entry.complete.notify_all();
+  }
+
+  const IndexRanges& _index_ranges;
+  const LeafElement& _element;
+  std::mutex _mutex;
+  std::map<LeafKey, Entry> _entries;
+};
 
 /// The tensor factors of a term and the indices of its normal operator,
 /// creators first.
@@ -421,22 +496,6 @@ std::vector<Slot> residual_slots(const PreparedContraction& term,
   return slots;
 }
 
-/// Number of values in a term's result: one per residual element of each
-/// distinct residual spin pattern, or one scalar.
-std::size_t result_size(const PreparedContraction& term,
-                        const IndexRanges& index_ranges) {
-  if (term.free.empty()) return 1;
-  std::set<std::vector<Slot>> patterns;
-  std::size_t size = 0;
-  for (const auto& assignment : term.assignments) {
-    auto slots = residual_slots(term, assignment);
-    std::size_t block = 1;
-    for (const auto& slot : slots) block *= index_ranges.orbitals(slot).size();
-    if (patterns.insert(std::move(slots)).second) size += block;
-  }
-  return size;
-}
-
 /// Weighted sum of a term's spin assignments: a scalar, or one block per
 /// residual spin pattern.
 struct TermResult {
@@ -445,10 +504,10 @@ struct TermResult {
 };
 
 TermResult evaluate_term(const PreparedContraction& term,
-                         const LeafStore& store) {
+                         const TermLeaves& blocks) {
   TermResult result;
   for (const auto& assignment : term.assignments) {
-    const AssignmentLeaves leaves(store, assignment, term.free);
+    const AssignmentLeaves leaves(blocks, assignment, term.free);
     const auto& node = term.plans[assignment.plan_index];
     const auto weight = static_cast<double>(assignment.multiplicity);
     if (term.free.empty()) {
@@ -478,77 +537,100 @@ void accumulate(const TermResult& result, const IndexRanges& index_ranges,
   total.scalar += result.scalar;
   for (const auto& [slots, block] : result.blocks) {
     auto& target = slots.size() == 2 ? total.one_body : total.two_body;
-    std::vector<const std::vector<std::size_t>*> axes;
-    for (const auto& slot : slots)
-      axes.push_back(&index_ranges.positions(slot));
-    std::vector<std::size_t> position(axes.size(), 0);
-    for (std::size_t flat = 0; flat < block.size(); ++flat) {
-      std::size_t address = 0;
-      for (std::size_t axis = 0; axis < axes.size(); ++axis)
-        address = address * n + (*axes[axis])[position[axis]];
-      target[address] += block.data()[flat];
-      for (std::size_t axis = axes.size(); axis-- > 0;) {
-        if (++position[axis] < axes[axis]->size()) break;
-        position[axis] = 0;
+    std::vector<std::vector<std::size_t>> offsets(slots.size());
+    for (std::size_t axis = slots.size(), stride = 1; axis-- > 0; stride *= n)
+      for (const auto position : index_ranges.positions(slots[axis]))
+        offsets[axis].push_back(position * stride);
+    const auto* value = block.data();
+    const auto add = [&](const auto& self, std::size_t axis,
+                         std::size_t base) -> void {
+      if (axis + 1 == offsets.size()) {
+        for (const auto offset : offsets[axis])
+          target[base + offset] += *value++;
+        return;
       }
-    }
+      for (const auto offset : offsets[axis])
+        self(self, axis + 1, base + offset);
+    };
+    add(add, 0, 0);
   }
 }
 
-/// Calls body(i) for i in [0, count) on up to `workers` threads and rethrows
-/// the first exception.
-template <typename Body>
-void parallel_for(std::size_t count, std::size_t workers, Body&& body) {
-  workers = std::max<std::size_t>(1, std::min(workers, count));
-  std::exception_ptr failure;
-#ifdef _OPENMP
-#pragma omp parallel if (workers > 1) num_threads(workers)
-#endif
-  {
-    const auto scope = set_scoped_default_context(evaluation_context());
-#ifdef _OPENMP
-#pragma omp for schedule(dynamic, 1)
-#endif
-    for (std::size_t i = 0; i < count; ++i) {
-      try {
-        body(i);
-      } catch (...) {
-#ifdef _OPENMP
-#pragma omp critical(sequant_evaluation_failure)
-#endif
-        {
-          if (!failure) failure = std::current_exception();
-        }
-      }
-    }
-  }
-  if (failure) std::rethrow_exception(failure);
+/// The blocks of a term's leaves, from the shared store.
+TermLeaves leaves_of(const PreparedContraction& term, LeafStore& store) {
+  TermLeaves leaves;
+  for (const auto& assignment : term.assignments)
+    term.plans[assignment.plan_index].visit_leaf([&](const EvalNodeBTAS& node) {
+      if (node->result_type() != ResultType::Tensor) return;
+      auto key = leaf_key(*node, assignment, term.free);
+      if (leaves.contains(key)) return;
+      auto block = store.block(key);
+      leaves.emplace(std::move(key), std::move(block));
+    });
+  return leaves;
 }
 
-/// Adds the leaf blocks that the prepared terms use and the store lacks.
-void add_leaves(const std::vector<PreparedContraction>& prepared,
-                const IndexRanges& index_ranges, const LeafElement& element,
-                std::size_t workers, LeafStore& store) {
-  std::vector<LeafStore::value_type*> missing;
-  for (const auto& term : prepared)
-    for (const auto& assignment : term.assignments)
-      term.plans[assignment.plan_index].visit_leaf(
-          [&](const EvalNodeBTAS& node) {
-            if (node->result_type() != ResultType::Tensor) return;
-            const auto [entry, inserted] =
-                store.try_emplace(leaf_key(*node, assignment, term.free));
-            if (inserted) missing.push_back(&*entry);
-          });
-  parallel_for(missing.size(), workers, [&](std::size_t i) {
-    missing[i]->second = build_leaf(missing[i]->first, index_ranges, element);
-  });
-}
+/// Hands out term indices in order and adds finished terms in the same order,
+/// with at most `lookahead` terms handed out but not yet added.
+class OrderedReduction {
+ public:
+  using Add = std::function<void(const TermResult&)>;
+
+  OrderedReduction(std::size_t count, std::size_t lookahead, Add add)
+      : _count(count), _lookahead(lookahead), _add(std::move(add)) {}
+
+  std::optional<std::size_t> take() {
+    std::unique_lock lock(_mutex);
+    _progress.wait(lock, [&] {
+      return _failed || _next == _count || _next < _added + _lookahead;
+    });
+    if (_failed || _next == _count) return std::nullopt;
+    return _next++;
+  }
+
+  void submit(std::size_t index, TermResult result) {
+    std::unique_lock lock(_mutex);
+    _finished.emplace(index, std::move(result));
+    if (_adding) return;
+    _adding = true;
+    // Term-order reduction is identical for serial and parallel evaluation.
+    while (!_failed && !_finished.empty() &&
+           _finished.begin()->first == _added) {
+      const auto next = std::move(_finished.begin()->second);
+      _finished.erase(_finished.begin());
+      lock.unlock();
+      _add(next);
+      lock.lock();
+      ++_added;
+      _progress.notify_all();
+    }
+    _adding = false;
+  }
+
+  void fail() {
+    {
+      const std::lock_guard lock(_mutex);
+      _failed = true;
+    }
+    _progress.notify_all();
+  }
+
+ private:
+  const std::size_t _count, _lookahead;
+  const Add _add;
+  std::mutex _mutex;
+  std::condition_variable _progress;
+  std::map<std::size_t, TermResult> _finished;
+  std::size_t _next = 0, _added = 0;
+  bool _adding = false, _failed = false;
+};
 
 }  // namespace
 
 NormalOrderedOperator evaluate(const sequant::ExprPtr& expression,
                                const SpinOrbitalSpace& space,
                                const LeafElement& leaf) {
+  const IndexRanges index_ranges(space);
   const auto n = space.target.size();
   NormalOrderedOperator total{
       0.0, std::vector<double>(tensor_size({n, n}), 0.0),
@@ -559,39 +641,40 @@ NormalOrderedOperator evaluate(const sequant::ExprPtr& expression,
       terms.push_back(term);
   } else
     terms.push_back(expression);
-  const IndexRanges index_ranges(space);
   std::size_t workers = 1;
 #ifdef _OPENMP
   workers = static_cast<std::size_t>(omp_get_max_threads());
 #endif
-  const auto scope = sequant::set_scoped_default_context(evaluation_context());
+  workers = std::max<std::size_t>(1, std::min(workers, terms.size()));
   const scf::util::ScopedBlasThreads blas_threads;
-  const auto window = terms_per_worker * workers;
-  LeafStore store;
-  for (std::size_t begin = 0; begin < terms.size(); begin += window) {
-    const auto count = std::min(window, terms.size() - begin);
-    std::vector<PreparedContraction> prepared(count);
-    parallel_for(count, workers, [&](std::size_t i) {
-      prepared[i] = prepare(terms[begin + i], index_ranges);
-    });
-    add_leaves(prepared, index_ranges, leaf, workers, store);
-    std::vector<std::size_t> sizes(count);
-    for (std::size_t i = 0; i < count; ++i)
-      sizes[i] = sizeof(double) * result_size(prepared[i], index_ranges);
-    for (std::size_t first = 0, last = 0; first < count; first = last) {
-      std::size_t bytes = sizes[first];
-      for (last = first + 1;
-           last < count && bytes + sizes[last] <= result_buffer_bytes; ++last)
-        bytes += sizes[last];
-      std::vector<TermResult> results(last - first);
-      parallel_for(last - first, workers, [&](std::size_t i) {
-        results[i] = evaluate_term(prepared[first + i], store);
-      });
-      // Term-order reduction is identical for serial and parallel evaluation.
-      for (const auto& result : results)
-        accumulate(result, index_ranges, n, total);
+  LeafStore store(index_ranges, leaf);
+  OrderedReduction reduction(terms.size(), terms_ahead_per_worker * workers,
+                             [&](const TermResult& result) {
+                               accumulate(result, index_ranges, n, total);
+                             });
+  std::exception_ptr failure;
+#ifdef _OPENMP
+#pragma omp parallel if (workers > 1) num_threads(workers)
+#endif
+  {
+    const auto scope =
+        sequant::set_scoped_default_context(evaluation_context());
+    try {
+      while (const auto index = reduction.take()) {
+        const auto term = prepare(terms[*index], index_ranges);
+        reduction.submit(*index, evaluate_term(term, leaves_of(term, store)));
+      }
+    } catch (...) {
+      reduction.fail();
+#ifdef _OPENMP
+#pragma omp critical(sequant_evaluation_failure)
+#endif
+      {
+        if (!failure) failure = std::current_exception();
+      }
     }
   }
+  if (failure) std::rethrow_exception(failure);
   return total;
 }
 

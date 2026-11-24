@@ -42,8 +42,6 @@ from .helpers import create_test_basis_set
 from .reference_tolerances import ci_energy_tolerance
 
 try:
-    import pyscf  # noqa: F401
-
     import qdk_chemistry.plugins.pyscf as pyscf_plugin
 
     pyscf_plugin.load()

@@ -7,6 +7,7 @@
 #include <Eigen/Dense>
 #include <algorithm>
 #include <cstdint>
+#include <limits>
 #include <memory>
 #include <optional>
 #include <qdk/chemistry/data/hamiltonian_containers/canonical_four_center.hpp>
@@ -227,6 +228,18 @@ TEST_F(DuccTest, RejectsAlphaAndBetaBasisMismatch) {
     auto reference = amplitudes(other, "20");
     EXPECT_THROW(constructor.run(reference, ham, target),
                  std::invalid_argument);
+  }
+}
+
+TEST_F(DuccTest, RejectsNonFiniteCoreEnergy) {
+  auto reference = amplitudes(orbitals, "20");
+  for (double core : {std::numeric_limits<double>::quiet_NaN(),
+                      std::numeric_limits<double>::infinity()}) {
+    SCOPED_TRACE(core);
+    EXPECT_THROW(
+        constructor.run(reference, hamiltonian(orbitals, one, opposite, core),
+                        target),
+        std::invalid_argument);
   }
 }
 

@@ -8,25 +8,11 @@
 #include <array>
 #include <cstddef>
 #include <functional>
-#include <initializer_list>
 #include <span>
 #include <string_view>
 #include <vector>
 
 namespace qdk::chemistry::algorithms::microsoft::sequant_evaluation {
-
-/// Number of elements of a tensor; throws std::length_error if unaddressable.
-std::size_t tensor_size(std::span<const std::size_t> extents);
-
-inline std::size_t tensor_size(std::initializer_list<std::size_t> extents) {
-  return tensor_size(std::span(extents.begin(), extents.size()));
-}
-
-/// Row-major offset of element (p, q, r, s) of an n x n x n x n tensor.
-inline std::size_t index4(std::size_t p, std::size_t q, std::size_t r,
-                          std::size_t s, std::size_t n) {
-  return ((p * n + q) * n + r) * n + s;
-}
 
 /// Spin orbitals of a single-determinant reference, by spin (0 = alpha).
 struct SpinOrbitalSpace {
@@ -35,13 +21,14 @@ struct SpinOrbitalSpace {
   std::vector<std::size_t> target;
 };
 
-/// Element of leaf tensor `label` at the spin orbitals of its slots, bra first.
+/// Element of leaf tensor `label` at the spin orbitals of its slots, bra first;
+/// may be called concurrently.
 using LeafElement = std::function<double(std::wstring_view label,
                                          std::span<const std::size_t> slots)>;
 
 /// Coefficients over the n target spin orbitals: one_body[p * n + q] multiplies
-/// {a+_p a_q} and two_body[index4(p, q, r, s, n)] multiplies
-/// {a+_p a+_q a_s a_r}.
+/// {a+_p a_q} and two_body[((p * n + q) * n + r) * n + s] multiplies
+/// {a+_p a+_q a_s a_r}, as accumulated (not antisymmetrized).
 struct NormalOrderedOperator {
   double scalar = 0.0;
   std::vector<double> one_body, two_body;
@@ -57,6 +44,9 @@ struct NormalOrderedOperator {
  * @param space Reference occupations and target spin orbitals.
  * @param leaf Elements of the expression's tensors.
  * @return The scalar, one-body and two-body coefficients over the target.
+ * @throws std::invalid_argument If a spin orbital appears more than once in
+ *         the occupied and virtual lists, or a target spin orbital is repeated
+ *         or not listed.
  */
 NormalOrderedOperator evaluate(const sequant::ExprPtr& expression,
                                const SpinOrbitalSpace& space,

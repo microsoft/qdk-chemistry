@@ -41,7 +41,7 @@ scf_energy, scf_wavefunction = scf_solver.run(
 )
 hamiltonian = create("hamiltonian_constructor").run(scf_wavefunction.get_orbitals())
 
-# T1/T2 amplitudes over W; a coupled-cluster calculator can be used instead of MP2
+# T1/T2 amplitudes over W; pyscf_coupled_cluster with store_amplitudes=True also works
 mp2_calculator = create("dynamical_correlation_calculator", "qdk_mp2_calculator")
 _, amplitudes, _ = mp2_calculator.run(Ansatz(hamiltonian, scf_wavefunction))
 

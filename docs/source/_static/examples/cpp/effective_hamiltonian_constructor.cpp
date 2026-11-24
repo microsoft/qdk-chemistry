@@ -40,8 +40,7 @@ H   -0.758602    0.000000    0.504284
   auto hamiltonian = HamiltonianConstructorFactory::create()->run(
       scf_wavefunction->get_orbitals());
 
-  // T1/T2 amplitudes over W; a coupled-cluster calculator can be used instead
-  // of MP2
+  // T1/T2 amplitudes over W
   auto mp2_calculator =
       DynamicalCorrelationCalculatorFactory::create("qdk_mp2_calculator");
   auto [mp2_energy, amplitudes, bra] = mp2_calculator->run(
