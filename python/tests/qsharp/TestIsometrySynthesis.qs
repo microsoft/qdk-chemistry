@@ -21,4 +21,9 @@ namespace QDKChemistry.TestUtils.IsometrySynthesisTests {
             }
         }
     }
+
+    /// Returns the adjoint of `op`.
+    function TestMakeAdjointOp(op : Qubit[] => Unit is Adj) : Qubit[] => Unit {
+        qs => Adjoint op(qs)
+    }
 }
