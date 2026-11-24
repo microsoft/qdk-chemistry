@@ -5,6 +5,8 @@
 /// (Berry et al., PRX Quantum 6, 020327; Rupprecht & Wölk, arXiv:2605.28489).
 namespace QDKChemistry.Utils.MPSSequential {
 
+    import Std.Arrays.All;
+    import Std.Arrays.Enumerated;
     import Std.Arrays.MappedOverRange;
     import Std.Arrays.Sorted;
     import Std.Arrays.Subarray;
@@ -40,7 +42,8 @@ namespace QDKChemistry.Utils.MPSSequential {
     internal operation ApplyMPSFermionicOrderSigns(siteToOrbitalOrder : Int[], state : Qubit[]) : Unit is Adj {
         let numSites = Length(siteToOrbitalOrder);
         let numQubits = Length(state);
-        if numQubits == 2 * numSites and numSites >= 6 and siteToOrbitalOrder == MappedOverRange(i -> i, 0..numSites - 1) {
+        // Element-wise checks, because QIR generation does not support whole-array comparison.
+        if numQubits == 2 * numSites and numSites >= 6 and All((index, orbital) -> index == orbital, Enumerated(siteToOrbitalOrder)) {
             within {
                 // α_j holds the parity of α_j, ..., α_{N-1}.
                 for j in numSites - 1..-1..2 {
@@ -94,7 +97,7 @@ namespace QDKChemistry.Utils.MPSSequential {
             "The state register must hold one or two qubits per MPS site."
         );
         Fact(
-            Sorted((a, b) -> a <= b, siteToOrbitalOrder) == MappedOverRange(i -> i, 0..numSites - 1),
+            Length(siteToOrbitalOrder) == numSites and All((index, orbital) -> index == orbital, Enumerated(Sorted((a, b) -> a <= b, siteToOrbitalOrder))),
             "siteToOrbitalOrder must be a permutation of the MPS sites."
         );
         let qubitsPerSite = Length(state) / numSites;

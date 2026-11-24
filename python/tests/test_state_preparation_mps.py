@@ -580,3 +580,12 @@ def test_resource_estimate_regression(fixture_name, method):
     counts = circuit.estimate().logical_counts
     actual = (counts["numQubits"], counts["cczCount"], counts["ccixCount"])
     assert actual == _EXPECTED_RESOURCES[(fixture_name, method)]
+
+
+@_METHODS
+def test_circuit_exports_qir(method):
+    """The circuit of a permuted-order MPS lowers to QIR, which rejects whole-array comparisons."""
+    circuit = create(
+        "state_prep", "matrix_product_state", unitary_synthesis=synthesis_ref(method), rotation_bit_precision=6
+    ).run(Wavefunction(_fixture_mps("mps_h2", (1, 0))))
+    assert str(circuit.get_qir())
