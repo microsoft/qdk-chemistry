@@ -48,24 +48,39 @@ namespace QDKChemistry.TestUtils.UnitarySynthesisTests {
         }
     }
 
-    /// Returns `ApplyControlledMultiplexedRy` of `words` on [controls | address | target] with its own phase gradient.
-    function TestMakeMultiplexedRyOp(words : Bool[][], maxSwapBits : Int, numControls : Int, numAddress : Int) : Qubit[] => Unit {
+    /// Returns `ApplyControlledMultiplexedRy`, or its adjoint, of `words` on [controls | address | target] with its own
+    /// phase gradient, passing the first `numOuter` controls through the `Controlled` functor unless `numOuter` < 0.
+    function TestMakeMultiplexedRyOp(
+        words : Bool[][],
+        maxSwapBits : Int,
+        numControls : Int,
+        numOuter : Int,
+        numAddress : Int,
+        inverse : Bool
+    ) : Qubit[] => Unit {
         (qs) => {
             let bits = Length(words[0]);
+            let split = MaxI(0, numOuter);
+            let (outer, inner) = (qs[...split - 1], qs[split..numControls - 1]);
+            let address = qs[numControls..numControls + numAddress - 1];
+            let target = qs[numControls + numAddress];
             use phaseGradient = Qubit[bits];
             use angleReg = Qubit[bits];
             within {
                 PreparePhaseGradientState(phaseGradient);
             } apply {
-                ApplyControlledMultiplexedRy(
-                    words,
-                    maxSwapBits,
-                    qs[numControls..numControls + numAddress - 1],
-                    qs[...numControls - 1],
-                    qs[numControls + numAddress],
-                    phaseGradient,
-                    angleReg
-                );
+                let args = (words, maxSwapBits, address, inner, target, phaseGradient, angleReg);
+                if numOuter < 0 {
+                    if inverse {
+                        Adjoint ApplyControlledMultiplexedRy(args);
+                    } else {
+                        ApplyControlledMultiplexedRy(args);
+                    }
+                } elif inverse {
+                    Controlled Adjoint ApplyControlledMultiplexedRy(outer, args);
+                } else {
+                    Controlled ApplyControlledMultiplexedRy(outer, args);
+                }
             }
         }
     }

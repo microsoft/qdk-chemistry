@@ -175,32 +175,42 @@ namespace QDKChemistry.Utils.UnitarySynthesis {
         phaseGradient : Qubit[],
         angleReg : Qubit[]
     ) : Unit is Adj + Ctl {
-        if not IsEmpty(data) {
-            let numBits = Length(angleReg);
-            let guarded = UseAddressGuard(Length(data), Length(address), numBits, maxSwapBits);
-            let table = guarded ? data | Padded(-(1 <<< Length(address)), [false, size = numBits], data);
-            if not guarded and IsEmpty(controls) {
-                let swapBits = ComputeOptimalLambda2D(1, Length(table), numBits, true, maxSwapBits);
-                within {
-                    SelectSwap2D([table], swapBits, true, [], address, [], angleReg);
-                } apply {
-                    RyViaPhaseGradient(targetQubit, angleReg, phaseGradient);
-                }
-            } elif not guarded and Length(controls) == 1 {
-                within {
-                    LoadAngleWord(table, maxSwapBits, address, controls[0], angleReg);
-                } apply {
-                    RyViaPhaseGradient(targetQubit, angleReg, phaseGradient);
-                }
-            } else {
-                use flag = Qubit();
-                within {
-                    ComputeLoadFlag(controls, guarded, Length(table), address, flag);
-                    LoadAngleWord(table, maxSwapBits, address, flag, angleReg);
-                } apply {
-                    RyViaPhaseGradient(targetQubit, angleReg, phaseGradient);
+        body (...) {
+            if not IsEmpty(data) {
+                let numBits = Length(angleReg);
+                let guarded = UseAddressGuard(Length(data), Length(address), numBits, maxSwapBits);
+                let table = guarded ? data | Padded(-(1 <<< Length(address)), [false, size = numBits], data);
+                if not guarded and IsEmpty(controls) {
+                    let swapBits = ComputeOptimalLambda2D(1, Length(table), numBits, true, maxSwapBits);
+                    within {
+                        SelectSwap2D([table], swapBits, true, [], address, [], angleReg);
+                    } apply {
+                        RyViaPhaseGradient(targetQubit, angleReg, phaseGradient);
+                    }
+                } elif not guarded and Length(controls) == 1 {
+                    within {
+                        LoadAngleWord(table, maxSwapBits, address, controls[0], angleReg);
+                    } apply {
+                        RyViaPhaseGradient(targetQubit, angleReg, phaseGradient);
+                    }
+                } else {
+                    use flag = Qubit();
+                    within {
+                        ComputeLoadFlag(controls, guarded, Length(table), address, flag);
+                        LoadAngleWord(table, maxSwapBits, address, flag, angleReg);
+                    } apply {
+                        RyViaPhaseGradient(targetQubit, angleReg, phaseGradient);
+                    }
                 }
             }
+        }
+        adjoint auto;
+        // External controls join the lookup controls, as the phase-gradient adder takes exactly one control.
+        controlled (ctls, ...) {
+            ApplyControlledMultiplexedRy(data, maxSwapBits, address, ctls + controls, targetQubit, phaseGradient, angleReg);
+        }
+        controlled adjoint (ctls, ...) {
+            Adjoint ApplyControlledMultiplexedRy(data, maxSwapBits, address, ctls + controls, targetQubit, phaseGradient, angleReg);
         }
     }
 

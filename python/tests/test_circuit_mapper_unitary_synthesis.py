@@ -379,11 +379,24 @@ class TestMultiplexedRy:
     _ADDRESS = 7
 
     @pytest.mark.parametrize(
-        ("num_words", "num_controls", "max_swap_bits"),
-        [(20, 0, -1), (20, 2, -1), (20, 0, 2), (100, 1, 1), (128, 2, 0)],
+        ("num_words", "num_controls", "num_outer", "max_swap_bits", "inverse"),
+        [
+            (20, 0, -1, -1, False),
+            (20, 2, -1, -1, False),
+            (20, 0, -1, 2, True),
+            (100, 1, -1, 1, False),
+            (128, 2, -1, 0, False),
+            (20, 0, 0, -1, False),
+            (20, 2, 2, -1, True),
+            (100, 2, 1, 1, False),
+            (128, 1, 1, 0, True),
+        ],
     )
-    def test_matches_reference(self, qsharp_test_context, qsharp_test_utils, num_words, num_controls, max_swap_bits):
-        """Each address below the table length rotates by its word; later addresses and unset controls do not."""
+    def test_matches_reference(
+        self, qsharp_test_context, qsharp_test_utils, num_words, num_controls, num_outer, max_swap_bits, inverse
+    ):
+        """Each address below the table length rotates by its word, or its negative for the adjoint, whether the
+        controls are passed directly or through ``Controlled``; later addresses and unset controls do not rotate."""
         rng = np.random.default_rng(num_words + 10 * num_controls)
         values = rng.integers(1, 1 << self._BITS, num_words)
         words = [[bool((value >> bit) & 1) for bit in range(self._BITS)] for value in values]
@@ -391,7 +404,7 @@ class TestMultiplexedRy:
         initial = rng.normal(size=1 << num_qubits)
         initial /= np.linalg.norm(initial)
         op = qsharp_test_utils.UnitarySynthesisTests.TestMakeMultiplexedRyOp(
-            words, max_swap_bits, num_controls, self._ADDRESS
+            words, max_swap_bits, num_controls, num_outer, self._ADDRESS, inverse
         )
         with use_qsharp_context(qsharp_test_context):
             state = apply_operation(op, initial)
@@ -402,7 +415,7 @@ class TestMultiplexedRy:
             bits = [(index >> (num_qubits - 2 - q)) & 1 for q in range(num_qubits - 1)]
             address = sum(bit << k for k, bit in enumerate(bits[num_controls:]))
             if all(bits[:num_controls]) and address < num_words:
-                angle = 4 * np.pi * values[address] / (1 << self._BITS)
+                angle = (-1 if inverse else 1) * 4 * np.pi * values[address] / (1 << self._BITS)
                 cosine, sine = np.cos(angle / 2), np.sin(angle / 2)
                 expected[index] = [[cosine, -sine], [sine, cosine]] @ expected[index]
         assert abs(np.vdot(expected.ravel(), state)) ** 2 == pytest.approx(1.0, abs=1e-10)
