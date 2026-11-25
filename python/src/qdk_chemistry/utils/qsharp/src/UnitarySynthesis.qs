@@ -50,8 +50,8 @@ namespace QDKChemistry.Utils.UnitarySynthesis {
     import QDKChemistry.Utils.SelectSwap.SwapNetworkPermutation;
     import QDKChemistry.Utils.UnaryIteration.AddressQubits;
 
-    /// Givens representation U = D · L_{m-1} ⋯ L_0 of a real orthogonal matrix, mirroring the
-    /// C++ `qdk::chemistry::utils::GivensDecomposition`, where layer L_j applies
+    /// Givens representation U = D · L_{m-1} ⋯ L_0 of a real orthogonal matrix, built from the
+    /// angle and sign arrays of the C++ unitary synthesis, where layer L_j applies
     /// G(θ) = [[cos θ, -sin θ], [sin θ, cos θ]] to the pairs (0, 1), (2, 3), … or, when shifted,
     /// (1, 2), (3, 4), … and D = diag(±1).
     struct GivensDecomposition {

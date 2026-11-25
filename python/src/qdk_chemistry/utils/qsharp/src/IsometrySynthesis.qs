@@ -49,12 +49,12 @@ namespace QDKChemistry.Utils.IsometrySynthesis {
     import QDKChemistry.Utils.UnitarySynthesis.QuantizeTrimmedRyAngles;
     import QDKChemistry.Utils.UnitarySynthesis.XorSigns;
 
-    /// Circuit data of a dense real isometry, mirroring the C++
-    /// `qdk::chemistry::utils::DenseIsometrySynthesis`, applied as
+    /// Circuit data of a dense real isometry from the C++
+    /// `qdk::chemistry::utils::dense_isometry_synthesis`, applied as
     /// V → UCR₀ → CNOT → W₀ → UCR₁ → CNOT → W₁ → UCR₂ → B for two added qubits, V → UCR₀ → B for
     /// one, and B for none.
     struct DenseIsometrySynthesis {
-        /// Ry angles of each UCRⱼ, one per input state, with the Givens signs folded in.
+        /// Ry angles of each UCRⱼ, one per input state.
         rotationAngles : Double[][],
         /// W₀ and W₁ on the input register; empty unless two qubits are added.
         mixingGivens : GivensDecomposition[],
@@ -71,8 +71,8 @@ namespace QDKChemistry.Utils.IsometrySynthesis {
         rotationBitPrecision : Int,
     }
 
-    /// Circuit data of a sparse real isometry U = P_r · B · P_c, mirroring the C++
-    /// `qdk::chemistry::utils::SparseIsometrySynthesis`.
+    /// Circuit data of a sparse real isometry U = P_r · B · P_c from the C++
+    /// `qdk::chemistry::utils::block_sparse_isometry_synthesis`.
     struct SparseIsometrySynthesis {
         /// P_c|c⟩ = |columnPermutation[c]⟩.
         columnPermutation : Int[],
