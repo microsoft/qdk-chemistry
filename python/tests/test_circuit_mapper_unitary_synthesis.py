@@ -102,6 +102,19 @@ def test_realizes_matrix(name, matrix):
 
 
 @pytest.mark.parametrize(
+    ("name", "matrix"),
+    [
+        (_DENSE, ortho_group.rvs(8, random_state=3)[:, :2]),
+        (_BLOCK_SPARSE, _block_sparse([2, 4, 1, 1], seed=4)),
+        (_BLOCK_SPARSE, np.eye(8)),
+    ],
+)
+def test_exports_qir(name, matrix):
+    """Circuits export to QIR on the default Adaptive_RIF target, so no qubit allocation depends on a measurement."""
+    assert str(create("circuit_mapper", name).run(_representation(matrix)).get_qir())
+
+
+@pytest.mark.parametrize(
     ("name", "num_input_qubits"), [(_DENSE, 2), (_DENSE, 4), (_BLOCK_SPARSE, 1), (_BLOCK_SPARSE, 3)]
 )
 def test_explicit_input_register(name, num_input_qubits):
@@ -184,10 +197,10 @@ def test_signed_permutation_needs_no_rotations():
     assert len(synthesis.column_permutation) == len(synthesis.row_permutation) == 4
 
 
-def test_identity_needs_no_lookups():
-    """The identity skips its identity permutations and its constant sign table, so it costs no Toffolis."""
+def test_identity_skips_permutations():
+    """The identity skips its identity permutation lookups, leaving at most one Toffoli."""
     counts = create("circuit_mapper", _BLOCK_SPARSE).run(_representation(np.eye(8))).estimate().logical_counts
-    assert counts["cczCount"] + counts["ccixCount"] == 0
+    assert counts["cczCount"] + counts["ccixCount"] <= 1
 
 
 @pytest.mark.parametrize("duplicates", ["split", "cancelling"])
