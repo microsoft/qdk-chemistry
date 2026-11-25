@@ -4,6 +4,8 @@
 # Licensed under the MIT License. See LICENSE.txt in the project root for license information.
 # --------------------------------------------------------------------------------------------
 
+import ctypes
+
 import numpy as np
 import pytest
 
@@ -67,6 +69,45 @@ class TestCubeGrid:
         """Omitted extents default to 80 points per axis."""
         grid = CubeGrid([0.0, 0.0, 0.0], [0.2, 0.2, 0.2])
         assert (grid.nx, grid.ny, grid.nz) == (80, 80, 80)
+
+    @pytest.mark.parametrize("field", ["origin", "spacing"])
+    @pytest.mark.parametrize("device_type", [1, 2], ids=["cpu", "cuda"])
+    def test_dlpack_coordinates_require_cpu_memory(self, field, device_type):
+        """CUDA-labelled host memory is safely rejected by the shared Eigen caster."""
+
+        class TensorHeader(ctypes.Structure):
+            _fields_ = (("data", ctypes.c_void_p), ("device_type", ctypes.c_int), ("device_id", ctypes.c_int))
+
+        coordinates = np.array([0.1, 0.2, 0.3])
+        capsule_pointer = ctypes.pythonapi.PyCapsule_GetPointer
+        capsule_pointer.argtypes = [ctypes.py_object, ctypes.c_char_p]
+        capsule_pointer.restype = ctypes.c_void_p
+
+        class DeviceArray:
+            def __dlpack_device__(self):
+                return (device_type, 0)
+
+            def __dlpack__(self, *args, **kwargs):
+                capsule = coordinates.__dlpack__()
+                header = ctypes.cast(capsule_pointer(capsule, b"dltensor"), ctypes.POINTER(TensorHeader))
+                header.contents.device_type = device_type
+                return capsule
+
+        arguments = {"origin": np.zeros(3), "spacing": np.ones(3)}
+        arguments[field] = DeviceArray()
+        grid = CubeGrid()
+        if device_type == 1:
+            constructed = CubeGrid(**arguments)
+            np.testing.assert_array_equal(getattr(constructed, field), coordinates)
+            setattr(grid, field, DeviceArray())
+            np.testing.assert_array_equal(getattr(grid, field), coordinates)
+        else:
+            original = getattr(grid, field).copy()
+            with pytest.raises(TypeError):
+                CubeGrid(**arguments)
+            with pytest.raises(TypeError):
+                setattr(grid, field, DeviceArray())
+            np.testing.assert_array_equal(getattr(grid, field), original)
 
     @pytest.mark.skipif(not PYSCF_AVAILABLE, reason="PySCF not available")
     def test_from_basis_set_encloses_molecule_with_margin(self):

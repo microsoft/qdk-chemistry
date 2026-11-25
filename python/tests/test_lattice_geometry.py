@@ -82,6 +82,13 @@ class TestLatticeGeometry:
 class TestSelectedLatticeGraph:
     """Check edge labels and graph persistence."""
 
+    @pytest.mark.parametrize("axis", [[1.0, 0.0], [[1.0, 0.0]], [[1.0], [0.0]]])
+    def test_bond_flavor_accepts_array_like_axis(self, axis) -> None:
+        """Bond axes retain array-like and singleton-dimension input support."""
+        definition = BondFlavorDefinition(1, axis, 7)
+        graph = LatticeGraph.from_geometry(LatticeGeometry.chain(2), [1], bond_flavors=[definition])
+        assert graph.edge_labels[0, 1] == EdgeLabel(1, 7)
+
     def test_from_geometry_materializes_selected_union(self) -> None:
         """Selected shells yield a deduplicated weighted, flavored union without mutating geometry."""
         geometry = LatticeGeometry.chain(3)

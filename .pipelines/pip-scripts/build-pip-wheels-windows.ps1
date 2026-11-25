@@ -11,7 +11,7 @@
 param(
     [Parameter(Mandatory)] [string]$SrcDir,
     [Parameter(Mandatory)] [string]$ClPath,
-    [string]$March          = 'x86-64-v3',
+    [string]$March          = 'AVX2',
     [string]$BuildType      = 'Release',
     [string]$BuildTesting   = 'OFF',
     [string]$EnableCoverage = 'OFF',
@@ -61,7 +61,7 @@ if ($PythonEnv -eq 'venv') {
 Write-Host "=== pip install build tooling ==="
 & $runExe @runArgs -m pip install --upgrade pip
 if ($LASTEXITCODE -ne 0) { throw "pip upgrade failed" }
-& $runExe @runArgs -m pip install -r "$SrcDir\.pipelines\requirements.txt"
+& $runExe @runArgs -m pip install -r "$SrcDir\.pipelines\requirements.in"
 if ($LASTEXITCODE -ne 0) { throw "pip install requirements failed" }
 
 # ─── Component Governance PipReport (non-fatal) ──────────────────────────────

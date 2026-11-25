@@ -14,7 +14,8 @@ param(
     [string]$RunSlowTests  = 'true',
     [string]$Triplet       = $env:VCPKG_TRIPLET,
     [ValidateSet('conda', 'venv')]
-    [string]$PythonEnv     = 'conda'
+    [string]$PythonEnv     = 'conda',
+    [int]$TestWorkers     = 1
 )
 
 $ErrorActionPreference = 'Stop'
@@ -71,7 +72,7 @@ if ($Triplet -ne 'arm64-windows-static-md') {
 # ─── 5. Component Governance PipReport (non-fatal) ───────────────────────────
 Write-Host "=== Generate Component Governance PipReport ==="
 try {
-    $manifestDir = "$pythonDir\build\test-manifest"
+    $manifestDir = "$pythonDir\build\test-manifest\python$PythonVersion"
     New-Item -ItemType Directory -Force -Path $manifestDir | Out-Null
     $reqs = & $runExe @runArgs -m pip list --format=freeze --exclude qdk_chemistry
     if ($LASTEXITCODE -ne 0) { throw "pip list failed ($LASTEXITCODE)" }
@@ -89,9 +90,26 @@ try {
 Write-Host "=== Running pytest suite ==="
 $env:QSHARP_PYTHON_TELEMETRY      = 'false'
 $env:QDK_CHEMISTRY_RUN_SLOW_TESTS = $RunSlowTests
-$env:OMP_NUM_THREADS              = '2'
+$env:OMP_NUM_THREADS             = '1'
+$env:OPENBLAS_NUM_THREADS        = '1'
+$env:MKL_NUM_THREADS             = '1'
+$env:BLIS_NUM_THREADS            = '1'
+$env:VECLIB_MAXIMUM_THREADS      = '1'
+$TestWorkers = [Math]::Min($TestWorkers, [Environment]::ProcessorCount)
+Write-Host "Pytest workers: $TestWorkers; native thread limits: 1"
+& $runExe @runNoCapArgs -c "import numpy; import scipy.linalg; import qdk_chemistry; numpy.show_runtime()"
+if ($LASTEXITCODE -ne 0) { throw "Native runtime inspection failed ($LASTEXITCODE)" }
+
+$xdistArgs = @()
+if ($TestWorkers -gt 1) {
+    $xdistArgs = @('-n', $TestWorkers, '--dist=worksteal')
+}
+New-Item -ItemType Directory -Force -Path "$pythonDir\test-results" | Out-Null
 Push-Location $pythonDir
-& $runExe @runNoCapArgs -m pytest -v tests/
-$code = $LASTEXITCODE
-Pop-Location
+try {
+    & $runExe @runNoCapArgs -m pytest @xdistArgs --junitxml="$pythonDir\test-results\pytest_report.xml" -v tests/
+    $code = $LASTEXITCODE
+} finally {
+    Pop-Location
+}
 if ($code -ne 0) { throw "pytest failed ($code)" }
