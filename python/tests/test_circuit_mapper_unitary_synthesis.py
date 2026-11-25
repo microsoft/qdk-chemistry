@@ -93,6 +93,7 @@ def _assert_realizes(circuit, matrix, seed: int, preimage=None) -> None:
         ],
         (_BLOCK_SPARSE, _block_sparse([4, 4, 3, 2, 1, 1, 1], seed=16).toarray()),
         (_BLOCK_SPARSE, ortho_group.rvs(4, random_state=8)),
+        (_BLOCK_SPARSE, sparse.csc_array(sparse.block_diag([ortho_group.rvs(4, random_state=s) for s in (1, 2)]))),
     ],
 )
 def test_realizes_matrix(name, matrix):
@@ -181,6 +182,12 @@ def test_signed_permutation_needs_no_rotations():
     synthesis = block_sparse_isometry_synthesis(sparse.csc_array(np.diag([1.0, -1.0, 1.0, -1.0])[[2, 0, 3, 1]]))
     assert synthesis.block_givens.layer_angles == []
     assert len(synthesis.column_permutation) == len(synthesis.row_permutation) == 4
+
+
+def test_identity_needs_no_lookups():
+    """The identity skips its identity permutations and its constant sign table, so it costs no Toffolis."""
+    counts = create("circuit_mapper", _BLOCK_SPARSE).run(_representation(np.eye(8))).estimate().logical_counts
+    assert counts["cczCount"] + counts["ccixCount"] == 0
 
 
 @pytest.mark.parametrize("duplicates", ["split", "cancelling"])
@@ -379,11 +386,23 @@ class TestMultiplexedRy:
     _ADDRESS = 7
 
     @pytest.mark.parametrize(
-        ("num_words", "num_controls", "max_swap_bits"),
-        [(20, 0, -1), (20, 2, -1), (20, 0, 2), (100, 1, 1), (128, 2, 0)],
+        ("num_words", "num_controls", "num_outer", "max_swap_bits", "inverse"),
+        [
+            (20, 0, -1, -1, False),
+            (20, 2, -1, -1, False),
+            (20, 0, -1, 2, True),
+            (100, 1, -1, 1, False),
+            (128, 2, -1, 0, False),
+            (20, 0, 0, -1, False),
+            (20, 2, 2, -1, True),
+            (100, 2, 1, 1, False),
+            (128, 1, 1, 0, True),
+        ],
     )
-    def test_matches_reference(self, qsharp_test_context, qsharp_test_utils, num_words, num_controls, max_swap_bits):
-        """Each address below the table length rotates by its word; later addresses and unset controls do not."""
+    def test_matches_reference(
+        self, qsharp_test_context, qsharp_test_utils, num_words, num_controls, num_outer, max_swap_bits, inverse
+    ):
+        """In-table addresses rotate by their word, negated in the adjoint, iff all inner and outer controls are set."""
         rng = np.random.default_rng(num_words + 10 * num_controls)
         values = rng.integers(1, 1 << self._BITS, num_words)
         words = [[bool((value >> bit) & 1) for bit in range(self._BITS)] for value in values]
@@ -391,7 +410,7 @@ class TestMultiplexedRy:
         initial = rng.normal(size=1 << num_qubits)
         initial /= np.linalg.norm(initial)
         op = qsharp_test_utils.UnitarySynthesisTests.TestMakeMultiplexedRyOp(
-            words, max_swap_bits, num_controls, self._ADDRESS
+            words, max_swap_bits, num_controls, num_outer, self._ADDRESS, inverse
         )
         with use_qsharp_context(qsharp_test_context):
             state = apply_operation(op, initial)
@@ -402,10 +421,30 @@ class TestMultiplexedRy:
             bits = [(index >> (num_qubits - 2 - q)) & 1 for q in range(num_qubits - 1)]
             address = sum(bit << k for k, bit in enumerate(bits[num_controls:]))
             if all(bits[:num_controls]) and address < num_words:
-                angle = 4 * np.pi * values[address] / (1 << self._BITS)
+                angle = (-1 if inverse else 1) * 4 * np.pi * values[address] / (1 << self._BITS)
                 cosine, sine = np.cos(angle / 2), np.sin(angle / 2)
                 expected[index] = [[cosine, -sine], [sine, cosine]] @ expected[index]
         assert abs(np.vdot(expected.ravel(), state)) ** 2 == pytest.approx(1.0, abs=1e-10)
+
+    @pytest.mark.parametrize(
+        ("num_address", "num_words", "num_controls", "deferred", "guard_wins"),
+        [(3, 2, 1, False, True), (4, 8, 0, False, True), (4, 8, 2, True, True), (3, 1, 2, True, False)],
+    )
+    def test_guards_short_tables_only_when_cheaper(
+        self, qsharp_test_context, qsharp_test_utils, num_address, num_words, num_controls, deferred, guard_wins
+    ):
+        """A short table costs fewer Toffolis than zero-padded where the address guard pays off, else the same."""
+        probe = qsharp_test_utils.UnitarySynthesisTests.TestMultiplexedRyResourceProbe
+        words = [[bool((5 * k + 3 + b) % 3) for b in range(4)] for k in range(num_words)]
+        padded = words + [[False] * 4] * ((1 << num_address) - num_words)
+        short_cost, padded_cost = (
+            sum(
+                qsharp_test_context.logical_counts(probe, table, -1, num_controls, num_address, deferred)[key]
+                for key in ("cczCount", "ccixCount")
+            )
+            for table in (words, padded)
+        )
+        assert short_cost < padded_cost if guard_wins else short_cost == padded_cost
 
 
 class TestAddConstant:
@@ -432,9 +471,9 @@ class TestPermutationViaQROAM:
         """The lookup, swap and measurement-based unlookup apply the permutation, or its inverse, exactly."""
         rng = np.random.default_rng(num_bits)
         reverse = _bit_reversal(num_bits)
-        # Each repetition exercises the phase fix-up on new unlookup measurement outcomes.
-        for _ in range(4):
-            permutation = rng.permutation(1 << num_bits).tolist()
+        # Each repetition exercises the phase fix-up on new unlookup measurement outcomes; the identity skips it.
+        for repetition in range(5):
+            permutation = rng.permutation(1 << num_bits).tolist() if repetition else list(range(1 << num_bits))
             angles = rng.uniform(0.2, np.pi - 0.2, num_bits).tolist()
             amplitudes = _ry_product_state(angles[::-1])
             expected = np.zeros_like(amplitudes)

@@ -17,6 +17,7 @@
 /// - `MakeXCircuit(synthesis)` runs it.
 namespace QDKChemistry.Utils.IsometrySynthesis {
 
+    import Std.Arrays.All;
     import Std.Arrays.Any;
     import Std.Arrays.ForEach;
     import Std.Arrays.IndexRange;
@@ -33,7 +34,6 @@ namespace QDKChemistry.Utils.IsometrySynthesis {
     import Std.Math.PI;
     import Std.Measurement.MResetX;
     import QDKChemistry.Utils.PhaseGradient.PreparePhaseGradientState;
-    import QDKChemistry.Utils.PhaseGradient.QuantizeRyAngles;
     import QDKChemistry.Utils.SelectSwap.ComputeOptimalLambda2D;
     import QDKChemistry.Utils.UnitarySynthesis.ApplyControlledMultiplexedRy;
     import QDKChemistry.Utils.UnitarySynthesis.ApplyGivensLayersDeferred;
@@ -46,7 +46,7 @@ namespace QDKChemistry.Utils.IsometrySynthesis {
     import QDKChemistry.Utils.UnitarySynthesis.MeasuredParity;
     import QDKChemistry.Utils.UnitarySynthesis.QuantizeGivensDecomposition;
     import QDKChemistry.Utils.UnitarySynthesis.QuantizedGivensDecomposition;
-    import QDKChemistry.Utils.UnitarySynthesis.TrimZeroWords;
+    import QDKChemistry.Utils.UnitarySynthesis.QuantizeTrimmedRyAngles;
     import QDKChemistry.Utils.UnitarySynthesis.XorSigns;
 
     /// Circuit data of a dense real isometry, mirroring the C++
@@ -124,6 +124,10 @@ namespace QDKChemistry.Utils.IsometrySynthesis {
         target : Qubit[],
         signs : Bool[]
     ) : Bool[] {
+        if All(fixed -> fixed, MappedOverRange(state -> BoolArrayAsInt(permTargets[state]) == state, IndexRange(permTargets))) {
+            // The identity needs no lookup.
+            return signs;
+        }
         use loaded = Qubit[Length(target)];
         let swapBits = ComputeOptimalLambda2D(1, Length(permTargets), Length(target), true, maxSwapBits);
         let loadSigns = LoadWordDeferred(permTargets, swapBits, target, [], loaded);
@@ -164,7 +168,7 @@ namespace QDKChemistry.Utils.IsometrySynthesis {
         let maxSwapBits = synthesis.maxSwapBits;
         let quantize = givens -> QuantizeGivensDecomposition(givens, inputAddresses, rotationBitPrecision, maxSwapBits);
         (
-            Mapped(angles -> TrimZeroWords(QuantizeRyAngles(angles, rotationBitPrecision)), synthesis.rotationAngles),
+            Mapped(QuantizeTrimmedRyAngles(_, rotationBitPrecision), synthesis.rotationAngles),
             Mapped(quantize, synthesis.mixingGivens),
             Mapped(quantize, synthesis.rightFactorGivens),
             QuantizeGivensDecomposition(synthesis.blockGivens, blockAddresses, rotationBitPrecision, maxSwapBits)

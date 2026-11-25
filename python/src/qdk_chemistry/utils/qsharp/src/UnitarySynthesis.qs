@@ -7,7 +7,6 @@ namespace QDKChemistry.Utils.UnitarySynthesis {
 
     import Std.Arithmetic.ApplyIfGreaterL;
     import Std.Arrays.All;
-    import Std.Arrays.Any;
     import Std.Arrays.Chunks;
     import Std.Arrays.Flattened;
     import Std.Arrays.ForEach;
@@ -29,11 +28,13 @@ namespace QDKChemistry.Utils.UnitarySynthesis {
     import Std.Math.MaxI;
     import Std.Math.MinI;
     import Std.Math.PI;
+    import Std.Math.TrailingZeroCountI;
     import Std.Measurement.MResetX;
     import Std.ResourceEstimation.BeginEstimateCaching;
     import Std.ResourceEstimation.EndEstimateCaching;
     import Std.TableLookup.Select;
     import QDKChemistry.Utils.Arithmetic.AddConstant;
+    import QDKChemistry.Utils.PhaseGradient.QuantizeRyAngle;
     import QDKChemistry.Utils.PhaseGradient.QuantizeRyAngles;
     import QDKChemistry.Utils.PhaseGradient.RyViaPhaseGradient;
     import QDKChemistry.Utils.SelectSwap.ApplyBranchPhaseFixup;
@@ -43,6 +44,7 @@ namespace QDKChemistry.Utils.UnitarySynthesis {
     import QDKChemistry.Utils.SelectSwap.MeasurementUnlookupCost;
     import QDKChemistry.Utils.SelectSwap.SelectSwap2D;
     import QDKChemistry.Utils.SelectSwap.SelectSwapAliased;
+    import QDKChemistry.Utils.SelectSwap.SelectSwapCost2D;
     import QDKChemistry.Utils.SelectSwap.SelectSwapForwardCost;
     import QDKChemistry.Utils.SelectSwap.SwapDataOutputs;
     import QDKChemistry.Utils.SelectSwap.SwapNetworkPermutation;
@@ -72,13 +74,13 @@ namespace QDKChemistry.Utils.UnitarySynthesis {
         maxSwapBits : Int,
     }
 
-    /// Drops the trailing all-zero words, which are identity rotations, of a quantized angle table.
-    function TrimZeroWords(words : Bool[][]) : Bool[][] {
-        mutable length = Length(words);
-        while length > 0 and not Any(bit -> bit, words[length - 1]) {
+    /// `QuantizeRyAngles` without the trailing angles that quantize to the zero word, which are identity rotations.
+    function QuantizeTrimmedRyAngles(angles : Double[], bits : Int) : Bool[][] {
+        mutable length = Length(angles);
+        while length > 0 and QuantizeRyAngle(angles[length - 1], bits) == 0 {
             set length -= 1;
         }
-        words[...length - 1]
+        QuantizeRyAngles(angles[...length - 1], bits)
     }
 
     /// Quantizes every layer of `givens` into words of `rotationBits` bits, at most
@@ -91,7 +93,7 @@ namespace QDKChemistry.Utils.UnitarySynthesis {
     ) : QuantizedGivensDecomposition {
         Fact(All(angles -> Length(angles) <= numAddresses, givens.layerAngles), "A Givens layer has more angles than addresses.");
         // G(θ) is Ry(2θ) on the active qubit.
-        let quantizeLayer = angles -> TrimZeroWords(QuantizeRyAngles(Mapped(angle -> 2.0 * angle, angles), rotationBits));
+        let quantizeLayer = angles -> QuantizeTrimmedRyAngles(Mapped(angle -> 2.0 * angle, angles), rotationBits);
         new QuantizedGivensDecomposition {
             layers = Mapped(quantizeLayer, givens.layerAngles),
             layerShifted = givens.layerShifted,
@@ -100,17 +102,33 @@ namespace QDKChemistry.Utils.UnitarySynthesis {
         }
     }
 
-    /// Whether a table of `numData` words is cheaper to load behind an `address < numData`
-    /// flag than zero-padded to all `2^addressBits` addresses.
-    function UseAddressGuard(numData : Int, addressBits : Int, numBits : Int, maxSwapBits : Int) : Bool {
+    /// Whether `numData` words under `numControls` controls take fewer Toffolis to load behind an `address < numData`
+    /// flag than zero-padded to all `2^addressBits` addresses, with each branch costed as the multiplexed Ry runs it,
+    /// erasure included unless `deferred`.
+    function UseAddressGuard(numData : Int, addressBits : Int, numBits : Int, maxSwapBits : Int, numControls : Int, deferred : Bool) : Bool {
         let full = 1 <<< addressBits;
         if numData >= full {
             return false;
         }
-        let paddedCost = SelectSwapForwardCost(ComputeOptimalSwapBits(full, numBits, maxSwapBits), full, numBits);
-        let trimmedCost = SelectSwapForwardCost(ComputeOptimalSwapBits(numData, numBits, maxSwapBits), numData, numBits);
-        // The comparator is computed and uncomputed.
-        trimmedCost + 2 * addressBits < paddedCost
+        // Toffolis of an X with m controls, as Q# decomposes it.
+        let gateCost = m -> MaxI(0, 2 * m - 3);
+        let cost = guarded -> {
+            let numWords = guarded ? numData | full;
+            let loadControls = guarded or numControls > 0 ? 1 | 0;
+            // The flag is computed and uncomputed: a comparator on the address bits above the bound's trailing
+            // zeros with the controls on its action, or the AND of several controls.
+            let flagCost = 2 * (guarded ? addressBits - TrailingZeroCountI(numData) - 1 + gateCost(numControls + 1) | gateCost(numControls));
+            if deferred {
+                let swapBits = not guarded and numControls == 0 ? ComputeOptimalLambda2D(1, numWords, numBits, true, maxSwapBits) | ComputeOptimalSwapBits(numWords, numBits, maxSwapBits);
+                // The swap network runs once and only the copy out is controlled.
+                flagCost + (swapBits == 0 ? MaxI(0, numWords + loadControls - 2) | MaxI(0, 2^(AddressQubits(numWords) - swapBits) - 2) + (2^swapBits - 1 + loadControls) * numBits)
+            } elif loadControls == 0 {
+                SelectSwapCost2D(ComputeOptimalLambda2D(1, full, numBits, true, maxSwapBits), 1, full, numBits, true)
+            } else {
+                flagCost + SelectSwapForwardCost(ComputeOptimalSwapBits(numWords, numBits, maxSwapBits), numWords, numBits) + MeasurementUnlookupCost(1 + AddressQubits(numWords))
+            }
+        };
+        cost(true) < cost(false)
     }
 
     /// Loads `data[address]` into the clean `target` when `flag` is |1⟩, with an adjoint that
@@ -175,32 +193,42 @@ namespace QDKChemistry.Utils.UnitarySynthesis {
         phaseGradient : Qubit[],
         angleReg : Qubit[]
     ) : Unit is Adj + Ctl {
-        if not IsEmpty(data) {
-            let numBits = Length(angleReg);
-            let guarded = UseAddressGuard(Length(data), Length(address), numBits, maxSwapBits);
-            let table = guarded ? data | Padded(-(1 <<< Length(address)), [false, size = numBits], data);
-            if not guarded and IsEmpty(controls) {
-                let swapBits = ComputeOptimalLambda2D(1, Length(table), numBits, true, maxSwapBits);
-                within {
-                    SelectSwap2D([table], swapBits, true, [], address, [], angleReg);
-                } apply {
-                    RyViaPhaseGradient(targetQubit, angleReg, phaseGradient);
-                }
-            } elif not guarded and Length(controls) == 1 {
-                within {
-                    LoadAngleWord(table, maxSwapBits, address, controls[0], angleReg);
-                } apply {
-                    RyViaPhaseGradient(targetQubit, angleReg, phaseGradient);
-                }
-            } else {
-                use flag = Qubit();
-                within {
-                    ComputeLoadFlag(controls, guarded, Length(table), address, flag);
-                    LoadAngleWord(table, maxSwapBits, address, flag, angleReg);
-                } apply {
-                    RyViaPhaseGradient(targetQubit, angleReg, phaseGradient);
+        body (...) {
+            if not IsEmpty(data) {
+                let numBits = Length(angleReg);
+                let guarded = UseAddressGuard(Length(data), Length(address), numBits, maxSwapBits, Length(controls), false);
+                let table = guarded ? data | Padded(-(1 <<< Length(address)), [false, size = numBits], data);
+                if not guarded and IsEmpty(controls) {
+                    let swapBits = ComputeOptimalLambda2D(1, Length(table), numBits, true, maxSwapBits);
+                    within {
+                        SelectSwap2D([table], swapBits, true, [], address, [], angleReg);
+                    } apply {
+                        RyViaPhaseGradient(targetQubit, angleReg, phaseGradient);
+                    }
+                } elif not guarded and Length(controls) == 1 {
+                    within {
+                        LoadAngleWord(table, maxSwapBits, address, controls[0], angleReg);
+                    } apply {
+                        RyViaPhaseGradient(targetQubit, angleReg, phaseGradient);
+                    }
+                } else {
+                    use flag = Qubit();
+                    within {
+                        ComputeLoadFlag(controls, guarded, Length(table), address, flag);
+                        LoadAngleWord(table, maxSwapBits, address, flag, angleReg);
+                    } apply {
+                        RyViaPhaseGradient(targetQubit, angleReg, phaseGradient);
+                    }
                 }
             }
+        }
+        adjoint auto;
+        // External controls join the lookup controls, as the phase-gradient adder takes exactly one control.
+        controlled (ctls, ...) {
+            ApplyControlledMultiplexedRy(data, maxSwapBits, address, ctls + controls, targetQubit, phaseGradient, angleReg);
+        }
+        controlled adjoint (ctls, ...) {
+            Adjoint ApplyControlledMultiplexedRy(data, maxSwapBits, address, ctls + controls, targetQubit, phaseGradient, angleReg);
         }
     }
 
@@ -281,11 +309,13 @@ namespace QDKChemistry.Utils.UnitarySynthesis {
     internal operation ApplySignTable(phases : Bool[], register : Qubit[]) : Unit {
         Fact(Length(phases) == 1 <<< Length(register), "Sign data needs one entry per basis state of the register.");
         // The lookup fixes signs relative to phases[0], which is applied as -I.
-        use marker = Qubit();
-        X(marker);
-        H(marker);
-        Adjoint Select(Mapped(phase -> [phase != phases[0]], phases), register, [marker]);
-        Reset(marker);
+        if not All(phase -> phase == phases[0], phases) {
+            use marker = Qubit();
+            X(marker);
+            H(marker);
+            Adjoint Select(Mapped(phase -> [phase != phases[0]], phases), register, [marker]);
+            Reset(marker);
+        }
         if phases[0] {
             Fact(not IsEmpty(register), "A constant sign needs a nonempty register to carry it.");
             R(PauliI, 2.0 * PI(), register[0]);
@@ -353,7 +383,7 @@ namespace QDKChemistry.Utils.UnitarySynthesis {
             [false, size = numSlices <<< addressBits]
         } else {
             let numBits = Length(angleReg);
-            let guarded = UseAddressGuard(Length(data), addressBits, numBits, maxSwapBits);
+            let guarded = UseAddressGuard(Length(data), addressBits, numBits, maxSwapBits, Length(controls), true);
             let table = guarded ? data | Padded(-(1 <<< addressBits), [false, size = numBits], data);
             let swapBits = not guarded and IsEmpty(controls) ? ComputeOptimalLambda2D(1, Length(table), numBits, true, maxSwapBits) | ComputeOptimalSwapBits(Length(table), numBits, maxSwapBits);
             // A flag holds the load condition unless that is a single control or always true.
