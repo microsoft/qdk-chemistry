@@ -196,7 +196,7 @@ class TestRegistryShowDefault:
         # Test for effective Hamiltonian constructor
         default_effective_hamiltonian_constructor = registry.show_default("effective_hamiltonian_constructor")
         assert isinstance(default_effective_hamiltonian_constructor, str)
-        assert default_effective_hamiltonian_constructor == "qdk_swpt2"
+        assert default_effective_hamiltonian_constructor == "qdk_dsrg_pt2"
 
         # Test for multi configuration SCF
         if PYSCF_AVAILABLE:
@@ -450,7 +450,7 @@ class TestRegistryAvailable:
 
         effective_hamiltonian_constructors = registry.available("effective_hamiltonian_constructor")
         assert isinstance(effective_hamiltonian_constructors, list)
-        assert "qdk_swpt2" in effective_hamiltonian_constructors
+        assert "qdk_dsrg_pt2" in effective_hamiltonian_constructors
 
     def test_available_returns_empty_list_for_unknown_type(self):
         """Test that available returns empty list for unknown algorithm type."""

@@ -99,7 +99,7 @@ endforeach()
 
 # chemistry links SeQuant privately, so these integration tests need it directly.
 target_link_libraries(test_sequant PRIVATE SeQuant::SeQuant)
-target_link_libraries(test_swpt2_kernel PRIVATE SeQuant::SeQuant)
+target_link_libraries(test_dsrg_pt2_kernel PRIVATE SeQuant::SeQuant)
 
 # Print information about discovered tests for debugging
 message(STATUS "Found ${CMAKE_CURRENT_LIST_LENGTH} test files:")

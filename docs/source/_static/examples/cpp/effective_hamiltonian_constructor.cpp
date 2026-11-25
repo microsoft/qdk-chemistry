@@ -19,15 +19,16 @@ for (const auto& name : names) {
 
 // --------------------------------------------------------------------------------------------
 // start-cell-create
-// Create a second-order Schrieffer-Wolff downfolder
-auto downfolder = EffectiveHamiltonianConstructorFactory::create("qdk_swpt2");
+// Create a DSRG-PT2 downfolder
+auto downfolder =
+    EffectiveHamiltonianConstructorFactory::create("qdk_dsrg_pt2");
 // end-cell-create
 // --------------------------------------------------------------------------------------------
 
 // --------------------------------------------------------------------------------------------
 // start-cell-configure
-// Weaken the denominator regularization
-downfolder->settings().set("regularizer_flow", 2.0);
+// Adjust the DSRG flow parameter s (in Eh^-2)
+downfolder->settings().set("flow_parameter", 2.0);
 // end-cell-configure
 // --------------------------------------------------------------------------------------------
 

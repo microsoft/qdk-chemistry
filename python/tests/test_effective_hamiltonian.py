@@ -13,7 +13,7 @@ import pytest
 from qdk_chemistry import algorithms
 from qdk_chemistry.algorithms import (
     EffectiveHamiltonianConstructor,
-    QdkSchriefferWolffPT2Constructor,
+    QdkDsrgPT2Constructor,
 )
 from qdk_chemistry.constants import ANGSTROM_TO_BOHR
 from qdk_chemistry.data import Hamiltonian, Orbitals, Structure
@@ -75,19 +75,19 @@ class TestEffectiveHamiltonianConstructor:
     """Registry, factory, and settings coverage for the downfolding bindings."""
 
     def test_factory_registration(self):
-        """qdk_swpt2 is registered as an effective-Hamiltonian constructor and is the default."""
+        """qdk_dsrg_pt2 is registered as an effective-Hamiltonian constructor and is the default."""
         available = algorithms.available(_TYPE)
         assert isinstance(available, list)
-        assert "qdk_swpt2" in available
+        assert "qdk_dsrg_pt2" in available
 
-        # default and explicit creation both yield the swpt2 constructor
+        # default and explicit creation both yield the dsrg_pt2 constructor
         default = algorithms.create(_TYPE)
         assert isinstance(default, EffectiveHamiltonianConstructor)
-        assert default.name() == "qdk_swpt2"
+        assert default.name() == "qdk_dsrg_pt2"
         assert default.type_name() == _TYPE
 
-        explicit = algorithms.create(_TYPE, "qdk_swpt2")
-        assert explicit.name() == "qdk_swpt2"
+        explicit = algorithms.create(_TYPE, "qdk_dsrg_pt2")
+        assert explicit.name() == "qdk_dsrg_pt2"
 
         # a nonexistent name raises
         with pytest.raises((KeyError, RuntimeError)):
@@ -95,21 +95,18 @@ class TestEffectiveHamiltonianConstructor:
 
     def test_direct_construction(self):
         """The concrete class constructs directly."""
-        constructor = QdkSchriefferWolffPT2Constructor()
+        constructor = QdkDsrgPT2Constructor()
         assert isinstance(constructor, EffectiveHamiltonianConstructor)
-        assert constructor.name() == "qdk_swpt2"
+        assert constructor.name() == "qdk_dsrg_pt2"
 
     def test_settings_knobs(self):
-        """Denominator/regularization settings expose their defaults and are settable."""
-        constructor = algorithms.create(_TYPE, "qdk_swpt2")
+        """flow_parameter exposes its default and is settable."""
+        constructor = algorithms.create(_TYPE, "qdk_dsrg_pt2")
         settings = constructor.settings()
-        # the regularizer is on by default at the constructor layer
-        assert settings.get("regularizer_flow") == pytest.approx(0.5)
-        assert settings.get("semicanonicalize") is True
-        assert settings.get("max_folded_occupation_deviation") == pytest.approx(0.5)
+        assert settings.get("flow_parameter") == pytest.approx(0.5)
 
-        settings.set("regularizer_flow", 0.2)
-        assert constructor.settings().get("regularizer_flow") == pytest.approx(0.2)
+        settings.set("flow_parameter", 0.2)
+        assert constructor.settings().get("flow_parameter") == pytest.approx(0.2)
 
     def test_full_window_spanning_reference_core(self):
         """Downfold a full-orbital window (the natural ``ham.run(orbitals)`` path).
@@ -134,7 +131,7 @@ class TestEffectiveHamiltonianConstructor:
         # window over the full orbital set (spans the reference core)
         h_full = algorithms.create("hamiltonian_constructor").run(wfn_hf.get_orbitals())
         # P == reference active space: pass its index set straight through
-        h_eff = algorithms.create(_TYPE, "qdk_swpt2").run(
+        h_eff = algorithms.create(_TYPE, "qdk_dsrg_pt2").run(
             reference, h_full, ref_orbs.active_indices()
         )  # must not raise
 
@@ -146,7 +143,7 @@ class TestEffectiveHamiltonianConstructor:
     def test_empty_external_space_is_the_identity(self, water_window):
         """Keeping the whole window leaves nothing to fold, so the integrals come back unchanged."""
         case = water_window
-        h_eff = algorithms.create(_TYPE, "qdk_swpt2").run(case.reference, case.hamiltonian, case.window_space)
+        h_eff = algorithms.create(_TYPE, "qdk_dsrg_pt2").run(case.reference, case.hamiltonian, case.window_space)
 
         assert h_eff.get_core_energy() == pytest.approx(case.hamiltonian.get_core_energy(), abs=1e-10)
         one_body, _ = h_eff.get_one_body_integrals()
@@ -156,10 +153,28 @@ class TestEffectiveHamiltonianConstructor:
             h_eff.get_two_body_integrals()[0], case.hamiltonian.get_two_body_integrals()[0], atol=1e-10
         )
 
+    def test_zero_flow_returns_bare_operator_over_p(self, water_window):
+        """flow_parameter=0 disables the DSRG transformation and returns the bare operator over P."""
+        case = water_window
+        downfolder = algorithms.create(_TYPE, "qdk_dsrg_pt2")
+        downfolder.settings().set("flow_parameter", 0.0)
+        h_eff = downfolder.run(case.reference, case.hamiltonian, case.kept_space)
+
+        kept = case.kept_in_window
+        window_one_body, _ = case.hamiltonian.get_one_body_integrals()
+        window_norb = window_one_body.shape[0]
+        bare_h1 = window_one_body[np.ix_(kept, kept)]
+        bare_h2 = np.asarray(case.hamiltonian.get_two_body_integrals()[0]).reshape((window_norb,) * 4)
+        bare_h2 = bare_h2[np.ix_(kept, kept, kept, kept)].reshape(-1)
+
+        assert h_eff.get_core_energy() == pytest.approx(case.hamiltonian.get_core_energy(), abs=1e-12)
+        np.testing.assert_allclose(h_eff.get_one_body_integrals()[0], bare_h1, atol=1e-12)
+        np.testing.assert_allclose(h_eff.get_two_body_integrals()[0], bare_h2, atol=1e-12)
+
     def test_downfold_dresses_the_two_body_block_and_keeps_four_fold_symmetry(self, water_window):
         """The dressing is nonzero, hermitian, and -- as documented -- not 8-fold symmetric."""
         case = water_window
-        h_eff = algorithms.create(_TYPE, "qdk_swpt2").run(case.reference, case.hamiltonian, case.kept_space)
+        h_eff = algorithms.create(_TYPE, "qdk_dsrg_pt2").run(case.reference, case.hamiltonian, case.kept_space)
 
         kept = case.kept_in_window
         n = len(kept)
@@ -181,7 +196,7 @@ class TestEffectiveHamiltonianConstructor:
     def test_downfolded_hamiltonian_round_trips_through_json(self, water_window, tmp_path):
         """The folded core is inactive without an inactive Fock matrix, and still loads from JSON."""
         case = water_window
-        h_eff = algorithms.create(_TYPE, "qdk_swpt2").run(case.reference, case.hamiltonian, case.kept_space)
+        h_eff = algorithms.create(_TYPE, "qdk_dsrg_pt2").run(case.reference, case.hamiltonian, case.kept_space)
         assert list(h_eff.get_orbitals().inactive_indices().indices(SymmetryLabel([axes.alpha()])))
         filename = str(tmp_path / "downfolded.hamiltonian.json")
         h_eff.to_json_file(filename)
@@ -190,10 +205,20 @@ class TestEffectiveHamiltonianConstructor:
         np.testing.assert_allclose(loaded.get_one_body_integrals()[0], h_eff.get_one_body_integrals()[0], atol=1e-12)
         np.testing.assert_allclose(loaded.get_two_body_integrals()[0], h_eff.get_two_body_integrals()[0], atol=1e-12)
 
-    def test_rejects_non_finite_regularizer(self, water_window):
+    def test_rejects_non_finite_flow_parameter(self, water_window):
         """A non-finite flow parameter must fail loudly rather than silently selecting the bare path."""
         case = water_window
-        downfolder = algorithms.create(_TYPE, "qdk_swpt2")
-        downfolder.settings().set("regularizer_flow", float("nan"))
+        downfolder = algorithms.create(_TYPE, "qdk_dsrg_pt2")
+        downfolder.settings().set("flow_parameter", float("nan"))
         with pytest.raises((ValueError, RuntimeError)):
             downfolder.run(case.reference, case.hamiltonian, case.kept_space)
+
+    def test_rejects_correlated_reference(self, water_window):
+        """Multi-determinant references are rejected until multireference DSRG-PT2 lands."""
+        case = water_window
+        h_p = algorithms.create("hamiltonian_constructor").run(case.reference.get_orbitals())
+        cas = algorithms.create("multi_configuration_calculator", "macis_cas")
+        cas.settings().set("calculate_one_rdm", True)
+        _, cas_wfn = cas.run(h_p, 1, 1)
+        with pytest.raises(ValueError, match="single-determinant"):
+            algorithms.create(_TYPE, "qdk_dsrg_pt2").run(cas_wfn, case.hamiltonian, case.kept_space)

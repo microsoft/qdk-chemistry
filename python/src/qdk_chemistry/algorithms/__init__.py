@@ -29,7 +29,7 @@ from qdk_chemistry.algorithms.double_factorization import DoubleFactorization
 from qdk_chemistry.algorithms.dynamical_correlation_calculator import DynamicalCorrelationCalculator, QdkMP2Calculator
 from qdk_chemistry.algorithms.effective_hamiltonian_constructor import (
     EffectiveHamiltonianConstructor,
-    QdkSchriefferWolffPT2Constructor,
+    QdkDsrgPT2Constructor,
 )
 from qdk_chemistry.algorithms.expectation_estimator.expectation_estimator import ExpectationEstimator
 from qdk_chemistry.algorithms.expectation_estimator.qdk import QdkExpectationEstimator
@@ -104,6 +104,7 @@ __all__ = [
     "QdkActiveSpaceQIOLocalizer",
     "QdkAutocasActiveSpaceSelector",
     "QdkAutocasEosActiveSpaceSelector",
+    "QdkDsrgPT2Constructor",
     "QdkExpectationEstimator",
     "QdkGaugeFixingLocalizer",
     "QdkHamiltonianConstructor",
@@ -119,7 +120,6 @@ __all__ = [
     "QdkPopulationAnalyzer",
     "QdkQubitMapper",
     "QdkScfSolver",
-    "QdkSchriefferWolffPT2Constructor",
     "QdkStabilityChecker",
     "QdkStabilizedScfSolver",
     "QdkVVHVLocalizer",

@@ -2,8 +2,8 @@
 // Licensed under the MIT License. See LICENSE.txt in the project root for
 // license information.
 
-// Constructor-level tests for the second-order Schrieffer-Wolff downfold
-// (`swpt2`), exercised through the `EffectiveHamiltonianConstructor` factory.
+// Constructor-level tests for the single-determinant DSRG-PT2 downfold
+// (`qdk_dsrg_pt2`), exercised through `EffectiveHamiltonianConstructorFactory`.
 
 #include <gtest/gtest.h>
 
@@ -29,8 +29,8 @@
 #include <set>
 #include <vector>
 
-#include "qdk/chemistry/algorithms/microsoft/effective_hamiltonian/swpt2.hpp"
-#include "qdk/chemistry/algorithms/microsoft/effective_hamiltonian/swpt2_kernel.hpp"
+#include "qdk/chemistry/algorithms/microsoft/effective_hamiltonian/dsrg_pt2.hpp"
+#include "qdk/chemistry/algorithms/microsoft/effective_hamiltonian/dsrg_pt2_kernel.hpp"
 #include "ut_common.hpp"
 
 namespace {
@@ -42,7 +42,7 @@ using qdk::chemistry::algorithms::LocalizerFactory;
 using qdk::chemistry::algorithms::MultiConfigurationCalculatorFactory;
 using qdk::chemistry::algorithms::ScfSolverFactory;
 
-namespace sw = qdk::chemistry::algorithms::microsoft::swpt2;
+namespace dsrg = qdk::chemistry::algorithms::microsoft::dsrg_pt2;
 
 struct SpinOrbitalTensors {
   double core_energy;
@@ -69,24 +69,26 @@ SpinOrbitalTensors build_spin_orbital_tensors(
     for (int second = 0; second < norb; ++second)
       for (int third = 0; third < norb; ++third)
         for (int fourth = 0; fourth < norb; ++fourth) {
-          const auto integral = sw::idx4(first, second, third, fourth, norb);
-          ordered[sw::idx4(2 * first, 2 * third, 2 * fourth, 2 * second,
-                           spin_count)] += 0.5 * alpha_integrals(integral);
-          ordered[sw::idx4(2 * first + 1, 2 * third + 1, 2 * fourth + 1,
-                           2 * second + 1, spin_count)] +=
+          const auto integral = dsrg::idx4(first, second, third, fourth, norb);
+          ordered[dsrg::idx4(2 * first, 2 * third, 2 * fourth, 2 * second,
+                             spin_count)] += 0.5 * alpha_integrals(integral);
+          ordered[dsrg::idx4(2 * first + 1, 2 * third + 1, 2 * fourth + 1,
+                             2 * second + 1, spin_count)] +=
               0.5 * beta_integrals(integral);
-          ordered[sw::idx4(2 * first, 2 * third + 1, 2 * fourth + 1, 2 * second,
-                           spin_count)] += mixed_integrals(integral);
+          ordered[dsrg::idx4(2 * first, 2 * third + 1, 2 * fourth + 1,
+                             2 * second, spin_count)] +=
+              mixed_integrals(integral);
         }
   for (int first = 0; first < spin_count; ++first)
     for (int second = 0; second < spin_count; ++second)
       for (int third = 0; third < spin_count; ++third)
         for (int fourth = 0; fourth < spin_count; ++fourth)
-          result.two_body(sw::idx4(first, second, third, fourth, spin_count)) =
-              ordered[sw::idx4(first, second, third, fourth, spin_count)] -
-              ordered[sw::idx4(second, first, third, fourth, spin_count)] -
-              ordered[sw::idx4(first, second, fourth, third, spin_count)] +
-              ordered[sw::idx4(second, first, fourth, third, spin_count)];
+          result.two_body(
+              dsrg::idx4(first, second, third, fourth, spin_count)) =
+              ordered[dsrg::idx4(first, second, third, fourth, spin_count)] -
+              ordered[dsrg::idx4(second, first, third, fourth, spin_count)] -
+              ordered[dsrg::idx4(first, second, fourth, third, spin_count)] +
+              ordered[dsrg::idx4(second, first, fourth, third, spin_count)];
   return result;
 }
 
@@ -168,7 +170,7 @@ double fci_ground_energy(double e0, const Eigen::MatrixXd& f,
       for (int Q : orbs)
         for (int R : orbs)
           for (int S : orbs) {
-            const double vpqrs = v(sw::idx4(P, Q, R, S, n_so));
+            const double vpqrs = v(dsrg::idx4(P, Q, R, S, n_so));
             if (vpqrs == 0.0) continue;
             const Ladder r = apply_two(ket, P, Q, R, S);
             if (!r.ok) continue;
@@ -199,38 +201,34 @@ double ground_energy(const qdk::chemistry::data::Hamiltonian& hamiltonian,
                            tensors.two_body, 2 * norb, spin_orbitals, na, nb);
 }
 
-TEST(SchriefferWolffPT2Test, FactoryRegistration) {
+TEST(DsrgPT2Test, FactoryRegistration) {
   const auto available = EffectiveHamiltonianConstructorFactory::available();
-  EXPECT_NE(std::find(available.begin(), available.end(), "qdk_swpt2"),
+  EXPECT_NE(std::find(available.begin(), available.end(), "qdk_dsrg_pt2"),
             available.end());
 
-  auto ctor = EffectiveHamiltonianConstructorFactory::create("qdk_swpt2");
+  auto ctor = EffectiveHamiltonianConstructorFactory::create("qdk_dsrg_pt2");
   ASSERT_NE(ctor, nullptr);
-  EXPECT_EQ(ctor->name(), "qdk_swpt2");
+  EXPECT_EQ(ctor->name(), "qdk_dsrg_pt2");
   EXPECT_EQ(ctor->type_name(), "effective_hamiltonian_constructor");
 
   EXPECT_EQ(EffectiveHamiltonianConstructorFactory::create()->name(),
-            "qdk_swpt2");
+            "qdk_dsrg_pt2");
 }
 
-TEST(SchriefferWolffPT2Test, SettingsKnobs) {
-  auto ctor = EffectiveHamiltonianConstructorFactory::create("qdk_swpt2");
+TEST(DsrgPT2Test, SettingsKnobs) {
+  auto ctor = EffectiveHamiltonianConstructorFactory::create("qdk_dsrg_pt2");
   auto& settings = ctor->settings();
-  // denominator knobs: the regularizer is on by default at this layer
-  EXPECT_DOUBLE_EQ(settings.get<double>("regularizer_flow"), 0.5);
-  EXPECT_TRUE(settings.get<bool>("semicanonicalize"));
-  EXPECT_DOUBLE_EQ(settings.get<double>("max_folded_occupation_deviation"),
-                   0.5);
-  EXPECT_ANY_THROW(settings.set("regularizer_flow", -1.0));
+  EXPECT_DOUBLE_EQ(settings.get<double>("flow_parameter"), 0.5);
+  EXPECT_ANY_THROW(settings.set("flow_parameter", -1.0));
 
-  auto invalid = EffectiveHamiltonianConstructorFactory::create("qdk_swpt2");
+  auto invalid = EffectiveHamiltonianConstructorFactory::create("qdk_dsrg_pt2");
   EXPECT_THROW(invalid->run(nullptr, nullptr,
                             testing::restricted_index_set(
                                 1, std::vector<std::size_t>{0})),
                std::invalid_argument);
 }
 
-TEST(SchriefferWolffPT2Test, PreservesModelOrbitals) {
+TEST(DsrgPT2Test, PreservesModelOrbitals) {
   namespace qcd = qdk::chemistry::data;
   constexpr int norb = 6;
   const auto window_indices =
@@ -247,7 +245,7 @@ TEST(SchriefferWolffPT2Test, PreservesModelOrbitals) {
   Eigen::MatrixXd one_body = Eigen::MatrixXd::Zero(norb, norb);
   Eigen::VectorXd two_body = Eigen::VectorXd::Zero(norb * norb * norb * norb);
   for (int i = 0; i < norb; ++i) {
-    two_body(sw::idx4(i, i, i, i, norb)) = 4.0;
+    two_body(dsrg::idx4(i, i, i, i, norb)) = 4.0;
     if (i + 1 < norb) one_body(i, i + 1) = one_body(i + 1, i) = -1.0;
   }
   const auto downfold = [&](const std::shared_ptr<qcd::Orbitals>& orbitals) {
@@ -257,7 +255,7 @@ TEST(SchriefferWolffPT2Test, PreservesModelOrbitals) {
     auto window = std::make_shared<qcd::Hamiltonian>(
         std::make_unique<qcd::CanonicalFourCenterHamiltonianContainer>(
             one_body, two_body, orbitals, 0.0, Eigen::MatrixXd::Zero(0, 0)));
-    return EffectiveHamiltonianConstructorFactory::create("qdk_swpt2")
+    return EffectiveHamiltonianConstructorFactory::create("qdk_dsrg_pt2")
         ->run(reference, window, p_indices);
   };
   const auto expected = downfold(coefficient_orbitals);
@@ -285,10 +283,11 @@ TEST(SchriefferWolffPT2Test, PreservesModelOrbitals) {
   }
 }
 
-// SCF -> window Hamiltonian over W -> CAS reference over P -> SW-PT2 -> CAS on
-// H_eff. Bare denominators hit an intruder here that the default regularizer
-// damps.
-TEST(SchriefferWolffPT2Test, DownfoldRunsEndToEndWater) {
+// SCF -> window Hamiltonian over W -> single-determinant reference over P ->
+// DSRG-PT2 -> CAS on H_eff. Also checks that flow_parameter = 0 returns the
+// bare core-folded operator over P.
+TEST(DsrgPT2Test, DownfoldRunsEndToEndWater) {
+  namespace qcd = qdk::chemistry::data;
   auto water = testing::create_water_structure();
   auto scf = ScfSolverFactory::create();
   auto [E_hf, wfn_hf] = scf->run(water, 0, 1, "sto-3g");
@@ -303,9 +302,11 @@ TEST(SchriefferWolffPT2Test, DownfoldRunsEndToEndWater) {
   auto ham = HamiltonianConstructorFactory::create();
   auto p_orbitals = testing::with_active_space(orbitals, active, core);
   auto H_P = ham->run(p_orbitals);
-  auto cas_ref = MultiConfigurationCalculatorFactory::create("macis_cas");
-  cas_ref->settings().set("calculate_one_rdm", true);
-  auto [E_bare, reference] = cas_ref->run(H_P, 2, 2);
+  auto reference = std::make_shared<qcd::Wavefunction>(
+      std::make_unique<qcd::StateVectorContainer>(
+          qcd::Configuration::from_spin_half_string("220"), p_orbitals));
+  auto cas_bare_ref = MultiConfigurationCalculatorFactory::create("macis_cas");
+  auto [E_bare, wfn_bare_ref] = cas_bare_ref->run(H_P, 2, 2);
 
   // window Hamiltonian over W = P + one virtual to fold
   auto w_orbitals = testing::with_active_space(orbitals, window, core);
@@ -315,22 +316,22 @@ TEST(SchriefferWolffPT2Test, DownfoldRunsEndToEndWater) {
   auto incomplete_w_orbitals =
       testing::with_active_space(orbitals, {3, 4, 6}, core);
   auto H_incomplete = ham->run(incomplete_w_orbitals);
-  auto swpt2_invalid =
-      EffectiveHamiltonianConstructorFactory::create("qdk_swpt2");
-  EXPECT_THROW(swpt2_invalid->run(reference, H_incomplete, P_set),
+  auto dsrg_invalid =
+      EffectiveHamiltonianConstructorFactory::create("qdk_dsrg_pt2");
+  EXPECT_THROW(dsrg_invalid->run(reference, H_incomplete, P_set),
                std::invalid_argument);
 
   // downfold the window onto P, then CAS on the effective Hamiltonian
-  auto swpt2 = EffectiveHamiltonianConstructorFactory::create("qdk_swpt2");
-  auto H_eff = swpt2->run(reference, H_window, P_set);
+  auto dsrg_ctor =
+      EffectiveHamiltonianConstructorFactory::create("qdk_dsrg_pt2");
+  auto H_eff = dsrg_ctor->run(reference, H_window, P_set);
   ASSERT_NE(H_eff, nullptr);
-  auto cas_sw = MultiConfigurationCalculatorFactory::create("macis_cas");
-  auto [E_sw, wfn_sw] = cas_sw->run(H_eff, 2, 2);
+  auto cas_dsrg = MultiConfigurationCalculatorFactory::create("macis_cas");
+  auto [E_dsrg, wfn_dsrg] = cas_dsrg->run(H_eff, 2, 2);
 
-  EXPECT_TRUE(std::isfinite(E_sw));
-  EXPECT_LT(E_sw, E_hf);  // captures correlation below Hartree-Fock
-  EXPECT_LT(E_sw,
-            E_bare);  // regularized-by-default downfold recovers below CAS
+  EXPECT_TRUE(std::isfinite(E_dsrg));
+  EXPECT_LT(E_dsrg, E_hf);
+  EXPECT_LT(E_dsrg, E_bare);
 
   // the downfold actually dressed the two-body interaction (nonzero effect)
   const auto [ge, ge_ab, ge_bb] = H_eff->get_two_body_integrals();
@@ -339,22 +340,30 @@ TEST(SchriefferWolffPT2Test, DownfoldRunsEndToEndWater) {
 
   // MACIS must reproduce a full CI of the same emitted integrals, which are
   // only 4-fold symmetric, so the container must hand it the dense block.
-  EXPECT_NEAR(E_sw, ground_energy(*H_eff, 2, 2), 1e-9);
+  EXPECT_NEAR(E_dsrg, ground_energy(*H_eff, 2, 2), 1e-9);
 
-  auto swpt2_bare = EffectiveHamiltonianConstructorFactory::create("qdk_swpt2");
-  swpt2_bare->settings().set("regularizer_flow", 0.0);
-  auto H_eff_bare = swpt2_bare->run(reference, H_window, P_set);
-  auto cas_bare = MultiConfigurationCalculatorFactory::create("macis_cas");
-  auto [E_sw_bare, wfn_bare] = cas_bare->run(H_eff_bare, 2, 2);
-  EXPECT_GT(E_sw_bare, E_sw);  // regularization lowers the energy vs bare PT2
+  // flow_parameter = 0 disables the DSRG transformation, returning the bare P
+  // operator.
+  auto dsrg_zero =
+      EffectiveHamiltonianConstructorFactory::create("qdk_dsrg_pt2");
+  dsrg_zero->settings().set("flow_parameter", 0.0);
+  auto H_eff_zero = dsrg_zero->run(reference, H_window, P_set);
+  EXPECT_NEAR(H_eff_zero->get_core_energy(), H_P->get_core_energy(), 1e-12);
+  EXPECT_NEAR((std::get<0>(H_eff_zero->get_one_body_integrals()) -
+               std::get<0>(H_P->get_one_body_integrals()))
+                  .cwiseAbs()
+                  .maxCoeff(),
+              0.0, 1e-12);
+  EXPECT_NEAR((std::get<0>(H_eff_zero->get_two_body_integrals()) - gb)
+                  .cwiseAbs()
+                  .maxCoeff(),
+              0.0, 1e-12);
 }
 
 // MP2 limit: with every occupied orbital active, no inactive space, all
-// virtuals folded and bare denominators, the reference determinant's energy in
-// H_eff is E_HF + E_MP2. Brillouin removes the singles, and the fold is exact
-// for the idempotent HF density. The reference value comes from the MP2
-// calculator, which shares only the SCF and integral layers with this code.
-TEST(SchriefferWolffPT2Test, ReproducesMp2WhenEveryOccupiedOrbitalIsActive) {
+// virtuals folded and large flow s -> infinity, the reference determinant's
+// energy in H_eff approaches E_HF + E_MP2.
+TEST(DsrgPT2Test, ReproducesMp2WhenEveryOccupiedOrbitalIsActive) {
   namespace qcd = qdk::chemistry::data;
   auto water = testing::create_water_structure();
   auto scf = ScfSolverFactory::create();
@@ -381,10 +390,11 @@ TEST(SchriefferWolffPT2Test, ReproducesMp2WhenEveryOccupiedOrbitalIsActive) {
 
   auto ham = HamiltonianConstructorFactory::create();
   auto H_window = ham->run(testing::with_active_space(orbitals, window, {}));
-  auto swpt2 = EffectiveHamiltonianConstructorFactory::create("qdk_swpt2");
-  swpt2->settings().set("regularizer_flow", 0.0);  // bare MP denominators
-  auto H_eff = swpt2->run(reference, H_window,
-                          testing::restricted_index_set(norb, occupied));
+  auto dsrg_ctor =
+      EffectiveHamiltonianConstructorFactory::create("qdk_dsrg_pt2");
+  dsrg_ctor->settings().set("flow_parameter", 1e6);
+  auto H_eff = dsrg_ctor->run(reference, H_window,
+                              testing::restricted_index_set(norb, occupied));
   ASSERT_NE(H_eff, nullptr);
   EXPECT_TRUE(H_eff->is_restricted());
   const int n_alpha = static_cast<int>(na), n_beta = static_cast<int>(nb);
@@ -402,7 +412,8 @@ TEST(SchriefferWolffPT2Test, ReproducesMp2WhenEveryOccupiedOrbitalIsActive) {
 
 // The window Hamiltonian's own folded core must be exactly the reference core
 // orbitals outside W.
-TEST(SchriefferWolffPT2Test, RejectsWindowCoreThatIsNotTheReferenceCore) {
+TEST(DsrgPT2Test, RejectsWindowCoreThatIsNotTheReferenceCore) {
+  namespace qcd = qdk::chemistry::data;
   auto water = testing::create_water_structure();
   auto scf = ScfSolverFactory::create();
   auto [E_hf, wfn_hf] = scf->run(water, 0, 1, "sto-3g");
@@ -414,39 +425,35 @@ TEST(SchriefferWolffPT2Test, RejectsWindowCoreThatIsNotTheReferenceCore) {
   const std::vector<std::size_t> window = {3, 4, 5};
 
   auto ham = HamiltonianConstructorFactory::create();
-  auto cas = MultiConfigurationCalculatorFactory::create("macis_cas");
-  cas->settings().set("calculate_one_rdm", true);
-  auto [E_cas, reference] = cas->run(
-      ham->run(testing::with_active_space(orbitals, active, core)), 2, 2);
+  auto reference = std::make_shared<qcd::Wavefunction>(
+      std::make_unique<qcd::StateVectorContainer>(
+          qcd::Configuration::from_spin_half_string("22"),
+          testing::with_active_space(orbitals, active, core)));
 
   // Window core drops orbital 2, so it no longer matches the reference core.
   auto H_window = ham->run(
       testing::with_active_space(orbitals, window, {core[0], core[1]}));
-  EXPECT_THROW(EffectiveHamiltonianConstructorFactory::create("qdk_swpt2")
+  EXPECT_THROW(EffectiveHamiltonianConstructorFactory::create("qdk_dsrg_pt2")
                    ->run(reference, H_window,
                          testing::restricted_index_set(norb, active)),
                std::invalid_argument);
 }
 
-// A mean-field HF reference (single determinant, no active 1-RDM) must work:
-// the downfold reads active orbital occupations directly from the reference
-// determinant. Mirrors the SCF -> active_space_selector -> downfold user flow.
-TEST(SchriefferWolffPT2Test, AcceptsMeanFieldHfReference) {
+// A mean-field HF reference (single determinant, no stored 1-RDM) works out of
+// the box, while a single-determinant container carrying an inconsistent
+// correlated 1-RDM is rejected.
+TEST(DsrgPT2Test, AcceptsMeanFieldHfReference) {
   auto water = testing::create_water_structure();
   auto scf = ScfSolverFactory::create();
   auto [E_hf, wfn_hf] = scf->run(water, 0, 1, "sto-3g");
   const auto orbitals = wfn_hf->get_orbitals();
 
-  // HF reference with a small active space; no 1-RDM is computed for it.
   auto selector = ActiveSpaceSelectorFactory::create("qdk_valence");
   selector->settings().set("num_active_electrons", 2);
   selector->settings().set("num_active_orbitals", 2);
   auto reference = selector->run(wfn_hf);
-  ASSERT_FALSE(reference->has_active_one_rdm());
   const auto [na, nb] = reference->get_active_num_electrons();
 
-  // window = active P + the lowest orbital outside P and the frozen core, so a
-  // real external orbital is folded while the window stays small (cheap).
   namespace qcd = qdk::chemistry::data;
   auto ref_orbs = reference->get_orbitals();
   const auto P =
@@ -468,38 +475,39 @@ TEST(SchriefferWolffPT2Test, AcceptsMeanFieldHfReference) {
   auto ham = HamiltonianConstructorFactory::create();
   auto H_window =
       ham->run(testing::with_active_space(orbitals, window, core_vec));
-  auto swpt2 = EffectiveHamiltonianConstructorFactory::create("qdk_swpt2");
-  auto H_eff =
-      swpt2->run(reference, H_window, testing::restricted_index_set(norb, P));
+  auto dsrg_ctor =
+      EffectiveHamiltonianConstructorFactory::create("qdk_dsrg_pt2");
+  auto H_eff = dsrg_ctor->run(reference, H_window,
+                              testing::restricted_index_set(norb, P));
   ASSERT_NE(H_eff, nullptr);
 
-  auto cas_sw = MultiConfigurationCalculatorFactory::create("macis_cas");
-  auto [E_sw, wfn_sw] = cas_sw->run(H_eff, static_cast<unsigned int>(na),
-                                    static_cast<unsigned int>(nb));
-  EXPECT_TRUE(std::isfinite(E_sw));
+  auto cas_dsrg = MultiConfigurationCalculatorFactory::create("macis_cas");
+  auto [E_dsrg, wfn_dsrg] = cas_dsrg->run(H_eff, static_cast<unsigned int>(na),
+                                          static_cast<unsigned int>(nb));
+  EXPECT_TRUE(std::isfinite(E_dsrg));
 
-  Eigen::MatrixXd legacy_density(2, 2);
-  legacy_density << 1.0, 0.2, 0.2, 1.0;
+  // A stored 1-RDM that does not match the single determinant is rejected.
+  Eigen::MatrixXd correlated_density(2, 2);
+  correlated_density << 1.0, 0.2, 0.2, 1.0;
   Eigen::VectorXd coefficients = Eigen::VectorXd::Ones(1);
   qcd::Wavefunction::DeterminantVector determinants{
       qcd::Configuration::from_spin_half_string("20")};
-  auto legacy_reference = std::make_shared<qcd::Wavefunction>(
+  auto correlated_reference = std::make_shared<qcd::Wavefunction>(
       std::make_unique<qcd::StateVectorContainer>(
           coefficients, determinants, ref_orbs,
           std::optional<qcd::StateVectorContainer::MatrixVariant>{
-              legacy_density},
+              correlated_density},
           std::nullopt));
-  ASSERT_TRUE(legacy_reference->has_one_rdm_spin_traced());
-  ASSERT_FALSE(legacy_reference->has_active_one_rdm());
-  EXPECT_NE(swpt2->run(legacy_reference, H_window,
-                       testing::restricted_index_set(norb, P)),
-            nullptr);
+  EXPECT_THROW(dsrg_ctor->run(correlated_reference, H_window,
+                              testing::restricted_index_set(norb, P)),
+               std::invalid_argument);
 }
 
-// The kept space P can be given explicitly via the `active_indices` setting,
-// independently of the reference wavefunction's active space, as long as every
-// folded orbital is closed-shell in the reference.
-TEST(SchriefferWolffPT2Test, CustomActiveSpaceOverridesReference) {
+// The kept space P can differ from the reference wavefunction's active space,
+// embedding reference core/virtual orbitals into P and folding closed-shell
+// reference active orbitals outside P.
+TEST(DsrgPT2Test, CustomActiveSpaceOverridesReference) {
+  namespace qcd = qdk::chemistry::data;
   auto water = testing::create_water_structure();
   auto scf = ScfSolverFactory::create();
   auto [E_hf, wfn_hf] = scf->run(water, 0, 1, "sto-3g");
@@ -510,28 +518,23 @@ TEST(SchriefferWolffPT2Test, CustomActiveSpaceOverridesReference) {
   const std::vector<size_t> window = {3, 4, 5, 6};
 
   auto ham = HamiltonianConstructorFactory::create();
-  auto cas_ref = MultiConfigurationCalculatorFactory::create("macis_cas");
-  cas_ref->settings().set("calculate_one_rdm", true);
-  auto [E_bare, reference] = cas_ref->run(
-      ham->run(testing::with_active_space(orbitals, active, core)), 1, 1);
+  auto reference = std::make_shared<qcd::Wavefunction>(
+      std::make_unique<qcd::StateVectorContainer>(
+          qcd::Configuration::from_spin_half_string("22"),
+          testing::with_active_space(orbitals, active, core)));
   auto H_window = ham->run(testing::with_active_space(orbitals, window, core));
 
-  namespace qcd = qdk::chemistry::data;
-
-  // (1) Custom P that differs from the reference active space {3,4}: also keep
-  // the empty external orbital 5, so the folded rest {6} stays closed-shell.
-  // The result must emit over exactly P and be consumable by MACIS.
+  // (1) Custom P that embeds empty external orbital 5 while folding {6}.
   const std::vector<std::size_t> P_custom = {3, 4, 5};
   const auto p_indices_custom = testing::restricted_index_set(
       orbitals->get_num_molecular_orbitals(), P_custom);
-  auto swpt2 = EffectiveHamiltonianConstructorFactory::create("qdk_swpt2");
-  auto H_eff = swpt2->run(reference, H_window, p_indices_custom);
+  auto dsrg_ctor =
+      EffectiveHamiltonianConstructorFactory::create("qdk_dsrg_pt2");
+  auto H_eff = dsrg_ctor->run(reference, H_window, p_indices_custom);
   ASSERT_NE(H_eff, nullptr);
 
   const auto [T_a, T_b] = H_eff->get_one_body_integrals();
   EXPECT_EQ(T_a.rows(), static_cast<Eigen::Index>(P_custom.size()));
-  // The output contract requires the emitted active set to be the caller's
-  // p_indices, in every spin channel and not just the alpha one.
   const auto emitted = H_eff->get_orbitals()->active_indices();
   for (const auto& spin : {qcd::axes::alpha(), qcd::axes::beta()})
     EXPECT_EQ(qcd::spin_channel_indices(emitted, spin),
@@ -543,34 +546,35 @@ TEST(SchriefferWolffPT2Test, CustomActiveSpaceOverridesReference) {
       P_custom);
 
   auto cas = MultiConfigurationCalculatorFactory::create("macis_cas");
-  auto [E_sw, wfn_sw] = cas->run(H_eff, 1, 1);
-  EXPECT_TRUE(std::isfinite(E_sw));
+  auto [E_dsrg, wfn_dsrg] = cas->run(H_eff, 2, 2);
+  EXPECT_TRUE(std::isfinite(E_dsrg));
 
-  // (2) Custom P = the whole window => empty external => the downfold is the
-  // identity, so the emitted operator must reproduce the bare window
-  // Hamiltonian (validates the custom-P emission path end to end).
+  // (2) Custom P = the whole window => empty external => identity.
   const std::vector<std::size_t> P_full = {3, 4, 5, 6};
-  auto swpt2_full = EffectiveHamiltonianConstructorFactory::create("qdk_swpt2");
+  auto dsrg_full =
+      EffectiveHamiltonianConstructorFactory::create("qdk_dsrg_pt2");
   auto H_identity =
-      swpt2_full->run(reference, H_window,
-                      testing::restricted_index_set(
-                          orbitals->get_num_molecular_orbitals(), P_full));
+      dsrg_full->run(reference, H_window,
+                     testing::restricted_index_set(
+                         orbitals->get_num_molecular_orbitals(), P_full));
   const auto [ge, ge_ab, ge_bb] = H_identity->get_two_body_integrals();
   const auto [gw, gw_ab, gw_bb] = H_window->get_two_body_integrals();
   EXPECT_LT((ge - gw).norm(), 1e-9);
   EXPECT_NEAR(H_identity->get_core_energy(), H_window->get_core_energy(), 1e-9);
 
-  // (3) Window that spans the reference core: {0,1,2} are reference core but
-  // lie inside W, so the downfold folds them itself instead of inheriting them
-  // from the window Hamiltonian, whose own inactive set is empty here. They
-  // must still come back labelled inactive, exactly once each.
+  // (3) Window spanning the reference core: {0,1,2} are folded inside W and
+  // still come back labelled inactive. Also matches downfolding the full-window
+  // SCF wavefunction directly onto {3, 4}.
   auto H_all =
       ham->run(testing::with_active_space(orbitals, {0, 1, 2, 3, 4, 5, 6}, {}));
-  auto swpt2_core = EffectiveHamiltonianConstructorFactory::create("qdk_swpt2");
-  auto H_eff_core = swpt2_core->run(
-      reference, H_all,
-      testing::restricted_index_set(orbitals->get_num_molecular_orbitals(),
-                                    std::vector<std::size_t>{3, 4}));
+  auto dsrg_core =
+      EffectiveHamiltonianConstructorFactory::create("qdk_dsrg_pt2");
+  const auto p_34 = testing::restricted_index_set(
+      orbitals->get_num_molecular_orbitals(), std::vector<std::size_t>{3, 4});
+  auto H_eff_core = dsrg_core->run(reference, H_all, p_34);
+  auto H_eff_from_hf =
+      EffectiveHamiltonianConstructorFactory::create("qdk_dsrg_pt2")
+          ->run(wfn_hf, H_all, p_34);
   ASSERT_NE(H_eff_core, nullptr);
   const auto core_active = qcd::spin_channel_indices(
       H_eff_core->get_orbitals()->active_indices(), qcd::axes::alpha());
@@ -581,19 +585,21 @@ TEST(SchriefferWolffPT2Test, CustomActiveSpaceOverridesReference) {
   EXPECT_EQ(
       std::vector<std::size_t>(core_inactive.begin(), core_inactive.end()),
       (std::vector<std::size_t>{0, 1, 2}));
+  EXPECT_NEAR(H_eff_core->get_core_energy(), H_eff_from_hf->get_core_energy(),
+              1e-12);
 
-  // (4) A spin-dependent P is rejected rather than silently reduced to its
-  // alpha channel.
-  auto swpt2_spin = EffectiveHamiltonianConstructorFactory::create("qdk_swpt2");
-  EXPECT_THROW(swpt2_spin->run(reference, H_window,
-                               testing::unrestricted_index_set(
-                                   orbitals->get_num_molecular_orbitals(),
-                                   {3, 4, 5}, {3, 4, 6})),
+  // (4) A spin-dependent P is rejected rather than silently reduced to alpha.
+  auto dsrg_spin =
+      EffectiveHamiltonianConstructorFactory::create("qdk_dsrg_pt2");
+  EXPECT_THROW(dsrg_spin->run(reference, H_window,
+                              testing::unrestricted_index_set(
+                                  orbitals->get_num_molecular_orbitals(),
+                                  {3, 4, 5}, {3, 4, 6})),
                std::invalid_argument);
 }
 
-// Folding an orbital whose correlated natural occupation is not exactly 2 or 0.
-TEST(SchriefferWolffPT2Test, FoldsFractionallyOccupiedExternalOrbital) {
+// Multi-determinant CAS references are rejected until full DSRG-MRPT2 lands.
+TEST(DsrgPT2Test, RejectsCorrelatedCasReference) {
   auto water = testing::create_water_structure();
   auto scf = ScfSolverFactory::create();
   auto [E_hf, wfn_hf] = scf->run(water, 0, 1, "sto-3g");
@@ -603,50 +609,24 @@ TEST(SchriefferWolffPT2Test, FoldsFractionallyOccupiedExternalOrbital) {
   auto ham = HamiltonianConstructorFactory::create();
   auto cas_ref = MultiConfigurationCalculatorFactory::create("macis_cas");
   cas_ref->settings().set("calculate_one_rdm", true);
-  // HOMO/LUMO CAS(2,2): natural occupations near 2 and 0 but not exactly, so
-  // orbital 4 is a fractionally occupied orbital available to fold.
   auto [E_bare, reference] = cas_ref->run(
       ham->run(testing::with_active_space(orbitals, {4, 5}, {0, 1, 2, 3})), 1,
       1);
 
-  // Window {3,4,5,6} holds 2 + n_4 + n_5 + 0 = 4 electrons. Folding the
-  // fractionally occupied orbital 4 as doubly occupied and 6 as empty leaves
-  // exactly 2 electrons for P = {3, 5}.
   auto H_window =
       ham->run(testing::with_active_space(orbitals, {3, 4, 5, 6}, {0, 1, 2}));
   const auto p_indices =
-      testing::restricted_index_set(num_mo, std::vector<std::size_t>{3, 5});
+      testing::restricted_index_set(num_mo, std::vector<std::size_t>{4, 5});
 
-  auto swpt2 = EffectiveHamiltonianConstructorFactory::create("qdk_swpt2");
-  auto H_eff = swpt2->run(reference, H_window, p_indices);
-  ASSERT_NE(H_eff, nullptr);
-
-  namespace qcd2 = qdk::chemistry::data;
-  const auto emitted_active = qcd2::spin_channel_indices(
-      H_eff->get_orbitals()->active_indices(), qcd2::axes::alpha());
-  EXPECT_EQ(
-      std::vector<std::size_t>(emitted_active.begin(), emitted_active.end()),
-      (std::vector<std::size_t>{3, 5}));
-  // reference core {0,1,2} plus the folded doubly-occupied orbital {4}
-  const auto emitted_inactive = qcd2::spin_channel_indices(
-      H_eff->get_orbitals()->inactive_indices(), qcd2::axes::alpha());
-  EXPECT_EQ(std::vector<std::size_t>(emitted_inactive.begin(),
-                                     emitted_inactive.end()),
-            (std::vector<std::size_t>{0, 1, 2, 4}));
-
-  // The derived active electron count (2) is the one the solver must be given.
-  auto cas = MultiConfigurationCalculatorFactory::create("macis_cas");
-  auto [E_sw, wfn_sw] = cas->run(H_eff, 1, 1);
-  EXPECT_TRUE(std::isfinite(E_sw));
-
-  // Demanding exactly integer folded occupations rejects the same partition.
-  auto strict = EffectiveHamiltonianConstructorFactory::create("qdk_swpt2");
-  strict->settings().set("max_folded_occupation_deviation", 0.0);
-  EXPECT_THROW(strict->run(reference, H_window, p_indices),
+  auto dsrg_ctor =
+      EffectiveHamiltonianConstructorFactory::create("qdk_dsrg_pt2");
+  EXPECT_THROW(dsrg_ctor->run(reference, H_window, p_indices),
                std::invalid_argument);
 }
 
-TEST(SchriefferWolffPT2Test, AcceptsRestrictedOpenShellHfReference) {
+// Restricted open-shell determinants have nonzero spin-averaged cumulants in
+// full DSRG-MRPT2 and are therefore rejected by the single-reference version.
+TEST(DsrgPT2Test, RejectsRestrictedOpenShellHfReference) {
   auto hydroxyl = testing::create_oh_structure();
   auto scf = ScfSolverFactory::create();
   scf->settings().set("enable_gdm", false);
@@ -659,11 +639,6 @@ TEST(SchriefferWolffPT2Test, AcceptsRestrictedOpenShellHfReference) {
   selector->settings().set("num_active_electrons", 1);
   selector->settings().set("num_active_orbitals", 1);
   auto reference = selector->run(wfn_rohf);
-  ASSERT_FALSE(reference->has_active_one_rdm());
-  const auto [occ_a, occ_b] = reference->get_active_orbital_occupations();
-  ASSERT_EQ(occ_a.size(), 1);
-  ASSERT_EQ(occ_b.size(), 1);
-  EXPECT_DOUBLE_EQ(occ_a(0) + occ_b(0), 1.0);
 
   namespace qcd = qdk::chemistry::data;
   const auto orbitals = wfn_rohf->get_orbitals();
@@ -685,143 +660,22 @@ TEST(SchriefferWolffPT2Test, AcceptsRestrictedOpenShellHfReference) {
   auto ham = HamiltonianConstructorFactory::create();
   auto H_window = ham->run(testing::with_active_space(
       orbitals, window, std::vector<size_t>(inactive.begin(), inactive.end())));
-  auto swpt2 = EffectiveHamiltonianConstructorFactory::create("qdk_swpt2");
-  auto H_eff = swpt2->run(reference, H_window,
-                          testing::restricted_index_set(
-                              orbitals->get_num_molecular_orbitals(), active));
-  ASSERT_NE(H_eff, nullptr);
-
-  auto cas = MultiConfigurationCalculatorFactory::create("macis_cas");
-  auto [E_sw, wfn_sw] = cas->run(H_eff, 1, 0);
-  EXPECT_TRUE(std::isfinite(E_sw));
-
-  // Folding the singly occupied orbital would need an arbitrary rounding.
-  std::vector<size_t> unused;
-  for (const size_t orbital : window)
-    if (!used.count(orbital)) unused.push_back(orbital);
-  EXPECT_THROW(swpt2->run(reference, H_window,
-                          testing::restricted_index_set(
-                              orbitals->get_num_molecular_orbitals(), unused)),
-               std::invalid_argument);
-}
-
-// The folded core is closed-shell, so each spin of a restricted reference must
-// keep a feasible electron count in P, not just their sum.
-TEST(SchriefferWolffPT2Test, RejectsFoldThatLeavesNegativeSpinCount) {
-  namespace qcd = qdk::chemistry::data;
-  auto water = testing::create_water_structure();
-  auto scf = ScfSolverFactory::create();
-  auto [E_hf, wfn_hf] = scf->run(water, 0, 1, "sto-3g");
-  const auto orbitals = wfn_hf->get_orbitals();
-  const size_t norb = orbitals->get_num_molecular_orbitals();
-  const std::vector<size_t> core{0};
-  const std::vector<size_t> reference_active{1, 2, 3, 4, 5};
-
-  // Five alpha and three beta electrons; each determinant lacks one beta
-  // electron in orbitals 1-4, whose spin-traced occupations become 1.75.
-  std::vector<qcd::Configuration> determinants;
-  for (const char* occupation : {"u222u", "2u22u", "22u2u", "222uu"})
-    determinants.push_back(
-        qcd::Configuration::from_spin_half_string(occupation));
-  Eigen::MatrixXd rdm = Eigen::MatrixXd::Identity(5, 5);
-  rdm.topLeftCorner(4, 4) +=
-      Eigen::MatrixXd::Identity(4, 4) - Eigen::MatrixXd::Constant(4, 4, 0.25);
-  auto reference = std::make_shared<qcd::Wavefunction>(
-      std::make_unique<qcd::StateVectorContainer>(
-          Eigen::VectorXd(Eigen::VectorXd::Constant(4, 0.5)), determinants,
-          testing::with_active_space(orbitals, reference_active, core), rdm,
-          std::nullopt));
-  auto H_window = HamiltonianConstructorFactory::create()->run(
-      testing::with_active_space(orbitals, {1, 2, 3, 4, 5, 6}, core));
-  auto swpt2 = EffectiveHamiltonianConstructorFactory::create("qdk_swpt2");
-
-  // Folding orbitals 1-4 as doubly occupied leaves 1 alpha and -1 beta
-  // electrons in P = {5}, although the total is a valid zero.
+  auto dsrg_ctor =
+      EffectiveHamiltonianConstructorFactory::create("qdk_dsrg_pt2");
   EXPECT_THROW(
-      swpt2->run(reference, H_window,
-                 testing::restricted_index_set(norb, std::vector<size_t>{5})),
+      dsrg_ctor->run(reference, H_window,
+                     testing::restricted_index_set(
+                         orbitals->get_num_molecular_orbitals(), active)),
       std::invalid_argument);
-  EXPECT_NO_THROW(
-      swpt2->run(reference, H_window,
-                 testing::restricted_index_set(norb, reference_active)));
-}
-
-TEST(SchriefferWolffPT2Test,
-     AcceptsCorrelatedCasOnRestrictedOpenShellOrbitals) {
-  auto hydroxyl = testing::create_oh_structure();
-  auto scf = ScfSolverFactory::create();
-  scf->settings().set("enable_gdm", false);
-  scf->settings().set("method", std::string("hf"));
-  scf->settings().set("scf_type", std::string("restricted"));
-  auto [E_rohf, wfn_rohf] = scf->run(hydroxyl, 0, 2, "sto-3g");
-  const auto orbitals = wfn_rohf->get_orbitals();
-  ASSERT_TRUE(orbitals->is_restricted());
-
-  auto selector = ActiveSpaceSelectorFactory::create("qdk_valence");
-  selector->settings().set("num_active_electrons", 3);
-  selector->settings().set("num_active_orbitals", 2);
-  auto selected = selector->run(wfn_rohf);
-  const auto [na, nb] = selected->get_active_num_electrons();
-  ASSERT_EQ(na + nb, 3);
-
-  auto ham = HamiltonianConstructorFactory::create();
-  auto H_P = ham->run(selected->get_orbitals());
-  auto cas_reference = MultiConfigurationCalculatorFactory::create("macis_cas");
-  cas_reference->settings().set("calculate_one_rdm", true);
-  auto [E_cas, reference] = cas_reference->run(H_P, na, nb);
-  ASSERT_TRUE(reference->has_active_one_rdm());
-
-  namespace qcd = qdk::chemistry::data;
-  const auto active = qcd::spin_channel_indices(
-      selected->get_orbitals()->active_indices(), qcd::axes::alpha());
-  const auto inactive = qcd::spin_channel_indices(
-      selected->get_orbitals()->inactive_indices(), qcd::axes::alpha());
-  std::set<size_t> used(active.begin(), active.end());
-  used.insert(inactive.begin(), inactive.end());
-  std::vector<size_t> window(active.begin(), active.end());
-  for (size_t orbital = 0; orbital < orbitals->get_num_molecular_orbitals();
-       ++orbital)
-    if (!used.count(orbital)) {
-      window.push_back(orbital);
-      break;
-    }
-  ASSERT_GT(window.size(), active.size());
-  std::sort(window.begin(), window.end());
-
-  auto H_window = ham->run(testing::with_active_space(
-      orbitals, window, std::vector<size_t>(inactive.begin(), inactive.end())));
-  auto swpt2 = EffectiveHamiltonianConstructorFactory::create("qdk_swpt2");
-  auto H_eff = swpt2->run(reference, H_window,
-                          testing::restricted_index_set(
-                              orbitals->get_num_molecular_orbitals(), active));
-  ASSERT_NE(H_eff, nullptr);
-
-  auto cas_effective = MultiConfigurationCalculatorFactory::create("macis_cas");
-  auto [E_sw, wfn_sw] = cas_effective->run(H_eff, na, nb);
-  EXPECT_TRUE(std::isfinite(E_sw));
-
-  // The non-semicanonical path must also handle a correlated (off-diagonal
-  // 1-RDM) reference.
-  auto swpt2_no_semicanon =
-      EffectiveHamiltonianConstructorFactory::create("qdk_swpt2");
-  swpt2_no_semicanon->settings().set("semicanonicalize", false);
-  auto H_eff_no_semicanon = swpt2_no_semicanon->run(
-      reference, H_window,
-      testing::restricted_index_set(orbitals->get_num_molecular_orbitals(),
-                                    active));
-  ASSERT_NE(H_eff_no_semicanon, nullptr);
-  auto [E_sw_no_semicanon, wfn_sw_no_semicanon] =
-      MultiConfigurationCalculatorFactory::create("macis_cas")
-          ->run(H_eff_no_semicanon, na, nb);
-  EXPECT_TRUE(std::isfinite(E_sw_no_semicanon));
 }
 
 // For a UHF doublet with every occupied orbital but the folded core kept, P
 // holds a single empty spin orbital, so no double excitation fits inside it
-// and the reference determinant's energy in H_eff is the UMP2 energy. Rotating
-// each spin's orbitals differently within its occupied active orbitals and
-// folded virtuals must not change that.
-TEST(SchriefferWolffPT2Test, ReproducesUmp2ForUnrestrictedDoublet) {
+// and the reference determinant's energy in H_eff approaches UMP2 at large s.
+// Rotating each spin's orbitals differently within its occupied active orbitals
+// and folded virtuals must not change that; folding the singly occupied orbital
+// is rejected.
+TEST(DsrgPT2Test, ReproducesUmp2ForUnrestrictedDoublet) {
   namespace qcd = qdk::chemistry::data;
   auto scf = ScfSolverFactory::create();
   // UMP2 uses the SCF orbital energies, so agreement tracks SCF convergence.
@@ -847,15 +701,24 @@ TEST(SchriefferWolffPT2Test, ReproducesUmp2ForUnrestrictedDoublet) {
           ->run(ansatz));
   EXPECT_LT(E_ump2, E_uhf - 1e-3) << "the correlation being matched is noise";
 
+  // Folding the singly occupied orbital (index na - 1) must be rejected.
+  const std::vector<size_t> missing_singly_occupied{1, 2, 3};
+  EXPECT_THROW(
+      EffectiveHamiltonianConstructorFactory::create("qdk_dsrg_pt2")
+          ->run(wfn_uhf, H_full,
+                testing::unrestricted_index_set(norb, missing_singly_occupied,
+                                                missing_singly_occupied)),
+      std::invalid_argument);
+
   const auto reference_energy =
       [&](const std::shared_ptr<qcd::Wavefunction>& reference,
           const std::shared_ptr<qcd::Hamiltonian>& window) {
-        auto swpt2 =
-            EffectiveHamiltonianConstructorFactory::create("qdk_swpt2");
-        swpt2->settings().set("regularizer_flow", 0.0);  // MP denominators
+        auto dsrg_ctor =
+            EffectiveHamiltonianConstructorFactory::create("qdk_dsrg_pt2");
+        dsrg_ctor->settings().set("flow_parameter", 1e6);
         const auto H_eff =
-            swpt2->run(reference, window,
-                       testing::unrestricted_index_set(norb, kept, kept));
+            dsrg_ctor->run(reference, window,
+                           testing::unrestricted_index_set(norb, kept, kept));
         EXPECT_TRUE(H_eff->is_unrestricted());
         const auto [T_a, T_b] = H_eff->get_one_body_integrals();
         EXPECT_GT((T_a - T_b).cwiseAbs().maxCoeff(), 1e-3);
@@ -914,7 +777,7 @@ TEST(SchriefferWolffPT2Test, ReproducesUmp2ForUnrestrictedDoublet) {
 
 // The reference active space places both spins' densities, so differing alpha
 // and beta active orbitals are rejected rather than misread.
-TEST(SchriefferWolffPT2Test, RejectsSpinDependentReferenceActiveSpace) {
+TEST(DsrgPT2Test, RejectsSpinDependentReferenceActiveSpace) {
   namespace qcd = qdk::chemistry::data;
   const auto orbitals =
       std::get<1>(ScfSolverFactory::create()->run(
@@ -953,7 +816,7 @@ TEST(SchriefferWolffPT2Test, RejectsSpinDependentReferenceActiveSpace) {
 
   const std::vector<size_t> kept{3, 4, 5, 6};
   try {
-    EffectiveHamiltonianConstructorFactory::create("qdk_swpt2")
+    EffectiveHamiltonianConstructorFactory::create("qdk_dsrg_pt2")
         ->run(reference, window,
               testing::unrestricted_index_set(norb, kept, kept));
     FAIL() << "Expected a spin-dependent active space error";
@@ -964,96 +827,10 @@ TEST(SchriefferWolffPT2Test, RejectsSpinDependentReferenceActiveSpace) {
   }
 }
 
-// Natural orbitals diagonalize the reference 1-RDM. Stretched LiH gives a
-// strongly correlated CAS (occupations 1.86/0.14) whose 1-RDM is non-diagonal
-// in the canonical basis. The rotation to natural orbitals lies inside P, so
-// semicanonicalization must remove it and the spectrum must match.
-TEST(SchriefferWolffPT2Test, AcceptsNaturalOrbitalReference) {
-  namespace qcd = qdk::chemistry::data;
-  std::vector<Eigen::Vector3d> coords = {{0, 0, 0}, {0, 0, 3.0}};
-  for (auto& c : coords) c *= qdk::chemistry::constants::angstrom_to_bohr;
-  auto stretched_lih = std::make_shared<qcd::Structure>(
-      coords, std::vector<qcd::Element>{qcd::Element::Li, qcd::Element::H});
-
-  auto scf = ScfSolverFactory::create();
-  scf->settings().set("enable_gdm", false);
-  auto [E_hf, wfn_hf] = scf->run(stretched_lih, 0, 1, "sto-3g");
-  const auto orbitals = wfn_hf->get_orbitals();
-  ASSERT_TRUE(orbitals->is_restricted());
-
-  const std::vector<std::size_t> P = {1, 2};
-  const std::vector<std::size_t> core = {0};
-  const std::vector<std::size_t> window = {1, 2, 3};
-  const int norb = static_cast<int>(orbitals->get_num_molecular_orbitals());
-
-  auto ham = HamiltonianConstructorFactory::create();
-  auto cas_ref = MultiConfigurationCalculatorFactory::create("macis_cas");
-  cas_ref->settings().set("calculate_one_rdm", true);
-  auto [E_cas, reference] = cas_ref->run(
-      ham->run(testing::with_active_space(orbitals, P, core)), 1, 1);
-  ASSERT_TRUE(reference->has_active_one_rdm());
-  {
-    const auto* rdm = std::get_if<Eigen::MatrixXd>(
-        &reference->get_active_one_rdm_spin_traced());
-    ASSERT_NE(rdm, nullptr);
-    ASSERT_GT(std::abs((*rdm)(0, 1)), 0.1)
-        << "canonical basis is already natural; the test would be vacuous";
-  }
-
-  // swpt2 reads the (now diagonal) active 1-RDM; the aufbau determinant
-  // occupations the localizer also attaches are integers and must not be used.
-  auto localizer = LocalizerFactory::create("qdk_natural_orbitals");
-  auto natural = localizer->run(reference, P, P);
-  ASSERT_TRUE(natural->has_active_one_rdm())
-      << "qdk_natural_orbitals must expose the rotated active 1-RDM; without "
-         "it the downfold silently falls back to determinant occupations";
-  const auto& natural_rdm_variant = natural->get_active_one_rdm_spin_traced();
-  const auto* natural_rdm = std::get_if<Eigen::MatrixXd>(&natural_rdm_variant);
-  ASSERT_NE(natural_rdm, nullptr);
-  ASSERT_EQ(natural_rdm->rows(), 2);
-  EXPECT_NEAR((*natural_rdm)(0, 1), 0.0, 1e-10);
-  EXPECT_NEAR((*natural_rdm)(1, 0), 0.0, 1e-10);
-  // Strongly correlated: neither natural orbital is close to 2 or 0.
-  EXPECT_GT((*natural_rdm)(0, 0), 1.5);
-  EXPECT_LT((*natural_rdm)(0, 0), 1.95);
-  EXPECT_GT((*natural_rdm)(1, 1), 0.05);
-
-  const auto natural_orbitals = natural->get_orbitals();
-  ASSERT_TRUE(natural_orbitals->is_restricted());
-  const auto& canonical_coeffs =
-      orbitals->coefficients()->block({qcd::axes::alpha(), qcd::axes::alpha()});
-  const auto& natural_coeffs = natural_orbitals->coefficients()->block(
-      {qcd::axes::alpha(), qcd::axes::alpha()});
-  ASSERT_GT((natural_coeffs - canonical_coeffs).norm(), 1e-6)
-      << "natural-orbital rotation is trivial; the test would be vacuous";
-
-  const auto P_set = testing::restricted_index_set(norb, P);
-  auto cas = MultiConfigurationCalculatorFactory::create("macis_cas");
-
-  auto H_natural =
-      ham->run(testing::with_active_space(natural_orbitals, window, core));
-  auto H_eff_natural =
-      EffectiveHamiltonianConstructorFactory::create("qdk_swpt2")
-          ->run(natural, H_natural, P_set);
-  ASSERT_NE(H_eff_natural, nullptr);
-  auto [E_natural, wfn_natural] = cas->run(H_eff_natural, 1, 1);
-  EXPECT_TRUE(std::isfinite(E_natural));
-
-  auto H_canonical =
-      ham->run(testing::with_active_space(orbitals, window, core));
-  auto H_eff_canonical =
-      EffectiveHamiltonianConstructorFactory::create("qdk_swpt2")
-          ->run(reference, H_canonical, P_set);
-  auto [E_canonical, wfn_canonical] = cas->run(H_eff_canonical, 1, 1);
-
-  // The two bases differ only by a rotation within P, so semicanonicalization
-  // maps them onto the same internal basis.
-  EXPECT_NEAR(E_natural, E_canonical, 1e-8);
-}
-
 // Localizing strictly inside the folded virtual block exercises a large
-// semicanonical rotation.
-TEST(SchriefferWolffPT2Test, AcceptsLocalizedOrbitalReference) {
+// semicanonical rotation on a single-determinant reference.
+TEST(DsrgPT2Test, AcceptsLocalizedOrbitalReference) {
+  namespace qcd = qdk::chemistry::data;
   auto water = testing::create_water_structure();
   auto scf = ScfSolverFactory::create();
   auto [E_hf, wfn_hf] = scf->run(water, 0, 1, "sto-3g");
@@ -1073,7 +850,6 @@ TEST(SchriefferWolffPT2Test, AcceptsLocalizedOrbitalReference) {
   const auto localized_orbitals = localized->get_orbitals();
   ASSERT_TRUE(localized_orbitals->is_restricted());
 
-  namespace qcd = qdk::chemistry::data;
   const auto& canonical_coeffs =
       orbitals->coefficients()->block({qcd::axes::alpha(), qcd::axes::alpha()});
   const auto& localized_coeffs = localized_orbitals->coefficients()->block(
@@ -1090,12 +866,12 @@ TEST(SchriefferWolffPT2Test, AcceptsLocalizedOrbitalReference) {
   auto ham = HamiltonianConstructorFactory::create();
   const auto P_set = testing::restricted_index_set(norb, P);
   const auto downfold = [&](const std::shared_ptr<qcd::Orbitals>& basis) {
-    auto cas_ref = MultiConfigurationCalculatorFactory::create("macis_cas");
-    cas_ref->settings().set("calculate_one_rdm", true);
-    auto [E_cas, reference] = cas_ref->run(
-        ham->run(testing::with_active_space(basis, P, core)), 2, 2);
+    auto reference = std::make_shared<qcd::Wavefunction>(
+        std::make_unique<qcd::StateVectorContainer>(
+            qcd::Configuration::from_spin_half_string("22"),
+            testing::with_active_space(basis, P, core)));
     auto H_window = ham->run(testing::with_active_space(basis, window, core));
-    return EffectiveHamiltonianConstructorFactory::create("qdk_swpt2")
+    return EffectiveHamiltonianConstructorFactory::create("qdk_dsrg_pt2")
         ->run(reference, H_window, P_set);
   };
 
@@ -1119,10 +895,9 @@ TEST(SchriefferWolffPT2Test, AcceptsLocalizedOrbitalReference) {
   EXPECT_NEAR((g_localized - g_canonical).cwiseAbs().maxCoeff(), 0.0, 1e-9);
 }
 
-// An amplitude-based reference (MP2/CC) carries neither an active 1-RDM nor
-// determinant occupations, so the downfold has no reference density to fold
-// against and must say so rather than guess one.
-TEST(SchriefferWolffPT2Test, RejectsReferenceWithoutDensity) {
+// An amplitude-based reference (MP2/CC) is not a StateVectorContainer and must
+// be rejected cleanly.
+TEST(DsrgPT2Test, RejectsNonStateVectorReference) {
   auto water = testing::create_water_structure();
   auto scf = ScfSolverFactory::create();
   auto [E_hf, wfn_hf] = scf->run(water, 0, 1, "sto-3g");
@@ -1135,14 +910,14 @@ TEST(SchriefferWolffPT2Test, RejectsReferenceWithoutDensity) {
       DynamicalCorrelationCalculatorFactory::create("qdk_mp2_calculator")
           ->run(ansatz);
   ASSERT_NE(mp2_reference, nullptr);
-  ASSERT_FALSE(mp2_reference->has_active_one_rdm());
 
   const int norb = static_cast<int>(orbitals->get_num_molecular_orbitals());
   auto H_window = ham->run(mp2_reference->get_orbitals());
-  auto swpt2 = EffectiveHamiltonianConstructorFactory::create("qdk_swpt2");
-  EXPECT_THROW(swpt2->run(mp2_reference, H_window,
-                          testing::restricted_index_set(
-                              norb, std::vector<std::size_t>{4, 5})),
-               std::runtime_error);
+  auto dsrg_ctor =
+      EffectiveHamiltonianConstructorFactory::create("qdk_dsrg_pt2");
+  EXPECT_THROW(dsrg_ctor->run(mp2_reference, H_window,
+                              testing::restricted_index_set(
+                                  norb, std::vector<std::size_t>{4, 5})),
+               std::invalid_argument);
 }
 }  // namespace

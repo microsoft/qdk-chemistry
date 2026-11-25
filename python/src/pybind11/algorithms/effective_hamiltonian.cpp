@@ -8,7 +8,7 @@
 #include <qdk/chemistry/algorithms/effective_hamiltonian.hpp>
 
 #include "factory_bindings.hpp"
-#include "qdk/chemistry/algorithms/microsoft/effective_hamiltonian/swpt2.hpp"
+#include "qdk/chemistry/algorithms/microsoft/effective_hamiltonian/dsrg_pt2.hpp"
 
 namespace py = pybind11;
 using namespace qdk::chemistry::algorithms;
@@ -188,18 +188,20 @@ Returns:
       EffectiveHamiltonianConstructorBase>(
       m, "EffectiveHamiltonianConstructorFactory");
 
-  py::class_<microsoft::SchriefferWolffPT2Constructor,
-             EffectiveHamiltonianConstructor, py::smart_holder>(
-      m, "QdkSchriefferWolffPT2Constructor", R"(
-Second-order Schrieffer-Wolff downfold of the window's external orbitals onto
-the kept space ``P`` (``p_indices``).
+  py::class_<microsoft::DsrgPT2Constructor, EffectiveHamiltonianConstructor,
+             py::smart_holder>(m, "QdkDsrgPT2Constructor", R"(
+Second-order driven similarity renormalization group (DSRG-PT2) downfold of the
+window's core and virtual orbitals onto the target space ``P`` (``p_indices``).
 
-Emits ``P exp(S) H exp(-S) P`` through second order, truncated to two-body, for
-a generator ``S`` regularized by ``regularizer_flow``, with semicanonical
-generalized-Fock denominators; three-body terms are folded with the reference
-1-RDM. Restricted input gives a spin-free result, unrestricted input an
+Emits the fixed-reference DSRG-PT2 effective Hamiltonian over ``P``, truncated
+to two-body terms in reference normal order and returned in bare normal order.
+Currently supports single-determinant references: closed-shell determinants on
+restricted orbitals, and closed- or open-shell determinants on unrestricted
+orbitals. The ``flow_parameter`` setting is the Gaussian-source flow ``s`` in
+:math:`E_h^{-2}` (default ``0.5``; ``0`` returns the bare core-folded operator
+over ``P``). Restricted input gives a restricted result, unrestricted input an
 unrestricted one. The emitted two-body integrals are 4-fold, not 8-fold,
-symmetric. The factory name is ``"qdk_swpt2"``.
+symmetric. The factory name is ``"qdk_dsrg_pt2"``.
 
 Typical usage:
 
@@ -207,7 +209,7 @@ Typical usage:
 
     import qdk_chemistry.algorithms as alg
 
-    downfolder = alg.create("effective_hamiltonian_constructor", "qdk_swpt2")
+    downfolder = alg.create("effective_hamiltonian_constructor", "qdk_dsrg_pt2")
     h_eff = downfolder.run(reference, window_hamiltonian, p_indices)
 
 See Also:
@@ -218,7 +220,6 @@ See Also:
       .def(py::init<>(), R"(
 Default constructor.
 
-Initializes a Schrieffer-Wolff PT2 downfold with the regularizer enabled by
-default. Set ``regularizer_flow`` to 0 for unregularized second-order PT.
+Initializes a DSRG-PT2 downfold with ``flow_parameter`` set to ``0.5``.
 )");
 }

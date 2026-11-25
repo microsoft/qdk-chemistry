@@ -12,7 +12,7 @@
 #include <stdexcept>
 #include <string>
 
-#include "microsoft/effective_hamiltonian/swpt2.hpp"
+#include "microsoft/effective_hamiltonian/dsrg_pt2.hpp"
 
 namespace qdk::chemistry::algorithms {
 
@@ -52,11 +52,30 @@ void validate_orbital_basis(const Orbitals& hamiltonian_orbitals,
                             const Orbitals& wavefunction_orbitals) {
   if (&hamiltonian_orbitals == &wavefunction_orbitals) return;
 
+  // Model bases are identified by mode count and symmetries, not MO columns.
+  const bool model_h = dynamic_cast<const data::ModelOrbitals*>(
+                           &hamiltonian_orbitals) != nullptr;
+  const bool model_ref = dynamic_cast<const data::ModelOrbitals*>(
+                             &wavefunction_orbitals) != nullptr;
+  if (model_h != model_ref) throw_incompatible("cannot mix model and MO bases");
+
   if (hamiltonian_orbitals.get_num_molecular_orbitals() !=
       wavefunction_orbitals.get_num_molecular_orbitals()) {
     throw_incompatible(
         "Hamiltonian and wavefunction must use the same MO universe");
   }
+  if (hamiltonian_orbitals.is_restricted() !=
+      wavefunction_orbitals.is_restricted()) {
+    throw_incompatible(
+        "Hamiltonian and wavefunction must have the same spin restriction");
+  }
+  if (*hamiltonian_orbitals.symmetries() !=
+      *wavefunction_orbitals.symmetries()) {
+    throw_incompatible(
+        "Hamiltonian and wavefunction must have the same orbital symmetries");
+  }
+  if (model_h) return;
+
   if (hamiltonian_orbitals.get_num_atomic_orbitals() !=
       wavefunction_orbitals.get_num_atomic_orbitals()) {
     throw_incompatible(
@@ -72,16 +91,6 @@ void validate_orbital_basis(const Orbitals& hamiltonian_orbitals,
           wavefunction_orbitals.get_basis_set()->content_hash()) {
     throw_incompatible(
         "Hamiltonian and wavefunction must use the same AO basis set");
-  }
-  if (hamiltonian_orbitals.is_restricted() !=
-      wavefunction_orbitals.is_restricted()) {
-    throw_incompatible(
-        "Hamiltonian and wavefunction must have the same spin restriction");
-  }
-  if (*hamiltonian_orbitals.symmetries() !=
-      *wavefunction_orbitals.symmetries()) {
-    throw_incompatible(
-        "Hamiltonian and wavefunction must have the same orbital symmetries");
   }
 
   const auto hamiltonian_coefficients = hamiltonian_orbitals.coefficients();
@@ -149,15 +158,15 @@ void EffectiveHamiltonianConstructor::_validate_inputs(
   }
 }
 
-std::unique_ptr<EffectiveHamiltonianConstructor> make_swpt2_constructor() {
+std::unique_ptr<EffectiveHamiltonianConstructor> make_dsrg_pt2_constructor() {
   QDK_LOG_TRACE_ENTERING();
-  return std::make_unique<microsoft::SchriefferWolffPT2Constructor>();
+  return std::make_unique<microsoft::DsrgPT2Constructor>();
 }
 
 void EffectiveHamiltonianConstructorFactory::register_default_instances() {
   QDK_LOG_TRACE_ENTERING();
   EffectiveHamiltonianConstructorFactory::register_instance(
-      &make_swpt2_constructor);
+      &make_dsrg_pt2_constructor);
 }
 
 }  // namespace qdk::chemistry::algorithms

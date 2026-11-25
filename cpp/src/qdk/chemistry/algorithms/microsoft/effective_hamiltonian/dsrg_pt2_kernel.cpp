@@ -2,7 +2,7 @@
 // Licensed under the MIT License. See LICENSE.txt in the project root for
 // license information.
 
-#include "swpt2_kernel.hpp"
+#include "dsrg_pt2_kernel.hpp"
 
 #include <btas/btas.h>
 #include <qdk/chemistry/scf/util/blas_threads.h>
@@ -28,7 +28,7 @@
 #include <utility>
 #include <vector>
 
-namespace qdk::chemistry::algorithms::microsoft::swpt2 {
+namespace qdk::chemistry::algorithms::microsoft::dsrg_pt2 {
 
 namespace {
 inline Eigen::Index n4(int n) {
@@ -47,17 +47,13 @@ double chemist(const TwoBodyBlocks& two_body, int left, int right, int p, int q,
 }
 }  // namespace
 
-// The second-order unitary expansion [S, H_OD] + [S, [S, F0]]/2 equals
+// The second-order DSRG expansion [S, H_OD] + [S, [S, F0]]/2 equals
 // [S, V]/2 with each channel's coupling scaled by 2 - g, so its energy carries
 // g (2 - g) = 1 - exp(-2s*D^2).
-ChannelFactors channel_factors(double delta, const RegularizerOptions& reg) {
-  // A channel left out of S keeps its whole coupling: [S, F0] has no part to
-  // cancel it. The floor also bounds amplitudes at very large s.
-  if (std::abs(delta) < denominator_floor) return {0.0, 2.0};
-  if (reg.flow == 0.0) return {1.0 / delta, 1.0};
-  // expm1 rather than 1-exp: the difference cancels catastrophically for
-  // small s*delta^2, which is exactly where the regularizer works.
-  const double kept = -std::expm1(-reg.flow * delta * delta);
+ChannelFactors channel_factors(double delta, double flow) {
+  if (flow == 0.0 || delta == 0.0) return {0.0, 2.0};
+  // expm1 rather than 1-exp avoids cancellation for small s*delta^2.
+  const double kept = -std::expm1(-flow * delta * delta);
   return {kept / delta, 2.0 - kept};
 }
 
@@ -393,7 +389,7 @@ void accumulate_projected_term(const sq::Product& product,
   auto source_product = sq::ex<sq::Constant>(product.scalar());
   for (const auto& source : sources) {
     if (source.label() != L"S" && source.label() != L"V")
-      throw std::runtime_error("SW-PT2: unreduced source contraction");
+      throw std::runtime_error("DSRG-PT2: unreduced source contraction");
     source_product *=
         source.bra_rank() == 1
             ? sq::ex<sq::Tensor>(source)
@@ -581,9 +577,10 @@ std::vector<Plan> build_plans(const Equations& equations,
 // integrals and stay out of the diagnostics.
 constexpr double negligible_coupling = 1e-12;
 
-// Raw (undamped) amplitude, with the denominator floored at the bare cutoff.
+// Raw (undamped) amplitude; a nonzero coupling at zero gap gives infinity.
 double raw_amplitude(double coupling, double delta) {
-  return std::abs(coupling) / std::max(std::abs(delta), denominator_floor);
+  return delta == 0.0 ? std::numeric_limits<double>::infinity()
+                      : std::abs(coupling) / std::abs(delta);
 }
 
 // Inputs shared by the steps of one downfold call.
@@ -592,7 +589,7 @@ struct Inputs {
   const std::vector<int>& active;
   const std::vector<int>& inactive;
   const std::vector<int>& virtuals;
-  const RegularizerOptions& regularizer;
+  double flow;
   const std::array<Eigen::MatrixXd, 2>& density;
   bool spin_free;
   int norb;
@@ -605,16 +602,14 @@ struct Inputs {
     return chemist(two_body, left, right, p, q, r, s, norb);
   }
   // Summing creators and annihilators separately makes the denominator
-  // exactly antisymmetric under the adjoint and symmetric under exchange,
-  // so S stays anti-Hermitian even at the bare cutoff.
+  // exactly antisymmetric under the adjoint and symmetric under exchange.
   static double denominator(double first, double second, double third,
                             double fourth) {
     return (first + second) - (third + fourth);
   }
   ChannelFactors two_body_factors(double first, double second, double third,
                                   double fourth) const {
-    return channel_factors(denominator(first, second, third, fourth),
-                           regularizer);
+    return channel_factors(denominator(first, second, third, fourth), flow);
   }
 };
 
@@ -622,44 +617,80 @@ struct OneBodyOperators {
   std::array<Eigen::MatrixXd, 2> normal_ordered, generator, coupling;
 };
 
-// Normal order against the filled inactive space, not the density used for
-// the generalized Fock. Each inactive trace keeps the denominator of the
-// two-body term it comes from, so the floor drops the same channels here as
-// in the two-body operator.
+// Normal order against the filled inactive space, and when a reference 1-RDM
+// is supplied, build the DSRG-PT2 singles (including the active-space
+// correction b^a_i) converted to core normal order.
 OneBodyOperators one_body_operators(
     const Inputs& in, const std::array<Eigen::MatrixXd, 2>& one_body) {
   OneBodyOperators out{one_body, one_body, one_body};
   const int norb = in.norb;
-  for (int spin = 0; spin < 2; ++spin) {
+  for (int spin = 0; spin < (in.spin_free ? 1 : 2); ++spin) {
     const auto& eps = in.energies[spin];
 #pragma omp parallel for schedule(static) if (n4(norb) >= min_parallel_work)
     for (int row = 0; row < norb; ++row)
       for (int col = 0; col < norb; ++col) {
-        const auto bare = channel_factors(eps(row) - eps(col), in.regularizer);
-        out.generator[spin](row, col) *= bare.inverse;
-        out.coupling[spin](row, col) *= bare.dressing;
+        double trace = 0.0;
         for (const int occupied : in.inactive) {
-          // Coulomb with both spins of the occupied orbital, exchange with one.
-          double trace = 0.0, generator_trace = 0.0, coupling_trace = 0.0;
-          const auto add = [&](double integral, const ChannelFactors& factors) {
-            trace += integral;
-            generator_trace += integral * factors.inverse;
-            coupling_trace += integral * factors.dressing;
-          };
-          for (int other = 0; other < 2; ++other) {
-            const double occupied_energy = in.energies[other](occupied);
-            add(in.integral(spin, other, row, col, occupied, occupied),
-                in.two_body_factors(eps(row), occupied_energy, occupied_energy,
-                                    eps(col)));
-          }
-          add(-in.integral(spin, spin, row, occupied, occupied, col),
-              in.two_body_factors(eps(row), eps(occupied), eps(occupied),
-                                  eps(col)));
-          out.normal_ordered[spin](row, col) += trace;
-          out.generator[spin](row, col) += generator_trace;
-          out.coupling[spin](row, col) += coupling_trace;
+          for (int other = 0; other < 2; ++other)
+            trace += in.integral(spin, other, row, col, occupied, occupied);
+          trace -= in.integral(spin, spin, row, occupied, occupied, col);
+        }
+        out.normal_ordered[spin](row, col) += trace;
+        if (in.flow > 0.0) {
+          const auto bare = channel_factors(eps(row) - eps(col), in.flow);
+          out.generator[spin](row, col) =
+              out.normal_ordered[spin](row, col) * bare.inverse;
+          out.coupling[spin](row, col) =
+              out.normal_ordered[spin](row, col) * bare.dressing;
         }
       }
+  }
+  if (in.flow > 0.0 && in.density[0].size() != 0) {
+    std::vector<char> is_active(norb, 0);
+    for (const int orbital : in.active) is_active[orbital] = 1;
+    std::vector<int> particles(in.active);
+    particles.insert(particles.end(), in.virtuals.begin(), in.virtuals.end());
+    std::vector<int> holes(in.inactive);
+    holes.insert(holes.end(), in.active.begin(), in.active.end());
+    for (int spin = 0; spin < (in.spin_free ? 1 : 2); ++spin) {
+      const auto& eps = in.energies[spin];
+      for (const int a : particles)
+        for (const int i : holes) {
+          if (is_active[a] && is_active[i]) continue;
+          double active_fock = 0.0, b = 0.0, t_trace = 0.0, v_trace = 0.0;
+          for (int other = 0; other < 2; ++other) {
+            const auto& other_eps = in.energies[other];
+            for (const int x : in.active)
+              for (const int u : in.active) {
+                const double gamma = in.density[other](x, u);
+                if (gamma == 0.0) continue;
+                double v = in.integral(spin, other, a, i, x, u);
+                if (other == spin) v -= in.integral(spin, spin, a, u, x, i);
+                const auto f2 = in.two_body_factors(eps(a), other_eps(x),
+                                                    eps(i), other_eps(u));
+                const double t = -v * f2.inverse;
+                active_fock += gamma * v;
+                b += (other_eps(x) - other_eps(u)) * gamma * t;
+                t_trace += gamma * t;
+                v_trace += gamma * v * f2.dressing;
+              }
+          }
+          const double f_ai = out.normal_ordered[spin](a, i) + active_fock;
+          const auto f1 = channel_factors(eps(a) - eps(i), in.flow);
+          const double s_ai = (f_ai + b) * f1.inverse + t_trace;
+          const double v_ai =
+              f_ai * f1.dressing + b * (f1.dressing - 1.0) - v_trace;
+          out.generator[spin](a, i) = s_ai;
+          out.generator[spin](i, a) = -s_ai;
+          out.coupling[spin](a, i) = v_ai;
+          out.coupling[spin](i, a) = v_ai;
+        }
+    }
+  }
+  if (in.spin_free) {
+    out.normal_ordered[1] = out.normal_ordered[0];
+    out.generator[1] = out.generator[0];
+    out.coupling[1] = out.coupling[0];
   }
   return out;
 }
@@ -722,14 +753,16 @@ void track_single_couplings(
       for (int spin = 0; spin < (in.spin_free ? 1 : 2); ++spin) {
         const double delta =
             in.energies[spin](creator) - in.energies[spin](annihilator);
-        // The generator's one-body coefficient is the normal-ordered one.
+        const double coupling = fock[spin](creator, annihilator);
         if (std::abs(normal_ordered[spin](creator, annihilator)) >
-            negligible_coupling)
+                negligible_coupling ||
+            std::abs(coupling) > negligible_coupling) {
           result.min_denominator =
               std::min(result.min_denominator, std::abs(delta));
-        result.max_amplitude =
-            std::max(result.max_amplitude,
-                     raw_amplitude(fock[spin](creator, annihilator), delta));
+          if (std::abs(coupling) > negligible_coupling)
+            result.max_amplitude =
+                std::max(result.max_amplitude, raw_amplitude(coupling, delta));
+        }
       }
     }
 }
@@ -815,7 +848,7 @@ sq::ResultPtr build_operand(const Inputs& in, const OneBodyOperators& operators,
       const double delta =
           Inputs::denominator(eps(orbital[0]), partner_eps(orbital[1]),
                               eps(orbital[2]), partner_eps(orbital[3]));
-      const auto factors = channel_factors(delta, in.regularizer);
+      const auto factors = channel_factors(delta, in.flow);
       value = direct * (is_generator ? factors.inverse : factors.dressing);
       if (is_generator) {
         const auto record = [&](double coupling) {
@@ -873,7 +906,7 @@ std::vector<sq::ResultPtr> evaluate_plans(
       try {
         values[ordinal] = sq::evaluate(selected[ordinal]->tree, leaf);
       } catch (...) {
-#pragma omp critical(swpt2_plan_failure)
+#pragma omp critical(dsrg_pt2_plan_failure)
         if (!failure) failure = std::current_exception();
       }
     }
@@ -921,25 +954,24 @@ DownfoldResult downfold(const std::array<Eigen::MatrixXd, 2>& one_body,
                         const std::array<Eigen::MatrixXd, 2>& fock,
                         const std::vector<int>& active,
                         const std::vector<int>& inactive,
-                        const std::vector<int>& virtuals,
-                        const RegularizerOptions& regularizer,
+                        const std::vector<int>& virtuals, double flow,
                         double core_energy, bool spin_free,
                         const std::array<Eigen::MatrixXd, 2>& density) {
   const Inputs in{two_body,
                   active,
                   inactive,
                   virtuals,
-                  regularizer,
+                  flow,
                   density,
                   spin_free,
                   static_cast<int>(fock[0].rows()),
                   {fock[0].diagonal(), fock[1].diagonal()}};
   const auto operators = one_body_operators(in, one_body);
-  // Start with P H_BD P; the contraction plans add 1/2 P [S, V] P with the
-  // dressed coupling V.
+  // Start with P H_BD P; at positive flow the contraction plans add
+  // 1/2 P [S, V] P with the dressed coupling V.
   auto result =
       block_diagonal_part(in, one_body, operators.normal_ordered, core_energy);
-  if (!inactive.empty() || !virtuals.empty()) {
+  if (flow > 0.0 && (!inactive.empty() || !virtuals.empty())) {
     track_single_couplings(in, operators.normal_ordered, fock, result);
     // Plans touching an empty role are skipped, so empty roles share extent
     // one.
@@ -964,4 +996,4 @@ DownfoldResult downfold(const std::array<Eigen::MatrixXd, 2>& one_body,
   return result;
 }
 
-}  // namespace qdk::chemistry::algorithms::microsoft::swpt2
+}  // namespace qdk::chemistry::algorithms::microsoft::dsrg_pt2

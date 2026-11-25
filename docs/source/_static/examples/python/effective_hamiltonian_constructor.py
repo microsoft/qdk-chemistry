@@ -11,7 +11,7 @@ from qdk_chemistry.algorithms import registry
 
 print(registry.available("effective_hamiltonian_constructor"))
 # Example output:
-# ['qdk_swpt2']
+# ['qdk_dsrg_pt2']
 # end-cell-list-implementations
 ################################################################################
 
@@ -19,15 +19,15 @@ print(registry.available("effective_hamiltonian_constructor"))
 # start-cell-create
 from qdk_chemistry.algorithms import create
 
-# Create a second-order Schrieffer-Wolff downfolder
-downfolder = create("effective_hamiltonian_constructor", "qdk_swpt2")
+# Create a DSRG-PT2 downfolder
+downfolder = create("effective_hamiltonian_constructor", "qdk_dsrg_pt2")
 # end-cell-create
 ################################################################################
 
 ################################################################################
 # start-cell-configure
-# Weaken the denominator regularization
-downfolder.settings().set("regularizer_flow", 2.0)
+# Adjust the DSRG flow parameter s (in Eh^-2)
+downfolder.settings().set("flow_parameter", 2.0)
 # end-cell-configure
 ################################################################################
 
