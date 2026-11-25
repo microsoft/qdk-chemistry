@@ -7,7 +7,6 @@ namespace QDKChemistry.Utils.UnitarySynthesis {
 
     import Std.Arithmetic.ApplyIfGreaterL;
     import Std.Arrays.All;
-    import Std.Arrays.Any;
     import Std.Arrays.Chunks;
     import Std.Arrays.Flattened;
     import Std.Arrays.ForEach;
@@ -34,6 +33,7 @@ namespace QDKChemistry.Utils.UnitarySynthesis {
     import Std.ResourceEstimation.EndEstimateCaching;
     import Std.TableLookup.Select;
     import QDKChemistry.Utils.Arithmetic.AddConstant;
+    import QDKChemistry.Utils.PhaseGradient.QuantizeRyAngle;
     import QDKChemistry.Utils.PhaseGradient.QuantizeRyAngles;
     import QDKChemistry.Utils.PhaseGradient.RyViaPhaseGradient;
     import QDKChemistry.Utils.SelectSwap.ApplyBranchPhaseFixup;
@@ -72,13 +72,13 @@ namespace QDKChemistry.Utils.UnitarySynthesis {
         maxSwapBits : Int,
     }
 
-    /// Drops the trailing all-zero words, which are identity rotations, of a quantized angle table.
-    function TrimZeroWords(words : Bool[][]) : Bool[][] {
-        mutable length = Length(words);
-        while length > 0 and not Any(bit -> bit, words[length - 1]) {
+    /// `QuantizeRyAngles` without the trailing angles that quantize to the zero word, which are identity rotations.
+    function QuantizeTrimmedRyAngles(angles : Double[], bits : Int) : Bool[][] {
+        mutable length = Length(angles);
+        while length > 0 and QuantizeRyAngle(angles[length - 1], bits) == 0 {
             set length -= 1;
         }
-        words[...length - 1]
+        QuantizeRyAngles(angles[...length - 1], bits)
     }
 
     /// Quantizes every layer of `givens` into words of `rotationBits` bits, at most
@@ -91,7 +91,7 @@ namespace QDKChemistry.Utils.UnitarySynthesis {
     ) : QuantizedGivensDecomposition {
         Fact(All(angles -> Length(angles) <= numAddresses, givens.layerAngles), "A Givens layer has more angles than addresses.");
         // G(θ) is Ry(2θ) on the active qubit.
-        let quantizeLayer = angles -> TrimZeroWords(QuantizeRyAngles(Mapped(angle -> 2.0 * angle, angles), rotationBits));
+        let quantizeLayer = angles -> QuantizeTrimmedRyAngles(Mapped(angle -> 2.0 * angle, angles), rotationBits);
         new QuantizedGivensDecomposition {
             layers = Mapped(quantizeLayer, givens.layerAngles),
             layerShifted = givens.layerShifted,
