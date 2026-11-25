@@ -293,11 +293,15 @@ std::shared_ptr<data::Hamiltonian> DsrgPT2Constructor::_run_impl(
   const std::vector<int>& active_spatial = window_roles.active_spatial;
   const std::vector<int>& inactive_spatial = window_roles.inactive_spatial;
   const std::vector<int>& virtual_spatial = window_roles.virtual_spatial;
+  // With no core or virtual orbital to fold, the transformation is the
+  // identity.
+  const double fold_flow =
+      inactive_spatial.empty() && virtual_spatial.empty() ? 0.0 : flow;
 
   std::array<Eigen::VectorXd, 2> orbital_energies{Eigen::VectorXd::Zero(norb),
                                                   Eigen::VectorXd::Zero(norb)};
   std::array<dsrg::SemicanonicalRotation, 2> rotation;
-  if (flow > 0.0) {
+  if (fold_flow > 0.0) {
     auto fock = dsrg::generalized_fock_matrices(one_body, two_body_blocks(),
                                                 density, norb, !unrestricted);
     constexpr double semicanonical_tolerance = 1e-12;
@@ -333,7 +337,7 @@ std::shared_ptr<data::Hamiltonian> DsrgPT2Constructor::_run_impl(
 
   auto down = dsrg::downfold(one_body, two_body_blocks(), orbital_energies,
                              active_spatial, inactive_spatial, virtual_spatial,
-                             flow, e_core, !unrestricted, density);
+                             fold_flow, e_core, !unrestricted, density);
 
   QDK_LOGGER().info(
       "DSRG-PT2 downfold complete: flow_parameter={}, active={}, "

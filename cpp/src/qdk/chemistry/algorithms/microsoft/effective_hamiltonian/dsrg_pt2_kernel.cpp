@@ -1072,7 +1072,7 @@ DownfoldResult downfold(const std::array<Eigen::MatrixXd, 2>& one_body,
   // 1/2 P [S, V] P with the dressed coupling V.
   populate_block_diagonal_part(in, one_body, operators.normal_ordered,
                                core_energy, result);
-  if (flow > 0.0 && (!inactive.empty() || !virtuals.empty())) {
+  if (flow > 0.0) {
     const auto plans = build_plans(
         reusable_equations(), {inactive.size(), active.size(), virtuals.size()},
         spin_free);
