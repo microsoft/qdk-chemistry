@@ -28,6 +28,7 @@ namespace QDKChemistry.Utils.UnitarySynthesis {
     import Std.Math.MaxI;
     import Std.Math.MinI;
     import Std.Math.PI;
+    import Std.Math.TrailingZeroCountI;
     import Std.Measurement.MResetX;
     import Std.ResourceEstimation.BeginEstimateCaching;
     import Std.ResourceEstimation.EndEstimateCaching;
@@ -43,6 +44,7 @@ namespace QDKChemistry.Utils.UnitarySynthesis {
     import QDKChemistry.Utils.SelectSwap.MeasurementUnlookupCost;
     import QDKChemistry.Utils.SelectSwap.SelectSwap2D;
     import QDKChemistry.Utils.SelectSwap.SelectSwapAliased;
+    import QDKChemistry.Utils.SelectSwap.SelectSwapCost2D;
     import QDKChemistry.Utils.SelectSwap.SelectSwapForwardCost;
     import QDKChemistry.Utils.SelectSwap.SwapDataOutputs;
     import QDKChemistry.Utils.SelectSwap.SwapNetworkPermutation;
@@ -100,17 +102,33 @@ namespace QDKChemistry.Utils.UnitarySynthesis {
         }
     }
 
-    /// Whether a table of `numData` words is cheaper to load behind an `address < numData`
-    /// flag than zero-padded to all `2^addressBits` addresses.
-    function UseAddressGuard(numData : Int, addressBits : Int, numBits : Int, maxSwapBits : Int) : Bool {
+    /// Whether `numData` words under `numControls` controls take fewer Toffolis to load behind an `address < numData`
+    /// flag than zero-padded to all `2^addressBits` addresses, with each branch costed as the multiplexed Ry runs it,
+    /// erasure included unless `deferred`.
+    function UseAddressGuard(numData : Int, addressBits : Int, numBits : Int, maxSwapBits : Int, numControls : Int, deferred : Bool) : Bool {
         let full = 1 <<< addressBits;
         if numData >= full {
             return false;
         }
-        let paddedCost = SelectSwapForwardCost(ComputeOptimalSwapBits(full, numBits, maxSwapBits), full, numBits);
-        let trimmedCost = SelectSwapForwardCost(ComputeOptimalSwapBits(numData, numBits, maxSwapBits), numData, numBits);
-        // The comparator is computed and uncomputed.
-        trimmedCost + 2 * addressBits < paddedCost
+        // Toffolis of an X with m controls, as Q# decomposes it.
+        let gateCost = m -> MaxI(0, 2 * m - 3);
+        let cost = guarded -> {
+            let numWords = guarded ? numData | full;
+            let loadControls = guarded or numControls > 0 ? 1 | 0;
+            // The flag is computed and uncomputed: a comparator on the address bits above the bound's trailing
+            // zeros with the controls on its action, or the AND of several controls.
+            let flagCost = 2 * (guarded ? addressBits - TrailingZeroCountI(numData) - 1 + gateCost(numControls + 1) | gateCost(numControls));
+            if deferred {
+                let swapBits = not guarded and numControls == 0 ? ComputeOptimalLambda2D(1, numWords, numBits, true, maxSwapBits) | ComputeOptimalSwapBits(numWords, numBits, maxSwapBits);
+                // The swap network runs once and only the copy out is controlled.
+                flagCost + (swapBits == 0 ? MaxI(0, numWords + loadControls - 2) | MaxI(0, 2^(AddressQubits(numWords) - swapBits) - 2) + (2^swapBits - 1 + loadControls) * numBits)
+            } elif loadControls == 0 {
+                SelectSwapCost2D(ComputeOptimalLambda2D(1, full, numBits, true, maxSwapBits), 1, full, numBits, true)
+            } else {
+                flagCost + SelectSwapForwardCost(ComputeOptimalSwapBits(numWords, numBits, maxSwapBits), numWords, numBits) + MeasurementUnlookupCost(1 + AddressQubits(numWords))
+            }
+        };
+        cost(true) < cost(false)
     }
 
     /// Loads `data[address]` into the clean `target` when `flag` is |1⟩, with an adjoint that
@@ -178,7 +196,7 @@ namespace QDKChemistry.Utils.UnitarySynthesis {
         body (...) {
             if not IsEmpty(data) {
                 let numBits = Length(angleReg);
-                let guarded = UseAddressGuard(Length(data), Length(address), numBits, maxSwapBits);
+                let guarded = UseAddressGuard(Length(data), Length(address), numBits, maxSwapBits, Length(controls), false);
                 let table = guarded ? data | Padded(-(1 <<< Length(address)), [false, size = numBits], data);
                 if not guarded and IsEmpty(controls) {
                     let swapBits = ComputeOptimalLambda2D(1, Length(table), numBits, true, maxSwapBits);
@@ -365,7 +383,7 @@ namespace QDKChemistry.Utils.UnitarySynthesis {
             [false, size = numSlices <<< addressBits]
         } else {
             let numBits = Length(angleReg);
-            let guarded = UseAddressGuard(Length(data), addressBits, numBits, maxSwapBits);
+            let guarded = UseAddressGuard(Length(data), addressBits, numBits, maxSwapBits, Length(controls), true);
             let table = guarded ? data | Padded(-(1 <<< addressBits), [false, size = numBits], data);
             let swapBits = not guarded and IsEmpty(controls) ? ComputeOptimalLambda2D(1, Length(table), numBits, true, maxSwapBits) | ComputeOptimalSwapBits(Length(table), numBits, maxSwapBits);
             // A flag holds the load condition unless that is a single control or always true.

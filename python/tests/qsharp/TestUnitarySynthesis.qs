@@ -7,6 +7,7 @@ namespace QDKChemistry.TestUtils.UnitarySynthesisTests {
     import Std.Math.MaxI;
     import QDKChemistry.Utils.PhaseGradient.PreparePhaseGradientState;
     import QDKChemistry.Utils.UnitarySynthesis.ApplyControlledMultiplexedRy;
+    import QDKChemistry.Utils.UnitarySynthesis.ApplyMultiplexedRyDeferred;
     import QDKChemistry.Utils.UnitarySynthesis.ApplyPhasePolynomial;
     import QDKChemistry.Utils.UnitarySynthesis.ApplyRealUnitaryViaGivens;
     import QDKChemistry.Utils.UnitarySynthesis.GivensDecomposition;
@@ -82,6 +83,19 @@ namespace QDKChemistry.TestUtils.UnitarySynthesisTests {
                     Controlled ApplyControlledMultiplexedRy(outer, args);
                 }
             }
+        }
+    }
+
+    /// Applies `ApplyControlledMultiplexedRy` of `words`, or its deferred-erasure variant, on fresh qubits for resource
+    /// counting.
+    operation TestMultiplexedRyResourceProbe(words : Bool[][], maxSwapBits : Int, numControls : Int, numAddress : Int, deferred : Bool) : Unit {
+        let bits = Length(words[0]);
+        use (address, controls, target) = (Qubit[numAddress], Qubit[numControls], Qubit());
+        use (phaseGradient, angleReg) = (Qubit[bits], Qubit[bits]);
+        if deferred {
+            let _ = ApplyMultiplexedRyDeferred(words, maxSwapBits, address, controls, target, phaseGradient, angleReg);
+        } else {
+            ApplyControlledMultiplexedRy(words, maxSwapBits, address, controls, target, phaseGradient, angleReg);
         }
     }
 

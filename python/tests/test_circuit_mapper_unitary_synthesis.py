@@ -402,8 +402,7 @@ class TestMultiplexedRy:
     def test_matches_reference(
         self, qsharp_test_context, qsharp_test_utils, num_words, num_controls, num_outer, max_swap_bits, inverse
     ):
-        """Each address below the table length rotates by its word, or its negative for the adjoint, whether the
-        controls are passed directly or through ``Controlled``; later addresses and unset controls do not rotate."""
+        """In-table addresses rotate by their word, negated in the adjoint, iff all inner and outer controls are set."""
         rng = np.random.default_rng(num_words + 10 * num_controls)
         values = rng.integers(1, 1 << self._BITS, num_words)
         words = [[bool((value >> bit) & 1) for bit in range(self._BITS)] for value in values]
@@ -426,6 +425,26 @@ class TestMultiplexedRy:
                 cosine, sine = np.cos(angle / 2), np.sin(angle / 2)
                 expected[index] = [[cosine, -sine], [sine, cosine]] @ expected[index]
         assert abs(np.vdot(expected.ravel(), state)) ** 2 == pytest.approx(1.0, abs=1e-10)
+
+    @pytest.mark.parametrize(
+        ("num_address", "num_words", "num_controls", "deferred", "guard_wins"),
+        [(3, 2, 1, False, True), (4, 8, 0, False, True), (4, 8, 2, True, True), (3, 1, 2, True, False)],
+    )
+    def test_guards_short_tables_only_when_cheaper(
+        self, qsharp_test_context, qsharp_test_utils, num_address, num_words, num_controls, deferred, guard_wins
+    ):
+        """A short table costs fewer Toffolis than zero-padded where the address guard pays off, else the same."""
+        probe = qsharp_test_utils.UnitarySynthesisTests.TestMultiplexedRyResourceProbe
+        words = [[bool((5 * k + 3 + b) % 3) for b in range(4)] for k in range(num_words)]
+        padded = words + [[False] * 4] * ((1 << num_address) - num_words)
+        short_cost, padded_cost = (
+            sum(
+                qsharp_test_context.logical_counts(probe, table, -1, num_controls, num_address, deferred)[key]
+                for key in ("cczCount", "ccixCount")
+            )
+            for table in (words, padded)
+        )
+        assert short_cost < padded_cost if guard_wins else short_cost == padded_cost
 
 
 class TestAddConstant:
