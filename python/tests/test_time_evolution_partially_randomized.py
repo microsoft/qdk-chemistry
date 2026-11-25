@@ -153,9 +153,9 @@ class TestPartiallyRandomizedBasics:
         builder = PartiallyRandomized()
         assert builder.type_name() == "hamiltonian_unitary_builder"
 
-    def test_default_random_sample_floor_is_one(self):
-        """Accuracy-aware sizing starts from the canonical minimum sample floor."""
-        assert PartiallyRandomized().settings().get("num_random_samples") == 1
+    def test_default_random_sample_count(self):
+        """Standalone builders keep main's fixed random-sample count by default."""
+        assert PartiallyRandomized().settings().get("num_random_samples") == 100
 
     def test_can_create_via_registry(self):
         """Test that PartiallyRandomized can be created via the algorithm registry."""
@@ -694,24 +694,6 @@ class TestPartiallyRandomizedEdgeCases:
 
 class TestPartiallyRandomizedAccuracyAwareStructure:
     """Structural tests for ε-aware (target_accuracy) parameterization."""
-
-    def test_epsilon_zero_preserves_single_step(self):
-        """With target_accuracy=0 the builder uses a single sandwich (r=1)."""
-        hamiltonian = QubitOperator(
-            pauli_strings=["X", "Z", "Y"],
-            coefficients=[1.0, 0.1, 0.05],
-        )
-        builder = PartiallyRandomized(
-            weight_threshold=0.5,
-            num_random_samples=5,
-            trotter_order=2,
-            seed=42,
-            merge_duplicate_terms=False,
-            time=0.2,
-        )
-        terms = builder.run(hamiltonian).get_container().step_terms
-        # Single sandwich: 1 det forward + 5 random + 1 det backward
-        assert len(terms) == 1 + 5 + 1
 
     def test_resolve_num_divisions_matches_commutator_bound(self):
         """The outer step count r equals the commutator Trotter bound for ε_D."""

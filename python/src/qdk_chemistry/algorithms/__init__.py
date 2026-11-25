@@ -66,7 +66,7 @@ from qdk_chemistry.algorithms.phase_estimation.circuit_builder.base import QpeCi
 from qdk_chemistry.algorithms.phase_estimation.circuit_builder.robust_builder import (
     RobustPhaseEstimationCircuitBuilder,
 )
-from qdk_chemistry.algorithms.phase_estimation.rpe_experiment_scheduler import (
+from qdk_chemistry.algorithms.phase_estimation.circuit_builder.rpe_experiment_scheduler import (
     RobustPhaseEstimationExperimentScheduler,
 )
 from qdk_chemistry.algorithms.population_analysis import PopulationAnalyzer, QdkPopulationAnalyzer

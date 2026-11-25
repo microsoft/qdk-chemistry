@@ -483,6 +483,10 @@ class RobustPhaseEstimationSchedule(DataClass):
             raise ValueError("Unsupported schedule evolution category.")
         if self.energy_correction not in ("linear", "qdrift_tangent"):
             raise ValueError("Unsupported schedule energy correction.")
+        if self.energy_correction == "qdrift_tangent" and self.unitary_builder_category != "qdrift":
+            raise ValueError(
+                "The qDRIFT tangent correction requires a qDRIFT schedule; regenerate it with linear correction."
+            )
         settings = Settings.from_json(self._unitary_builder_configuration.settings_json)
         for key in ("time", "seed", "num_samples"):
             if settings.has(key):

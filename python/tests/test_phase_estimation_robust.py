@@ -26,13 +26,13 @@ from qdk_chemistry.algorithms.base import create_from_ref
 from qdk_chemistry.algorithms.phase_estimation.circuit_builder.robust_builder import (
     RobustPhaseEstimationCircuitBuilder,
 )
+from qdk_chemistry.algorithms.phase_estimation.circuit_builder.rpe_experiment_scheduler import (
+    RobustPhaseEstimationExperimentScheduler,
+)
 from qdk_chemistry.algorithms.phase_estimation.robust_phase_estimation import (
     RobustPhaseEstimation,
     _rpe_angle_update,
     _RpeExecutionResult,
-)
-from qdk_chemistry.algorithms.phase_estimation.rpe_experiment_scheduler import (
-    RobustPhaseEstimationExperimentScheduler,
 )
 from qdk_chemistry.data import (
     AlgorithmRef,
@@ -85,6 +85,32 @@ def test_rpe_angle_update_rejects_negative_round() -> None:
     """Phase reconstruction rejects a negative round index."""
     with pytest.raises(ValueError, match="round_index"):
         _rpe_angle_update(0.0, 0.1, round_index=-1)
+
+
+def _exhaustive_alias_update(previous_angle: float, measured_phase: float, round_index: int) -> float:
+    """Return the closest alias by checking every candidate in index order."""
+    scale = 2**round_index
+    best_candidate = measured_phase / scale
+    best_distance = abs(float((best_candidate - previous_angle + np.pi) % (2 * np.pi) - np.pi))
+    for alias_index in range(1, scale):
+        candidate = (measured_phase + 2 * np.pi * alias_index) / scale
+        distance = abs(float((candidate - previous_angle + np.pi) % (2 * np.pi) - np.pi))
+        if distance < best_distance:
+            best_distance, best_candidate = distance, candidate
+    return float(best_candidate)
+
+
+@pytest.mark.parametrize("round_index", [0, 1, 3, 8])
+def test_rpe_angle_update_matches_exhaustive_alias_search(round_index: int) -> None:
+    """Constant-time alias selection matches an exhaustive search, including equidistant aliases."""
+    scale = 2**round_index
+    rng = np.random.default_rng(round_index)
+    cases = [(float(previous), float(measured)) for previous, measured in rng.uniform(-2 * np.pi, 2 * np.pi, (500, 2))]
+    cases += [((0.25 + np.pi * (2 * alias + 1)) / scale, 0.25) for alias in range(min(scale, 8))]
+
+    for previous_angle, measured_phase in cases:
+        expected = _exhaustive_alias_update(previous_angle, measured_phase, round_index)
+        assert _rpe_angle_update(previous_angle, measured_phase, round_index) == expected
 
 
 def test_resolve_energy_inverts_linear_phase() -> None:
@@ -514,6 +540,52 @@ def test_driver_recovers_energy_qdrift_mode(monkeypatch: pytest.MonkeyPatch, ene
     assert result.resolved_energy == pytest.approx(energy, abs=1e-3)
 
 
+@pytest.mark.parametrize("mutate_input", [False, True])
+def test_qdrift_tangent_correction_uses_sampled_norm(monkeypatch: pytest.MonkeyPatch, mutate_input: bool) -> None:
+    """Thresholded qDRIFT corrects with the sampled-term norm of the input snapshot that built the circuits."""
+    pauli_strings, coefficients = ["ZI", "IZ"], [0.6, 0.4]
+    hamiltonian = QubitOperator(pauli_strings=pauli_strings, coefficients=coefficients)
+    _, eigenvectors = np.linalg.eigh(_dense_from_pauli(pauli_strings, coefficients))
+    readout = _classical_expectation(eigenvectors[:, 0])
+
+    def expectation(unitary: object, basis: str) -> float:
+        if mutate_input:
+            hamiltonian.coefficients[0] = 0.9
+        return readout(unitary, basis)
+
+    builder = _make_builder(
+        target_accuracy=0.5,
+        unitary_builder_name="qdrift",
+        unitary_builder_kwargs={"weight_threshold": 0.5},
+        energy_correction="qdrift_tangent",
+    )
+    driver = RobustPhaseEstimation()
+    _install_test_stack(monkeypatch, driver, builder, expectation, use_real_unitary_builder=True)
+
+    result = driver.run(state_preparation=_DUMMY_STATE_PREPARATION, qubit_hamiltonian=hamiltonian)
+
+    assert result.metadata["lambda"] == pytest.approx(1.0)
+    assert result.resolved_energy == pytest.approx(-0.6, abs=1e-6)
+
+
+def test_qdrift_tangent_replay_resolves_omitted_builder_defaults(monkeypatch: pytest.MonkeyPatch) -> None:
+    """A saved qDRIFT schedule without stored builder defaults replays with the default sampling threshold."""
+    hamiltonian = QubitOperator(pauli_strings=["Z"], coefficients=[0.5])
+    builder = _make_builder(target_accuracy=0.5, unitary_builder_name="qdrift", energy_correction="qdrift_tangent")
+    driver = RobustPhaseEstimation()
+    _install_test_stack(
+        monkeypatch, driver, builder, _classical_expectation(np.array([0.0, 1.0])), use_real_unitary_builder=True
+    )
+    payload = driver.schedule_circuit_set(_DUMMY_STATE_PREPARATION, hamiltonian).to_json()
+    payload["schedule"]["unitary_builder_configuration"]["settings_json"] = Settings().to_json()
+    restored = RobustPhaseEstimationCircuitSet.from_json(payload)
+    assert not restored.schedule.unitary_builder_configuration.settings.has("weight_threshold")
+
+    result = driver.execute_circuit_set(restored)
+
+    assert result.resolved_energy == pytest.approx(-0.5, abs=1e-5)
+
+
 def test_driver_uses_explicit_base_time(monkeypatch: pytest.MonkeyPatch) -> None:
     """A builder-provided base time is honored during execution."""
     energy = 0.6
@@ -545,27 +617,30 @@ def test_robust_phase_estimation_name() -> None:
     assert RobustPhaseEstimation().name() == "qdk_robust"
 
 
-@pytest.mark.parametrize(
-    ("builder_name", "correction", "expected"),
-    [
-        ("qdrift", "auto", "qdrift_tangent"),
-        ("partially_randomized", "auto", "linear"),
-        ("trotter", "auto", "linear"),
-        ("partially_randomized", "qdrift_tangent", "qdrift_tangent"),
-        ("qdrift", "linear", "linear"),
-    ],
-)
-def test_energy_correction_auto_selection(builder_name: str, correction: str, expected: str) -> None:
-    """The scheduled correction follows the evolution family unless explicitly overridden."""
+def test_energy_correction_allows_linear_qdrift_override() -> None:
+    """An explicit linear map overrides qDRIFT's automatic tangent correction."""
     scheduler = RobustPhaseEstimationExperimentScheduler(
         target_accuracy=0.5,
         seed=7,
-        energy_correction=correction,
-        unitary_builder=AlgorithmRef("hamiltonian_unitary_builder", builder_name),
+        energy_correction="linear",
+        unitary_builder=AlgorithmRef("hamiltonian_unitary_builder", "qdrift"),
     )
     circuit_set = scheduler.run(QubitOperator(pauli_strings=["Z"], coefficients=np.array([1.0])))
 
-    assert circuit_set.energy_correction == expected
+    assert circuit_set.energy_correction == "linear"
+
+
+@pytest.mark.parametrize("builder_name", ["trotter", "partially_randomized", "zassenhaus"])
+def test_qdrift_tangent_requires_qdrift_builder(builder_name: str) -> None:
+    """The tangent map models pure qDRIFT and is rejected for other evolution families."""
+    scheduler = RobustPhaseEstimationExperimentScheduler(
+        target_accuracy=0.5,
+        energy_correction="qdrift_tangent",
+        unitary_builder=AlgorithmRef("hamiltonian_unitary_builder", builder_name),
+    )
+
+    with pytest.raises(ValueError, match=f"qdrift_tangent.*{builder_name}"):
+        scheduler.run(QubitOperator(pauli_strings=["Z"], coefficients=np.array([1.0])))
 
 
 @pytest.mark.parametrize("base_time", [0.0, np.pi / 32.0, 3.0 * np.pi / 4.0])
@@ -705,6 +780,34 @@ def test_non_trotter_fraction_rejects_branch_unsafe_budget(unitary_builder_name:
     )
 
     with pytest.raises(ValueError, match="epsilon_unitary must be smaller"):
+        scheduler.run(QubitOperator(pauli_strings=["Z"], coefficients=[1.0]))
+
+
+@pytest.mark.parametrize("unitary_builder_name", ["partially_randomized", "zassenhaus"])
+@pytest.mark.parametrize("fraction", [1.0, 1.5])
+def test_non_trotter_fraction_rejects_unit_fraction(unitary_builder_name: str, fraction: float) -> None:
+    """A fraction of one or more would leave the RPE ladder without an energy budget."""
+    scheduler = _make_scheduler(
+        target_accuracy=0.1,
+        unitary_builder_name=unitary_builder_name,
+        unitary_accuracy_fraction=fraction,
+    )
+
+    with pytest.raises(ValueError, match="unitary_accuracy_fraction must be smaller than 1"):
+        scheduler.run(QubitOperator(pauli_strings=["Z"], coefficients=[1.0]))
+
+
+@pytest.mark.parametrize("unitary_builder_name", ["partially_randomized", "zassenhaus"])
+@pytest.mark.parametrize("epsilon_rpe", [0.0, -0.5])
+def test_non_trotter_rejects_nonpositive_explicit_rpe_budget(unitary_builder_name: str, epsilon_rpe: float) -> None:
+    """Only the unset sentinel omits an RPE tolerance; any other explicit value must be positive."""
+    scheduler = _make_scheduler(
+        target_accuracy=0.1,
+        unitary_builder_name=unitary_builder_name,
+        epsilon_rpe=epsilon_rpe,
+    )
+
+    with pytest.raises(ValueError, match="must both be positive"):
         scheduler.run(QubitOperator(pauli_strings=["Z"], coefficients=[1.0]))
 
 
@@ -1065,57 +1168,24 @@ def test_robust_qpe_within_target_accuracy_classical_signal(
 
 
 @pytest.mark.parametrize(
-    "epsilon_total",
-    [0.1, 1e-3],
-    ids=["tenth-hartree", "one-millihartree"],
+    ("problem", "epsilon_total"),
+    [
+        (_noncommuting_ground_state_problem, 0.1),
+        (_noncommuting_ground_state_problem, 1e-3),
+        (_h2_sto3g_ground_state_problem, 1e-3),
+    ],
+    ids=["noncommuting-tenth-hartree", "noncommuting-one-millihartree", "h2-sto3g-one-millihartree"],
 )
-def test_independent_tolerances_bound_noncommuting_trotter_ground_energy(
+def test_independent_tolerances_bound_trotter_ground_energy(
     monkeypatch: pytest.MonkeyPatch,
+    problem: Callable[[], tuple[QubitOperator, np.ndarray, float]],
     epsilon_total: float,
 ) -> None:
     """Independent defaults bound real order-two Trotter ground-energy estimates."""
     epsilon_rpe = epsilon_total
     epsilon_unitary = 0.85
-    hamiltonian, ground_vector, ground_energy = _noncommuting_ground_state_problem()
-    lambda_norm = float(np.sum(np.abs(_NONCOMMUTING_COEFFS)))
-    builder = _make_builder(
-        target_accuracy=epsilon_total,
-        unitary_builder_name="trotter",
-        unitary_builder_kwargs={"order": 2},
-        energy_correction="linear",
-    )
-    driver = RobustPhaseEstimation()
-    _install_test_stack(
-        monkeypatch,
-        driver,
-        builder,
-        _classical_expectation(ground_vector),
-        use_real_unitary_builder=True,
-    )
-
-    result = driver.run(state_preparation=_DUMMY_STATE_PREPARATION, qubit_hamiltonian=hamiltonian)
-
-    final_round = int(np.ceil(np.log2(lambda_norm / epsilon_rpe)))
-    final_time = (2**final_round) * np.pi / (2.0 * lambda_norm)
-    ladder_bound = np.arcsin(epsilon_unitary) / final_time
-    product_bound = (2.0 / np.pi) * epsilon_rpe * np.arcsin(epsilon_unitary)
-    energy_error = abs(result.resolved_energy - ground_energy)
-    assert result.metadata["num_rounds"] == final_round + 1
-    assert result.metadata["unitary_builder"] == "deterministic_or_exact"
-    assert result.metadata["epsilon_rpe"] == pytest.approx(epsilon_total)
-    assert result.metadata["epsilon_unitary"] == pytest.approx(epsilon_unitary)
-    assert result.metadata["error_budget_mode"] == "independent_trotter"
-    assert product_bound < epsilon_total
-    assert energy_error <= ladder_bound <= epsilon_total
-
-
-def test_product_budget_reaches_one_millihartree_for_h2_sto3g(monkeypatch: pytest.MonkeyPatch) -> None:
-    """The independent Trotter tolerances reach one millihartree on H2/STO-3G."""
-    epsilon_total = 1e-3
-    epsilon_unitary = 0.85
-    epsilon_rpe = epsilon_total
-    hamiltonian, ground_vector, ground_energy = _h2_sto3g_ground_state_problem()
-    lambda_norm = float(np.sum(np.abs(_H2_STO3G_COEFFS)))
+    hamiltonian, ground_vector, ground_energy = problem()
+    lambda_norm = hamiltonian.schatten_norm
     builder = _make_builder(
         target_accuracy=epsilon_total,
         unitary_builder_name="trotter",

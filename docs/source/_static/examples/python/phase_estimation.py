@@ -165,57 +165,6 @@ print(rpe_result.get_summary())
 ################################################################################
 
 ################################################################################
-# start-cell-robust-preview
-from qdk_chemistry.algorithms.base import create_from_ref
-
-builder = create(
-    "qpe_circuit_builder",
-    "qdk_robust",
-    experiment_scheduler=experiment_scheduler,
-)
-scheduler = create_from_ref(builder.settings(), "experiment_scheduler")
-schedule = scheduler.run(qubit_ham)
-
-print(schedule.get_summary())
-
-# Stream only the circuit pair needed for execution or resource estimation.
-first_spec, x_circuit, y_circuit = next(
-    builder.iter_build(schedule, circuit, qubit_ham)
-)
-x_application = x_circuit.get_qre_application()
-y_application = y_circuit.get_qre_application()
-print(first_spec.round_index, first_spec.draw_index, first_spec.shots)
-print(x_application, y_application)
-# end-cell-robust-preview
-################################################################################
-
-################################################################################
-# start-cell-robust-replay
-from pathlib import Path
-from tempfile import TemporaryDirectory
-
-from qdk_chemistry.data import RobustPhaseEstimationCircuitSet
-
-circuit_set = RobustPhaseEstimationCircuitSet(
-    schedule=schedule,
-    state_preparation=circuit,
-    qubit_hamiltonian=qubit_ham,
-)
-
-with TemporaryDirectory() as replay_directory:
-    replay_path = (
-        Path(replay_directory) / "example.robust_phase_estimation_circuit_set.json"
-    )
-    circuit_set.to_file(replay_path, "json")
-    restored = RobustPhaseEstimationCircuitSet.from_file(replay_path, "json")
-    rebound = restored.rebind(circuit)
-    replay_result = rpe.execute_circuit_set(rebound)
-
-print(replay_result.get_summary())
-# end-cell-robust-replay
-################################################################################
-
-################################################################################
 # start-cell-list-implementations
 from qdk_chemistry.algorithms import registry
 

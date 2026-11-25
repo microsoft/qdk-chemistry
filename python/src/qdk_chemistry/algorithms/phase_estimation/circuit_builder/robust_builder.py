@@ -9,6 +9,7 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
+from qdk_chemistry.algorithms.hamiltonian_unitary_builder.time_evolution.qdrift_error import _qdrift_lambda
 from qdk_chemistry.data import (
     AlgorithmRef,
     Circuit,
@@ -18,8 +19,8 @@ from qdk_chemistry.data import (
     Settings,
 )
 
-from ..rpe_experiment_scheduler import RobustPhaseEstimationExperimentScheduler, _validate_unit_power
 from .base import QpeCircuitBuilder
+from .rpe_experiment_scheduler import RobustPhaseEstimationExperimentScheduler, _validate_unit_power
 
 if TYPE_CHECKING:
     from collections.abc import Iterator
@@ -110,6 +111,7 @@ class RobustPhaseEstimationCircuitBuilder(QpeCircuitBuilder):
             hadamard_configuration.algorithm_name,
             **(hadamard_settings | {"test_basis": "Y"}),
         )
+        sampled_lambda: float | None = None
         for experiment_spec in schedule.experiment_specs:
             round_data = schedule.rounds[experiment_spec.round_index]
             updates: dict[str, object] = {"time": round_data.evolution_time}
@@ -125,12 +127,12 @@ class RobustPhaseEstimationCircuitBuilder(QpeCircuitBuilder):
                 **(unitary_settings | updates),
             )
             if schedule.unitary_builder_category == "qdrift":
-                sample_resolver = getattr(unitary_builder, "_resolve_num_samples", None)
-                if (
-                    callable(sample_resolver)
-                    and sample_resolver(hamiltonian, round_data.evolution_time) != round_data.scheduled_samples
-                ):
-                    raise ValueError("Executed qDRIFT sample count must match the schedule.")
+                sample_resolver = getattr(unitary_builder, "_resolve_num_samples_from_lambda", None)
+                if callable(sample_resolver):
+                    if sampled_lambda is None:
+                        sampled_lambda = _qdrift_lambda(hamiltonian, unitary_builder.settings().get("weight_threshold"))
+                    if sample_resolver(sampled_lambda, round_data.evolution_time) != round_data.scheduled_samples:
+                        raise ValueError("Executed qDRIFT sample count must match the schedule.")
             unitary = unitary_builder.run(hamiltonian)
             x_circuit = x_builder.run(state_preparation, unitary)
             y_circuit = y_builder.run(state_preparation, unitary)

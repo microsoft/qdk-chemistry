@@ -351,6 +351,15 @@ def test_schedule_rejects_duplicated_round_settings(field: str) -> None:
         RobustPhaseEstimationSchedule.from_json(payload)
 
 
+def test_schedule_rejects_tangent_correction_for_other_families() -> None:
+    """A stored qDRIFT tangent correction cannot be replayed for another evolution family."""
+    payload = _schedule().to_json()
+    payload["energy_correction"] = "qdrift_tangent"
+
+    with pytest.raises(ValueError, match="qDRIFT tangent correction requires a qDRIFT schedule"):
+        RobustPhaseEstimationSchedule.from_json(payload)
+
+
 def test_bundle_rejects_inconsistent_reconstruction_norm() -> None:
     """A stored reconstruction norm must describe the bundle's actual Hamiltonian."""
     payload = _circuit_set().to_json()

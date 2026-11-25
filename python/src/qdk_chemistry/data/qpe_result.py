@@ -223,8 +223,8 @@ class QpeResult(DataClass):
         is required for workflows whose phase-to-energy map is non-linear (for
         example the qDRIFT tangent de-biasing in robust phase estimation), where a
         single ``phase_fraction`` cannot reproduce the energy. The reported phase
-        fields are the principal phase implied by ``angle = -energy * evolution_time``
-        under ``U = exp(-iHt)``.
+        fields are ``angle = -energy * evolution_time`` under ``U = exp(-iHt)``,
+        wrapped to ``[0, 2*pi)``.
 
         Args:
             method: Phase estimation algorithm or workflow label.

@@ -13,6 +13,7 @@ import numpy as np
 
 from qdk_chemistry.algorithms.base import Algorithm, AlgorithmFactory
 from qdk_chemistry.algorithms.hamiltonian_unitary_builder.base import TimeEvolutionBuilder
+from qdk_chemistry.algorithms.hamiltonian_unitary_builder.time_evolution.qdrift_error import _qdrift_lambda
 from qdk_chemistry.data import (
     AlgorithmRef,
     QubitOperator,
@@ -102,7 +103,7 @@ class RobustPhaseEstimationExperimentSchedulerSettings(Settings):
             "double",
             _UNSET_BUDGET_VALUE,
             "Optional legacy fraction of target_accuracy assigned to a non-Trotter unitary builder; "
-            "omitted partially randomized builders use an independent unitary tolerance.",
+            "omitted partially randomized builders use an independent unitary tolerance. Must be below 1.",
         )
         self._set_default(
             "epsilon_rpe",
@@ -120,7 +121,7 @@ class RobustPhaseEstimationExperimentSchedulerSettings(Settings):
             "energy_correction",
             "string",
             "auto",
-            "Phase-to-energy map: 'auto', 'linear', or 'qdrift_tangent'.",
+            "Phase-to-energy map: 'auto', 'linear', or 'qdrift_tangent' (qDRIFT builder only).",
             ["auto", "linear", "qdrift_tangent"],
         )
         self._set_default(
@@ -202,15 +203,16 @@ class RobustPhaseEstimationExperimentScheduler(Algorithm):
         """Resolve rounds, randomized draws, and execution metadata.
 
         The workload includes round zero and every subsequent time doubling.
-        Deterministic rounds use one multi-shot X/Y pair. Randomized rounds use
-        one independently seeded unitary per shot, shared by the two bases.
+        Deterministic rounds use one multi-shot X/Y pair without a draw seed.
+        Randomized rounds use one independently seeded unitary per shot, shared by the two bases.
         For nonzero Hamiltonians, the final evolution time is at least
         ``pi / (2 * epsilon_rpe)``, including when ``base_time`` is explicit.
         qDRIFT counts include any tighter nested accuracy request and must not
-        exceed ``max_qdrift_samples``. Counts are never silently clamped.
+        exceed ``max_qdrift_samples``. Every count is checked before any draw seed
+        is generated, and counts are never silently clamped.
 
         Args:
-            qubit_hamiltonian: Hamiltonian used to choose the norm, time ladder, and nested builder settings.
+            qubit_hamiltonian: Hermitian Hamiltonian used to choose the norm, time ladder, and nested builder settings.
 
         Returns:
             A reproducible schedule with rounds, shared settings, and concrete draw seeds, without live inputs.
@@ -218,13 +220,15 @@ class RobustPhaseEstimationExperimentScheduler(Algorithm):
         Raises:
             KeyError: If the configured unitary builder is not registered.
             TypeError: If the Hamiltonian is not a QubitOperator or the builder is not a time-evolution builder.
-            ValueError: If the builder name, power, base time, or error-budget settings are unsupported or invalid.
+            ValueError: If the Hamiltonian is non-Hermitian or a builder, correction, power, time, or budget is invalid.
 
         """
         if not isinstance(qubit_hamiltonian, QubitOperator):
             raise TypeError(
                 f"The {self.name()!r} RPE scheduler takes a QubitOperator, got {type(qubit_hamiltonian).__name__}."
             )
+        if not qubit_hamiltonian.is_hermitian():
+            raise ValueError("RPE requires a Hermitian Hamiltonian; coefficients have nonzero imaginary parts.")
         for setting in ("target_accuracy", "unitary_accuracy_fraction", "epsilon_rpe", "epsilon_unitary"):
             value = float(self._settings.get(setting))
             if not np.isfinite(value):
@@ -243,7 +247,7 @@ class RobustPhaseEstimationExperimentScheduler(Algorithm):
         hadamard_ref = self._settings.get("hadamard_test_circuit_builder")
         # Create first so an unregistered builder name raises the registry's KeyError.
         unitary_builder = self._create_nested("unitary_builder")
-        unitary_settings = unitary_ref.settings
+        unitary_settings = unitary_builder.settings()
         _validate_unit_power(unitary_settings)
 
         if not isinstance(unitary_builder, TimeEvolutionBuilder):
@@ -260,13 +264,17 @@ class RobustPhaseEstimationExperimentScheduler(Algorithm):
         correction = str(self._settings.get("energy_correction"))
         if correction == "auto":
             correction = "qdrift_tangent" if category == "qdrift" else "linear"
+        elif correction == "qdrift_tangent" and category != "qdrift":
+            raise ValueError(
+                f"energy_correction='qdrift_tangent' requires the qDRIFT unitary builder, got {builder_name!r}."
+            )
         fraction, epsilon_rpe, epsilon_unitary, budget_mode = self._resolve_budget(
             category,
             epsilon_total,
             is_trotter=builder_name == "trotter",
         )
 
-        lambda_norm = float(np.sum(np.abs(np.asarray(qubit_hamiltonian.coefficients, dtype=float))))
+        lambda_norm = float(qubit_hamiltonian.schatten_norm)
         automatic_base_time = float((np.pi / 2.0) / lambda_norm) if lambda_norm > 0.0 else 1.0
         if base_time == 0.0:
             base_time = automatic_base_time
@@ -287,11 +295,26 @@ class RobustPhaseEstimationExperimentScheduler(Algorithm):
             else int(np.ceil(np.log2(energy_resolution_scale / epsilon_rpe)))
         )
         base_time_ratio = base_time / automatic_base_time if category == "qdrift" and lambda_norm > 0.0 else 1.0
+        round_samples = [_round_sample_floor(round_index, base_time_ratio) for round_index in range(total_round + 1)]
         if category == "qdrift":
-            final_scheduled_samples = _round_sample_floor(total_round, base_time_ratio)
-            if final_scheduled_samples > max_qdrift_samples:
+            if unitary_settings.has("target_accuracy") and unitary_settings.get("target_accuracy") > 0.0:
+                sample_resolver = getattr(unitary_builder, "_resolve_num_samples_from_lambda", None)
+                if not callable(sample_resolver):
+                    raise TypeError("qDRIFT builders with target_accuracy must support sample-count resolution.")
+                sampled_lambda = _qdrift_lambda(qubit_hamiltonian, unitary_settings.get("weight_threshold"))
+                for round_index, minimum_samples in enumerate(round_samples):
+                    resolved_samples = sample_resolver(
+                        sampled_lambda, float((2**round_index) * base_time), minimum_samples
+                    )
+                    if not isinstance(resolved_samples, int) or resolved_samples < minimum_samples:
+                        raise ValueError(
+                            "Resolved qDRIFT samples must be an integer at least as large as the RPE count."
+                        )
+                    round_samples[round_index] = resolved_samples
+            peak_samples = max(round_samples)
+            if peak_samples > max_qdrift_samples:
                 raise ValueError(
-                    f"qDRIFT round {total_round} requires at least {final_scheduled_samples} samples, exceeding "
+                    f"qDRIFT round {round_samples.index(peak_samples)} requires {peak_samples} samples, exceeding "
                     f"max_qdrift_samples={max_qdrift_samples}. Raise max_qdrift_samples explicitly only "
                     "if sufficient resources are available."
                 )
@@ -306,52 +329,21 @@ class RobustPhaseEstimationExperimentScheduler(Algorithm):
             )
 
         rounds: list[RobustPhaseEstimationRound] = []
-        for round_index in range(total_round + 1):
+        for round_index, samples in enumerate(round_samples):
             shots = int(np.ceil(np.e * (11 + 4 * (total_round - round_index))))
-            samples = _round_sample_floor(round_index, base_time_ratio)
-            evolution_time = float((2**round_index) * base_time)
-            if category == "qdrift" and unitary_settings.has("num_samples"):
-                if unitary_settings.has("target_accuracy") and unitary_builder.settings().get("target_accuracy") > 0.0:
-                    sample_resolver = getattr(unitary_builder, "_resolve_num_samples", None)
-                    if not callable(sample_resolver):
-                        raise TypeError("qDRIFT builders with target_accuracy must support sample-count resolution.")
-                    unitary_builder.settings().set("time", evolution_time)
-                    unitary_builder.settings().set("num_samples", samples)
-                    resolved_samples = sample_resolver(qubit_hamiltonian, evolution_time)
-                    if not isinstance(resolved_samples, int) or resolved_samples < samples:
-                        raise ValueError(
-                            "Resolved qDRIFT samples must be an integer at least as large as the RPE count."
-                        )
-                    samples = resolved_samples
-                if samples > max_qdrift_samples:
-                    raise ValueError(
-                        f"qDRIFT round {round_index} requires {samples} samples, exceeding "
-                        f"max_qdrift_samples={max_qdrift_samples}. Raise max_qdrift_samples explicitly only "
-                        "if sufficient resources are available."
-                    )
-            draw_seeds: list[int | None] = []
-            if randomized:
-                assert root_seed is not None
-                for draw_index in range(shots):
-                    sequence = np.random.SeedSequence([root_seed, round_index, draw_index])
-                    draw_seed = int(sequence.generate_state(1, dtype=np.uint32)[0])
-                    draw_seeds.append(draw_seed)
-            else:
-                seed = None
-                if unitary_settings.has("seed"):
-                    configured_seed = int(unitary_builder.settings().get("seed"))
-                    seed = requested_seed + round_index if requested_seed >= 0 else configured_seed
-                    if seed < 0:
-                        seed = None
-                draw_seeds.append(seed)
-
+            draw_seeds: tuple[int | None, ...] = (None,)
+            if root_seed is not None:
+                draw_seeds = tuple(
+                    int(np.random.SeedSequence([root_seed, round_index, draw_index]).generate_state(1, np.uint32)[0])
+                    for draw_index in range(shots)
+                )
             rounds.append(
                 RobustPhaseEstimationRound(
                     round_index=round_index,
-                    evolution_time=evolution_time,
+                    evolution_time=float((2**round_index) * base_time),
                     shots_per_basis=shots,
                     scheduled_samples=samples,
-                    draw_seeds=tuple(draw_seeds),
+                    draw_seeds=draw_seeds,
                 )
             )
 
@@ -438,8 +430,10 @@ class RobustPhaseEstimationExperimentScheduler(Algorithm):
                 raise ValueError("epsilon_unitary must be smaller than sin(pi/3) for branch-safe RPE.")
             return 0.0, epsilon_total, epsilon_unitary, "independent_partial_randomized"
 
-        fraction = 0.5 if configured_fraction == _UNSET_BUDGET_VALUE else min(max(configured_fraction, 0.0), 1.0)
-        has_explicit_budget = explicit_rpe > 0.0 or explicit_unitary > 0.0
+        if configured_fraction != _UNSET_BUDGET_VALUE and configured_fraction >= 1.0:
+            raise ValueError("unitary_accuracy_fraction must be smaller than 1 so RPE keeps a positive energy budget.")
+        fraction = 0.5 if configured_fraction == _UNSET_BUDGET_VALUE else max(configured_fraction, 0.0)
+        has_explicit_budget = explicit_rpe != _UNSET_BUDGET_VALUE or explicit_unitary != _UNSET_BUDGET_VALUE
 
         if category == "qdrift":
             if has_explicit_budget:
@@ -464,8 +458,6 @@ class RobustPhaseEstimationExperimentScheduler(Algorithm):
         if epsilon_unitary >= np.sin(np.pi / 3.0):
             raise ValueError("epsilon_unitary must be smaller than sin(pi/3) for branch-safe RPE.")
         epsilon_rpe = (1.0 - fraction) * epsilon_total
-        if epsilon_rpe <= 0.0:
-            epsilon_rpe = epsilon_total
         return fraction, epsilon_rpe, epsilon_unitary, "fraction"
 
     def name(self) -> str:

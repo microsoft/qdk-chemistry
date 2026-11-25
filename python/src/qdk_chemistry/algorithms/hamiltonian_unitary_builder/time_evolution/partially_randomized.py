@@ -92,7 +92,7 @@ class PartiallyRandomizedSettings(TimeEvolutionSettings):
         self._set_default(
             "num_random_samples",
             "int",
-            1,
+            100,
             "Number of random samples for the randomized part (H_R). "
             "Acts as a per-step floor when target_accuracy is set.",
         )
@@ -232,7 +232,7 @@ class PartiallyRandomized(QDrift):
         time: float = 0.0,
         weight_threshold: float = -1.0,
         trotter_order: int = 2,
-        num_random_samples: int = 1,
+        num_random_samples: int = 100,
         target_accuracy: float = 0.0,
         accuracy_split: float = 0.5,
         trotter_error_bound: str = "commutator",
@@ -255,7 +255,7 @@ class PartiallyRandomized(QDrift):
                 1 = first order, 2 = second order (symmetric). Defaults to 2.
             num_random_samples: Number of random samples for the qDRIFT-style
                 treatment of H_R. When ``target_accuracy`` is set, this acts as
-                a per-step floor on the sample count. Defaults to 1.
+                a per-step floor on the sample count. Defaults to 100.
             target_accuracy: Target accuracy ε for automatic parameterization of
                 the outer Trotter step count and the qDRIFT sample count. Use
                 ``0.0`` (default) to disable and preserve the legacy single-step

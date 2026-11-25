@@ -84,7 +84,7 @@ HamiltonianDescription
 Settings
    The :class:`~qdk_chemistry.algorithms.PhaseEstimation` is configured via its settings object, which includes:
 
-    - ``qpe_circuit_builder`` — A :class:`~qdk_chemistry.data.AlgorithmRef` to a :doc:`QpeCircuitBuilder <qpe_circuit_builder>` that handles circuit composition. Iterative and standard builders encapsulate a :doc:`HamiltonianUnitaryBuilder <hamiltonian_unitary_builder>` and a :class:`~qdk_chemistry.algorithms.ControlledCircuitMapper`; the robust builder instead contains an experiment scheduler that owns its unitary-builder and Hadamard-test-builder configuration. See :doc:`qpe_circuit_builder` for detailed configuration.
+   - ``qpe_circuit_builder`` — A :class:`~qdk_chemistry.data.AlgorithmRef` to a :doc:`QpeCircuitBuilder <qpe_circuit_builder>` that handles circuit composition. Iterative and standard builders encapsulate a :doc:`HamiltonianUnitaryBuilder <hamiltonian_unitary_builder>` and a :class:`~qdk_chemistry.algorithms.ControlledCircuitMapper`; the robust builder instead contains an experiment scheduler that owns its unitary-builder and Hadamard-test-builder configuration. See :doc:`qpe_circuit_builder` for detailed configuration.
 
    - ``circuit_executor`` — A :class:`~qdk_chemistry.data.AlgorithmRef` to a backend that executes :class:`~qdk_chemistry.data.Circuit` objects and returns measurement bitstrings as :class:`~qdk_chemistry.data.CircuitExecutorData`.
      QDK/Chemistry ships native Q# simulators (sparse-state and full-state, with optional :class:`~qdk_chemistry.data.QuantumErrorProfile` noise modelling) and integrates with Qiskit's Aer simulator through the :doc:`plugin system <../plugins>`.

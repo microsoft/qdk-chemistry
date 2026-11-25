@@ -19,6 +19,7 @@ References:
 
 from __future__ import annotations
 
+import math
 from dataclasses import dataclass
 from typing import TYPE_CHECKING
 
@@ -26,6 +27,7 @@ import numpy as np
 
 from qdk_chemistry.algorithms.base import create_from_ref
 from qdk_chemistry.algorithms.circuit_executor.base import CircuitExecutor
+from qdk_chemistry.algorithms.hamiltonian_unitary_builder.time_evolution.qdrift_error import _qdrift_lambda
 from qdk_chemistry.data import (
     AlgorithmRef,
     Circuit,
@@ -42,7 +44,7 @@ from qdk_chemistry.utils import Logger
 
 from .base import PhaseEstimation
 from .circuit_builder.robust_builder import RobustPhaseEstimationCircuitBuilder
-from .rpe_experiment_scheduler import RobustPhaseEstimationExperimentScheduler
+from .circuit_builder.rpe_experiment_scheduler import RobustPhaseEstimationExperimentScheduler
 
 if TYPE_CHECKING:
     from collections.abc import Iterator
@@ -77,10 +79,11 @@ def _rpe_angle_update(previous_angle: float, measured_phase: float, round_index:
     if round_index < 0:
         raise ValueError(f"round_index must be non-negative, received {round_index}.")
     scale = 2**round_index
+    nearest_alias = math.floor((previous_angle * scale - measured_phase) / (2 * np.pi))
     best_candidate = measured_phase / scale
-    best_diff = (best_candidate - previous_angle + np.pi) % (2 * np.pi) - np.pi
-    best_distance = abs(float(best_diff))
-    for alias_index in range(1, scale):
+    best_distance = math.inf
+    # Rounding can misplace the nearest alias by one; ascending order preserves the lowest-index tie break.
+    for alias_index in sorted({(nearest_alias + offset) % scale for offset in (-1, 0, 1, 2)}):
         candidate = (measured_phase + 2 * np.pi * alias_index) / scale
         diff = (candidate - previous_angle + np.pi) % (2 * np.pi) - np.pi
         distance = abs(float(diff))
@@ -272,7 +275,7 @@ class RobustPhaseEstimation(PhaseEstimation):
             circuit_builder: Builder whose shared ``iter_build`` implementation constructs each pair on demand.
             circuit_set: Canonical schedule, without replay inputs.
             state_preparation: Live preparation for construction.
-            qubit_hamiltonian: Hamiltonian tied to the schedule.
+            qubit_hamiltonian: Hamiltonian tied to the schedule; validated and copied once before execution.
             noise: Optional profile forwarded to the executor.
 
         Returns:
@@ -285,13 +288,24 @@ class RobustPhaseEstimation(PhaseEstimation):
             f"builder={circuit_set.unitary_builder_category}, correction={circuit_set.energy_correction}, "
             f"eps_rpe={circuit_set.epsilon_rpe:.3g}, eps_unitary={circuit_set.epsilon_unitary:.3g}."
         )
+        hamiltonian = circuit_set.validate_and_copy_hamiltonian(qubit_hamiltonian)
+        correction_lambda = None
+        if circuit_set.energy_correction == "qdrift_tangent":
+            from qdk_chemistry.algorithms import registry  # noqa: PLC0415
+
+            configuration = circuit_set.unitary_builder_configuration
+            unitary_builder = registry.create(
+                configuration.algorithm_type, configuration.algorithm_name, **configuration.settings.to_dict()
+            )
+            correction_lambda = _qdrift_lambda(hamiltonian, unitary_builder.settings().get("weight_threshold"))
         execution_results, requested_executor_seed, executor_root_seed = self._execute_experiments(
-            circuit_builder.iter_build(circuit_set, state_preparation, qubit_hamiltonian),
+            circuit_builder.iter_build(circuit_set, state_preparation, hamiltonian),
             noise=noise,
         )
         return self._post_process(
             circuit_set,
             execution_results,
+            correction_lambda=correction_lambda,
             requested_executor_seed=requested_executor_seed,
             executor_root_seed=executor_root_seed,
         )
@@ -353,6 +367,7 @@ class RobustPhaseEstimation(PhaseEstimation):
         circuit_set: RobustPhaseEstimationSchedule,
         execution_results: tuple[_RpeExecutionResult, ...],
         *,
+        correction_lambda: float | None = None,
         requested_executor_seed: int | None,
         executor_root_seed: int | None,
     ) -> QpeResult:
@@ -364,6 +379,7 @@ class RobustPhaseEstimation(PhaseEstimation):
         Args:
             circuit_set: Schedule defining round times, experiment identities, and the energy correction.
             execution_results: X/Y counts associated with their experiment specifications, in any order.
+            correction_lambda: One-norm of the terms qDRIFT samples; ``None`` uses the schedule's coefficient norm.
             requested_executor_seed: Original measurement-seed setting, or ``None`` when unsupported.
             executor_root_seed: Concrete measurement root used for this execution, or ``None`` when unsupported.
 
@@ -404,7 +420,7 @@ class RobustPhaseEstimation(PhaseEstimation):
             theta,
             circuit_set.base_time,
             circuit_set.num_rounds - 1,
-            circuit_set.lambda_norm,
+            circuit_set.lambda_norm if correction_lambda is None else correction_lambda,
             circuit_set.final_samples,
             correction=circuit_set.energy_correction,
         )
@@ -476,7 +492,7 @@ class RobustPhaseEstimation(PhaseEstimation):
             theta: Recovered phase at the base evolution time, in radians.
             base_time: Positive base evolution time.
             total_rounds: Final round index, equal to the number of doublings after round zero.
-            lambda_norm: Hamiltonian coefficient one-norm used by the qDRIFT correction.
+            lambda_norm: One-norm of the Hamiltonian terms sampled by qDRIFT, used by the qDRIFT correction.
             final_samples: Reference qDRIFT sample count for the final round.
             correction: Resolved mapping; ``"qdrift_tangent"`` uses the tangent correction, otherwise linear.
 

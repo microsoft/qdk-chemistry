@@ -250,7 +250,7 @@ The nested experiment scheduler defines:
      - Round-zero evolution time. ``0.0`` selects :math:`\pi/(2\lambda)`. An explicit positive value must satisfy :math:`\mathtt{base\_time}\,\lambda < \pi`.
    * - ``unitary_accuracy_fraction``
      - float
-     - Legacy fraction used by non-Trotter builders. Partially randomized evolution uses it only when explicitly set. Trotter does not support it.
+     - Legacy fraction used by non-Trotter builders. Partially randomized evolution uses it only when explicitly set. Trotter does not support it. Values must be below ``1``.
    * - ``epsilon_rpe``
      - float
      - Optional explicit RPE energy tolerance for non-Trotter builders. Set it together with ``epsilon_unitary``.
@@ -259,7 +259,7 @@ The nested experiment scheduler defines:
      - Positive full-unitary tolerance. Trotter and default partially randomized evolution use an independent value of ``0.85`` when omitted.
    * - ``energy_correction``
      - str
-     - Phase-to-energy map: ``"auto"``, ``"linear"``, or ``"qdrift_tangent"``.
+     - Phase-to-energy map: ``"auto"``, ``"linear"``, or ``"qdrift_tangent"``. The tangent map requires the qDRIFT builder.
    * - ``seed``
      - int
      - Root random seed. ``-1`` chooses one entropy-backed seed when the schedule is created.
@@ -271,11 +271,14 @@ RPE scheduling policies are selected by the registered unitary-builder name.
 The supported names are ``"trotter"``, ``"qdrift"``, ``"partially_randomized"``, and ``"zassenhaus"``.
 Other names, including renamed subclasses, are rejected until an explicit RPE policy is defined for them.
 
-Scheduler accuracy settings must be finite.
+Scheduler accuracy settings must be finite, and the Hamiltonian must be Hermitian.
 ``base_time`` must be finite and nonnegative, with only ``0.0`` selecting automatic time.
 For qDRIFT, a tighter nested ``target_accuracy`` can increase the sample count above the RPE ladder's minimum.
 The resolved count is recorded in the schedule and used by circuit construction and tangent energy correction.
 The sample ceiling applies to this resolved count and never clamps it or relaxes the requested accuracy.
+Every round's count is checked before any draw seed is generated.
+The tangent correction uses the one-norm of the terms qDRIFT samples after its ``weight_threshold`` filter.
+Partially randomized evolution keeps its configured per-step ``num_random_samples`` floor, which defaults to ``100``; set it to ``1`` to let ``epsilon_unitary`` alone size each random tail.
 
 For qDRIFT at round :math:`k`, let :math:`t_k=2^k\tau` and let :math:`\lambda` be the coefficient one-norm.
 The minimum number of sampled rotations per circuit is
@@ -371,7 +374,7 @@ Algorithm instantiation, settings updates, and RPE power policy remain in the sc
 
 The schedule derives ``base_time`` from round zero and derives draw counts and :class:`~qdk_chemistry.data.RobustPhaseEstimationExperimentSpec` entries from the rounds.
 Neither a second time in the builder settings nor a separately stored experiment manifest can contradict those values.
-Constructors and JSON/HDF5 loaders reject invalid counts, nonfinite times, and inconsistent time ladders.
+Constructors and JSON/HDF5 loaders reject invalid counts, nonfinite times, inconsistent time ladders, and a qDRIFT tangent correction on any other evolution family.
 
 Each derived experiment specification identifies one X/Y pair and carries its round, randomized draw coordinates, concrete draw seed, and execution count.
 For deterministic evolution, one pair represents every shot in its round.
@@ -403,20 +406,6 @@ Call :meth:`~qdk_chemistry.data.RobustPhaseEstimationCircuitSet.rebind` with the
    The replay-bundle format is version ``0.2.0`` and rejects earlier ``0.1.0`` circuit-set files.
    Regenerate old files from their original inputs and settings.
    The standalone schedule uses its own ``0.1.0`` format and the filename suffix ``.robust_phase_estimation_schedule``.
-
-.. tab:: Circuit preview
-
-   .. literalinclude:: ../../../_static/examples/python/phase_estimation.py
-      :language: python
-      :start-after: # start-cell-robust-preview
-      :end-before: # end-cell-robust-preview
-
-.. tab:: Save and replay
-
-   .. literalinclude:: ../../../_static/examples/python/phase_estimation.py
-      :language: python
-      :start-after: # start-cell-robust-replay
-      :end-before: # end-cell-robust-replay
 
 
 Unary-iteration Phase Estimation Circuit Builder

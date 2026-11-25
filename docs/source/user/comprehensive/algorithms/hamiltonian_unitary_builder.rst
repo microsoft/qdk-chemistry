@@ -297,7 +297,7 @@ Because the deterministic part removes the dominant terms from :math:`\lambda_R`
      - Order of the Trotter formula for the deterministic part (1 or 2). Default is 2.
    * - ``num_random_samples``
      - int
-     - Number of qDRIFT samples for :math:`H_R`. Acts as a per-step floor when ``target_accuracy`` is set. Default is 1.
+     - Number of qDRIFT samples for :math:`H_R`. Acts as a per-step floor when ``target_accuracy`` is set. Default is 100.
    * - ``target_accuracy``
      - float
      - Target approximation error :math:`\epsilon`. When set to 0.0 (default), automatic parameterization is disabled.
