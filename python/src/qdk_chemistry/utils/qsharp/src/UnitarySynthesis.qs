@@ -8,6 +8,8 @@ namespace QDKChemistry.Utils.UnitarySynthesis {
     import Std.Arithmetic.ApplyIfGreaterL;
     import Std.Arrays.All;
     import Std.Arrays.Any;
+    import Std.Arrays.Chunks;
+    import Std.Arrays.Flattened;
     import Std.Arrays.ForEach;
     import Std.Arrays.IndexRange;
     import Std.Arrays.IsEmpty;
@@ -37,10 +39,13 @@ namespace QDKChemistry.Utils.UnitarySynthesis {
     import QDKChemistry.Utils.SelectSwap.ApplyBranchPhaseFixup;
     import QDKChemistry.Utils.SelectSwap.ComputeOptimalLambda2D;
     import QDKChemistry.Utils.SelectSwap.ComputeOptimalSwapBits;
+    import QDKChemistry.Utils.SelectSwap.CreatePaddedData;
     import QDKChemistry.Utils.SelectSwap.MeasurementUnlookupCost;
     import QDKChemistry.Utils.SelectSwap.SelectSwap2D;
     import QDKChemistry.Utils.SelectSwap.SelectSwapAliased;
     import QDKChemistry.Utils.SelectSwap.SelectSwapForwardCost;
+    import QDKChemistry.Utils.SelectSwap.SwapDataOutputs;
+    import QDKChemistry.Utils.SelectSwap.SwapNetworkPermutation;
     import QDKChemistry.Utils.UnaryIteration.AddressQubits;
 
     /// Givens representation U = D · L_{m-1} ⋯ L_0 of a real orthogonal matrix, mirroring the
@@ -231,15 +236,7 @@ namespace QDKChemistry.Utils.UnitarySynthesis {
             let lookupCost = MeasurementUnlookupCost(n + MinI(numControls, 1)) + (numControls > 1 ? 2 * gateCost(numControls) | 0);
             if lookupCost < polynomialCost {
                 if numControls == 0 {
-                    // The erasure fixes signs relative to phases[0], which is applied as -I.
-                    use marker = Qubit();
-                    X(marker);
-                    H(marker);
-                    Adjoint Select(Mapped(phase -> [phase != phases[0]], phases), register, [marker]);
-                    Reset(marker);
-                    if phases[0] {
-                        R(PauliI, 2.0 * PI(), register[0]);
-                    }
+                    ApplySignTable(phases, register);
                 } elif numControls == 1 {
                     ApplyBranchPhaseFixup([true], Mapped(phase -> [phase], phases), true, controls + register);
                 } else {
@@ -265,9 +262,197 @@ namespace QDKChemistry.Utils.UnitarySynthesis {
         controlled adjoint self;
     }
 
+    /// Returns the parity of `measured` against `word`, the sign an X-basis erasure leaves on it.
+    internal function MeasuredParity(measured : Bool[], word : Bool[]) : Bool {
+        mutable parity = false;
+        for (measuredBit, wordBit) in Zipped(measured, word) {
+            set parity = parity != (measuredBit and wordBit);
+        }
+        parity
+    }
+
+    /// Returns the entrywise XOR of two sign tables.
+    internal function XorSigns(left : Bool[], right : Bool[]) : Bool[] {
+        Fact(Length(left) == Length(right), "Sign tables need equal lengths.");
+        Mapped((leftSign, rightSign) -> leftSign != rightSign, Zipped(left, right))
+    }
+
+    /// Applies diag((-1)^{phases[x]}) on the little-endian `register` by one measurement-based lookup.
+    internal operation ApplySignTable(phases : Bool[], register : Qubit[]) : Unit {
+        Fact(Length(phases) == 1 <<< Length(register), "Sign data needs one entry per basis state of the register.");
+        // The lookup fixes signs relative to phases[0], which is applied as -I.
+        use marker = Qubit();
+        X(marker);
+        H(marker);
+        Adjoint Select(Mapped(phase -> [phase != phases[0]], phases), register, [marker]);
+        Reset(marker);
+        if phases[0] {
+            Fact(not IsEmpty(register), "A constant sign needs a nonempty register to carry it.");
+            R(PauliI, 2.0 * PI(), register[0]);
+        }
+    }
+
+    /// Loads `table[address]` into the clean `target` when every qubit of `controls` is |1⟩ and measures out
+    /// the swap scratch, returning its sign per address prefix (one entry without a swap network).
+    internal operation LoadWordDeferred(
+        table : Bool[][],
+        swapBits : Int,
+        address : Qubit[],
+        controls : Qubit[],
+        target : Qubit[]
+    ) : Bool[] {
+        let addressBits = AddressQubits(Length(table));
+        if swapBits == 0 {
+            Controlled Select(controls, (table, address[...addressBits - 1], target));
+            [false]
+        } else {
+            let selectBits = addressBits - swapBits;
+            let wordBits = Length(target);
+            let flat = CreatePaddedData(table, addressBits, wordBits, selectBits);
+            use scratch = Qubit[wordBits <<< swapBits];
+            Select(flat, address[...selectBits - 1], scratch);
+            SwapDataOutputs(address[selectBits..addressBits - 1], Chunks(wordBits, scratch));
+            for (source, copy) in Zipped(scratch, target) {
+                Controlled CNOT(controls, (source, copy));
+            }
+            let measured = ResultArrayAsBoolArray(ForEach(MResetX, scratch));
+            // Each parity pairs the measured chunks, moved back through the swap network, with the unswapped row.
+            let measuredChunks = Chunks(wordBits, measured);
+            let unswapped = MappedOverRange(
+                swap -> {
+                    let permutation = SwapNetworkPermutation(swapBits, swap);
+                    mutable chunks = measuredChunks;
+                    for position in IndexRange(permutation) {
+                        set chunks w/= permutation[position] <- measuredChunks[position];
+                    }
+                    Flattened(chunks)
+                },
+                0..(1 <<< swapBits) - 1
+            );
+            MappedOverRange(
+                state -> MeasuredParity(unswapped[state >>> selectBits], flat[state % (1 <<< selectBits)]),
+                0..(1 <<< addressBits) - 1
+            )
+        }
+    }
+
+    /// `ApplyControlledMultiplexedRy` that measures out its loads without phase fixups and returns their signs,
+    /// indexed by a + 2^{Length(address)}·AND(controls) for address state a, with no AND term without controls.
+    internal operation ApplyMultiplexedRyDeferred(
+        data : Bool[][],
+        maxSwapBits : Int,
+        address : Qubit[],
+        controls : Qubit[],
+        targetQubit : Qubit,
+        phaseGradient : Qubit[],
+        angleReg : Qubit[]
+    ) : Bool[] {
+        let addressBits = Length(address);
+        let numSlices = IsEmpty(controls) ? 1 | 2;
+        if IsEmpty(data) {
+            [false, size = numSlices <<< addressBits]
+        } else {
+            let numBits = Length(angleReg);
+            let guarded = UseAddressGuard(Length(data), addressBits, numBits, maxSwapBits);
+            let table = guarded ? data | Padded(-(1 <<< addressBits), [false, size = numBits], data);
+            let swapBits = not guarded and IsEmpty(controls) ? ComputeOptimalLambda2D(1, Length(table), numBits, true, maxSwapBits) | ComputeOptimalSwapBits(Length(table), numBits, maxSwapBits);
+            // A flag holds the load condition unless that is a single control or always true.
+            let needsFlag = guarded or Length(controls) > 1;
+            use flag = Qubit[needsFlag ? 1 | 0];
+            if needsFlag {
+                ComputeLoadFlag(controls, guarded, Length(table), address, flag[0]);
+            }
+            let scratchSigns = LoadWordDeferred(table, swapBits, address, needsFlag ? flag | controls, angleReg);
+            RyViaPhaseGradient(targetQubit, angleReg, phaseGradient);
+            let measured = ResultArrayAsBoolArray(ForEach(MResetX, angleReg));
+            if needsFlag {
+                Adjoint ComputeLoadFlag(controls, guarded, Length(table), address, flag[0]);
+            }
+            MappedOverRange(
+                state -> {
+                    let addressValue = state % (1 <<< addressBits);
+                    let loaded = state >>> addressBits == numSlices - 1 and addressValue < Length(table);
+                    (loaded and MeasuredParity(measured, table[addressValue])) != scratchSigns[addressValue % Length(scratchSigns)]
+                },
+                0..(numSlices <<< addressBits) - 1
+            )
+        }
+    }
+
+    /// Applies the layers of `givens`, or their adjoints in reverse order when `reverse`, to a register whose
+    /// state carries the pending `signs`, and returns them with the measured-out loads and D added.
+    /// Signs are indexed by t + 2^n·AND(controls) for the value t of `Reversed(target)`, with no AND term
+    /// without controls.
+    internal operation ApplyGivensLayersDeferred(
+        givens : QuantizedGivensDecomposition,
+        reverse : Bool,
+        controls : Qubit[],
+        target : Qubit[],
+        phaseGradient : Qubit[],
+        angleReg : Qubit[],
+        signs : Bool[]
+    ) : Bool[] {
+        let n = Length(target);
+        let numStates = 1 <<< n;
+        let numLayers = Length(givens.layers);
+        Fact(Length(givens.layerShifted) == numLayers, "Givens data needs one shift flag per layer.");
+        Fact(IsEmpty(givens.phases) or Length(givens.phases) == numStates, "Givens phase data needs one entry per basis state of the target register.");
+        Fact(n > 0 or All(layer -> IsEmpty(layer), givens.layers), "Givens rotation layers need a nonempty target register.");
+        Fact(Length(signs) == (IsEmpty(controls) ? numStates | 2 * numStates), "Pending signs need one entry per target state and AND(controls).");
+        // The layers and D act on the slice where every control is set, the top `numStates` entries.
+        let allOn = Length(signs) - numStates;
+        let phaseSigns = IsEmpty(givens.phases) ? [false, size = Length(signs)] | MappedOverRange(state -> state >= allOn and givens.phases[state - allOn], IndexRange(signs));
+        // D is diagonal, so it is added to the pending signs instead of applied.
+        mutable updated = reverse ? XorSigns(signs, phaseSigns) | signs;
+        for step in 0..numLayers - 1 {
+            let layerIndex = reverse ? numLayers - 1 - step | step;
+            let layer = givens.layers[layerIndex];
+            if not IsEmpty(layer) {
+                let shift = givens.layerShifted[layerIndex] ? 1 | 0;
+                // Layers differ only in data, so the cache key holds every width that sets a layer's cost.
+                let cacheName = $"GivensLayer_c{Length(controls)}_g{Length(phaseGradient)}_a{Length(angleReg)}_d{Length(layer)}_s{givens.maxSwapBits}";
+                if BeginEstimateCaching(cacheName, 2 * n + shift) {
+                    let pending = updated;
+                    // Z·Ry(φ)·Z = Ry(-φ), so a pair with unequal pending signs rotates by the negated word.
+                    let words = MappedOverRange(
+                        pair -> {
+                            let lowSign = pending[allOn + (2 * pair + shift) % numStates];
+                            let highSign = pending[allOn + (2 * pair + 1 + shift) % numStates];
+                            let negate = reverse != (lowSign != highSign);
+                            mutable word : Bool[] = [];
+                            mutable lowerBitSet = false;
+                            for bit in layer[pair] {
+                                set word += [bit != (negate and lowerBitSet)];
+                                set lowerBitSet = lowerBitSet or bit;
+                            }
+                            word
+                        },
+                        IndexRange(layer)
+                    );
+                    // Decrementing maps the shifted pairs (1, 2), (3, 4), … onto (0, 1), (2, 3), ….
+                    if shift == 1 {
+                        AddConstant(-1, Reversed(target));
+                    }
+                    let erased = ApplyMultiplexedRyDeferred(words, givens.maxSwapBits, Reversed(Most(target)), controls, Tail(target), phaseGradient, angleReg);
+                    if shift == 1 {
+                        Adjoint AddConstant(-1, Reversed(target));
+                    }
+                    // The erasure signs are indexed in the decremented frame.
+                    set updated = MappedOverRange(
+                        state -> pending[state] != erased[((state % numStates - shift + numStates) % numStates) / 2 + ((state / numStates) <<< (n - 1))],
+                        IndexRange(pending)
+                    );
+                    EndEstimateCaching();
+                }
+            }
+        }
+        reverse ? updated | XorSigns(updated, phaseSigns)
+    }
+
     /// Applies the real unitary of `givens`, controlled on `controls`, to the most-significant-first
     /// `target` with phase-gradient Givens layers (Berry et al., PRX Quantum 6, 020327; Clements et
     /// al., arXiv:1603.08788), where leading block-selecting qubits give a block-diagonal unitary.
+    /// The layers' measured-out loads are fixed together with D by one sign lookup.
     operation ApplyRealUnitaryViaGivens(
         givens : QuantizedGivensDecomposition,
         controls : Qubit[],
@@ -275,52 +460,37 @@ namespace QDKChemistry.Utils.UnitarySynthesis {
         phaseGradient : Qubit[],
         angleReg : Qubit[]
     ) : Unit is Adj {
-        let n = Length(target);
-        Fact(Length(givens.layerShifted) == Length(givens.layers), "Givens data needs one shift flag per layer.");
-        Fact(IsEmpty(givens.phases) or Length(givens.phases) == 1 <<< n, "Givens phase data needs one entry per basis state of the target register.");
-        Fact(n > 0 or IsEmpty(givens.layers), "Givens rotation layers need a nonempty target register.");
-
-        // Layers differ only in data, so the cache key holds every width that sets a layer's cost.
-        for (layer, shifted) in Zipped(givens.layers, givens.layerShifted) {
-            if not IsEmpty(layer) {
-                let cacheName = $"GivensLayer_c{Length(controls)}_g{Length(phaseGradient)}_a{Length(angleReg)}_d{Length(layer)}_s{givens.maxSwapBits}";
-                ApplyGivensLayer(cacheName, layer, shifted, givens.maxSwapBits, controls, target, phaseGradient, angleReg);
-            }
+        body (...) {
+            ApplyRealUnitaryViaGivensInDirection(givens, false, controls, target, phaseGradient, angleReg);
         }
-        Controlled ApplyPhasePolynomial(controls, (givens.phases, Reversed(target)));
+        adjoint (...) {
+            ApplyRealUnitaryViaGivensInDirection(givens, true, controls, target, phaseGradient, angleReg);
+        }
     }
 
-    /// Applies one layer of `ApplyRealUnitaryViaGivens`, estimated once per `cacheName` and shift
-    /// with an explicit adjoint so that `EndEstimateCaching` follows the layer.
-    operation ApplyGivensLayer(
-        cacheName : String,
-        layer : Bool[][],
-        shifted : Bool,
-        maxSwapBits : Int,
+    /// Applies `ApplyRealUnitaryViaGivens`, or its adjoint when `reverse`.
+    internal operation ApplyRealUnitaryViaGivensInDirection(
+        givens : QuantizedGivensDecomposition,
+        reverse : Bool,
         controls : Qubit[],
         target : Qubit[],
         phaseGradient : Qubit[],
         angleReg : Qubit[]
-    ) : Unit is Adj {
-        body ... {
-            if BeginEstimateCaching(cacheName, 2 * Length(target) + (shifted ? 1 | 0)) {
-                // Decrementing maps the shifted pairs (1, 2), (3, 4), … onto (0, 1), (2, 3), ….
+    ) : Unit {
+        if All(layer -> IsEmpty(layer), givens.layers) {
+            Controlled ApplyPhasePolynomial(controls, (givens.phases, Reversed(target)));
+        } else {
+            let numSigns = (IsEmpty(controls) ? 1 | 2) <<< Length(target);
+            let signs = ApplyGivensLayersDeferred(givens, reverse, controls, target, phaseGradient, angleReg, [false, size = numSigns]);
+            if Length(controls) > 1 {
+                use flag = Qubit();
                 within {
-                    if shifted { AddConstant(-1, Reversed(target)); }
+                    Controlled X(controls, flag);
                 } apply {
-                    ApplyControlledMultiplexedRy(layer, maxSwapBits, Reversed(Most(target)), controls, Tail(target), phaseGradient, angleReg);
+                    ApplySignTable(signs, Reversed(target) + [flag]);
                 }
-                EndEstimateCaching();
-            }
-        }
-        adjoint ... {
-            if BeginEstimateCaching(cacheName, 2 * Length(target) + (shifted ? 1 | 0)) {
-                within {
-                    if shifted { AddConstant(-1, Reversed(target)); }
-                } apply {
-                    Adjoint ApplyControlledMultiplexedRy(layer, maxSwapBits, Reversed(Most(target)), controls, Tail(target), phaseGradient, angleReg);
-                }
-                EndEstimateCaching();
+            } else {
+                ApplySignTable(signs, Reversed(target) + controls);
             }
         }
     }
