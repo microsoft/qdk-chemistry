@@ -5,6 +5,10 @@
 # Licensed under the MIT License. See LICENSE.txt in the project root for license information.
 # --------------------------------------------------------------------------------------------
 
+import operator
+
+import pytest
+
 from qdk_chemistry.data import Element, get_current_ciaaw_version
 
 
@@ -33,6 +37,12 @@ class TestElementEnum:
         """Test that elements can be compared."""
         assert Element.He != Element.H
         assert Element.C.value < Element.O.value
+
+    @pytest.mark.parametrize(("element", "atomic_number"), [(Element.H, 1), (Element.C, 6), (Element.Og, 118)])
+    def test_element_integer_conversion(self, element, atomic_number):
+        """Elements retain their integer conversion and indexing protocols."""
+        assert int(element) == atomic_number
+        assert operator.index(element) == atomic_number
 
     def test_all_elements_present(self):
         """Test that all 118 elements are accessible."""

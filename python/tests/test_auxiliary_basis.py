@@ -113,7 +113,7 @@ def test_validation_rejects_invalid_construction_and_maps():
     structure = _make_structure(("H",))
     shell = Shell(0, OrbitalType.S, [2.0], [1.0])
 
-    with pytest.raises(TypeError, match="incompatible constructor arguments"):
+    with pytest.raises(TypeError):
         AuxiliaryBasis([shell])
     with pytest.raises(ValueError, match="nullptr"):
         AuxiliaryBasis([shell], None)

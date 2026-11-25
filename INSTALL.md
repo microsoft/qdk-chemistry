@@ -42,6 +42,11 @@ simplest option when you need PySCF.
 > **NOTE:** Commands below are given for Linux/macOS (`bash`) and Windows (PowerShell). Where the
 > Linux/macOS commands use `python3`, use `python` on Windows.
 
+Standard (GIL-enabled) CPython 3.11 and newer share a `cp311-abi3` QDK Chemistry
+wheel per platform and architecture. Pip installs the matching `nanobind-backend`
+wheel for your interpreter. The backend and other dependencies must also support
+your Python version.
+
 ### Step 1: Create a virtual environment
 
 Use a virtual environment to avoid conflicts with other packages:
@@ -206,7 +211,7 @@ After the initial build, restart VS Code and reopen in the container to ensure t
 
 ### Step 4: Develop
 
-The dev container installs the Python package in editable mode, so changes to pure Python files are available immediately. After changing pybind11 sources, rebuild the Python package:
+The dev container installs the Python package in editable mode, so changes to pure Python files are available immediately. After changing nanobind sources, rebuild the Python package:
 
 ```bash
 python -m pip install --no-build-isolation --check-build-dependencies --no-deps \
@@ -415,7 +420,7 @@ $env:CMAKE_BUILD_PARALLEL_LEVEL = 1
 python -m pip install ".[all]"
 ```
 
-> **For active developers:** The pip source build includes a full C++ compilation, which is slow. For faster iteration, [build and install the C++ library separately](#building-the-c-library) first, then [link the Python build to it](#linking-to-an-existing-c-installation). That way `pip install` only rebuilds the pybind11 bindings.
+> **For active developers:** The pip source build includes a full C++ compilation, which is slow. For faster iteration, [build and install the C++ library separately](#building-the-c-library) first, then [link the Python build to it](#linking-to-an-existing-c-installation). That way `pip install` only rebuilds the nanobind bindings.
 
 #### Building on Windows
 
