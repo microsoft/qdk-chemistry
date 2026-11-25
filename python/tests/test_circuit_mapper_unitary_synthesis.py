@@ -5,17 +5,14 @@
 # Licensed under the MIT License. See LICENSE.txt in the project root for license information.
 # --------------------------------------------------------------------------------------------
 
-from unittest.mock import Mock
-
 import numpy as np
 import pytest
 from qdk.test_utils import dump_operation_on_state
 from scipy import sparse
 from scipy.stats import ortho_group
 
-from qdk_chemistry._core.utils.unitary_synthesis import block_sparse_isometry_synthesis, dense_isometry_right_factor
+from qdk_chemistry._core.utils.unitary_synthesis import block_sparse_isometry_synthesis
 from qdk_chemistry.algorithms import create
-from qdk_chemistry.algorithms.circuit_mapper import unitary_synthesis_mapper
 from qdk_chemistry.data import UnitaryMatrixContainer, UnitaryRepresentation
 from qdk_chemistry.data.unitary_representation.containers.pauli_product_formula import (
     ExponentiatedPauliTerm,
@@ -148,7 +145,7 @@ def test_shared_phase_gradient(name):
 def test_omit_right_factor(matrix):
     """The dense circuit realizes ``M``, and without ``V`` it maps ``V a`` to ``M a``."""
     representation = _representation(matrix)
-    right_factor = create("circuit_mapper", _DENSE).right_factor(representation)
+    right_factor = create("circuit_mapper", _DENSE).synthesize(representation)["rightFactor"]
     np.testing.assert_allclose(right_factor.T @ right_factor, np.eye(matrix.shape[1]), atol=1e-12)
     _assert_realizes(create("circuit_mapper", _DENSE).run(representation), matrix, seed=0)
     mapper = create("circuit_mapper", _DENSE, omit_right_factor=True)
@@ -165,7 +162,7 @@ def test_adjoint_inverts(qsharp_test_context, qsharp_test_utils, name, settings)
     representation = _representation(matrix)
     coefficients = np.random.default_rng(21).normal(size=2)
     coefficients /= np.linalg.norm(coefficients)
-    preimage = create("circuit_mapper", _DENSE).right_factor(representation) if settings else np.eye(2)
+    preimage = create("circuit_mapper", _DENSE).synthesize(representation)["rightFactor"] if settings else np.eye(2)
     expected = np.zeros(8)
     expected[: len(preimage)] = preimage @ coefficients
     reverse = _bit_reversal(3)
@@ -176,25 +173,13 @@ def test_adjoint_inverts(qsharp_test_context, qsharp_test_utils, name, settings)
     assert abs(np.vdot(expected, output[reverse])) ** 2 > 1 - _INFIDELITY_TOLERANCE
 
 
-def test_right_factor_reuses_last_run(monkeypatch):
-    """After ``run`` the dense mapper returns a copy of the synthesized ``V`` without factorizing again."""
-    spy = Mock(wraps=dense_isometry_right_factor)
-    monkeypatch.setattr(unitary_synthesis_mapper, "dense_isometry_right_factor", spy)
-    matrix, other = (ortho_group.rvs(16, random_state=seed)[:, :4] for seed in (7, 8))
-    mapper = create("circuit_mapper", _DENSE, omit_right_factor=True)
-    mapper.run(_representation(matrix))
-    mapper.right_factor(_representation(matrix.copy()))[:] = 0.0
-    np.testing.assert_array_equal(mapper.right_factor(_representation(matrix)), dense_isometry_right_factor(matrix, 4))
-    spy.assert_not_called()
-    np.testing.assert_array_equal(mapper.right_factor(_representation(other)), dense_isometry_right_factor(other, 4))
-    spy.assert_called_once()
-
-
 def test_signed_permutation_needs_no_rotations():
     """One-by-one blocks leave only the permutations and the signs."""
-    synthesis = block_sparse_isometry_synthesis(sparse.csc_array(np.diag([1.0, -1.0, 1.0, -1.0])[[2, 0, 3, 1]]))
-    assert synthesis.block_givens.layer_angles == []
-    assert len(synthesis.column_permutation) == len(synthesis.row_permutation) == 4
+    rows, columns, angles, _ = block_sparse_isometry_synthesis(
+        sparse.csc_array(np.diag([1.0, -1.0, 1.0, -1.0])[[2, 0, 3, 1]])
+    )
+    assert angles.shape == (0, 3)
+    assert len(columns) == len(rows) == 4
 
 
 def test_identity_skips_permutations():
@@ -221,28 +206,25 @@ def test_duplicate_entries_are_summed(duplicates):
     indptr = np.searchsorted(columns[order], np.arange(matrix.shape[1] + 1))
     stored = sparse.csc_array((data[order], rows[order], indptr), shape=matrix.shape)
     assert not stored.has_canonical_format
-    expected, actual = block_sparse_isometry_synthesis(matrix), block_sparse_isometry_synthesis(stored)
-    assert actual.row_permutation == expected.row_permutation
-    assert actual.column_permutation == expected.column_permutation
-    assert actual.block_givens.layer_angles == expected.block_givens.layer_angles
-    assert actual.block_givens.phases == expected.block_givens.phases
+    for expected, actual in zip(
+        block_sparse_isometry_synthesis(matrix), block_sparse_isometry_synthesis(stored), strict=True
+    ):
+        np.testing.assert_array_equal(actual, expected)
 
 
 @pytest.mark.parametrize(
     "call",
     [
         lambda unitary: create("circuit_mapper", _DENSE).run(unitary),
-        lambda unitary: create("circuit_mapper", _DENSE).right_factor(unitary),
+        lambda unitary: create("circuit_mapper", _DENSE).synthesize(unitary),
         lambda unitary: create("circuit_mapper", _BLOCK_SPARSE).run(unitary),
     ],
-    ids=["dense-run", "dense-right-factor", "block-sparse-run"],
+    ids=["dense-run", "dense-synthesize", "block-sparse-run"],
 )
 def test_rejects_unsupported_containers(call):
-    """Only real unitary matrix containers can be synthesized."""
+    """Only unitary matrix containers can be synthesized."""
     with pytest.raises(ValueError, match="unitary_matrix"):
         call(UnitaryRepresentation(PauliProductFormulaContainer([ExponentiatedPauliTerm({0: "X"}, 0.1)], 1, 1)))
-    with pytest.raises(ValueError, match="requires a real matrix"):
-        call(_representation(np.diag([1.0, 1j])))
 
 
 @pytest.mark.parametrize(

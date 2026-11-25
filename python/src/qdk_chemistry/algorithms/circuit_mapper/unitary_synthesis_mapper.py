@@ -10,11 +10,9 @@ from __future__ import annotations
 from abc import abstractmethod
 from typing import TYPE_CHECKING, Any
 
-from qdk_chemistry._core.utils.unitary_synthesis import (
-    block_sparse_isometry_synthesis,
-    dense_isometry_right_factor,
-    dense_isometry_synthesis,
-)
+import numpy as np
+
+from qdk_chemistry._core.utils.unitary_synthesis import block_sparse_isometry_synthesis, dense_isometry_synthesis
 from qdk_chemistry.data import Settings
 from qdk_chemistry.data.circuit import Circuit, CircuitMetadata, QsharpFactoryData
 from qdk_chemistry.data.unitary_representation.containers.unitary_matrix import UnitaryMatrixContainer
@@ -23,9 +21,6 @@ from qdk_chemistry.utils.qsharp import QSHARP_UTILS
 from .base import CircuitMapper
 
 if TYPE_CHECKING:
-    import numpy as np
-
-    from qdk_chemistry._core.utils.unitary_synthesis import GivensDecomposition
     from qdk_chemistry.data.unitary_representation.base import UnitaryRepresentation
 
 __all__: list[str] = [
@@ -36,8 +31,6 @@ __all__: list[str] = [
     "UnitarySynthesisMapper",
     "UnitarySynthesisMapperSettings",
 ]
-
-_HASH_CHARS = 64  # Full SHA-256 digest, so a reused right factor cannot belong to another matrix.
 
 
 class UnitarySynthesisMapperSettings(Settings):
@@ -115,15 +108,13 @@ class UnitarySynthesisMapper(CircuitMapper):
         """Return the fields of the Q# ``{_qsharp_prefix}Synthesis`` struct."""
 
     def _container(self, unitary: UnitaryRepresentation) -> UnitaryMatrixContainer:
-        """Return the real UnitaryMatrixContainer of ``unitary``."""
+        """Return the UnitaryMatrixContainer of ``unitary``."""
         container = unitary.get_container()
         if not isinstance(container, UnitaryMatrixContainer):
             raise ValueError(
                 f"The {unitary.get_container_type()} container type is not supported; "
                 f"{self.name()} requires a unitary_matrix container."
             )
-        if not container.is_real:
-            raise ValueError(f"{self.name()} requires a real matrix, but the matrix is complex.")
         return container
 
     def _num_input_qubits(self, container: UnitaryMatrixContainer) -> int:
@@ -149,7 +140,7 @@ class UnitarySynthesisMapper(CircuitMapper):
             unitary: The unitary representation holding a UnitaryMatrixContainer.
 
         Returns:
-            dict[str, Any]: The struct fields, with the register widths and ``maxSwapBits``, that ``run`` passes to Q#.
+            dict[str, Any]: The struct fields, register widths and ``maxSwapBits``, and ``rightFactor`` V if dense.
 
         Raises:
             ValueError: If the container or the settings are invalid for the matrix.
@@ -179,6 +170,7 @@ class UnitarySynthesisMapper(CircuitMapper):
 
         """
         synthesis = self.synthesize(unitary)
+        synthesis.pop("rightFactor", None)
         module, prefix = QSHARP_UTILS.IsometrySynthesis, self._qsharp_prefix
         qsharp_synthesis = getattr(module, f"{prefix}Synthesis")(**synthesis)
         if self._settings.get("allocate_phase_gradient"):
@@ -207,46 +199,24 @@ class DenseUnitarySynthesisMapper(UnitarySynthesisMapper):
         """Initialize the DenseUnitarySynthesisMapper."""
         super().__init__()
         self._settings = DenseUnitarySynthesisMapperSettings()
-        # V of the last run with its matrix hash and input width, which right_factor reuses.
-        self._last_right_factor: tuple[str, int, np.ndarray] | None = None
 
     def name(self) -> str:
         """Return ``unitary_synthesis_dense``."""
         return "unitary_synthesis_dense"
 
-    def right_factor(self, unitary: UnitaryRepresentation) -> np.ndarray:
-        """Return the right factor ``V`` that ``omit_right_factor`` leaves out, reusing the last run's factor.
-
-        Args:
-            unitary: The unitary representation to map with the current settings.
-
-        Returns:
-            numpy.ndarray: Orthogonal matrix with one row and column per column of the matrix.
-
-        Raises:
-            ValueError: If the container or ``num_input_qubits`` is invalid for the matrix.
-
-        """
-        container = self._container(unitary)
-        num_input_qubits = self._num_input_qubits(container)
-        if self._last_right_factor is not None:
-            matrix_hash, last_input_qubits, right_factor = self._last_right_factor
-            if last_input_qubits == num_input_qubits and matrix_hash == container.content_hash(_HASH_CHARS):
-                return right_factor.copy()
-        return dense_isometry_right_factor(container.to_dense(), 1 << num_input_qubits)
-
     def _synthesize(self, container: UnitaryMatrixContainer, num_input_qubits: int) -> dict[str, Any]:
-        """Return the fields of the Q# ``DenseIsometrySynthesis`` struct and cache the right factor."""
-        synthesis = dense_isometry_synthesis(
+        """Return the fields of the Q# ``DenseIsometrySynthesis`` struct and the right factor ``V``."""
+        rotation_angles, layers, signs, right_factor = dense_isometry_synthesis(
             container.to_dense(), 1 << num_input_qubits, omit_right_factor=self._settings.get("omit_right_factor")
         )
-        self._last_right_factor = (container.content_hash(_HASH_CHARS), num_input_qubits, synthesis.right_factor.copy())
-        right_factor = synthesis.right_factor_givens
+        givens = [_givens_to_qsharp(angles, layer_signs) for angles, layer_signs in zip(layers, signs, strict=True)]
+        num_mixing = 2 if len(rotation_angles) == 3 else 0
         return {
-            "rotationAngles": synthesis.rotation_angles,
-            "mixingGivens": [_givens_to_qsharp(givens) for givens in synthesis.mixing_givens],
-            "blockGivens": _givens_to_qsharp(synthesis.block_givens),
-            "rightFactorGivens": [] if right_factor is None else [_givens_to_qsharp(right_factor)],
+            "rotationAngles": rotation_angles.tolist(),
+            "mixingGivens": givens[1 : 1 + num_mixing],
+            "blockGivens": givens[0],
+            "rightFactorGivens": givens[1 + num_mixing :],
+            "rightFactor": right_factor,
         }
 
 
@@ -267,14 +237,19 @@ class BlockSparseUnitarySynthesisMapper(UnitarySynthesisMapper):
     def _synthesize(self, container: UnitaryMatrixContainer, num_input_qubits: int) -> dict[str, Any]:  # noqa: ARG002
         """Return the fields of the Q# ``SparseIsometrySynthesis`` struct."""
         # The permutations act on the whole register, so the input width only splits the Q# arguments.
-        synthesis = block_sparse_isometry_synthesis(container.matrix)
+        row_permutation, column_permutation, angles, signs = block_sparse_isometry_synthesis(container.matrix)
         return {
-            "columnPermutation": synthesis.column_permutation,
-            "rowPermutation": synthesis.row_permutation,
-            "blockGivens": _givens_to_qsharp(synthesis.block_givens),
+            "columnPermutation": column_permutation,
+            "rowPermutation": row_permutation,
+            "blockGivens": _givens_to_qsharp(angles, signs),
         }
 
 
-def _givens_to_qsharp(givens: GivensDecomposition) -> dict[str, Any]:
-    """Return the fields of the Q# ``GivensDecomposition`` struct."""
-    return {"layerAngles": givens.layer_angles, "layerShifted": givens.layer_shifted, "phases": givens.phases}
+def _givens_to_qsharp(angles: np.ndarray, signs: np.ndarray) -> dict[str, Any]:
+    """Return the fields of the Q# ``GivensDecomposition`` struct from angles indexed by layer and pair."""
+    shifts = [int(np.flatnonzero(layer)[0] % 2) for layer in angles]
+    return {
+        "layerAngles": [layer[shift::2].tolist() for layer, shift in zip(angles, shifts, strict=True)],
+        "layerShifted": [shift == 1 for shift in shifts],
+        "phases": (signs < 0).tolist(),
+    }

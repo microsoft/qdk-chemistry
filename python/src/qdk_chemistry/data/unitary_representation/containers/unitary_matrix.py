@@ -14,7 +14,6 @@ from scipy import sparse
 
 from qdk_chemistry.data._hashing import _hash_array, _hash_bool, _hash_str
 from qdk_chemistry.data.unitary_representation.containers.base import UnitaryContainer
-from qdk_chemistry.utils.serialization import complex_array_from_json, complex_array_to_json
 
 if TYPE_CHECKING:
     import h5py
@@ -25,14 +24,14 @@ _ORTHONORMALITY_TOLERANCE = 1.0e-8  # Per-column Frobenius norm of M^H M - I, as
 
 
 class UnitaryMatrixContainer(UnitaryContainer):
-    """Unitary matrix, or its leading orthonormal columns.
+    """Real orthogonal matrix, or its leading orthonormal columns.
 
     Args:
-        matrix: Matrix with :math:`2^n` rows and orthonormal columns, as a NumPy array or SciPy sparse matrix.
+        matrix: Real matrix with :math:`2^n` rows and orthonormal columns, as a NumPy array or SciPy sparse matrix.
 
     Raises:
         TypeError: If the matrix is not numeric.
-        ValueError: If the matrix has an invalid shape, non-finite entries or non-orthonormal columns.
+        ValueError: If the matrix is complex or has an invalid shape, non-finite entries or non-orthonormal columns.
 
     """
 
@@ -51,33 +50,28 @@ class UnitaryMatrixContainer(UnitaryContainer):
         super().__init__()
 
     @staticmethod
-    def _is_complex_dtype(dtype: np.dtype) -> bool:
-        """Return whether ``dtype`` is complex, rejecting non-numeric dtypes."""
-        if np.issubdtype(dtype, np.complexfloating):
-            return True
-        if np.issubdtype(dtype, np.floating) or np.issubdtype(dtype, np.integer) or dtype == np.bool_:
-            return False
-        raise TypeError(f"UnitaryMatrixContainer requires a numeric matrix, got dtype {dtype}.")
+    def _real(values: np.ndarray) -> np.ndarray:
+        """Return a float64 copy of numeric ``values`` whose imaginary part, if any, is round-off."""
+        if not (np.issubdtype(values.dtype, np.number) or values.dtype == np.bool_):
+            raise TypeError(f"UnitaryMatrixContainer requires a numeric matrix, got dtype {values.dtype}.")
+        values = np.real_if_close(values)
+        if np.iscomplexobj(values):
+            raise ValueError("UnitaryMatrixContainer requires a real matrix.")
+        return values.astype(np.float64)
 
     @classmethod
     def _canonical_dense(cls, matrix: Any) -> np.ndarray:
-        """Return a read-only float64 or complex128 copy of a dense matrix."""
-        array = np.asarray(matrix)
-        is_complex = cls._is_complex_dtype(array.dtype)
-        array = np.asarray(array, dtype=np.complex128 if is_complex else np.float64)
-        array = np.array(np.real_if_close(array), order="C")
-        # Adding zero turns -0.0 into +0.0, which JSON serialization of complex values does not keep.
-        array += 0.0
+        """Return a read-only float64 copy of a dense matrix."""
+        array = np.ascontiguousarray(cls._real(np.asarray(matrix)))
         array.setflags(write=False)
         return array
 
     @classmethod
     def _canonical_sparse(cls, matrix: sparse.sparray | sparse.spmatrix) -> sparse.csc_array:
-        """Return a canonical float64 or complex128 CSC copy of a sparse matrix without explicit zeros."""
-        is_complex = cls._is_complex_dtype(matrix.dtype)
-        array = sparse.csc_array(matrix, dtype=np.complex128 if is_complex else np.float64, copy=True)
+        """Return a canonical float64 CSC copy of a sparse matrix without explicit zeros."""
+        array = sparse.csc_array(matrix, copy=True)
         array.sum_duplicates()
-        array = sparse.csc_array((np.real_if_close(array.data) + 0.0, array.indices, array.indptr), shape=array.shape)
+        array = sparse.csc_array((cls._real(array.data), array.indices, array.indptr), shape=array.shape)
         array.eliminate_zeros()
         array.sort_indices()
         return array
@@ -95,15 +89,14 @@ class UnitaryMatrixContainer(UnitaryContainer):
         values = matrix.data if sparse.issparse(matrix) else matrix
         if not np.all(np.isfinite(values)):
             raise ValueError("UnitaryMatrixContainer requires a finite matrix.")
-        adjoint = matrix.conj().T if np.iscomplexobj(values) else matrix.T
         if sparse.issparse(matrix):
             # Keep the residual sparse: a dense m-by-m Gram matrix would dominate memory for wide isometries.
             identity = sparse.csc_array(
                 (np.ones(cols), np.arange(cols), np.arange(cols + 1)), shape=(cols, cols), dtype=np.float64
             )
-            residual = float(np.linalg.norm(sparse.csc_array(adjoint @ matrix - identity).data))
+            residual = float(np.linalg.norm(sparse.csc_array(matrix.T @ matrix - identity).data))
         else:
-            residual = float(np.linalg.norm(adjoint @ matrix - np.eye(cols)))
+            residual = float(np.linalg.norm(matrix.T @ matrix - np.eye(cols)))
         if not residual <= _ORTHONORMALITY_TOLERANCE * cols:
             raise ValueError(
                 "UnitaryMatrixContainer requires orthonormal columns; "
@@ -123,11 +116,6 @@ class UnitaryMatrixContainer(UnitaryContainer):
         matrix = self._matrix.copy()
         matrix.setflags(write=False)
         return matrix
-
-    @property
-    def is_real(self) -> bool:
-        """Return whether every entry is real, so the matrix is stored as float64."""
-        return not np.issubdtype(self._matrix.dtype, np.complexfloating)
 
     @property
     def is_sparse(self) -> bool:
@@ -150,7 +138,7 @@ class UnitaryMatrixContainer(UnitaryContainer):
         return int(self._matrix.shape[0]).bit_length() - 1
 
     def to_dense(self) -> np.ndarray:
-        """Return a dense float64 or complex128 copy of the matrix."""
+        """Return a dense float64 copy of the matrix."""
         if self.is_sparse:
             return self._matrix.toarray()
         return np.array(self._matrix)
@@ -203,10 +191,6 @@ class UnitaryMatrixContainer(UnitaryContainer):
         else:
             _hash_array(h, self._matrix)
 
-    def _values_to_json(self, values: np.ndarray) -> list | dict[str, Any]:
-        """Return real values as nested lists and complex values split into real and imaginary parts."""
-        return values.tolist() if self.is_real else complex_array_to_json(values)
-
     def to_json(self) -> dict[str, Any]:
         """Convert the container to a JSON dictionary.
 
@@ -220,11 +204,11 @@ class UnitaryMatrixContainer(UnitaryContainer):
             "shape": [int(dim) for dim in self._matrix.shape],
         }
         if self.is_sparse:
-            data["data"] = self._values_to_json(self._matrix.data)
+            data["data"] = self._matrix.data.tolist()
             data["indices"] = self._matrix.indices.tolist()
             data["indptr"] = self._matrix.indptr.tolist()
         else:
-            data["matrix"] = self._values_to_json(self._matrix)
+            data["matrix"] = self._matrix.tolist()
         return self._add_json_version(data)
 
     def to_hdf5(self, group: h5py.Group) -> None:
@@ -245,21 +229,16 @@ class UnitaryMatrixContainer(UnitaryContainer):
         else:
             group.create_dataset("matrix", data=self._matrix)
 
-    @staticmethod
-    def _values_from_json(values: Any) -> np.ndarray:
-        """Return the array written by ``_values_to_json``, or an HDF5 dataset's array unchanged."""
-        return complex_array_from_json(values) if isinstance(values, dict) else np.asarray(values)
-
     @classmethod
     def _from_arrays(cls, storage_format: str, shape: Any, arrays: dict[str, Any]) -> UnitaryMatrixContainer:
         """Rebuild a container from its serialized storage format, shape, and arrays."""
         shape = tuple(int(dim) for dim in shape)
         if storage_format == "dense":
-            return cls(cls._values_from_json(arrays["matrix"]).reshape(shape))
+            return cls(np.asarray(arrays["matrix"]).reshape(shape))
         if storage_format == "sparse":
             csc = sparse.csc_array(
                 (
-                    cls._values_from_json(arrays["data"]),
+                    np.asarray(arrays["data"]),
                     np.asarray(arrays["indices"], dtype=np.int64),
                     np.asarray(arrays["indptr"], dtype=np.int64),
                 ),
@@ -304,6 +283,6 @@ class UnitaryMatrixContainer(UnitaryContainer):
     def get_summary(self) -> str:
         """Return a human-readable summary of the container."""
         rows, cols = self._matrix.shape
-        kind = ("orthogonal matrix" if self.is_real else "unitary matrix") if self.is_square else "isometry"
+        kind = "orthogonal matrix" if self.is_square else "isometry"
         storage = f"sparse, {self._matrix.nnz} nonzeros" if self.is_sparse else "dense"
-        return f"{'Real' if self.is_real else 'Complex'} {kind} ({self.num_qubits} qubits, {rows}x{cols}, {storage})"
+        return f"Real {kind} ({self.num_qubits} qubits, {rows}x{cols}, {storage})"
