@@ -129,7 +129,6 @@ class TestEffectiveHamiltonianConstructor:
         emitted = h_eff.get_orbitals()
         assert list(emitted.active_indices().indices(alpha)) == active
         assert list(emitted.inactive_indices().indices(alpha)) == core
-        assert not emitted.has_energies()
 
     def test_empty_external_space_is_the_identity(self, water_window):
         """Keeping the whole window leaves nothing to fold, so the integrals come back unchanged."""

@@ -140,8 +140,7 @@ Eigen::MatrixXd window_density(
 }
 
 /// The reference orbitals relabeled with `p_indices` as active and
-/// `emit_inactive` as inactive orbitals. Orbital energies are dropped: they
-/// describe the input Fock operator, not the effective Hamiltonian.
+/// `emit_inactive` as inactive orbitals.
 std::shared_ptr<data::Orbitals> relabeled_orbitals(
     const data::Orbitals& ref_orbitals,
     const std::shared_ptr<const data::SymmetryBlockedIndexSet>& p_indices,
@@ -164,9 +163,10 @@ std::shared_ptr<data::Orbitals> relabeled_orbitals(
     overlap = ref_orbitals.get_overlap_matrix();
   std::shared_ptr<data::BasisSet> basis;
   if (ref_orbitals.has_basis_set()) basis = ref_orbitals.get_basis_set();
-  return std::make_shared<data::Orbitals>(ref_orbitals.coefficients(), nullptr,
-                                          overlap, basis, p_indices,
-                                          inactive_set);
+  return std::make_shared<data::Orbitals>(
+      ref_orbitals.coefficients(),
+      ref_orbitals.has_energies() ? ref_orbitals.energies() : nullptr, overlap,
+      basis, p_indices, inactive_set);
 }
 
 struct WindowPartition {

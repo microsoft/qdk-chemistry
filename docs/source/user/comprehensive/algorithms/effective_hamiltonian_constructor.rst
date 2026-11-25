@@ -160,7 +160,6 @@ Its two-body integrals are read as stored, so they must have the Hermitian symme
 Its inactive orbitals must be exactly the reference core outside :math:`W`, which its scalar and integrals already include.
 
 The output orbitals preserve the reference orbital basis, and ``ModelOrbitals`` references give ``ModelOrbitals`` output.
-They carry no orbital energies, which describe the input Fock operator rather than the effective Hamiltonian.
 The output keeps the spin restriction of the input.
 The restricted and same-spin (``aaaa``, ``bbbb``) two-body blocks are 4-fold rather than 8-fold symmetric, :math:`(pq|rs) = (qp|sr) = (rs|pq)`: the commutator is not an electron-repulsion operator, so the bra swap :math:`(pq|rs) = (qp|rs)` does not hold.
 For an unrestricted output, the mixed-spin ``aabb`` block satisfies 2-fold Hermiticity, :math:`(pq|rs)^{\alpha\beta} = (qp|sr)^{\alpha\beta}`.
