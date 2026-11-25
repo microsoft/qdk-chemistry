@@ -25,7 +25,6 @@ if TYPE_CHECKING:
 
 __all__: list[str] = [
     "BlockSparseUnitarySynthesisMapper",
-    "BlockSparseUnitarySynthesisMapperSettings",
     "DenseUnitarySynthesisMapper",
     "DenseUnitarySynthesisMapperSettings",
     "UnitarySynthesisMapper",
@@ -86,10 +85,6 @@ class DenseUnitarySynthesisMapperSettings(UnitarySynthesisMapperSettings):
         )
 
 
-class BlockSparseUnitarySynthesisMapperSettings(UnitarySynthesisMapperSettings):
-    """Settings for the BlockSparseUnitarySynthesisMapper."""
-
-
 class UnitarySynthesisMapper(CircuitMapper):
     r"""Base mapper that synthesizes a real isometry :math:`M` from a UnitaryMatrixContainer.
 
@@ -99,6 +94,11 @@ class UnitarySynthesisMapper(CircuitMapper):
     _qsharp_prefix: str
     _max_added_qubits: int | None = None
 
+    def __init__(self):
+        """Initialize the mapper with the shared settings."""
+        super().__init__()
+        self._settings = UnitarySynthesisMapperSettings()
+
     def type_name(self) -> str:
         """Return ``circuit_mapper``."""
         return "circuit_mapper"
@@ -106,32 +106,6 @@ class UnitarySynthesisMapper(CircuitMapper):
     @abstractmethod
     def _synthesize(self, container: UnitaryMatrixContainer, num_input_qubits: int) -> dict[str, Any]:
         """Return the fields of the Q# ``{_qsharp_prefix}Synthesis`` struct."""
-
-    def _container(self, unitary: UnitaryRepresentation) -> UnitaryMatrixContainer:
-        """Return the UnitaryMatrixContainer of ``unitary``."""
-        container = unitary.get_container()
-        if not isinstance(container, UnitaryMatrixContainer):
-            raise ValueError(
-                f"The {unitary.get_container_type()} container type is not supported; "
-                f"{self.name()} requires a unitary_matrix container."
-            )
-        return container
-
-    def _num_input_qubits(self, container: UnitaryMatrixContainer) -> int:
-        """Return the input register width, validating the ``num_input_qubits`` setting."""
-        num_qubits = container.num_qubits
-        smallest = (container.num_columns - 1).bit_length()
-        if self._max_added_qubits is not None:
-            smallest = max(smallest, num_qubits - self._max_added_qubits)
-        requested = self._settings.get("num_input_qubits")
-        if requested == -1:
-            return smallest
-        if not smallest <= requested <= num_qubits:
-            raise ValueError(
-                f"num_input_qubits={requested} is invalid for {self.name()} on a {num_qubits}-qubit matrix with "
-                f"{container.num_columns} columns. It must be at least {smallest} and at most {num_qubits}."
-            )
-        return requested
 
     def synthesize(self, unitary: UnitaryRepresentation) -> dict[str, Any]:
         """Return the fields of the Q# ``{_qsharp_prefix}Synthesis`` struct without building a Q# operation.
@@ -146,13 +120,29 @@ class UnitarySynthesisMapper(CircuitMapper):
             ValueError: If the container or the settings are invalid for the matrix.
 
         """
-        container = self._container(unitary)
-        num_input_qubits = self._num_input_qubits(container)
+        container = unitary.get_container()
+        if not isinstance(container, UnitaryMatrixContainer):
+            raise ValueError(
+                f"The {unitary.get_container_type()} container type is not supported; "
+                f"{self.name()} requires a unitary_matrix container."
+            )
+        num_qubits = container.num_qubits
+        smallest = (container.num_columns - 1).bit_length()
+        if self._max_added_qubits is not None:
+            smallest = max(smallest, num_qubits - self._max_added_qubits)
+        num_input_qubits = self._settings.get("num_input_qubits")
+        if num_input_qubits == -1:
+            num_input_qubits = smallest
+        elif not smallest <= num_input_qubits <= num_qubits:
+            raise ValueError(
+                f"num_input_qubits={num_input_qubits} is invalid for {self.name()} on a {num_qubits}-qubit matrix "
+                f"with {container.num_columns} columns. It must be at least {smallest} and at most {num_qubits}."
+            )
         return {
             **self._synthesize(container, num_input_qubits),
             "maxSwapBits": self._settings.get("max_swap_address_bits"),
             "numInputQubits": num_input_qubits,
-            "numAddedQubits": container.num_qubits - num_input_qubits,
+            "numAddedQubits": num_qubits - num_input_qubits,
             "rotationBitPrecision": self._settings.get("rotation_bit_precision"),
         }
 
@@ -224,11 +214,6 @@ class BlockSparseUnitarySynthesisMapper(UnitarySynthesisMapper):
     """Isometry synthesis as QROAM permutations around a block-diagonal orthogonal matrix :cite:`Rupprecht2026`."""
 
     _qsharp_prefix = "SparseIsometry"
-
-    def __init__(self):
-        """Initialize the BlockSparseUnitarySynthesisMapper."""
-        super().__init__()
-        self._settings = BlockSparseUnitarySynthesisMapperSettings()
 
     def name(self) -> str:
         """Return ``unitary_synthesis_block_sparse``."""

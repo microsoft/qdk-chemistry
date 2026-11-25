@@ -11,7 +11,6 @@ from .psp_mapper import PSPMapper, PSPMapperSettings
 from .sossa_mapper import SOSSAMapper, SOSSAMapperSettings
 from .unitary_synthesis_mapper import (
     BlockSparseUnitarySynthesisMapper,
-    BlockSparseUnitarySynthesisMapperSettings,
     DenseUnitarySynthesisMapper,
     DenseUnitarySynthesisMapperSettings,
     UnitarySynthesisMapper,
@@ -20,7 +19,6 @@ from .unitary_synthesis_mapper import (
 
 __all__ = [
     "BlockSparseUnitarySynthesisMapper",
-    "BlockSparseUnitarySynthesisMapperSettings",
     "CircuitMapperFactory",
     "DenseUnitarySynthesisMapper",
     "DenseUnitarySynthesisMapperSettings",

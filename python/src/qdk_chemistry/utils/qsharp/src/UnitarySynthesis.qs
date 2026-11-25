@@ -9,6 +9,7 @@ namespace QDKChemistry.Utils.UnitarySynthesis {
     import Std.Arrays.All;
     import Std.Arrays.Chunks;
     import Std.Arrays.Flattened;
+    import Std.Arrays.Fold;
     import Std.Arrays.ForEach;
     import Std.Arrays.IndexRange;
     import Std.Arrays.IsEmpty;
@@ -169,21 +170,8 @@ namespace QDKChemistry.Utils.UnitarySynthesis {
         }
     }
 
-    /// Applies Ry(4π·data[a]/2^b) to `targetQubit` for each state |a⟩ of the little-endian
-    /// `address`, with the identity past `Length(data)` and a clean b-qubit `angleReg`.
-    operation ApplyMultiplexedRy(
-        data : Bool[][],
-        maxSwapBits : Int,
-        address : Qubit[],
-        targetQubit : Qubit,
-        phaseGradient : Qubit[],
-        angleReg : Qubit[]
-    ) : Unit is Adj + Ctl {
-        ApplyControlledMultiplexedRy(data, maxSwapBits, address, [], targetQubit, phaseGradient, angleReg);
-    }
-
-    /// `ApplyMultiplexedRy` that rotates only when every qubit of `controls` is |1⟩, controlling
-    /// only the lookup, which is cheaper than `Controlled ApplyMultiplexedRy`.
+    /// Applies Ry(4π·data[a]/2^b) to `targetQubit` for each state |a⟩ of the little-endian `address` when every
+    /// qubit of `controls` is |1⟩, with the identity past `Length(data)` and a clean b-qubit `angleReg`.
     operation ApplyControlledMultiplexedRy(
         data : Bool[][],
         maxSwapBits : Int,
@@ -205,17 +193,15 @@ namespace QDKChemistry.Utils.UnitarySynthesis {
                     } apply {
                         RyViaPhaseGradient(targetQubit, angleReg, phaseGradient);
                     }
-                } elif not guarded and Length(controls) == 1 {
-                    within {
-                        LoadAngleWord(table, maxSwapBits, address, controls[0], angleReg);
-                    } apply {
-                        RyViaPhaseGradient(targetQubit, angleReg, phaseGradient);
-                    }
                 } else {
-                    use flag = Qubit();
+                    // Only the lookup is controlled, by a flag unless the condition is a single control.
+                    let needsFlag = guarded or Length(controls) > 1;
+                    use flag = Qubit[needsFlag ? 1 | 0];
                     within {
-                        ComputeLoadFlag(controls, guarded, Length(table), address, flag);
-                        LoadAngleWord(table, maxSwapBits, address, flag, angleReg);
+                        if needsFlag {
+                            ComputeLoadFlag(controls, guarded, Length(table), address, flag[0]);
+                        }
+                        LoadAngleWord(table, maxSwapBits, address, needsFlag ? flag[0] | controls[0], angleReg);
                     } apply {
                         RyViaPhaseGradient(targetQubit, angleReg, phaseGradient);
                     }
@@ -292,11 +278,7 @@ namespace QDKChemistry.Utils.UnitarySynthesis {
 
     /// Returns the parity of `measured` against `word`, the sign an X-basis erasure leaves on it.
     internal function MeasuredParity(measured : Bool[], word : Bool[]) : Bool {
-        mutable parity = false;
-        for (measuredBit, wordBit) in Zipped(measured, word) {
-            set parity = parity != (measuredBit and wordBit);
-        }
-        parity
+        Fold((parity, (measuredBit, wordBit)) -> parity != (measuredBit and wordBit), false, Zipped(measured, word))
     }
 
     /// Returns the entrywise XOR of two sign tables.

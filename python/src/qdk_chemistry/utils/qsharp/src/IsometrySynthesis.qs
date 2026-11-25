@@ -37,7 +37,6 @@ namespace QDKChemistry.Utils.IsometrySynthesis {
     import QDKChemistry.Utils.SelectSwap.ComputeOptimalLambda2D;
     import QDKChemistry.Utils.UnitarySynthesis.ApplyControlledMultiplexedRy;
     import QDKChemistry.Utils.UnitarySynthesis.ApplyGivensLayersDeferred;
-    import QDKChemistry.Utils.UnitarySynthesis.ApplyMultiplexedRy;
     import QDKChemistry.Utils.UnitarySynthesis.ApplyMultiplexedRyDeferred;
     import QDKChemistry.Utils.UnitarySynthesis.ApplyRealUnitaryViaGivens;
     import QDKChemistry.Utils.UnitarySynthesis.ApplySignTable;
@@ -237,7 +236,7 @@ namespace QDKChemistry.Utils.IsometrySynthesis {
                 CNOT(q1, q0);
             }
             if numAdded > 0 {
-                Adjoint ApplyMultiplexedRy(rotations[0], maxSwapBits, input, added[0], phaseGradient, angleReg);
+                Adjoint ApplyControlledMultiplexedRy(rotations[0], maxSwapBits, input, [], added[0], phaseGradient, angleReg);
             }
             for givens in rightFactorGivens {
                 if IsEmpty(input) {
@@ -331,25 +330,13 @@ namespace QDKChemistry.Utils.IsometrySynthesis {
 
     /// Returns `ApplyDenseIsometry` on the target `[input | added]`, with its own phase gradient.
     function MakeDenseIsometryOp(synthesis : DenseIsometrySynthesis) : Qubit[] => Unit is Adj {
-        ApplyIsometryOnTarget(
-            synthesis.numInputQubits,
-            synthesis.numAddedQubits,
-            synthesis.rotationBitPrecision,
-            ApplyDenseIsometry(synthesis, _, _, _, _),
-            _
-        )
+        ApplyIsometryOnTarget(synthesis.numInputQubits, synthesis.numAddedQubits, synthesis.rotationBitPrecision, ApplyDenseIsometry(synthesis, _, _, _, _), _)
     }
 
     /// Returns `ApplyDenseIsometry` on `[input | added | phaseGradient]`, whose prepared phase
     /// gradient is left in its state.
     function MakeDenseIsometryOpWithPhaseGradient(synthesis : DenseIsometrySynthesis) : Qubit[] => Unit is Adj {
-        ApplyIsometryOnRegister(
-            synthesis.numInputQubits,
-            synthesis.numAddedQubits,
-            synthesis.rotationBitPrecision,
-            ApplyDenseIsometry(synthesis, _, _, _, _),
-            _
-        )
+        ApplyIsometryOnRegister(synthesis.numInputQubits, synthesis.numAddedQubits, synthesis.rotationBitPrecision, ApplyDenseIsometry(synthesis, _, _, _, _), _)
     }
 
     /// Circuit entry point for a dense isometry, leaving the output on the allocated target.
@@ -360,24 +347,12 @@ namespace QDKChemistry.Utils.IsometrySynthesis {
 
     /// Returns `ApplySparseIsometry` on the target, with its own phase gradient.
     function MakeSparseIsometryOp(synthesis : SparseIsometrySynthesis) : Qubit[] => Unit is Adj {
-        ApplyIsometryOnTarget(
-            synthesis.numInputQubits,
-            synthesis.numAddedQubits,
-            synthesis.rotationBitPrecision,
-            ApplySparseIsometry(synthesis, _, _, _, _),
-            _
-        )
+        ApplyIsometryOnTarget(synthesis.numInputQubits, synthesis.numAddedQubits, synthesis.rotationBitPrecision, ApplySparseIsometry(synthesis, _, _, _, _), _)
     }
 
     /// Returns `ApplySparseIsometry` on `[target | phaseGradient]`, as for dense isometries.
     function MakeSparseIsometryOpWithPhaseGradient(synthesis : SparseIsometrySynthesis) : Qubit[] => Unit is Adj {
-        ApplyIsometryOnRegister(
-            synthesis.numInputQubits,
-            synthesis.numAddedQubits,
-            synthesis.rotationBitPrecision,
-            ApplySparseIsometry(synthesis, _, _, _, _),
-            _
-        )
+        ApplyIsometryOnRegister(synthesis.numInputQubits, synthesis.numAddedQubits, synthesis.rotationBitPrecision, ApplySparseIsometry(synthesis, _, _, _, _), _)
     }
 
     /// Circuit entry point for a sparse isometry, leaving the output on the allocated target.
