@@ -235,6 +235,23 @@ TEST_F(UnitarySynthesisTest, ReconstructsDenseIsometries) {
         target * (Eigen::MatrixXd::Identity(8, 8) + symmetric);
     expect_dense_synthesis(target, 8, &perturbed);
   }
+
+  // Near-permutations put cosine-sine values near 0 and 1.
+  for (const Eigen::Index added : {2, 4}) {
+    for (const double eps : {1.0e-6, 1.0e-8}) {
+      SCOPED_TRACE(::testing::Message()
+                   << "near permutation, added " << added << " eps " << eps);
+      const Eigen::Index dim = added * 8;
+      Eigen::MatrixXd q = random_orthogonal(dim, seed++);
+      q = (Eigen::MatrixXd::Identity(dim, dim) + eps * (q - q.transpose()))
+              .householderQr()
+              .householderQ();
+      std::vector<Eigen::Index> rows(dim);
+      std::iota(rows.begin(), rows.end(), 0);
+      std::shuffle(rows.begin(), rows.end(), std::mt19937(seed++));
+      expect_dense_synthesis(q(rows, Eigen::seqN(0, 8)), 8);
+    }
+  }
 }
 
 // Sparse synthesis reconstructs structured and random block-sparse isometries.
