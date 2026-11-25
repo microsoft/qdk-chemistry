@@ -29,7 +29,6 @@
 #include <set>
 #include <vector>
 
-#include "qdk/chemistry/algorithms/microsoft/effective_hamiltonian/dsrg_pt2.hpp"
 #include "qdk/chemistry/algorithms/microsoft/effective_hamiltonian/dsrg_pt2_kernel.hpp"
 #include "ut_common.hpp"
 
@@ -261,14 +260,22 @@ TEST(DsrgPT2Test, PreservesModelOrbitals) {
   const auto expected = downfold(coefficient_orbitals);
   const auto result = downfold(model_orbitals);
   const auto restored = qcd::Hamiltonian::from_json(result->to_json());
+  const auto expect_same_indices =
+      [](const std::shared_ptr<const qcd::SymmetryBlockedIndexSet>& actual,
+         const std::shared_ptr<const qcd::SymmetryBlockedIndexSet>& target) {
+        EXPECT_EQ(*actual->symmetries(), *target->symmetries());
+        EXPECT_EQ(actual->extents(), target->extents());
+        for (const auto& spin : {qcd::axes::alpha(), qcd::axes::beta()})
+          EXPECT_EQ(qcd::spin_channel_indices(actual, spin),
+                    qcd::spin_channel_indices(target, spin));
+      };
   for (const auto& output : {result, restored}) {
     const auto orbitals = output->get_orbitals();
     ASSERT_NE(std::dynamic_pointer_cast<qcd::ModelOrbitals>(orbitals), nullptr);
     EXPECT_TRUE(orbitals->is_restricted());
     EXPECT_EQ(orbitals->get_num_molecular_orbitals(), norb);
-    EXPECT_EQ(orbitals->active_indices()->to_json(), p_indices->to_json());
-    EXPECT_EQ(orbitals->inactive_indices()->to_json(),
-              inactive_indices->to_json());
+    expect_same_indices(orbitals->active_indices(), p_indices);
+    expect_same_indices(orbitals->inactive_indices(), inactive_indices);
     EXPECT_NEAR(output->get_core_energy(), expected->get_core_energy(), 1e-12);
     EXPECT_NEAR((std::get<0>(output->get_one_body_integrals()) -
                  std::get<0>(expected->get_one_body_integrals()))
@@ -919,5 +926,134 @@ TEST(DsrgPT2Test, RejectsNonStateVectorReference) {
                               testing::restricted_index_set(
                                   norb, std::vector<std::size_t>{4, 5})),
                std::invalid_argument);
+}
+
+TEST(DsrgPT2Test, AcceptsEmptyReferenceActiveSpaceWithZeroSizedRdm) {
+  namespace qcd = qdk::chemistry::data;
+  constexpr std::size_t norb = 4;
+  Eigen::MatrixXd h1 = Eigen::MatrixXd::Zero(norb, norb);
+  h1.diagonal() << -2.0, -1.0, 1.0, 2.0;
+  h1(0, 2) = h1(2, 0) = 0.1;
+  const Eigen::VectorXd g2 = Eigen::VectorXd::Zero(norb * norb * norb * norb);
+  const Eigen::MatrixXd empty_fock = Eigen::MatrixXd::Zero(0, 0);
+
+  for (const bool unrestricted : {false, true}) {
+    const auto idx = [&](const std::vector<std::size_t>& orbitals) {
+      return unrestricted
+                 ? testing::unrestricted_index_set(norb, orbitals, orbitals)
+                 : testing::restricted_index_set(norb, orbitals);
+    };
+    auto win_orbs = std::make_shared<qcd::ModelOrbitals>(idx({0, 1, 2, 3}));
+    auto ref_orbs = std::make_shared<qcd::ModelOrbitals>(idx({}), idx({0, 1}));
+    auto window = unrestricted
+                      ? std::make_shared<qcd::Hamiltonian>(
+                            std::make_unique<
+                                qcd::CanonicalFourCenterHamiltonianContainer>(
+                                h1, h1, g2, g2, g2, win_orbs, 0.0, empty_fock,
+                                empty_fock))
+                      : std::make_shared<qcd::Hamiltonian>(
+                            std::make_unique<
+                                qcd::CanonicalFourCenterHamiltonianContainer>(
+                                h1, g2, win_orbs, 0.0, empty_fock));
+    const qcd::Wavefunction::DeterminantVector dets{
+        qcd::Configuration::from_spin_half_string("")};
+    const Eigen::MatrixXd zero_rdm(0, 0);
+    const Eigen::VectorXd coeffs(Eigen::VectorXd::Ones(1));
+    std::unique_ptr<qcd::StateVectorContainer> container;
+    if (unrestricted) {
+      container = std::make_unique<qcd::StateVectorContainer>(
+          coeffs, dets, ref_orbs, std::nullopt,
+          std::optional<qcd::StateVectorContainer::MatrixVariant>{zero_rdm},
+          std::optional<qcd::StateVectorContainer::MatrixVariant>{zero_rdm},
+          std::nullopt, std::nullopt, std::nullopt, std::nullopt);
+    } else {
+      container = std::make_unique<qcd::StateVectorContainer>(
+          coeffs, dets, ref_orbs,
+          std::optional<qcd::StateVectorContainer::MatrixVariant>{zero_rdm},
+          std::nullopt, std::nullopt, std::nullopt, std::nullopt, std::nullopt,
+          std::nullopt);
+    }
+    auto reference = std::make_shared<qcd::Wavefunction>(std::move(container));
+
+    auto h_eff = EffectiveHamiltonianConstructorFactory::create("qdk_dsrg_pt2")
+                     ->run(reference, window, idx({1, 2}));
+    ASSERT_NE(h_eff, nullptr);
+    EXPECT_TRUE(std::isfinite(h_eff->get_core_energy()));
+    // Folding only virtuals leaves no inactive orbitals; inactive_indices
+    // should be null rather than an empty index set.
+    auto h_virt_only =
+        EffectiveHamiltonianConstructorFactory::create("qdk_dsrg_pt2")
+            ->run(reference, window, idx({0, 1, 2}));
+    EXPECT_FALSE(h_virt_only->get_orbitals()->has_inactive_space());
+    EXPECT_EQ(h_virt_only->get_orbitals()->inactive_indices(), nullptr);
+  }
+}
+
+TEST(DsrgPT2Test, RejectsMismatchedStoredRdmsRegardlessOfSpinRestriction) {
+  namespace qcd = qdk::chemistry::data;
+  constexpr std::size_t norb = 4;
+  Eigen::MatrixXd h1 = Eigen::MatrixXd::Zero(norb, norb);
+  h1.diagonal() << -2.0, -1.0, 1.0, 2.0;
+  const Eigen::VectorXd g2 = Eigen::VectorXd::Zero(norb * norb * norb * norb);
+  const Eigen::MatrixXd empty_fock = Eigen::MatrixXd::Zero(0, 0);
+  const qcd::Wavefunction::DeterminantVector dets{
+      qcd::Configuration::from_spin_half_string("20")};
+
+  // Unrestricted reference carrying only a correlated spin-traced 1-RDM.
+  {
+    auto u_win = std::make_shared<qcd::ModelOrbitals>(
+        testing::unrestricted_index_set(norb, {0, 1, 2, 3}, {0, 1, 2, 3}));
+    auto u_ref = std::make_shared<qcd::ModelOrbitals>(
+        testing::unrestricted_index_set(norb, {1, 2}, {1, 2}),
+        testing::unrestricted_index_set(norb, {0}, {0}));
+    auto window = std::make_shared<qcd::Hamiltonian>(
+        std::make_unique<qcd::CanonicalFourCenterHamiltonianContainer>(
+            h1, h1, g2, g2, g2, u_win, 0.0, empty_fock, empty_fock));
+    Eigen::Matrix2d bad_traced;
+    bad_traced << 1.5, 0.4, 0.4, 0.5;
+    auto reference = std::make_shared<qcd::Wavefunction>(
+        std::make_unique<qcd::StateVectorContainer>(
+            Eigen::VectorXd(Eigen::VectorXd::Ones(1)), dets, u_ref,
+            std::optional<qcd::StateVectorContainer::MatrixVariant>{
+                Eigen::MatrixXd(bad_traced)},
+            std::nullopt, std::nullopt, std::nullopt, std::nullopt,
+            std::nullopt, std::nullopt));
+    EXPECT_THROW(
+        EffectiveHamiltonianConstructorFactory::create("qdk_dsrg_pt2")
+            ->run(reference, window,
+                  testing::unrestricted_index_set(norb, {1, 2}, {1, 2})),
+        std::invalid_argument);
+  }
+
+  // Restricted reference carrying a matching spin-traced 1-RDM plus mismatched
+  // spin-dependent 1-RDMs.
+  {
+    auto r_win = std::make_shared<qcd::ModelOrbitals>(
+        testing::restricted_index_set(norb, {0, 1, 2, 3}));
+    auto r_ref = std::make_shared<qcd::ModelOrbitals>(
+        testing::restricted_index_set(norb, {1, 2}),
+        testing::restricted_index_set(norb, {0}));
+    auto window = std::make_shared<qcd::Hamiltonian>(
+        std::make_unique<qcd::CanonicalFourCenterHamiltonianContainer>(
+            h1, g2, r_win, 0.0, empty_fock));
+    Eigen::MatrixXd good_traced = Eigen::MatrixXd::Zero(2, 2);
+    good_traced(0, 0) = 2.0;
+    Eigen::MatrixXd bad_a = Eigen::MatrixXd::Zero(2, 2);
+    Eigen::MatrixXd bad_b = Eigen::MatrixXd::Zero(2, 2);
+    bad_a(0, 0) = 1.5;
+    bad_b(0, 0) = 0.5;
+    auto reference = std::make_shared<qcd::Wavefunction>(
+        std::make_unique<qcd::StateVectorContainer>(
+            Eigen::VectorXd(Eigen::VectorXd::Ones(1)), dets, r_ref,
+            std::optional<qcd::StateVectorContainer::MatrixVariant>{
+                good_traced},
+            std::optional<qcd::StateVectorContainer::MatrixVariant>{bad_a},
+            std::optional<qcd::StateVectorContainer::MatrixVariant>{bad_b},
+            std::nullopt, std::nullopt, std::nullopt, std::nullopt));
+    EXPECT_THROW(EffectiveHamiltonianConstructorFactory::create("qdk_dsrg_pt2")
+                     ->run(reference, window,
+                           testing::restricted_index_set(norb, {1, 2})),
+                 std::invalid_argument);
+  }
 }
 }  // namespace

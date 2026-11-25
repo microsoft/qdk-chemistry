@@ -14,7 +14,7 @@
 //     normal ordering]
 //   Evangelista, J. Chem. Phys. 141, 054109 (2014)          [DSRG flow
 //     parameter s]
-//   Li & Evangelista, J. Chem. Phys. 143, 164104 (2015)     [DSRG-MRPT2]
+//   Li & Evangelista, J. Chem. Theory Comput. 11, 2097 (2015) [DSRG-MRPT2]
 //   Li & Evangelista, J. Chem. Phys. 146, 124132 (2017)     [second-order
 //     DSRG effective Hamiltonian]
 
@@ -57,11 +57,16 @@ std::array<Eigen::MatrixXd, 2> generalized_fock_matrices(
     const TwoBodyBlocks& two_body,
     const std::array<Eigen::MatrixXd, 2>& density, int norb, bool spin_free);
 
+struct SemicanonicalRotation {
+  Eigen::MatrixXd matrix;
+  bool rotated = false;
+};
+
 /// Block-diagonal orthogonal rotation that diagonalizes each block of the
 /// symmetric Fock matrix. Blocks contain spatial-orbital indices and must be
 /// disjoint. Blocks whose off-diagonal max norm does not exceed `tolerance`
-/// are left unchanged.
-Eigen::MatrixXd semicanonical_rotation(
+/// times the block max norm are left unchanged.
+SemicanonicalRotation semicanonical_rotation(
     const Eigen::MatrixXd& fock, const std::vector<std::vector<int>>& blocks,
     double tolerance);
 
@@ -74,10 +79,13 @@ Eigen::VectorXd rotate_two_body(const Eigen::VectorXd& two_body,
                                 const Eigen::MatrixXd& rotation, int norb);
 
 /// Transform chemist integrals whose (pq) and (rs) pairs rotate separately,
-/// as the aabb block of unrestricted orbitals does.
+/// as the aabb block of unrestricted orbitals does. Either pair may be skipped
+/// when its rotation flag is false.
 Eigen::VectorXd rotate_two_body(const Eigen::VectorXd& two_body,
                                 const Eigen::MatrixXd& first_pair,
-                                const Eigen::MatrixXd& second_pair, int norb);
+                                const Eigen::MatrixXd& second_pair, int norb,
+                                bool rotate_first = true,
+                                bool rotate_second = true);
 
 struct DownfoldResult {
   double scalar = 0.0;
@@ -92,20 +100,18 @@ struct DownfoldResult {
   double max_amplitude = 0.0;
 };
 
-/// Spin-blocked DSRG-PT2 downfold. The diagonals of the per-spin generalized
-/// Fock matrices `fock` are the orbital energies of the denominators; their
-/// off-diagonals supply the one-body couplings. `spin_free` input has
-/// identical spin blocks and is evaluated once. `density` holds the per-spin
-/// reference 1-RDMs used for reference normal ordering; leave it empty for
-/// core-normal-ordered two-body truncation. `flow == 0` returns the bare
-/// core-folded operator over `active`.
+/// Spin-blocked DSRG-PT2 downfold. `orbital_energies` holds the per-spin
+/// semicanonical generalized-Fock diagonals that form the denominators.
+/// `spin_free` input has identical spin blocks and is evaluated once.
+/// `density` holds the per-spin reference 1-RDMs used for reference normal
+/// ordering. `flow == 0` returns the bare core-folded operator over `active`.
 DownfoldResult downfold(const std::array<Eigen::MatrixXd, 2>& one_body,
                         const TwoBodyBlocks& two_body,
-                        const std::array<Eigen::MatrixXd, 2>& fock,
+                        const std::array<Eigen::VectorXd, 2>& orbital_energies,
                         const std::vector<int>& active,
                         const std::vector<int>& inactive,
                         const std::vector<int>& virtuals, double flow,
                         double core_energy, bool spin_free,
-                        const std::array<Eigen::MatrixXd, 2>& density = {});
+                        const std::array<Eigen::MatrixXd, 2>& density);
 
 }  // namespace qdk::chemistry::algorithms::microsoft::dsrg_pt2

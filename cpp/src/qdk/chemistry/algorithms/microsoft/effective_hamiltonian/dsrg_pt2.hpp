@@ -3,13 +3,11 @@
 // license information.
 
 #pragma once
-#include <cmath>
 #include <limits>
 #include <memory>
 #include <qdk/chemistry/algorithms/effective_hamiltonian.hpp>
 #include <qdk/chemistry/data/settings.hpp>
 #include <string>
-#include <vector>
 
 namespace qdk::chemistry::algorithms::microsoft {
 
@@ -38,8 +36,9 @@ class DsrgPT2Settings : public qdk::chemistry::data::Settings {
  * closed- or open-shell determinants on unrestricted orbitals. The
  * `flow_parameter` setting is the flow s in Eh^-2; zero leaves the bare
  * operator over `p_indices`. Restricted input gives a restricted result,
- * unrestricted input an unrestricted one. The emitted two-body integrals are
- * 4-fold, not 8-fold, symmetric.
+ * unrestricted input an unrestricted one. The restricted and same-spin
+ * two-body blocks are 4-fold (not 8-fold) symmetric, and the unrestricted
+ * mixed-spin block is 2-fold Hermitian.
  */
 class DsrgPT2Constructor
     : public qdk::chemistry::algorithms::EffectiveHamiltonianConstructor {

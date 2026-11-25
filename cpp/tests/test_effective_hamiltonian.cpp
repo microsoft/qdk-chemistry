@@ -278,3 +278,43 @@ TEST(EffectiveHamiltonianConstructorTest, RejectsNullInputs) {
   EXPECT_THROW(constructor._validate_inputs(reference, hamiltonian, nullptr),
                std::invalid_argument);
 }
+
+TEST(EffectiveHamiltonianConstructorTest, ValidatesModelOrbitalBases) {
+  auto window_orbitals = std::make_shared<ModelOrbitals>(
+      testing::restricted_index_set(4, {0, 1, 2, 3}));
+  auto ref_orbitals =
+      std::make_shared<ModelOrbitals>(testing::restricted_index_set(4, {1, 2}),
+                                      testing::restricted_index_set(4, {0}));
+  auto hamiltonian = make_hamiltonian(window_orbitals);
+  auto reference = make_wavefunction(ref_orbitals);
+  auto p_indices = testing::restricted_index_set(4, {1, 2});
+  TestEffectiveHamiltonianConstructor constructor;
+
+  // Distinct compatible ModelOrbitals instances must be accepted.
+  EXPECT_NO_THROW(
+      constructor._validate_inputs(reference, hamiltonian, p_indices));
+
+  // Mixing ModelOrbitals and coefficient-bearing Orbitals must be rejected.
+  auto mo_orbitals = testing::create_test_orbitals(4, 4);
+  EXPECT_THROW(constructor._validate_inputs(make_wavefunction(mo_orbitals),
+                                            hamiltonian, p_indices),
+               std::invalid_argument);
+  EXPECT_THROW(constructor._validate_inputs(
+                   reference, make_hamiltonian(mo_orbitals), p_indices),
+               std::invalid_argument);
+
+  // Mismatched mode counts must be rejected.
+  auto other_size =
+      std::make_shared<ModelOrbitals>(testing::restricted_index_set(5, {1, 2}));
+  EXPECT_THROW(constructor._validate_inputs(make_wavefunction(other_size),
+                                            hamiltonian, p_indices),
+               std::invalid_argument);
+
+  // Mismatched spin restriction must be rejected.
+  auto unrestricted_model = std::make_shared<ModelOrbitals>(
+      testing::unrestricted_index_set(4, {1, 2}, {1, 2}));
+  EXPECT_THROW(
+      constructor._validate_inputs(make_wavefunction(unrestricted_model),
+                                   hamiltonian, p_indices),
+      std::invalid_argument);
+}
