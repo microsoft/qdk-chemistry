@@ -45,8 +45,34 @@ class UnitaryMatrixContainer(UnitaryContainer):
 
     def __init__(self, matrix: np.ndarray | sparse.sparray | sparse.spmatrix) -> None:
         """Initialize the container."""
-        stored = self._canonical_sparse(matrix) if sparse.issparse(matrix) else self._canonical_dense(matrix)
-        self._validate_isometry(stored)
+        if sparse.issparse(matrix):
+            stored = sparse.csc_array(matrix, copy=True)
+            stored.sum_duplicates()
+            stored.data = self._real(stored.data)
+            stored.eliminate_zeros()
+            values = stored.data
+        else:
+            stored = values = np.ascontiguousarray(self._real(np.asarray(matrix)))
+            stored.setflags(write=False)
+        if stored.ndim != 2:
+            raise ValueError(f"UnitaryMatrixContainer requires a two-dimensional matrix, got {stored.ndim} dimensions.")
+        rows, cols = stored.shape
+        if rows < 2 or rows & (rows - 1):
+            raise ValueError(f"UnitaryMatrixContainer requires a power-of-two row count of at least two, got {rows}.")
+        if not 1 <= cols <= rows:
+            raise ValueError(f"UnitaryMatrixContainer requires between 1 and {rows} columns, got {cols}.")
+        if not np.all(np.isfinite(values)):
+            raise ValueError("UnitaryMatrixContainer requires a finite matrix.")
+        if sparse.issparse(stored):
+            # Keep the residual sparse: a dense m-by-m Gram matrix would dominate memory for wide isometries.
+            residual = np.linalg.norm(sparse.csc_array(stored.T @ stored - sparse.identity(cols, format="csc")).data)
+        else:
+            residual = np.linalg.norm(stored.T @ stored - np.eye(cols))
+        if not residual <= _ORTHONORMALITY_TOLERANCE * cols:
+            raise ValueError(
+                "UnitaryMatrixContainer requires orthonormal columns; "
+                f"the Frobenius norm of M^H @ M - I is {residual:.3e}."
+            )
         self._matrix = stored
         super().__init__()
 
@@ -60,50 +86,6 @@ class UnitaryMatrixContainer(UnitaryContainer):
             raise ValueError("UnitaryMatrixContainer requires a real matrix.")
         return values.astype(np.float64)
 
-    @classmethod
-    def _canonical_dense(cls, matrix: Any) -> np.ndarray:
-        """Return a read-only float64 copy of a dense matrix."""
-        array = np.ascontiguousarray(cls._real(np.asarray(matrix)))
-        array.setflags(write=False)
-        return array
-
-    @classmethod
-    def _canonical_sparse(cls, matrix: sparse.sparray | sparse.spmatrix) -> sparse.csc_array:
-        """Return a canonical float64 CSC copy of a sparse matrix without explicit zeros."""
-        array = sparse.csc_array(matrix, copy=True)
-        array.sum_duplicates()
-        array = sparse.csc_array((cls._real(array.data), array.indices, array.indptr), shape=array.shape)
-        array.eliminate_zeros()
-        array.sort_indices()
-        return array
-
-    @staticmethod
-    def _validate_isometry(matrix: np.ndarray | sparse.csc_array) -> None:
-        """Check the shape, finiteness, and orthonormal columns of a canonical matrix."""
-        if matrix.ndim != 2:
-            raise ValueError(f"UnitaryMatrixContainer requires a two-dimensional matrix, got {matrix.ndim} dimensions.")
-        rows, cols = matrix.shape
-        if rows < 2 or rows & (rows - 1):
-            raise ValueError(f"UnitaryMatrixContainer requires a power-of-two row count of at least two, got {rows}.")
-        if not 1 <= cols <= rows:
-            raise ValueError(f"UnitaryMatrixContainer requires between 1 and {rows} columns, got {cols}.")
-        values = matrix.data if sparse.issparse(matrix) else matrix
-        if not np.all(np.isfinite(values)):
-            raise ValueError("UnitaryMatrixContainer requires a finite matrix.")
-        if sparse.issparse(matrix):
-            # Keep the residual sparse: a dense m-by-m Gram matrix would dominate memory for wide isometries.
-            identity = sparse.csc_array(
-                (np.ones(cols), np.arange(cols), np.arange(cols + 1)), shape=(cols, cols), dtype=np.float64
-            )
-            residual = float(np.linalg.norm(sparse.csc_array(matrix.T @ matrix - identity).data))
-        else:
-            residual = float(np.linalg.norm(matrix.T @ matrix - np.eye(cols)))
-        if not residual <= _ORTHONORMALITY_TOLERANCE * cols:
-            raise ValueError(
-                "UnitaryMatrixContainer requires orthonormal columns; "
-                f"the Frobenius norm of M^H @ M - I is {residual:.3e}."
-            )
-
     @property
     def type(self) -> str:
         """Return the container type."""
@@ -112,10 +94,9 @@ class UnitaryMatrixContainer(UnitaryContainer):
     @property
     def matrix(self) -> np.ndarray | sparse.csc_array:
         """Return a copy of the stored matrix, read-only when dense, so the container stays immutable."""
-        if self.is_sparse:
-            return self._matrix.copy()
         matrix = self._matrix.copy()
-        matrix.setflags(write=False)
+        if not self.is_sparse:
+            matrix.setflags(write=False)
         return matrix
 
     @property
@@ -140,9 +121,7 @@ class UnitaryMatrixContainer(UnitaryContainer):
 
     def to_dense(self) -> np.ndarray:
         """Return a dense float64 copy of the matrix."""
-        if self.is_sparse:
-            return self._matrix.toarray()
-        return np.array(self._matrix)
+        return self._matrix.toarray() if self.is_sparse else np.array(self._matrix)
 
     def eigenvalue_from_phase(self, phase_fraction: float) -> float:
         """Raise NotImplementedError, since the container has no Hamiltonian.
@@ -277,9 +256,7 @@ class UnitaryMatrixContainer(UnitaryContainer):
         storage_format = group.attrs["format"]
         if isinstance(storage_format, bytes):
             storage_format = storage_format.decode("utf-8")
-        names = ("data", "indices", "indptr") if storage_format == "sparse" else ("matrix",)
-        arrays = {name: group[name][()] for name in names if name in group}
-        return cls._from_arrays(str(storage_format), group.attrs["shape"], arrays)
+        return cls._from_arrays(str(storage_format), group.attrs["shape"], group)
 
     def get_summary(self) -> str:
         """Return a human-readable summary of the container."""

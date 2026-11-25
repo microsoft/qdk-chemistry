@@ -216,9 +216,11 @@ dense_isometry_synthesis(const Eigen::MatrixXd& isometry,
     u1[j] = detail::complete_columns(m.topRows(chi));
     u2[j] = detail::complete_columns(m.bottomRows(chi));
   }
-  std::vector<Eigen::MatrixXd> blocks{exact}, factors;
+  std::vector<Eigen::MatrixXd> blocks, factors;
   Eigen::MatrixXd right_factor = Eigen::MatrixXd::Identity(cols, cols);
-  if (num_csds > 0) {
+  if (num_csds == 0) {
+    blocks = {exact};
+  } else {
     blocks = u1;
     blocks.push_back(u2.back());
     right_factor = vt[0];
@@ -309,10 +311,6 @@ block_sparse_isometry_synthesis(const Eigen::SparseMatrix<double>& isometry) {
     const Eigen::Index size = group_rows[g].size(),
                        width = group_cols[g].size(),
                        start = row_permutation.size();
-    if (size < width) {
-      throw std::invalid_argument(
-          "Block-sparse isometry synthesis requires orthonormal columns.");
-    }
     Eigen::MatrixXd block = Eigen::MatrixXd::Zero(size, width);
     for (Eigen::Index i = 0; i < size; ++i) local[group_rows[g][i]] = i;
     for (Eigen::Index j = 0; j < width; ++j) {
@@ -325,14 +323,15 @@ block_sparse_isometry_synthesis(const Eigen::SparseMatrix<double>& isometry) {
     for (Eigen::Index j = width; j < size; ++j) {
       column_permutation[free_column++] = start + j;
     }
+    // The residual only grows, so reject before completing a too-large block.
     residual += std::pow(detail::isometry_residual(block), 2);
+    if (size < width || !(std::sqrt(residual) <= 1.0e-8 * cols)) {
+      throw std::invalid_argument(
+          "Block-sparse isometry synthesis requires orthonormal columns.");
+    }
     blocks.push_back(detail::complete_isometry(block));
     row_permutation.insert(row_permutation.end(), group_rows[g].begin(),
                            group_rows[g].end());
-  }
-  if (!(std::sqrt(residual) <= 1.0e-8 * cols)) {
-    throw std::invalid_argument(
-        "Block-sparse isometry synthesis requires orthonormal columns.");
   }
   for (Eigen::Index r = 0; r < rows; ++r) {
     if (first[r] < 0) {
