@@ -1,0 +1,711 @@
+// Copyright (c) Microsoft Corporation. All rights reserved.
+// Licensed under the MIT License. See LICENSE.txt in the project root for
+// license information.
+
+#include "sequant_evaluation.hpp"
+
+#include <btas/btas.h>
+#include <qdk/chemistry/scf/util/blas_threads.h>
+
+#include <SeQuant/core/binary_node.hpp>
+#include <SeQuant/core/context.hpp>
+#include <SeQuant/core/eval/backends/btas/eval_expr.hpp>
+#include <SeQuant/core/eval/backends/btas/result.hpp>
+#include <SeQuant/core/eval/eval.hpp>
+#include <SeQuant/core/expr.hpp>
+#include <SeQuant/core/expressions/tensor.hpp>
+#include <SeQuant/core/expressions/variable.hpp>
+#include <SeQuant/core/op.hpp>
+#include <SeQuant/core/optimize/optimize.hpp>
+#include <SeQuant/core/utility/indices.hpp>
+#include <SeQuant/domain/mbpt/convention.hpp>
+#include <SeQuant/domain/mbpt/spin.hpp>
+#include <algorithm>
+#include <atomic>
+#include <compare>
+#include <condition_variable>
+#include <cstdint>
+#include <exception>
+#include <map>
+#include <mutex>
+#include <optional>
+#include <qdk/chemistry/utils/tensor_index.hpp>
+#include <range/v3/range/conversion.hpp>
+#include <stdexcept>
+#include <string>
+#include <tuple>
+#include <unordered_map>
+#include <unordered_set>
+#include <utility>
+
+#ifdef _OPENMP
+#include <omp.h>
+#endif
+
+namespace qdk::chemistry::algorithms::microsoft::sequant_evaluation {
+
+using utils::tensor_size;
+
+namespace {
+
+using namespace sequant;
+using BTensor = btas::Tensor<double>;
+
+constexpr std::size_t terms_ahead_per_worker = 4;
+
+const Context& evaluation_context() {
+  static const Context context(
+      {.index_basis_registry_shared_ptr =
+           mbpt::make_min_sr_spaces(mbpt::SpinConvention::Default),
+       .vacuum = Vacuum::SingleProduct});
+  return context;
+}
+
+enum class Space : std::uint8_t { occupied, virtuals, general };
+
+/// Orbital range of one tensor slot; residual slots are limited to the target.
+struct Slot {
+  Space space = Space::general;
+  int spin = 0;
+  bool residual = false;
+  auto operator<=>(const Slot&) const = default;
+};
+
+Slot slot(const Index& resolved, bool residual) {
+  const auto spin = mbpt::to_spin(resolved.space().qns());
+  if (spin != mbpt::Spin::alpha && spin != mbpt::Spin::beta)
+    throw std::logic_error(
+        "SeQuant evaluation requires spin-resolved indices.");
+  const auto space = [&] {
+    switch (resolved.space().base_key().front()) {
+      case L'i':
+        return Space::occupied;
+      case L'a':
+        return Space::virtuals;
+      case L'p':
+        return Space::general;
+      default:
+        throw std::invalid_argument(
+            "SeQuant evaluation supports only the i, a and p index spaces.");
+    }
+  }();
+  return {space, spin == mbpt::Spin::beta ? 1 : 0, residual};
+}
+
+/// Spin orbitals of each slot, and the output positions of residual slots.
+class IndexRanges {
+ public:
+  explicit IndexRanges(const SpinOrbitalSpace& space) {
+    std::unordered_set<std::size_t> listed;
+    for (const auto* lists : {&space.occupied, &space.virtuals})
+      for (const auto& orbitals : *lists)
+        for (const auto orbital : orbitals)
+          if (!listed.insert(orbital).second)
+            throw std::invalid_argument(
+                "SeQuant evaluation requires each spin orbital in exactly one "
+                "occupied or virtual list.");
+    std::unordered_map<std::size_t, std::size_t> position;
+    for (std::size_t i = 0; i < space.target.size(); ++i)
+      if (!listed.contains(space.target[i]) ||
+          !position.emplace(space.target[i], i).second)
+        throw std::invalid_argument(
+            "SeQuant evaluation requires distinct target spin orbitals from "
+            "the occupied and virtual lists.");
+    for (int spin = 0; spin < 2; ++spin) {
+      _all[0][spin] = space.occupied[spin];
+      _all[1][spin] = space.virtuals[spin];
+      _all[2][spin] = space.occupied[spin];
+      _all[2][spin].insert(_all[2][spin].end(), space.virtuals[spin].begin(),
+                           space.virtuals[spin].end());
+      for (std::size_t kind = 0; kind < 3; ++kind)
+        for (const auto orbital : _all[kind][spin])
+          if (const auto found = position.find(orbital);
+              found != position.end()) {
+            _target[kind][spin].push_back(orbital);
+            _positions[kind][spin].push_back(found->second);
+          }
+    }
+  }
+
+  const std::vector<std::size_t>& orbitals(const Slot& slot) const {
+    const auto kind = static_cast<std::size_t>(slot.space);
+    return slot.residual ? _target[kind][slot.spin] : _all[kind][slot.spin];
+  }
+
+  const std::vector<std::size_t>& positions(const Slot& slot) const {
+    return _positions[static_cast<std::size_t>(slot.space)][slot.spin];
+  }
+
+ private:
+  std::array<std::array<std::vector<std::size_t>, 2>, 3> _all, _target,
+      _positions;
+};
+
+struct LeafKey {
+  std::wstring label;
+  std::vector<Slot> slots;
+  auto operator<=>(const LeafKey&) const = default;
+};
+
+using TermLeaves = std::map<LeafKey, ResultPtr>;
+
+/// One spin assignment of a term: its plan in PreparedContraction::plans, its
+/// spin-summation multiplicity and the spin-resolved version of each index.
+struct SpinAssignment {
+  std::size_t plan_index, multiplicity;
+  container::map<Index, Index> indices;
+};
+
+/// A term ready for evaluation: residual indices, result layout, one plan per
+/// set of index extents, and the spin assignments to sum.
+struct PreparedContraction {
+  container::svector<Index> free;
+  container::svector<long> target;
+  std::vector<EvalNodeBTAS> plans;
+  std::vector<SpinAssignment> assignments;
+};
+
+bool is_free(const Index& index, const container::svector<Index>& free) {
+  return std::find(free.begin(), free.end(), index) != free.end();
+}
+
+LeafKey leaf_key(const EvalExprBTAS& leaf, const SpinAssignment& assignment,
+                 const container::svector<Index>& free) {
+  const auto& tensor = leaf.expr()->as<Tensor>();
+  LeafKey key{std::wstring(tensor.label()), {}};
+  for (const auto& index : tensor.const_braket_indices())
+    key.slots.push_back(
+        slot(assignment.indices.at(index), is_free(index, free)));
+  return key;
+}
+
+/// Leaf blocks of one spin assignment, for sequant::evaluate.
+class AssignmentLeaves {
+ public:
+  AssignmentLeaves(const TermLeaves& leaves, const SpinAssignment& assignment,
+                   const container::svector<Index>& free)
+      : _leaves(leaves), _assignment(assignment), _free(free) {}
+
+  ResultPtr operator()(sequant::meta::can_evaluate auto const& node) const {
+    if (node->result_type() != ResultType::Tensor)
+      return eval_result<ResultScalar<double>>(
+          node->as_constant().template value<double>());
+    const auto& block = _leaves.at(leaf_key(*node, _assignment, _free));
+    // Canonicalization can permute antisymmetric leaf slots.
+    return node->canon_phase() == -1 ? block->mult_by_phase(-1) : block;
+  }
+
+ private:
+  const TermLeaves& _leaves;
+  const SpinAssignment& _assignment;
+  const container::svector<Index>& _free;
+};
+
+/// Leaf blocks shared by all workers. Each block is built on first use, by all
+/// workers that request it before it is complete.
+class LeafStore {
+ public:
+  LeafStore(const IndexRanges& index_ranges, const LeafElement& element)
+      : _index_ranges(index_ranges), _element(element) {}
+
+  ResultPtr block(const LeafKey& key) {
+    Entry* entry = nullptr;
+    {
+      const std::lock_guard lock(_mutex);
+      entry = &_entries[key];
+    }
+    {
+      const std::lock_guard lock(entry->mutex);
+      if (!entry->allocated) {
+        entry->allocated = true;
+        try {
+          allocate(*entry, key);
+        } catch (...) {
+          entry->failure = std::current_exception();
+          entry->done = true;
+        }
+      }
+    }
+    for (auto slice = entry->next++; slice < entry->slices;
+         slice = entry->next++) {
+      try {
+        fill(*entry, key.label, slice);
+      } catch (...) {
+        const std::lock_guard lock(entry->mutex);
+        if (!entry->failure) entry->failure = std::current_exception();
+      }
+      if (++entry->filled == entry->slices) finish(*entry);
+    }
+    std::unique_lock lock(entry->mutex);
+    entry->complete.wait(lock, [&] { return entry->done; });
+    if (entry->failure) std::rethrow_exception(entry->failure);
+    return entry->block;
+  }
+
+ private:
+  /// A block filled in slices over the first half of its slots.
+  struct Entry {
+    std::vector<const std::vector<std::size_t>*> axes;
+    BTensor values;
+    std::size_t slices = 0;
+    std::atomic<std::size_t> next = 0, filled = 0;
+    std::mutex mutex;
+    std::condition_variable complete;
+    bool allocated = false, done = false;
+    ResultPtr block;
+    std::exception_ptr failure;
+  };
+
+  void allocate(Entry& entry, const LeafKey& key) const {
+    std::vector<const std::vector<std::size_t>*> axes;
+    std::vector<std::size_t> extents;
+    for (const auto& slot : key.slots) {
+      axes.push_back(&_index_ranges.orbitals(slot));
+      extents.push_back(axes.back()->size());
+    }
+    tensor_size(extents);
+    entry.values = BTensor{btas::Range{extents}};
+    entry.slices = tensor_size(std::span(extents).first(extents.size() / 2));
+    entry.axes = std::move(axes);
+  }
+
+  void fill(Entry& entry, std::wstring_view label, std::size_t slice) const {
+    const auto rank = entry.axes.size(), lead = rank / 2;
+    const auto size = entry.values.size() / entry.slices;
+    std::vector<std::size_t> position(rank, 0), orbitals(rank);
+    for (std::size_t axis = lead, rest = slice; axis-- > 0;
+         rest /= entry.axes[axis]->size())
+      position[axis] = rest % entry.axes[axis]->size();
+    auto* values = entry.values.data() + slice * size;
+    for (std::size_t flat = 0; flat < size; ++flat) {
+      for (std::size_t axis = 0; axis < rank; ++axis)
+        orbitals[axis] = (*entry.axes[axis])[position[axis]];
+      values[flat] = _element(label, orbitals);
+      for (std::size_t axis = rank; axis-- > lead;) {
+        if (++position[axis] < entry.axes[axis]->size()) break;
+        position[axis] = 0;
+      }
+    }
+  }
+
+  static void finish(Entry& entry) {
+    const std::lock_guard lock(entry.mutex);
+    if (!entry.failure)
+      entry.block =
+          eval_result<ResultTensorBTAS<BTensor>>(std::move(entry.values));
+    entry.done = true;
+    entry.complete.notify_all();
+  }
+
+  const IndexRanges& _index_ranges;
+  const LeafElement& _element;
+  std::mutex _mutex;
+  std::map<LeafKey, Entry> _entries;
+};
+
+/// The tensor factors of a term and the indices of its normal operator,
+/// creators first.
+std::pair<ExprPtr, container::svector<Index>> split_term(
+    const ExprPtr& source) {
+  const auto term = source->clone();
+  ExprPtr coefficient = ex<Product>(1, ExprPtrList{});
+  container::svector<Index> free;
+  auto visit = [&](const ExprPtr& factor) {
+    if (factor.is<FNOperator>()) {
+      const auto& op = factor.as<FNOperator>();
+      if (!free.empty() || op.ncreators() != op.nannihilators() ||
+          op.ncreators() > 2)
+        throw std::invalid_argument(
+            "SeQuant evaluation supports one number-conserving normal operator "
+            "of rank at most two per term.");
+      for (const auto& creator : op.creators()) free.push_back(creator.index());
+      for (const auto& annihilator : op.annihilators())
+        free.push_back(annihilator.index());
+    } else if (factor.is<Tensor>() || factor.is<Constant>())
+      coefficient.as<Product>().append(1, factor, Product::Flatten::No);
+    else
+      throw std::invalid_argument(
+          "SeQuant evaluation supports only tensor and constant factors "
+          "besides the normal operator.");
+  };
+  if (term.is<Product>()) {
+    coefficient = ex<Product>(term.as<Product>().scalar(), ExprPtrList{});
+    for (const auto& factor : term.as<Product>().factors()) visit(factor);
+  } else
+    visit(term);
+  return {coefficient, free};
+}
+
+/// Indices of a coefficient with, per tensor, the bra-minus-ket count of each
+/// index, and the groups of interchangeable indices.
+struct IndexGraph {
+  std::vector<Index> indices;
+  container::map<Index, std::size_t> positions;
+  std::vector<std::vector<int>> conservation;
+  std::vector<std::vector<std::size_t>> equivalent;
+  std::vector<std::size_t> previous;
+};
+
+IndexGraph index_graph(const ExprPtr& coefficient,
+                       const container::svector<Index>& free) {
+  constexpr auto index_occurrence_error =
+      "SeQuant evaluation requires each index once in each of two tensors, or "
+      "once in a tensor and once in the normal operator.";
+  IndexGraph graph;
+  const auto used = get_used_indices<container::set<Index>>(coefficient);
+  graph.indices.assign(used.begin(), used.end());
+  for (std::size_t i = 0; i < graph.indices.size(); ++i)
+    graph.positions.emplace(graph.indices[i], i);
+  using Endpoint = std::pair<std::size_t, int>;
+  std::vector<std::vector<Endpoint>> endpoints(graph.indices.size());
+  std::vector<Symmetry> symmetries;
+  for (const auto& factor : coefficient.as<Product>().factors()) {
+    if (!factor.is<Tensor>()) continue;
+    const auto& tensor = factor.as<Tensor>();
+    const auto ordinal = symmetries.size();
+    symmetries.push_back(tensor.symmetry());
+    std::vector<int> row(graph.indices.size(), 0);
+    for (const auto& index : tensor.bra()) {
+      ++row[graph.positions.at(index)];
+      endpoints[graph.positions.at(index)].emplace_back(ordinal, 0);
+    }
+    for (const auto& index : tensor.ket()) {
+      --row[graph.positions.at(index)];
+      endpoints[graph.positions.at(index)].emplace_back(ordinal, 1);
+    }
+    for (const auto& index : tensor.aux())
+      endpoints[graph.positions.at(index)].emplace_back(ordinal, 2);
+    graph.conservation.push_back(std::move(row));
+  }
+  for (std::size_t i = 0; i < graph.indices.size(); ++i) {
+    const auto& edge = endpoints[i];
+    const std::size_t tensors = is_free(graph.indices[i], free) ? 1 : 2;
+    if (edge.size() != tensors ||
+        (tensors == 2 && edge[0].first == edge[1].first))
+      throw std::invalid_argument(index_occurrence_error);
+  }
+  for (const auto& index : free)
+    if (graph.positions.find(index) == graph.positions.end() ||
+        std::count(free.begin(), free.end(), index) != 1)
+      throw std::invalid_argument(index_occurrence_error);
+  graph.previous.assign(graph.indices.size(), graph.indices.size());
+  for (std::size_t i = 0; i < graph.indices.size(); ++i) {
+    const auto& edge = endpoints[i];
+    if (is_free(graph.indices[i], free) ||
+        graph.indices[i].has_proto_indices() || edge[0].second == 2 ||
+        edge[1].second == 2)
+      continue;
+    const auto symmetry = symmetries[edge[0].first];
+    if ((symmetry != Symmetry::Antisymm && symmetry != Symmetry::Symm) ||
+        symmetry != symmetries[edge[1].first])
+      continue;
+    auto group =
+        std::find_if(graph.equivalent.begin(), graph.equivalent.end(),
+                     [&](const auto& candidate) {
+                       return graph.indices[candidate.front()].space() ==
+                                  graph.indices[i].space() &&
+                              endpoints[candidate.front()] == edge;
+                     });
+    if (group == graph.equivalent.end())
+      graph.equivalent.push_back({i});
+    else {
+      graph.previous[i] = group->back();
+      group->push_back(i);
+    }
+  }
+  return graph;
+}
+
+/// Calls visit(spins) with each spin-conserving assignment (0 alpha, 1 beta),
+/// listing interchangeable indices in nondecreasing spin order only.
+template <typename Visit>
+void enumerate_spins(const IndexGraph& graph, Visit&& visit) {
+  std::vector<int> spins(graph.indices.size(), 0);
+  auto next_index = [&](auto&& self, std::size_t next) -> void {
+    for (const auto& row : graph.conservation) {
+      int balance = 0, lower = 0, upper = 0;
+      for (std::size_t i = 0; i < row.size(); ++i) {
+        if (i < next)
+          balance += row[i] * spins[i];
+        else if (row[i] < 0)
+          lower += row[i];
+        else
+          upper += row[i];
+      }
+      if (balance + lower > 0 || balance + upper < 0) return;
+    }
+    if (next == graph.indices.size()) {
+      visit(spins);
+      return;
+    }
+    for (int spin : {0, 1}) {
+      if (graph.previous[next] != graph.indices.size() &&
+          spin < spins[graph.previous[next]])
+        continue;
+      spins[next] = spin;
+      self(self, next + 1);
+    }
+  };
+  next_index(next_index, 0);
+}
+
+std::size_t multiplicity(const IndexGraph& graph,
+                         const std::vector<int>& spins) {
+  // Parallel equivalent edges contribute two cancelling permutation signs.
+  std::size_t result = 1;
+  for (const auto& group : graph.equivalent) {
+    std::size_t beta = 0, choices = 1;
+    for (const auto i : group) beta += spins[i];
+    for (std::size_t k = 1; k <= beta; ++k)
+      choices = choices * (group.size() - beta + k) / k;
+    result *= choices;
+  }
+  return result;
+}
+
+EvalNodeBTAS plan(const ExprPtr& coefficient,
+                  const container::svector<Index>& free,
+                  const IndexGraph& graph,
+                  const std::vector<std::size_t>& extents) {
+  OptimizeOptions options;
+  options.idx_to_extent = [&](const Index& index) {
+    return extents[graph.positions.at(index)];
+  };
+  const auto optimized = sequant::optimize(coefficient, options);
+  if (free.empty())
+    return binarize<EvalExprBTAS>(ResultExpr(Variable(L"E"), optimized));
+  const auto rank = free.size() / 2;
+  const Tensor result(
+      L"R", bra(container::svector<Index>(free.begin(), free.begin() + rank)),
+      ket(container::svector<Index>(free.begin() + rank, free.end())),
+      Symmetry::Nonsymm);
+  return binarize<EvalExprBTAS>(ResultExpr(result, optimized));
+}
+
+PreparedContraction prepare(const ExprPtr& term,
+                            const IndexRanges& index_ranges) {
+  PreparedContraction result;
+  ExprPtr coefficient;
+  std::tie(coefficient, result.free) = split_term(term);
+  result.target = EvalExprBTAS::index_hash(result.free) |
+                  ranges::to<container::svector<long>>;
+  const auto graph = index_graph(coefficient, result.free);
+  std::vector<std::array<Index, 2>> spin_indices;
+  for (const auto& index : graph.indices)
+    spin_indices.push_back(
+        {mbpt::make_spinalpha(index), mbpt::make_spinbeta(index)});
+  std::map<std::vector<std::size_t>, std::size_t> plans;
+  enumerate_spins(graph, [&](const std::vector<int>& spins) {
+    container::map<Index, Index> resolved;
+    std::vector<std::size_t> extents;
+    for (std::size_t i = 0; i < graph.indices.size(); ++i) {
+      const auto& index = spin_indices[i][spins[i]];
+      resolved.emplace(graph.indices[i], index);
+      extents.push_back(
+          index_ranges
+              .orbitals(slot(index, is_free(graph.indices[i], result.free)))
+              .size());
+      if (extents.back() == 0) return;
+    }
+    auto found = plans.find(extents);
+    if (found == plans.end()) {
+      found = plans.emplace(extents, result.plans.size()).first;
+      result.plans.push_back(plan(coefficient, result.free, graph, extents));
+    }
+    result.assignments.push_back(
+        {found->second, multiplicity(graph, spins), std::move(resolved)});
+  });
+  return result;
+}
+
+std::vector<Slot> residual_slots(const PreparedContraction& term,
+                                 const SpinAssignment& assignment) {
+  std::vector<Slot> slots;
+  for (const auto& index : term.free)
+    slots.push_back(slot(assignment.indices.at(index), true));
+  return slots;
+}
+
+/// Weighted sum of a term's spin assignments: a scalar, or one block per
+/// residual spin pattern.
+struct TermResult {
+  double scalar = 0.0;
+  std::vector<std::pair<std::vector<Slot>, BTensor>> blocks;
+};
+
+TermResult evaluate_term(const PreparedContraction& term,
+                         const TermLeaves& blocks) {
+  TermResult result;
+  for (const auto& assignment : term.assignments) {
+    const AssignmentLeaves leaves(blocks, assignment, term.free);
+    const auto& node = term.plans[assignment.plan_index];
+    const auto weight = static_cast<double>(assignment.multiplicity);
+    if (term.free.empty()) {
+      result.scalar += weight * sequant::evaluate(node, leaves)->get<double>();
+      continue;
+    }
+    auto slots = residual_slots(term, assignment);
+    const auto value = sequant::evaluate(node, term.target, leaves);
+    const auto& block = value->get<BTensor>();
+    auto found =
+        std::find_if(result.blocks.begin(), result.blocks.end(),
+                     [&](const auto& entry) { return entry.first == slots; });
+    if (found == result.blocks.end()) {
+      result.blocks.emplace_back(std::move(slots), block);
+      for (std::size_t i = 0; i < block.size(); ++i)
+        result.blocks.back().second.data()[i] *= weight;
+      continue;
+    }
+    for (std::size_t i = 0; i < block.size(); ++i)
+      found->second.data()[i] += weight * block.data()[i];
+  }
+  return result;
+}
+
+void accumulate(const TermResult& result, const IndexRanges& index_ranges,
+                std::size_t n, NormalOrderedOperator& total) {
+  total.scalar += result.scalar;
+  for (const auto& [slots, block] : result.blocks) {
+    auto& target = slots.size() == 2 ? total.one_body : total.two_body;
+    std::vector<std::vector<std::size_t>> offsets(slots.size());
+    for (std::size_t axis = slots.size(), stride = 1; axis-- > 0; stride *= n)
+      for (const auto position : index_ranges.positions(slots[axis]))
+        offsets[axis].push_back(position * stride);
+    const auto* value = block.data();
+    const auto add = [&](const auto& self, std::size_t axis,
+                         std::size_t base) -> void {
+      if (axis + 1 == offsets.size()) {
+        for (const auto offset : offsets[axis])
+          target[base + offset] += *value++;
+        return;
+      }
+      for (const auto offset : offsets[axis])
+        self(self, axis + 1, base + offset);
+    };
+    add(add, 0, 0);
+  }
+}
+
+/// The blocks of a term's leaves, from the shared store.
+TermLeaves leaves_of(const PreparedContraction& term, LeafStore& store) {
+  TermLeaves leaves;
+  for (const auto& assignment : term.assignments)
+    term.plans[assignment.plan_index].visit_leaf([&](const EvalNodeBTAS& node) {
+      if (node->result_type() != ResultType::Tensor) return;
+      auto key = leaf_key(*node, assignment, term.free);
+      if (leaves.contains(key)) return;
+      auto block = store.block(key);
+      leaves.emplace(std::move(key), std::move(block));
+    });
+  return leaves;
+}
+
+/// Hands out term indices in order and adds finished terms in the same order,
+/// with at most `lookahead` terms handed out but not yet added.
+class OrderedReduction {
+ public:
+  using Add = std::function<void(const TermResult&)>;
+
+  OrderedReduction(std::size_t count, std::size_t lookahead, Add add)
+      : _count(count), _lookahead(lookahead), _add(std::move(add)) {}
+
+  std::optional<std::size_t> take() {
+    std::unique_lock lock(_mutex);
+    _progress.wait(lock, [&] {
+      return _failed || _next == _count || _next < _added + _lookahead;
+    });
+    if (_failed || _next == _count) return std::nullopt;
+    return _next++;
+  }
+
+  void submit(std::size_t index, TermResult result) {
+    std::unique_lock lock(_mutex);
+    _finished.emplace(index, std::move(result));
+    if (_adding) return;
+    _adding = true;
+    // Term-order reduction is identical for serial and parallel evaluation.
+    while (!_failed && !_finished.empty() &&
+           _finished.begin()->first == _added) {
+      const auto next = std::move(_finished.begin()->second);
+      _finished.erase(_finished.begin());
+      lock.unlock();
+      _add(next);
+      lock.lock();
+      ++_added;
+      _progress.notify_all();
+    }
+    _adding = false;
+  }
+
+  void fail() {
+    {
+      const std::lock_guard lock(_mutex);
+      _failed = true;
+    }
+    _progress.notify_all();
+  }
+
+ private:
+  const std::size_t _count, _lookahead;
+  const Add _add;
+  std::mutex _mutex;
+  std::condition_variable _progress;
+  std::map<std::size_t, TermResult> _finished;
+  std::size_t _next = 0, _added = 0;
+  bool _adding = false, _failed = false;
+};
+
+}  // namespace
+
+NormalOrderedOperator evaluate(const sequant::ExprPtr& expression,
+                               const SpinOrbitalSpace& space,
+                               const LeafElement& leaf) {
+  const IndexRanges index_ranges(space);
+  const auto n = space.target.size();
+  NormalOrderedOperator total{
+      0.0, std::vector<double>(tensor_size({n, n}), 0.0),
+      std::vector<double>(tensor_size({n, n, n, n}), 0.0)};
+  std::vector<sequant::ExprPtr> terms;
+  if (expression.is<sequant::Sum>()) {
+    for (const auto& term : expression.as<sequant::Sum>().summands())
+      terms.push_back(term);
+  } else
+    terms.push_back(expression);
+  std::size_t workers = 1;
+#ifdef _OPENMP
+  workers = static_cast<std::size_t>(omp_get_max_threads());
+#endif
+  workers = std::max<std::size_t>(1, std::min(workers, terms.size()));
+  const scf::util::ScopedBlasThreads blas_threads;
+  LeafStore store(index_ranges, leaf);
+  OrderedReduction reduction(terms.size(), terms_ahead_per_worker * workers,
+                             [&](const TermResult& result) {
+                               accumulate(result, index_ranges, n, total);
+                             });
+  std::exception_ptr failure;
+#ifdef _OPENMP
+#pragma omp parallel if (workers > 1) num_threads(workers)
+#endif
+  {
+    const auto scope =
+        sequant::set_scoped_default_context(evaluation_context());
+    try {
+      while (const auto index = reduction.take()) {
+        const auto term = prepare(terms[*index], index_ranges);
+        reduction.submit(*index, evaluate_term(term, leaves_of(term, store)));
+      }
+    } catch (...) {
+      reduction.fail();
+#ifdef _OPENMP
+#pragma omp critical(sequant_evaluation_failure)
+#endif
+      {
+        if (!failure) failure = std::current_exception();
+      }
+    }
+  }
+  if (failure) std::rethrow_exception(failure);
+  return total;
+}
+
+}  // namespace qdk::chemistry::algorithms::microsoft::sequant_evaluation
