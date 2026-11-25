@@ -1109,7 +1109,7 @@ class PauliTermAccumulator {
    *
    * Computes E_pq = a†_p a_q for all (p, q) pairs in sparse format.
    * This is optimized to compute all N² terms in one call, avoiding
-   * repeated pybind11 boundary crossings when invoked from Python.
+   * repeated nanobind boundary crossings when invoked from Python.
    *
    * @param n_spin_orbitals Total number of spin orbitals (N).
    * @return Map from (p, q) indices to list of (coefficient, SparsePauliWord)

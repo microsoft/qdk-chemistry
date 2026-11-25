@@ -6,6 +6,7 @@
 # --------------------------------------------------------------------------------------------
 
 import numpy as np
+import pytest
 import scipy.sparse as sp
 
 from qdk_chemistry._core._algorithms import davidson_solver
@@ -49,6 +50,21 @@ def test_davidson_solver_matrix():
     )
     assert eigvec.shape == (6,)
     assert np.isclose(abs(dot), 1.0, atol=float_comparison_absolute_tolerance, rtol=float_comparison_relative_tolerance)
+
+
+@pytest.mark.parametrize("dtype", [np.float32, np.float64, ">f8", np.longdouble])
+def test_davidson_solver_real_array_coercion(dtype):
+    """CSR values accept real dtypes beyond nanobind's native ndarray formats."""
+    matrix = np.array([[2.0, -1.0], [-1.0, 3.0]])
+    sparse_matrix = sp.csr_matrix(matrix)
+    sparse_matrix.data = sparse_matrix.data.astype(dtype)
+    original = sparse_matrix.data.copy()
+
+    eigenvalue, eigenvector = davidson_solver(sparse_matrix)
+
+    np.testing.assert_array_equal(sparse_matrix.data, original)
+    np.testing.assert_allclose(eigenvalue, np.linalg.eigvalsh(matrix)[0])
+    np.testing.assert_allclose(matrix @ eigenvector, eigenvalue * eigenvector)
 
 
 def test_davidson_solver_model_hamiltonian():
