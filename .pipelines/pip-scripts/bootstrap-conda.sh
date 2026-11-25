@@ -114,19 +114,6 @@ _bootstrap_conda() {
                  --channel "${CONDA_FEED_ROOT}/main" \
                  --channel "${CONDA_FEED_ROOT}/conda-forge" \
                  --yes --quiet --name "${CONDA_ENV_NAME}" "python=${PYTHON_VERSION}" pip || return 1
-    conda run --no-capture-output --name "${CONDA_ENV_NAME}" python -c '
-import encodings
-import platform
-import sys
-
-version = ".".join(map(str, sys.version_info[:2]))
-machine = platform.machine()
-print(f"Python {version} ({machine}): {sys.executable}")
-if version != sys.argv[1]:
-    raise SystemExit(f"Expected Python {sys.argv[1]}, got {version}")
-if sys.argv[2] == "ON" and (sys.platform != "darwin" or machine.lower() != "arm64"):
-    raise SystemExit(f"Expected native macOS ARM64 Python, got {sys.platform}/{machine}")
-' "$PYTHON_VERSION" "${MAC_BUILD:-OFF}"
 }
 
 _bootstrap_attempt=1
@@ -143,4 +130,22 @@ while true; do
     _bootstrap_attempt=$((_bootstrap_attempt + 1))
 done
 unset _bootstrap_attempt _BOOTSTRAP_MAX_ATTEMPTS _BOOTSTRAP_RETRY_DELAY
+
+# Interpreter mismatches are deterministic, so validate outside the retry loop.
+if ! conda run --no-capture-output --name "${CONDA_ENV_NAME}" python -c '
+import encodings
+import platform
+import sys
+
+version = ".".join(map(str, sys.version_info[:2]))
+machine = platform.machine()
+print(f"Python {version} ({machine}): {sys.executable}")
+if version != sys.argv[1]:
+    raise SystemExit(f"Expected Python {sys.argv[1]}, got {version}")
+if sys.argv[2] == "ON" and (sys.platform != "darwin" or machine.lower() != "arm64"):
+    raise SystemExit(f"Expected native macOS ARM64 Python, got {sys.platform}/{machine}")
+' "$PYTHON_VERSION" "${MAC_BUILD:-OFF}"; then
+    echo "ERROR: conda environment '${CONDA_ENV_NAME}' has an unexpected Python interpreter." >&2
+    return 1 2>/dev/null || exit 1
+fi
 unset -f _bootstrap_conda
