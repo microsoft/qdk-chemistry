@@ -63,6 +63,48 @@ TEST_CASE("FCIDUMP") {
                             2.701609068389e+02, testing::ascii_text_tolerance));
     }
 
+    SECTION("Integer Integrals") {
+      // Two-site Hubbard models (U = 4, E_core = 2) with integer-valued
+      // integrals: hopping 1 in the standard column order, where every line
+      // holds non-negative integers, and hopping -1 with the indices first
+      const std::vector<std::pair<std::string, double>> cases = {
+          {hubbard_2site_fcidump, 1.0},
+          {hubbard_2site_indices_first_fcidump, -1.0}};
+      for (const auto& [fname, t] : cases) {
+        const std::vector<double> T_ref = {0.0, t, t, 0.0};
+        std::vector<double> V_ref(16, 0.0);
+        V_ref[0] = V_ref[15] = 4.0;  // (11|11) and (22|22)
+
+        std::vector<double> T(4), V(16);
+        double E_core = 0.0;
+        macis::read_fcidump_all(fname, T.data(), 2, V.data(), 2, E_core);
+        REQUIRE(E_core == 2.0);
+        REQUIRE_THAT(T, Catch::Matchers::Equals(T_ref));
+        REQUIRE_THAT(V, Catch::Matchers::Equals(V_ref));
+
+        std::vector<double> T1(4), V1(16);
+        macis::read_fcidump_1body(fname, T1.data(), 2);
+        macis::read_fcidump_2body(fname, V1.data(), 2);
+        REQUIRE(macis::read_fcidump_core(fname) == 2.0);
+        REQUIRE_THAT(T1, Catch::Matchers::Equals(T_ref));
+        REQUIRE_THAT(V1, Catch::Matchers::Equals(V_ref));
+      }
+    }
+
+    SECTION("Orbital Out of Range") {
+      std::vector<double> T(4), V(16);
+      double E_core = 0.0;
+      REQUIRE_THROWS_AS(
+          macis::read_fcidump_1body(out_of_range_fcidump, T.data(), 2),
+          std::runtime_error);
+      REQUIRE_THROWS_AS(
+          macis::read_fcidump_2body(out_of_range_fcidump, V.data(), 2),
+          std::runtime_error);
+      REQUIRE_THROWS_AS(macis::read_fcidump_all(out_of_range_fcidump, T.data(),
+                                                2, V.data(), 2, E_core),
+                        std::runtime_error);
+    }
+
     SECTION("Validity Checks") {
       auto norb = norb_ref;
       size_t num_occupied_orbitals = 5;
