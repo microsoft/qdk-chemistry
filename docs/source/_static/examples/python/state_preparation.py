@@ -53,7 +53,7 @@ binary_encoded_prep.settings().set(
 
 ################################################################################
 # start-cell-configure-matrix-product-state
-# Synthesize the MPS site isometries with the block-sparse method
+# MPS state preparation with block sparse method
 mps_prep = create(
     "state_prep",
     "matrix_product_state",

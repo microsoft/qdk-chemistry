@@ -3,10 +3,10 @@
 // license information.
 
 namespace QDKChemistry.TestUtils.MPSPreparationTests {
-    import QDKChemistry.Utils.MPSSequential.MPSSequential;
-    import QDKChemistry.Utils.MPSSequential.MPSSequentialParams;
-    import QDKChemistry.Utils.MPSSparse.MPSSparse;
-    import QDKChemistry.Utils.MPSSparse.MPSSparseParams;
+    import QDKChemistry.Utils.MPSStatePrep.MPSSequential;
+    import QDKChemistry.Utils.MPSStatePrep.MPSSequentialParams;
+    import QDKChemistry.Utils.MPSStatePrep.MPSSparse;
+    import QDKChemistry.Utils.MPSStatePrep.MPSSparseParams;
     import QDKChemistry.Utils.PhaseGradient.PreparePhaseGradientState;
 
     /// Returns `MPSSequential` on [state | bond] with its own phase gradient, leaving the bond register exposed.
@@ -17,15 +17,7 @@ namespace QDKChemistry.TestUtils.MPSPreparationTests {
             within {
                 PreparePhaseGradientState(phaseGradient);
             } apply {
-                MPSSequential(
-                    params.initialStateVec,
-                    params.numSites,
-                    params.siteToOrbitalOrder,
-                    params.siteDecompositions,
-                    qs[...numState - 1],
-                    qs[numState...],
-                    phaseGradient
-                );
+                MPSSequential(params, qs[...numState - 1], qs[numState...], phaseGradient);
             }
         }
     }
@@ -38,15 +30,7 @@ namespace QDKChemistry.TestUtils.MPSPreparationTests {
             within {
                 PreparePhaseGradientState(phaseGradient);
             } apply {
-                MPSSparse(
-                    params.initialStateVec,
-                    params.numSites,
-                    params.siteToOrbitalOrder,
-                    params.siteDecompositions,
-                    qs[...numState - 1],
-                    qs[numState...],
-                    phaseGradient
-                );
+                MPSSparse(params, qs[...numState - 1], qs[numState...], phaseGradient);
             }
         }
     }

@@ -7,7 +7,6 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass
 from typing import Any
 
 import numpy as np
@@ -86,27 +85,7 @@ class MatrixProductStatePreparation(StatePreparation):
     which prepares the state one site at a time using an ancilla register that stores the virtual bond.
     Site zero is loaded as an initial state, and every later site is applied as an isometry from its
     left bond, held in the bond register, to its physical state and right bond. The nested
-    ``unitary_synthesis`` circuit mapper synthesizes each isometry, and its choice selects how:
-
-    ``"unitary_synthesis_dense"``
-        Each site isometry is decomposed based on Appendix B in :cite:`Rupprecht2026`, with orthogonal
-        factors synthesized as parallel Givens rotation layers using the elimination schedule of
-        :cite:`Clements2016`. The right factor of each decomposition, an orthogonal matrix on the left
-        bond, is absorbed classically into the preceding site or the initial state. The cost depends
-        only on the bond and physical dimensions.
-
-    ``"unitary_synthesis_block_sparse"``
-        Each site isometry is decomposed as ``U = P_row · V_blockdiag · P_col`` following
-        :cite:`Rupprecht2026`, where ``P_row`` and ``P_col`` are permutations (a table lookup of the
-        permuted index, a SWAP, and erasure of the old index by X-basis measurement with a phase
-        fixup) and ``V_blockdiag`` is block diagonal, with each block synthesized from Givens rotation
-        layers. This exploits U(1) symmetries (particle number, spin) that make MPS tensors block
-        sparse. :cite:`Rupprecht2026` reports 10-30x fewer Toffolis than earlier MPS preparations for
-        molecular MPS; the savings shrink with the bond dimension and the block sparsity, and small
-        bonds can cost more than the dense synthesis.
-
-    For example, ``create("state_prep", "matrix_product_state", unitary_synthesis=AlgorithmRef(
-    "circuit_mapper", "unitary_synthesis_block_sparse"))`` selects the block-sparse synthesis.
+    ``unitary_synthesis`` circuit mapper synthesizes each isometry.
 
     Sites with the ``('0', 'u', 'd', '2')`` physical basis are spatial
     orbitals in the blocked Jordan-Wigner layout. Sites
@@ -128,7 +107,7 @@ class MatrixProductStatePreparation(StatePreparation):
         """
         return "matrix_product_state"
 
-    def _generate_preparation_data(self, mps: MPSContainer) -> MatrixProductStatePreparationData:
+    def _generate_preparation_data(self, mps: MPSContainer) -> tuple[str, dict[str, Any]]:
         """Synthesize the site isometries with the nested ``unitary_synthesis`` circuit mapper.
 
         Args:
@@ -136,8 +115,8 @@ class MatrixProductStatePreparation(StatePreparation):
                 Its validated site-to-orbital order is preserved.
 
         Returns:
-            Preparation data with raw angles and phases for Q# angle quantization.
-            Site zero is the initial state; every following site is synthesized.
+            The site synthesis method, ``"dense"`` or ``"block_sparse"``, and the fields of the Q#
+            ``MPSSequentialParams`` or ``MPSSparseParams`` struct.
 
         Raises:
             TypeError: If the ``unitary_synthesis`` setting does not refer to a dense or block-sparse
@@ -201,15 +180,16 @@ class MatrixProductStatePreparation(StatePreparation):
             raise ValueError("MPS initial state must contain finite amplitudes with nonzero norm.")
         vector = vector / scale
 
-        return MatrixProductStatePreparationData(
-            initial_state_vec=(vector / np.linalg.norm(vector)).tolist(),
-            site_to_orbital_order=mps.site_to_orbital_order(),
-            num_sites=mps.num_sites(),
-            num_qubits_per_site=(dimension - 1).bit_length(),
-            ancilla_bits=ancilla_bits,
-            method=method,
-            sites=syntheses,
-        )
+        # Site zero is the initial state, and each following site is a synthesized isometry.
+        return method, {
+            "initialStateVec": (vector / np.linalg.norm(vector)).tolist(),
+            "numSites": mps.num_sites(),
+            "numQubitsPerSite": (dimension - 1).bit_length(),
+            "siteToOrbitalOrder": mps.site_to_orbital_order(),
+            "rotationBitPrecision": self._settings.get("rotation_bit_precision"),
+            "numAncillaQubits": ancilla_bits,
+            "siteDecompositions": syntheses,
+        }
 
     def _run_impl(self, wavefunction: Wavefunction) -> Circuit:
         """Return a circuit to prepare an MPS state.
@@ -228,43 +208,32 @@ class MatrixProductStatePreparation(StatePreparation):
                 physical bases on every site.
 
         """
-        rotation_bit_precision = self._settings.get("rotation_bit_precision")
-
         container = wavefunction.get_container()
         if not isinstance(container, MPSContainer):
             raise TypeError(f"MatrixProductStatePreparation requires an MPSContainer, got {type(container)}.")
         if container.orthogonality_center() != 0:
             raise ValueError(f"{_DESCRIPTION} requires a right-canonical MPS with center zero.")
 
-        data = self._generate_preparation_data(container)
-        params = data.to_qsharp_params(rotation_bit_precision)
+        method, params = self._generate_preparation_data(container)
         # The MPS circuits are Adaptive-only; the default shared context targets Adaptive_RIF.
-        if data.method == "block_sparse":
-            sparse_module = QSHARP_UTILS.MPSSparse
-            program, params_type = sparse_module.MakeMPSSparseCircuit, sparse_module.MPSSparseParams
-            make_op = sparse_module.MakeMPSSparseOp
-            make_op_with_phase_gradient = sparse_module.MakeMPSSparseOpWithPhaseGradient
-        else:
-            sequential = QSHARP_UTILS.MPSSequential
-            program, params_type = sequential.MakeMPSSequentialCircuit, sequential.MPSSequentialParams
-            make_op = sequential.MakeMPSSequentialOp
-            make_op_with_phase_gradient = sequential.MakeMPSSequentialOpWithPhaseGradient
-        num_qubits = data.num_qubits_per_site * data.num_sites
+        name = "MPSSparse" if method == "block_sparse" else "MPSSequential"
+        module = QSHARP_UTILS.MPSStatePrep
+        qsharp_params = getattr(module, f"{name}Params")(**params)
         if self._settings.get("allocate_phase_gradient"):
-            qsharp_op = make_op(params_type(**params))
+            qsharp_op = getattr(module, f"Make{name}Op")(qsharp_params)
             num_gradient_ancillas = 0
         else:
             # The caller owns the trailing gradient register, must leave the gradient in it, and
             # must exclude it from any reflection about |0>.
-            qsharp_op = make_op_with_phase_gradient(params_type(**params))
-            num_gradient_ancillas = rotation_bit_precision
+            qsharp_op = getattr(module, f"Make{name}OpWithPhaseGradient")(qsharp_params)
+            num_gradient_ancillas = params["rotationBitPrecision"]
         # An exported circuit has no caller to own the gradient, so it always allocates its own.
-        qsharp_factory = QsharpFactoryData(program=program, parameter=params)
+        program = getattr(module, f"Make{name}Circuit")
         return Circuit(
-            qsharp_factory=qsharp_factory,
+            qsharp_factory=QsharpFactoryData(program=program, parameter={"params": params}),
             qsharp_op=qsharp_op,
             encoding="jordan-wigner",
-            num_qubits=num_qubits + num_gradient_ancillas,
+            num_qubits=params["numQubitsPerSite"] * params["numSites"] + num_gradient_ancillas,
             metadata=CircuitMetadata(num_phase_gradient_ancillas=num_gradient_ancillas),
         )
 
@@ -331,52 +300,3 @@ class MatrixProductStatePreparation(StatePreparation):
             (np.concatenate(values), (np.concatenate(rows), np.concatenate(columns))),
             shape=(site.physical_dimension() * ancilla_dim, site.left_bond_dimension()),
         )
-
-
-# ---------------------------------------------------------------------------
-# Preparation data passed to Q#
-# ---------------------------------------------------------------------------
-
-
-@dataclass
-class MatrixProductStatePreparationData:
-    """Arguments of the Q# MPS preparation operations, built by ``MatrixProductStatePreparation``.
-
-    The sites are the fields of the Q# ``DenseIsometrySynthesis`` structs for the ``MPSSequential``
-    operations or of the Q# ``SparseIsometrySynthesis`` structs for the ``MPSSparse`` operations. Dense
-    sites carry no right factor, which is absorbed into the preceding site.
-    """
-
-    num_sites: int
-    """Number of MPS sites."""
-
-    num_qubits_per_site: int
-    """Physical qubits per site: one for the ``('0', '1')`` basis and two for ``('0', 'u', 'd', '2')``."""
-
-    ancilla_bits: int
-    """Width of the bond register, which holds the largest bond."""
-
-    initial_state_vec: list[float]
-    """Normalized amplitudes of site zero, indexed by physical state times its padded right bond plus bond state."""
-
-    site_to_orbital_order: list[int]
-    """Orbital that holds each chain site, from the MPS container."""
-
-    method: str
-    """Site synthesis method, either ``"dense"`` or ``"block_sparse"``."""
-
-    sites: list[dict[str, Any]]
-    """Per-site Q# synthesis data (one entry per site 1..num_sites-1)."""
-
-    def to_qsharp_params(self, rotation_bit_precision: int) -> dict:
-        """Flatten into the dict expected by ``MakeMPSSequentialCircuit`` or ``MakeMPSSparseCircuit``."""
-        # The order matches the Q# Params structs and the positional arguments of Make*Circuit.
-        return {
-            "initialStateVec": self.initial_state_vec,
-            "numSites": self.num_sites,
-            "numQubitsPerSite": self.num_qubits_per_site,
-            "siteToOrbitalOrder": self.site_to_orbital_order,
-            "rotationBitPrecision": rotation_bit_precision,
-            "numAncillaQubits": self.ancilla_bits,
-            "siteDecompositions": self.sites,
-        }

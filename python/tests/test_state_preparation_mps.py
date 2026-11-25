@@ -7,8 +7,11 @@ Trotterized quantum phase estimation to recover classical eigenvalues, and resou
 regressions. The site isometries are
 synthesized by the ``unitary_synthesis_dense`` and ``unitary_synthesis_block_sparse`` circuit mappers, which have
 their own tests. Fixture data
-(``mps_h2``, ``mps_spin``) lives in ``test_data/mps_h2.mps.json``/``mps_spin.mps.json``, generated
-by ``test_data/make_mps_fixtures.py``.
+(``mps_h2``, ``mps_spin``) lives in ``test_data/mps_h2.mps.json``/``mps_spin.mps.json``: each holds a qubit
+Hamiltonian, its exact ground-state energy, and right-canonical MPS tensors of that ground state for the identity
+and reversed site orders. ``mps_h2`` is H2/STO-3G at 0.74 Angstrom (RHF orbitals, Jordan-Wigner), and ``mps_spin``
+is ``Jx*XX + Jy*YY + hA*Z0 + hB*Z1`` with distinct coefficients. The tensors are stored so resource counts stay
+fixed across platforms.
 """
 
 # --------------------------------------------------------------------------------------------
@@ -78,26 +81,28 @@ def synthesis_ref(method: str) -> AlgorithmRef:
     return AlgorithmRef("circuit_mapper", f"unitary_synthesis_{method}")
 
 
-def preparation_data(mps: MPSContainer, method: str = "dense"):
-    """Generate preparation data from a container using the selected site synthesis method."""
+def preparation_data(mps: MPSContainer, method: str = "dense") -> dict:
+    """Return the Q# MPS Params fields of a container using the selected site synthesis method."""
     preparer = MatrixProductStatePreparation()
     preparer.settings().update("unitary_synthesis", synthesis_ref(method))
-    return preparer._generate_preparation_data(mps)
+    preparer.settings().update("rotation_bit_precision", _AGREEMENT_PRECISION)
+    return preparer._generate_preparation_data(mps)[1]
 
 
-def simulate_mps_preparation(qsharp_test_utils, data, method: str):
+def simulate_mps_preparation(qsharp_test_utils, params: dict, method: str):
     """Run the preparation with its bond register exposed and post-select that register on ``|0>``."""
     tests = qsharp_test_utils.MPSPreparationTests
     make_op = tests.TestMakeMPSSparseOp if method == "block_sparse" else tests.TestMakeMPSSequentialOp
-    num_state_qubits = data.num_qubits_per_site * data.num_sites
-    initial = np.eye(1, 1 << (num_state_qubits + data.ancilla_bits)).ravel()
-    output = apply_operation(make_op(data.to_qsharp_params(_AGREEMENT_PRECISION)), initial)
-    state = output.reshape(1 << num_state_qubits, 1 << data.ancilla_bits)[:, 0]
+    num_state_qubits = params["numQubitsPerSite"] * params["numSites"]
+    num_bond_qubits = params["numAncillaQubits"]
+    initial = np.eye(1, 1 << (num_state_qubits + num_bond_qubits)).ravel()
+    output = apply_operation(make_op(params), initial)
+    state = output.reshape(1 << num_state_qubits, 1 << num_bond_qubits)[:, 0]
     probability = float(np.sum(np.abs(state) ** 2))
     return probability, state / np.sqrt(probability)
 
 
-# File-backed mps_h2 / mps_spin fixtures (see test_data/make_mps_fixtures.py).
+# File-backed mps_h2 / mps_spin fixtures; see the module docstring.
 _FIXTURES = {name: json.loads((_FIXTURE_DIR / f"{name}.mps.json").read_text()) for name in ("mps_h2", "mps_spin")}
 
 
@@ -106,7 +111,7 @@ def _fixture_mps(name: str, order: tuple[int, ...]) -> MPSContainer:
 
 
 def _fixture_site_tensors(name: str, order: tuple[int, ...]):
-    """Return the per-order right-canonical MPS tensors for *name* (see make_mps_fixtures.py)."""
+    """Return the per-order right-canonical MPS tensors for *name*."""
     return _FIXTURES[name]["orders"][",".join(map(str, order))]["site_tensors"]
 
 
@@ -347,10 +352,10 @@ def test_multi_site_mps_matches_contraction(qsharp_test_context, qsharp_test_uti
         mapper = create("circuit_mapper", "unitary_synthesis_dense", num_input_qubits=2)
         right_factor = mapper.right_factor(UnitaryRepresentation(UnitaryMatrixContainer(last.reshape(-1, 2))))
         assert not np.allclose(np.abs(right_factor), np.eye(2), atol=1e-3)
-    data = preparation_data(mps, method)
+    params = preparation_data(mps, method)
     with use_qsharp_context(qsharp_test_context):
-        probability, state = simulate_mps_preparation(qsharp_test_utils, data, method)
-    assert data.ancilla_bits == 2
+        probability, state = simulate_mps_preparation(qsharp_test_utils, params, method)
+    assert params["numAncillaQubits"] == 2
     assert probability > 1 - _AGREEMENT_TOLERANCE
     assert np.abs(np.vdot(_target_state(mps), state)) ** 2 > 1 - _AGREEMENT_TOLERANCE
 
@@ -369,9 +374,9 @@ def test_six_site_identity_order_signs_match_contraction(qsharp_test_context, qs
     target = _target_state(mps)
     assert (target < 0).any()
     assert (target > 0).any()
-    data = preparation_data(mps, method)
+    params = preparation_data(mps, method)
     with use_qsharp_context(qsharp_test_context):
-        probability, state = simulate_mps_preparation(qsharp_test_utils, data, method)
+        probability, state = simulate_mps_preparation(qsharp_test_utils, params, method)
     assert probability > 1 - _AGREEMENT_TOLERANCE
     assert np.abs(np.vdot(target, state)) ** 2 > 1 - _AGREEMENT_TOLERANCE
 
@@ -432,9 +437,9 @@ def test_operation_adjoint_returns_to_zero(qsharp_test_context, qsharp_test_util
 def test_initial_state_normalization_ignores_overall_scale():
     """Scaling site zero by any finite nonzero factor leaves the prepared initial state unchanged."""
     tensors = [np.asarray(t) for t in _fixture_site_tensors("mps_spin", _identity_order("mps_spin"))]
-    expected = preparation_data(make_mps(tensors)).initial_state_vec
+    expected = preparation_data(make_mps(tensors))["initialStateVec"]
     for scale in (1e-16, 1e200):
-        scaled = preparation_data(make_mps([tensors[0] * scale, *tensors[1:]])).initial_state_vec
+        scaled = preparation_data(make_mps([tensors[0] * scale, *tensors[1:]]))["initialStateVec"]
         np.testing.assert_allclose(scaled, expected, atol=1e-14)
 
 
@@ -471,8 +476,8 @@ def test_open_shell_states_have_fermionic_signs(qsharp_test_context, qsharp_test
     energies = {}
     with use_qsharp_context(qsharp_test_context):
         for name, amplitudes in _OPEN_SHELL_STATES.items():
-            data = preparation_data(make_mps(_two_site_tensors(amplitudes), site_to_orbital_order=order), method)
-            probability, state = simulate_mps_preparation(qsharp_test_utils, data, method)
+            params = preparation_data(make_mps(_two_site_tensors(amplitudes), site_to_orbital_order=order), method)
+            probability, state = simulate_mps_preparation(qsharp_test_utils, params, method)
             assert probability > 1 - _AGREEMENT_TOLERANCE, name
             # The dump has qubit 0 most significant; the Pauli matrix has it least significant.
             state = state.reshape((2,) * 4).transpose().reshape(-1)
