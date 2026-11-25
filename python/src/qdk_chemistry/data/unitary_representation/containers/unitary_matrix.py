@@ -36,6 +36,7 @@ class UnitaryMatrixContainer(UnitaryContainer):
     """
 
     _serialization_version = "0.1.0"
+    has_eigenvalue_mapping = False
 
     @staticmethod
     def data_type_name() -> str:

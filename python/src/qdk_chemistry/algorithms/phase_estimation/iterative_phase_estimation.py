@@ -98,6 +98,7 @@ class IterativePhaseEstimation(PhaseEstimation):
         Raises:
             ValueError: If ``shots_per_bit`` or ``num_bits`` is not positive, combined mode is requested
                 with an unsupported builder, or combined mode is enabled only on the nested builder.
+            TypeError: If the circuit builder is not an iterative builder, or the unitary has no eigenvalue mapping.
 
         """
         settings = self.settings()
@@ -137,6 +138,8 @@ class IterativePhaseEstimation(PhaseEstimation):
         unitary_builder.settings().update("power", 1)
         unitary_rep = unitary_builder.run(qubit_hamiltonian)
         container = unitary_rep.get_container()
+        if not container.has_eigenvalue_mapping:
+            raise TypeError(f"Phase estimation needs a unitary whose phases map to eigenvalues; got {container.type}.")
 
         num_bits = builder_settings.get("num_bits")
         if num_bits <= 0:

@@ -9,6 +9,7 @@ import copy
 import json
 import pickle
 import tracemalloc
+from unittest.mock import Mock
 
 import h5py
 import numpy as np
@@ -16,7 +17,18 @@ import pytest
 from scipy import sparse
 from scipy.stats import ortho_group
 
-from qdk_chemistry.data import UnitaryMatrixContainer, UnitaryRepresentation
+from qdk_chemistry.algorithms.phase_estimation.circuit_builder.base import (
+    IterativeQpeCircuitBuilder,
+    QpeCircuitBuilderSettings,
+    StandardQpeCircuitBuilder,
+)
+from qdk_chemistry.algorithms.phase_estimation.circuit_builder.unary_phase_estimation_builder import (
+    QdkUnaryQpeCircuitBuilder,
+)
+from qdk_chemistry.algorithms.phase_estimation.iterative_phase_estimation import IterativePhaseEstimation
+from qdk_chemistry.algorithms.phase_estimation.standard_phase_estimation import StandardPhaseEstimation
+from qdk_chemistry.algorithms.phase_estimation.unary_phase_estimation import UnaryPhaseEstimation
+from qdk_chemistry.data import Circuit, QubitOperator, UnitaryMatrixContainer, UnitaryRepresentation
 from qdk_chemistry.data.unitary_representation.containers.pauli_product_formula import (
     ExponentiatedPauliTerm,
     PauliProductFormulaContainer,
@@ -625,3 +637,26 @@ class TestUnitaryMatrixContainer:
         assert representation.get_num_qubits() == representation.get_num_system_qubits() == 3
         with pytest.raises(NotImplementedError):
             representation.get_container().eigenvalue_from_phase(0.25)
+
+    @pytest.mark.parametrize(
+        ("estimator_type", "builder_type"),
+        [
+            (StandardPhaseEstimation, StandardQpeCircuitBuilder),
+            (IterativePhaseEstimation, IterativeQpeCircuitBuilder),
+            (UnaryPhaseEstimation, QdkUnaryQpeCircuitBuilder),
+        ],
+    )
+    def test_phase_estimation_rejects_matrix_before_running(self, monkeypatch, estimator_type, builder_type):
+        """Phase estimation rejects a matrix container before building or executing any circuit."""
+        builder = Mock(spec=builder_type)
+        builder.settings.return_value = QpeCircuitBuilderSettings()
+        builder._create_nested.return_value.run.return_value = UnitaryRepresentation(UnitaryMatrixContainer(np.eye(2)))
+        executor = Mock()
+        executor.name.return_value = "qdk_sparse_state_simulator"
+        estimator = estimator_type()
+        nested = {"qpe_circuit_builder": builder, "circuit_executor": executor}
+        monkeypatch.setattr(estimator, "_create_nested", nested.__getitem__)
+        with pytest.raises(TypeError, match="phases map to eigenvalues; got unitary_matrix"):
+            estimator.run(state_preparation=Mock(spec=Circuit), qubit_hamiltonian=QubitOperator(["Z"], [1.0]))
+        builder.run.assert_not_called()
+        executor.run.assert_not_called()
