@@ -4,6 +4,7 @@
 
 namespace QDKChemistry.Utils.ControlledPauliExp {
 
+    import QDKChemistry.Utils.Loop.ResourceEstimateLoop;
     import QDKChemistry.Utils.HammingWeightPhasing.HammingWeightPhase;
     import QDKChemistry.Utils.PauliExp.RepPauliExp;
     import QDKChemistry.Utils.PauliExp.RepPauliExpParams;
@@ -14,8 +15,6 @@ namespace QDKChemistry.Utils.ControlledPauliExp {
     import Std.Arrays.Subarray;
     import Std.Canon.MapPauliAxis;
     import Std.Math.Max;
-    import Std.ResourceEstimation.IsResourceEstimating;
-    import Std.ResourceEstimation.RepeatEstimates;
 
     /// Returns the summed coefficient of the identity terms in `first..last`.
     function LayerIdentityPhase(params : RepPauliExpParams, first : Int, last : Int) : Double {
@@ -173,17 +172,11 @@ namespace QDKChemistry.Utils.ControlledPauliExp {
             let last = IndexOf(offset -> offset == Length(params.pauliCoefficients) - params.numSuffixTerms, layerOffsets);
             let stepOffsets = layerOffsets[first..last];
             ControlledPauliLayers(params, layerOffsets[0..first], useHammingWeightPhasing, maxBatchSize, control, systems);
-            if IsResourceEstimating() {
-                within {
-                    RepeatEstimates(params.repetitions);
-                } apply {
-                    ControlledPauliLayers(params, stepOffsets, useHammingWeightPhasing, maxBatchSize, control, systems);
-                }
-            } else {
-                for _ in 1..params.repetitions {
-                    ControlledPauliLayers(params, stepOffsets, useHammingWeightPhasing, maxBatchSize, control, systems);
-                }
-            }
+            ResourceEstimateLoop(
+                params.repetitions,
+                0,
+                _ => ControlledPauliLayers(params, stepOffsets, useHammingWeightPhasing, maxBatchSize, control, systems)
+            );
             ControlledPauliLayers(params, layerOffsets[last...], useHammingWeightPhasing, maxBatchSize, control, systems);
         }
     }

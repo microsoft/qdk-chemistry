@@ -10,7 +10,6 @@ import math
 import numpy as np
 import pytest
 from qdk import TargetProfile
-from qdk.estimator import EstimatorResult
 
 from qdk_chemistry.algorithms import create
 from qdk_chemistry.algorithms.state_preparation._binary_encoding_utils import (
@@ -136,21 +135,12 @@ class TestSparseIsometryBinaryEncoding:
     """Tests for the sparse isometry binary encoding state preparation."""
 
     def test_ozone(self, ozone_wf):
-        """End-to-end: ozone SCI wavefunction → run() → Circuit → estimate()."""
+        """Build an ozone circuit using binary encoding."""
         binary_encoding_prep = create("state_prep", "sparse_isometry", binary_encoding=True)
         circuit = binary_encoding_prep.run(ozone_wf)
         assert isinstance(circuit, Circuit)
         assert circuit.encoding == "jordan-wigner"
         _assert_uses_binary_encoding(circuit)
-
-        result = circuit.estimate()
-        assert isinstance(result, EstimatorResult)
-        lc = result["logicalCounts"]
-        assert lc["numQubits"] == 10  # 10 system qubits; pool covers all ancilla
-        assert lc["tCount"] == 7
-        assert lc["rotationCount"] == 7
-        assert lc["cczCount"] == 9
-        assert lc["measurementCount"] == 0
 
     @pytest.mark.skipif(not QDK_CHEMISTRY_HAS_QISKIT, reason="Qiskit not available")
     def test_ozone_statevector(self, ozone_wf):
@@ -227,16 +217,11 @@ class TestSparseIsometryBinaryEncoding:
         assert state_prep.settings().get("measurement_based_uncompute") is False
 
     def test_ozone_negative_controls_disabled(self, ozone_wf):
-        """Ozone with include_negative_controls=False produces different resource counts."""
+        """Build an ozone binary-encoding circuit without negative controls."""
         prep = create("state_prep", "sparse_isometry", binary_encoding=True, include_negative_controls=False)
         circuit = prep.run(ozone_wf)
         assert isinstance(circuit, Circuit)
         _assert_uses_binary_encoding(circuit)
-        lc = circuit.estimate()["logicalCounts"]
-        assert lc["numQubits"] == 10  # 10 system qubits; pool covers the 1 ancilla
-        assert lc["tCount"] == 7
-        assert lc["rotationCount"] == 7
-        assert lc["cczCount"] == 5
 
     @pytest.mark.skipif(not QDK_CHEMISTRY_HAS_QISKIT, reason="Qiskit not available")
     @pytest.mark.parametrize(

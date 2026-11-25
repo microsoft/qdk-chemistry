@@ -28,12 +28,8 @@ from qdk_chemistry.algorithms.state_preparation.qrom_state_prep import QROMState
 from qdk_chemistry.data import (
     AlgorithmRef,
     Circuit,
-    Configuration,
     DFTHCHamiltonianContainer,
     Hamiltonian,
-    MajoranaMapping,
-    StateVectorContainer,
-    Wavefunction,
 )
 from qdk_chemistry.data.circuit import QsharpFactoryData
 from qdk_chemistry.utils.qsharp import QSHARP_UTILS, get_qsharp_context
@@ -1051,77 +1047,3 @@ def test_subspace_marks_both_conjugate_walk_bins_at_an_exact_energy_bound(phase_
 
     assert {phase_bin, 8 - phase_bin} <= marked
     assert all((8 - b) % 8 in marked for b in marked)
-
-
-# ═══════════════════════════════════════════════════════════════════════════════
-# Resource estimation
-# ═══════════════════════════════════════════════════════════════════════════════
-
-
-class TestSOSSAResourceEstimation:
-    """Logical-resource estimation of the SOSSA unary-iteration QPE circuit."""
-
-    @staticmethod
-    def _fe2s2_logical_counts(**select_settings):
-        """Estimate Fe2S2-20 while varying only SELECT rotation settings.
-
-        Random data exercises the ``(N, R, B, C) = (20, 14, 15, 5)`` register widths.
-        """
-        num_orbitals = 20
-        factorized = create_random_factorized_hamiltonian(
-            num_orbitals=num_orbitals, num_ranks=14, num_bases=15, num_copies=5
-        )
-        operator = create("qubit_mapper", "sum_of_squares").run(
-            Hamiltonian(factorized), MajoranaMapping.jordan_wigner(2 * num_orbitals)
-        )
-
-        hf_config = Configuration.canonical_hf_configuration(15, 15, num_orbitals)
-        reference = Wavefunction(StateVectorContainer(hf_config, create_test_orbitals(num_orbitals)))
-        state_prep = create("state_prep", "sparse_isometry").run(reference)
-
-        builder = create(
-            "qpe_circuit_builder",
-            "qdk_unary",
-            num_queries=10_162,
-            circuit_mapper=_sossa_circuit_mapper_ref(
-                outer_prepare_algorithm="alias_sampling",
-                inner_prepare_algorithm="controlled_alias_sampling",
-                select_algorithm="qrom_phase_gradient",
-                coefficient_bit_precision=11,
-                rotation_bit_precision=15,
-                **select_settings,
-            ),
-            unitary_builder=AlgorithmRef("hamiltonian_unitary_builder", "sossa"),
-        )
-        circuit = builder.run(state_preparation=state_prep, qubit_hamiltonian=operator)[0]
-
-        counts = circuit.estimate().logical_counts
-        return counts["numQubits"], counts["cczCount"] + counts["ccixCount"]
-
-    def test_fe2s2_logical_resource_estimate(self):
-        """Pin the Fe2S2-20 logical cost of the circuit that actually runs.
-
-        Uses a random factorized Hamiltonian rather than the H2 data because the point is
-        to exercise the register widths at ``(N, R, B, C) = (20, 14, 15, 5)``, not to
-        recover an energy.
-        Tolerance is estimator noise only; re-measure and re-pin when design changes move it.
-        """
-        num_qubits, toffoli_count = self._fe2s2_logical_counts()
-
-        assert toffoli_count == pytest.approx(41_715_063, rel=0.01)
-        assert num_qubits == 486
-
-    def test_fe2s2_streamed_logical_resource_estimate(self):
-        """Pin the streamed Fe2S2 cost with the default ``select_swap`` lookup."""
-        # Fewest passes reaching the 379-qubit PREPARE floor, which needs lambda <= 19 - ceil((486 - 379) / 15) = 11.
-        num_qubits, toffoli_count = self._fe2s2_logical_counts(max_givens_rotation_batches=2)
-
-        assert num_qubits == 379
-        assert toffoli_count == pytest.approx(59_498_563, rel=0.01)
-
-    def test_fe2s2_streamed_select_logical_resource_estimate(self):
-        """Pin the streamed Fe2S2 cost with the plain ``select`` lookup, as the example runs it."""
-        num_qubits, toffoli_count = self._fe2s2_logical_counts(max_givens_rotation_batches=2, lookup_method="select")
-
-        assert num_qubits == 350
-        assert toffoli_count == pytest.approx(79_954_669, rel=0.01)

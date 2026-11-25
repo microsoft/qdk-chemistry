@@ -26,88 +26,27 @@ Use `estimate_circuit` to apply the estimator exposed by a stored QDK Chemistry
 project artifact.
 
 The tool accepts `project_name`, `circuit_filename`, and optional `params`.
-`params` is either one estimator-parameter object or a list of objects for a
-batch comparison. Omit it to use QDK defaults. MCP calls use the camel-case JSON
-field names below; Python code that constructs `EstimatorParams` uses the
-corresponding snake-case attributes.
+`params` forwards keyword arguments to `Circuit.estimate`. Omit it to use
+Majorana with error rate `1e-6`, ThreeAux, and RoundBasedFactory.
 
 ## Parameter objects
 
-A parameter object may contain:
+A JSON parameter object may contain:
 
 | Field | Purpose |
 |---|---|
-| `qubitParams` | Selects a built-in physical-qubit model or describes a custom one. |
-| `qecScheme` | Selects a built-in error-correction scheme or describes a custom one. |
-| `distillationUnitSpecifications` | Supplies custom magic-state distillation units. |
-| `constraints` | Restricts runtime, physical qubits, factories, or logical depth. |
-| `errorBudget` | Sets the total error budget or partitions it by source. |
-| `estimateType` | Requests `singlePoint` or `frontier`. |
+| `max_error` | Sets the maximum allowed estimation error (default `1.0`). |
+| `post_process` | Enables application-specific post-processing. |
+| `use_graph` | Prunes dominated ISA instructions (default `true`). |
+| `name` | Names the estimation table. |
+| `use_trace_backend` | Opts into the QRE trace backend. |
 
-A list applies independent parameter objects to the same circuit. Use it to
-compare assumptions rather than making separate tool calls.
-
-### Physical-qubit parameters
-
-`qubitParams.name` accepts these built-in models:
-
-- `qubit_gate_us_e3`
-- `qubit_gate_us_e4`
-- `qubit_gate_ns_e3`
-- `qubit_gate_ns_e4`
-- `qubit_maj_ns_e4`
-- `qubit_maj_ns_e6`
-
-Instead of `name`, a custom model can use the fields
-`instructionSet`, `oneQubitMeasurementTime`,
-`twoQubitJointMeasurementTime`, `oneQubitGateTime`, `twoQubitGateTime`,
-`tGateTime`, `oneQubitMeasurementErrorRate`,
-`twoQubitJointMeasurementErrorRate`, `oneQubitGateErrorRate`,
-`twoQubitGateErrorRate`, `tGateErrorRate`, and `idleErrorRate`.
-Measurement-error fields accept either one probability or an object with
-`process` and `readout` probabilities. Time values use the duration strings
-accepted by QDK.
-
-### Error correction
-
-`qecScheme.name` accepts `surface_code` or `floquet_code`. A custom scheme can
-instead use `errorCorrectionThreshold`, `crossingPrefactor`,
-`distanceCoefficientPower`, `logicalCycleTime`,
-`physicalQubitsPerLogicalQubit`, and `maxCodeDistance`. Formula fields use the
-expression syntax accepted by the QDK estimator.
-
-### Error budget and constraints
-
-`errorBudget` may be a probability strictly between zero and one, or an object
-with `logical`, `tstates`, and `rotations` probabilities. A partition describes
-how the total failure budget is divided among logical errors, distilled
-T states, and synthesized rotations.
-
-`constraints` may contain `logicalDepthFactor`, `maxTFactories`, `maxDuration`,
-and `maxPhysicalQubits`. `maxDuration` and `maxPhysicalQubits` are alternative
-space/time constraints and cannot be supplied together.
-
-### Distillation units
-
-Each `distillationUnitSpecifications` item can contain `name`, `displayName`,
-`numInputTs`, `numOutputTs`, `failureProbabilityFormula`,
-`outputErrorRateFormula`, `physicalQubitSpecification`,
-`logicalQubitSpecification`, and
-`logicalQubitSpecificationFirstRoundOverride`. A protocol-specific
-specification supplies `numUnitQubits` and `durationInQubitCycleTime`.
-
-Custom qubit, QEC, formula, and distillation settings are coupled. Generate them
-only from a coherent hardware model; do not combine individually plausible
-values without checking the QDK estimator's validation rules.
+Use the direct code path below for custom architecture and query objects.
 
 ## Results
 
-A single parameter object returns one estimator result. A parameter list returns
-a list in the same order. Depending on `estimateType`, a result can include a
-single selected estimate or frontier entries. Common sections include logical
-counts, physical counts, formatted counts, logical-qubit/QEC information,
-T-factory data, report data, and assumptions. Inspect status and error fields
-before reading resource counts.
+The tool returns Pareto-frontier rows containing `qubits`, `runtime` in
+nanoseconds, `error`, and an optional `name`.
 
 ## Path 2: Generate direct `qdk.qre` code
 

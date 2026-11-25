@@ -21,7 +21,6 @@ namespace QDKChemistry.Utils.SOSSAWalk {
     import Std.Arrays.MappedOverRange;
     import Std.Arrays.Padded;
     import Std.Arrays.Reversed;
-    import Std.Arrays.Subarray;
     import Std.Arrays.Zipped;
     import Std.Canon.ApplyControlledOnInt;
     import Std.Canon.ApplyToEachCA;
