@@ -52,6 +52,7 @@ _ADAPTIVE_ONLY_MODULES = (
     "SelectSwapDirty",
     "AliasSamplingStatePrep",
     "QROMStatePrep",
+    "GivensRotations",
     "SOSSAGivens",
     "SOSSALookup",
     "SOSSAPrepare",
@@ -193,7 +194,7 @@ class TestTargetProfiles:
 
     def test_every_vendored_module_is_classified(self) -> None:
         """A module in neither list is silently untested, so require the split to be total."""
-        vendored = {path.stem for path in (Path(qsharp_package.__file__).parent / "src").glob("*.qs")}
+        vendored = {path.stem for path in (Path(qsharp_package.__file__).parent / "src").rglob("*.qs")}
         assert vendored == set(_PORTABLE_MODULES) | set(_ADAPTIVE_ONLY_MODULES)
 
     def test_adaptive_ri_loads_the_whole_project(self) -> None:
