@@ -523,8 +523,8 @@ generator rows remain valid when the total normalization is positive.
 Reference energies and query precision
 """""""""""""""""""""""""""""""""""""""
 
-The builder accepts one of ``reference_ground_state_energy`` (a total
-energy), ``reference_energy_gap``, or ``variational_bound_determinants``:
+The builder accepts either ``reference_ground_state_energy`` (a total
+energy) or ``reference_energy_gap``:
 
 .. math::
 
@@ -532,18 +532,8 @@ energy), ``reference_energy_gap``, or ``variational_bound_determinants``:
    \lambda_{\mathrm{eff}}
    = \sqrt{E_{\mathrm{gap}}(2\Lambda-E_{\mathrm{gap}})}.
 
-``variational_bound_determinants`` supplies distinct occupation strings with
-one character per spatial orbital: ``0`` (empty), ``u`` (alpha), ``d`` (beta),
-or ``2`` (doubly occupied), all sharing the same alpha and beta electron counts.
-The builder computes the lowest Rayleigh--Ritz energy :math:`E_{\mathrm{ub}}`
-in their span and uses :math:`E_{\mathrm{gap}}=\min(E_{\mathrm{ub}}-E_{\mathrm{shift}},\Lambda)`
-to bound :math:`\lambda_{\mathrm{eff}}` from above in that particle-number sector
-:cite:`Shirobokov2026`.
-The cap at :math:`\Lambda` keeps the bound conservative, returning
-:math:`\lambda_{\mathrm{eff}}=\Lambda` when it applies.
-
-The resulting gap must satisfy :math:`0<E_{\mathrm{gap}}<2\Lambda`.
-The three settings are mutually exclusive; without any of them, the block encoding can still be built, but
+A supplied reference must satisfy :math:`0<E_{\mathrm{gap}}<2\Lambda`.
+Without either reference, the block encoding can still be built, but
 accessing ``lambda_eff`` for a query-count estimate raises an error.
 
 The factor container's ``get_lambda()``, the mapped normalization

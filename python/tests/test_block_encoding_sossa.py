@@ -5,7 +5,6 @@
 # Licensed under the MIT License. See LICENSE.txt in the project root for license information.
 # --------------------------------------------------------------------------------------------
 
-import itertools
 import tempfile
 from math import ceil, log2
 from pathlib import Path
@@ -17,7 +16,6 @@ import pytest
 from qdk_chemistry.algorithms.hamiltonian_unitary_builder.block_encoding.sossa import SOSSABuilder
 from qdk_chemistry.data import (
     Configuration,
-    DFTHCHamiltonianContainer,
     ModelOrbitals,
     QubitOperator,
     StateVectorContainer,
@@ -36,12 +34,7 @@ from qdk_chemistry.data.unitary_representation.containers.sossa import (
     SOSSASelect,
 )
 
-from .helpers import (
-    create_random_factorized_hamiltonian,
-    create_test_orbitals,
-    factorized_hamiltonian_to_sossa_operator,
-)
-from .test_phase_estimation_sossa import _build_dfthc_hamiltonian_matrix
+from .helpers import create_random_factorized_hamiltonian, factorized_hamiltonian_to_sossa_operator
 
 
 def _make_sossa_unitary_representation(*, power: int = 1, lambda_eff: float | None = None):
@@ -703,89 +696,9 @@ class TestSOSSABuilder:
         band_operator = factorized_hamiltonian_to_sossa_operator(create_random_factorized_hamiltonian(2, 2, 1, 1))
         lam = SOSSABuilder().run(band_operator).get_container().normalization
 
-        with pytest.raises(ValueError, match="only one of"):
+        with pytest.raises(ValueError, match="not both"):
             SOSSABuilder(reference_ground_state_energy=0.0, reference_energy_gap=lam).run(band_operator)
 
         for gap_fraction in [-0.5, 0.0, 2.0, 2.5]:
             with pytest.raises(ValueError, match="outside the representable window"):
                 SOSSABuilder(reference_energy_gap=gap_fraction * lam).run(band_operator)
-
-    @pytest.mark.parametrize(
-        ("shape", "num_pairs", "seed"),
-        [((3, 2, 2, 1), 1, 1), ((4, 2, 2, 2), 2, 7)],
-    )
-    def test_variational_bound_is_exact_on_the_full_sector_and_bounds_from_above(self, shape, num_pairs, seed):
-        """The Rayleigh-Ritz gap equals the exact sector gap on all determinants and bounds it from above on subsets."""
-        num_orbitals, num_ranks, num_bases, num_copies = shape
-        rng = np.random.default_rng(seed)
-        n = num_orbitals
-        h1 = rng.standard_normal((n, n))
-        h1 = 0.5 * (h1 + h1.T)
-        basis_vectors = rng.standard_normal((num_ranks, num_bases, n))
-        basis_vectors /= np.linalg.norm(basis_vectors, axis=2, keepdims=True)
-        two_body_weights = 0.5 * rng.standard_normal((num_ranks, num_bases, num_copies))
-        identity_weight = 0.3 * rng.standard_normal((num_ranks, num_copies))
-
-        def operator():
-            return factorized_hamiltonian_to_sossa_operator(
-                DFTHCHamiltonianContainer(
-                    one_body_integrals=h1,
-                    u_matrices=basis_vectors.flatten(),
-                    w_matrices=two_body_weights.flatten(),
-                    wb_matrix=identity_weight,
-                    orbitals=create_test_orbitals(n),
-                    core_energy=0.0,
-                    inactive_fock_matrix=np.zeros((n, n)),
-                )
-            )
-
-        h_gap = _build_dfthc_hamiltonian_matrix(h1, basis_vectors, two_body_weights, identity_weight)
-        sector = [
-            i
-            for i in range(h_gap.shape[0])
-            if bin(i & int("01" * n, 2)).count("1") == num_pairs and bin(i & int("10" * n, 2)).count("1") == num_pairs
-        ]
-        exact_gap = np.linalg.eigvalsh(h_gap[np.ix_(sector, sector)])[0]
-        diagonal = np.diag(h_gap)[sector]
-        lam = SOSSABuilder().run(operator()).get_container().normalization
-        # Gaps above Λ are clamped to Λ, so the best determinant is identifiable only if one lies below Λ.
-        assert exact_gap + 1e-3 < diagonal.min() < lam
-        determinants = [
-            "".join("2" if p in a and p in b else "u" if p in a else "d" if p in b else "0" for p in range(n))
-            for a in itertools.combinations(range(n), num_pairs)
-            for b in itertools.combinations(range(n), num_pairs)
-        ]
-
-        def gap(dets):
-            """Return the gap implied by the λ_eff built from ``dets``."""
-            lambda_eff = SOSSABuilder(variational_bound_determinants=dets).run(operator()).get_container().lambda_eff
-            return lam - np.sqrt(lam**2 - lambda_eff**2)
-
-        assert gap(determinants) == pytest.approx(exact_gap, abs=1e-9)
-        single_gaps = [gap([det]) for det in determinants]
-        np.testing.assert_allclose(sorted(single_gaps), sorted(np.minimum(diagonal, lam)), atol=1e-9)
-        best = determinants[int(np.argmin(single_gaps))]
-        subset = [best, *[det for det in determinants if det != best][: len(determinants) // 2]]
-        assert exact_gap - 1e-9 <= gap(subset) <= diagonal.min() + 1e-9
-        steps = {
-            name: ceil(np.pi * SOSSABuilder(**settings).run(operator()).get_container().lambda_eff / (2 * 1.6e-3))
-            for name, settings in [
-                ("single", {"reference_energy_gap": diagonal.min()}),
-                ("subset", {"variational_bound_determinants": subset}),
-            ]
-        }
-        assert steps["subset"] < steps["single"]
-
-    def test_variational_bound_rejects_invalid_determinants(self):
-        """Malformed, repeated, mixed-sector or combined determinant settings raise a clear ValueError."""
-        operator = factorized_hamiltonian_to_sossa_operator(create_random_factorized_hamiltonian(3, 2, 2, 1))
-        for dets, match in [
-            (["2u"], "per spatial orbital"),
-            (["2x0"], "per spatial orbital"),
-            (["u0d", "u0d"], "must not repeat"),
-            (["u0d", "u0u"], "electron count"),
-        ]:
-            with pytest.raises(ValueError, match=match):
-                SOSSABuilder(variational_bound_determinants=dets).run(operator)
-        with pytest.raises(ValueError, match="only one of"):
-            SOSSABuilder(variational_bound_determinants=["u0d"], reference_energy_gap=0.1).run(operator)
