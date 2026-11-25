@@ -7,11 +7,16 @@
 namespace QDKChemistry.Utils.AliasSampling {
 
     import Std.Arithmetic.ApplyIfGreaterLE;
+    import Std.Arrays.Filtered;
+    import Std.Arrays.ForEach;
     import Std.Arrays.MappedOverRange;
     import Std.Arrays.Reversed;
+    import Std.Arrays.SequenceI;
+    import Std.Arrays.Zipped;
     import Std.Canon.ApplyToEachCA;
     import Std.Convert.IntAsBoolArray;
     import Std.Convert.IntAsDouble;
+    import Std.Convert.ResultArrayAsBoolArray;
     import Std.Core.Length;
     import Std.Diagnostics.Fact;
     import Std.Math.AbsD;
@@ -21,6 +26,7 @@ namespace QDKChemistry.Utils.AliasSampling {
     import Std.Math.IsNaN;
     import Std.Math.MinI;
     import Std.Math.Sqrt;
+    import Std.Measurement.MResetX;
     import Std.StatePreparation.PreparePureStateD;
     import Std.Arrays.Fold;
     import Std.Arrays.Mapped;
@@ -29,6 +35,7 @@ namespace QDKChemistry.Utils.AliasSampling {
     import QDKChemistry.Utils.SelectSwapDirty.ComputeOptimalDirtySwapBits2D;
     import QDKChemistry.Utils.SelectSwap.SelectSwap2D;
     import QDKChemistry.Utils.SelectSwap.SelectSwapClean;
+    import QDKChemistry.Utils.UnaryIteration.UnaryIterationWithControl;
 
     /// Parameters for alias sampling state preparation.
     struct AliasSamplingParams {
@@ -410,6 +417,86 @@ namespace QDKChemistry.Utils.AliasSampling {
 
         Controlled SWAP([flagQubit], (signOrigQubit, signAltQubit));
         Z(signOrigQubit);
+    }
+
+    /// Conditional alias sampling PREPARE whose lookup reads the condition from a one-hot register.
+    ///
+    /// Prepares the same state as `ConditionalAliasSamplingPrepareWithFreeRider` without free-rider data,
+    /// but `oneHotRegister[c]` (one qubit per condition, exactly one set) replaces the binary condition
+    /// register, so the (keep, alt, signOrig, signAlt) word is loaded by `OneHotTableLookup` instead of a
+    /// 2D QROAM (arXiv:2611.09822, App. I).
+    operation ConditionalAliasSamplingPrepareOneHot(
+        coefficients : Double[][],
+        bitsPrecision : Int,
+        oneHotRegister : Qubit[],
+        indexRegister : Qubit[],
+        uniformRegister : Qubit[],
+        flagQubit : Qubit,
+        qromOutput : Qubit[],
+    ) : Unit is Adj {
+        let nIndexBits = Length(indexRegister);
+        let nCoeffs = Length(coefficients[0]);
+        let table3D = BuildConditionalAliasTable3D(coefficients, [], bitsPrecision, nIndexBits);
+
+        PreparePhaseSafeUniformSuperposition(nCoeffs, indexRegister);
+        ApplyToEachCA(H, uniformRegister);
+        // Only the first nCoeffs words can carry amplitude; the uniform superposition leaves the rest empty.
+        OneHotTableLookup(Mapped(row -> row[0..nCoeffs - 1], table3D), oneHotRegister, indexRegister, qromOutput);
+
+        let keepCoeffLoaded = qromOutput[0..bitsPrecision - 1];
+        let altIndexReg = qromOutput[bitsPrecision..bitsPrecision + nIndexBits - 1];
+        let signOrigQubit = qromOutput[bitsPrecision + nIndexBits];
+        let signAltQubit = qromOutput[bitsPrecision + nIndexBits + 1];
+        ApplyIfGreaterLE(X, keepCoeffLoaded, uniformRegister, flagQubit);
+        X(flagQubit);
+
+        for i in 0..nIndexBits - 1 {
+            Controlled SWAP([flagQubit], (indexRegister[i], altIndexReg[i]));
+        }
+
+        Controlled SWAP([flagQubit], (signOrigQubit, signAltQubit));
+        Z(signOrigQubit);
+    }
+
+    /// XOR `data[c][b]` into `target`, with c one-hot in `oneHotRegister` and b binary in `address`.
+    ///
+    /// Unary iteration over b exposes one leaf control per b; at that leaf, bit j of the word is the
+    /// parity of the one-hot qubits {c : data[c][b][j]}, gathered with CNOTs onto one of them, so it
+    /// costs one Toffoli per nonzero (b, j) column and no Toffoli at all for the condition.
+    /// The adjoint erases `target` by X-basis measurement and repairs each leaf's phase with Cliffords.
+    operation OneHotTableLookup(
+        data : Bool[][][],
+        oneHotRegister : Qubit[],
+        address : Qubit[],
+        target : Qubit[],
+    ) : Unit is Adj {
+        body (...) {
+            UnaryIterationWithControl(address, Length(data[0]), (b, ctl) => {
+                for j in 0..Length(target) - 1 {
+                    let members = Filtered(c -> data[c][b][j], SequenceI(0, Length(data) - 1));
+                    if Length(members) > 0 {
+                        within {
+                            for c in members[1...] {
+                                CNOT(oneHotRegister[c], oneHotRegister[members[0]]);
+                            }
+                        } apply {
+                            CCNOT(ctl, oneHotRegister[members[0]], target[j]);
+                        }
+                    }
+                }
+            });
+        }
+        adjoint (...) {
+            let measured = ResultArrayAsBoolArray(ForEach(MResetX, target));
+            UnaryIterationWithControl(address, Length(data[0]), (b, ctl) => {
+                // Phase (-1)^(measured · data[c][b]) on one-hot qubit c; a static loop keeps QIR export adaptive-safe.
+                for c in 0..Length(data) - 1 {
+                    if Fold((parity, (m, d)) -> parity != (m and d), false, Zipped(measured, data[c][b])) {
+                        CZ(ctl, oneHotRegister[c]);
+                    }
+                }
+            });
+        }
     }
 
     /// Circuit entry point for alias sampling.

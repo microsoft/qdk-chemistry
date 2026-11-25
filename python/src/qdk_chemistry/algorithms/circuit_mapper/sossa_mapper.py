@@ -5,12 +5,17 @@
 # Licensed under the MIT License. See LICENSE.txt in the project root for license information.
 # --------------------------------------------------------------------------------------------
 
+from dataclasses import replace
 from typing import Any
 
+import numpy as np
+
+from qdk_chemistry.algorithms.hamiltonian_unitary_builder.block_encoding.sossa import SOSSABuilder
+from qdk_chemistry.algorithms.state_preparation.state_preparation import StatePreparation
 from qdk_chemistry.data import AlgorithmRef, SettingNotFound, Settings
 from qdk_chemistry.data.circuit import Circuit, CircuitMetadata, QsharpFactoryData
 from qdk_chemistry.data.unitary_representation.base import UnitaryRepresentation
-from qdk_chemistry.data.unitary_representation.containers.sossa import SOSSABlockEncodingContainer
+from qdk_chemistry.data.unitary_representation.containers.sossa import SOSSABlockEncodingContainer, SOSSAInnerPrepare
 from qdk_chemistry.utils.qsharp import QSHARP_UTILS
 
 from .base import CircuitMapper
@@ -41,15 +46,22 @@ def _sossa_mapper_setting_defaults() -> tuple[tuple[Any, ...], ...]:
             "inner_prepare_algorithm",
             "string",
             "controlled_alias_sampling",
-            "Inner PREPARE algorithm ('controlled_alias_sampling' or 'direct').",
-            ["controlled_alias_sampling", "direct"],
+            "Inner PREPARE algorithm.",
+            ["controlled_alias_sampling", "one_hot", "direct"],
         ),
         (
             "select_algorithm",
             "string",
             "qrom_phase_gradient",
-            "SELECT algorithm ('qrom_phase_gradient' or 'direct').",
-            ["qrom_phase_gradient", "direct"],
+            "SELECT algorithm.",
+            ["qrom_phase_gradient", "one_hot", "direct"],
+        ),
+        (
+            "spin_swap",
+            "string",
+            "controlled_swap",
+            "Spin-swap implementation in SELECT.",
+            ["controlled_swap", "bell_parity"],
         ),
         (
             "rotation_bit_precision",
@@ -57,6 +69,12 @@ def _sossa_mapper_setting_defaults() -> tuple[tuple[Any, ...], ...]:
             10,
             "Number of bits for Givens rotation angle precision, from 1 to 30 inclusive.",
             (1, 30),
+        ),
+        (
+            "compressed_angle_representation",
+            "bool",
+            False,
+            "Use range-reduced Givens angle words.",
         ),
         (
             "coefficient_bit_precision",
@@ -69,43 +87,67 @@ def _sossa_mapper_setting_defaults() -> tuple[tuple[Any, ...], ...]:
             "max_givens_rotation_batches",
             "int",
             1,
-            "Upper bound J on the number of passes the 'qrom_phase_gradient' SELECT makes over the N-1 "
-            "Givens angles. The 'direct' SELECT loads no angle table and ignores it. 1 keeps every angle "
-            "resident, which is the cheapest in Toffolis and the widest in qubits. A larger J shrinks the "
-            "rotation register to ceil((N-1)/J) angles, at one extra table lookup per batch in each "
-            "direction. SELECT makes the fewest passes that register allows, ceil((N-1)/ceil((N-1)/J)), "
-            "which can be fewer than J: 19 angles with J = 6 run 5 passes of 4.",
+            "Maximum number of Givens rotation batches.",
             (1, 4096),
         ),
         (
             "lookup_method",
             "string",
             "select_swap",
-            "How the Givens rotation tables and the inner alias-sampling table are routed. The outer "
-            "PREPARE follows its own algorithm's settings, and a separately loaded free-rider word and "
-            "the direct inner PREPARE's sign table always use a plain lookup. 'select' is a plain "
-            "unary-iteration lookup; 'select_swap' is "
-            "a clean QROAM that cuts Toffolis but allocates scratch. 'dirty_select_swap' runs the same "
-            "network on borrowed dirty qubits that are provably idle across the load, so it costs no "
-            "width at all, but it pays roughly two to three times the Toffolis of the clean network at "
-            "equal width. Every method falls back to a plain lookup at shapes where its own cost model "
-            "says no network pays. 'select_swap' and 'dirty_select_swap' choose their swap widths "
-            "under max_swap_address_bits.",
-            ["select", "select_swap", "dirty_select_swap"],
+            "Lookup method for Givens and inner alias-sampling tables.",
+            ["select", "select_swap", "dirty_select_swap", "skew_tree"],
         ),
         (
             "max_swap_address_bits",
             "int",
             -1,
-            "Upper bound on the address width k of each QROAM swap network, which routes 2^k data words; "
-            "it does not count data or scratch qubits. It applies to the Givens rotation tables of the "
-            "'qrom_phase_gradient' SELECT and the inner table of the 'controlled_alias_sampling' PREPARE, "
-            "and only when lookup_method is 'select_swap' or 'dirty_select_swap'; 'select' always uses "
-            "width 0 and ignores it. -1 leaves each loader's cost model to choose, 0 forces plain select, "
-            "and a positive value limits each loader to widths at or below it.",
+            "Maximum QROAM swap-address bits (-1: automatic, 0: no swaps).",
             (-1, 30),
         ),
+        (
+            "angle_batch_streaming",
+            "string",
+            "per_batch",
+            "Loading and erasure strategy for streamed Givens angle batches.",
+            ["per_batch", "per_word", "amortized", "amortized_measured"],
+        ),
+        (
+            "recompute_outer_registers",
+            "bool",
+            False,
+            "Recompute free-rider registers from the outer index.",
+        ),
+        (
+            "givens_rotation_layout",
+            "string",
+            "sweep",
+            "Givens rotation layout in SELECT.",
+            ["sweep", "tree"],
+        ),
+        (
+            "givens_step",
+            "string",
+            "two_adders",
+            "Phase-gradient implementation of each Givens rotation.",
+            ["two_adders", "controlled_adder"],
+        ),
     )
+
+
+def _compressed_givens_angles(angles: np.ndarray, rot_bits: int) -> np.ndarray:
+    r"""Reduce quantized Givens rows to :math:`[0, \pi)` up to a sign canceled by the SOSSA walk :cite:`Caesura2025`."""
+    full = 1 << (rot_bits - 1)
+    half = full >> 1
+    scaled = (2.0**rot_bits * np.asarray(angles, dtype=float)) / (4.0 * np.pi)
+    words = (np.sign(scaled) * np.ceil(np.abs(scaled) - 0.5)).astype(np.int64) % full
+    reduced = np.zeros_like(words)
+    for row_index, row in enumerate(words):
+        negate = False
+        for j in range(len(row) - 1, -1, -1):
+            word = (-int(row[j]) if negate else int(row[j])) % full
+            negate = word >= half
+            reduced[row_index, j] = word - half if negate else word
+    return reduced * (4.0 * np.pi / 2**rot_bits)
 
 
 class SOSSAMapperSettings(Settings):
@@ -176,23 +218,7 @@ class SOSSAMapper(CircuitMapper):
         return circuit
 
     def _build_inner_oracles(self, container: SOSSABlockEncodingContainer) -> tuple[Any, Any]:
-        r"""Build the Q# inner PREPARE and free-rider load callables.
-
-        Creates a superposition over bases :math:`b` conditioned on :math:`x_o`. The
-        alias-sampling factory places the free-rider table in the cheaper of the inner
-        PREPARE and a separate load performed once per block encoding.
-
-        Algorithms:
-            - ``"controlled_alias_sampling"``: 2D alias sampling.
-            - ``"direct"``: Direct multiplexed preparation (ControlledPureStatePrep).
-
-        Args:
-            container: The SOSSA container with inner_prepare coefficients.
-
-        Returns:
-            The inner PREPARE and free-rider load callables.
-
-        """
+        """Build the Q# inner PREPARE and free-rider load callables."""
         algorithm = self._settings.get("inner_prepare_algorithm")
         coeff_bits = self._settings.get("coefficient_bit_precision")
         coefficients = container.inner_prepare.conditional_coefficients.tolist()
@@ -209,6 +235,8 @@ class SOSSAMapper(CircuitMapper):
                 self._max_swap_address_bits,
                 available_dirty,
             )
+        if algorithm == "one_hot":
+            return QSHARP_UTILS.SOSSAWalk.MakeInnerPrepareOneHotOracles(coefficients, free_rider_data, coeff_bits)
         if algorithm == "direct":
             return (
                 QSHARP_UTILS.SOSSAWalk.MakeInnerPrepareDirect(coefficients, free_rider_data),
@@ -233,7 +261,7 @@ class SOSSAMapper(CircuitMapper):
         num_free_rider_bits = container.layout.num_free_rider_bits
         inner_prep_bits = container.layout.inner_prep_bits
         inner_algorithm = self._settings.get("inner_prepare_algorithm")
-        if inner_algorithm == "controlled_alias_sampling":
+        if inner_algorithm in ("controlled_alias_sampling", "one_hot"):
             sign_qubit_index = 2 * inner_prep_bits + 2 * self._settings.get("coefficient_bit_precision") + 1
         elif inner_algorithm == "direct":
             sign_qubit_index = inner_prep_bits
@@ -247,6 +275,47 @@ class SOSSAMapper(CircuitMapper):
                 f"max_givens_rotation_batches must be at most the {num_angles} rotation angles of a "
                 f"{meta.num_spatial_orbitals}-orbital system, got {max_givens_rotation_batches}"
             )
+        if algorithm == "one_hot" and max_givens_rotation_batches != 1:
+            raise ValueError(
+                "select_algorithm 'one_hot' keeps one qubit per angle vector resident and does not stream "
+                f"Givens angle batches, so max_givens_rotation_batches must be 1, got {max_givens_rotation_batches}"
+            )
+
+        spin_parity = self._settings.get("spin_swap") == "bell_parity"
+        recompute = bool(self._settings.get("recompute_outer_registers"))
+
+        shared_spin_parity = spin_parity and not recompute and inner_algorithm != "one_hot"
+
+        one_body_angles = container.select.one_body_rotation_angles
+        two_body_angles = container.select.two_body_rotation_angles
+        compressed = bool(self._settings.get("compressed_angle_representation"))
+        controlled_adder = self._settings.get("givens_step") == "controlled_adder"
+        if compressed:
+            # The controlled adder's words sit on the one-bit-finer grid of the full angle.
+            grid_bits = rot_bits + int(controlled_adder)
+            one_body_angles = _compressed_givens_angles(np.asarray(one_body_angles), grid_bits)
+            two_body_angles = _compressed_givens_angles(np.asarray(two_body_angles), grid_bits)
+
+        one_hot_angles: list[list[float]] = []
+        one_hot_dq_index: list[int] = []
+        one_hot_sf_index: list[int] = []
+        if algorithm == "one_hot":
+            # Distinct nonzero vectors by exact value; b == B rows map to none since SELECT skips them.
+            vector_index: dict[tuple[float, ...], int] = {}
+            two_body = np.asarray(two_body_angles)
+            rows = [(True, row) for row in np.asarray(one_body_angles)] + [
+                (False, two_body[idx] if idx // meta.num_ranks < meta.num_bases and idx < len(two_body) else None)
+                for idx in range(meta.num_ranks * (meta.num_bases + 1))
+            ]
+            for is_dq, row in rows:
+                index = -1
+                if row is not None and np.any(row != 0.0):
+                    index = vector_index.setdefault(tuple(float(angle) for angle in row), len(vector_index))
+                (one_hot_dq_index if is_dq else one_hot_sf_index).append(index)
+            one_hot_angles = [list(vector) for vector in vector_index]
+        # Pairing needs the fused adder, and its select qubit pays off only from four distinct vectors.
+        one_hot_pairs = controlled_adder and len(one_hot_angles) > 3
+        streaming = self._settings.get("angle_batch_streaming")
 
         select_data = {
             "numOrbitals": meta.num_spatial_orbitals,
@@ -254,17 +323,31 @@ class SOSSAMapper(CircuitMapper):
             "numBases": meta.num_bases,
             "numCopies": meta.num_copies,
             "numPositiveOneBody": meta.num_positive_one_body_terms,
-            "OneBodyRotationAngles": container.select.one_body_rotation_angles.tolist(),
-            "TwoBodyRotationAngles": container.select.two_body_rotation_angles.tolist(),
+            "OneBodyRotationAngles": np.asarray(one_body_angles).tolist(),
+            "TwoBodyRotationAngles": np.asarray(two_body_angles).tolist(),
             "rotationBitPrecision": rot_bits,
+            "compressedAngleWords": compressed,
             # Narrowest lambda within max_givens_rotation_batches passes; 6 on 19 angles gives lambda 4, so 5 passes.
             "rotationBatchSize": -(-num_angles // max_givens_rotation_batches),
             "borrowDirty": self._borrow_dirty,
             "maxSwapBits": self._max_swap_address_bits,
+            "amortizeBatchLookups": streaming in ("amortized", "amortized_measured"),
+            "measureAngleWords": streaming in ("per_word", "amortized_measured"),
+            "useSkewTree": self._settings.get("lookup_method") == "skew_tree",
+            "recomputeOuterRegisters": recompute,
+            "givensTree": self._settings.get("givens_rotation_layout") == "tree",
+            "givensControlledAdder": controlled_adder,
             "numFreeRiderBits": num_free_rider_bits,
             "signQubitIndex": sign_qubit_index,
+            "oneHotAngles": one_hot_angles,
+            "oneHotDQIndex": one_hot_dq_index,
+            "oneHotSFIndex": one_hot_sf_index,
+            "oneHotPairedVectors": one_hot_pairs,
+            "bellParitySpinSwap": spin_parity,
+            # The mapper only embeds SELECT in the walk, which applies the shared trailing parity swap.
+            "walkSharesSpinParity": shared_spin_parity,
         }
-        if algorithm == "qrom_phase_gradient":
+        if algorithm in ("qrom_phase_gradient", "one_hot"):
             return QSHARP_UTILS.SOSSAWalk.MakeSelectPhaseGradient(select_data)
         if algorithm == "direct":
             return QSHARP_UTILS.SOSSAWalk.MakeSelectDirectRotation(select_data)
@@ -305,9 +388,13 @@ class SOSSAMapper(CircuitMapper):
             )
 
         inner_algorithm = self._settings.get("inner_prepare_algorithm")
-        if inner_algorithm == "controlled_alias_sampling":
+        num_free_rider_qubits = num_free_rider_bits
+        if inner_algorithm in ("controlled_alias_sampling", "one_hot"):
             mu_inner = self._settings.get("coefficient_bit_precision")
-            num_inner_qubits = 2 * inner_prep_bits + 2 * mu_inner + 3 + num_free_rider_bits
+            if inner_algorithm == "one_hot":
+                # The one-hot x_o register sits before the free-rider bits and is loaded with them.
+                num_free_rider_qubits += container.inner_prepare.conditional_coefficients.shape[0]
+            num_inner_qubits = 2 * inner_prep_bits + 2 * mu_inner + 3 + num_free_rider_qubits
             num_reflect_inner = inner_prep_bits + mu_inner + 1
         elif inner_algorithm == "direct":
             # The extra qubit is the sign bit SELECT phases
@@ -317,7 +404,7 @@ class SOSSAMapper(CircuitMapper):
             raise ValueError(f"Unsupported SOSSA inner PREPARE algorithm '{inner_algorithm}'.")
 
         select_algorithm = self._settings.get("select_algorithm")
-        if select_algorithm == "qrom_phase_gradient":
+        if select_algorithm in ("qrom_phase_gradient", "one_hot"):
             select_gradient_bits = int(self._settings.get("rotation_bit_precision"))
         elif select_algorithm == "direct":
             select_gradient_bits = 0
@@ -348,8 +435,11 @@ class SOSSAMapper(CircuitMapper):
             numOuterPrepareGradientQubits=regs["num_outer_prepare_gradient_qubits"],
             numInnerQubits=regs["num_inner_qubits"],
             numReflectInner=regs["num_reflect_inner"],
-            numFreeRiderQubits=num_free_rider_bits,
+            numFreeRiderQubits=num_free_rider_qubits,
             numPhaseGradientQubits=regs["num_phase_gradient_qubits"],
+            sharedSpinParity=self._settings.get("spin_swap") == "bell_parity"
+            and not self._settings.get("recompute_outer_registers")
+            and inner_algorithm != "one_hot",
         )
         return regs, register_layout
 
@@ -371,6 +461,67 @@ class SOSSAMapper(CircuitMapper):
             ValueError: If the layout reserves free-rider bits but the container carries no free-rider table.
 
         """
+        algorithm = self._settings.get("select_algorithm")
+        rot_bits = self._settings.get("rotation_bit_precision")
+        compressed = bool(self._settings.get("compressed_angle_representation"))
+        controlled_adder = self._settings.get("givens_step") == "controlled_adder"
+        if compressed:
+            if algorithm not in ("qrom_phase_gradient", "one_hot"):
+                raise ValueError(
+                    "compressed_angle_representation needs the 'qrom_phase_gradient' or 'one_hot' SELECT, which store "
+                    f"angle words; the '{algorithm}' SELECT has none to compress."
+                )
+            if self._settings.get("givens_rotation_layout") != "sweep":
+                raise ValueError(
+                    "compressed_angle_representation needs givens_rotation_layout 'sweep': it carries each sign "
+                    "flip into the next angle of the sweep chain, which the tree's angles do not follow."
+                )
+            # A full-angle word is the half-angle word one bit wider, so it keeps b - 1 of b + 1 bits.
+            dropped_bits = 1 if controlled_adder else 2
+            if rot_bits < dropped_bits + 1:
+                raise ValueError(
+                    f"compressed_angle_representation drops {dropped_bits} of the rotation_bit_precision bits, "
+                    f"so it needs at least {dropped_bits + 1}, got {rot_bits}."
+                )
+
+        if self._settings.get("recompute_outer_registers"):
+            meta = container.metadata
+            if meta.num_copies == 0:
+                raise ValueError(
+                    "recompute_outer_registers recomputes the spin-free flag and rank from x_o, so it needs at "
+                    "least one spin-free copy, got num_copies=0."
+                )
+            num_orbitals = meta.num_spatial_orbitals
+            num_sf = meta.num_ranks * meta.num_copies
+            rank_span = 1 << container.layout.rank_bits
+            sf_span = rank_span * meta.num_copies
+            # Low 2026 Eq. E9 places SF (r, c) at 2^nR*c + r, then D1 and Q1 from sf_span on.
+            new_index = np.array(
+                [sf_span + a for a in range(num_orbitals)]
+                + [(row % meta.num_copies) * rank_span + row // meta.num_copies for row in range(num_sf)]
+            )
+            old_amplitudes, _ = StatePreparation._dense_state_vector(  # noqa: SLF001
+                container.outer_prepare, "SOSSA outer PREPARE"
+            )
+            outer_amplitudes = np.zeros(sf_span + num_orbitals)
+            outer_amplitudes[new_index] = old_amplitudes[: num_orbitals + num_sf]
+            old_rows = container.inner_prepare.conditional_coefficients
+            # Padding indices carry no outer weight, so any normalized inner row is valid there.
+            inner_rows = np.zeros((sf_span + num_orbitals, old_rows.shape[1]))
+            inner_rows[:, 0] = 1.0
+            inner_rows[new_index] = old_rows
+            outer_prep_bits = max(1, (sf_span + num_orbitals - 1).bit_length())
+            container = SOSSABlockEncodingContainer(
+                outer_prepare=SOSSABuilder._build_outer_prepare(outer_amplitudes, outer_prep_bits),  # noqa: SLF001
+                inner_prepare=SOSSAInnerPrepare(conditional_coefficients=inner_rows),
+                select=container.select,
+                metadata=meta,
+                layout=replace(container.layout, outer_prep_bits=outer_prep_bits, num_free_rider_bits=0),
+                normalization=container.normalization,
+                power=container.power,
+                lambda_eff=container._lambda_eff,  # noqa: SLF001
+            )
+
         free_rider = container.inner_prepare.free_rider_data
         if container.layout.num_free_rider_bits and (free_rider is None or free_rider.size == 0):
             raise ValueError(

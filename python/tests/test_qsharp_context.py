@@ -52,7 +52,11 @@ _ADAPTIVE_ONLY_MODULES = (
     "SelectSwapDirty",
     "AliasSamplingStatePrep",
     "QROMStatePrep",
+    "SOSSAGivens",
+    "SOSSALookup",
+    "SOSSAPrepare",
     "SOSSAWalk",
+    "SkewTree",
 )
 
 

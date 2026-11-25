@@ -571,6 +571,8 @@ Circuit precision and shared registers
 
 .. rubric:: SOSSA circuit mapper settings
 
+Opt-in variants follow :cite:`Low2026,Shirobokov2026,Caesura2025`.
+
 .. list-table::
    :header-rows: 1
    :widths: 25 15 60
@@ -583,16 +585,43 @@ Circuit precision and shared registers
      - Outer PREPARE implementation. Default: ``state_prep`` / ``alias_sampling``.
    * - ``inner_prepare_algorithm``
      - str
-     - Inner PREPARE implementation: ``"direct"`` or ``"controlled_alias_sampling"``. Default: ``"controlled_alias_sampling"``.
+     - ``["controlled_alias_sampling", "one_hot", "direct"]``. Default: ``"controlled_alias_sampling"``.
    * - ``select_algorithm``
      - str
-     - SELECT implementation: ``"direct"`` or ``"qrom_phase_gradient"``. Default: ``"qrom_phase_gradient"``.
+     - ``["qrom_phase_gradient", "one_hot", "direct"]``; ``"one_hot"`` requires one batch. Default: ``"qrom_phase_gradient"``.
+   * - ``spin_swap``
+     - str
+     - ``["controlled_swap", "bell_parity"]``. Default: ``"controlled_swap"``.
    * - ``coefficient_bit_precision``
      - int
      - Alias-sampling coefficient precision, from 1 through 30. Default: 10.
    * - ``rotation_bit_precision``
      - int
      - Givens-rotation angle precision, from 1 through 30. Default: 10.
+   * - ``compressed_angle_representation``
+     - bool
+     - Range-reduce angle words; requires non-direct SELECT, ``"sweep"`` layout, and at least 3 rotation bits (2 with ``"controlled_adder"``). Default: ``False``.
+   * - ``givens_rotation_layout``
+     - str
+     - ``["sweep", "tree"]``. Default: ``"sweep"``.
+   * - ``givens_step``
+     - str
+     - ``["two_adders", "controlled_adder"]``. Default: ``"two_adders"``.
+   * - ``max_givens_rotation_batches``
+     - int
+     - Maximum Givens rotation batches, from 1 through 4096. Default: 1.
+   * - ``lookup_method``
+     - str
+     - ``["select", "select_swap", "dirty_select_swap", "skew_tree"]``. Default: ``"select_swap"``.
+   * - ``max_swap_address_bits``
+     - int
+     - Maximum QROAM swap-address bits (-1: automatic, 0: no swaps), up to 30. Default: -1.
+   * - ``recompute_outer_registers``
+     - bool
+     - Recompute free-rider registers from the outer index; requires a spin-free copy. Default: ``False``.
+   * - ``angle_batch_streaming``
+     - str
+     - ``["per_batch", "per_word", "amortized", "amortized_measured"]``. Default: ``"per_batch"``.
 
 ``coefficient_bit_precision`` and ``rotation_bit_precision`` control
 different approximations and do not define a total energy-error budget.

@@ -438,18 +438,13 @@ def create_random_wavefunction(
 
 
 def apply_operation(
-    operation: str | Callable[..., Any], state: np.ndarray, *, split_control: bool = False
+    operation: str | Callable[..., Any],
+    state: np.ndarray,
+    *,
+    split_control: bool = False,
+    num_qubits: int | None = None,
 ) -> np.ndarray:
-    """Return the state ``operation`` produces from a real-amplitude ``state``.
-
-    ``operation`` is either Q# source or a Q# callable of type ``Qubit[] => Unit``. With ``split_control`` it is
-    a ``(Qubit, Qubit[]) => Unit`` callable, such as a controlled circuit mapper's, and the most significant
-    qubit is its control.
-
-    This dumps the whole machine rather than using ``dump_operation_on_state``, whose ``DumpRegister``
-    rejects states with nonzero amplitudes below its zero cutoff as not separable, which long
-    evolutions reach. Every helper qubit is released by then, so the machine is the register.
-    """
+    """Apply to real amplitudes with optional MSB control and zero-padding, returning the input-length prefix."""
     context = get_qsharp_context()
     if not hasattr(context.code, "_TestDumpControlled"):
         for name, signature, call in (
@@ -464,7 +459,8 @@ def apply_operation(
                 " Std.Diagnostics.DumpMachine();"
                 " ResetAll(qubits); }"
             )
-    num_qubits = round(math.log2(len(state)))
+    if num_qubits is None:
+        num_qubits = round(math.log2(len(state)))
     run = context.run(
         context.code._TestDumpControlled if split_control else context.code._TestDumpMachine,
         1,
@@ -475,7 +471,8 @@ def apply_operation(
     )
     result = np.zeros(len(state), dtype=complex)
     for index, amplitude in run[0]["events"][-1].state_dump().get_dict().items():
-        result[index] = amplitude
+        if index < len(state):
+            result[index] = amplitude
     return result
 
 

@@ -1,4 +1,4 @@
-"""Tests for the Q# SELECT-SWAP data-loading network."""
+"""Tests for the Q# SELECT-SWAP and box-restricted skew-tree table lookups."""
 
 # --------------------------------------------------------------------------------------------
 # Copyright (c) Microsoft Corporation. All rights reserved.
@@ -6,6 +6,7 @@
 # --------------------------------------------------------------------------------------------
 
 import math
+import random
 
 import pytest
 from qdk.test_utils import ArithmeticOpTester
@@ -48,12 +49,12 @@ def _address_bits(length):
 
 
 def _word(bits):
-    """The little-endian integer ``ArithmeticOpTester`` reads back for *bits*."""
+    """Convert little-endian bits to an integer."""
     return sum(1 << index for index, bit in enumerate(bits) if bit)
 
 
 def _assert_1d_loads_every_address(context, test_utils, data, num_swap_bits):
-    """Every address loads its row, and the address and output registers come back clean."""
+    """Check 1D lookup values and register restoration."""
     op = test_utils.SelectSwapTests.TestMakeSelectSwap1DCopyOp(data, num_swap_bits)
     width = len(data[0])
     tester = ArithmeticOpTester(op, [_address_bits(len(data)), width, width], context=context)
@@ -66,7 +67,7 @@ def _assert_1d_loads_every_address(context, test_utils, data, num_swap_bits):
 
 
 def _assert_2d_loads_every_address(context, test_utils, data, num_swap_bits, outer_always_valid):
-    """Every (outer, inner) pair loads its word, and every other register comes back clean."""
+    """Check 2D lookup values and register restoration."""
     op = test_utils.SelectSwapTests.TestMakeSelectSwap2DCopyOp(data, num_swap_bits, outer_always_valid)
     width = len(data[0][0])
     tester = ArithmeticOpTester(
@@ -85,7 +86,7 @@ def _assert_2d_loads_every_address(context, test_utils, data, num_swap_bits, out
 
 
 def _assert_phase_agreement(test_utils, operation_name, data, num_swap_bits, outer_always_valid=False):
-    """Fail if any trial reports disagreement; a single passing trial proves nothing."""
+    """Require phase agreement in every trial."""
     operation = getattr(test_utils.SelectSwapTests, operation_name)
     args = (data, num_swap_bits) if "1D" in operation_name else (data, num_swap_bits, outer_always_valid)
     failures = sum(1 for _ in range(_PHASE_TRIALS) if not operation(*args))
@@ -96,7 +97,7 @@ def _assert_phase_agreement(test_utils, operation_name, data, num_swap_bits, out
 
 
 class TestSelectSwapLoadsCorrectValues:
-    """The loaded word is the addressed word, for every select/swap split."""
+    """Check lookup values across select/swap splits."""
 
     @pytest.mark.parametrize("num_swap_bits", [0, 1, 2, 3])
     def test_1d_loads_every_address(self, qsharp_test_context, qsharp_test_utils, num_swap_bits):
@@ -110,7 +111,7 @@ class TestSelectSwapLoadsCorrectValues:
 
     @pytest.mark.parametrize("data", [_DATA_1D, _DATA_1D_RAGGED])
     def test_1d_auto_swap_width_loads_every_address(self, qsharp_test_context, qsharp_test_utils, data):
-        """``numSwapBits = -1`` hands the select/swap split to ``ComputeOptimalLambda1D``."""
+        """Check lookup values with automatic swap width."""
         _assert_1d_loads_every_address(qsharp_test_context, qsharp_test_utils, data, -1)
 
     @pytest.mark.parametrize("outer_always_valid", [False, True])
@@ -127,7 +128,7 @@ class TestSelectSwapLoadsCorrectValues:
     def test_2d_word_loads_every_address_when_both_lengths_are_powers_of_two(
         self, qsharp_test_context, qsharp_test_utils, num_swap_bits, outer_always_valid
     ):
-        """No address is aliased onto a real row, so the in-range fixups must be no-ops."""
+        """Check 2D lookup values for power-of-two dimensions."""
         _assert_2d_loads_every_address(
             qsharp_test_context, qsharp_test_utils, _DATA_2D_POWER_OF_TWO, num_swap_bits, outer_always_valid
         )
@@ -143,7 +144,7 @@ class TestSelectSwapLoadsCorrectValues:
 
 
 class TestSelectSwapPreservesAddressPhases:
-    """The swap path must agree with the plain-select path as a *phase* oracle."""
+    """Check phase equivalence with plain SELECT."""
 
     @pytest.mark.parametrize("num_swap_bits", [1, 2, 3])
     def test_1d_swap_path_matches_plain_select(self, qsharp_test_utils, num_swap_bits):
@@ -158,11 +159,7 @@ class TestSelectSwapPreservesAddressPhases:
     @pytest.mark.parametrize("outer_always_valid", [False, True])
     @pytest.mark.parametrize("num_swap_bits", [0, 1, 2])
     def test_2d_word_load_matches_plain_select(self, qsharp_test_utils, num_swap_bits, outer_always_valid):
-        """``SelectSwap2D`` erases against the flat table whatever swap width it loaded at.
-
-        Its adjoint is written by hand rather than derived from its body, so this is the only
-        test that can see an erasure that is wrong in phase but right in value.
-        """
+        """Check 2D erasure phases across swap widths."""
         _assert_phase_agreement(
             qsharp_test_utils, "TestSelectSwap2DPhaseAgreement", _DATA_2D, num_swap_bits, outer_always_valid
         )
@@ -182,18 +179,13 @@ class TestSelectSwapPreservesAddressPhases:
 
 
 def _unlookup_toffolis(num_entries: int) -> int:
-    """Toffolis of ``Adjoint Select`` over *num_entries*, the measurement-based unlookup.
-
-    ``Std.TableLookup.Select`` erases by measuring the target and applying a phase fixup over
-    the address, which costs ``2**ceil(n/2) + 2**floor(n/2) - n - 2`` on ``n`` address qubits
-    rather than repeating the load. That is what makes the erasure sublinear in the table.
-    """
+    """Return the measurement-based SELECT unlookup's Toffoli count."""
     address_bits = max(1, math.ceil(math.log2(num_entries)))
     return 2 ** math.ceil(address_bits / 2) + 2 ** (address_bits // 2) - address_bits - 2
 
 
 def _probe_toffolis(ctx, test_utils, data, num_swap_bits, *, forward, adjoint):
-    """Trace ``TestSelectSwap2DResourceProbe`` and return its Toffoli count."""
+    """Return the traced 2D lookup's Toffoli count."""
     counts = ctx.logical_counts(
         test_utils.SelectSwapTests.TestSelectSwap2DResourceProbe,
         data,
@@ -206,7 +198,7 @@ def _probe_toffolis(ctx, test_utils, data, num_swap_bits, *, forward, adjoint):
 
 
 class TestSelectSwap2DErasesByMeasurement:
-    """The 2D word load's adjoint is a phase fixup over the flat address, not a second lookup."""
+    """Check measurement-based 2D erasure costs."""
 
     @pytest.mark.parametrize(
         ("num_outer", "num_inner", "width"),
@@ -215,7 +207,7 @@ class TestSelectSwap2DErasesByMeasurement:
     def test_adjoint_costs_the_unlookup_whatever_the_swap_width(
         self, qsharp_test_context, qsharp_test_utils, num_outer, num_inner, width
     ):
-        """Erasure cost follows the table size alone, and undercuts the load it undoes."""
+        """Check erasure costs depend only on table size and undercut loading."""
         ctx = qsharp_test_context
         data = [
             [[(o * 31 + i * 7 + b) % 2 == 0 for b in range(width)] for i in range(num_inner)] for o in range(num_outer)
@@ -231,7 +223,7 @@ class TestSelectSwap2DErasesByMeasurement:
 
 
 class TestSelectSwapCleanErasesByMeasurement:
-    """The 1D clean load erases by measurement uncontrolled and stays coherent when controlled."""
+    """Check clean 1D erasure costs and coherence."""
 
     @pytest.mark.parametrize("use_control", [False, True])
     @pytest.mark.parametrize(
@@ -239,7 +231,7 @@ class TestSelectSwapCleanErasesByMeasurement:
         [(_DATA_1D, k) for k in (-1, 0, 1, 2, 3)] + [(_DATA_1D_RAGGED, k) for k in (-1, 0, 1, 2)],
     )
     def test_matches_plain_select_as_a_phase_oracle(self, qsharp_test_utils, data, num_swap_bits, use_control):
-        """The hand-written erasure must leave the same address phases as a zero-padded ``Select``."""
+        """Check clean erasure phases against plain SELECT."""
         operation = qsharp_test_utils.SelectSwapTests.TestSelectSwapCleanPhaseAgreement
         failures = sum(1 for _ in range(_PHASE_TRIALS) if not operation(data, num_swap_bits, use_control))
 
@@ -249,7 +241,7 @@ class TestSelectSwapCleanErasesByMeasurement:
     def test_adjoint_costs_the_unlookup_rather_than_a_second_load(
         self, qsharp_test_context, qsharp_test_utils, num_rows, width
     ):
-        """Erasure cost follows the row count alone and undercuts the load it undoes."""
+        """Check erasure costs depend only on row count and undercut loading."""
         ctx = qsharp_test_context
         probe = qsharp_test_utils.SelectSwapTests.TestSelectSwapCleanResourceProbe
         data = _make_table(num_rows, width)
@@ -267,31 +259,22 @@ _DIRTY_TRIALS = 6
 
 
 def _select_swap_ns(ctx):
-    """The clean-strategy namespace: loaders that allocate their own swap scratch."""
+    """Return the clean lookup namespace."""
     return ctx.code.QDKChemistry.Utils.SelectSwap
 
 
 def _select_swap_dirty_ns(ctx):
-    """Return the dirty-strategy namespace for loaders that borrow live caller qubits.
-
-    Keeping it separate catches calls routed through the clean namespace.
-    """
+    """Return the borrowed-qubit lookup namespace."""
     return ctx.code.QDKChemistry.Utils.SelectSwapDirty
 
 
 def _make_table(num_rows: int, width: int) -> list[list[bool]]:
-    """Builds a deterministic bit table whose rows all differ whenever ``num_rows <= 2**width``.
-
-    An odd multiplier is a bijection modulo ``2**width``; narrower words must repeat rows, so see ``_routing_tables``.
-    """
+    """Build deterministic rows, distinct when the word width permits."""
     return [[bool(((r * 91 + 53) % (1 << width)) >> b & 1) for b in range(width)] for r in range(num_rows)]
 
 
 def _routing_tables(num_rows: int, width: int) -> list[list[list[bool]]]:
-    """Tables that between them give every pair of addresses different words, so no misrouting can pass.
-
-    Words too narrow for distinct rows add tables that pack successive address bits, wrapping, into each word.
-    """
+    """Build tables that collectively distinguish every address pair."""
     if num_rows <= 1 << width:
         return [_make_table(num_rows, width)]
     num_address_bits = math.ceil(math.log2(num_rows))
@@ -302,25 +285,19 @@ def _routing_tables(num_rows: int, width: int) -> list[list[list[bool]]]:
 
 
 def _make_table_2d(num_outer: int, num_inner: int, width: int) -> list[list[list[bool]]]:
-    """Splits one ``_make_table`` into ``num_outer`` blocks, so rows also differ across the outer address."""
+    """Split deterministic rows into a 2D table."""
     rows = _make_table(num_outer * num_inner, width)
     return [rows[block * num_inner : (block + 1) * num_inner] for block in range(num_outer)]
 
 
 class TestSelectSwapDirtyLoadsCorrectValues:
-    """Dirty loads must match clean lookup words and return borrowed qubits.
-
-    Sweep aliases too, because ragged tables route surplus addresses through ``Select``.
-    """
+    """Check dirty lookup values and borrowed-qubit restoration."""
 
     @pytest.mark.parametrize("dirty_seed", [0, 1, 5])
     @pytest.mark.parametrize("num_swap_bits", [0, 1, 2, 3])
     @pytest.mark.parametrize(("num_rows", "width"), [(8, 1), (16, 1)])
     def test_loads_every_address(self, qsharp_test_utils, num_rows, width, num_swap_bits, dirty_seed):
-        """Power-of-two tables are the baseline, with no surplus addresses to alias.
-
-        ``dirty_seed`` catches loaders that only work from a zeroed borrow.
-        """
+        """Check dirty lookup values with nonzero borrowed inputs."""
         for data in _routing_tables(num_rows, width):
             assert qsharp_test_utils.SelectSwapDirtyTests.TestSelectSwapDirtyCorrectness(
                 data, num_swap_bits, dirty_seed
@@ -332,7 +309,7 @@ class TestSelectSwapDirtyLoadsCorrectValues:
     def test_loads_every_address_when_length_is_not_a_power_of_two(
         self, qsharp_test_utils, num_rows, width, num_swap_bits, dirty_seed
     ):
-        """Surplus addresses have to alias exactly as the plain lookup aliases them."""
+        """Check ragged-table aliasing against plain SELECT."""
         for data in _routing_tables(num_rows, width):
             assert qsharp_test_utils.SelectSwapDirtyTests.TestSelectSwapDirtyCorrectness(
                 data, num_swap_bits, dirty_seed
@@ -340,17 +317,14 @@ class TestSelectSwapDirtyLoadsCorrectValues:
 
 
 class TestSelectSwapDirtyReturnsTheBorrowedQubits:
-    """The lender comes back unentangled, or the borrowing silently corrupts the caller."""
+    """Check borrowed-qubit coherence."""
 
     @pytest.mark.parametrize(
         ("num_rows", "width", "num_swap_bits"),
         [(8, 1, 1), (8, 1, 2), (8, 1, 3), (6, 2, 1), (6, 2, 2), (5, 1, 2)],
     )
     def test_borrowed_register_is_restored_exactly(self, qsharp_test_utils, num_rows, width, num_swap_bits):
-        """One load, XORed back out by the plain lookup, must leave the Hadamard-basis input unchanged.
-
-        A single forward load is what SOSSA runs, so a second dirty load must not get the chance to cancel an error.
-        """
+        """Check one dirty load against independent erasure on Hadamard-basis inputs."""
         for data in _routing_tables(num_rows, width):
             failures = sum(
                 1
@@ -364,7 +338,7 @@ class TestSelectSwapDirtyReturnsTheBorrowedQubits:
 
 
 class TestSelectSwap2DBorrowedMatchesClean:
-    """Lending ``SelectSwap2D`` a register changes where the swap block lives, not what loads."""
+    """Check borrowed and clean 2D lookup equivalence."""
 
     @pytest.mark.parametrize("dirty_seed", [0, 5])
     @pytest.mark.parametrize("outer_always_valid", [False, True])
@@ -373,7 +347,7 @@ class TestSelectSwap2DBorrowedMatchesClean:
     def test_every_address_loads_the_clean_word_and_returns_the_lender(
         self, qsharp_test_utils, data, num_swap_bits, outer_always_valid, dirty_seed
     ):
-        """Nothing else reaches the borrowed 2D branch: at the Fe2S2 shapes its cost model declines."""
+        """Check borrowed 2D lookup values and lender restoration."""
         assert qsharp_test_utils.SelectSwapDirtyTests.TestSelectSwap2DDirtyMatchesClean(
             data, num_swap_bits, outer_always_valid, dirty_seed
         )
@@ -384,10 +358,7 @@ class TestSelectSwap2DBorrowedMatchesClean:
     def test_one_load_preserves_address_and_lender_phases(
         self, qsharp_test_utils, data, num_swap_bits, outer_always_valid
     ):
-        """The inner PREPARE lends live system qubits, so their relative phases must survive.
-
-        Basis-state checks see a stray Z on a lender only as a global phase.
-        """
+        """Check address and lender phase preservation."""
         failures = sum(
             1
             for _ in range(_DIRTY_TRIALS)
@@ -399,10 +370,10 @@ class TestSelectSwap2DBorrowedMatchesClean:
 
 
 class TestSelectSwapDirtyCostModel:
-    """The width is chosen by cost, so the cost model is what decides if borrowing happens."""
+    """Check dirty lookup cost models."""
 
     def test_select_swap_dirty_cost_1d(self, qsharp_test_context):
-        """Width 0 is the plain lookup; every wider width is the reference ``2*ceil(d/K) + 4b(K-1)``, less 2."""
+        """Check dirty 1D costs against the reference formula."""
         cost = _select_swap_dirty_ns(qsharp_test_context).SelectSwapDirtyCost1D
         for num_data in (8, 15, 224, 864):
             assert cost(0, num_data, 10) == num_data - 1
@@ -418,7 +389,7 @@ class TestSelectSwapDirtyCostModel:
                 )
 
     def test_compute_optimal_dirty_swap_bits(self, qsharp_test_context):
-        """Borrows only past the crossover, then beats the plain lookup without overdrawing the budget or cap."""
+        """Check dirty swap-width selection, qubit budgets, and caps."""
         select_swap = _select_swap_dirty_ns(qsharp_test_context)
         # Fe2S2's 224-row, 15-bit angle table sits below the ``numData > 32 * numBits`` crossover.
         for num_data, num_bits in [(20, 15), (224, 15), (64, 10)]:
@@ -444,7 +415,7 @@ class TestSelectSwapDirtyCostModel:
             assert select_swap.ComputeOptimalDirtySwapBits(864, 10, 4096, cap) == best, f"cap {cap}"
 
     def test_select_swap_dirty_cost_2d(self, qsharp_test_context, qsharp_test_utils):
-        """Matches the traced borrowed load and its erasure at every width, including a one-entry select layer."""
+        """Check dirty 2D costs against traced load and erasure."""
         ctx = qsharp_test_context
         select_swap = _select_swap_dirty_ns(ctx)
         probe = qsharp_test_utils.SelectSwapDirtyTests.TestSelectSwap2DDirtyResourceProbe
@@ -459,7 +430,7 @@ class TestSelectSwapDirtyCostModel:
                 ), f"width {width} on a {num_outer}x{num_inner}x{num_bits} table"
 
     def test_compute_optimal_dirty_swap_bits_2d(self, qsharp_test_context):
-        """Borrows once a width beats the plain lookup, and never past what the caller lends or caps."""
+        """Check dirty 2D swap-width selection within budgets and caps."""
         select_swap = _select_swap_dirty_ns(qsharp_test_context)
         # Width 2 measures 25 Toffolis against the plain lookup's 27, but needs all four lent qubits.
         assert select_swap.ComputeOptimalDirtySwapBits2D(3, 5, 1, True, 4, -1) == 2
@@ -471,7 +442,7 @@ class TestSelectSwapDirtyCostModel:
         assert [select_swap.ComputeOptimalDirtySwapBits2D(3, 5, 1, True, 4, cap) for cap in range(4)] == [0, 0, 2, 2]
 
     def test_select_swap_dirty_borrowed_qubits(self, qsharp_test_context, qsharp_test_utils):
-        """Exactly the lender ``SelectSwap2D`` accepts: one qubit fewer fails, and width 0 needs none."""
+        """Check the minimum borrowed-register size."""
         ctx = qsharp_test_context
         select_swap = _select_swap_dirty_ns(ctx)
         probe = qsharp_test_utils.SelectSwapDirtyTests.TestSelectSwap2DDirtyResourceProbe
@@ -487,10 +458,10 @@ class TestSelectSwapDirtyCostModel:
 
 
 class TestCleanSelectSwapForwardCostModel:
-    """The clean network is chosen for a load that is erased by measurement, not by its adjoint."""
+    """Check clean forward lookup cost models."""
 
     def test_select_swap_forward_cost(self, qsharp_test_context, qsharp_test_utils):
-        """Matches the traced Toffolis of the clean rotation-word load at every width."""
+        """Check clean forward costs against traced Toffoli counts."""
         ctx = qsharp_test_context
         probe = qsharp_test_utils.SOSSAWalkTests.TestLoadRotationWordResourceProbe
         for num_data, num_bits in [(224, 15), (64, 10)]:
@@ -502,7 +473,7 @@ class TestCleanSelectSwapForwardCostModel:
                 ), f"width {width} on a {num_data}x{num_bits} table"
 
     def test_compute_optimal_swap_bits(self, qsharp_test_context):
-        """Picks the true argmin over every width the cap allows, and stays on the plain lookup when none beats it."""
+        """Check minimum-cost swap-width selection within caps."""
         select_swap = _select_swap_ns(qsharp_test_context)
         for num_data, num_bits in [(224, 15), (864, 10), (32, 4)]:
             address_bits = math.ceil(math.log2(num_data))
@@ -520,7 +491,7 @@ class TestCleanSelectSwapForwardCostModel:
             assert select_swap.ComputeOptimalSwapBits(num_data, num_bits, -1) == 0
 
     def test_select_swap_scratch_qubits(self, qsharp_test_context, qsharp_test_utils):
-        """With no select layer left, the traced peak is the probe's own registers plus exactly this scratch."""
+        """Check scratch-qubit counts against traced peaks."""
         ctx = qsharp_test_context
         select_swap = _select_swap_ns(ctx)
         probe = qsharp_test_utils.SOSSAWalkTests.TestLoadRotationWordResourceProbe
@@ -534,10 +505,10 @@ class TestCleanSelectSwapForwardCostModel:
 
 
 class TestCleanSelectSwap2DCostModel:
-    """The 2D word load's width is chosen by cost, so the model must price every width the selector can pick."""
+    """Check clean 2D lookup cost models."""
 
     def test_select_swap_cost_2d(self, qsharp_test_context, qsharp_test_utils):
-        """Matches the traced load and its erasure at every width, including the full inner address."""
+        """Check clean 2D costs against traced load and erasure."""
         ctx = qsharp_test_context
         select_swap = _select_swap_ns(ctx)
         for num_outer, num_inner, num_bits in [(1, 1, 2), (3, 5, 1), (1, 8, 2), (1, 16, 3), (90, 16, 1), (90, 16, 23)]:
@@ -548,7 +519,7 @@ class TestCleanSelectSwap2DCostModel:
                 ), f"width {width} on a {num_outer}x{num_inner}x{num_bits} table"
 
     def test_compute_optimal_lambda_2d(self, qsharp_test_context):
-        """Picks the narrowest width within 20% of the cheapest the cap allows, the full inner address included."""
+        """Check the narrowest allowed width within 20% of minimum cost."""
         select_swap = _select_swap_ns(qsharp_test_context)
         # One-bit words make the swaps cheap enough that only swapping the whole inner address is near the minimum.
         assert select_swap.ComputeOptimalLambda2D(90, 16, 1, True, -1) == 4
@@ -567,12 +538,96 @@ class TestCleanSelectSwap2DCostModel:
 
 
 class TestSelectSwapAliasedMatchesPlainSelect:
-    """A loader sharing ``Select`` erasure must share its address routing.
-
-    The check is by value because phase-oracle harnesses disagree with ``Select`` on ragged tables.
-    """
+    """Check lookup address routing against plain SELECT."""
 
     @pytest.mark.parametrize("num_swap_bits", [-1, 0, 1, 2])
     @pytest.mark.parametrize("data", [_DATA_1D, _DATA_1D_RAGGED], ids=["power_of_two", "ragged"])
     def test_aliased_load_matches_plain_select(self, qsharp_test_utils, num_swap_bits, data):
         assert qsharp_test_utils.SelectSwapTests.TestSelectSwapAliasedMatchesSelect1D(data, num_swap_bits)
+
+
+# (fields, rows, word width): two padded fields, a padded high field, a ragged 1D table, an unpadded low field.
+_SKEW_TREE_SHAPES = [
+    ([(2, 3), (2, 3)], 11, 4),
+    ([(3, 5), (2, 3)], 21, 3),
+    ([], 6, 5),
+    ([(1, 2), (3, 6)], 16, 2),
+]
+_SKEW_TREE_SHAPE_IDS = ["box3x3", "box5x3", "ragged1d", "box2x6"]
+
+
+def _xor_rows(rows, width):
+    """Return the bitwise XOR of rows."""
+    out = [False] * width
+    for row in rows:
+        out = [a != b for a, b in zip(out, row, strict=True)]
+    return out
+
+
+def _skew_tree_shape(fields, num_rows, width, seed):
+    """Return a random table, address width, and in-box addresses."""
+    rng = random.Random(seed)
+    num_bits = sum(bits for bits, _ in fields) or math.ceil(math.log2(num_rows))
+    data = [[rng.random() < 0.5 for _ in range(width)] for _ in range(num_rows)]
+    offsets = [sum(bits for bits, _ in fields[:j]) for j in range(len(fields))]
+    box = [
+        x
+        for x in range(num_rows)
+        if all(
+            (x >> offset) & ((1 << bits) - 1) < extent for offset, (bits, extent) in zip(offsets, fields, strict=True)
+        )
+    ]
+    return data, num_bits, box
+
+
+@pytest.mark.parametrize("num_controls", [0, 1, 2])
+@pytest.mark.parametrize(("fields", "num_rows", "width"), _SKEW_TREE_SHAPES, ids=_SKEW_TREE_SHAPE_IDS)
+def test_skew_tree_loads_every_in_box_address(
+    qsharp_test_context, qsharp_test_utils, fields, num_rows, width, num_controls
+):
+    """Check controlled skew-tree values and register restoration."""
+    data, num_bits, box = _skew_tree_shape(fields, num_rows, width, seed=num_rows)
+    op = qsharp_test_utils.SkewTreeTests.TestMakeSkewTreeCopyOp(data, fields, num_controls)
+    tester = ArithmeticOpTester(op, [max(num_controls, 1), num_bits, width, width], context=qsharp_test_context)
+    on = (1 << num_controls) - 1
+    # ArithmeticOpTester reads registers back as little-endian integers.
+    failures = [
+        x for x in box if tester.run([on, x, 0, 0]) != [on, x, 0, sum(1 << i for i, bit in enumerate(data[x]) if bit)]
+    ]
+    if num_controls:
+        failures += [("off", x) for x in box if tester.run([0, x, 0, 0]) != [0, x, 0, 0]]
+    assert not failures
+
+
+@pytest.mark.parametrize("num_controls", [0, 1, 2])
+@pytest.mark.parametrize(("fields", "num_rows", "width"), _SKEW_TREE_SHAPES, ids=_SKEW_TREE_SHAPE_IDS)
+def test_skew_tree_phase_matches_an_independent_reference(qsharp_test_utils, fields, num_rows, width, num_controls):
+    """Check skew-tree phase equivalence and mutation detection."""
+    data, num_bits, box = _skew_tree_shape(fields, num_rows, width, seed=num_rows + 1)
+    # Outside the box the lookup writes the XOR of the in-box subset-XOR coefficients below the address.
+    coefficients = {p: _xor_rows((data[q] for q in range(p + 1) if q & p == q), width) for p in box}
+    reference = [_xor_rows((c for p, c in coefficients.items() if p & x == p), width) for x in range(1 << num_bits)]
+    assert all(reference[x] == data[x] for x in box)
+    tests = qsharp_test_utils.SkewTreeTests
+
+    assert tests.TestSkewTreePhaseAgreement(data, reference, fields, num_bits, num_controls)
+    mutated = [list(row) for row in data]
+    mutated[box[-1]][0] = not mutated[box[-1]][0]
+    assert not tests.TestSkewTreePhaseAgreement(mutated, reference, fields, num_bits, num_controls)
+
+
+def test_skew_tree_costs_one_toffoli_per_box_node_and_undercuts_a_padded_select(qsharp_test_context, qsharp_test_utils):
+    """Check skew-tree Toffoli counts against box size and padded SELECT."""
+    fields, num_rows, width = _SKEW_TREE_SHAPES[0]
+    data, num_bits, box = _skew_tree_shape(fields, num_rows, width, seed=0)
+
+    def toffolis(*args):
+        """Return the traced Toffoli count."""
+        counts = qsharp_test_context.logical_counts(*args)
+        return counts["cczCount"] + counts["ccixCount"]
+
+    skew = toffolis(qsharp_test_utils.SkewTreeTests.TestSkewTreeResourceProbe, data, fields, num_bits, 1)
+    padded = toffolis(qsharp_test_utils.SOSSAWalkTests.TestLoadRotationWordResourceProbe, data, 0)
+    assert skew == len(box) - 1
+    assert padded == num_rows - 1
+    assert skew < padded
