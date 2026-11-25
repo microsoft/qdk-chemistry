@@ -67,9 +67,9 @@ class MatrixProductStatePreparationSettings(Settings):
             "algorithm_ref",
             AlgorithmRef("circuit_mapper", "unitary_synthesis_dense"),
             "unitary_synthesis_dense or unitary_synthesis_block_sparse circuit mapper that synthesizes "
-            "every site isometry. Its num_input_qubits is set to the bond register width, and the dense "
-            "mapper's omit_right_factor to True. Its rotation_bit_precision and allocate_phase_gradient "
-            "are unused, as all sites share this algorithm's phase gradient.",
+            "every site isometry. Its num_input_qubits is set to the bond register width, its "
+            "rotation_bit_precision to this algorithm's, and the dense mapper's omit_right_factor to True. "
+            "Its allocate_phase_gradient is unused, as all sites share this algorithm's phase gradient.",
         )
         self._set_default(
             "allocate_phase_gradient",
@@ -140,14 +140,12 @@ class MatrixProductStatePreparation(StatePreparation):
             Site zero is the initial state; every following site is synthesized.
 
         Raises:
-            TypeError: If the input is not an MPSContainer, or the ``unitary_synthesis`` setting does not
-                refer to a dense or block-sparse unitary synthesis mapper.
+            TypeError: If the ``unitary_synthesis`` setting does not refer to a dense or block-sparse
+                unitary synthesis mapper.
             ValueError: If the physical basis is unsupported, the MPS is complex,
                 the initial state has zero norm, or a synthesized site is not isometric.
 
         """
-        if not isinstance(mps, MPSContainer):
-            raise TypeError(f"MatrixProductStatePreparation requires an MPSContainer, got {type(mps)}.")
         if mps.is_complex():
             raise ValueError(f"{_DESCRIPTION} currently supports only real-valued MPS tensors.")
         mps_sites = mps.sites()
@@ -291,6 +289,7 @@ class MatrixProductStatePreparation(StatePreparation):
             )
         # The bond register is the input register; the site qubits are the added qubits.
         mapper.settings().update("num_input_qubits", ancilla_bits)
+        mapper.settings().update("rotation_bit_precision", self._settings.get("rotation_bit_precision"))
         return mapper, method
 
     @staticmethod

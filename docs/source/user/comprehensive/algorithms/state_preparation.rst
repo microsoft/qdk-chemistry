@@ -294,7 +294,7 @@ A bond register of :math:`\max(1, \lceil \log_2 \chi \rceil)` qubits carries the
 Site 0 is normalized and loaded on its physical qubits and the bond qubits its right bond needs.
 Every later site isometry maps the left bond held in the bond register to the qubits of its site and its right bond.
 The nested ``unitary_synthesis`` setting holds an :class:`~qdk_chemistry.data.AlgorithmRef` to the ``unitary_synthesis_dense`` (:class:`~qdk_chemistry.algorithms.circuit_mapper.DenseUnitarySynthesisMapper`) or ``unitary_synthesis_block_sparse`` (:class:`~qdk_chemistry.algorithms.circuit_mapper.BlockSparseUnitarySynthesisMapper`) circuit mapper, which selects the dense or block-sparse synthesis of every site isometry.
-The preparer sets the mapper's ``num_input_qubits`` to the bond register width.
+The preparer sets the mapper's ``num_input_qubits`` to the bond register width and its ``rotation_bit_precision`` to the preparer's.
 For the dense mapper it also sets ``omit_right_factor`` and absorbs the right factor of each site isometry into the preceding site, or into site 0.
 The mapper's ``max_swap_address_bits`` setting caps the swap network of the rotation-angle lookups, trading Toffoli gates for scratch qubits; the default ``-1`` lets each lookup's cost model choose the width.
 A final layer of CZ gates applies the fermionic sign of reordering the creation operators from chain order, α before β on each site, into qubit order.
@@ -323,7 +323,7 @@ A final layer of CZ gates applies the fermionic sign of reordering the creation 
      - Size of the phase gradient register, which sets the precision of every rotation angle. The upper bound of 30 is a sanity limit as :math:`2^{-30}` is far below chemical accuracy. Default is 10.
    * - ``unitary_synthesis``
      - AlgorithmRef
-     - Circuit mapper that synthesizes every site isometry: the ``"unitary_synthesis_dense"`` or ``"unitary_synthesis_block_sparse"`` circuit mapper. Its ``rotation_bit_precision`` and ``allocate_phase_gradient`` settings are unused, as all sites share this preparer's phase gradient register. Default is ``AlgorithmRef("circuit_mapper", "unitary_synthesis_dense")``.
+     - Circuit mapper that synthesizes every site isometry: the ``"unitary_synthesis_dense"`` or ``"unitary_synthesis_block_sparse"`` circuit mapper. Its ``allocate_phase_gradient`` setting is unused, as all sites share this preparer's phase gradient register. Default is ``AlgorithmRef("circuit_mapper", "unitary_synthesis_dense")``.
 
 Related classes
 ---------------

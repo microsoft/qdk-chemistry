@@ -39,27 +39,11 @@ from qdk_chemistry.data import (
     Wavefunction,
 )
 from qdk_chemistry.data import symmetry as sym
-from qdk_chemistry.utils.qsharp import (
-    QSHARP_UTILS,
-    create_qsharp_context,
-    get_qsharp_context,
-    use_qsharp_context,
-)
+from qdk_chemistry.utils.qsharp import QSHARP_UTILS, use_qsharp_context
 
 from .helpers import apply_operation, create_test_basis_set, create_test_orbitals, create_test_wavefunction
 
-# Q# operation and site struct of each synthesis method.
-_QSHARP_OPERATIONS = {
-    "dense": (
-        "QDKChemistry.Utils.MPSSequential.MPSSequential",
-        "QDKChemistry.Utils.IsometrySynthesis.DenseIsometrySynthesis",
-    ),
-    "block_sparse": (
-        "QDKChemistry.Utils.MPSSparse.MPSSparse",
-        "QDKChemistry.Utils.IsometrySynthesis.SparseIsometrySynthesis",
-    ),
-}
-_METHODS = pytest.mark.parametrize("method", list(_QSHARP_OPERATIONS))
+_METHODS = pytest.mark.parametrize("method", ["dense", "block_sparse"])
 _FIXTURE_DIR = Path(__file__).parent / "test_data"
 
 
@@ -101,49 +85,16 @@ def preparation_data(mps: MPSContainer, method: str = "dense"):
     return preparer._generate_preparation_data(mps)
 
 
-def simulate_mps_preparation(operation, site_struct, params, num_sites, num_ancilla_qubits):
-    """Run an MPS preparation operation and post-select the bond register on ``|0>``."""
-    arguments = ", ".join(
-        _to_qsharp_literal(params[name], site_struct)
-        for name in ("initialStateVec", "numSites", "siteToOrbitalOrder", "siteDecompositions")
-    )
-    num_state_qubits = params["numQubitsPerSite"] * num_sites
-    context = get_qsharp_context()
-    context.eval(f"use state = Qubit[{num_state_qubits}];")
-    context.eval(f"use ancilla = Qubit[{num_ancilla_qubits}];")
-    context.eval(
-        f"{{ use phaseGradient = Qubit[{params['rotationBitPrecision']}]; "
-        "within { QDKChemistry.Utils.PhaseGradient.PreparePhaseGradientState(phaseGradient); } "
-        f"apply {{ {operation}({arguments}, state, ancilla, phaseGradient); }} }}"
-    )
-    dump = context.dump_machine()
-    context.eval("ResetAll(state + ancilla);")
-    num_relevant, ancilla_mask = num_state_qubits + num_ancilla_qubits, (1 << num_ancilla_qubits) - 1
-    amplitudes = np.zeros(1 << num_state_qubits, dtype=complex)
-    for idx in dump:
-        if idx >> num_relevant == 0 and idx & ancilla_mask == 0:
-            amplitudes[idx >> num_ancilla_qubits] = dump[idx]
-    probability = float(np.sum(np.abs(amplitudes) ** 2))
-    return probability, amplitudes / np.sqrt(probability)
-
-
-_GIVENS_STRUCT = "QDKChemistry.Utils.UnitarySynthesis.GivensDecomposition"
-_GIVENS_FIELDS = {"layerAngles", "layerShifted", "phases"}
-
-
-def _to_qsharp_literal(value, site_struct: str) -> str:
-    """Serialize nested numeric/Boolean data as a Q# literal (``GivensDecomposition`` or ``site_struct``)."""
-    if isinstance(value, bool):
-        return str(value).lower()
-    if isinstance(value, float):
-        return f"{value:.15f}"
-    if isinstance(value, dict):
-        fields = ", ".join(f"{name} = {_to_qsharp_literal(item, site_struct)}" for name, item in value.items())
-        struct = _GIVENS_STRUCT if value.keys() == _GIVENS_FIELDS else site_struct
-        return f"new {struct} {{ {fields} }}"
-    if isinstance(value, list):
-        return f"[{', '.join(_to_qsharp_literal(item, site_struct) for item in value)}]"
-    return str(value)
+def simulate_mps_preparation(qsharp_test_utils, data, method: str):
+    """Run the preparation with its bond register exposed and post-select that register on ``|0>``."""
+    tests = qsharp_test_utils.MPSPreparationTests
+    make_op = tests.TestMakeMPSSparseOp if method == "block_sparse" else tests.TestMakeMPSSequentialOp
+    num_state_qubits = data.num_qubits_per_site * data.num_sites
+    initial = np.eye(1, 1 << (num_state_qubits + data.ancilla_bits)).ravel()
+    output = apply_operation(make_op(data.to_qsharp_params(_AGREEMENT_PRECISION)), initial)
+    state = output.reshape(1 << num_state_qubits, 1 << data.ancilla_bits)[:, 0]
+    probability = float(np.sum(np.abs(state) ** 2))
+    return probability, state / np.sqrt(probability)
 
 
 # File-backed mps_h2 / mps_spin fixtures (see test_data/make_mps_fixtures.py).
@@ -163,129 +114,84 @@ def _identity_order(name: str) -> tuple[int, ...]:
     return tuple(range(_FIXTURES[name]["num_sites"]))
 
 
-def _zeroed_fixture_mps(name: str) -> MPSContainer:
-    """Zero only the loaded initial-state tensor of *name*, keeping later sites valid isometries.
-
-    Site zero becomes the (null) initial state; later sites are still isometric, so the
-    zero-norm check fires instead of the earlier isometric-site check.
-    """
-    tensors = [np.asarray(t) for t in _fixture_site_tensors(name, _identity_order(name))]
-    tensors[0] = np.zeros_like(tensors[0])
-    return make_mps(tensors)
+# A normalized spinless site zero and a right-canonical site one that copies its physical state to its left bond.
+_INITIAL_SITE = np.array([[[0.6, 0.0], [0.0, 0.8]]])
+_IDENTITY_SITE = np.eye(2).reshape(2, 2, 1)
 
 
-def _active_space_fixture_mps(name: str) -> MPSContainer:
-    """Place the *name* sites on the two active orbitals of a four-orbital space (one core, one virtual)."""
-    orbitals = Orbitals(
-        np.eye(4),
-        np.array([-1.0, -0.5, 0.5, 1.0]),
-        None,
-        create_test_basis_set(4, "mps-active-space"),
-        sym.spin_index_set(4, [1, 2], [1, 2]),
-    )
-    return make_mps(_fixture_site_tensors(name, _identity_order(name)), orbitals=orbitals)
+def test_default_settings():
+    """The default site mapper is the dense unitary synthesis mapper, and the rotation precision is range-checked."""
+    preparer = create("state_prep", "matrix_product_state")
+    ref = preparer.settings().get("unitary_synthesis")
+    assert (ref.algorithm_type, ref.algorithm_name) == ("circuit_mapper", "unitary_synthesis_dense")
+    with pytest.raises(ValueError, match="out of allowed range"):
+        preparer.settings().update("rotation_bit_precision", 0)
 
 
-def _non_isometric_fixture_mps(name: str) -> MPSContainer:
-    """Overwrite every loaded site tensor of *name* with an all-ones tensor of the same shape."""
-    return make_mps([np.ones_like(np.asarray(t)) for t in _fixture_site_tensors(name, _identity_order(name))])
+@pytest.mark.parametrize("active_space", [False, True], ids=["full-space", "active-space"])
+def test_circuit_register_holds_two_qubits_per_site(active_space):
+    """The H2 circuit acts on two qubits per site, also when the sites are the active orbitals of a larger space."""
+    orbitals = None
+    if active_space:
+        orbitals = Orbitals(
+            np.eye(4),
+            np.array([-1.0, -0.5, 0.5, 1.0]),
+            None,
+            create_test_basis_set(4, "mps-active-space"),
+            sym.spin_index_set(4, [1, 2], [1, 2]),
+        )
+    mps = make_mps(_fixture_site_tensors("mps_h2", (0, 1)), orbitals=orbitals)
+    circuit = create("state_prep", "matrix_product_state", rotation_bit_precision=6).run(Wavefunction(mps))
+    assert circuit.encoding == "jordan-wigner"
+    assert circuit.num_qubits == 4
 
 
 @pytest.mark.parametrize(
-    ("action", "expected"),
+    ("make_wavefunction", "settings", "error", "message"),
     [
         pytest.param(
-            lambda: create("state_prep", "matrix_product_state").settings().get("unitary_synthesis"),
-            lambda ref: (ref.algorithm_type, ref.algorithm_name) == ("circuit_mapper", "unitary_synthesis_dense"),
-            id="settings-default-is-dense-unitary-synthesis-mapper",
+            lambda: Wavefunction(make_mps([_INITIAL_SITE, _IDENTITY_SITE])),
+            {"unitary_synthesis": AlgorithmRef("circuit_mapper", "pauli_sequence")},
+            TypeError,
+            "requires the unitary_synthesis_dense or unitary_synthesis_block_sparse circuit mapper",
+            id="other-circuit-mapper",
+        ),
+        pytest.param(create_test_wavefunction, {}, TypeError, "requires an MPSContainer", id="non-mps-wavefunction"),
+        pytest.param(
+            lambda: Wavefunction(make_mps([_INITIAL_SITE, _IDENTITY_SITE], orthogonality_center=None)),
+            {},
+            ValueError,
+            "right-canonical MPS with center zero",
+            id="unknown-orthogonality-center",
         ),
         pytest.param(
-            lambda: create(
-                "state_prep",
-                "matrix_product_state",
-                unitary_synthesis=AlgorithmRef("circuit_mapper", "pauli_sequence"),
-            ).run(Wavefunction(_fixture_mps("mps_h2", _identity_order("mps_h2")))),
-            (TypeError, "requires the unitary_synthesis_dense or unitary_synthesis_block_sparse circuit mapper"),
-            id="run-rejects-other-circuit-mapper",
+            lambda: Wavefunction(make_mps([_INITIAL_SITE.astype(complex), _IDENTITY_SITE.astype(complex)])),
+            {},
+            ValueError,
+            "only real-valued",
+            id="complex-tensors",
         ),
         pytest.param(
-            lambda: create("state_prep", "matrix_product_state").settings().update("rotation_bit_precision", 0),
-            (ValueError, "out of allowed range"),
-            id="settings-rejects-out-of-range-precision",
+            lambda: Wavefunction(make_mps([np.zeros((1, 2, 2)), _IDENTITY_SITE])),
+            {},
+            ValueError,
+            "finite amplitudes with nonzero norm",
+            id="zero-initial-state",
         ),
         pytest.param(
-            lambda: create("state_prep", "matrix_product_state").run(create_test_wavefunction()),
-            (TypeError, "requires an MPSContainer"),
-            id="run-rejects-non-mps-wavefunction",
-        ),
-        pytest.param(
-            lambda: MatrixProductStatePreparation()._generate_preparation_data(
-                _fixture_mps("mps_h2", _identity_order("mps_h2")).sites()
-            ),
-            (TypeError, "requires an MPSContainer"),
-            id="generate-rejects-raw-site-list",
-        ),
-        pytest.param(
-            lambda: create("state_prep", "matrix_product_state", rotation_bit_precision=6).run(
-                Wavefunction(_fixture_mps("mps_h2", _identity_order("mps_h2")))
-            ),
-            lambda circuit: circuit.encoding == "jordan-wigner"
-            and circuit.num_qubits == _FIXTURES["mps_h2"]["num_sites"] * _FIXTURES["mps_h2"]["qubits_per_site"],
-            id="valid-mps-register-width-matches-sites",
-        ),
-        pytest.param(
-            lambda: create("state_prep", "matrix_product_state", rotation_bit_precision=6).run(
-                Wavefunction(_active_space_fixture_mps("mps_h2"))
-            ),
-            lambda circuit: circuit.num_qubits
-            == _FIXTURES["mps_h2"]["num_sites"] * _FIXTURES["mps_h2"]["qubits_per_site"],
-            id="active-space-mps-register-width-matches-sites",
-        ),
-        pytest.param(
-            lambda: create("state_prep", "matrix_product_state").run(
-                Wavefunction(
-                    make_mps(_fixture_site_tensors("mps_h2", _identity_order("mps_h2")), orthogonality_center=None)
-                )
-            ),
-            (ValueError, "right-canonical MPS with center zero"),
-            id="rejects-unknown-orthogonality-center",
-        ),
-        pytest.param(
-            lambda: create("state_prep", "matrix_product_state").run(
-                Wavefunction(
-                    make_mps(
-                        [
-                            np.asarray(t, dtype=complex)
-                            for t in _fixture_site_tensors("mps_h2", _identity_order("mps_h2"))
-                        ]
-                    )
-                )
-            ),
-            (ValueError, "only real-valued"),
-            id="rejects-complex-tensors",
-        ),
-        pytest.param(
-            lambda: create("state_prep", "matrix_product_state").run(Wavefunction(_zeroed_fixture_mps("mps_spin"))),
-            (ValueError, "finite amplitudes with nonzero norm"),
-            id="rejects-zero-state",
-        ),
-        pytest.param(
-            lambda: create("state_prep", "matrix_product_state").run(
-                Wavefunction(_non_isometric_fixture_mps("mps_spin"))
-            ),
-            (ValueError, "isometric"),
-            id="rejects-non-isometric-site",
+            lambda: Wavefunction(make_mps([_INITIAL_SITE, np.ones((2, 2, 1))])),
+            {},
+            ValueError,
+            "requires isometric sites",
+            id="non-isometric-site",
         ),
     ],
 )
-def test_state_preparation_contract(action, expected):
-    """Each action raises its expected error or returns a value its validator accepts."""
-    if isinstance(expected, tuple):
-        exc_type, message = expected
-        with pytest.raises(exc_type, match=message):
-            action()
-    else:
-        assert expected(action())
+def test_run_rejects_invalid_input(make_wavefunction, settings, error, message):
+    """Each invalid wavefunction or site mapper is rejected with its error."""
+    preparer = create("state_prep", "matrix_product_state", **settings)
+    with pytest.raises(error, match=message):
+        preparer.run(make_wavefunction())
 
 
 # MPS state preparation composed with Trotterized QPE to recover classical eigenvalues.
@@ -346,17 +252,17 @@ _AGREEMENT_TOLERANCE = 1e-3
 
 @pytest.mark.parametrize("reversed_order", [False, True], ids=["identity-order", "reversed-order"])
 @pytest.mark.parametrize("fixture_name", ["mps_h2", "mps_spin"])
-def test_dense_and_block_sparse_prepare_same_state(fixture_name, reversed_order):
+def test_dense_and_block_sparse_prepare_same_state(
+    qsharp_test_context, qsharp_test_utils, fixture_name, reversed_order
+):
     """The dense circuit, with absorbed right factors, and the block-sparse circuit prepare the same state."""
     order = tuple(reversed(_identity_order(fixture_name))) if reversed_order else _identity_order(fixture_name)
     mps = _fixture_mps(fixture_name, order)
     states = {}
-    with use_qsharp_context(create_qsharp_context()):
-        for method, (operation, site_struct) in _QSHARP_OPERATIONS.items():
-            data = preparation_data(mps, method)
-            params = data.to_qsharp_params(rotation_bit_precision=_AGREEMENT_PRECISION)
+    with use_qsharp_context(qsharp_test_context):
+        for method in ("dense", "block_sparse"):
             probability, states[method] = simulate_mps_preparation(
-                operation, site_struct, params, data.num_sites, data.ancilla_bits
+                qsharp_test_utils, preparation_data(mps, method), method
             )
             assert probability > 1 - _AGREEMENT_TOLERANCE, method
     assert np.abs(np.vdot(states["dense"], states["block_sparse"])) ** 2 > 1 - _AGREEMENT_TOLERANCE
@@ -433,7 +339,7 @@ def _target_state(mps: MPSContainer) -> np.ndarray:
 
 
 @_METHODS
-def test_multi_site_mps_matches_contraction(method):
+def test_multi_site_mps_matches_contraction(qsharp_test_context, qsharp_test_utils, method):
     """A four-site MPS with unequal bonds, a nontrivial right factor and a permuted order prepares its contraction."""
     mps = make_mps(_random_right_canonical_tensors([1, 4, 3, 2, 1], 4, seed=11), site_to_orbital_order=(2, 0, 3, 1))
     if method == "dense":
@@ -441,18 +347,16 @@ def test_multi_site_mps_matches_contraction(method):
         mapper = create("circuit_mapper", "unitary_synthesis_dense", num_input_qubits=2)
         right_factor = mapper.right_factor(UnitaryRepresentation(UnitaryMatrixContainer(last.reshape(-1, 2))))
         assert not np.allclose(np.abs(right_factor), np.eye(2), atol=1e-3)
-    operation, site_struct = _QSHARP_OPERATIONS[method]
-    with use_qsharp_context(create_qsharp_context()):
-        data = preparation_data(mps, method)
-        params = data.to_qsharp_params(rotation_bit_precision=_AGREEMENT_PRECISION)
-        probability, state = simulate_mps_preparation(operation, site_struct, params, data.num_sites, data.ancilla_bits)
+    data = preparation_data(mps, method)
+    with use_qsharp_context(qsharp_test_context):
+        probability, state = simulate_mps_preparation(qsharp_test_utils, data, method)
     assert data.ancilla_bits == 2
     assert probability > 1 - _AGREEMENT_TOLERANCE
     assert np.abs(np.vdot(_target_state(mps), state)) ** 2 > 1 - _AGREEMENT_TOLERANCE
 
 
 @_METHODS
-def test_six_site_identity_order_signs_match_contraction(method):
+def test_six_site_identity_order_signs_match_contraction(qsharp_test_context, qsharp_test_utils, method):
     """A six-site identity-order MPS, whose signs use the parity ladder, prepares its signed contraction."""
     rng = np.random.default_rng(6)
     tensors = []
@@ -465,11 +369,9 @@ def test_six_site_identity_order_signs_match_contraction(method):
     target = _target_state(mps)
     assert (target < 0).any()
     assert (target > 0).any()
-    operation, site_struct = _QSHARP_OPERATIONS[method]
-    with use_qsharp_context(create_qsharp_context()):
-        data = preparation_data(mps, method)
-        params = data.to_qsharp_params(rotation_bit_precision=_AGREEMENT_PRECISION)
-        probability, state = simulate_mps_preparation(operation, site_struct, params, data.num_sites, data.ancilla_bits)
+    data = preparation_data(mps, method)
+    with use_qsharp_context(qsharp_test_context):
+        probability, state = simulate_mps_preparation(qsharp_test_utils, data, method)
     assert probability > 1 - _AGREEMENT_TOLERANCE
     assert np.abs(np.vdot(target, state)) ** 2 > 1 - _AGREEMENT_TOLERANCE
 
@@ -512,24 +414,18 @@ def test_operation_leaves_later_system_qubits_untouched():
 
 
 @_METHODS
-def test_operation_adjoint_returns_to_zero(method):
+def test_operation_adjoint_returns_to_zero(qsharp_test_context, qsharp_test_utils, method):
     """Preparing an MPS with unequal bonds and a permuted order, then applying the adjoint, returns to ``|0>``."""
     mps = make_mps(_random_right_canonical_tensors([1, 4, 3, 2, 1], 4, seed=11), site_to_orbital_order=(2, 0, 3, 1))
-    circuit = create(
-        "state_prep",
-        "matrix_product_state",
-        unitary_synthesis=synthesis_ref(method),
-        rotation_bit_precision=_AGREEMENT_PRECISION,
-    ).run(Wavefunction(mps))
-    context = get_qsharp_context()
-    if not hasattr(context.code, "_TestRoundTripOp"):
-        context.eval(
-            "function _TestRoundTripOp(op : Qubit[] => Unit is Adj) : Qubit[] => Unit {"
-            " qs => { op(qs); Adjoint op(qs); } }"
-        )
-    output = apply_operation(
-        context.code._TestRoundTripOp(circuit._qsharp_op), np.eye(1, 1 << circuit.num_qubits).ravel()
-    )
+    with use_qsharp_context(qsharp_test_context):
+        circuit = create(
+            "state_prep",
+            "matrix_product_state",
+            unitary_synthesis=synthesis_ref(method),
+            rotation_bit_precision=_AGREEMENT_PRECISION,
+        ).run(Wavefunction(mps))
+        round_trip = qsharp_test_utils.MPSPreparationTests.TestMakeRoundTripOp(circuit._qsharp_op)
+        output = apply_operation(round_trip, np.eye(1, 1 << circuit.num_qubits).ravel())
     assert abs(output[0]) ** 2 > 1 - _AGREEMENT_TOLERANCE
 
 
@@ -563,7 +459,7 @@ _OPEN_SHELL_STATES = {
 
 @_METHODS
 @pytest.mark.parametrize("reversed_order", [False, True], ids=["identity-order", "reversed-order"])
-def test_open_shell_states_have_fermionic_signs(reversed_order, method):
+def test_open_shell_states_have_fermionic_signs(qsharp_test_context, qsharp_test_utils, reversed_order, method):
     """The M_s = 0 triplet is degenerate with the sign-free triplet and the open-shell singlet is not."""
     order = (1, 0) if reversed_order else (0, 1)
     fixture = _FIXTURES["mps_h2"]
@@ -572,15 +468,11 @@ def test_open_shell_states_have_fermionic_signs(reversed_order, method):
         .get_container()
         .to_matrix()
     )
-    operation, site_struct = _QSHARP_OPERATIONS[method]
     energies = {}
-    with use_qsharp_context(create_qsharp_context()):
+    with use_qsharp_context(qsharp_test_context):
         for name, amplitudes in _OPEN_SHELL_STATES.items():
             data = preparation_data(make_mps(_two_site_tensors(amplitudes), site_to_orbital_order=order), method)
-            params = data.to_qsharp_params(rotation_bit_precision=_AGREEMENT_PRECISION)
-            probability, state = simulate_mps_preparation(
-                operation, site_struct, params, data.num_sites, data.ancilla_bits
-            )
+            probability, state = simulate_mps_preparation(qsharp_test_utils, data, method)
             assert probability > 1 - _AGREEMENT_TOLERANCE, name
             # The dump has qubit 0 most significant; the Pauli matrix has it least significant.
             state = state.reshape((2,) * 4).transpose().reshape(-1)
