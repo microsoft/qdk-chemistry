@@ -57,12 +57,6 @@ def _sossa_mapper_setting_defaults() -> tuple[tuple[Any, ...], ...]:
             ["qrom_phase_gradient", "one_hot", "direct"],
         ),
         (
-            "one_hot_vector_pairing",
-            "bool",
-            False,
-            "Pair angle vectors in one-hot SELECT.",
-        ),
-        (
             "spin_swap",
             "string",
             "controlled_swap",
@@ -111,16 +105,11 @@ def _sossa_mapper_setting_defaults() -> tuple[tuple[Any, ...], ...]:
             (-1, 30),
         ),
         (
-            "amortize_batch_lookups",
-            "bool",
-            False,
-            "Amortize consecutive streamed Givens lookups.",
-        ),
-        (
-            "measure_angle_words",
-            "bool",
-            False,
-            "Erase streamed Givens angle words by measurement.",
+            "angle_batch_streaming",
+            "string",
+            "per_batch",
+            "Loading and erasure strategy for streamed Givens angle batches.",
+            ["per_batch", "per_word", "amortized", "amortized_measured"],
         ),
         (
             "recompute_outer_registers",
@@ -150,12 +139,9 @@ def _compressed_givens_angles(angles: np.ndarray, rot_bits: int) -> np.ndarray:
     full = 1 << (rot_bits - 1)
     half = full >> 1
     scaled = (2.0**rot_bits * np.asarray(angles, dtype=float)) / (4.0 * np.pi)
-    # Q# Round sends exact halves toward zero; working on its words adds no quantization error.
     words = (np.sign(scaled) * np.ceil(np.abs(scaled) - 0.5)).astype(np.int64) % full
     reduced = np.zeros_like(words)
     for row_index, row in enumerate(words):
-        # Shifting angle j by pi leaves Z_j Z_{j+1} on the output side, and the Z_{j+1} moved past gate j + 1
-        # negates its angle, so the sweep's first-applied (last) angle is reduced first.
         negate = False
         for j in range(len(row) - 1, -1, -1):
             word = (-int(row[j]) if negate else int(row[j])) % full
@@ -294,16 +280,10 @@ class SOSSAMapper(CircuitMapper):
                 "select_algorithm 'one_hot' keeps one qubit per angle vector resident and does not stream "
                 f"Givens angle batches, so max_givens_rotation_batches must be 1, got {max_givens_rotation_batches}"
             )
-        one_hot_pairs = bool(self._settings.get("one_hot_vector_pairing"))
-        if one_hot_pairs and (algorithm != "one_hot" or self._settings.get("givens_step") != "controlled_adder"):
-            raise ValueError(
-                "one_hot_vector_pairing needs select_algorithm 'one_hot' and givens_step 'controlled_adder'"
-            )
 
         spin_parity = self._settings.get("spin_swap") == "bell_parity"
         recompute = bool(self._settings.get("recompute_outer_registers"))
-        # The walk reads isSF as the first free-rider qubit, which recompute_outer_registers drops and the
-        # one-hot inner PREPARE displaces with its x_o register, so those keep both swaps in SELECT.
+
         shared_spin_parity = spin_parity and not recompute and inner_algorithm != "one_hot"
 
         one_body_angles = container.select.one_body_rotation_angles
@@ -333,6 +313,9 @@ class SOSSAMapper(CircuitMapper):
                     index = vector_index.setdefault(tuple(float(angle) for angle in row), len(vector_index))
                 (one_hot_dq_index if is_dq else one_hot_sf_index).append(index)
             one_hot_angles = [list(vector) for vector in vector_index]
+        # Pairing needs the fused adder, and its select qubit pays off only from four distinct vectors.
+        one_hot_pairs = controlled_adder and len(one_hot_angles) > 3
+        streaming = self._settings.get("angle_batch_streaming")
 
         select_data = {
             "numOrbitals": meta.num_spatial_orbitals,
@@ -348,8 +331,8 @@ class SOSSAMapper(CircuitMapper):
             "rotationBatchSize": -(-num_angles // max_givens_rotation_batches),
             "borrowDirty": self._borrow_dirty,
             "maxSwapBits": self._max_swap_address_bits,
-            "amortizeBatchLookups": bool(self._settings.get("amortize_batch_lookups")),
-            "measureAngleWords": bool(self._settings.get("measure_angle_words")),
+            "amortizeBatchLookups": streaming in ("amortized", "amortized_measured"),
+            "measureAngleWords": streaming in ("per_word", "amortized_measured"),
             "useSkewTree": self._settings.get("lookup_method") == "skew_tree",
             "recomputeOuterRegisters": recompute,
             "givensTree": self._settings.get("givens_rotation_layout") == "tree",

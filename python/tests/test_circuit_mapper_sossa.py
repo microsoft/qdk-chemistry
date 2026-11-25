@@ -1139,6 +1139,34 @@ class TestSelectFullFidelity:
             assert abs(np.vdot(reference, run(data, 3))) < 1 - 1e-6, config
         assert checked == 12
 
+    def test_one_hot_vector_pairing_halves_the_one_hot_register(self, qsharp_test_context):
+        """Check paired-vector qubit savings and compressed-word Toffoli counts."""
+        select = qsharp_test_context.code.QDKChemistry.TestUtils.SOSSAWalkTests.TestSelectOnSystemState
+        for angle_words in ("default", "compressed"):
+            counts = [
+                qsharp_test_context.logical_counts(
+                    select,
+                    self._select_data(
+                        5,
+                        4,
+                        num_ranks=3,
+                        num_bases=2,
+                        angle_words=angle_words,
+                        givens_controlled_adder=True,
+                        one_hot=True,
+                        one_hot_pairs=paired,
+                    ),
+                    0,
+                    0,
+                    True,
+                    [],
+                )
+                for paired in (False, True)
+            ]
+            assert counts[0]["numQubits"] - counts[1]["numQubits"] == 4
+            if angle_words == "compressed":
+                assert counts[1]["cczCount"] + counts[1]["ccixCount"] <= counts[0]["cczCount"] + counts[0]["ccixCount"]
+
     @pytest.mark.parametrize("N", [2, 3, 5, 8, 20, 54])
     def test_givens_tree_is_a_log_depth_spanning_tree(self, qsharp_test_context, N):  # noqa: N803
         """Check tree coverage, disjoint spans, and logarithmic depth."""
@@ -1191,7 +1219,7 @@ class TestOptInBlockEncodings:
                 "lookup_method": "skew_tree",
                 "compressed_angle_representation": True,
             },
-            {"givens_step": "controlled_adder", "select_algorithm": "one_hot", "one_hot_vector_pairing": True},
+            {"givens_step": "controlled_adder", "select_algorithm": "one_hot"},
         ],
         ids=["one_hot_inner", "one_hot_select", "bell_parity", "recompute", "compressed", "combined", "one_hot_pairs"],
     )
@@ -1344,22 +1372,6 @@ class TestSOSSAWalkLogicalCounts:
         if batches == 1:
             assert adder["cczCount"] + adder["ccixCount"] < default["cczCount"] + default["ccixCount"]
 
-    def test_one_hot_vector_pairing_halves_the_one_hot_register(self):
-        """Check paired-vector qubit savings and compressed-word Toffoli counts."""
-        unitary = _build_sossa_unitary(5, 3, 2, 2)
-        for compressed in (False, True):
-            counts = []
-            for paired in (False, True):
-                mapper = _make_sossa_mapper()
-                mapper.settings().set("givens_step", "controlled_adder")
-                mapper.settings().set("select_algorithm", "one_hot")
-                mapper.settings().set("compressed_angle_representation", compressed)
-                mapper.settings().set("one_hot_vector_pairing", paired)
-                counts.append(_logical_counts(mapper, unitary))
-            assert counts[0]["numQubits"] - counts[1]["numQubits"] == 4
-            if compressed:
-                assert counts[1]["cczCount"] + counts[1]["ccixCount"] <= counts[0]["cczCount"] + counts[0]["ccixCount"]
-
     def test_amortized_batch_lookups_run_on_a_plain_select(self):
         """Check amortized lookup width and Toffoli counts."""
         unitary = _build_sossa_unitary(num_orbitals=4)
@@ -1368,7 +1380,7 @@ class TestSOSSAWalkLogicalCounts:
             mapper = _make_sossa_mapper()
             mapper.settings().set("lookup_method", "select")
             mapper.settings().set("max_givens_rotation_batches", 2)
-            mapper.settings().set("amortize_batch_lookups", amortize)
+            mapper.settings().set("angle_batch_streaming", "amortized" if amortize else "per_batch")
             counts[amortize] = _logical_counts(mapper, unitary)
         assert counts[True]["numQubits"] == counts[False]["numQubits"]
         assert counts[True]["measurementCount"] < counts[False]["measurementCount"]
@@ -1409,10 +1421,6 @@ class TestOptInSettingValidation:
             (
                 {"compressed_angle_representation": True, "givens_rotation_layout": "tree"},
                 "needs givens_rotation_layout 'sweep'",
-            ),
-            (
-                {"one_hot_vector_pairing": True, "select_algorithm": "one_hot"},
-                "one_hot_vector_pairing needs select_algorithm 'one_hot' and givens_step 'controlled_adder'",
             ),
         ],
     )

@@ -589,9 +589,6 @@ Opt-in variants follow :cite:`Low2026,Shirobokov2026,Caesura2025`.
    * - ``select_algorithm``
      - str
      - ``["qrom_phase_gradient", "one_hot", "direct"]``; ``"one_hot"`` requires one batch. Default: ``"qrom_phase_gradient"``.
-   * - ``one_hot_vector_pairing``
-     - bool
-     - Pair one-hot angle vectors; requires ``select_algorithm="one_hot"`` and ``givens_step="controlled_adder"``. Default: ``False``.
    * - ``spin_swap``
      - str
      - ``["controlled_swap", "bell_parity"]``. Default: ``"controlled_swap"``.
@@ -622,12 +619,9 @@ Opt-in variants follow :cite:`Low2026,Shirobokov2026,Caesura2025`.
    * - ``recompute_outer_registers``
      - bool
      - Recompute free-rider registers from the outer index; requires a spin-free copy. Default: ``False``.
-   * - ``amortize_batch_lookups``
-     - bool
-     - Amortize streamed lookups, bypassing clean QROAM/skew-tree angle loads; Toffolis may increase. Default: ``False``.
-   * - ``measure_angle_words``
-     - bool
-     - Measure streamed angle words after use; amortization delays release and may increase peak qubits. Default: ``False``.
+   * - ``angle_batch_streaming``
+     - str
+     - ``["per_batch", "per_word", "amortized", "amortized_measured"]``. Default: ``"per_batch"``.
 
 ``coefficient_bit_precision`` and ``rotation_bit_precision`` control
 different approximations and do not define a total energy-error budget.
