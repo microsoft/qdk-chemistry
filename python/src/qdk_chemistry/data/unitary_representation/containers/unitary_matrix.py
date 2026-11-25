@@ -25,7 +25,7 @@ _ORTHONORMALITY_TOLERANCE = 1.0e-8  # Per-column Frobenius norm of M^H M - I, as
 
 
 class UnitaryMatrixContainer(UnitaryContainer):
-    """Unitary matrix, or its leading orthonormal columns, on a little-endian register, stored dense or sparse.
+    """Unitary matrix, or its leading orthonormal columns.
 
     Args:
         matrix: Matrix with :math:`2^n` rows and orthonormal columns, as a NumPy array or SciPy sparse matrix.
@@ -64,9 +64,10 @@ class UnitaryMatrixContainer(UnitaryContainer):
         """Return a read-only float64 or complex128 copy of a dense matrix."""
         array = np.asarray(matrix)
         is_complex = cls._is_complex_dtype(array.dtype)
-        array = np.array(array, dtype=np.complex128 if is_complex else np.float64, order="C")
+        array = np.asarray(array, dtype=np.complex128 if is_complex else np.float64)
+        array = np.array(np.real_if_close(array), order="C")
         # Adding zero turns -0.0 into +0.0, which JSON serialization of complex values does not keep.
-        array = np.ascontiguousarray(np.real_if_close(array) + 0.0)
+        array += 0.0
         array.setflags(write=False)
         return array
 

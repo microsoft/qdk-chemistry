@@ -98,11 +98,9 @@ class BlockSparseUnitarySynthesisMapperSettings(UnitarySynthesisMapperSettings):
 
 
 class UnitarySynthesisMapper(CircuitMapper):
-    r"""Base mapper that synthesizes a real isometry :math:`M` on little-endian qubits from a UnitaryMatrixContainer.
+    r"""Base mapper that synthesizes a real isometry :math:`M` from a UnitaryMatrixContainer.
 
-    Subclasses set ``_qsharp_prefix`` of the ``QDKChemistry.Utils.IsometrySynthesis`` entry points and implement
-    ``_synthesize``; the input is the low ``num_input_qubits`` qubits, the others start in :math:`|0\rangle`,
-    and all rotations use quantized Givens angles :cite:`Clements2016` applied by phase-gradient addition.
+    All rotations use quantized Givens angles :cite:`Clements2016` applied by phase-gradient addition.
     """
 
     _qsharp_prefix: str
@@ -151,16 +149,21 @@ class UnitarySynthesisMapper(CircuitMapper):
             unitary: The unitary representation holding a UnitaryMatrixContainer.
 
         Returns:
-            dict[str, Any]: The struct fields, including ``maxSwapBits``, that ``run`` passes to Q#.
+            dict[str, Any]: The struct fields, with the register widths and ``maxSwapBits``, that ``run`` passes to Q#.
 
         Raises:
             ValueError: If the container or the settings are invalid for the matrix.
 
         """
         container = self._container(unitary)
-        synthesis = self._synthesize(container, self._num_input_qubits(container))
-        synthesis["maxSwapBits"] = self._settings.get("max_swap_address_bits")
-        return synthesis
+        num_input_qubits = self._num_input_qubits(container)
+        return {
+            **self._synthesize(container, num_input_qubits),
+            "maxSwapBits": self._settings.get("max_swap_address_bits"),
+            "numInputQubits": num_input_qubits,
+            "numAddedQubits": container.num_qubits - num_input_qubits,
+            "rotationBitPrecision": self._settings.get("rotation_bit_precision"),
+        }
 
     def _run_impl(self, unitary: UnitaryRepresentation) -> Circuit:
         """Synthesize the circuit of the isometry in ``unitary``.
@@ -176,29 +179,20 @@ class UnitarySynthesisMapper(CircuitMapper):
 
         """
         synthesis = self.synthesize(unitary)
-        container = self._container(unitary)
-        num_input_qubits = self._num_input_qubits(container)
-        rotation_bit_precision = self._settings.get("rotation_bit_precision")
-        # The order matches the Q# Params structs and the positional arguments of Make*Circuit.
-        parameter: dict[str, Any] = {
-            "synthesis": synthesis,
-            "numInputQubits": num_input_qubits,
-            "numAddedQubits": container.num_qubits - num_input_qubits,
-            "rotationBitPrecision": rotation_bit_precision,
-        }
         module, prefix = QSHARP_UTILS.IsometrySynthesis, self._qsharp_prefix
-        params = getattr(module, f"{prefix}Params")(**parameter)
+        qsharp_synthesis = getattr(module, f"{prefix}Synthesis")(**synthesis)
         if self._settings.get("allocate_phase_gradient"):
-            qsharp_op = getattr(module, f"Make{prefix}Op")(params)
+            qsharp_op = getattr(module, f"Make{prefix}Op")(qsharp_synthesis)
             num_gradient_ancillas = 0
         else:
-            qsharp_op = getattr(module, f"Make{prefix}OpWithPhaseGradient")(params)
-            num_gradient_ancillas = rotation_bit_precision
+            qsharp_op = getattr(module, f"Make{prefix}OpWithPhaseGradient")(qsharp_synthesis)
+            num_gradient_ancillas = synthesis["rotationBitPrecision"]
         # An exported circuit has no caller to own the gradient, so it always allocates its own.
+        program = getattr(module, f"Make{prefix}Circuit")
         return Circuit(
             qsharp_op=qsharp_op,
-            qsharp_factory=QsharpFactoryData(program=getattr(module, f"Make{prefix}Circuit"), parameter=parameter),
-            num_qubits=container.num_qubits + num_gradient_ancillas,
+            qsharp_factory=QsharpFactoryData(program=program, parameter={"synthesis": synthesis}),
+            num_qubits=synthesis["numInputQubits"] + synthesis["numAddedQubits"] + num_gradient_ancillas,
             metadata=CircuitMetadata(num_phase_gradient_ancillas=num_gradient_ancillas),
         )
 

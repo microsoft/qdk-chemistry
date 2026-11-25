@@ -107,7 +107,7 @@ def test_explicit_input_register(name, num_input_qubits):
     """Any valid input width realizes the matrix, and the block-sparse mapper may add more than two qubits."""
     matrix = _block_sparse([4, 4, 3, 2, 1, 1, 1], seed=6)[:, :2]
     circuit = create("circuit_mapper", name, num_input_qubits=num_input_qubits).run(_representation(matrix))
-    assert circuit._qsharp_factory.parameter["numAddedQubits"] == 4 - num_input_qubits
+    assert circuit._qsharp_factory.parameter["synthesis"]["numAddedQubits"] == 4 - num_input_qubits
     _assert_realizes(circuit, matrix, seed=num_input_qubits)
 
 

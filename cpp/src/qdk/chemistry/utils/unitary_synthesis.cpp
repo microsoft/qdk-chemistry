@@ -21,16 +21,20 @@
 namespace qdk::chemistry::utils {
 namespace {
 
+// ---------------------------------------------------------------------------
+// Shared helpers
+// ---------------------------------------------------------------------------
+
 constexpr double orthogonality_tolerance = 1.0e-8;
 
-// Frobenius norm of M^T M - I.
+// Norm of M^T M - I.
 double isometry_residual(const Eigen::Ref<const Eigen::MatrixXd>& matrix) {
   return (matrix.transpose() * matrix -
           Eigen::MatrixXd::Identity(matrix.cols(), matrix.cols()))
       .norm();
 }
 
-// Whether the residual is within a column-scaled tolerance, rejecting NaN.
+// Check whether a matrix has orthonormal columns.
 bool is_isometry(const Eigen::Ref<const Eigen::MatrixXd>& matrix) {
   return isometry_residual(matrix) <=
          orthogonality_tolerance * static_cast<double>(matrix.cols());
@@ -42,29 +46,11 @@ struct FullSvd {
   Eigen::MatrixXd v;
 };
 
-// [A; B] = diag(U_1, U_2) [D_1; D_2] V, with D_1^2 + D_2^2 = I.
-struct TwoBlockCsd {
-  Eigen::MatrixXd u_1;
-  Eigen::MatrixXd u_2;
-  Eigen::VectorXd d_1;
-  Eigen::VectorXd d_2;
-  Eigen::MatrixXd v;
-};
-
-// Cosine-sine decompositions of a dense isometry, shared so that the synthesis
-// and the right-factor helper see the same V.
-struct DenseIsometryFactors {
-  Eigen::Index num_added_qubits = 0;
-  // Nearest exact isometry to the input.
-  Eigen::MatrixXd isometry;
-  std::vector<TwoBlockCsd> csds;
-};
-
-constexpr double elimination_tolerance = 1.0e-15;
+constexpr double rotation_threshold = 1.0e-15;
 
 // Whether an angle is large enough to keep as a rotation.
 bool is_rotation(double angle) {
-  return std::abs(angle) > elimination_tolerance;
+  return std::abs(angle) > rotation_threshold;
 }
 
 // Full singular value decomposition M = U · diag(s) · Vᵀ.
@@ -86,53 +72,6 @@ FullSvd singular_value_decomposition(
   }
   result.v.transposeInPlace();
   return result;
-}
-
-// QR decomposition M = Q · R with complete Q and upper-triangular R.
-std::pair<Eigen::MatrixXd, Eigen::MatrixXd> qr_decomposition(
-    const Eigen::Ref<const Eigen::MatrixXd>& matrix, Eigen::Index num_columns) {
-  Eigen::HouseholderQR<Eigen::MatrixXd> qr(matrix);
-  Eigen::MatrixXd q =
-      qr.householderQ() * Eigen::MatrixXd::Identity(matrix.rows(), num_columns);
-  Eigen::MatrixXd r = Eigen::MatrixXd::Zero(num_columns, matrix.cols());
-  r.topRows(matrix.cols()) = qr.matrixQR()
-                                 .topRows(matrix.cols())
-                                 .template triangularView<Eigen::Upper>();
-  return {std::move(q), std::move(r)};
-}
-
-// Two-block CSD from an SVD of the top block and a polar decomposition below.
-TwoBlockCsd cosine_sine_decomposition(
-    const Eigen::Ref<const Eigen::MatrixXd>& a,
-    const Eigen::Ref<const Eigen::MatrixXd>& b) {
-  const Eigen::Index width = a.cols();
-  auto top = singular_value_decomposition(a);
-  auto bottom = singular_value_decomposition(b * top.v);
-  TwoBlockCsd csd;
-  csd.u_1 = std::move(top.u);
-  csd.d_1 = std::move(top.singular_values);
-  csd.v = top.v.transpose();
-  const Eigen::MatrixXd polar_factor =
-      bottom.u.leftCols(width) * bottom.v.transpose();
-  csd.d_2 =
-      (bottom.v * bottom.singular_values.asDiagonal() * bottom.v.transpose())
-          .diagonal();
-  csd.u_2 = std::move(bottom.u);
-  csd.u_2.leftCols(width) = polar_factor;
-  return csd;
-}
-
-// Ry angles 2 atan2(d', d), zero-padded to num_states entries.
-std::vector<double> rotation_angles(const Eigen::VectorXd& d,
-                                    const Eigen::VectorXd& d_prime,
-                                    Eigen::Index num_states) {
-  std::vector<double> angles(static_cast<std::size_t>(num_states), 0.0);
-  for (Eigen::Index index = 0;
-       index < std::min<Eigen::Index>(d_prime.size(), num_states); ++index) {
-    angles[static_cast<std::size_t>(index)] =
-        2.0 * std::atan2(d_prime(index), d(index));
-  }
-  return angles;
 }
 
 // Clements elimination into parallel Givens layers and a diagonal sign matrix.
@@ -161,7 +100,7 @@ GivensDecomposition decompose_orthogonal(const Eigen::MatrixXd& matrix) {
       const Eigen::Index row =
           from_right ? n - 1 - step : n - 1 - diagonal + step;
       const Eigen::Index col = from_right ? diagonal - step : step;
-      if (std::abs(work(row, col)) < elimination_tolerance) {
+      if (std::abs(work(row, col)) < rotation_threshold) {
         continue;
       }
       const double angle = from_right
@@ -363,6 +302,9 @@ bool absorb_sign_pair(GivensDecomposition& givens, std::size_t pair,
 // Folds the signs of D into covering rotations and sets those of unused states
 // to shorten the remaining phase polynomial.
 void absorb_signs(GivensDecomposition& givens, const std::vector<bool>& used) {
+  if (givens.phases.empty()) {
+    return;
+  }
   commute_signs(givens);
   const auto size = givens.phases.size();
   std::optional<std::size_t> first_unused;
@@ -426,8 +368,80 @@ void absorb_signs(GivensDecomposition& givens, const std::vector<bool>& used) {
   commute_signs(givens);
 }
 
+// ---------------------------------------------------------------------------
+// Dense helpers
+// ---------------------------------------------------------------------------
+
+// [A; B] = diag(U_1, U_2) [D_1; D_2] V, with D_1^2 + D_2^2 = I (Eq. 6 of
+// arXiv:2605.28489).
+struct TwoBlockCsd {
+  Eigen::MatrixXd u_1;
+  Eigen::MatrixXd u_2;
+  Eigen::VectorXd d_1;
+  Eigen::VectorXd d_2;
+  Eigen::MatrixXd v;
+};
+
+// Cosine-sine decompositions of a dense isometry.
+struct DenseIsometryFactors {
+  Eigen::Index num_added_qubits = 0;
+  // Nearest exact isometry to the input.
+  Eigen::MatrixXd isometry;
+  std::vector<TwoBlockCsd> csds;
+};
+
+// QR decomposition M = Q · R
+std::pair<Eigen::MatrixXd, Eigen::MatrixXd> qr_decomposition(
+    const Eigen::Ref<const Eigen::MatrixXd>& matrix, Eigen::Index num_columns) {
+  Eigen::HouseholderQR<Eigen::MatrixXd> qr(matrix);
+  Eigen::MatrixXd q =
+      qr.householderQ() * Eigen::MatrixXd::Identity(matrix.rows(), num_columns);
+  Eigen::MatrixXd r = Eigen::MatrixXd::Zero(num_columns, matrix.cols());
+  r.topRows(matrix.cols()) = qr.matrixQR()
+                                 .topRows(matrix.cols())
+                                 .template triangularView<Eigen::Upper>();
+  return {std::move(q), std::move(r)};
+}
+
+// Two-block CSD from an SVD of the top block and a polar decomposition below.
+// [A; B] must be an exact isometry, since only the diagonal of D_2 is kept.
+TwoBlockCsd cosine_sine_decomposition(
+    const Eigen::Ref<const Eigen::MatrixXd>& a,
+    const Eigen::Ref<const Eigen::MatrixXd>& b) {
+  const Eigen::Index width = a.cols();
+  auto top = singular_value_decomposition(a);
+  auto bottom = singular_value_decomposition(b * top.v);
+  TwoBlockCsd csd;
+  csd.u_1 = std::move(top.u);
+  csd.d_1 = std::move(top.singular_values);
+  csd.v = top.v.transpose();
+  const Eigen::MatrixXd polar_factor =
+      bottom.u.leftCols(width) * bottom.v.transpose();
+  csd.d_2 =
+      (bottom.v * bottom.singular_values.asDiagonal() * bottom.v.transpose())
+          .diagonal();
+  csd.u_2 = std::move(bottom.u);
+  csd.u_2.leftCols(width) = polar_factor;
+  return csd;
+}
+
+// Ry angles 2 atan2(d', d), zero-padded to num_states entries.
+std::vector<double> rotation_angles(const Eigen::VectorXd& d,
+                                    const Eigen::VectorXd& d_prime,
+                                    Eigen::Index num_states) {
+  std::vector<double> angles(static_cast<std::size_t>(num_states), 0.0);
+  for (Eigen::Index index = 0;
+       index < std::min<Eigen::Index>(d_prime.size(), num_states); ++index) {
+    angles[static_cast<std::size_t>(index)] =
+        2.0 * std::atan2(d_prime(index), d(index));
+  }
+  return angles;
+}
+
+// With right_factor_only, only the first CSD, which holds V, is computed.
 DenseIsometryFactors dense_isometry_factors(const Eigen::MatrixXd& isometry,
-                                            Eigen::Index num_input_states) {
+                                            Eigen::Index num_input_states,
+                                            bool right_factor_only = false) {
   const Eigen::Index dim = num_input_states;
   if (dim <= 0 || isometry.rows() % dim != 0) {
     throw std::invalid_argument(
@@ -462,10 +476,12 @@ DenseIsometryFactors dense_isometry_factors(const Eigen::MatrixXd& isometry,
     blocks.emplace_back(exact.topRows(dim), exact.bottomRows(dim));
   } else if (ratio == 4) {
     auto [b, r] = qr_decomposition(exact.bottomRows(3 * dim), dim);
-    auto [c, s] = qr_decomposition(b.bottomRows(2 * dim), dim);
     blocks.emplace_back(exact.topRows(dim), std::move(r));
-    blocks.emplace_back(b.topRows(dim), std::move(s));
-    blocks.emplace_back(c.topRows(dim), c.bottomRows(dim));
+    if (!right_factor_only) {
+      auto [c, s] = qr_decomposition(b.bottomRows(2 * dim), dim);
+      blocks.emplace_back(b.topRows(dim), std::move(s));
+      blocks.emplace_back(c.topRows(dim), c.bottomRows(dim));
+    }
   }
   factors.csds.resize(blocks.size());
   // Exceptions cannot escape an OpenMP region, so the first is rethrown after.
@@ -488,6 +504,10 @@ DenseIsometryFactors dense_isometry_factors(const Eigen::MatrixXd& isometry,
   }
   return factors;
 }
+
+// ---------------------------------------------------------------------------
+// Sparse helpers
+// ---------------------------------------------------------------------------
 
 constexpr Eigen::Index unused_row = -1;
 
@@ -555,7 +575,6 @@ ColumnSupports discover_column_supports(
     if (lhs != rhs) {
       parent[static_cast<std::size_t>(std::max(lhs, rhs))] = std::min(lhs, rhs);
     }
-    first = std::min(first, column);
   });
 
   // Roots are the smallest columns, so group order is storage independent.
@@ -750,6 +769,10 @@ GivensDecomposition synthesize_completed_blocks(
 
 }  // namespace
 
+// ---------------------------------------------------------------------------
+// Dense isometry synthesis
+// ---------------------------------------------------------------------------
+
 DenseIsometrySynthesis dense_isometry_synthesis(const Eigen::MatrixXd& isometry,
                                                 Eigen::Index num_input_states,
                                                 bool omit_right_factor) {
@@ -909,12 +932,16 @@ DenseIsometrySynthesis dense_isometry_synthesis(const Eigen::MatrixXd& isometry,
 
 Eigen::MatrixXd dense_isometry_right_factor(const Eigen::MatrixXd& isometry,
                                             Eigen::Index num_input_states) {
-  auto factors = dense_isometry_factors(isometry, num_input_states);
+  auto factors = dense_isometry_factors(isometry, num_input_states, true);
   if (factors.csds.empty()) {
     return Eigen::MatrixXd::Identity(isometry.cols(), isometry.cols());
   }
   return std::move(factors.csds.front().v);
 }
+
+// ---------------------------------------------------------------------------
+// Block-sparse isometry synthesis
+// ---------------------------------------------------------------------------
 
 SparseIsometrySynthesis block_sparse_isometry_synthesis(
     const Eigen::SparseMatrix<double>& isometry) {

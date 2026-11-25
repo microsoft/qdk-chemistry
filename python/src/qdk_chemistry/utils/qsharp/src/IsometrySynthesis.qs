@@ -10,12 +10,11 @@
 ///
 /// Each `unitary_synthesis_*` circuit mapper uses these entry points with its prefix X
 /// (`DenseIsometry` or `SparseIsometry`):
-/// - `XSynthesis` holds the circuit data from the C++ synthesis;
+/// - `XSynthesis` holds the circuit data from the C++ synthesis and the register widths;
 /// - `ApplyX(synthesis, input, added, phaseGradient, angleReg)` applies the isometry;
-/// - `XParams { synthesis, numInputQubits, numAddedQubits, rotationBitPrecision }` bundles it;
-/// - `MakeXOp(params)` returns the operation on the target, with its own phase gradient;
-/// - `MakeXOpWithPhaseGradient(params)` returns it on the target and a prepared phase gradient;
-/// - `MakeXCircuit(synthesis, numInputQubits, numAddedQubits, rotationBitPrecision)` runs it.
+/// - `MakeXOp(synthesis)` returns the operation on the target, with its own phase gradient;
+/// - `MakeXOpWithPhaseGradient(synthesis)` returns it on the target and a prepared phase gradient;
+/// - `MakeXCircuit(synthesis)` runs it.
 namespace QDKChemistry.Utils.IsometrySynthesis {
 
     import Std.Arrays.Any;
@@ -55,6 +54,11 @@ namespace QDKChemistry.Utils.IsometrySynthesis {
         rightFactorGivens : GivensDecomposition[],
         /// Widest swap network of the angle lookups, -1 to let each loader's cost model choose.
         maxSwapBits : Int,
+        /// Qubits of the input register, the low qubits of the target.
+        numInputQubits : Int,
+        /// Qubits added to the input register, the high qubits of the target.
+        numAddedQubits : Int,
+        rotationBitPrecision : Int,
     }
 
     /// Circuit data of a sparse real isometry U = P_r · B · P_c, mirroring the C++
@@ -68,22 +72,9 @@ namespace QDKChemistry.Utils.IsometrySynthesis {
         blockGivens : GivensDecomposition,
         /// Widest swap network of the angle lookups, -1 to let each loader's cost model choose.
         maxSwapBits : Int,
-    }
-
-    /// Parameters of a composable dense isometry operation.
-    struct DenseIsometryParams {
-        synthesis : DenseIsometrySynthesis,
         /// Qubits of the input register, the low qubits of the target.
         numInputQubits : Int,
         /// Qubits added to the input register, the high qubits of the target.
-        numAddedQubits : Int,
-        rotationBitPrecision : Int,
-    }
-
-    /// Parameters of a composable sparse isometry operation; see `DenseIsometryParams`.
-    struct SparseIsometryParams {
-        synthesis : SparseIsometrySynthesis,
-        numInputQubits : Int,
         numAddedQubits : Int,
         rotationBitPrecision : Int,
     }
@@ -238,69 +229,59 @@ namespace QDKChemistry.Utils.IsometrySynthesis {
     }
 
     /// Returns `ApplyDenseIsometry` on the target `[input | added]`, with its own phase gradient.
-    function MakeDenseIsometryOp(params : DenseIsometryParams) : Qubit[] => Unit is Adj {
+    function MakeDenseIsometryOp(synthesis : DenseIsometrySynthesis) : Qubit[] => Unit is Adj {
         ApplyIsometryOnTarget(
-            params.numInputQubits,
-            params.numAddedQubits,
-            params.rotationBitPrecision,
-            ApplyDenseIsometry(params.synthesis, _, _, _, _),
+            synthesis.numInputQubits,
+            synthesis.numAddedQubits,
+            synthesis.rotationBitPrecision,
+            ApplyDenseIsometry(synthesis, _, _, _, _),
             _
         )
     }
 
     /// Returns `ApplyDenseIsometry` on `[input | added | phaseGradient]`, whose prepared phase
     /// gradient is left in its state.
-    function MakeDenseIsometryOpWithPhaseGradient(params : DenseIsometryParams) : Qubit[] => Unit is Adj {
+    function MakeDenseIsometryOpWithPhaseGradient(synthesis : DenseIsometrySynthesis) : Qubit[] => Unit is Adj {
         ApplyIsometryOnRegister(
-            params.numInputQubits,
-            params.numAddedQubits,
-            params.rotationBitPrecision,
-            ApplyDenseIsometry(params.synthesis, _, _, _, _),
+            synthesis.numInputQubits,
+            synthesis.numAddedQubits,
+            synthesis.rotationBitPrecision,
+            ApplyDenseIsometry(synthesis, _, _, _, _),
             _
         )
     }
 
     /// Circuit entry point for a dense isometry, leaving the output on the allocated target.
-    operation MakeDenseIsometryCircuit(
-        synthesis : DenseIsometrySynthesis,
-        numInputQubits : Int,
-        numAddedQubits : Int,
-        rotationBitPrecision : Int
-    ) : Unit {
-        use target = Qubit[numInputQubits + numAddedQubits];
-        ApplyIsometryOnTarget(numInputQubits, numAddedQubits, rotationBitPrecision, ApplyDenseIsometry(synthesis, _, _, _, _), target);
+    operation MakeDenseIsometryCircuit(synthesis : DenseIsometrySynthesis) : Unit {
+        use target = Qubit[synthesis.numInputQubits + synthesis.numAddedQubits];
+        MakeDenseIsometryOp(synthesis)(target);
     }
 
     /// Returns `ApplySparseIsometry` on the target, with its own phase gradient.
-    function MakeSparseIsometryOp(params : SparseIsometryParams) : Qubit[] => Unit is Adj {
+    function MakeSparseIsometryOp(synthesis : SparseIsometrySynthesis) : Qubit[] => Unit is Adj {
         ApplyIsometryOnTarget(
-            params.numInputQubits,
-            params.numAddedQubits,
-            params.rotationBitPrecision,
-            ApplySparseIsometry(params.synthesis, _, _, _, _),
+            synthesis.numInputQubits,
+            synthesis.numAddedQubits,
+            synthesis.rotationBitPrecision,
+            ApplySparseIsometry(synthesis, _, _, _, _),
             _
         )
     }
 
     /// Returns `ApplySparseIsometry` on `[target | phaseGradient]`, as for dense isometries.
-    function MakeSparseIsometryOpWithPhaseGradient(params : SparseIsometryParams) : Qubit[] => Unit is Adj {
+    function MakeSparseIsometryOpWithPhaseGradient(synthesis : SparseIsometrySynthesis) : Qubit[] => Unit is Adj {
         ApplyIsometryOnRegister(
-            params.numInputQubits,
-            params.numAddedQubits,
-            params.rotationBitPrecision,
-            ApplySparseIsometry(params.synthesis, _, _, _, _),
+            synthesis.numInputQubits,
+            synthesis.numAddedQubits,
+            synthesis.rotationBitPrecision,
+            ApplySparseIsometry(synthesis, _, _, _, _),
             _
         )
     }
 
     /// Circuit entry point for a sparse isometry, leaving the output on the allocated target.
-    operation MakeSparseIsometryCircuit(
-        synthesis : SparseIsometrySynthesis,
-        numInputQubits : Int,
-        numAddedQubits : Int,
-        rotationBitPrecision : Int
-    ) : Unit {
-        use target = Qubit[numInputQubits + numAddedQubits];
-        ApplyIsometryOnTarget(numInputQubits, numAddedQubits, rotationBitPrecision, ApplySparseIsometry(synthesis, _, _, _, _), target);
+    operation MakeSparseIsometryCircuit(synthesis : SparseIsometrySynthesis) : Unit {
+        use target = Qubit[synthesis.numInputQubits + synthesis.numAddedQubits];
+        MakeSparseIsometryOp(synthesis)(target);
     }
 }
