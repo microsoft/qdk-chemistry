@@ -229,14 +229,16 @@ inline TwoBodyComparison eightfold_comparison(const double* integrals,
   return comparison;
 }
 
-inline std::runtime_error not_eightfold_error(
-    const std::string& consumer, const TwoBodyComparison& comparison) {
+/// Error for integrals that `consumer` takes only with `symmetry`, such as
+/// "8-fold" for @ref eightfold_comparison.
+inline std::runtime_error not_symmetric_error(
+    const std::string& consumer, const std::string& symmetry,
+    const TwoBodyComparison& comparison) {
   char relative[32];
   std::snprintf(relative, sizeof(relative), "%.1e", comparison.relative());
   return std::runtime_error(
-      consumer +
-      " requires 8-fold two-body permutation symmetry; the integrals differ "
-      "from their 8-fold average by " +
+      consumer + " requires two-body integrals with " + symmetry +
+      " permutation symmetry; they differ from their symmetrized average by " +
       relative +
       " relative to their norm, so they cannot be represented losslessly. If "
       "this is round-off, as in Hamiltonians saved by earlier versions, "

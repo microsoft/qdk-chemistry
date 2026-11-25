@@ -15,6 +15,7 @@ from qdk_chemistry.data.symmetry import SymmetryProduct, axes, spin_index_set
 from qdk_chemistry.utils import Logger
 
 from .reference_tolerances import (
+    ci_energy_tolerance,
     float_comparison_absolute_tolerance,
     float_comparison_relative_tolerance,
     mcscf_energy_tolerance,
@@ -27,6 +28,9 @@ from .reference_tolerances import (
 
 try:
     import pyscf
+    import pyscf.ao2mo
+    import pyscf.cc
+    import pyscf.fci
     import pyscf.gto
     import pyscf.lo
     import pyscf.mcscf
@@ -49,8 +53,10 @@ if PYSCF_AVAILABLE:
         orbitals_to_scf,
         orbitals_to_scf_from_n_electrons_and_multiplicity,
         pyscf_mol_to_qdk_basis,
+        spin_blocked_ao2mofn,
         structure_to_pyscf_atom_labels,
     )
+    from qdk_chemistry.plugins.pyscf.coupled_cluster import _spin_blocked_integrals
     from qdk_chemistry.plugins.pyscf.mcscf import _mcsolver_to_fcisolver
 
 
@@ -88,6 +94,11 @@ def create_water_structure():
 def create_helium_structure():
     """Create a helium atom structure."""
     return Structure(["He"], np.array([[0.0, 0.0, 0.0]]))
+
+
+def create_h2_structure():
+    """Create a hydrogen molecule structure."""
+    return Structure(["H", "H"], np.array([[0.0, 0.0, 0.0], [0.0, 0.0, 0.74 * ANGSTROM_TO_BOHR]]))
 
 
 def create_li_structure():
@@ -2448,9 +2459,8 @@ class TestPyscfPlugin:
         )
         occ_a, occ_b = wavefunction.get_total_orbital_occupations()
         mf = hamiltonian_to_scf(hamiltonian, occ_a, occ_b)
-        coeff = spin_channel_matrix(wavefunction.get_orbitals().coefficients(), axes.alpha())
         h1, _ = hamiltonian.get_one_body_integrals()
-        np.testing.assert_allclose(coeff.T @ mf.get_hcore() @ coeff, h1, rtol=0.0, atol=scf_energy_tolerance)
+        np.testing.assert_allclose(mf.get_hcore(), h1, rtol=0.0, atol=scf_energy_tolerance)
         assert mf.energy_nuc() == hamiltonian.get_core_energy()
 
     def test_hamiltonian_to_scf_preserves_scf_optimized_x2c_hamiltonian(self) -> None:
@@ -2462,20 +2472,19 @@ class TestPyscfPlugin:
         )
         occ_a, occ_b = wavefunction.get_total_orbital_occupations()
         mf = hamiltonian_to_scf(hamiltonian, occ_a, occ_b)
-        coeff = spin_channel_matrix(wavefunction.get_orbitals().coefficients(), axes.alpha())
         h1, _ = hamiltonian.get_one_body_integrals()
-        np.testing.assert_allclose(coeff.T @ mf.get_hcore() @ coeff, h1, rtol=0.0, atol=scf_energy_tolerance)
+        np.testing.assert_allclose(mf.get_hcore(), h1, rtol=0.0, atol=scf_energy_tolerance)
         assert mf.energy_nuc() == hamiltonian.get_core_energy()
 
-    def test_hamiltonian_to_scf_rerouting_and_error_handling(self):
-        """Test hamiltonian_to_scf rerouting and error handling.
+    def test_hamiltonian_to_scf_stored_integrals_and_error_handling(self):
+        """Test hamiltonian_to_scf on molecular and model Hamiltonians, and its error handling.
 
         This test validates three scenarios:
-        1. Rerouting: Non-model Hamiltonians should reroute to orbitals_to_scf
-        2. Error throwing: Invalid configurations should raise ValueError
-        3. Non-rerouting: Valid model Hamiltonians should create fake SCF objects
+        1. Molecular Hamiltonians use their stored integrals in the MO basis, like model ones
+        2. Unrestricted model Hamiltonians keep separate spin blocks
+        3. Restricted model Hamiltonians create fake SCF objects
         """
-        # 1: Rerouting for non-model Hamiltonian
+        # 1: Molecular Hamiltonian
         water = create_water_structure()
         scf_solver = algorithms.create("scf_solver", "pyscf")
         _, wavefunction = scf_solver.run(water, 0, 1, "sto-3g")
@@ -2497,15 +2506,15 @@ class TestPyscfPlugin:
         occupation_alpha = np.concatenate((np.ones(5), np.zeros(norb - 5)))
         occupation_beta = np.concatenate((np.ones(5), np.zeros(norb - 5)))
 
-        # Call hamiltonian_to_scf - should re-route to orbitals_to_scf
+        # Call hamiltonian_to_scf - stored integrals in the MO basis
         scf_from_hamiltonian = hamiltonian_to_scf(hamiltonian, occupation_alpha, occupation_beta)
 
-        # MO coefficients should NOT be identity matrix
-        assert not np.allclose(scf_from_hamiltonian.mo_coeff, np.eye(norb)), (
-            "MO coefficients should not be identity matrix for non-model Hamiltonian (rerouted case)"
+        # MO coefficients should be identity matrix, as for model Hamiltonians
+        assert np.allclose(scf_from_hamiltonian.mo_coeff, np.eye(norb)), (
+            "MO coefficients should be identity matrix for molecular Hamiltonians too"
         )
 
-        # 2. Unrestricted model Hamiltonian should throw
+        # 2. Unrestricted model Hamiltonian keeps its spin blocks
         model_orbitals_unrestricted = data.ModelOrbitals(4, SymmetryProduct([axes.spin(1, False)]))  # unrestricted
         one_body_alpha = np.eye(4)
         one_body_beta = np.eye(4) * 1.1
@@ -2529,8 +2538,9 @@ class TestPyscfPlugin:
         occupation_alpha_test = np.array([1.0, 1.0, 0.0, 0.0])
         occupation_beta_test = np.array([1.0, 1.0, 0.0, 0.0])
 
-        with pytest.raises(ValueError, match="You cannot pass an unrestricted model Hamiltonian here"):
-            hamiltonian_to_scf(h_unrestricted_model, occupation_alpha_test, occupation_beta_test)
+        scf_unrestricted = hamiltonian_to_scf(h_unrestricted_model, occupation_alpha_test, occupation_beta_test)
+        for coeff, one_body in zip(scf_unrestricted.mo_coeff, (one_body_alpha, one_body_beta), strict=True):
+            assert np.allclose(coeff.T @ scf_unrestricted.get_hcore() @ coeff, one_body)
 
         # 3. Non-rerouting for valid model Hamiltonian
 
@@ -2579,6 +2589,24 @@ class TestPyscfPlugin:
                     with pytest.raises(ValueError, match="0 or 1"):
                         hamiltonian_to_scf(reference, alpha, beta)
 
+        for reference in (h_model, h_unrestricted_model):
+            with pytest.raises(ValueError, match="Occupied orbitals must precede"):
+                hamiltonian_to_scf(reference, np.array([1.0, 0.0, 0.0, 0.0]), np.array([0.0, 1.0, 0.0, 0.0]))
+
+    def test_hamiltonian_to_scf_keeps_spin_occupations(self) -> None:
+        """Each spin keeps its occupations, also for a beta majority and for boolean masks."""
+        orbitals = data.ModelOrbitals(4, SymmetryProduct([axes.spin(1, True)]))
+        hamiltonian = data.Hamiltonian(
+            data.CanonicalFourCenterHamiltonianContainer(
+                np.diag([-1.0, -0.5, 0.5, 1.0]), np.zeros(4**4), orbitals, 0.0, np.eye(4)
+            )
+        )
+        alpha, beta = np.array([1, 0, 0, 0]), np.array([1, 1, 0, 0])
+        assert pyscf.cc.CCSD(hamiltonian_to_scf(hamiltonian, alpha, beta)).nocc == (1, 2)
+        for occupations in ((alpha, beta), (beta, beta)):
+            masks = hamiltonian_to_scf(hamiltonian, *(occupation.astype(bool) for occupation in occupations))
+            np.testing.assert_array_equal(masks.mo_occ, hamiltonian_to_scf(hamiltonian, *occupations).mo_occ)
+
     @pytest.mark.parametrize("defect", ["fourfold", "non-finite"])
     def test_hamiltonian_to_scf_rejects_model_two_body_without_eightfold_symmetry(self, defect: str) -> None:
         """PySCF reads one member per 8-fold class, so other model tensors would give wrong energies."""
@@ -2602,6 +2630,28 @@ class TestPyscfPlugin:
         with pytest.raises(ValueError, match="8-fold" if defect == "fourfold" else "non-finite"):
             hamiltonian_to_scf(hamiltonian, occupation, occupation)
 
+    def test_hamiltonian_to_scf_passes_symmetric_part_of_one_body_integrals(self) -> None:
+        """Hermitian Hamiltonians pass the symmetric part of finite one-body integrals; others are rejected."""
+        orbitals = data.ModelOrbitals(3, SymmetryProduct([axes.spin(1, True)]))
+        occupation = np.array([1.0, 0.0, 0.0])
+
+        def to_scf(one_body, hamiltonian_type=data.HamiltonianType.Hermitian):
+            hamiltonian = data.Hamiltonian(
+                data.CanonicalFourCenterHamiltonianContainer(
+                    one_body, np.zeros(3**4), orbitals, 0.0, np.eye(3), hamiltonian_type
+                )
+            )
+            return hamiltonian_to_scf(hamiltonian, occupation, occupation)
+
+        one_body = np.diag([-1.0, -0.5, 0.5])
+        one_body[0, 1] = 0.2
+        np.testing.assert_array_equal(to_scf(one_body).get_hcore(), (one_body + one_body.T) / 2)
+        with pytest.raises(ValueError, match="non-Hermitian"):
+            to_scf(one_body, data.HamiltonianType.NonHermitian)
+        one_body[0, 1] = np.nan
+        with pytest.raises(ValueError, match="One-body integrals must be finite"):
+            to_scf(one_body)
+
     def test_hamiltonian_to_scf_passes_model_two_body_class_averages(self) -> None:
         """A 4-fold part within ``isApprox`` precision is averaged away; a larger one is rejected."""
         num_orbitals = 3
@@ -2622,9 +2672,161 @@ class TestPyscfPlugin:
             )
             return hamiltonian_to_scf(hamiltonian, occupation, occupation)
 
-        np.testing.assert_allclose(to_scf(1e-13)._eri, eightfold, atol=1e-14, rtol=0)
+        eri = pyscf.ao2mo.restore(1, to_scf(1e-13)._eri, num_orbitals)
+        np.testing.assert_allclose(eri, eightfold, atol=1e-14, rtol=0)
         with pytest.raises(ValueError, match="8-fold"):
             to_scf(1e-11)
+
+    def test_hamiltonian_to_scf_passes_alpha_beta_pair_averages(self) -> None:
+        """An alpha-beta pair asymmetry within ``isApprox`` precision is averaged away; a larger one is rejected."""
+        norb = 2
+        tensor = np.random.default_rng(706).normal(size=(norb,) * 4)
+        paired = (
+            tensor + tensor.transpose(1, 0, 2, 3) + tensor.transpose(0, 1, 3, 2) + tensor.transpose(1, 0, 3, 2)
+        ) / 4
+        same_spin = np.zeros(norb**4)
+        orbitals = data.ModelOrbitals(norb, SymmetryProduct([axes.spin(1, False)]))
+        occupation = np.array([1.0, 0.0])
+
+        def to_scf(scale):
+            alpha_beta = paired + scale * (tensor - paired)
+            hamiltonian = data.Hamiltonian(
+                data.CanonicalFourCenterHamiltonianContainer(
+                    np.eye(norb),
+                    np.eye(norb),
+                    same_spin,
+                    alpha_beta.ravel(),
+                    same_spin,
+                    orbitals,
+                    0.0,
+                    np.empty((0, 0)),
+                    np.empty((0, 0)),
+                )
+            )
+            return hamiltonian_to_scf(hamiltonian, occupation, occupation)
+
+        eri = pyscf.ao2mo.restore(1, to_scf(1e-13)._eri, 2 * norb)
+        np.testing.assert_allclose(eri[:norb, :norb, norb:, norb:], paired, atol=1e-14, rtol=0)
+        with pytest.raises(ValueError, match=r"\(pq\|rs\) = \(qp\|rs\) = \(pq\|sr\) permutation symmetry"):
+            to_scf(1e-11)
+
+    def test_hamiltonian_to_scf_spin_blocked_reference_keeps_spins_in_scf(self) -> None:
+        """SCF on the spin-blocked reference keeps each spin in its half and reproduces the SCF energy."""
+        _, wavefunction = algorithms.create("scf_solver", "pyscf").run(create_water_structure(), 1, 2, "sto-3g")
+        hamiltonian = algorithms.create("hamiltonian_constructor").run(wavefunction.get_orbitals())
+        assert hamiltonian.is_unrestricted()
+        norb = wavefunction.get_orbitals().get_num_molecular_orbitals()
+        mf = hamiltonian_to_scf(hamiltonian, *wavefunction.get_total_orbital_occupations())
+        reference_energy = mf.energy_tot()
+        assert np.isclose(mf.kernel(), reference_energy, rtol=0.0, atol=scf_energy_tolerance)
+        assert not np.any(mf.mo_coeff[0][norb:])
+        assert not np.any(mf.mo_coeff[1][:norb])
+
+    @pytest.mark.parametrize("unrestricted", [False, True])
+    def test_hamiltonian_to_scf_one_electron_scf_keeps_core_energy(self, unrestricted: bool) -> None:
+        """SCF on a one-electron reference keeps the core energy."""
+        one_body, two_body, empty = np.diag([-1.0, 0.5]), np.zeros(2**4), np.empty((0, 0))
+        orbitals = data.ModelOrbitals(2, SymmetryProduct([axes.spin(1, not unrestricted)]))
+        if unrestricted:
+            container = data.CanonicalFourCenterHamiltonianContainer(
+                one_body, one_body, two_body, two_body, two_body, orbitals, 0.7, empty, empty
+            )
+        else:
+            container = data.CanonicalFourCenterHamiltonianContainer(one_body, two_body, orbitals, 0.7, np.eye(2))
+        mf = hamiltonian_to_scf(data.Hamiltonian(container), np.array([1.0, 0.0]), np.array([0.0, 0.0]))
+        reference_energy = mf.energy_tot()
+        assert np.isclose(mf.kernel(), reference_energy, rtol=0.0, atol=scf_energy_tolerance)
+
+    @pytest.mark.parametrize("norb", [1, 3])
+    def test_spin_blocked_ao2mofn_matches_pyscf_transformation(self, norb: int) -> None:
+        """Per-spin-block transformations and UCCSD integrals equal PySCF's over the doubled basis, in its layout."""
+        random = np.random.default_rng(796)
+
+        def symmetrized(*swaps):
+            tensor = random.normal(size=(norb,) * 4)
+            for swap in swaps:
+                tensor = (tensor + tensor.transpose(swap)) / 2
+            return tensor
+
+        pair_swaps = ((1, 0, 2, 3), (0, 1, 3, 2))
+        aaaa, bbbb = (symmetrized(*pair_swaps, (2, 3, 0, 1)) for _ in range(2))
+        aabb = symmetrized(*pair_swaps)
+        empty = np.empty((0, 0))
+        orbitals = data.ModelOrbitals(norb, SymmetryProduct([axes.spin(1, False)]))
+        hamiltonian = data.Hamiltonian(
+            data.CanonicalFourCenterHamiltonianContainer(
+                np.eye(norb), np.eye(norb), aaaa.ravel(), aabb.ravel(), bbbb.ravel(), orbitals, 0.0, empty, empty
+            )
+        )
+        reference = hamiltonian_to_scf(hamiltonian, np.eye(norb)[0], np.eye(norb)[0])
+        ao2mofn = spin_blocked_ao2mofn(reference)
+        coefficients = [random.normal(size=(2 * norb, count)) for count in (2, 3, 1, 2)]
+        expected = pyscf.ao2mo.general(reference._eri, coefficients, compact=False)
+        np.testing.assert_allclose(ao2mofn(tuple(coefficients)), expected, rtol=0.0, atol=1e-12)
+        expected = pyscf.ao2mo.general(reference._eri, (coefficients[1],) * 4, compact=False)
+        np.testing.assert_allclose(ao2mofn(coefficients[1]), expected, rtol=0.0, atol=1e-12)
+        pyscf_cc = pyscf.cc.CCSD(reference)
+        integrals = _spin_blocked_integrals(pyscf_cc, reference)
+        for name, value in vars(pyscf_cc.ao2mo()).items():
+            if isinstance(value, np.ndarray):
+                np.testing.assert_allclose(getattr(integrals, name), value, rtol=0.0, atol=1e-12)
+
+    @pytest.mark.parametrize(
+        ("multiplicity", "configuration", "nelec"),
+        [(1, "2000", (1, 1)), (1, "uu00", (2, 0)), (3, "uu00", (2, 0)), (3, "2000", (1, 1))],
+    )
+    def test_pyscf_coupled_cluster_uses_stored_two_body_integrals(self, multiplicity, configuration, nelec):
+        """Two-electron CCSD on modified integrals over molecular orbitals equals exact diagonalization."""
+        _, wavefunction = algorithms.create("scf_solver", "pyscf").run(create_h2_structure(), 0, multiplicity, "6-31g")
+        orbitals = wavefunction.get_orbitals()
+        bare = algorithms.create("hamiltonian_constructor").run(orbitals)
+        norb = orbitals.get_num_molecular_orbitals()
+        core = bare.get_core_energy()
+        (h1a, h1b), blocks = bare.get_one_body_integrals(), bare.get_two_body_integrals()
+        scales = (0.5, 0.7, 0.6)
+        aaaa, aabb, bbbb = (scale * np.reshape(block, (norb,) * 4) for scale, block in zip(scales, blocks, strict=True))
+        if bare.is_unrestricted():
+            container = data.CanonicalFourCenterHamiltonianContainer(
+                h1a, h1b, aaaa.ravel(), aabb.ravel(), bbbb.ravel(), orbitals, core, np.empty((0, 0)), np.empty((0, 0))
+            )
+            exact = pyscf.fci.direct_uhf.FCI().kernel((h1a, h1b), (aaaa, aabb, bbbb), norb, nelec, ecore=core)[0]
+        else:
+            container = data.CanonicalFourCenterHamiltonianContainer(
+                h1a, aaaa.ravel(), orbitals, core, np.empty((0, 0))
+            )
+            exact = pyscf.fci.direct_spin1.FCI().kernel(h1a, aaaa, norb, nelec, ecore=core)[0]
+        reference = data.Wavefunction(
+            data.StateVectorContainer(data.Configuration.from_spin_half_string(configuration), orbitals)
+        )
+        calculator = algorithms.create("dynamical_correlation_calculator", "pyscf_coupled_cluster", conv_tol=1e-10)
+        energy, _, _ = calculator.run(Ansatz(data.Hamiltonian(container), reference))
+        assert np.isclose(energy, exact, rtol=0.0, atol=ci_energy_tolerance)
+
+    def test_pyscf_coupled_cluster_integral_settings(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        """AO-direct CCSD needs an AO basis, which the reference lacks.
+
+        ``incore_complete=False`` moves only DIIS and intermediates to disk, even when ``max_memory`` is small.
+        """
+        monkeypatch.setattr(pyscf.gto.Mole, "max_memory", 1)  # MB, too little for in-core integrals by PySCF's estimate
+        one_body = np.array([[-1.0, -0.15], [-0.15, 0.2]])
+        two_body = np.zeros((2,) * 4)
+        two_body[0, 0, 0, 0] = two_body[1, 1, 1, 1] = 0.4
+        orbitals = data.ModelOrbitals(2, SymmetryProduct([axes.spin(1, True)]))
+        hamiltonian = data.Hamiltonian(
+            data.CanonicalFourCenterHamiltonianContainer(one_body, two_body.ravel(), orbitals, 0.0, np.eye(2))
+        )
+        reference = data.Wavefunction(
+            data.StateVectorContainer(data.Configuration.from_spin_half_string("20"), orbitals)
+        )
+        ansatz = Ansatz(hamiltonian, reference)
+
+        def run(**settings):
+            calculator = algorithms.create("dynamical_correlation_calculator", "pyscf_coupled_cluster", **settings)
+            return calculator.run(ansatz)[0]
+
+        with pytest.raises(ValueError, match="AO-direct"):
+            run(direct=True)
+        assert np.isclose(run(incore_complete=False), run(), rtol=0.0, atol=ci_energy_tolerance)
 
 
 class TestQDKChemistryPySCFBasisConversion:

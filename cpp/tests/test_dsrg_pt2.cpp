@@ -209,9 +209,6 @@ TEST(DsrgPT2Test, FactoryRegistration) {
   ASSERT_NE(ctor, nullptr);
   EXPECT_EQ(ctor->name(), "qdk_dsrg_pt2");
   EXPECT_EQ(ctor->type_name(), "effective_hamiltonian_constructor");
-
-  EXPECT_EQ(EffectiveHamiltonianConstructorFactory::create()->name(),
-            "qdk_dsrg_pt2");
 }
 
 TEST(DsrgPT2Test, SettingsKnobs) {

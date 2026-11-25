@@ -18,8 +18,6 @@ import numpy as np
 import pytest
 
 from qdk_chemistry import data
-from qdk_chemistry.algorithms import registry
-from qdk_chemistry.algorithms.base import AlgorithmFactory
 from qdk_chemistry.remote.backends import base as remote_backend_registry
 from qdk_chemistry.remote.backends.base import RemoteBackend, get_mcp_safe_config_options, register_backend
 from qdk_chemistry.remote.job import Job
@@ -289,26 +287,28 @@ def test_describe_algorithm_reports_nuclear_derivative_default_aliases():
     assert description["is_default"] is True
 
 
+def test_describe_algorithm_reports_ducc_default():
+    result = srv.describe_algorithm(algorithm_type="effective_hamiltonian_constructor")
+
+    assert result["status"] == "ok"
+    description = result["result"]
+    assert description["name"] == "qdk_ducc"
+    assert description["is_default"] is True
+    assert description["default_settings"]["level"] == 2
+
+
 def test_describe_algorithm_handles_interface_only_type():
-    class InterfaceOnlyFactory(AlgorithmFactory):
-        def algorithm_type_name(self):
-            return "test_interface_only"
+    with patch("qdk_chemistry.algorithms.available", return_value=[]):
+        result = srv.describe_algorithm(algorithm_type="effective_hamiltonian_constructor")
+        rejected = srv.describe_algorithm(algorithm_type="effective_hamiltonian_constructor", algorithm_name="qdk_ducc")
 
-        def default_algorithm_name(self):
-            return ""
-
-    factory = InterfaceOnlyFactory()
-    registry.register_factory(factory)
-    try:
-        result = srv.describe_algorithm(algorithm_type=factory.algorithm_type_name())
-
-        assert result["status"] == "ok"
-        description = result["result"]
-        assert description["name"] is None
-        assert description["interface_only"] is True
-        assert description["settings"] == []
-    finally:
-        registry.unregister_factory(factory.algorithm_type_name())
+    assert result["status"] == "ok"
+    description = result["result"]
+    assert description["name"] is None
+    assert description["interface_only"] is True
+    assert description["settings"] == []
+    assert rejected["status"] == "error"
+    assert "has no registered implementations" in rejected["message"]
 
 
 def test_list_algorithms_rejects_unknown_type():

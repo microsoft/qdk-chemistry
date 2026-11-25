@@ -168,6 +168,7 @@ nanobind_add_module(_core
     src/nanobind/data/pauli_operator.cpp
     src/nanobind/data/majorana_mapping.cpp
     src/nanobind/data/serialization.cpp
+    src/nanobind/data/two_body_symmetry.cpp
     src/nanobind/data/lattice_geometry.cpp
     src/nanobind/data/lattice_graph.cpp
     src/nanobind/algorithms/localizer.cpp

@@ -2,65 +2,89 @@
 // Licensed under the MIT License. See LICENSE.txt in the project root for
 // license information.
 
-// Effective Hamiltonian constructor usage examples.
+// Effective Hamiltonian construction example.
+// --------------------------------------------------------------------------------------------
+// start-cell-create
 #include <iostream>
 #include <qdk/chemistry.hpp>
 using namespace qdk::chemistry::algorithms;
 using namespace qdk::chemistry::data;
 
-// --------------------------------------------------------------------------------------------
-// start-cell-list-implementations
-auto names = EffectiveHamiltonianConstructorFactory::available();
-for (const auto& name : names) {
-  std::cout << name << std::endl;
-}
-// end-cell-list-implementations
-// --------------------------------------------------------------------------------------------
+int main() {
+  // Create the DUCC effective Hamiltonian constructor
+  auto ducc = EffectiveHamiltonianConstructorFactory::create("qdk_ducc");
+  // end-cell-create
+  // --------------------------------------------------------------------------------------------
 
-// --------------------------------------------------------------------------------------------
-// start-cell-create
-// Create a DSRG-PT2 downfolder
-auto downfolder =
-    EffectiveHamiltonianConstructorFactory::create("qdk_dsrg_pt2");
-// end-cell-create
-// --------------------------------------------------------------------------------------------
+  // --------------------------------------------------------------------------------------------
+  // start-cell-configure
+  // Select the commutator level (0 to 2)
+  ducc->settings().set("level", 2);
+  // end-cell-configure
+  // --------------------------------------------------------------------------------------------
 
-// --------------------------------------------------------------------------------------------
-// start-cell-configure
-// Adjust the DSRG flow parameter s (in Eh^-2)
-downfolder->settings().set("flow_parameter", 2.0);
-// end-cell-configure
-// --------------------------------------------------------------------------------------------
-
-// --------------------------------------------------------------------------------------------
-// docs:xyz ../data/water.structure.xyz
-// start-cell-downfold
-auto structure = Structure::from_xyz(R"(3
+  // --------------------------------------------------------------------------------------------
+  // docs:xyz ../data/water.structure.xyz
+  // start-cell-run
+  auto structure = Structure::from_xyz(R"(3
 Water molecule
 O    0.000000    0.000000    0.000000
 H    0.758602    0.000000    0.504284
 H   -0.758602    0.000000    0.504284
 )");
 
-auto [E_scf, wfn] = ScfSolverFactory::create()->run(structure, 0, 1, "sto-3g");
+  // Reference determinant and the Hamiltonian over the full orbital window W
+  auto scf_solver = ScfSolverFactory::create();
+  auto [scf_energy, scf_wavefunction] =
+      scf_solver->run(structure, 0, 1, "sto-3g");
+  auto hamiltonian = HamiltonianConstructorFactory::create()->run(
+      scf_wavefunction->get_orbitals());
 
-// Assign an active space to the mean-field reference
-auto selector = ActiveSpaceSelectorFactory::create("qdk_valence");
-selector->settings().set("num_active_electrons", 6);
-selector->settings().set("num_active_orbitals", 5);
-auto reference = selector->run(wfn);
+  // T1/T2 amplitudes over W
+  auto mp2_calculator =
+      DynamicalCorrelationCalculatorFactory::create("qdk_mp2_calculator");
+  auto [mp2_energy, amplitudes, bra] = mp2_calculator->run(
+      std::make_shared<Ansatz>(*hamiltonian, *scf_wavefunction));
 
-// Build the window Hamiltonian from the pre-selection orbitals, so that every
-// orbital of W is active
-auto window_hamiltonian =
-    HamiltonianConstructorFactory::create()->run(wfn->get_orbitals());
+  // Target space P: a four-electron, four-orbital valence space
+  auto active_space_selector =
+      ActiveSpaceSelectorFactory::create("qdk_valence");
+  active_space_selector->settings().set("num_active_electrons", 4);
+  active_space_selector->settings().set("num_active_orbitals", 4);
+  auto p_indices = active_space_selector->run(scf_wavefunction)
+                       ->get_orbitals()
+                       ->active_indices();
 
-// Keep the reference active space as P and fold the rest of the window into it
-auto p_indices = reference->get_orbitals()->active_indices();
+  // Downfold W into P, then diagonalize the effective Hamiltonian in P
+  auto effective_hamiltonian = ducc->run(amplitudes, hamiltonian, p_indices);
+  auto mc_calculator = MultiConfigurationCalculatorFactory::create("macis_cas");
+  auto [ducc_energy, ci_wavefunction] =
+      mc_calculator->run(effective_hamiltonian, 2, 2);
+  std::cout << "SCF Energy: " << scf_energy << " Hartree" << std::endl;
+  std::cout << "DUCC CASCI Energy: " << ducc_energy << " Hartree" << std::endl;
+  // end-cell-run
+  // --------------------------------------------------------------------------------------------
 
-auto effective_hamiltonian =
-    downfolder->run(reference, window_hamiltonian, p_indices);
+  // --------------------------------------------------------------------------------------------
+  // start-cell-list-implementations
+  auto names = EffectiveHamiltonianConstructorFactory::available();
+  for (const auto& name : names) {
+    std::cout << name << std::endl;
+  }
+  // end-cell-list-implementations
+  // --------------------------------------------------------------------------------------------
 
-std::cout << effective_hamiltonian->get_summary() << std::endl;
-// end-cell-downfold
-// --------------------------------------------------------------------------------------------
+  // --------------------------------------------------------------------------------------------
+  // start-cell-dsrg-pt2-example
+  // DSRG-PT2 takes the SCF determinant as its reference; s is in Eh^-2
+  auto dsrg = EffectiveHamiltonianConstructorFactory::create("qdk_dsrg_pt2");
+  dsrg->settings().set("flow_parameter", 2.0);
+  auto dsrg_hamiltonian = dsrg->run(scf_wavefunction, hamiltonian, p_indices);
+  auto [dsrg_energy, dsrg_wavefunction] =
+      mc_calculator->run(dsrg_hamiltonian, 2, 2);
+  std::cout << "DSRG-PT2 CASCI Energy: " << dsrg_energy << " Hartree"
+            << std::endl;
+  // end-cell-dsrg-pt2-example
+  // --------------------------------------------------------------------------------------------
+  return 0;
+}

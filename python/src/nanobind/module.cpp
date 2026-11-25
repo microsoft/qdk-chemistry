@@ -33,6 +33,7 @@ void bind_structure(nb::module_& m);
 void bind_basis_set(nb::module_& m);
 void bind_auxiliary_basis(nb::module_& m);
 void bind_serialization(nb::module_& m);
+void bind_two_body_symmetry(nb::module_& m);
 void bind_mc(nb::module_& m);
 void bind_mcscf(nb::module_& m);
 void bind_hamiltonian_constructor(nb::module_& m);
@@ -109,6 +110,7 @@ NB_MODULE(_core, m) {
   bind_majorana_mapping(
       data);  // Depends on SparsePauliWord from pauli_operator
   bind_serialization(data);
+  bind_two_body_symmetry(data);
 
   bind_localizer(algorithms);
   bind_mc(algorithms);

@@ -13,7 +13,7 @@ import numpy as np
 import pytest
 
 from qdk_chemistry._core._algorithms import ScfSolverFactory
-from qdk_chemistry.algorithms import ScfSolver, registry
+from qdk_chemistry.algorithms import EffectiveHamiltonianConstructor, QdkDuccConstructor, ScfSolver, registry
 from qdk_chemistry.data import AlgorithmRef, Settings, Structure
 from qdk_chemistry.plugins import DuplicateRegistrationError
 from qdk_chemistry.plugins.qiskit import (
@@ -242,7 +242,7 @@ class TestRegistryShowDefault:
         # Test for effective Hamiltonian constructor
         default_effective_hamiltonian_constructor = registry.show_default("effective_hamiltonian_constructor")
         assert isinstance(default_effective_hamiltonian_constructor, str)
-        assert default_effective_hamiltonian_constructor == "qdk_dsrg_pt2"
+        assert default_effective_hamiltonian_constructor == "qdk_ducc"
 
         # Test for multi configuration SCF
         if PYSCF_AVAILABLE:
@@ -324,6 +324,19 @@ class TestRegistryShowDefault:
 
 class TestRegistryCreate:
     """Test the create function in the registry module."""
+
+    def test_create_ducc_constructor(self):
+        """DUCC is exported directly and available through the default factory."""
+        constructor = QdkDuccConstructor()
+        assert isinstance(constructor, EffectiveHamiltonianConstructor)
+        assert constructor.name() == "qdk_ducc"
+        assert constructor.settings().get("level") == 2
+        default = registry.create("effective_hamiltonian_constructor")
+        assert default.name() == "qdk_ducc"
+        assert default.settings().get("level") == 2
+        for level in range(3):
+            configured = registry.create("effective_hamiltonian_constructor", "qdk_ducc", level=level)
+            assert configured.settings().get("level") == level
 
     def test_create_default_algorithm(self):
         """Test creating the default algorithm without specifying name."""
@@ -496,7 +509,7 @@ class TestRegistryAvailable:
 
         effective_hamiltonian_constructors = registry.available("effective_hamiltonian_constructor")
         assert isinstance(effective_hamiltonian_constructors, list)
-        assert "qdk_dsrg_pt2" in effective_hamiltonian_constructors
+        assert "qdk_ducc" in effective_hamiltonian_constructors
 
     def test_available_returns_empty_list_for_unknown_type(self):
         """Test that available returns empty list for unknown algorithm type."""

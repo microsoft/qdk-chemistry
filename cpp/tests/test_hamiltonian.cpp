@@ -395,25 +395,6 @@ TEST_F(HamiltonianTest, JSONSerialization) {
   EXPECT_FALSE(h2->is_unrestricted());
 }
 
-TEST_F(HamiltonianTest, JSONRoundTripWithInactiveOrbitalsAndNoInactiveFock) {
-  std::vector<size_t> active_indices = {1, 2};
-  std::vector<size_t> inactive_indices = {0};
-  auto orbitals_with_inactive =
-      std::make_shared<ModelOrbitals>(trivial_index_set(4, active_indices),
-                                      trivial_index_set(4, inactive_indices));
-  Hamiltonian h(std::make_unique<CanonicalFourCenterHamiltonianContainer>(
-      one_body, two_body, orbitals_with_inactive, core_energy,
-      Eigen::MatrixXd(0, 0)));
-  ASSERT_FALSE(h.has_inactive_fock_matrix());
-
-  auto loaded = Hamiltonian::from_json(h.to_json());
-  EXPECT_TRUE(loaded->get_orbitals()->has_inactive_space());
-  EXPECT_FALSE(loaded->has_inactive_fock_matrix());
-  EXPECT_EQ(loaded->get_core_energy(), core_energy);
-  EXPECT_TRUE(std::get<0>(loaded->get_one_body_integrals()).isApprox(one_body));
-  EXPECT_TRUE(std::get<0>(loaded->get_two_body_integrals()).isApprox(two_body));
-}
-
 TEST_F(HamiltonianTest, JSONFileIO) {
   Hamiltonian h(std::make_unique<CanonicalFourCenterHamiltonianContainer>(
       one_body, two_body, orbitals, core_energy, inactive_fock));
@@ -1206,6 +1187,25 @@ TEST_F(HamiltonianTest, CholeskyContainerJSONSerialization) {
   EXPECT_TRUE(h_loaded->has_two_body_integrals());
   EXPECT_EQ(h_loaded->get_container_type(), "cholesky");
   EXPECT_DOUBLE_EQ(h_loaded->get_core_energy(), 1.5);
+}
+
+TEST_F(HamiltonianTest, JSONRoundTripWithoutInactiveFock) {
+  // Inactive orbitals do not require an inactive Fock matrix, as in HDF5.
+  auto frozen_core =
+      std::make_shared<ModelOrbitals>(testing::restricted_index_set(3, {1, 2}),
+                                      testing::restricted_index_set(3, {0}));
+  Hamiltonian four_center(
+      std::make_unique<CanonicalFourCenterHamiltonianContainer>(
+          one_body, two_body, frozen_core, core_energy, inactive_fock));
+  Hamiltonian cholesky(std::make_unique<CholeskyHamiltonianContainer>(
+      one_body, Eigen::MatrixXd::Random(4, 3), frozen_core, core_energy,
+      inactive_fock));
+  for (const auto* hamiltonian : {&four_center, &cholesky}) {
+    auto restored = Hamiltonian::from_json(hamiltonian->to_json());
+    EXPECT_TRUE(restored->get_orbitals()->has_inactive_space());
+    EXPECT_FALSE(restored->has_inactive_fock_matrix());
+    EXPECT_DOUBLE_EQ(restored->get_core_energy(), core_energy);
+  }
 }
 
 TEST_F(HamiltonianTest, CholeskyContainerHDF5Serialization) {

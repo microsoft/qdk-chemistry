@@ -9,6 +9,7 @@
 
 #include "factory_bindings.hpp"
 #include "qdk/chemistry/algorithms/microsoft/effective_hamiltonian/dsrg_pt2.hpp"
+#include "qdk/chemistry/algorithms/microsoft/effective_hamiltonian/ducc.hpp"
 #include "stl.hpp"
 
 namespace nb = nanobind;
@@ -184,6 +185,20 @@ Returns:
       EffectiveHamiltonianConstructorFactory, EffectiveHamiltonianConstructor,
       EffectiveHamiltonianConstructorBase>(
       m, "EffectiveHamiltonianConstructorFactory");
+
+  nb::class_<microsoft::DuccConstructor, EffectiveHamiltonianConstructor>(
+      m, "QdkDuccConstructor", R"(
+Double unitary coupled-cluster (DUCC) downfolding with real T1 and T2 amplitudes.
+
+The reference wavefunction carries amplitudes over the same orbital window as
+the input Hamiltonian and a single-determinant reference. Restricted closed-shell
+and unrestricted open-shell references, including frozen-core windows, are supported.
+The output preserves the input spin restriction.
+
+The ``level`` setting is an integer from 0 to 2, with default 2.
+Level 0 performs bare downfolding without commutator corrections.
+)")
+      .def(nb::init<>());
 
   nb::class_<microsoft::DsrgPT2Constructor, EffectiveHamiltonianConstructor>(
       m, "QdkDsrgPT2Constructor", R"(

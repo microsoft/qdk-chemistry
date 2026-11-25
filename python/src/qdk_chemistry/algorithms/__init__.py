@@ -30,6 +30,7 @@ from qdk_chemistry.algorithms.dynamical_correlation_calculator import DynamicalC
 from qdk_chemistry.algorithms.effective_hamiltonian_constructor import (
     EffectiveHamiltonianConstructor,
     QdkDsrgPT2Constructor,
+    QdkDuccConstructor,
 )
 from qdk_chemistry.algorithms.expectation_estimator.expectation_estimator import ExpectationEstimator
 from qdk_chemistry.algorithms.expectation_estimator.qdk import QdkExpectationEstimator
@@ -105,6 +106,7 @@ __all__ = [
     "QdkAutocasActiveSpaceSelector",
     "QdkAutocasEosActiveSpaceSelector",
     "QdkDsrgPT2Constructor",
+    "QdkDuccConstructor",
     "QdkExpectationEstimator",
     "QdkGaugeFixingLocalizer",
     "QdkHamiltonianConstructor",

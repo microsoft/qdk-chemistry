@@ -5,6 +5,7 @@
 #include <gtest/gtest.h>
 
 #include <Eigen/Dense>
+#include <algorithm>
 #include <memory>
 #include <optional>
 #include <qdk/chemistry/algorithms/effective_hamiltonian.hpp>
@@ -86,6 +87,15 @@ TEST(EffectiveHamiltonianConstructorTest, MetaData) {
 }
 
 TEST(EffectiveHamiltonianConstructorTest, Factory) {
+  const auto available = EffectiveHamiltonianConstructorFactory::available();
+  EXPECT_NE(std::find(available.begin(), available.end(), "qdk_ducc"),
+            available.end());
+  auto default_constructor = EffectiveHamiltonianConstructorFactory::create();
+  ASSERT_NE(default_constructor, nullptr);
+  EXPECT_EQ(default_constructor->name(), "qdk_ducc");
+  auto ducc = EffectiveHamiltonianConstructorFactory::create("qdk_ducc");
+  ASSERT_NE(ducc, nullptr);
+  EXPECT_EQ(ducc->type_name(), "effective_hamiltonian_constructor");
   EXPECT_THROW(
       EffectiveHamiltonianConstructorFactory::create("nonexistent_constructor"),
       std::runtime_error);
@@ -141,6 +151,23 @@ TEST(EffectiveHamiltonianConstructorTest,
   TestEffectiveHamiltonianConstructor constructor;
   EXPECT_NO_THROW(
       constructor._validate_inputs(reference, hamiltonian, p_indices));
+}
+
+TEST(EffectiveHamiltonianConstructorTest, AcceptsEquivalentModelOrbitals) {
+  // Separately constructed model orbitals, as after deserialization.
+  auto hamiltonian = make_hamiltonian(std::make_shared<ModelOrbitals>(
+      testing::restricted_index_set(2, {0, 1})));
+  auto reference = make_wavefunction(std::make_shared<ModelOrbitals>(
+      testing::restricted_index_set(2, {0, 1})));
+  auto p_indices = testing::restricted_index_set(2, {0});
+  TestEffectiveHamiltonianConstructor constructor;
+  EXPECT_NO_THROW(
+      constructor._validate_inputs(reference, hamiltonian, p_indices));
+
+  auto larger = make_wavefunction(std::make_shared<ModelOrbitals>(
+      testing::restricted_index_set(3, {0, 1})));
+  EXPECT_THROW(constructor._validate_inputs(larger, hamiltonian, p_indices),
+               std::invalid_argument);
 }
 
 TEST(EffectiveHamiltonianConstructorTest, TreatsPIndicesAsAbsoluteIndices) {
@@ -273,44 +300,4 @@ TEST(EffectiveHamiltonianConstructorTest, RejectsNullInputs) {
                std::invalid_argument);
   EXPECT_THROW(constructor._validate_inputs(reference, hamiltonian, nullptr),
                std::invalid_argument);
-}
-
-TEST(EffectiveHamiltonianConstructorTest, ValidatesModelOrbitalBases) {
-  auto window_orbitals = std::make_shared<ModelOrbitals>(
-      testing::restricted_index_set(4, {0, 1, 2, 3}));
-  auto ref_orbitals =
-      std::make_shared<ModelOrbitals>(testing::restricted_index_set(4, {1, 2}),
-                                      testing::restricted_index_set(4, {0}));
-  auto hamiltonian = make_hamiltonian(window_orbitals);
-  auto reference = make_wavefunction(ref_orbitals);
-  auto p_indices = testing::restricted_index_set(4, {1, 2});
-  TestEffectiveHamiltonianConstructor constructor;
-
-  // Distinct compatible ModelOrbitals instances must be accepted.
-  EXPECT_NO_THROW(
-      constructor._validate_inputs(reference, hamiltonian, p_indices));
-
-  // Mixing ModelOrbitals and coefficient-bearing Orbitals must be rejected.
-  auto mo_orbitals = testing::create_test_orbitals(4, 4);
-  EXPECT_THROW(constructor._validate_inputs(make_wavefunction(mo_orbitals),
-                                            hamiltonian, p_indices),
-               std::invalid_argument);
-  EXPECT_THROW(constructor._validate_inputs(
-                   reference, make_hamiltonian(mo_orbitals), p_indices),
-               std::invalid_argument);
-
-  // Mismatched mode counts must be rejected.
-  auto other_size =
-      std::make_shared<ModelOrbitals>(testing::restricted_index_set(5, {1, 2}));
-  EXPECT_THROW(constructor._validate_inputs(make_wavefunction(other_size),
-                                            hamiltonian, p_indices),
-               std::invalid_argument);
-
-  // Mismatched spin restriction must be rejected.
-  auto unrestricted_model = std::make_shared<ModelOrbitals>(
-      testing::unrestricted_index_set(4, {1, 2}, {1, 2}));
-  EXPECT_THROW(
-      constructor._validate_inputs(make_wavefunction(unrestricted_model),
-                                   hamiltonian, p_indices),
-      std::invalid_argument);
 }
