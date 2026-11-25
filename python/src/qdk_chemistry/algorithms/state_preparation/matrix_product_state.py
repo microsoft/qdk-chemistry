@@ -159,9 +159,9 @@ class MatrixProductStatePreparation(StatePreparation):
                 container = UnitaryMatrixContainer(matrix)
             except ValueError as error:
                 raise ValueError(f"{_DESCRIPTION} requires isometric sites; site {index} is not: {error}") from error
-            unitary = UnitaryRepresentation(container)
-            syntheses.append(mapper.synthesize(unitary))
-            right_factor = mapper.right_factor(unitary) if isinstance(mapper, DenseUnitarySynthesisMapper) else None
+            synthesis = mapper.synthesize(UnitaryRepresentation(container))
+            right_factor = synthesis.pop("rightFactor", None)
+            syntheses.append(synthesis)
         syntheses.reverse()
 
         # With a left bond of dimension one the packed matrix is (physical, right).

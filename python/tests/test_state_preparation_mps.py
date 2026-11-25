@@ -350,7 +350,8 @@ def test_multi_site_mps_matches_contraction(qsharp_test_context, qsharp_test_uti
     if method == "dense":
         last = MatrixProductStatePreparation._site_isometry(mps.sites()[-1], ancilla_dim=4)
         mapper = create("circuit_mapper", "unitary_synthesis_dense", num_input_qubits=2)
-        right_factor = mapper.right_factor(UnitaryRepresentation(UnitaryMatrixContainer(last.reshape(-1, 2))))
+        unitary = UnitaryRepresentation(UnitaryMatrixContainer(last.reshape(-1, 2)))
+        right_factor = mapper.synthesize(unitary)["rightFactor"]
         assert not np.allclose(np.abs(right_factor), np.eye(2), atol=1e-3)
     params = preparation_data(mps, method)
     with use_qsharp_context(qsharp_test_context):
