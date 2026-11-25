@@ -76,4 +76,28 @@ class GAUXCRegistry {
   }
 };
 
+/**
+ * @brief Clear the entire shared GauXC registry on scope exit.
+ */
+class ScopedGAUXCCacheCleanup {
+ public:
+  /// @brief Establish a cleanup scope without modifying the registry.
+  ScopedGAUXCCacheCleanup() = default;
+
+  /// @brief Destroy all cached GauXC instances and invalidate pointers to them.
+  ~ScopedGAUXCCacheCleanup() { GAUXCRegistry::clear(); }
+
+  /// @brief Copy construction is disabled.
+  ScopedGAUXCCacheCleanup(const ScopedGAUXCCacheCleanup&) = delete;
+
+  /// @brief Copy assignment is disabled.
+  ScopedGAUXCCacheCleanup& operator=(const ScopedGAUXCCacheCleanup&) = delete;
+
+  /// @brief Move construction is disabled.
+  ScopedGAUXCCacheCleanup(ScopedGAUXCCacheCleanup&&) = delete;
+
+  /// @brief Move assignment is disabled.
+  ScopedGAUXCCacheCleanup& operator=(ScopedGAUXCCacheCleanup&&) = delete;
+};
+
 }  // namespace qdk::chemistry::scf::util

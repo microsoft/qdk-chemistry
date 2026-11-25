@@ -4,6 +4,12 @@ PYTHON_VERSION=${1:-3.11}
 MAC_BUILD=${2:-OFF}
 export MAC_BUILD
 
+PYTHON_TEST_WORKERS=${PYTHON_TEST_WORKERS:-1}
+if ! [[ "$PYTHON_TEST_WORKERS" =~ ^[1-9][0-9]*$ ]]; then
+    echo "ERROR: PYTHON_TEST_WORKERS must be a positive integer." >&2
+    exit 1
+fi
+
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
 
@@ -133,14 +139,15 @@ python3 -m pip install "${WHEEL[0]}[test]"
 # because it is not resolvable from any index. See:
 #   https://github.com/microsoft/component-detection/blob/main/docs/detectors/pip.md
 #   https://github.com/microsoft/component-detection/issues/243
-mkdir -p "$PYTHON_DIR/build/test-manifest"
+TEST_MANIFEST_DIR="$PYTHON_DIR/build/test-manifest/python$PYTHON_VERSION"
+mkdir -p "$TEST_MANIFEST_DIR"
 echo "------------------ Installed Python packages (testenv) ------------------"
 python3 -m pip list --format=freeze --exclude qdk_chemistry \
-    | tee "$PYTHON_DIR/build/test-manifest/requirements.txt"
+    | tee "$TEST_MANIFEST_DIR/requirements.txt"
 echo "-------------------------------------------------------------------------"
 python3 -m pip install --dry-run --ignore-installed --quiet \
-    --report "$PYTHON_DIR/build/test-manifest/component-detection-pip-report.json" \
-    -r "$PYTHON_DIR/build/test-manifest/requirements.txt"
+    --report "$TEST_MANIFEST_DIR/component-detection-pip-report.json" \
+    -r "$TEST_MANIFEST_DIR/requirements.txt"
 
 # Disable telemetry during testing
 export QSHARP_PYTHON_TELEMETRY=false
@@ -164,4 +171,18 @@ fi
 
 # Run pytest suite
 echo '=== Running pytest suite ==='
-python3 -m pytest -v ./tests
+export OMP_NUM_THREADS=1
+export OPENBLAS_NUM_THREADS=1
+export MKL_NUM_THREADS=1
+export BLIS_NUM_THREADS=1
+export VECLIB_MAXIMUM_THREADS=1
+PYTHON_TEST_WORKERS=$(python3 -c "import os; print(min(int('$PYTHON_TEST_WORKERS'), os.cpu_count() or 1))")
+echo "Pytest workers: $PYTHON_TEST_WORKERS; native thread limits: 1"
+python3 -c "import numpy; import scipy.linalg; import qdk_chemistry; numpy.show_runtime()"
+
+XDIST_ARGS=()
+if [ "$PYTHON_TEST_WORKERS" -gt 1 ]; then
+    XDIST_ARGS=(-n "$PYTHON_TEST_WORKERS" --dist=worksteal)
+fi
+mkdir -p "$PYTHON_DIR/test-results"
+python3 -m pytest "${XDIST_ARGS[@]}" --junitxml="$PYTHON_DIR/test-results/pytest_report.xml" -v ./tests

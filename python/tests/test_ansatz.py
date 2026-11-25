@@ -87,6 +87,16 @@ class TestAnsatzSerialization:
         test_hamiltonian = Hamiltonian(CanonicalFourCenterHamiltonianContainer(one_body, two_body, orbitals, 0.0, fock))
         return Ansatz(test_hamiltonian, test_wavefunction)
 
+    @pytest.mark.parametrize("missing", ["hamiltonian", "wavefunction", "both"])
+    def test_constructor_rejects_null_components(self, test_ansatz, missing):
+        """Null components reach the constructor's documented ValueError checks."""
+        hamiltonian = None if missing in ("hamiltonian", "both") else test_ansatz.get_hamiltonian()
+        wavefunction = None if missing in ("wavefunction", "both") else test_ansatz.get_wavefunction()
+        component = "Hamiltonian" if hamiltonian is None else "Wavefunction"
+
+        with pytest.raises(ValueError, match=f"{component} pointer cannot be nullptr"):
+            Ansatz(hamiltonian, wavefunction)
+
     def test_json_serialization(self, test_ansatz):
         """Test JSON serialization for ansatz."""
         # Test to_json and from_json
