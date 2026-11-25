@@ -85,23 +85,18 @@ def _reverse_bits(x: int, n: int) -> int:
 
 
 def _run_and_dump(context, operation, *args) -> dict[int, complex]:
-    """Run ``operation`` once and return the sparse amplitudes of its final ``DumpMachine``."""
+    """Return sparse amplitudes from the final machine dump."""
     return context.run(operation, 1, *args, save_events=True)[0]["events"][-1].state_dump().get_dict()
 
 
 def _logical_counts(mapper: SOSSAMapper, unitary: UnitaryRepresentation) -> dict:
-    """Return the logical resource counts of the block encoding ``mapper`` builds for ``unitary``."""
+    """Return the mapped block encoding's logical resource counts."""
     factory = mapper.run(unitary)._qsharp_factory
     return factory.program._qdk_context.logical_counts(factory.program, *factory.parameter.values())
 
 
 def _block_encoding_action(circuit, num_system_qubits: int, system_state: np.ndarray) -> np.ndarray:
-    r"""Apply ``circuit`` to :math:`|\psi\rangle|0\rangle_\mathrm{anc}` and project on ancilla zero.
-
-    Returns :math:`(\langle 0|_\mathrm{anc} \otimes I) B (|0\rangle_\mathrm{anc} \otimes I) |\psi\rangle`,
-    i.e. the top-left block of the encoding applied to ``system_state``. The mapper lays the
-    register out as ``[system | ancilla]`` while the machine dump numbers basis states big-endian.
-    """
+    """Apply the system block with ancillas initialized and projected to zero."""
     stride = 2 ** (circuit.num_qubits - num_system_qubits)
     dimension = 2**num_system_qubits
 
@@ -255,7 +250,7 @@ class TestInnerPrep:
 
     @pytest.mark.parametrize("algorithm", ["controlled_alias_sampling", "direct"])
     def test_build_inner_prep_fidelity(self, qsharp_test_context, qsharp_test_utils, algorithm):
-        """Each inner PREPARE reproduces |c_lb|^2 for B + 1 = 3 and never populates the padded index slot."""
+        """Check inner PREPARE probabilities and zero padding."""
         # Use num_bases=2 for a non-trivial inner dimension (B+1=3)
         sossa_unitary = _build_sossa_unitary(num_orbitals=2, num_ranks=2, num_bases=2, num_copies=1)
         container = sossa_unitary.get_container()
@@ -519,7 +514,7 @@ class TestSOSSAMapper:
     def test_amortized_sweep_holds_each_batch_and_returns_the_lenders(
         self, qsharp_test_utils, measure: bool, swap_bits: tuple[int, int], run_adjoint: bool
     ) -> None:
-        """Each round of an amortized sweep holds exactly its batch, and a mutated table is caught."""
+        """Check amortized batches, lender restoration, and mutation detection."""
         rng = np.random.default_rng(7)
         width, num_batches = 2, 3
         sf_tables = rng.integers(0, 2, (num_batches, 4, width)).astype(bool).tolist()
@@ -527,7 +522,7 @@ class TestSOSSAMapper:
         num_lenders = width * ((1 << max(swap_bits)) - 1)
 
         def run(loaded_sf: list) -> bool:
-            """Run the sweep loading ``loaded_sf`` and erasing the expected SF tables."""
+            """Load the supplied batches and erase the expected tables."""
             return qsharp_test_utils.SOSSAWalkTests.TestAmortizedSweepRecordsEachBatch(
                 loaded_sf, dq_tables, sf_tables, dq_tables, [2, 1, 0], *swap_bits, num_lenders, measure, run_adjoint
             )
@@ -864,10 +859,7 @@ class TestSelectFullFidelity:
         amortize: bool,
         measure: bool,
     ):
-        """Streaming Givens angles, amortized or measured per word, must preserve SELECT while only changing cost.
-
-        This covers both angle-table branches and batch orders for every loader, and the skew tree's resident load too.
-        """
+        """Check streamed and resident angle loads preserve SELECT."""
         num_orbitals, num_ranks, num_bases, num_copies = dims
         # Annotated so mypy does not widen this to dict[str, int] against _select_data's str keyword.
         kwargs: dict[str, Any] = {
@@ -914,7 +906,7 @@ class TestSelectFullFidelity:
     def _run_entangled_select(
         context, select_data: dict, xo_of: list[int], num_xo_bits: int, *, use_phase_gradient: bool, num_reference: int
     ) -> np.ndarray:
-        """Run SELECT forward on a label-entangled input where label l loads x_o = xo_of[l mod Xo] and some b."""
+        """Run SELECT on label-entangled outer indices."""
         num_orbitals, num_copies = select_data["numOrbitals"], select_data["numCopies"]
         num_bp1 = select_data["numBases"] + 1
         b_bits = max(1, math.ceil(math.log2(num_bp1)))
@@ -980,11 +972,7 @@ class TestSelectFullFidelity:
     def test_recomputed_outer_registers_match_the_loaded_free_rider(
         self, qsharp_test_context, dims, num_positive, gradient_lookup, num_reference
     ):
-        """Recomputing G, r, spin and b == B from the E2-ordered x_o acts like the free-rider SELECT on every branch.
-
-        ``gradient_lookup`` selects the phase-gradient backend and its lookup settings; None runs the direct backend.
-        Wrong comparator thresholds and the default x_o order are negative controls that must fail.
-        """
+        """Check recomputed SELECT matches free-rider SELECT and rejects corrupted thresholds or ordering."""
         num_orbitals, num_ranks, num_bases, num_copies = dims
         num_sf = num_ranks * num_copies
         use_phase_gradient = gradient_lookup is not None
@@ -1038,7 +1026,7 @@ class TestSelectFullFidelity:
     def test_compressed_angle_words_match_the_default_select(
         self, qsharp_test_context, dims: tuple[int, int, int, int], rotation_batch_size: int, lookup_method: str
     ):
-        """Range-reduced 3-bit words must match every 5-bit SELECT branch up to sign, but truncated words must not."""
+        """Check compressed SELECT agrees up to sign and detects truncation."""
         num_orbitals, num_ranks, num_bases, num_copies = dims
         fidelities, truncated_fidelities = [], []
         for xo_value in range(num_orbitals + num_ranks * num_copies):
@@ -1070,7 +1058,7 @@ class TestSelectFullFidelity:
 
     @pytest.mark.parametrize("N", [3, 4, 5, 6])
     def test_givens_tree_and_controlled_adder_match_the_default_chain(self, qsharp_test_context, N):  # noqa: N803
-        """The tree layout and the b-bit controlled-adder step reproduce the default chain; wrong angles are caught."""
+        """Check tree and controlled-adder SELECT equivalence and angle-mutation detection."""
         # Ry then Rz angles for an entangled system state over both spin blocks.
         angles = list(np.random.default_rng(7 * N).uniform(0.3, 2.8, size=4 * N))
 
@@ -1122,7 +1110,7 @@ class TestSelectFullFidelity:
 
     @pytest.mark.parametrize("lookup_method", ["select", "dirty_select_swap", "skew_tree"])
     def test_controlled_adder_matches_on_entangled_outer_indices(self, qsharp_test_context, lookup_method):
-        """Every controlled-adder SELECT matches the two-adder SELECT on superposed x_o and b."""
+        """Check controlled-adder SELECT equivalence on entangled indices."""
         num_orbitals = 4
         xo_of = list(range(num_orbitals + 2))
         kwargs: dict[str, Any] = {"num_ranks": 2, "lookup_method": lookup_method}
@@ -1153,7 +1141,7 @@ class TestSelectFullFidelity:
 
     @pytest.mark.parametrize("N", [2, 3, 5, 8, 20, 54])
     def test_givens_tree_is_a_log_depth_spanning_tree(self, qsharp_test_context, N):  # noqa: N803
-        """Tree pairs span all orbitals in ceil(log2 N) layers of disjoint Jordan-Wigner spans; the sweep needs N-1."""
+        """Check tree coverage, disjoint spans, and logarithmic depth."""
         pairs_fn = qsharp_test_context.code.QDKChemistry.Utils.SOSSAWalk.GivensRotationPairs
         for tree, expected_depth in ((False, N - 1), (True, math.ceil(math.log2(N)))):
             pairs = [tuple(pair) for pair in pairs_fn(N, tree)]
@@ -1168,7 +1156,7 @@ class TestSelectFullFidelity:
             assert max(free_at) == expected_depth
 
     def test_a_mutated_decode_or_a_skipped_parity_pair_is_detected(self, qsharp_test_context):
-        """Negative controls: swapping two one-hot rows or dropping one pair from the parity must break equivalence."""
+        """Detect swapped one-hot rows and missing parity pairs."""
         tests = qsharp_test_context.code.QDKChemistry.TestUtils.SOSSAWalkTests
         reference = _run_and_dump(qsharp_test_context, tests.TestSelectOnEntangledState, self._select_data(3, 5))
         mutated = self._select_data(3, 5, one_hot=True)
@@ -1186,7 +1174,7 @@ class TestSelectFullFidelity:
 
 
 class TestOptInBlockEncodings:
-    """Opt-in mapper settings must reproduce the default block encoding."""
+    """Check opt-in block-encoding equivalence."""
 
     @pytest.mark.parametrize(
         "settings",
@@ -1208,7 +1196,7 @@ class TestOptInBlockEncodings:
         ids=["one_hot_inner", "one_hot_select", "bell_parity", "recompute", "compressed", "combined", "one_hot_pairs"],
     )
     def test_block_matches_the_default_and_detects_corrupted_data(self, qsharp_test_context, settings):
-        """Each opt-in gives exactly the default controlled-walk block on two erasure runs; corrupted data breaks it."""
+        """Check opt-in block equivalence across erasure branches and detect corrupted data."""
         unitary = _build_sossa_unitary(num_orbitals=3, num_ranks=2, num_bases=2, num_copies=1)
         num_system_qubits = 6
 
@@ -1329,7 +1317,7 @@ class TestSOSSAWalkLogicalCounts:
         ],
     )
     def test_opt_in_qubit_savings(self, setting, value, dims, saved_qubits):
-        """Recomputing frees 4 + ceil(log2 R) qubits, compression 2 per angle, and the tree keeps the sweep's counts."""
+        """Check recomputation, compression, and tree resource counts."""
         unitary = _build_sossa_unitary(*dims)
         default = _logical_counts(_make_sossa_mapper(), unitary)
         mapper = _make_sossa_mapper()
@@ -1342,7 +1330,7 @@ class TestSOSSAWalkLogicalCounts:
 
     @pytest.mark.parametrize("batches", [1, 2])
     def test_controlled_adder_one_bit_narrower_saves_resources(self, batches):
-        """A 9-bit ``controlled_adder`` word uses fewer qubits and rotations than an equally precise 10-bit default."""
+        """Check controlled-adder savings at equal angle precision."""
         unitary = _build_sossa_unitary(num_orbitals=4)
         counts = {}
         for step, bits in (("two_adders", 10), ("controlled_adder", 9)):
@@ -1357,7 +1345,7 @@ class TestSOSSAWalkLogicalCounts:
             assert adder["cczCount"] + adder["ccixCount"] < default["cczCount"] + default["ccixCount"]
 
     def test_one_hot_vector_pairing_halves_the_one_hot_register(self):
-        """Pairing 11 one-hot vectors frees 4 qubits, and with compressed words it adds no Toffolis."""
+        """Check paired-vector qubit savings and compressed-word Toffoli counts."""
         unitary = _build_sossa_unitary(5, 3, 2, 2)
         for compressed in (False, True):
             counts = []
@@ -1373,7 +1361,7 @@ class TestSOSSAWalkLogicalCounts:
                 assert counts[1]["cczCount"] + counts[1]["ccixCount"] <= counts[0]["cczCount"] + counts[0]["ccixCount"]
 
     def test_amortized_batch_lookups_run_on_a_plain_select(self):
-        """Amortizing plain-Select batches keeps the width and trades the measured unlookups for one closing lookup."""
+        """Check amortized lookup width and Toffoli counts."""
         unitary = _build_sossa_unitary(num_orbitals=4)
         counts = {}
         for amortize in (False, True):
@@ -1404,7 +1392,7 @@ class TestMaxGivensRotationBatchesSetting:
 
 
 class TestOptInSettingValidation:
-    """Opt-in settings reject the combinations they cannot build."""
+    """Check opt-in setting validation."""
 
     @pytest.mark.parametrize(
         ("settings", "message"),
@@ -1429,7 +1417,7 @@ class TestOptInSettingValidation:
         ],
     )
     def test_it_rejects_unsupported_combinations(self, settings, message):
-        """One-hot SELECT and its pairing, and compressed words, reject the settings they cannot build."""
+        """Reject unsupported one-hot and compressed-angle combinations."""
         mapper = _make_sossa_mapper()
         for key, value in settings.items():
             mapper.settings().set(key, value)
@@ -1437,7 +1425,7 @@ class TestOptInSettingValidation:
             mapper.run(_build_sossa_unitary(num_orbitals=3))
 
     def test_recompute_rejects_operators_without_spin_free_copies(self):
-        """Recompute reads the spin-free flag and rank from x_o, so a sum of squares with no copy is refused."""
+        """Reject recomputation without a spin-free copy."""
         operator = QubitOperator(
             container=SumOfSquaresContainer(
                 RotatedPaulis(np.full((2, 1), 0.3), np.tile([0.2, 0.2j], (2, 1)), ("X", "Y")),

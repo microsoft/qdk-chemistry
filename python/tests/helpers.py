@@ -444,17 +444,7 @@ def apply_operation(
     split_control: bool = False,
     num_qubits: int | None = None,
 ) -> np.ndarray:
-    """Return the state ``operation`` produces from a real-amplitude ``state``.
-
-    ``operation`` is either Q# source or a Q# callable of type ``Qubit[] => Unit``. With ``split_control`` it is
-    a ``(Qubit, Qubit[]) => Unit`` callable, such as a controlled circuit mapper's, and the most significant
-    qubit is its control. With ``num_qubits``, ``state`` is a zero-padded prefix of the register's state and
-    only that prefix of the output is returned.
-
-    This dumps the whole machine rather than using ``dump_operation_on_state``, whose ``DumpRegister``
-    rejects states with nonzero amplitudes below its zero cutoff as not separable, which long
-    evolutions reach. Every helper qubit is released by then, so the machine is the register.
-    """
+    """Apply to real amplitudes with optional MSB control and zero-padding, returning the input-length prefix."""
     context = get_qsharp_context()
     if not hasattr(context.code, "_TestDumpControlled"):
         for name, signature, call in (

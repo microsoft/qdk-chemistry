@@ -46,44 +46,27 @@ def _sossa_mapper_setting_defaults() -> tuple[tuple[Any, ...], ...]:
             "inner_prepare_algorithm",
             "string",
             "controlled_alias_sampling",
-            "Inner PREPARE algorithm. 'controlled_alias_sampling' loads the alias word with a 2D QROAM "
-            "addressed by the binary x_o; 'one_hot' decodes x_o once per block into an (N + R*C)-qubit "
-            "one-hot register and loads the word by unary iteration over b alone, one Toffoli per word bit "
-            "and b (arXiv:2611.09822, App. I), ignoring lookup_method and max_swap_address_bits; 'direct' "
-            "is a multiplexed state preparation for simulation.",
+            "Inner PREPARE algorithm.",
             ["controlled_alias_sampling", "one_hot", "direct"],
         ),
         (
             "select_algorithm",
             "string",
             "qrom_phase_gradient",
-            "SELECT algorithm ('qrom_phase_gradient', 'one_hot' or 'direct'). 'one_hot' (arXiv:2611.09822) "
-            "loads one qubit per distinct nonzero Givens angle vector plus a b == B flag instead of the "
-            "(N-1)*rotation_bit_precision angle word, and fans each angle word out of it with CNOTs; it "
-            "loads that one-hot row with the same lookup as the angle word, so it does not save Toffolis "
-            "and saves qubits only when the distinct-vector register and lookup scratch are narrower than "
-            "the binary angle-word implementation; many distinct vectors can make it wider, and it requires "
-            "max_givens_rotation_batches = 1.",
+            "SELECT algorithm.",
             ["qrom_phase_gradient", "one_hot", "direct"],
         ),
         (
             "one_hot_vector_pairing",
             "bool",
             False,
-            "Let each 'one_hot' SELECT qubit stand for two angle vectors, chosen by one more qubit "
-            "(arXiv:2611.09822 Eq. 23), which halves the one-hot register for one more Toffoli per Givens "
-            "step, or none with compressed_angle_representation; requires givens_step 'controlled_adder'.",
+            "Pair angle vectors in one-hot SELECT.",
         ),
         (
             "spin_swap",
             "string",
             "controlled_swap",
-            "Spin swap in SELECT ('controlled_swap' or 'bell_parity'). 'controlled_swap' applies N controlled "
-            "SWAPs per swap. 'bell_parity' (arXiv:2611.09822) computes the singlet parity of the up/down "
-            "pairs in the Bell basis for N Toffolis, phases it by the spin and erases it by measurement, and "
-            "one parity serves both the trailing swap of SELECT and the leading swap of SELECT^dagger, so "
-            "each block encoding pays 3N instead of 4N Toffolis. With recompute_outer_registers or the 'one_hot' "
-            "inner PREPARE, which leave no free-rider isSF bit for the walk to read, SELECT computes both parities.",
+            "Spin-swap implementation in SELECT.",
             ["controlled_swap", "bell_parity"],
         ),
         (
@@ -97,11 +80,7 @@ def _sossa_mapper_setting_defaults() -> tuple[tuple[Any, ...], ...]:
             "compressed_angle_representation",
             "bool",
             False,
-            "Reduce every Givens angle of the 'qrom_phase_gradient' or 'one_hot' SELECT into [0, pi) so each word "
-            "stores rotation_bit_precision - 2 bits (rotation_bit_precision - 1 with givens_step 'controlled_adder') "
-            ":cite:`Caesura2025`. With the 'one_hot' SELECT and givens_step 'controlled_adder' the word is "
-            "zero-padded back to the gradient width, so it saves no qubits and only removes the extra Toffolis "
-            "of one_hot_vector_pairing.",
+            "Use range-reduced Givens angle words.",
         ),
         (
             "coefficient_bit_precision",
@@ -114,122 +93,60 @@ def _sossa_mapper_setting_defaults() -> tuple[tuple[Any, ...], ...]:
             "max_givens_rotation_batches",
             "int",
             1,
-            "Upper bound J on the number of passes the 'qrom_phase_gradient' SELECT makes over the N-1 "
-            "Givens angles. The 'direct' SELECT loads no angle table and ignores it. 1 keeps every angle "
-            "resident, which is the cheapest in Toffolis and the widest in qubits. A larger J shrinks the "
-            "rotation register to ceil((N-1)/J) angles, at one extra table lookup per batch in each "
-            "direction. SELECT makes the fewest passes that register allows, ceil((N-1)/ceil((N-1)/J)), "
-            "which can be fewer than J: 19 angles with J = 6 run 5 passes of 4.",
+            "Maximum number of Givens rotation batches.",
             (1, 4096),
         ),
         (
             "lookup_method",
             "string",
             "select_swap",
-            "How the Givens rotation tables and the inner alias-sampling table are routed. The outer "
-            "PREPARE follows its own algorithm's settings, and a separately loaded free-rider word and "
-            "the direct inner PREPARE's sign table always use a plain lookup, and the 'one_hot' inner PREPARE "
-            "uses none. 'select' is a plain "
-            "unary-iteration lookup; 'select_swap' is "
-            "a clean QROAM that cuts Toffolis but allocates scratch. 'dirty_select_swap' runs the same "
-            "network on borrowed dirty qubits that are provably idle across the load, so it allocates no "
-            "scratch, which narrows the circuit only when that scratch sets the peak width, but it pays roughly "
-            "two to three times the Toffolis of the clean network at equal width. 'skew_tree' behaves like "
-            "'select_swap' except that each unswapped Givens "
-            "rotation load walks a skew tree over the in-range (B+1)*R addresses instead of padding the "
-            "low address field to a power of two, saving Toffolis when neither B+1 nor R is a power of "
-            "two. Every method falls back to a plain lookup at shapes where its own cost model "
-            "says no network pays. 'select_swap', 'dirty_select_swap' and 'skew_tree' choose their swap "
-            "widths under max_swap_address_bits; amortize_batch_lookups bypasses the clean QROAM and skew tree "
-            "for streamed Givens loads.",
+            "Lookup method for Givens and inner alias-sampling tables.",
             ["select", "select_swap", "dirty_select_swap", "skew_tree"],
         ),
         (
             "max_swap_address_bits",
             "int",
             -1,
-            "Upper bound on the address width k of each QROAM swap network, which routes 2^k data words; "
-            "it does not count data or scratch qubits. It applies to the Givens rotation tables of the "
-            "'qrom_phase_gradient' SELECT and the inner table of the 'controlled_alias_sampling' PREPARE, "
-            "and only when lookup_method is 'select_swap', 'dirty_select_swap' or 'skew_tree'; 'select' "
-            "always uses width 0 and ignores it. -1 leaves each loader's cost model to choose, 0 forces "
-            "plain select (or the skew tree for 'skew_tree'), "
-            "and a positive value limits each loader to widths at or below it.",
+            "Maximum QROAM swap-address bits (-1: automatic, 0: no swaps).",
             (-1, 30),
         ),
         (
             "amortize_batch_lookups",
             "bool",
             False,
-            "When the Givens angles are streamed in J > 1 batches, telescope consecutive lookups "
-            "(J + 1 instead of 2J without measure_angle_words), each round XORing the next batch onto the previous one. "
-            "This bypasses clean select_swap and skew_tree for the angle loads and can increase Toffolis despite fewer "
-            "lookup rounds, since measurement-based unlookups are cheaper than forward loads. With "
-            "lookup_method 'dirty_select_swap' a round borrows the idle spin-up register as swap workspace when "
-            "the batch word fits in it; otherwise it is a plain controlled Select. It does nothing at J = 1.",
+            "Amortize consecutive streamed Givens lookups.",
         ),
         (
             "measure_angle_words",
             "bool",
             False,
-            "When the Givens angles are streamed in J > 1 batches, erase each angle word by measurement "
-            "right after its rotation; without amortize_batch_lookups its qubits are released within the sweep, "
-            "but with amortization the word stays allocated through the final phase fix-up and peak qubits can "
-            "increase. It does nothing at J = 1.",
+            "Erase streamed Givens angle words by measurement.",
         ),
         (
             "recompute_outer_registers",
             "bool",
             False,
-            "Reorder the outer index as x_o = [SF at 2^nR*c + r | D1 | Q1] and let SELECT recompute the "
-            "generator type, rank, spin and b == B flags from x_o and b instead of loading a free-rider word "
-            "and keeping them live (Low et al. 2026, Appendix E2). It frees the 2 + ceil(log2 R) free-rider qubits "
-            "and the spin and b == B flags, but pads the rank to a power of two, which lengthens the outer and inner "
-            "tables and can widen x_o by a bit. It needs at least one spin-free copy.",
+            "Recompute free-rider registers from the outer index.",
         ),
         (
             "givens_rotation_layout",
             "string",
             "sweep",
-            "Arrangement of SELECT's N-1 Givens rotations. 'sweep' rotates neighbouring orbitals one after "
-            "another (rotation depth N-1); 'tree' uses the binary tree of arXiv:2605.30455 Eq. D6 (rotation "
-            "depth ceil(log2 N)), with Jordan-Wigner CZ strings on non-adjacent pairs. Both apply the same "
-            "number of rotations and the same orbital rotation to the Majorana operator.",
+            "Givens rotation layout in SELECT.",
             ["sweep", "tree"],
         ),
         (
             "givens_step",
             "string",
             "two_adders",
-            "How the 'qrom_phase_gradient' SELECT applies each Givens rotation; 'direct' ignores it. "
-            "'two_adders' builds the controlled RY(2θ) from two uncontrolled phase-gradient adders of a "
-            "half-angle word (arXiv:2605.30455 FIG. 40). 'controlled_adder' uses one controlled adder of a "
-            "full-angle word, the fused adder of arXiv:2501.06165 Fig. 3(b) (arXiv:2605.30455 FIG. 39, "
-            "Lemma 6): 2b-2 Toffolis on b-1 clean ancillas, or 3b-3 with none, one "
-            "below Lemma 7 because the gradient's top qubit is |->, so its controlled flip is a CZ. Streamed batches "
-            "(max_givens_rotation_batches > 1) erase each word right after its step and "
-            "reuse its qubits as the next step's ancillas, so only each batch's first step is ancilla-free. "
-            "The full-angle word has the precision of a 'two_adders' word one bit wider. Works with either "
-            "givens_rotation_layout.",
+            "Phase-gradient implementation of each Givens rotation.",
             ["two_adders", "controlled_adder"],
         ),
     )
 
 
 def _compressed_givens_angles(angles: np.ndarray, rot_bits: int) -> np.ndarray:
-    r"""Reduce each row of quantized Givens angles into :math:`[0, \pi)` with the compression of :cite:`Caesura2025`.
-
-    A row may leave a sign on mode 0, but the walk applies SELECT and SELECT† on the same :math:`x_o`, so it squares
-    to one.
-
-    Args:
-        angles: Givens angle table, one row of :math:`N-1` angles per rotated mode.
-        rot_bits: Width of the uncompressed angle word.
-
-    Returns:
-        The reduced angles, each an exact multiple of :math:`4\pi / 2^{b}` whose word is below :math:`2^{b-2}`.
-
-    """
+    r"""Reduce quantized Givens rows to :math:`[0, \pi)` up to a sign canceled by the SOSSA walk :cite:`Caesura2025`."""
     full = 1 << (rot_bits - 1)
     half = full >> 1
     scaled = (2.0**rot_bits * np.asarray(angles, dtype=float)) / (4.0 * np.pi)
@@ -315,25 +232,7 @@ class SOSSAMapper(CircuitMapper):
         return circuit
 
     def _build_inner_oracles(self, container: SOSSABlockEncodingContainer) -> tuple[Any, Any]:
-        r"""Build the Q# inner PREPARE and free-rider load callables.
-
-        Creates a superposition over bases :math:`b` conditioned on :math:`x_o`. The
-        alias-sampling factory places the free-rider table in the cheaper of the inner
-        PREPARE and a separate load performed once per block encoding.
-
-        Algorithms:
-            - ``"controlled_alias_sampling"``: 2D alias sampling.
-            - ``"one_hot"``: Alias sampling whose lookup reads x_o from a one-hot register the free-rider
-              loader decodes once per block encoding.
-            - ``"direct"``: Direct multiplexed preparation (ControlledPureStatePrep).
-
-        Args:
-            container: The SOSSA container with inner_prepare coefficients.
-
-        Returns:
-            The inner PREPARE and free-rider load callables.
-
-        """
+        """Build the Q# inner PREPARE and free-rider load callables."""
         algorithm = self._settings.get("inner_prepare_algorithm")
         coeff_bits = self._settings.get("coefficient_bit_precision")
         coefficients = container.inner_prepare.conditional_coefficients.tolist()
