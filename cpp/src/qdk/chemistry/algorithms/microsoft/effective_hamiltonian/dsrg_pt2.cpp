@@ -251,6 +251,8 @@ std::shared_ptr<data::Hamiltonian> DsrgPT2Constructor::_run_impl(
             std::cref(*two_body[2])};
   };
   const double e_core = hamiltonian->get_core_energy();
+  if (!std::isfinite(e_core))
+    throw std::invalid_argument("DSRG-PT2 requires a finite core energy.");
 
   const auto W_global = spatial(win_orbitals->active_indices(),
                                 "the window Hamiltonian's active index set");

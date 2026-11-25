@@ -64,7 +64,7 @@ print(f"DUCC CASCI Energy: {ducc_energy:.10f} Hartree")
 # start-cell-list-implementations
 from qdk_chemistry.algorithms import registry
 
-print(registry.available("effective_hamiltonian_constructor"))
+print(sorted(registry.available("effective_hamiltonian_constructor")))
 # ['qdk_dsrg_pt2', 'qdk_ducc']
 # end-cell-list-implementations
 ################################################################################

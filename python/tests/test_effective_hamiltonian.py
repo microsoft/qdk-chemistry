@@ -203,21 +203,23 @@ class TestEffectiveHamiltonianConstructor:
         with pytest.raises((ValueError, RuntimeError)):
             downfolder.run(case.reference, case.hamiltonian, case.kept_space)
 
-    def test_rejects_non_finite_integrals(self, water_window):
-        """Non-finite integrals are rejected at the boundary."""
+    def test_rejects_non_finite_hamiltonian(self, water_window):
+        """Non-finite integrals and core energies are rejected at the boundary."""
         case = water_window
         one_body, _ = case.hamiltonian.get_one_body_integrals()
         two_body = np.array(case.hamiltonian.get_two_body_integrals()[0])
+
+        def downfold(integrals, core_energy):
+            container = CanonicalFourCenterHamiltonianContainer(
+                one_body, integrals, case.hamiltonian.get_orbitals(), core_energy, np.empty((0, 0))
+            )
+            return algorithms.create(_TYPE, "qdk_dsrg_pt2").run(case.reference, Hamiltonian(container), case.kept_space)
+
+        with pytest.raises(ValueError, match="finite core energy"):
+            downfold(two_body, np.nan)
         two_body[0] = np.nan
-        container = CanonicalFourCenterHamiltonianContainer(
-            one_body,
-            two_body,
-            case.hamiltonian.get_orbitals(),
-            case.hamiltonian.get_core_energy(),
-            np.empty((0, 0)),
-        )
         with pytest.raises(ValueError, match="non-finite"):
-            algorithms.create(_TYPE, "qdk_dsrg_pt2").run(case.reference, Hamiltonian(container), case.kept_space)
+            downfold(two_body, case.hamiltonian.get_core_energy())
 
     def test_rejects_correlated_reference(self, water_window):
         """Multi-determinant references are rejected."""
