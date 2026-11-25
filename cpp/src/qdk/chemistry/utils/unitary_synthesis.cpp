@@ -49,9 +49,7 @@ struct FullSvd {
 constexpr double rotation_threshold = 1.0e-15;
 
 // Whether an angle is large enough to keep as a rotation.
-bool is_rotation(double angle) {
-  return std::abs(angle) > rotation_threshold;
-}
+bool is_rotation(double angle) { return std::abs(angle) > rotation_threshold; }
 
 // Full singular value decomposition M = U · diag(s) · Vᵀ.
 FullSvd singular_value_decomposition(
