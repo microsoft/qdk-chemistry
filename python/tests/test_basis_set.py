@@ -100,6 +100,22 @@ def test_shell_management():
     assert basis_extended.get_num_atoms() == 2  # Now we have atoms 0 and 1
 
 
+@pytest.mark.parametrize(
+    "getter_name", ["get_shell", "get_shells_for_atom", "get_ecp_shell", "get_ecp_shells_for_atom"]
+)
+def test_shell_accessor_arrays_are_read_only(getter_name):
+    """Shell accessors must not allow in-place edits of stored primitive arrays."""
+    basis = BasisSet.from_basis_name("def2-svp", Structure(["Ag"], np.array([[0.0, 0.0, 0.0]])))
+    original_hash = basis.content_hash()
+    result = getattr(basis, getter_name)(0)
+    shell = result if isinstance(result, Shell) else result[0]
+    names = ["exponents", "coefficients"] + (["rpowers"] if shell.has_radial_powers() else [])
+    for name in names:
+        with pytest.raises(ValueError, match="read-only"):
+            getattr(shell, name)[0] = 0
+    assert basis.content_hash() == original_hash
+
+
 def test_atomic_orbital_type_management():
     """Test basis type management."""
     # Create a valid shell for testing
@@ -1042,6 +1058,7 @@ def test_basis_set_pickling_and_repr():
         Shell(0, OrbitalType.S, [3.425251, 0.623914, 0.168855], [0.154329, 0.535328, 0.444635]),
         Shell(0, OrbitalType.P, [1.158, 0.325], [0.155916, 0.607684]),
     ]
+
     original = BasisSet("STO-3G", shells)
 
     # Test pickling and unpickling

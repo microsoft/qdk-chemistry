@@ -44,12 +44,12 @@ parameters:
   - name: windows_x86_64
     os: windows
     arch: x86_64
-    march: x86-64-v3
+    march: AVX2
     imageName: windows-2025-1espt
   - name: windows_aarch64
     os: windows
     arch: aarch64
-    march: armv8-a
+    march: armv8.0
     imageName: windows-2025-arm64-1espt
   displayName: Target platforms
 - name: pythonVersions
@@ -77,6 +77,15 @@ parameters:
   type: boolean
   default: true
   displayName: Run slow tests
+- name: testWorkers
+  type: object
+  default:
+    linux_x86_64: 48
+    linux_aarch64: 16
+    macos_arm64: 5
+    windows_x86_64: 48
+    windows_aarch64: 16
+  displayName: Pytest workers per platform
 
 variables:
 - group: QdkChemistry
@@ -167,7 +176,7 @@ extends:
         - ${{ if eq(target.name, 'windows_aarch64') }}:
           - job: Build_windows_aarch64_deps
             pool:
-              name: aqe-1es-Dpds_v6-arm-pool
+              name: $(CPU_POOL_ARM_WINDOWS)
               demands:
               - ImageOverride -equals ${{ target.imageName }}
               os: windows
@@ -192,14 +201,14 @@ extends:
           ${{ elseif eq(target.name, 'windows_aarch64') }}:
             dependsOn: Build_windows_aarch64_deps
             pool:
-              name: aqe-1es-Dpds_v6-arm-pool
+              name: $(CPU_POOL_ARM_WINDOWS)
               demands:
               - ImageOverride -equals ${{ target.imageName }}
               os: ${{ target.os }}
               hostArchitecture: Arm64
           ${{ elseif eq(target.name, 'linux_aarch64') }}:
             pool:
-              name: aqe-1es-Dpsd_v5-arm-pool
+              name: $(CPU_POOL_ARM_LINUX)
               demands:
               - ImageOverride -equals ${{ target.imageName }}
               os: ${{ target.os }}
@@ -270,6 +279,7 @@ extends:
                 imageTag: linux/amd64
                 pythonVersion: $(pythonVersion)
                 runSlowTests: ${{ parameters.runSlowTests }}
+                testWorkers: ${{ parameters.testWorkers[target.name] }}
                 exachemRequired: true
                 condition: succeeded()
 
@@ -295,6 +305,7 @@ extends:
                 imageTag: linux/arm64/v8
                 pythonVersion: $(pythonVersion)
                 runSlowTests: ${{ parameters.runSlowTests }}
+                testWorkers: ${{ parameters.testWorkers[target.name] }}
                 condition: succeeded()
 
           # Build - macOS ARM64
@@ -317,6 +328,7 @@ extends:
                 pythonVersion: $(pythonVersion)
                 macBuild: ON
                 runSlowTests: ${{ parameters.runSlowTests }}
+                testWorkers: ${{ parameters.testWorkers[target.name] }}
                 condition: succeeded()
 
           # Build - Windows (x86_64 and ARM64)
@@ -337,9 +349,19 @@ extends:
               parameters:
                 pythonVersion: $(pythonVersion)
                 runSlowTests: ${{ parameters.runSlowTests }}
+                testWorkers: ${{ parameters.testWorkers[target.name] }}
                 condition: succeeded()
                 ${{ if eq(target.name, 'windows_aarch64') }}:
                   arch: arm64
+
+          - task: PublishTestResults@2
+            displayName: Publish Python test results
+            condition: succeededOrFailed()
+            continueOnError: true
+            inputs:
+              testResultsFormat: JUnit
+              testResultsFiles: $(System.DefaultWorkingDirectory)/python/test-results/pytest_report.xml
+              testRunTitle: ${{ target.name }} Python $(pythonVersion)
 
           # SBoM Manifest Generator Task requires we transfer ownership of the wheel directory
           # back to the original base image user (Linux/macOS only; not needed on Windows).
