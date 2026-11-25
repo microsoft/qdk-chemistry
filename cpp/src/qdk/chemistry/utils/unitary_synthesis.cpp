@@ -16,12 +16,14 @@ namespace detail {
 
 // Frobenius norm of M^T M - I.
 double isometry_residual(const Eigen::MatrixXd& m) {
+  // Accelerate rejects zero leading dimensions even for empty matrices.
+  const Eigen::Index lda = std::max<Eigen::Index>(m.rows(), 1),
+                     ldg = std::max<Eigen::Index>(m.cols(), 1);
   Eigen::MatrixXd gram = Eigen::MatrixXd::Identity(m.cols(), m.cols());
   blas::syrk(blas::Layout::ColMajor, blas::Uplo::Upper, blas::Op::Trans,
-             m.cols(), m.rows(), 1.0, m.data(), m.rows(), -1.0, gram.data(),
-             m.cols());
+             m.cols(), m.rows(), 1.0, m.data(), lda, -1.0, gram.data(), ldg);
   return lapack::lansy(lapack::Norm::Fro, lapack::Uplo::Upper, m.cols(),
-                       gram.data(), m.cols());
+                       gram.data(), ldg);
 }
 
 // Orthogonal matrix whose leading columns are the polar factor of m.
@@ -56,7 +58,8 @@ Eigen::MatrixXd complete_columns(const Eigen::MatrixXd& m) {
   Eigen::MatrixXd q(n, n), u(n, n);
   Eigen::VectorXd tau(std::max<Eigen::Index>(r, 1)), sign(r);
   for (Eigen::Index i = 0; i < r; ++i) q.col(i) = m.col(kept[i]);
-  lapack::geqrf(n, r, q.data(), n, tau.data());
+  // LAPACK 3.2.1 (Accelerate) sizes a zero-column QR's workspace as zero.
+  if (r > 0) lapack::geqrf(n, r, q.data(), n, tau.data());
   for (Eigen::Index i = 0; i < r; ++i) sign(i) = q(i, i) < 0.0 ? -1.0 : 1.0;
   lapack::orgqr(n, n, r, q.data(), n, tau.data());
   for (Eigen::Index i = 0; i < r; ++i) u.col(kept[i]) = sign(i) * q.col(i);
