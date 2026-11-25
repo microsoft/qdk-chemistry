@@ -308,14 +308,13 @@ namespace QDKChemistry.Utils.UnitarySynthesis {
     /// Applies diag((-1)^{phases[x]}) on the little-endian `register` by one measurement-based lookup.
     internal operation ApplySignTable(phases : Bool[], register : Qubit[]) : Unit {
         Fact(Length(phases) == 1 <<< Length(register), "Sign data needs one entry per basis state of the register.");
-        // The lookup fixes signs relative to phases[0], which is applied as -I.
-        if not All(phase -> phase == phases[0], phases) {
-            use marker = Qubit();
-            X(marker);
-            H(marker);
-            Adjoint Select(Mapped(phase -> [phase != phases[0]], phases), register, [marker]);
-            Reset(marker);
-        }
+        // The lookup fixes signs relative to phases[0], which is applied as -I. The phases may depend on
+        // measurements, so skipping constant tables would make the allocation dynamic, which QIR rejects.
+        use marker = Qubit();
+        X(marker);
+        H(marker);
+        Adjoint Select(Mapped(phase -> [phase != phases[0]], phases), register, [marker]);
+        Reset(marker);
         if phases[0] {
             Fact(not IsEmpty(register), "A constant sign needs a nonempty register to carry it.");
             R(PauliI, 2.0 * PI(), register[0]);
