@@ -41,6 +41,29 @@ Eigen::MatrixXd complete_isometry(Eigen::MatrixXd m) {
   return u;
 }
 
+// Orthogonal matrix whose columns are the orthonormalized nonzero columns of
+// m in place, largest first, and a Householder complement elsewhere.
+Eigen::MatrixXd complete_columns(const Eigen::MatrixXd& m) {
+  const Eigen::Index n = m.rows();
+  std::vector<Eigen::Index> kept, free;
+  for (Eigen::Index k = 0; k < n; ++k) {
+    (k < m.cols() && m.col(k).norm() > 1.0e-12 ? kept : free).push_back(k);
+  }
+  std::stable_sort(kept.begin(), kept.end(), [&](auto a, auto b) {
+    return m.col(a).norm() > m.col(b).norm();
+  });
+  const Eigen::Index r = kept.size();
+  Eigen::MatrixXd q(n, n), u(n, n);
+  Eigen::VectorXd tau(std::max<Eigen::Index>(r, 1)), sign(r);
+  for (Eigen::Index i = 0; i < r; ++i) q.col(i) = m.col(kept[i]);
+  lapack::geqrf(n, r, q.data(), n, tau.data());
+  for (Eigen::Index i = 0; i < r; ++i) sign(i) = q(i, i) < 0.0 ? -1.0 : 1.0;
+  lapack::orgqr(n, n, r, q.data(), n, tau.data());
+  for (Eigen::Index i = 0; i < r; ++i) u.col(kept[i]) = sign(i) * q.col(i);
+  for (Eigen::Index i = r; i < n; ++i) u.col(free[i - r]) = q.col(i);
+  return u;
+}
+
 // Clements layers (Optica 3, 1460) of an orthogonal matrix; angles must be 0.
 void givens_layers(Eigen::MatrixXd u, Eigen::Ref<Eigen::MatrixXd> angles,
                    Eigen::Ref<Eigen::VectorXd> signs) {
@@ -143,20 +166,55 @@ dense_isometry_synthesis(const Eigen::MatrixXd& isometry,
   std::vector<Eigen::MatrixXd> u1(num_csds, Eigen::MatrixXd(chi, chi)),
       u2 = u1, vt(num_csds);
   for (Eigen::Index j = 0; j < num_csds; ++j) {
-    const Eigen::Index width = inputs[j].cols();
-    Eigen::VectorXd theta(width);
-    vt[j].resize(width, width);
-    if (lapack::orcsd2by1(lapack::Job::Vec, lapack::Job::Vec, lapack::Job::Vec,
-                          2 * chi, chi, width, inputs[j].data(), 2 * chi,
-                          inputs[j].data() + chi, 2 * chi, theta.data(),
-                          u1[j].data(), chi, u2[j].data(), chi, vt[j].data(),
-                          width) != 0) {
-      throw std::runtime_error("Unitary synthesis CSD did not converge.");
+    // CSD [A; B] V = diag(U1, U2) [C; S] by one-sided Jacobi on A, then on the
+    // columns of B with S <= C (Van Loan, Numer. Math. 46, 479), which keeps
+    // orthogonal columns apart (orcsd2by1 needs LAPACK 3.5).
+    Eigen::MatrixXd& m = inputs[j];
+    const Eigen::Index width = m.cols();
+    Eigen::MatrixXd v = Eigen::MatrixXd::Identity(width, width);
+    std::vector<Eigen::Index> active(width);
+    std::iota(active.begin(), active.end(), 0);
+    for (const Eigen::Index offset : {Eigen::Index{0}, chi}) {
+      if (offset > 0) {
+        std::erase_if(active, [&](Eigen::Index k) {
+          return m.col(k).tail(chi).norm() > m.col(k).head(chi).norm();
+        });
+      }
+      for (int sweep = 0, rotated = 1; rotated; ++sweep) {
+        if (sweep == 100) {
+          throw std::runtime_error("Unitary synthesis CSD did not converge.");
+        }
+        rotated = 0;
+        for (std::size_t i = 0; i < active.size(); ++i) {
+          for (std::size_t k = i + 1; k < active.size(); ++k) {
+            const auto a = m.col(active[i]).segment(offset, chi);
+            const auto b = m.col(active[k]).segment(offset, chi);
+            const double alpha = a.squaredNorm(), beta = b.squaredNorm();
+            const double gamma = a.dot(b);
+            if (std::min(alpha, beta) < 1.0e-24 ||
+                !(std::abs(gamma) > 1.0e-15 * chi * std::sqrt(alpha * beta))) {
+              continue;
+            }
+            rotated = 1;
+            const double zeta = (beta - alpha) / (2.0 * gamma);
+            const double t = std::copysign(1.0, zeta) /
+                             (std::abs(zeta) + std::hypot(1.0, zeta));
+            const double c = 1.0 / std::hypot(1.0, t);
+            blas::rot(2 * chi, &m(0, active[i]), 1, &m(0, active[k]), 1, c,
+                      -c * t);
+            blas::rot(width, &v(0, active[i]), 1, &v(0, active[k]), 1, c,
+                      -c * t);
+          }
+        }
+      }
     }
-    // LAPACK pairs the sines with the last columns of U2; move them first.
-    std::rotate(u2[j].data(), u2[j].data() + (chi - width) * chi,
-                u2[j].data() + u2[j].size());
-    ucr_angles.row(j).head(width) = 2.0 * theta;
+    vt[j] = v.transpose();
+    for (Eigen::Index k = 0; k < width; ++k) {
+      ucr_angles(j, k) = 2.0 * std::atan2(m.col(k).tail(chi).norm(),
+                                          m.col(k).head(chi).norm());
+    }
+    u1[j] = detail::complete_columns(m.topRows(chi));
+    u2[j] = detail::complete_columns(m.bottomRows(chi));
   }
   std::vector<Eigen::MatrixXd> blocks{exact}, factors;
   Eigen::MatrixXd right_factor = Eigen::MatrixXd::Identity(cols, cols);
