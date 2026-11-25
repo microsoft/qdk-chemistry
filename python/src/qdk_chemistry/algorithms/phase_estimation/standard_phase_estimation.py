@@ -81,6 +81,9 @@ class StandardPhaseEstimation(PhaseEstimation):
         Returns:
             A QpeResult object containing the results of the phase estimation.
 
+        Raises:
+            TypeError: If the circuit builder is not a standard builder, or the unitary has no eigenvalue mapping.
+
         """
         Logger.trace_entering()
         circuit_executor = self._create_nested("circuit_executor")
@@ -97,6 +100,8 @@ class StandardPhaseEstimation(PhaseEstimation):
         unitary_builder.settings().update("power", 1)
         unitary_rep = unitary_builder.run(qubit_hamiltonian)
         container = unitary_rep.get_container()
+        if not container.has_eigenvalue_mapping:
+            raise TypeError(f"Phase estimation needs a unitary whose phases map to eigenvalues; got {container.type}.")
 
         num_bits = circuit_builder.settings().get("num_bits")
         circuits = circuit_builder.run(

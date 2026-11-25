@@ -94,7 +94,7 @@ void merge_layers(const std::vector<Eigen::MatrixXd>& blocks,
   for (Eigen::Index j = 0; j < num_layers; ++j) {
     if ((angles.row(j).array() != 0.0).any()) kept.push_back(j);
   }
-  angles = angles(kept, Eigen::all).eval();
+  angles = angles(kept, Eigen::seqN(0, angles.cols())).eval();
 }
 
 }  // namespace detail

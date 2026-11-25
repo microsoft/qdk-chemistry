@@ -172,6 +172,7 @@ class LCUContainer(BlockEncodingContainer):
 
     # Serialization version for this class
     _serialization_version = "0.2.0"
+    has_eigenvalue_mapping = False
 
     def __init__(
         self,
