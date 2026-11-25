@@ -40,15 +40,46 @@ This module requires both QDK/Chemistry and PySCF to be installed.
 # Licensed under the MIT License. See LICENSE.txt in the project root for license information.
 # --------------------------------------------------------------------------------------------
 
+from typing import Any
+
 import numpy as np
-from pyscf import cc
+from pyscf import ao2mo, cc, lib
 
 from qdk_chemistry.algorithms import DynamicalCorrelationCalculator
 from qdk_chemistry.data import AmplitudeContainer, AmplitudeType, Settings, Wavefunction
-from qdk_chemistry.plugins.pyscf.conversion import hamiltonian_to_scf
+from qdk_chemistry.plugins.pyscf.conversion import hamiltonian_to_scf, spin_blocked_ao2mofn
 from qdk_chemistry.utils import Logger
 
 __all__ = ["PyscfCoupledClusterCalculator", "PyscfCoupledClusterSettings"]
+
+
+def _spin_blocked_integrals(pyscf_cc: cc.uccsd.UCCSD, reference: Any) -> Any:
+    """UCCSD integrals of a spin-blocked reference from :func:`hamiltonian_to_scf`.
+
+    Same integrals, in the same layout, as ``pyscf_cc.ao2mo()``; built per spin block through PySCF's private
+    ``_make_eris_incore``, which ``pyscf_cc.ao2mo()`` can replace if that hook changes.
+
+    Args:
+        pyscf_cc: The UCCSD calculation on the reference.
+        reference: A reference from :func:`hamiltonian_to_scf` for an unrestricted Hamiltonian.
+
+    Returns:
+        The integrals to pass to ``kernel`` and ``solve_lambda``.
+
+    """
+    eris = cc.uccsd._make_eris_incore(pyscf_cc, None, spin_blocked_ao2mofn(reference))  # noqa: SLF001
+    for name in ("ovvv", "OVVV", "ovVV", "OVvv"):
+        block = getattr(eris, name)
+        occupied, virtual, nvir = block.shape[:3]
+        packed = lib.pack_tril(block.reshape(occupied * virtual, nvir, nvir))
+        setattr(eris, name, packed.reshape(occupied, virtual, nvir * (nvir + 1) // 2))
+    nvira, nvirb = eris.vvVV.shape[0], eris.vvVV.shape[2]
+    eris.vvvv = ao2mo.restore(4, eris.vvvv, nvira)
+    eris.VVVV = ao2mo.restore(4, eris.VVVV, nvirb)
+    rows_a, cols_a = np.tril_indices(nvira)
+    rows_b, cols_b = np.tril_indices(nvirb)
+    eris.vvVV = lib.take_2d(eris.vvVV.reshape(nvira**2, nvirb**2), rows_a * nvira + cols_a, rows_b * nvirb + cols_b)
+    return eris
 
 
 class PyscfCoupledClusterSettings(Settings):
@@ -66,7 +97,7 @@ class PyscfCoupledClusterSettings(Settings):
         max_cycle (int): Max number of iterations. Default is 50.
         diis_space (int): DIIS space size. Default is 6.
         diis_start_cycle (int): The step to start DIIS. Default is 0.
-        direct (bool): AO-direct CCSD. Default is False.
+        direct (bool): AO-direct CCSD; must be False, as the integrals come from the Hamiltonian. Default is False.
         async_io (bool): Allow for asynchronous function execution. Default is True.
         incore_complete (bool): Avoid all I/O. Default is True.
         frozen (int or list): If integer is given, the inner-most orbitals are frozen from CC amplitudes.
@@ -140,11 +171,14 @@ class PyscfCoupledClusterCalculator(DynamicalCorrelationCalculator):
                   When compute_bra is False, only (total_energy, ket_wavefunction, None) is returned.
 
         Raises:
+            ValueError: If ``direct`` is True.
             RuntimeError: If the CCSD calculation does not converge.
             RuntimeError: If the lambda equation solver does not converge (when compute_bra=True).
 
         """
         Logger.trace_entering()
+        if self._settings.get("direct"):
+            raise ValueError("AO-direct CCSD needs an AO basis; the reference holds the Hamiltonian's integrals.")
         hamiltonian = ansatz.get_hamiltonian()
 
         alpha_occ, beta_occ = ansatz.get_wavefunction().get_total_orbital_occupations()
@@ -168,9 +202,11 @@ class PyscfCoupledClusterCalculator(DynamicalCorrelationCalculator):
         pyscf_cc.diis_start_cycle = int(self._settings.get("diis_start_cycle"))
         pyscf_cc.direct = bool(self._settings.get("direct"))
         pyscf_cc.async_io = bool(self._settings.get("async_io"))
+        # Build the integrals while PySCF's own in-core flag holds; the setting then only moves DIIS and intermediates.
+        eris = _spin_blocked_integrals(pyscf_cc, pyscf_scf) if hamiltonian.is_unrestricted() else pyscf_cc.ao2mo()
         pyscf_cc.incore_complete = bool(self._settings.get("incore_complete"))
 
-        pyscf_cc.kernel()
+        pyscf_cc.kernel(eris=eris)
         if not pyscf_cc.converged:
             raise RuntimeError("CCSD calculation did not converge")
 
@@ -251,7 +287,7 @@ class PyscfCoupledClusterCalculator(DynamicalCorrelationCalculator):
 
         # Compute bra wavefunction (lambda/gamma amplitudes) if requested
         if compute_bra:
-            pyscf_cc.solve_lambda()
+            pyscf_cc.solve_lambda(eris=eris)
             if not pyscf_cc.converged_lambda:
                 raise RuntimeError("Lambda equation solver did not converge")
 
