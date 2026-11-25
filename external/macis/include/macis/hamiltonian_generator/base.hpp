@@ -142,6 +142,22 @@ class HamiltonianGeneratorBase {
     generate_integral_intermediates_(V_pqrs_);
   }
 
+  /// @brief Canonical determinant diagonal from the occupied spin orbitals.
+  double matrix_element_diag(const std::vector<uint32_t>& occ_alpha,
+                             const std::vector<uint32_t>& occ_beta) const {
+    double h_el = 0;
+    for (auto p : occ_alpha) h_el += T_pq_(p, p);
+    for (auto p : occ_beta) h_el += T_pq_(p, p);
+
+    for (auto q : occ_alpha)
+      for (auto p : occ_alpha) h_el += G2_red_(p, q);
+    for (auto q : occ_beta)
+      for (auto p : occ_beta) h_el += G2_red_(p, q);
+    for (auto q : occ_beta)
+      for (auto p : occ_alpha) h_el += V2_red_(p, q);
+    return h_el;
+  }
+
   /**
    * @brief Compute single orbital energy for a given orbital from integrals and
    * occupied orbitals

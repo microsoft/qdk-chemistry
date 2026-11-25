@@ -188,44 +188,4 @@ double HamiltonianGenerator<WfnType>::matrix_element_2(
   return sign * h_el;
 }
 
-/**
- * @brief Compute diagonal matrix element (no excitations)
- *
- * Calculates the diagonal matrix element for identical determinants.
- * Includes one-electron terms and all two-electron interactions between
- * occupied orbitals.
- *
- * @tparam WfnType Wavefunction type defining determinant representation
- * @param occ_alpha Occupied alpha orbitals
- * @param occ_beta Occupied beta orbitals
- * @return Diagonal matrix element value
- */
-template <typename WfnType>
-double HamiltonianGenerator<WfnType>::matrix_element_diag(
-    const std::vector<uint32_t>& occ_alpha,
-    const std::vector<uint32_t>& occ_beta) const {
-  double h_el = 0;
-
-  // One-electron piece
-  for (auto p : occ_alpha) h_el += T_pq_(p, p);
-  for (auto p : occ_beta) h_el += T_pq_(p, p);
-
-  // Same-spin two-body term
-  for (auto q : occ_alpha)
-    for (auto p : occ_alpha) {
-      h_el += G2_red_(p, q);
-    }
-  for (auto q : occ_beta)
-    for (auto p : occ_beta) {
-      h_el += G2_red_(p, q);
-    }
-
-  // Opposite-spin two-body term
-  for (auto q : occ_beta)
-    for (auto p : occ_alpha) {
-      h_el += V2_red_(p, q);
-    }
-
-  return h_el;
-}
 }  // namespace macis

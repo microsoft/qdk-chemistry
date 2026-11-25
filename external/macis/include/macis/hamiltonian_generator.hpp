@@ -156,19 +156,6 @@ class HamiltonianGenerator : public HamiltonianGeneratorBase<double> {
                           const std::vector<uint32_t>& bra_occ_beta) const;
 
   /**
-   *  @brief Compute diagonal matrix element
-   *
-   *  Calculates the diagonal Hamiltonian matrix element for a determinant
-   *  (expectation value of the Hamiltonian).
-   *
-   *  @param[in] occ_alpha Alpha occupied orbital indices
-   *  @param[in] occ_beta Beta occupied orbital indices
-   *  @returns Diagonal Hamiltonian matrix element value
-   */
-  double matrix_element_diag(const std::vector<uint32_t>& occ_alpha,
-                             const std::vector<uint32_t>& occ_beta) const;
-
-  /**
    *  @brief Compute general matrix element with occupation information
    *
    *  General interface for computing Hamiltonian matrix elements between

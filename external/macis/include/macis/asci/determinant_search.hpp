@@ -233,6 +233,7 @@ asci_contrib_container<wfn_t<N>> asci_contributions_standard(
   using spin_wfn_traits = wavefunction_traits<spin_wfn_type>;
   auto logger = spdlog::get("asci_search");
 
+  const detail::asci_diagonals diagonals(ham_gen);
   const size_t ncdets = std::distance(cdets_begin, cdets_end);
 
   asci_contrib_container<wfn_t<N>> asci_pairs;
@@ -263,32 +264,32 @@ asci_contrib_container<wfn_t<N>> asci_contributions_standard(
     append_singles_asci_contributions<Spin::Alpha>(
         coeff, state, state_alpha, occ_alpha, vir_alpha, occ_beta,
         eps_alpha.data(), T_pq, norb, G_red, norb, V_red, norb, h_el_tol,
-        h_diag, E_ASCI, ham_gen, asci_pairs);
+        h_diag, E_ASCI, diagonals, asci_pairs);
 
     // Singles - BB
     append_singles_asci_contributions<Spin::Beta>(
         coeff, state, state_beta, occ_beta, vir_beta, occ_alpha,
         eps_beta.data(), T_pq, norb, G_red, norb, V_red, norb, h_el_tol, h_diag,
-        E_ASCI, ham_gen, asci_pairs);
+        E_ASCI, diagonals, asci_pairs);
 
     if (not asci_settings.just_singles) {
       // Doubles - AAAA
       append_ss_doubles_asci_contributions<Spin::Alpha>(
           coeff, state, state_alpha, state_beta, occ_alpha, vir_alpha, occ_beta,
-          eps_alpha.data(), V_pqrs, norb, h_el_tol, h_diag, E_ASCI, ham_gen,
+          eps_alpha.data(), V_pqrs, norb, h_el_tol, h_diag, E_ASCI, diagonals,
           asci_pairs);
 
       // Doubles - BBBB
       append_ss_doubles_asci_contributions<Spin::Beta>(
           coeff, state, state_beta, state_alpha, occ_beta, vir_beta, occ_alpha,
-          eps_beta.data(), V_pqrs, norb, h_el_tol, h_diag, E_ASCI, ham_gen,
+          eps_beta.data(), V_pqrs, norb, h_el_tol, h_diag, E_ASCI, diagonals,
           asci_pairs);
 
       // Doubles - AABB
       append_os_doubles_asci_contributions(
           coeff, state, state_alpha, state_beta, occ_alpha, occ_beta, vir_alpha,
           vir_beta, eps_alpha.data(), eps_beta.data(), V_pqrs, norb, h_el_tol,
-          h_diag, E_ASCI, ham_gen, asci_pairs);
+          h_diag, E_ASCI, diagonals, asci_pairs);
     }
 
     // Prune Down Contributions
@@ -364,6 +365,7 @@ asci_contrib_container<wfn_t<N>> asci_contributions_constraint(
     throw std::runtime_error("ASCI Search Only Works with Sorted Wfns");
 
   auto logger = spdlog::get("asci_search");
+  const detail::asci_diagonals diagonals(ham_gen);
   const size_t ncdets = std::distance(cdets_begin, cdets_end);
 
 #ifdef MACIS_ENABLE_MPI
@@ -628,32 +630,32 @@ asci_contrib_container<wfn_t<N>> asci_contributions_constraint(
             generate_constraint_singles_contributions_ss(
                 c, w, con, occ_alpha, occ_beta, orb_ens_alpha.data(), T_pq,
                 norb, G_red, norb, V_red, norb, h_el_tol, h_diag, E_ASCI,
-                ham_gen, working_pairs);
+                diagonals, working_pairs);
 
             // AAAA excitations
             generate_constraint_doubles_contributions_ss(
                 c, w, con, occ_alpha, occ_beta, orb_ens_alpha.data(), V_pqrs,
-                norb, h_el_tol, h_diag, E_ASCI, ham_gen, working_pairs, O_buf,
+                norb, h_el_tol, h_diag, E_ASCI, diagonals, working_pairs, O_buf,
                 V_buf, virt_ind_buf, occ_ind_buf);
 
             // AABB excitations
             generate_constraint_doubles_contributions_os(
                 c, w, con, occ_alpha, occ_beta, vir_beta, orb_ens_alpha.data(),
                 orb_ens_beta.data(), V_pqrs, norb, h_el_tol, h_diag, E_ASCI,
-                ham_gen, working_pairs);
+                diagonals, working_pairs);
 
             if (alpha_satisfies_con) {
               // BB excitations
               append_singles_asci_contributions<Spin::Beta>(
                   c, w, beta_det, occ_beta, vir_beta, occ_alpha,
                   orb_ens_beta.data(), T_pq, norb, G_red, norb, V_red, norb,
-                  h_el_tol, h_diag, E_ASCI, ham_gen, working_pairs);
+                  h_el_tol, h_diag, E_ASCI, diagonals, working_pairs);
 
               // BBBB excitations
               append_ss_doubles_asci_contributions<Spin::Beta>(
                   c, w, beta_det, alpha_det, occ_beta, vir_beta, occ_alpha,
                   orb_ens_beta.data(), V_pqrs, norb, h_el_tol, h_diag, E_ASCI,
-                  ham_gen, working_pairs);
+                  diagonals, working_pairs);
 
               // No excitation (push inf to remove from list)
               working_pairs.push_back(
@@ -968,9 +970,9 @@ std::vector<wfn_t<N>> asci_search(
   // Remove core dets
   // This assumes the constraint search
   {
-    auto inf_ptr = std::partition(asci_pairs.begin(), asci_pairs.end(),
-                                  [](auto& p) { return !std::isinf(p.rv()); });
-    asci_pairs.erase(inf_ptr, asci_pairs.end());
+    auto core = std::partition(asci_pairs.begin(), asci_pairs.end(),
+                               [](const auto& p) { return !p.is_core(); });
+    asci_pairs.erase(core, asci_pairs.end());
   }
 
   auto keep_large_en = clock_type::now();
@@ -995,7 +997,9 @@ std::vector<wfn_t<N>> asci_search(
 
   // Do Top-K to get the largest determinant contributions
   auto asci_sort_st = clock_type::now();
-  if (world_size > 1 or asci_pairs.size() > top_k_elements) {
+  if (top_k_elements == 0) {
+    asci_pairs.clear();
+  } else if (world_size > 1 or asci_pairs.size() > top_k_elements) {
     std::vector<asci_contrib<wfn_t<N>>> topk(top_k_elements);
     if (world_size > 1) {
 #ifdef MACIS_ENABLE_MPI
@@ -1004,10 +1008,15 @@ std::vector<wfn_t<N>> asci_search(
       std::transform(asci_pairs.begin(), asci_pairs.end(), scores.begin(),
                      [](const auto& p) { return std::abs(p.rv()); });
 
-      // Determine kth-ranked scores
+      // Cancellation may leave fewer than k external states (even none).
+      // All surviving scores are nonnegative, so a zero cutoff gathers all.
+      const size_t nscores = allreduce(scores.size(), MPI_SUM, comm);
       auto kth_score =
-          dist_quickselect(scores.begin(), scores.end(), top_k_elements, comm,
-                           std::greater<double>{}, std::equal_to<double>{});
+          nscores <= top_k_elements
+              ? 0.
+              : dist_quickselect(scores.begin(), scores.end(), top_k_elements,
+                                 comm, std::greater<double>{},
+                                 std::equal_to<double>{});
 
       logger->info("  * Kth Score Pivot = {:.16e}", kth_score);
       // Partition local pairs into less / eq batches

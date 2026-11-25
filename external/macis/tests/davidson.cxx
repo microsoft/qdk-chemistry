@@ -7,6 +7,7 @@
  * See LICENSE.txt for details
  */
 
+#include <cmath>
 #include <iomanip>
 #include <iostream>
 #include <macis/csr_hamiltonian.hpp>
@@ -71,7 +72,33 @@ TEST_CASE("Davidson") {
         blas::dot(X.size(), X.data(), 1, AX.data(), 1),
         Catch::Matchers::WithinAbs(E0, testing::numerical_zero_tolerance));
   }
-  spdlog::drop_all();
+  spdlog::drop("davidson");
+}
+
+TEST_CASE("Davidson at the full subspace dimension") {
+  ROOT_ONLY(MPI_COMM_WORLD);
+  const double s = std::ldexp(1.0, 1023);
+  sparsexx::csr_matrix<double, int32_t> H(2, 2, {0, 2, 4}, {0, 1, 0, 1},
+                                          {-s, s / 4, s / 4, s});
+  const auto op = macis::SparseMatrixOperator(H);
+  const double D[] = {-s, s};
+  double X[] = {1., 0.};
+
+  SECTION("attainable absolute residual tolerance") {
+    const double tol = s * 1e-12;
+    const double e = macis::davidson(2, 10, op, D, tol, X).second / s;
+    REQUIRE_THAT(e, Catch::Matchers::WithinAbs(-std::sqrt(17.) / 4, tol / s));
+    REQUIRE_THAT(std::hypot(X[0], X[1]),
+                 Catch::Matchers::WithinAbs(1., tol / s));
+    REQUIRE(std::hypot(-X[0] + X[1] / 4 - e * X[0],
+                       X[0] / 4 + X[1] - e * X[1]) < tol / s);
+  }
+
+  SECTION("unmet tolerance is a convergence failure") {
+    // The strict residual test cannot succeed, even if a BLAS rounds it to 0.
+    REQUIRE_THROWS_WITH(macis::davidson(2, 10, op, D, 0., X),
+                        "Davidson Did Not Converge!");
+  }
 }
 
 #ifdef MACIS_ENABLE_MPI
@@ -138,6 +165,6 @@ TEST_CASE("Parallel Davidson") {
   }
 
   MPI_Barrier(MPI_COMM_WORLD);
-  spdlog::drop_all();
+  spdlog::drop("davidson");
 }
 #endif
