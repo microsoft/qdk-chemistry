@@ -79,6 +79,7 @@ Exposed exceptions are:
 
 import warnings
 from contextlib import suppress
+from typing import TYPE_CHECKING
 
 from qdk_chemistry._core.data import (
     AlgorithmRef,
@@ -143,9 +144,7 @@ from qdk_chemistry.data.hamiltonian_description.fermi_hubbard import FermiHubbar
 from qdk_chemistry.data.hamiltonian_description.model_hamiltonian import ModelHamiltonianDescription
 from qdk_chemistry.data.noise_models import QuantumErrorProfile
 from qdk_chemistry.data.qpe_result import QpeResult
-
-# ``QubitHamiltonian`` is re-exported as a deprecated alias of ``QubitOperator``.
-from qdk_chemistry.data.qubit_operator import QubitHamiltonian, QubitOperator
+from qdk_chemistry.data.qubit_operator import QubitOperator
 from qdk_chemistry.data.registry import available_dataclasses, get_dataclass_type, register_dataclass
 from qdk_chemistry.data.symmetries import Symmetries
 from qdk_chemistry.data.term_partition import FlatPartition, LayeredPartition, TermPartition
@@ -156,6 +155,9 @@ from qdk_chemistry.data.time_dependent_qubit_hamiltonian.driven import DrivenQub
 from qdk_chemistry.data.unitary_representation.base import UnitaryRepresentation
 from qdk_chemistry.data.unitary_representation.containers.base import UnitaryContainer
 from qdk_chemistry.data.unitary_representation.containers.pauli_product_formula import PauliProductFormulaContainer
+
+if TYPE_CHECKING:
+    QubitHamiltonian = QubitOperator
 
 # Give Users the option to use "Error" suffix for exceptions if they prefer
 SettingNotFoundError = SettingNotFound
@@ -250,9 +252,9 @@ __all__ = [
 
 # v1 names removed or renamed in v2.0, kept as deprecated aliases to their v2
 # replacement. The constructor signatures of the v2 replacements may differ from
-# the v1 classes; see the v1 -> v2 migration guide for details. These names are
-# intentionally omitted from ``__all__`` so ``import *`` does not pull them in.
+# the v1 classes; see the v1 -> v2 migration guide for details.
 _DEPRECATED_ALIASES = {
+    "QubitHamiltonian": "QubitOperator",
     "SlaterDeterminantContainer": "StateVectorContainer",
     "CasWavefunctionContainer": "StateVectorContainer",
     "SciWavefunctionContainer": "StateVectorContainer",

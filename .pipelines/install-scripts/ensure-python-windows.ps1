@@ -22,8 +22,8 @@
     need packages, they get them from the internal feed via PipAuthenticate@1.
 
     Resolution order, cheapest first:
-      1. A working python already on PATH.
-      2. A python already in the agent tool cache. This also recovers the
+      1. A working python of the requested version already on PATH.
+      2. A matching python already in the agent tool cache. This also recovers the
          extracted-but-unregistered interpreter that a failed UsePythonVersion@0
          leaves behind.
       3. A download from the actions/python-versions GitHub release feed, which
@@ -34,8 +34,8 @@
     Target architecture, x64 or arm64. Defaults to the host architecture.
 
 .PARAMETER Version
-    Python feature version to provision, e.g. '3.13'. Only used when a download
-    is actually required.
+    Python feature version to provision, e.g. '3.13'. Interpreters on PATH and
+    in the tool cache must also match this version.
 
 .PARAMETER Force
     Skip the PATH and tool cache probes and go straight to the download. Used to
@@ -82,6 +82,11 @@ function Test-PythonExe {
         $code = if (Test-Path variable:LASTEXITCODE) { $LASTEXITCODE } else { 0 }
         if ($code -ne 0 -or ($out | Out-String) -notmatch 'Python\s+(\d+\.\d+\.\d+)') { return $null }
         $found = $Matches[1]
+
+        if ($found -notlike "$Version.*") {
+            Write-Host "  ignoring $Exe : reports Python $found, wanted $Version"
+            return $null
+        }
 
         # Reject an interpreter of the wrong architecture. Windows on ARM64 runs
         # x64 binaries under emulation perfectly happily, so an x64 python on

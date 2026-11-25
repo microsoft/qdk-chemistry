@@ -442,6 +442,16 @@ class TestSettings:
         with pytest.raises(SettingNotFoundError):
             settings.update(bad_update_dict)
 
+    def test_string_value_preserves_embedded_nulls(self):
+        """String settings retain their complete value across Python and JSON access."""
+        settings = _TestSettingsContainer()
+        value = "\0alpha\0\u00e9\0"
+        settings.set("test_string", value)
+
+        assert settings.get("test_string") == value
+        assert settings.to_dict()["test_string"] == value
+        assert json.loads(settings.to_json())["test_string"] == value
+
     def test_dictionary_conversion(self):
         """Test to_dict and from_dict methods."""
         settings = _TestSettingsContainer()
