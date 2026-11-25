@@ -93,6 +93,7 @@ def _assert_realizes(circuit, matrix, seed: int, preimage=None) -> None:
         ],
         (_BLOCK_SPARSE, _block_sparse([4, 4, 3, 2, 1, 1, 1], seed=16).toarray()),
         (_BLOCK_SPARSE, ortho_group.rvs(4, random_state=8)),
+        (_BLOCK_SPARSE, sparse.csc_array(sparse.block_diag([ortho_group.rvs(4, random_state=s) for s in (1, 2)]))),
     ],
 )
 def test_realizes_matrix(name, matrix):
@@ -181,6 +182,12 @@ def test_signed_permutation_needs_no_rotations():
     synthesis = block_sparse_isometry_synthesis(sparse.csc_array(np.diag([1.0, -1.0, 1.0, -1.0])[[2, 0, 3, 1]]))
     assert synthesis.block_givens.layer_angles == []
     assert len(synthesis.column_permutation) == len(synthesis.row_permutation) == 4
+
+
+def test_identity_needs_no_lookups():
+    """The identity skips its identity permutations and its constant sign table, so it costs no Toffolis."""
+    counts = create("circuit_mapper", _BLOCK_SPARSE).run(_representation(np.eye(8))).estimate().logical_counts
+    assert counts["cczCount"] + counts["ccixCount"] == 0
 
 
 @pytest.mark.parametrize("duplicates", ["split", "cancelling"])
@@ -445,9 +452,9 @@ class TestPermutationViaQROAM:
         """The lookup, swap and measurement-based unlookup apply the permutation, or its inverse, exactly."""
         rng = np.random.default_rng(num_bits)
         reverse = _bit_reversal(num_bits)
-        # Each repetition exercises the phase fix-up on new unlookup measurement outcomes.
-        for _ in range(4):
-            permutation = rng.permutation(1 << num_bits).tolist()
+        # Each repetition exercises the phase fix-up on new unlookup measurement outcomes; the identity skips it.
+        for repetition in range(5):
+            permutation = rng.permutation(1 << num_bits).tolist() if repetition else list(range(1 << num_bits))
             angles = rng.uniform(0.2, np.pi - 0.2, num_bits).tolist()
             amplitudes = _ry_product_state(angles[::-1])
             expected = np.zeros_like(amplitudes)

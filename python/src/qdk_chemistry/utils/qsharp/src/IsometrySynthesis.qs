@@ -17,6 +17,7 @@
 /// - `MakeXCircuit(synthesis)` runs it.
 namespace QDKChemistry.Utils.IsometrySynthesis {
 
+    import Std.Arrays.All;
     import Std.Arrays.Any;
     import Std.Arrays.ForEach;
     import Std.Arrays.IndexRange;
@@ -123,6 +124,10 @@ namespace QDKChemistry.Utils.IsometrySynthesis {
         target : Qubit[],
         signs : Bool[]
     ) : Bool[] {
+        if All(fixed -> fixed, MappedOverRange(state -> BoolArrayAsInt(permTargets[state]) == state, IndexRange(permTargets))) {
+            // The identity needs no lookup.
+            return signs;
+        }
         use loaded = Qubit[Length(target)];
         let swapBits = ComputeOptimalLambda2D(1, Length(permTargets), Length(target), true, maxSwapBits);
         let loadSigns = LoadWordDeferred(permTargets, swapBits, target, [], loaded);
