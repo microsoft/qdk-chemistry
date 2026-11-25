@@ -56,6 +56,7 @@ if PYSCF_AVAILABLE:
         spin_blocked_ao2mofn,
         structure_to_pyscf_atom_labels,
     )
+    from qdk_chemistry.plugins.pyscf.coupled_cluster import _spin_blocked_integrals
     from qdk_chemistry.plugins.pyscf.mcscf import _mcsolver_to_fcisolver
 
 
@@ -2721,9 +2722,24 @@ class TestPyscfPlugin:
         assert not np.any(mf.mo_coeff[0][norb:])
         assert not np.any(mf.mo_coeff[1][:norb])
 
-    def test_spin_blocked_ao2mofn_matches_pyscf_transformation(self) -> None:
-        """Transforming each spin block in its half equals PySCF's transformation over the doubled basis."""
-        norb = 3
+    @pytest.mark.parametrize("unrestricted", [False, True])
+    def test_hamiltonian_to_scf_one_electron_scf_keeps_core_energy(self, unrestricted: bool) -> None:
+        """SCF on a one-electron reference keeps the core energy."""
+        one_body, two_body, empty = np.diag([-1.0, 0.5]), np.zeros(2**4), np.empty((0, 0))
+        orbitals = data.ModelOrbitals(2, SymmetryProduct([axes.spin(1, not unrestricted)]))
+        if unrestricted:
+            container = data.CanonicalFourCenterHamiltonianContainer(
+                one_body, one_body, two_body, two_body, two_body, orbitals, 0.7, empty, empty
+            )
+        else:
+            container = data.CanonicalFourCenterHamiltonianContainer(one_body, two_body, orbitals, 0.7, np.eye(2))
+        mf = hamiltonian_to_scf(data.Hamiltonian(container), np.array([1.0, 0.0]), np.array([0.0, 0.0]))
+        reference_energy = mf.energy_tot()
+        assert np.isclose(mf.kernel(), reference_energy, rtol=0.0, atol=scf_energy_tolerance)
+
+    @pytest.mark.parametrize("norb", [1, 3])
+    def test_spin_blocked_ao2mofn_matches_pyscf_transformation(self, norb: int) -> None:
+        """Per-spin-block transformations and UCCSD integrals equal PySCF's over the doubled basis, in its layout."""
         random = np.random.default_rng(796)
 
         def symmetrized(*swaps):
@@ -2742,13 +2758,18 @@ class TestPyscfPlugin:
                 np.eye(norb), np.eye(norb), aaaa.ravel(), aabb.ravel(), bbbb.ravel(), orbitals, 0.0, empty, empty
             )
         )
-        reference = hamiltonian_to_scf(hamiltonian, np.array([1.0, 0.0, 0.0]), np.array([1.0, 0.0, 0.0]))
+        reference = hamiltonian_to_scf(hamiltonian, np.eye(norb)[0], np.eye(norb)[0])
         ao2mofn = spin_blocked_ao2mofn(reference)
         coefficients = [random.normal(size=(2 * norb, count)) for count in (2, 3, 1, 2)]
         expected = pyscf.ao2mo.general(reference._eri, coefficients, compact=False)
         np.testing.assert_allclose(ao2mofn(tuple(coefficients)), expected, rtol=0.0, atol=1e-12)
         expected = pyscf.ao2mo.general(reference._eri, (coefficients[1],) * 4, compact=False)
         np.testing.assert_allclose(ao2mofn(coefficients[1]), expected, rtol=0.0, atol=1e-12)
+        pyscf_cc = pyscf.cc.CCSD(reference)
+        integrals = _spin_blocked_integrals(pyscf_cc, reference)
+        for name, value in vars(pyscf_cc.ao2mo()).items():
+            if isinstance(value, np.ndarray):
+                np.testing.assert_allclose(getattr(integrals, name), value, rtol=0.0, atol=1e-12)
 
     @pytest.mark.parametrize(
         ("multiplicity", "configuration", "nelec"),

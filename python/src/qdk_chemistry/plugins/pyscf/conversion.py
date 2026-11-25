@@ -739,7 +739,8 @@ def hamiltonian_to_scf(hamiltonian: Hamiltonian, alpha_occ: np.ndarray, beta_occ
         eri[starts[:, None] + np.arange(npair)] = ao2mo.restore(4, aabb, norb).T
         lower = np.tril_indices(npair)
         eri[starts[lower[0]] + beta_pairs[lower[1]]] = ao2mo.restore(4, bbbb, norb)[lower]
-        mf = pyscf.scf.UHF(mol)
+        # pyscf.scf.UHF would return a one-electron class whose SCF ignores energy_nuc.
+        mf = pyscf.scf.uhf.UHF(mol)
         mf._eri = eri  # noqa: SLF001
         zero = np.zeros((norb, norb))
         core = np.block([[one_body[0], zero], [zero, one_body[1]]])
@@ -765,7 +766,7 @@ def hamiltonian_to_scf(hamiltonian: Hamiltonian, alpha_occ: np.ndarray, beta_occ
             mf.mo_occ = alpha_occ + beta_occ
         else:
             # PySCF's ROHF-to-UHF conversion would assign every singly occupied orbital to alpha.
-            mf = pyscf.scf.UHF(mol)
+            mf = pyscf.scf.uhf.UHF(mol)
             mf.mo_coeff = (np.eye(norb), np.eye(norb))
             mf.mo_occ = (alpha_occ, beta_occ)
         mf._eri = ao2mo.restore(8, _required_eightfold_symmetrized(two_body[0], "PySCF"), norb)  # noqa: SLF001
@@ -819,7 +820,7 @@ def spin_blocked_ao2mofn(reference: pyscf.scf.hf.SCF) -> Callable[[np.ndarray | 
             orbitals = [c[halves[bra]] for c in coefficients[:2]] + [c[halves[ket]] for c in coefficients[2:]]
             if all(np.any(c) for c in orbitals):
                 term = ao2mo.general(block, orbitals, compact=identical)
-                integrals += ao2mo.restore(1, term, dims[0]).reshape(integrals.shape) if identical else term
+                integrals += (ao2mo.restore(1, term, dims[0]) if identical else term).reshape(integrals.shape)
         return integrals
 
     return ao2mofn
