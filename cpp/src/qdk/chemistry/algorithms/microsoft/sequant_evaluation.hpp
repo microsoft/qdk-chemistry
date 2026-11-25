@@ -37,16 +37,19 @@ struct NormalOrderedOperator {
 /**
  * @brief Numerically evaluate a reference-normal-ordered operator expression.
  *
- * @param expression Spin-orbital sum of products of tensors and at most one
- *        number-conserving normal operator of rank one or two, over the
- *        occupied (i), virtual (a) and general (p) spaces of
- *        sequant::mbpt::make_min_sr_spaces.
+ * @param expression Spin-orbital sum of terms over the occupied (i), virtual
+ *        (a) and general (p) spaces of sequant::mbpt::make_min_sr_spaces. Each
+ *        term is a product of tensors and constants with at most one
+ *        number-conserving normal operator of rank one or two, and each of its
+ *        indices occurs once in each of two tensors, or once in a tensor and
+ *        once in the operator.
  * @param space Reference occupations and target spin orbitals.
- * @param leaf Elements of the expression's tensors.
+ * @param leaf Elements of the expression's tensors; exceptions it throws
+ *        propagate.
  * @return The scalar, one-body and two-body coefficients over the target.
- * @throws std::invalid_argument If a spin orbital appears more than once in
- *         the occupied and virtual lists, or a target spin orbital is repeated
- *         or not listed.
+ * @throws std::invalid_argument If the expression has another form, a spin
+ *         orbital appears more than once in the occupied and virtual lists, or
+ *         a target spin orbital is repeated or not listed.
  */
 NormalOrderedOperator evaluate(const sequant::ExprPtr& expression,
                                const SpinOrbitalSpace& space,

@@ -7,6 +7,7 @@
 #include <SeQuant/core/context.hpp>
 #include <SeQuant/core/expr.hpp>
 #include <SeQuant/core/expressions/tensor.hpp>
+#include <SeQuant/core/expressions/variable.hpp>
 #include <SeQuant/core/op.hpp>
 #include <SeQuant/domain/mbpt/convention.hpp>
 #include <algorithm>
@@ -182,6 +183,33 @@ TEST(SeQuantEvaluationTest, RejectsInconsistentSpaces) {
   for (const auto& space : spaces)
     EXPECT_THROW(evaluation::evaluate(fock_operator(), space, test_leaf),
                  std::invalid_argument);
+}
+
+TEST(SeQuantEvaluationTest, RejectsUnsupportedExpressions) {
+  const auto context = scoped_context();
+  const Index p1{L"p_1"}, p2{L"p_2"}, i1{L"i_1"}, i2{L"i_2"}, a1{L"a_1"};
+  const auto f = [](const Index& bra_index, const Index& ket_index) {
+    return ex<Tensor>(L"f", bra{bra_index}, ket{ket_index});
+  };
+  const auto excitation = [&] { return ex<FNOperator>(cre{p1}, ann{p2}); };
+  const std::vector<ExprPtr> expressions{
+      f(i1, i1),
+      ex<Tensor>(L"g", bra{p1, i1}, ket{p2, i1}) * excitation(),
+      f(i1, a1) * ex<Tensor>(L"g", bra{a1, i2}, ket{i1, i2}),
+      f(i1, i1) * f(i2, i2),
+      ex<Variable>(L"x") * fock_operator(),
+      ex<Constant>(2) * excitation(),
+      f(p1, p2) * ex<FNOperator>(cre{p1}, ann{p2, i1})};
+  for (const auto& expression : expressions)
+    EXPECT_THROW(evaluation::evaluate(expression, test_space(), test_leaf),
+                 std::invalid_argument);
+}
+
+TEST(SeQuantEvaluationTest, ConstantTermAddsToTheScalar) {
+  const auto context = scoped_context();
+  const auto result = evaluation::evaluate(
+      fock_operator() + ex<Constant>(rational{3, 2}), test_space(), test_leaf);
+  EXPECT_EQ(result.scalar, 1.5);
 }
 
 TEST(SeQuantEvaluationTest, LeafErrorsPropagateFromEveryWorker) {

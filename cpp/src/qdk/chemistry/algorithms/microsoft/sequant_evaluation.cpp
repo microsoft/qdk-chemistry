@@ -85,8 +85,8 @@ Slot slot(const Index& resolved, bool residual) {
       case L'p':
         return Space::general;
       default:
-        throw std::logic_error(
-            "SeQuant evaluation encountered an unsupported index space.");
+        throw std::invalid_argument(
+            "SeQuant evaluation supports only the i, a and p index spaces.");
     }
   }();
   return {space, spin == mbpt::Spin::beta ? 1 : 0, residual};
@@ -214,7 +214,18 @@ class LeafStore {
       const std::lock_guard lock(_mutex);
       entry = &_entries[key];
     }
-    std::call_once(entry->allocated, [&] { allocate(*entry, key); });
+    {
+      const std::lock_guard lock(entry->mutex);
+      if (!entry->allocated) {
+        entry->allocated = true;
+        try {
+          allocate(*entry, key);
+        } catch (...) {
+          entry->failure = std::current_exception();
+          entry->done = true;
+        }
+      }
+    }
     for (auto slice = entry->next++; slice < entry->slices;
          slice = entry->next++) {
       try {
@@ -234,27 +245,28 @@ class LeafStore {
  private:
   /// A block filled in slices over the first half of its slots.
   struct Entry {
-    std::once_flag allocated;
     std::vector<const std::vector<std::size_t>*> axes;
     BTensor values;
     std::size_t slices = 0;
     std::atomic<std::size_t> next = 0, filled = 0;
     std::mutex mutex;
     std::condition_variable complete;
-    bool done = false;
+    bool allocated = false, done = false;
     ResultPtr block;
     std::exception_ptr failure;
   };
 
   void allocate(Entry& entry, const LeafKey& key) const {
+    std::vector<const std::vector<std::size_t>*> axes;
     std::vector<std::size_t> extents;
     for (const auto& slot : key.slots) {
-      entry.axes.push_back(&_index_ranges.orbitals(slot));
-      extents.push_back(entry.axes.back()->size());
+      axes.push_back(&_index_ranges.orbitals(slot));
+      extents.push_back(axes.back()->size());
     }
     tensor_size(extents);
     entry.values = BTensor{btas::Range{extents}};
     entry.slices = tensor_size(std::span(extents).first(extents.size() / 2));
+    entry.axes = std::move(axes);
   }
 
   void fill(Entry& entry, std::wstring_view label, std::size_t slice) const {
@@ -303,14 +315,18 @@ std::pair<ExprPtr, container::svector<Index>> split_term(
       const auto& op = factor.as<FNOperator>();
       if (!free.empty() || op.ncreators() != op.nannihilators() ||
           op.ncreators() > 2)
-        throw std::logic_error(
+        throw std::invalid_argument(
             "SeQuant evaluation supports one number-conserving normal operator "
             "of rank at most two per term.");
       for (const auto& creator : op.creators()) free.push_back(creator.index());
       for (const auto& annihilator : op.annihilators())
         free.push_back(annihilator.index());
-    } else
+    } else if (factor.is<Tensor>() || factor.is<Constant>())
       coefficient.as<Product>().append(1, factor, Product::Flatten::No);
+    else
+      throw std::invalid_argument(
+          "SeQuant evaluation supports only tensor and constant factors "
+          "besides the normal operator.");
   };
   if (term.is<Product>()) {
     coefficient = ex<Product>(term.as<Product>().scalar(), ExprPtrList{});
@@ -332,6 +348,9 @@ struct IndexGraph {
 
 IndexGraph index_graph(const ExprPtr& coefficient,
                        const container::svector<Index>& free) {
+  constexpr auto index_occurrence_error =
+      "SeQuant evaluation requires each index once in each of two tensors, or "
+      "once in a tensor and once in the normal operator.";
   IndexGraph graph;
   const auto used = get_used_indices<container::set<Index>>(coefficient);
   graph.indices.assign(used.begin(), used.end());
@@ -358,12 +377,23 @@ IndexGraph index_graph(const ExprPtr& coefficient,
       endpoints[graph.positions.at(index)].emplace_back(ordinal, 2);
     graph.conservation.push_back(std::move(row));
   }
+  for (std::size_t i = 0; i < graph.indices.size(); ++i) {
+    const auto& edge = endpoints[i];
+    const std::size_t tensors = is_free(graph.indices[i], free) ? 1 : 2;
+    if (edge.size() != tensors ||
+        (tensors == 2 && edge[0].first == edge[1].first))
+      throw std::invalid_argument(index_occurrence_error);
+  }
+  for (const auto& index : free)
+    if (graph.positions.find(index) == graph.positions.end() ||
+        std::count(free.begin(), free.end(), index) != 1)
+      throw std::invalid_argument(index_occurrence_error);
   graph.previous.assign(graph.indices.size(), graph.indices.size());
   for (std::size_t i = 0; i < graph.indices.size(); ++i) {
     const auto& edge = endpoints[i];
-    if (graph.indices[i].has_proto_indices() || edge.size() != 2 ||
-        edge[0].first == edge[1].first || edge[0].second == 2 ||
-        edge[1].second == 2 || is_free(graph.indices[i], free))
+    if (is_free(graph.indices[i], free) ||
+        graph.indices[i].has_proto_indices() || edge[0].second == 2 ||
+        edge[1].second == 2)
       continue;
     const auto symmetry = symmetries[edge[0].first];
     if ((symmetry != Symmetry::Antisymm && symmetry != Symmetry::Symm) ||
