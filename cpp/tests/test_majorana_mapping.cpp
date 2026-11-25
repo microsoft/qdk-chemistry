@@ -10,6 +10,7 @@
 #include <cmath>
 #include <complex>
 #include <limits>
+#include <map>
 #include <memory>
 #include <qdk/chemistry/data/hamiltonian.hpp>
 #include <qdk/chemistry/data/hamiltonian_containers/canonical_four_center.hpp>
@@ -22,6 +23,7 @@
 #include <sstream>
 #include <stdexcept>
 #include <string>
+#include <tuple>
 #include <unordered_map>
 #include <utility>
 #include <vector>
@@ -473,6 +475,16 @@ TEST(MajoranaMapEngineTest, RejectsNonFiniteOneBodyIntegrals) {
       majorana_map_hamiltonian(mapping, 0.0, finite.data(), invalid.data(), eri,
                                eri, eri, 2, false, 1e-12, 1e-12),
       std::invalid_argument);
+  constexpr std::size_t wide = 520;
+  std::vector<double> wide_invalid(wide * wide, 0.0);
+  wide_invalid[1] = std::numeric_limits<double>::quiet_NaN();
+  const int index[4] = {0, 0, 0, 0};
+  const double value[1] = {0.5};
+  EXPECT_THROW(
+      majorana_map_hamiltonian_sparse(
+          MajoranaMapping::jordan_wigner(2 * wide), 0.0, wide_invalid.data(),
+          wide_invalid.data(), index, value, 1, wide, true, 1e-12, 1e-12),
+      std::invalid_argument);
 }
 
 TEST(MajoranaMapEngineTest, RejectsNonFiniteCoreEnergy) {
@@ -483,8 +495,16 @@ TEST(MajoranaMapEngineTest, RejectsNonFiniteCoreEnergy) {
   Eigen::MatrixXd factors = Eigen::MatrixXd::Zero(4, 1);
   const int index[4] = {0, 0, 0, 0};
   const double value[1] = {0.5};
+  constexpr std::size_t wide = 520;
+  const auto wide_mapping = MajoranaMapping::jordan_wigner(2 * wide);
+  const std::vector<double> wide_one_body(wide * wide, 0.0);
   for (double core_energy : {std::numeric_limits<double>::quiet_NaN(),
                              std::numeric_limits<double>::infinity()}) {
+    EXPECT_THROW(
+        majorana_map_hamiltonian_sparse(
+            wide_mapping, core_energy, wide_one_body.data(),
+            wide_one_body.data(), index, value, 1, wide, true, 1e-12, 1e-12),
+        std::invalid_argument);
     EXPECT_THROW(majorana_map_hamiltonian(mapping, core_energy, one_body.data(),
                                           one_body.data(), eri, eri, eri, 2,
                                           true, 1e-12, 1e-12),
@@ -866,6 +886,153 @@ TEST(MajoranaMapEngineTest, WarnsOnlyWhenAveragingChangesTheOperator) {
       << unrestricted;
   EXPECT_NE(unrestricted.find("(beta-beta block)"), std::string::npos)
       << unrestricted;
+}
+
+TEST(MajoranaMapEngineTest, SparseMappingBeyondTheDenseWidthMatchesSmallOne) {
+  // Sparse mappings beyond 1024 qubits match the same terms mapped within it.
+  constexpr std::size_t active = 3;
+  const std::vector<double> one_body{0.3,  0.05, 0.0,  0.05, -0.2,
+                                     0.08, 0.0,  0.08, 0.1};
+  std::vector<double> eightfold(active * active * active * active);
+  for (std::size_t p = 0; p < active; ++p)
+    for (std::size_t q = 0; q < active; ++q)
+      for (std::size_t r = 0; r < active; ++r)
+        for (std::size_t s = 0; s < active; ++s) {
+          const auto c =
+              qdk::chemistry::data::detail::eightfold_canonical({p, q, r, s});
+          eightfold[flat_index(active, p, q, r, s)] =
+              0.3 * std::cos(1.0 + static_cast<double>(flat_index(
+                                       active, c[0], c[1], c[2], c[3])));
+        }
+  const auto fourfold = fourfold_test_tensor(active);
+  const auto asymmetric = asymmetric_tensor(active, 0.4);
+  auto map_embedded = [&](std::size_t n, const std::vector<double>& two_body,
+                          HamiltonianType type, double integral_threshold) {
+    Eigen::SparseMatrix<double> h(n, n);
+    SparseHamiltonianContainer::TwoBodyMap entries;
+    for (std::size_t p = 0; p < active; ++p) {
+      for (std::size_t q = 0; q < active; ++q) {
+        if (one_body[p * active + q] != 0.0)
+          h.insert(p, q) = one_body[p * active + q];
+        for (std::size_t r = 0; r < active; ++r)
+          for (std::size_t s = 0; s < active; ++s)
+            entries[{static_cast<int>(p), static_cast<int>(q),
+                     static_cast<int>(r), static_cast<int>(s)}] =
+                two_body[flat_index(active, p, q, r, s)];
+      }
+    }
+    return majorana_map_hamiltonian(
+        MajoranaMapping::jordan_wigner(2 * n),
+        Hamiltonian(std::make_unique<SparseHamiltonianContainer>(h, entries,
+                                                                 0.0, type)),
+        true, 1e-12, integral_threshold);
+  };
+  // Terms keyed by spin block and in-block qubit, so that Jordan-Wigner
+  // mappings of the same orbitals embedded in different spaces compare
+  // directly.
+  auto block_terms = [](const MajoranaMapResult& result,
+                        std::size_t n_spatial) {
+    std::map<std::string, std::complex<double>> terms;
+    for (std::size_t i = 0; i < result.words.size(); ++i) {
+      std::string label;
+      for (const auto& [qubit, op] : result.words[i])
+        label += (qubit < n_spatial ? "a" : "b") +
+                 std::to_string(qubit % n_spatial) + "XYZ"[op - 1];
+      terms[label] += result.coefficients[i];
+    }
+    return terms;
+  };
+  using Case = std::tuple<const std::vector<double>*, HamiltonianType, double>;
+  for (const auto& [two_body, type, integral_threshold] :
+       {Case{&eightfold, HamiltonianType::Hermitian, 1e-12},
+        Case{&fourfold, HamiltonianType::Hermitian, 1e-12},
+        Case{&fourfold, HamiltonianType::Hermitian, 0.1},
+        Case{&asymmetric, HamiltonianType::NonHermitian, 1e-12}}) {
+    const auto wide = block_terms(
+        map_embedded(520, *two_body, type, integral_threshold), 520);
+    const auto narrow =
+        block_terms(map_embedded(4, *two_body, type, integral_threshold), 4);
+    ASSERT_EQ(wide.size(), narrow.size());
+    for (const auto& [label, coefficient] : narrow) {
+      const auto it = wide.find(label);
+      ASSERT_NE(it, wide.end()) << label;
+      EXPECT_NEAR(std::abs(it->second - coefficient), 0.0, 1e-12) << label;
+    }
+  }
+
+  // A beta qubit at 65536 needs the widest word count and must land exactly
+  // where qubit 1 does in the narrow mapping; one at 131072 exceeds it.
+  const double h1[1] = {1.0};
+  const int index[4] = {0, 0, 0, 0};
+  const double value[1] = {0.75};
+  auto map_gapped = [&](std::uint64_t beta) {
+    return majorana_map_hamiltonian_sparse(
+        MajoranaMapping::from_table(
+            {{{0, 1}}, {{0, 2}}, {{0, 3}, {beta, 1}}, {{0, 3}, {beta, 2}}}),
+        0.5, h1, h1, index, value, 1, 1, true, 1e-12, 1e-12);
+  };
+  auto gapped = map_gapped(65536);
+  bool has_beta = false;
+  for (auto& word : gapped.words) {
+    for (auto& [qubit, op] : word) {
+      ASSERT_TRUE(qubit == 0 || qubit == 65536) << qubit;
+      if (qubit == 65536) {
+        has_beta = true;
+        qubit = 1;
+      }
+    }
+  }
+  EXPECT_TRUE(has_beta);
+  expect_same_coefficients(gapped, map_gapped(1), 2);
+  EXPECT_THROW(map_gapped(131072), std::invalid_argument);
+
+  // Verstraete-Cirac stabilizer penalties map alike with every qubit shifted
+  // past 1024.
+  const auto vc = MajoranaMapping::verstraete_cirac(
+      LatticeGraph({{{0, 1}, 1.0}, {{1, 2}, 1.0}, {{0, 2}, 1.0}}, 3));
+  auto shifted_json = vc.to_json();
+  auto shift = [](nlohmann::json& word) {
+    for (auto& entry : word) entry[0] = entry[0].get<std::uint64_t>() + 1024;
+  };
+  for (auto& bilinear : shifted_json["bilinears"]) shift(bilinear["word"]);
+  for (auto& stabilizer : shifted_json["stabilizers"])
+    shift(stabilizer["word"]);
+  const auto shifted_vc = MajoranaMapping::from_json(shifted_json);
+  ASSERT_GT(shifted_vc.num_qubits(), 1024u);
+  std::vector<int> indices;
+  std::vector<double> values;
+  for (std::size_t p = 0; p < active; ++p)
+    for (std::size_t q = 0; q < active; ++q)
+      for (std::size_t r = 0; r < active; ++r)
+        for (std::size_t s = 0; s < active; ++s) {
+          indices.insert(indices.end(), {int(p), int(q), int(r), int(s)});
+          values.push_back(eightfold[flat_index(active, p, q, r, s)]);
+        }
+  auto map_vc = [&](const MajoranaMapping& mapping) {
+    return majorana_map_hamiltonian_sparse(
+        mapping, 0.5, one_body.data(), one_body.data(), indices.data(),
+        values.data(), values.size(), active, true, 1e-12, 1e-12);
+  };
+  auto shifted = map_vc(shifted_vc);
+  for (auto& word : shifted.words)
+    for (auto& [qubit, op] : word) qubit -= 1024;
+  expect_same_coefficients(shifted, map_vc(vc), vc.num_qubits());
+}
+
+TEST(MajoranaMapEngineTest, DenseAndCholeskyRejectMappingsBeyondTheirWidth) {
+  // Dense and Cholesky reject the width before reading their N^4 integrals.
+  constexpr std::size_t n = 520;
+  const auto mapping = MajoranaMapping::jordan_wigner(2 * n);
+  const std::vector<double> one_body(n * n, 0.0);
+  const double placeholder[1] = {0.0};
+  EXPECT_THROW(majorana_map_hamiltonian(
+                   mapping, 0.0, one_body.data(), one_body.data(), placeholder,
+                   placeholder, placeholder, n, true, 1e-12, 1e-12),
+               std::invalid_argument);
+  EXPECT_THROW(majorana_map_hamiltonian_cholesky(
+                   mapping, 0.0, one_body.data(), one_body.data(), placeholder,
+                   placeholder, n, 1, true, 1e-12, 1e-12),
+               std::invalid_argument);
 }
 
 TEST(MajoranaMappingHashTest, EqualMappingsHaveStableHash) {
