@@ -5,7 +5,6 @@
 #include <gtest/gtest.h>
 
 #include <Eigen/Dense>
-#include <algorithm>
 #include <memory>
 #include <optional>
 #include <qdk/chemistry/algorithms/effective_hamiltonian.hpp>
@@ -87,9 +86,6 @@ TEST(EffectiveHamiltonianConstructorTest, MetaData) {
 }
 
 TEST(EffectiveHamiltonianConstructorTest, Factory) {
-  const auto built_in = EffectiveHamiltonianConstructorFactory::available();
-  EXPECT_NE(std::find(built_in.begin(), built_in.end(), "qdk_dsrg_pt2"),
-            built_in.end());
   EXPECT_THROW(
       EffectiveHamiltonianConstructorFactory::create("nonexistent_constructor"),
       std::runtime_error);

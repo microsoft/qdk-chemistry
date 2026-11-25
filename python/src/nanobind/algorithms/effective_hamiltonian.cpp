@@ -192,14 +192,15 @@ window's core and virtual orbitals onto the target space ``P`` (``p_indices``).
 
 Emits the fixed-reference DSRG-PT2 effective Hamiltonian over ``P``, truncated
 to two-body terms in reference normal order and returned in bare normal order.
-Currently supports single-determinant references: closed-shell determinants on
+Supports single-determinant references: closed-shell determinants on
 restricted orbitals, and closed- or open-shell determinants on unrestricted
 orbitals. The ``flow_parameter`` setting is the Gaussian-source flow ``s`` in
-:math:`E_h^{-2}` (default ``0.5``; ``0`` returns the bare core-folded operator
-over ``P``). Restricted input gives a restricted result, unrestricted input an
-unrestricted one. The restricted and same-spin two-body blocks are 4-fold (not
-8-fold) symmetric, and the unrestricted mixed-spin block is 2-fold Hermitian.
-The factory name is ``"qdk_dsrg_pt2"``.
+inverse squared energy units, :math:`E_h^{-2}` for molecules (default ``0.5``;
+``0`` returns the bare core-folded operator over ``P``). Restricted input gives
+a restricted result, unrestricted input an unrestricted one, and the output
+orbitals carry no orbital energies. The restricted and same-spin two-body blocks
+are 4-fold (not 8-fold) symmetric, and the unrestricted mixed-spin block is
+2-fold Hermitian. The factory name is ``"qdk_dsrg_pt2"``.
 
 Typical usage:
 
@@ -218,6 +219,6 @@ See Also:
       .def(nb::init<>(), R"(
 Default constructor.
 
-Initializes a DSRG-PT2 downfold with ``flow_parameter`` set to ``0.5``.
+Initializes a DSRG-PT2 downfold with default settings.
 )");
 }

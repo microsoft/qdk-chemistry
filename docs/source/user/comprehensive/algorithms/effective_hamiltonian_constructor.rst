@@ -142,27 +142,30 @@ With the antisymmetrized integrals :math:`v^{ij}_{ab} = \langle ab \Vert ij \ran
    \tilde v^{ij}_{ab} = v^{ij}_{ab}\left(1 + e^{-s(\Delta^{ij}_{ab})^2}\right),
 
 where :math:`s` is the flow parameter.
-For the singles, :math:`t^i_a` applies :math:`(1 - e^{-s(\Delta^i_a)^2}) / \Delta^i_a` to :math:`f^i_a + b^i_a`, where :math:`b^i_a` is the active-space correction, while :math:`\tilde f^i_a = f^i_a(1 + e^{-s(\Delta^i_a)^2}) + b^i_a e^{-s(\Delta^i_a)^2}` :cite:`Li2015`.
+For the singles, :math:`t^i_a` applies :math:`(1 - e^{-s(\Delta^i_a)^2}) / \Delta^i_a` to :math:`f^i_a + b^i_a`, where :math:`b^i_a = \sum_{ux} (\varepsilon_x - \varepsilon_u)\, t^{iu}_{ax}\, \gamma^x_u` sums over active orbitals, while :math:`\tilde f^i_a = f^i_a(1 + e^{-s(\Delta^i_a)^2}) + b^i_a e^{-s(\Delta^i_a)^2}` :cite:`Li2015`.
 
 The commutator in :math:`H_{\mathrm{eff}}^{P}` keeps its scalar, one- and two-body parts in reference normal order :cite:`Kutzelnigg1997`, and discards the residual three-body operator (including for two-electron active spaces).
 The result is returned in ordinary normal order over the unrotated orbitals of :math:`P`.
+The reference expectation value of :math:`H_{\mathrm{eff}}^{P}` is the unrelaxed DSRG-MRPT2 energy :cite:`Li2015`, and its eigenvalues in :math:`P` are partially relaxed energies :cite:`Li2017`.
 
 ``flow_parameter`` must be finite and nonnegative.
 Larger :math:`s` regularizes less, and :math:`s = 0` disables the transformation, returning only the bare core-folded operator over :math:`P`.
 At finite :math:`s`, an amplitude tends continuously to zero as its gap closes.
-For a Hartree-Fock reference with every occupied orbital kept in :math:`P`, each MP2 pair energy carries the factor :math:`1 - e^{-2s\Delta^2}`, tending to bare MP2 as :math:`s \to \infty`.
+For a Hartree-Fock reference and :math:`P` equal to the occupied orbitals, the reference expectation value is the Hartree-Fock energy plus MP2 with each :math:`ij \to ab` term scaled by :math:`1 - e^{-2s(\Delta^{ij}_{ab})^2}`, tending to MP2 as :math:`s \to \infty`.
 
-This implementation currently supports real, normalized, self-dual single-determinant references: closed-shell determinants on restricted orbitals, and closed- or open-shell determinants on unrestricted orbitals.
+This implementation supports real, normalized, self-dual single-determinant references: closed-shell determinants on restricted orbitals, and closed- or open-shell determinants on unrestricted orbitals.
 Multi-determinant (correlated) references and open-shell determinants on restricted orbitals are rejected.
 The input Hamiltonian must be Hermitian, and both spins must use the same spatial partitions.
+Its two-body integrals are read as stored, so they must have the Hermitian symmetries: :math:`(pq|rs) = (rs|pq) = (qp|sr)` for the restricted and same-spin blocks, and :math:`(pq|rs)^{\alpha\beta} = (qp|sr)^{\alpha\beta}` for an unrestricted ``aabb`` block.
 Its inactive orbitals must be exactly the reference core outside :math:`W`, which its scalar and integrals already include.
 
 The output orbitals preserve the reference orbital basis, and ``ModelOrbitals`` references give ``ModelOrbitals`` output.
+They carry no orbital energies, which describe the input Fock operator rather than the effective Hamiltonian.
 The output keeps the spin restriction of the input.
 The restricted and same-spin (``aaaa``, ``bbbb``) two-body blocks are 4-fold rather than 8-fold symmetric, :math:`(pq|rs) = (qp|sr) = (rs|pq)`: the commutator is not an electron-repulsion operator, so the bra swap :math:`(pq|rs) = (qp|rs)` does not hold.
 For an unrestricted output, the mixed-spin ``aabb`` block satisfies 2-fold Hermiticity, :math:`(pq|rs)^{\alpha\beta} = (qp|sr)^{\alpha\beta}`.
 
-The constructor logs the partition, the smallest gap, and the largest undamped ratio :math:`\lvert v/\Delta \rvert` over the coupled channels, and warns on large undamped amplitudes.
+The constructor logs the partition, the smallest gap, and the largest damped amplitude :math:`\lvert t \rvert` over the coupled channels, and warns when an amplitude exceeds one.
 
 .. rubric:: Creating a downfolder
 
@@ -191,7 +194,7 @@ The constructor logs the partition, the smallest gap, and the largest undamped r
      - Description
    * - ``flow_parameter``
      - float
-     - Flow parameter :math:`s`, in :math:`E_h^{-2}`; ``0`` returns the bare operator over :math:`P`. Default: 0.5
+     - Flow parameter :math:`s`, in inverse squared energy units (:math:`E_h^{-2}` for molecules); ``0`` returns the bare operator over :math:`P`. Default: 0.5
 
 .. tab:: Python API
 

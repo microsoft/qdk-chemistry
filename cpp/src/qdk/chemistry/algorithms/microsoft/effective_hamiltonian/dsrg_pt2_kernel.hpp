@@ -79,13 +79,19 @@ Eigen::VectorXd rotate_two_body(const Eigen::VectorXd& two_body,
                                 const Eigen::MatrixXd& rotation, int norb);
 
 /// Transform chemist integrals whose (pq) and (rs) pairs rotate separately,
-/// as the aabb block of unrestricted orbitals does. Either pair may be skipped
-/// when its rotation flag is false.
+/// as the aabb block of unrestricted orbitals does.
 Eigen::VectorXd rotate_two_body(const Eigen::VectorXd& two_body,
                                 const Eigen::MatrixXd& first_pair,
-                                const Eigen::MatrixXd& second_pair, int norb,
-                                bool rotate_first = true,
-                                bool rotate_second = true);
+                                const Eigen::MatrixXd& second_pair, int norb);
+
+/// The same for rotations that keep each of the inactive, active and virtual
+/// `roles`. Only the integrals with at most two virtual indices, the ones the
+/// downfold reads, are transformed; the others are left unset.
+Eigen::VectorXd rotate_two_body(const Eigen::VectorXd& two_body,
+                                const Eigen::MatrixXd& first_pair,
+                                const Eigen::MatrixXd& second_pair,
+                                const std::array<std::vector<int>, 3>& roles,
+                                int norb);
 
 struct DownfoldResult {
   double scalar = 0.0;
@@ -94,8 +100,8 @@ struct DownfoldResult {
   Eigen::VectorXd two_body;
   /// Chemist aaaa and bbbb blocks, which are fixed only up to exchange.
   std::array<Eigen::VectorXd, 2> same_spin_two_body;
-  /// Smallest denominator and largest raw amplitude among the excitations
-  /// that connect P and Q.
+  /// Smallest gap and largest damped amplitude among the excitations that
+  /// connect P and Q.
   double min_denominator = std::numeric_limits<double>::infinity();
   double max_amplitude = 0.0;
 };

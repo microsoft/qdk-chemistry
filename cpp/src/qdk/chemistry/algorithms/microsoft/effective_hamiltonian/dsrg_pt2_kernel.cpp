@@ -20,6 +20,7 @@
 #include <exception>
 #include <map>
 #include <memory>
+#include <numeric>
 #include <span>
 #include <stdexcept>
 #include <string>
@@ -36,7 +37,6 @@ inline Eigen::Index n4(int n) {
 
 constexpr Eigen::Index min_parallel_work = Eigen::Index{1} << 16;
 constexpr Eigen::Index min_parallel_operand_size = Eigen::Index{1} << 12;
-constexpr std::size_t plan_batch_size = 32;
 
 // Chemist (pq|rs) with p, q of spin `left` and r, s of spin `right`.
 double chemist(const TwoBodyBlocks& two_body, int left, int right, int p, int q,
@@ -47,11 +47,12 @@ double chemist(const TwoBodyBlocks& two_body, int left, int right, int p, int q,
 }
 }  // namespace
 
-// The second-order DSRG expansion [S, H_OD] + [S, [S, F0]]/2 equals
-// [S, V]/2 with each channel's coupling scaled by 2 - g, so its energy carries
-// g (2 - g) = 1 - exp(-2s*D^2).
+// The second-order DSRG expansion [S, H_OD] + [S, [S, F0]]/2 equals [S, V]/2
+// with each doubles coupling and singles Fock coupling scaled by 2 - g, so a
+// doubles channel's energy carries g (2 - g) = 1 - exp(-2s*D^2). The singles'
+// active-space correction is scaled by 1 - g instead.
 ChannelFactors channel_factors(double delta, double flow) {
-  if (flow == 0.0 || delta == 0.0) return {0.0, 2.0};
+  if (delta == 0.0) return {0.0, 2.0};
   // expm1 rather than 1-exp avoids cancellation for small s*delta^2.
   const double kept = -std::expm1(-flow * delta * delta);
   return {kept / delta, 2.0 - kept};
@@ -128,15 +129,12 @@ std::array<Eigen::MatrixXd, 2> generalized_fock_matrices(
 SemicanonicalRotation semicanonical_rotation(
     const Eigen::MatrixXd& fock, const std::vector<std::vector<int>>& blocks,
     double tolerance) {
-  if (!fock.allFinite())
-    throw std::runtime_error("semicanonical_rotation: non-finite Fock matrix");
   SemicanonicalRotation out{Eigen::MatrixXd::Identity(fock.rows(), fock.cols()),
                             false};
   for (const auto& block : blocks) {
     if (block.size() < 2) continue;
     const Eigen::MatrixXd sub = fock(block, block);
     const double scale = sub.cwiseAbs().maxCoeff();
-    if (scale == 0.0) continue;
     Eigen::MatrixXd off_diagonal = sub;
     off_diagonal.diagonal().setZero();
     if (off_diagonal.cwiseAbs().maxCoeff() <= tolerance * scale) continue;
@@ -163,58 +161,89 @@ Eigen::VectorXd rotate_two_body(const Eigen::VectorXd& two_body,
 
 Eigen::VectorXd rotate_two_body(const Eigen::VectorXd& two_body,
                                 const Eigen::MatrixXd& first_pair,
-                                const Eigen::MatrixXd& second_pair, int norb,
-                                bool rotate_first, bool rotate_second) {
-  if (!rotate_first && !rotate_second) return two_body;
+                                const Eigen::MatrixXd& second_pair, int norb) {
+  std::vector<int> all(norb);
+  std::iota(all.begin(), all.end(), 0);
+  return rotate_two_body(two_body, first_pair, second_pair, {{{}, all, {}}},
+                         norb);
+}
+
+Eigen::VectorXd rotate_two_body(const Eigen::VectorXd& two_body,
+                                const Eigen::MatrixXd& first_pair,
+                                const Eigen::MatrixXd& second_pair,
+                                const std::array<std::vector<int>, 3>& roles,
+                                int norb) {
   using RowMajorMatrix =
       Eigen::Matrix<double, Eigen::Dynamic, Eigen::Dynamic, Eigen::RowMajor>;
-  const Eigen::Index n = norb;
-  const Eigen::Index n2 = n * n;
-  const Eigen::Index n3 = n2 * n;
-  const Eigen::Index total_size = n4(norb);
-  Eigen::VectorXd out(total_size);
-  const Eigen::VectorXd* src = &two_body;
-  if (rotate_second) {
-    const Eigen::MatrixXd vt = second_pair.transpose();
-#pragma omp parallel for schedule(static) if (total_size >= min_parallel_work)
-    for (Eigen::Index pq = 0; pq < n2; ++pq) {
-      const Eigen::Map<const RowMajorMatrix> slice(two_body.data() + pq * n2, n,
-                                                   n);
-      Eigen::Map<RowMajorMatrix> dest(out.data() + pq * n2, n, n);
-      const Eigen::MatrixXd tmp = vt * slice;
-      dest.noalias() = tmp * second_pair;
-    }
-    if (!rotate_first) return out;
-    src = &out;
-  }
-  const Eigen::MatrixXd ut = first_pair.transpose();
   constexpr Eigen::Index panel = 1024;
-  Eigen::VectorXd tmp(total_size);
-  {
-    const Eigen::Map<const RowMajorMatrix> in(src->data(), n, n3);
-    Eigen::Map<RowMajorMatrix> mid(tmp.data(), n, n3);
-    const Eigen::Index panels = (n3 + panel - 1) / panel;
-#pragma omp parallel for schedule(static) if (total_size >= min_parallel_work)
-    for (Eigen::Index index = 0; index < panels; ++index) {
-      const Eigen::Index begin = index * panel;
-      const Eigen::Index width = std::min(panel, n3 - begin);
-      mid.middleCols(begin, width).noalias() = ut * in.middleCols(begin, width);
-    }
-  }
-  {
-    const Eigen::Index panels = (n2 + panel - 1) / panel;
-    const Eigen::Index tasks = n * panels;
-#pragma omp parallel for schedule(static) if (total_size >= min_parallel_work)
-    for (Eigen::Index task = 0; task < tasks; ++task) {
-      const Eigen::Index p = task / panels;
-      const Eigen::Index begin = (task % panels) * panel;
-      const Eigen::Index width = std::min(panel, n2 - begin);
-      const Eigen::Map<const RowMajorMatrix> in(tmp.data() + p * n3, n, n2);
-      Eigen::Map<RowMajorMatrix> dest(out.data() + p * n3, n, n2);
-      dest.middleCols(begin, width).noalias() =
-          ut * in.middleCols(begin, width);
-    }
-  }
+  const Eigen::Index n = norb;
+  const bool parallel = n4(norb) >= min_parallel_work;
+  Eigen::VectorXd out(n4(norb));
+  for (int role_p = 0; role_p < 3; ++role_p)
+    for (int role_q = 0; role_q < 3; ++role_q)
+      for (int role_r = 0; role_r < 3; ++role_r)
+        for (int role_s = 0; role_s < 3; ++role_s) {
+          if ((role_p == 2) + (role_q == 2) + (role_r == 2) + (role_s == 2) > 2)
+            continue;
+          const auto& ip = roles[role_p];
+          const auto& iq = roles[role_q];
+          const auto& ir = roles[role_r];
+          const auto& is = roles[role_s];
+          const Eigen::Index np = ip.size(), nq = iq.size(), nr = ir.size(),
+                             ns = is.size();
+          const Eigen::Index size = np * nq * nr * ns;
+          if (size == 0) continue;
+          // The rotation keeps each role, so every role block transforms on
+          // its own.
+          Eigen::VectorXd block(size);
+          const Eigen::Index rows = np * nq * nr;
+#pragma omp parallel for schedule(static) if (parallel)
+          for (Eigen::Index row = 0; row < rows; ++row) {
+            const double* src =
+                two_body.data() +
+                ((ip[row / (nq * nr)] * n + iq[row / nr % nq]) * n +
+                 ir[row % nr]) *
+                    n;
+            for (Eigen::Index s = 0; s < ns; ++s)
+              block[row * ns + s] = src[is[s]];
+          }
+          const Eigen::MatrixXd ur = second_pair(ir, ir).transpose();
+          const Eigen::MatrixXd us = second_pair(is, is);
+#pragma omp parallel for schedule(static) if (parallel)
+          for (Eigen::Index pq = 0; pq < np * nq; ++pq) {
+            Eigen::Map<RowMajorMatrix> slice(block.data() + pq * nr * ns, nr,
+                                             ns);
+            const Eigen::MatrixXd tmp = ur * slice;
+            slice.noalias() = tmp * us;
+          }
+          // Multiplies each of `count` consecutive row-major (rows x cols)
+          // slices of the block from the left by `left`.
+          const auto left_multiply = [&](Eigen::Index count, Eigen::Index cols,
+                                         const Eigen::MatrixXd& left) {
+            const Eigen::Index panels = (cols + panel - 1) / panel;
+#pragma omp parallel for schedule(static) if (parallel)
+            for (Eigen::Index task = 0; task < count * panels; ++task) {
+              const Eigen::Index begin = task % panels * panel;
+              const Eigen::Index width = std::min(panel, cols - begin);
+              Eigen::Map<RowMajorMatrix> slice(
+                  block.data() + task / panels * left.cols() * cols,
+                  left.cols(), cols);
+              const Eigen::MatrixXd tmp = left * slice.middleCols(begin, width);
+              slice.middleCols(begin, width) = tmp;
+            }
+          };
+          left_multiply(np, nr * ns, first_pair(iq, iq).transpose());
+          left_multiply(1, nq * nr * ns, first_pair(ip, ip).transpose());
+#pragma omp parallel for schedule(static) if (parallel)
+          for (Eigen::Index row = 0; row < rows; ++row) {
+            double* dst = out.data() +
+                          ((ip[row / (nq * nr)] * n + iq[row / nr % nq]) * n +
+                           ir[row % nr]) *
+                              n;
+            for (Eigen::Index s = 0; s < ns; ++s)
+              dst[is[s]] = block[row * ns + s];
+          }
+        }
   return out;
 }
 
@@ -621,12 +650,6 @@ std::vector<Plan> build_plans(const Equations& equations,
 // symmetry-forbidden integrals and kept out of diagnostics.
 constexpr double negligible_coupling = 1e-12;
 
-// Raw (undamped) amplitude; a nonzero coupling at zero gap gives infinity.
-double raw_amplitude(double coupling, double delta) {
-  return delta == 0.0 ? std::numeric_limits<double>::infinity()
-                      : std::abs(coupling) / std::abs(delta);
-}
-
 // Inputs shared by the steps of one downfold call.
 struct Inputs {
   const TwoBodyBlocks& two_body;
@@ -719,13 +742,13 @@ OneBodyOperators one_body_operators(
           const double delta = eps(a) - eps(i);
           const double f_ai = out.normal_ordered[spin](a, i) + active_fock;
           const double coupling = f_ai + b;
+          const auto f1 = channel_factors(delta, in.flow);
           if (std::abs(coupling) > in.coupling_tolerance) {
             result.min_denominator =
                 std::min(result.min_denominator, std::abs(delta));
             result.max_amplitude =
-                std::max(result.max_amplitude, raw_amplitude(coupling, delta));
+                std::max(result.max_amplitude, std::abs(coupling * f1.inverse));
           }
-          const auto f1 = channel_factors(delta, in.flow);
           const double s_ai = coupling * f1.inverse + t_trace;
           const double v_ai =
               f_ai * f1.dressing + b * (f1.dressing - 1.0) - v_trace;
@@ -860,13 +883,12 @@ void build_two_body_operands(const Inputs& in,
     const std::size_t i0 = rem / e1;
     const int o0 = orb0[i0], o1 = orb1[i1], o2 = orb2[i2];
     const std::size_t base = static_cast<std::size_t>(idx) * e3;
-    const double e01 = eps(o0) + partner_eps(o1);
-    const double e_o2 = eps(o2);
     for (std::size_t i3 = 0; i3 < e3; ++i3) {
       const int o3 = orb3[i3];
       // Symbolic (bra, ket) slots map to chemist (pq|rs) order.
       const double direct = in.integral(spin, partner, o0, o2, o1, o3);
-      const double delta = e01 - (e_o2 + partner_eps(o3));
+      const double delta = Inputs::denominator(eps(o0), partner_eps(o1),
+                                               eps(o2), partner_eps(o3));
       const auto factors = channel_factors(delta, in.flow);
       if (need_s) {
         s_data[base + i3] = direct * factors.inverse;
@@ -874,7 +896,7 @@ void build_two_body_operands(const Inputs& in,
           if (std::abs(coupling) <= in.coupling_tolerance) return;
           min_denominator = std::min(min_denominator, std::abs(delta));
           max_amplitude =
-              std::max(max_amplitude, raw_amplitude(coupling, delta));
+              std::max(max_amplitude, std::abs(coupling * factors.inverse));
         };
         if (opposite_spin) record(direct);
         if (same_spin) record(direct - in.integral(spin, spin, o0, o3, o1, o2));
@@ -991,28 +1013,34 @@ void evaluate_and_merge(const std::vector<Plan>& plans,
     return operands.at(operand_key(node->as_tensor(), in.spin_free));
   };
   const int active_count = static_cast<int>(in.active.size());
-  for (std::size_t begin = 0; begin < plans.size(); begin += plan_batch_size) {
-    const std::size_t count = std::min(plan_batch_size, plans.size() - begin);
-    std::vector<sq::ResultPtr> values(count);
-    std::exception_ptr failure;
-    const auto batch_size = static_cast<std::ptrdiff_t>(count);
-    {
-      const qdk::chemistry::scf::util::ScopedBlasThreads blas_thread_guard;
+  // Results merge in plan order, so the sum does not depend on the thread
+  // count.
+  std::vector<sq::ResultPtr> values(plans.size());
+  std::size_t merged = 0;
+  std::exception_ptr failure;
+  const auto plan_count = static_cast<std::ptrdiff_t>(plans.size());
+  const qdk::chemistry::scf::util::ScopedBlasThreads blas_thread_guard;
 #pragma omp parallel for schedule(dynamic, \
                                       1) if (n4(in.norb) >= min_parallel_work)
-      for (std::ptrdiff_t ordinal = 0; ordinal < batch_size; ++ordinal) {
-        try {
-          values[ordinal] = sq::evaluate(plans[begin + ordinal].tree, leaf);
-        } catch (...) {
-#pragma omp critical(dsrg_pt2_plan_failure)
-          if (!failure) failure = std::current_exception();
-        }
+  for (std::ptrdiff_t ordinal = 0; ordinal < plan_count; ++ordinal) {
+    sq::ResultPtr value;
+    try {
+      value = sq::evaluate(plans[ordinal].tree, leaf);
+    } catch (...) {
+#pragma omp critical(dsrg_pt2_merge)
+      if (!failure) failure = std::current_exception();
+      continue;
+    }
+#pragma omp critical(dsrg_pt2_merge)
+    {
+      values[ordinal] = std::move(value);
+      for (; merged < values.size() && values[merged]; ++merged) {
+        merge(plans[merged], values[merged], active_count, result);
+        values[merged].reset();
       }
     }
-    if (failure) std::rethrow_exception(failure);
-    for (std::size_t ordinal = 0; ordinal < count; ++ordinal)
-      merge(plans[begin + ordinal], values[ordinal], active_count, result);
   }
+  if (failure) std::rethrow_exception(failure);
 }
 }  // namespace
 
@@ -1025,12 +1053,9 @@ DownfoldResult downfold(const std::array<Eigen::MatrixXd, 2>& one_body,
                         double core_energy, bool spin_free,
                         const std::array<Eigen::MatrixXd, 2>& density) {
   double scale = 0.0;
-  for (int spin = 0; spin < (spin_free ? 1 : 2); ++spin) {
-    if (one_body[spin].size() > 0)
-      scale = std::max(scale, one_body[spin].cwiseAbs().maxCoeff());
-    if (orbital_energies[spin].size() > 0)
-      scale = std::max(scale, orbital_energies[spin].cwiseAbs().maxCoeff());
-  }
+  for (int spin = 0; spin < (spin_free ? 1 : 2); ++spin)
+    scale = std::max({scale, one_body[spin].cwiseAbs().maxCoeff(),
+                      orbital_energies[spin].cwiseAbs().maxCoeff()});
   const Inputs in{two_body,
                   active,
                   inactive,

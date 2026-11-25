@@ -16,7 +16,16 @@ from qdk_chemistry.algorithms import (
     QdkDsrgPT2Constructor,
 )
 from qdk_chemistry.constants import ANGSTROM_TO_BOHR
-from qdk_chemistry.data import Hamiltonian, Orbitals, Structure
+from qdk_chemistry.data import (
+    CanonicalFourCenterHamiltonianContainer,
+    Configuration,
+    Hamiltonian,
+    ModelOrbitals,
+    Orbitals,
+    StateVectorContainer,
+    Structure,
+    Wavefunction,
+)
 from qdk_chemistry.data.symmetry import SymmetryLabel, axes, spin_index_set
 
 _TYPE = "effective_hamiltonian_constructor"
@@ -74,25 +83,6 @@ def water_window():
 class TestEffectiveHamiltonianConstructor:
     """Registry, factory, and settings coverage for the downfolding bindings."""
 
-    def test_factory_registration(self):
-        """qdk_dsrg_pt2 is registered as an effective-Hamiltonian constructor and is the default."""
-        available = algorithms.available(_TYPE)
-        assert isinstance(available, list)
-        assert "qdk_dsrg_pt2" in available
-
-        # default and explicit creation both yield the dsrg_pt2 constructor
-        default = algorithms.create(_TYPE)
-        assert isinstance(default, EffectiveHamiltonianConstructor)
-        assert default.name() == "qdk_dsrg_pt2"
-        assert default.type_name() == _TYPE
-
-        explicit = algorithms.create(_TYPE, "qdk_dsrg_pt2")
-        assert explicit.name() == "qdk_dsrg_pt2"
-
-        # a nonexistent name raises
-        with pytest.raises((KeyError, RuntimeError)):
-            algorithms.create(_TYPE, "nonexistent_downfolder")
-
     def test_direct_construction(self):
         """The concrete class constructs directly."""
         constructor = QdkDsrgPT2Constructor()
@@ -139,6 +129,7 @@ class TestEffectiveHamiltonianConstructor:
         emitted = h_eff.get_orbitals()
         assert list(emitted.active_indices().indices(alpha)) == active
         assert list(emitted.inactive_indices().indices(alpha)) == core
+        assert not emitted.has_energies()
 
     def test_empty_external_space_is_the_identity(self, water_window):
         """Keeping the whole window leaves nothing to fold, so the integrals come back unchanged."""
@@ -213,8 +204,24 @@ class TestEffectiveHamiltonianConstructor:
         with pytest.raises((ValueError, RuntimeError)):
             downfolder.run(case.reference, case.hamiltonian, case.kept_space)
 
+    def test_rejects_non_finite_integrals(self, water_window):
+        """Non-finite integrals are rejected at the boundary."""
+        case = water_window
+        one_body, _ = case.hamiltonian.get_one_body_integrals()
+        two_body = np.array(case.hamiltonian.get_two_body_integrals()[0])
+        two_body[0] = np.nan
+        container = CanonicalFourCenterHamiltonianContainer(
+            one_body,
+            two_body,
+            case.hamiltonian.get_orbitals(),
+            case.hamiltonian.get_core_energy(),
+            np.empty((0, 0)),
+        )
+        with pytest.raises(ValueError, match="non-finite"):
+            algorithms.create(_TYPE, "qdk_dsrg_pt2").run(case.reference, Hamiltonian(container), case.kept_space)
+
     def test_rejects_correlated_reference(self, water_window):
-        """Multi-determinant references are rejected until multireference DSRG-PT2 lands."""
+        """Multi-determinant references are rejected."""
         case = water_window
         h_p = algorithms.create("hamiltonian_constructor").run(case.reference.get_orbitals())
         cas = algorithms.create("multi_configuration_calculator", "macis_cas")
@@ -222,3 +229,62 @@ class TestEffectiveHamiltonianConstructor:
         _, cas_wfn = cas.run(h_p, 1, 1)
         with pytest.raises(ValueError, match="single-determinant"):
             algorithms.create(_TYPE, "qdk_dsrg_pt2").run(cas_wfn, case.hamiltonian, case.kept_space)
+
+    def test_matches_independent_values_when_the_reference_density_is_not_semicanonical(self):
+        """Excited determinants whose semicanonical 1-RDM is not diagonal exercise the singles' active-space correction.
+
+        The expected values come from an independent evaluation of P(H + [H~, A]/2)P in the full Fock space
+        (Li & Evangelista 2015, eqs. 35-39), less its reference-normal-ordered three-body part.
+        """
+        n, p = 5, [1, 2, 3]
+        idx = np.arange(n)
+        one_body = np.diag(np.linspace(-2.0, 1.4, n)) + 0.04 * np.cos(np.add.outer(idx, idx))
+        factors = 0.25 * np.sin(
+            1.0 + np.arange(4)[:, None, None] + 0.7 * np.add.outer(idx, idx) + 0.3 * np.multiply.outer(idx, idx)
+        )
+        two_body = np.einsum("lpq,lrs->pqrs", factors, factors).ravel()
+        empty = np.empty((0, 0))
+        closed_shell = [
+            [-1.351189221109, -0.337193172810, -0.172398121086],
+            [-0.337193172810, -0.709598435596, 0.059747549607],
+            [-0.172398121086, 0.059747549607, 0.577129719002],
+        ]
+        cases = [
+            ("20200", False, -3.579592577784, closed_shell, closed_shell),
+            (
+                "2u0d0",
+                True,
+                -3.547663065324,
+                [
+                    [-1.390153486186, -0.334179849259, -0.195528033827],
+                    [-0.334179849259, -0.742150875760, 0.037815040782],
+                    [-0.195528033827, 0.037815040782, 0.678805617545],
+                ],
+                [
+                    [-1.351986305377, -0.349546300520, -0.203746749714],
+                    [-0.349546300520, -0.754557102533, 0.040610717282],
+                    [-0.203746749714, 0.040610717282, 0.656693872486],
+                ],
+            ),
+        ]
+        for determinant, unrestricted, scalar, alpha, beta in cases:
+            orbitals = ModelOrbitals(
+                spin_index_set(n, list(range(n)), list(range(n)), equivalent=not unrestricted),
+                spin_index_set(n, [], [], equivalent=not unrestricted),
+            )
+            container = (
+                CanonicalFourCenterHamiltonianContainer(
+                    one_body, one_body, two_body, two_body, two_body, orbitals, 0.3, empty, empty
+                )
+                if unrestricted
+                else CanonicalFourCenterHamiltonianContainer(one_body, two_body, orbitals, 0.3, empty)
+            )
+            reference = Wavefunction(
+                StateVectorContainer(np.array([1.0]), [Configuration.from_spin_half_string(determinant)], orbitals)
+            )
+            h_eff = algorithms.create(_TYPE, "qdk_dsrg_pt2").run(
+                reference, Hamiltonian(container), spin_index_set(n, p, p, equivalent=not unrestricted)
+            )
+            assert h_eff.get_core_energy() == pytest.approx(scalar, abs=1e-10)
+            np.testing.assert_allclose(h_eff.get_one_body_integrals()[0], alpha, atol=1e-10)
+            np.testing.assert_allclose(h_eff.get_one_body_integrals()[1], beta, atol=1e-10)

@@ -660,12 +660,14 @@ TEST(DsrgPT2KernelTest, DiagnosticsTrackConnectingCouplings) {
   // The single excitation 0 -> 2 picks up active_fock = 2 * 0.175 = 0.35 on
   // top of bare 0.05, giving generalized-Fock coupling 0.4.
   const auto single = run(one_body, integrals_with_fock_shift, active_occ);
-  EXPECT_DOUBLE_EQ(single.max_amplitude, 0.4 / 2.5);
+  EXPECT_DOUBLE_EQ(single.max_amplitude,
+                   0.4 * dsrg::channel_factors(2.5, 0.5).inverse);
   EXPECT_DOUBLE_EQ(single.min_denominator, 2.5);
   // Without one-body couplings only the double excitation remains.
   const Eigen::MatrixXd zero_density = Eigen::MatrixXd::Zero(norb, norb);
   const auto pair = run(diagonal, integrals, zero_density);
-  EXPECT_DOUBLE_EQ(pair.max_amplitude, 0.3 / 4.25);
+  EXPECT_DOUBLE_EQ(pair.max_amplitude,
+                   0.3 * dsrg::channel_factors(4.25, 0.5).inverse);
   EXPECT_DOUBLE_EQ(pair.min_denominator, 4.25);
 }
 
@@ -1433,33 +1435,14 @@ TEST(DsrgPT2KernelTest, SemicanonicalPrimitivesAreCovariantAndReversible) {
   EXPECT_FALSE(noop.rotated);
   EXPECT_EQ(noop.matrix, Eigen::MatrixXd::Identity(count, count));
 
-  // Tolerance scales with block norm, and non-finite blocks throw.
+  // Tolerance scales with block norm.
   const auto tiny =
       dsrg::semicanonical_rotation(1e-14 * rotated, {{0}, {1, 2}, {3}}, 1e-12);
   EXPECT_TRUE(tiny.rotated);
-  Eigen::MatrixXd nan_fock = diagonal;
-  nan_fock(1, 2) = nan_fock(2, 1) = std::numeric_limits<double>::quiet_NaN();
-  EXPECT_THROW(
-      dsrg::semicanonical_rotation(nan_fock, {{0}, {1, 2}, {3}}, 1e-12),
-      std::runtime_error);
 
-  // aabb integrals rotate their (pq) and (rs) pairs separately, and either pair
-  // can be skipped independently.
+  // aabb integrals rotate their (pq) and (rs) pairs separately.
   const Eigen::MatrixXd second = semicanonical.matrix * basis;
   const auto mixed = dsrg::rotate_two_body(integrals, basis, second, count);
-  const Eigen::MatrixXd identity = Eigen::MatrixXd::Identity(count, count);
-  EXPECT_LT(
-      (dsrg::rotate_two_body(integrals, basis, identity, count, true, false) -
-       dsrg::rotate_two_body(integrals, basis, identity, count))
-          .cwiseAbs()
-          .maxCoeff(),
-      1e-14);
-  EXPECT_LT(
-      (dsrg::rotate_two_body(integrals, identity, second, count, false, true) -
-       dsrg::rotate_two_body(integrals, identity, second, count))
-          .cwiseAbs()
-          .maxCoeff(),
-      1e-14);
   double mixed_error = 0.0;
   for (int p = 0; p < count; ++p)
     for (int q = 0; q < count; ++q)
@@ -1478,6 +1461,21 @@ TEST(DsrgPT2KernelTest, SemicanonicalPrimitivesAreCovariantAndReversible) {
               std::abs(mixed(dsrg::idx4(p, q, r, s, count)) - expected));
         }
   EXPECT_LT(mixed_error, 1e-14);
+
+  // A rotation that keeps the roles {0}, {1, 2}, {3} transforms by role
+  // blocks; the integrals with three or more virtual indices (3) are unset.
+  const Eigen::MatrixXd beta = semicanonical.matrix.transpose();
+  const auto by_role = dsrg::rotate_two_body(integrals, semicanonical.matrix,
+                                             beta, {{{0}, {1, 2}, {3}}}, count);
+  const auto full =
+      dsrg::rotate_two_body(integrals, semicanonical.matrix, beta, count);
+  for (int p = 0; p < count; ++p)
+    for (int q = 0; q < count; ++q)
+      for (int r = 0; r < count; ++r)
+        for (int s = 0; s < count; ++s)
+          if ((p == 3) + (q == 3) + (r == 3) + (s == 3) <= 2)
+            EXPECT_NEAR(by_role(dsrg::idx4(p, q, r, s, count)),
+                        full(dsrg::idx4(p, q, r, s, count)), 1e-14);
 }
 
 }  // namespace

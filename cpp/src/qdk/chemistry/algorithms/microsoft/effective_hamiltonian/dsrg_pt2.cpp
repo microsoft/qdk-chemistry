@@ -24,6 +24,7 @@
 #include <unordered_set>
 #include <vector>
 
+#include "../../../data/two_body_symmetry.hpp"
 #include "dsrg_pt2_kernel.hpp"
 
 namespace qdk::chemistry::algorithms::microsoft {
@@ -67,15 +68,11 @@ std::array<Eigen::MatrixXd, 2> single_determinant_active_density(
   }
   if (nonzero_count != 1)
     throw std::invalid_argument(
-        "DSRG-PT2 currently supports single-determinant references only.");
+        "DSRG-PT2 requires a single-determinant reference.");
 
   const auto& det = state.get_active_determinants()[det_index];
   if (det.bits_per_mode() != 2)
     throw std::invalid_argument("DSRG-PT2 requires spin-1/2 determinants.");
-  if (det.get_orbital_capacity() < n_ref_active)
-    throw std::invalid_argument(
-        "DSRG-PT2: determinant capacity is smaller than the reference active "
-        "space.");
 
   const auto size = static_cast<Eigen::Index>(n_ref_active);
   Eigen::VectorXd occ_a(size), occ_b(size);
@@ -86,8 +83,7 @@ std::array<Eigen::MatrixXd, 2> single_determinant_active_density(
   }
   if (!unrestricted && occ_a != occ_b)
     throw std::invalid_argument(
-        "DSRG-PT2 requires a closed-shell determinant on restricted orbitals; "
-        "use unrestricted orbitals for open-shell determinants.");
+        "DSRG-PT2 requires a closed-shell determinant on restricted orbitals.");
 
   constexpr double rdm_tolerance = 1e-10;
   const auto check_rdm = [&](const auto& variant,
@@ -100,7 +96,7 @@ std::array<Eigen::MatrixXd, 2> single_determinant_active_density(
     const Eigen::MatrixXd expected = expected_diag.asDiagonal();
     if (size > 0 && (*rdm - expected).cwiseAbs().maxCoeff() > rdm_tolerance)
       throw std::invalid_argument(
-          "DSRG-PT2 currently supports single-determinant references only.");
+          "DSRG-PT2 requires a single-determinant reference.");
   };
   if (reference.has_one_rdm_spin_dependent()) {
     const auto [rdm_a, rdm_b] = reference.get_active_one_rdm_spin_dependent();
@@ -144,24 +140,22 @@ Eigen::MatrixXd window_density(
 }
 
 /// The reference orbitals relabeled with `p_indices` as active and
-/// `emit_inactive` as inactive orbitals.
+/// `emit_inactive` as inactive orbitals. Orbital energies are dropped: they
+/// describe the input Fock operator, not the effective Hamiltonian.
 std::shared_ptr<data::Orbitals> relabeled_orbitals(
     const data::Orbitals& ref_orbitals,
     const std::shared_ptr<const data::SymmetryBlockedIndexSet>& p_indices,
     const std::vector<std::size_t>& emit_inactive) {
-  std::shared_ptr<const data::SymmetryBlockedIndexSet> inactive_set;
-  if (!emit_inactive.empty()) {
-    std::vector<std::uint32_t> inactive_indices;
-    inactive_indices.reserve(emit_inactive.size());
-    for (const std::size_t index : emit_inactive)
-      inactive_indices.push_back(static_cast<std::uint32_t>(index));
-    std::unordered_map<data::SymmetryLabel, std::vector<std::uint32_t>>
-        inactive;
-    for (const auto& label : p_indices->labels())
-      inactive[label] = inactive_indices;
-    inactive_set = std::make_shared<const data::SymmetryBlockedIndexSet>(
-        p_indices->symmetries(), p_indices->extents(), std::move(inactive));
-  }
+  std::vector<std::uint32_t> inactive_indices;
+  inactive_indices.reserve(emit_inactive.size());
+  for (const std::size_t index : emit_inactive)
+    inactive_indices.push_back(static_cast<std::uint32_t>(index));
+  std::unordered_map<data::SymmetryLabel, std::vector<std::uint32_t>> inactive;
+  for (const auto& label : p_indices->labels())
+    inactive[label] = inactive_indices;
+  const auto inactive_set =
+      std::make_shared<const data::SymmetryBlockedIndexSet>(
+          p_indices->symmetries(), p_indices->extents(), std::move(inactive));
   if (dynamic_cast<const data::ModelOrbitals*>(&ref_orbitals))
     return std::make_shared<data::ModelOrbitals>(p_indices, inactive_set);
 
@@ -170,10 +164,9 @@ std::shared_ptr<data::Orbitals> relabeled_orbitals(
     overlap = ref_orbitals.get_overlap_matrix();
   std::shared_ptr<data::BasisSet> basis;
   if (ref_orbitals.has_basis_set()) basis = ref_orbitals.get_basis_set();
-  return std::make_shared<data::Orbitals>(
-      ref_orbitals.coefficients(),
-      ref_orbitals.has_energies() ? ref_orbitals.energies() : nullptr, overlap,
-      basis, p_indices, inactive_set);
+  return std::make_shared<data::Orbitals>(ref_orbitals.coefficients(), nullptr,
+                                          overlap, basis, p_indices,
+                                          inactive_set);
 }
 
 struct WindowPartition {
@@ -222,8 +215,7 @@ std::shared_ptr<data::Hamiltonian> DsrgPT2Constructor::_run_impl(
 
   auto win_orbitals = hamiltonian->get_orbitals();
   auto ref_orbitals = reference->get_orbitals();
-  const bool unrestricted =
-      hamiltonian->is_unrestricted() || ref_orbitals->is_unrestricted();
+  const bool unrestricted = hamiltonian->is_unrestricted();
 
   // The spatial orbitals an index set selects; both spins must agree.
   const auto spatial = [](const auto& indices, const std::string& what) {
@@ -239,23 +231,29 @@ std::shared_ptr<data::Hamiltonian> DsrgPT2Constructor::_run_impl(
     throw std::invalid_argument("DSRG-PT2 requires a non-empty p_indices.");
 
   const auto [h_alpha, h_beta] = hamiltonian->get_one_body_integrals();
+  if (!h_alpha.allFinite() || !h_beta.allFinite())
+    throw std::invalid_argument(
+        "DSRG-PT2: the one-body integrals contain a non-finite value.");
   std::array<Eigen::MatrixXd, 2> one_body{h_alpha, h_beta};
+  const int norb = static_cast<int>(h_alpha.rows());
+  // The aaaa, aabb and bbbb blocks are read as stored; `rotated` holds their
+  // semicanonical rotation.
   const auto [g_aaaa, g_aabb, g_bbbb] = hamiltonian->get_two_body_integrals();
-  std::array<const Eigen::VectorXd*, 3> two_body{&g_aaaa, &g_aaaa, &g_aaaa};
-  if (unrestricted) two_body = {&g_aaaa, &g_aabb, &g_bbbb};
-  std::array<Eigen::VectorXd, 3> rotated_two_body;
+  std::array<const Eigen::VectorXd*, 3> two_body{&g_aaaa, &g_aabb, &g_bbbb};
+  if (!unrestricted) two_body.fill(&g_aaaa);
+  for (int block = 0; block < (unrestricted ? 3 : 1); ++block)
+    data::detail::require_finite_two_body(
+        two_body[block]->data(),
+        static_cast<std::size_t>(two_body[block]->size()), "DSRG-PT2");
+  std::array<Eigen::VectorXd, 3> rotated;
   const auto two_body_blocks = [&]() -> dsrg::TwoBodyBlocks {
     return {std::cref(*two_body[0]), std::cref(*two_body[1]),
             std::cref(*two_body[2])};
   };
   const double e_core = hamiltonian->get_core_energy();
-  const int norb = static_cast<int>(h_alpha.rows());
 
   const auto W_global = spatial(win_orbitals->active_indices(),
                                 "the window Hamiltonian's active index set");
-  if (W_global.size() != static_cast<std::size_t>(norb))
-    throw std::invalid_argument(
-        "DSRG-PT2: window active index count does not match integral rank.");
   const auto win_inactive_global =
       spatial(win_orbitals->inactive_indices(),
               "the window Hamiltonian's inactive index set");
@@ -318,51 +316,42 @@ std::shared_ptr<data::Hamiltonian> DsrgPT2Constructor::_run_impl(
       }
       orbital_energies[spin] = fock[spin].diagonal();
     }
-    if (rotation[0].rotated) {
-      rotated_two_body[0] =
-          dsrg::rotate_two_body(*two_body[0], rotation[0].matrix, norb);
-      two_body[0] = &rotated_two_body[0];
-    }
-    if (unrestricted) {
-      if (rotation[0].rotated || rotation[1].rotated) {
-        rotated_two_body[1] = dsrg::rotate_two_body(
-            *two_body[1], rotation[0].matrix, rotation[1].matrix, norb,
-            rotation[0].rotated, rotation[1].rotated);
-        two_body[1] = &rotated_two_body[1];
+    if (rotation[0].rotated || rotation[1].rotated) {
+      const std::array<std::vector<int>, 3> roles{
+          inactive_spatial, active_spatial, virtual_spatial};
+      // aaaa, aabb and bbbb rotate their (pq) and (rs) pairs by the alpha and
+      // beta rotations as (alpha, alpha), (alpha, beta) and (beta, beta).
+      for (int block = 0; block < (unrestricted ? 3 : 1); ++block) {
+        rotated[block] = dsrg::rotate_two_body(
+            *two_body[block], rotation[block / 2].matrix,
+            rotation[(block + 1) / 2].matrix, roles, norb);
+        two_body[block] = &rotated[block];
       }
-      if (rotation[1].rotated) {
-        rotated_two_body[2] =
-            dsrg::rotate_two_body(*two_body[2], rotation[1].matrix, norb);
-        two_body[2] = &rotated_two_body[2];
-      }
-    } else if (rotation[0].rotated) {
-      two_body.fill(&rotated_two_body[0]);
+      if (!unrestricted) two_body.fill(&rotated[0]);
     }
   }
 
   auto down = dsrg::downfold(one_body, two_body_blocks(), orbital_energies,
                              active_spatial, inactive_spatial, virtual_spatial,
                              flow, e_core, !unrestricted, density);
-  rotated_two_body = {};
 
   QDK_LOGGER().info(
       "DSRG-PT2 downfold complete: flow_parameter={}, active={}, "
       "folded inactive={}, folded virtual={}, minimum gap={:.3g} Eh, "
-      "maximum raw amplitude={:.3g}",
+      "maximum amplitude={:.3g}",
       flow, active_spatial.size(), inactive_spatial.size(),
       virtual_spatial.size(), down.min_denominator, down.max_amplitude);
   constexpr double intruder_warn_amplitude = 1.0;
-  if (flow > 0.0 && down.max_amplitude > intruder_warn_amplitude)
+  if (down.max_amplitude > intruder_warn_amplitude)
     QDK_LOGGER().warn(
-        "DSRG-PT2: large undamped amplitude {:.3g} (smallest gap {:.3g} Eh); "
-        "consider a larger P or smaller flow_parameter.",
+        "DSRG-PT2: large amplitude {:.3g} (smallest gap {:.3g} Eh); consider "
+        "a larger P or smaller flow_parameter.",
         down.max_amplitude, down.min_denominator);
 
   if (rotation[0].rotated || rotation[1].rotated) {
     const int active_count = static_cast<int>(active_spatial.size());
     std::array<Eigen::MatrixXd, 2> active_rotation;
     for (int spin = 0; spin < 2; ++spin) {
-      if (!rotation[spin].rotated) continue;
       active_rotation[spin] =
           rotation[spin].matrix(active_spatial, active_spatial).transpose();
       down.one_body[spin] =
@@ -371,9 +360,8 @@ std::shared_ptr<data::Hamiltonian> DsrgPT2Constructor::_run_impl(
         down.same_spin_two_body[spin] = dsrg::rotate_two_body(
             down.same_spin_two_body[spin], active_rotation[spin], active_count);
     }
-    down.two_body = dsrg::rotate_two_body(
-        down.two_body, active_rotation[0], active_rotation[1], active_count,
-        rotation[0].rotated, rotation[1].rotated);
+    down.two_body = dsrg::rotate_two_body(down.two_body, active_rotation[0],
+                                          active_rotation[1], active_count);
   }
 
   // The orbitals the window Hamiltonian folded into its core energy are

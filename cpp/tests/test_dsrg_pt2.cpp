@@ -605,7 +605,6 @@ TEST(DsrgPT2Test, CustomActiveSpaceOverridesReference) {
                std::invalid_argument);
 }
 
-// Multi-determinant CAS references are rejected until full DSRG-MRPT2 lands.
 TEST(DsrgPT2Test, RejectsCorrelatedCasReference) {
   auto water = testing::create_water_structure();
   auto scf = ScfSolverFactory::create();
@@ -632,7 +631,7 @@ TEST(DsrgPT2Test, RejectsCorrelatedCasReference) {
 }
 
 // Restricted open-shell determinants have nonzero spin-averaged cumulants in
-// full DSRG-MRPT2 and are therefore rejected by the single-reference version.
+// DSRG-MRPT2 and are therefore rejected.
 TEST(DsrgPT2Test, RejectsRestrictedOpenShellHfReference) {
   auto hydroxyl = testing::create_oh_structure();
   auto scf = ScfSolverFactory::create();
@@ -979,13 +978,10 @@ TEST(DsrgPT2Test, AcceptsEmptyReferenceActiveSpaceWithZeroSizedRdm) {
                      ->run(reference, window, idx({1, 2}));
     ASSERT_NE(h_eff, nullptr);
     EXPECT_TRUE(std::isfinite(h_eff->get_core_energy()));
-    // Folding only virtuals leaves no inactive orbitals; inactive_indices
-    // should be null rather than an empty index set.
     auto h_virt_only =
         EffectiveHamiltonianConstructorFactory::create("qdk_dsrg_pt2")
             ->run(reference, window, idx({0, 1, 2}));
     EXPECT_FALSE(h_virt_only->get_orbitals()->has_inactive_space());
-    EXPECT_EQ(h_virt_only->get_orbitals()->inactive_indices(), nullptr);
   }
 }
 

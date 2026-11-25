@@ -395,6 +395,25 @@ TEST_F(HamiltonianTest, JSONSerialization) {
   EXPECT_FALSE(h2->is_unrestricted());
 }
 
+TEST_F(HamiltonianTest, JSONRoundTripWithInactiveOrbitalsAndNoInactiveFock) {
+  std::vector<size_t> active_indices = {1, 2};
+  std::vector<size_t> inactive_indices = {0};
+  auto orbitals_with_inactive =
+      std::make_shared<ModelOrbitals>(trivial_index_set(4, active_indices),
+                                      trivial_index_set(4, inactive_indices));
+  Hamiltonian h(std::make_unique<CanonicalFourCenterHamiltonianContainer>(
+      one_body, two_body, orbitals_with_inactive, core_energy,
+      Eigen::MatrixXd(0, 0)));
+  ASSERT_FALSE(h.has_inactive_fock_matrix());
+
+  auto loaded = Hamiltonian::from_json(h.to_json());
+  EXPECT_TRUE(loaded->get_orbitals()->has_inactive_space());
+  EXPECT_FALSE(loaded->has_inactive_fock_matrix());
+  EXPECT_EQ(loaded->get_core_energy(), core_energy);
+  EXPECT_TRUE(std::get<0>(loaded->get_one_body_integrals()).isApprox(one_body));
+  EXPECT_TRUE(std::get<0>(loaded->get_two_body_integrals()).isApprox(two_body));
+}
+
 TEST_F(HamiltonianTest, JSONFileIO) {
   Hamiltonian h(std::make_unique<CanonicalFourCenterHamiltonianContainer>(
       one_body, two_body, orbitals, core_energy, inactive_fock));
