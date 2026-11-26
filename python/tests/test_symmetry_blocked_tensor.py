@@ -121,6 +121,19 @@ class TestSymmetryBlockedTensorRank2:
         # Independent storage: alpha and beta blocks differ.
         assert not np.allclose(sbt.block((alpha, alpha)), sbt.block((beta, beta)))
 
+    def test_blocks_lists_every_stored_block(self, unrestricted_spin):
+        """blocks() returns each stored (labels, block) pair, matching block()."""
+        syms, alpha, beta = unrestricted_spin
+        stored = {(alpha, beta): np.arange(6.0).reshape(2, 3), (beta, alpha): -np.ones((3, 2))}
+        sbt = sym.SymmetryBlockedTensorRank2(
+            [syms, syms], [{alpha: 2, beta: 3}, {alpha: 2, beta: 3}], list(stored.items())
+        )
+        blocks = sbt.blocks()
+        assert len(blocks) == sbt.num_blocks() == len(stored)
+        for labels, block in blocks:
+            assert np.array_equal(block, stored[tuple(labels)])
+            assert np.array_equal(block, sbt.block(labels))
+
     def test_missing_block_raises(self, unrestricted_spin):
         """Requesting an absent block raises ValueError."""
         syms, alpha, beta = unrestricted_spin
