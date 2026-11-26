@@ -492,7 +492,7 @@ def test_open_shell_states_have_fermionic_signs(qsharp_test_context, qsharp_test
 # (fixture, method) -> (numQubits, cczCount, ccixCount) at rotation_bit_precision=6 and the identity
 # site_to_orbital_order.
 _EXPECTED_RESOURCES = {
-    ("mps_h2", "dense"): (24, 144, 0),
+    ("mps_h2", "dense"): (24, 108, 0),
     ("mps_h2", "block_sparse"): (24, 45, 0),
     ("mps_spin", "dense"): (21, 22, 0),
     ("mps_spin", "block_sparse"): (21, 14, 0),
