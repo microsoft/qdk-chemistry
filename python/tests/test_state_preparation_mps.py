@@ -50,7 +50,7 @@ _METHODS = pytest.mark.parametrize("method", ["dense", "block_sparse"])
 _FIXTURE_DIR = Path(__file__).parent / "test_data"
 
 
-def make_site(values: np.ndarray) -> MPSSite:
+def make_site(values: np.ndarray, physical_basis=()) -> MPSSite:
     """Wrap a dense ``(left, physical, right)`` array as one trivial-symmetry MPS block."""
     left, physical, right = values.shape
     product, label = sym.SymmetryProduct([]), sym.SymmetryLabel([])
@@ -60,14 +60,18 @@ def make_site(values: np.ndarray) -> MPSSite:
         [{label: left}, {label: physical}, {label: right}],
         [((label,) * 3, values.reshape(left * physical, right))],
     )
-    return MPSSite(tensor, [label], [label], [label], [])
+    return MPSSite(tensor, [label], [label], [label], list(physical_basis))
 
 
 def make_mps(
-    tensors, orthogonality_center: int | None = 0, site_to_orbital_order=None, orbitals: Orbitals | None = None
+    tensors,
+    orthogonality_center: int | None = 0,
+    site_to_orbital_order=None,
+    orbitals: Orbitals | None = None,
+    physical_basis=(),
 ) -> MPSContainer:
     """Construct a native MPS container from dense test tensors (one site per orbital unless *orbitals* is given)."""
-    sites = [make_site(np.asarray(tensor)) for tensor in tensors]
+    sites = [make_site(np.asarray(tensor), physical_basis) for tensor in tensors]
     return MPSContainer(
         sites,
         orbitals if orbitals is not None else create_test_orbitals(max(1, len(sites))),
@@ -151,6 +155,13 @@ def test_circuit_register_holds_two_qubits_per_site(active_space):
     assert circuit.num_qubits == 4
 
 
+def test_physical_basis_with_trailing_empty_modes_is_accepted():
+    """A physical basis padded with empty modes gives the same preparation data as the default basis."""
+    tensors = _fixture_site_tensors("mps_h2", (0, 1))
+    padded = [Configuration.from_spin_half_string(f"{state}0000") for state in ("0", "u", "d", "2")]
+    assert preparation_data(make_mps(tensors, physical_basis=padded)) == preparation_data(make_mps(tensors))
+
+
 @pytest.mark.parametrize(
     ("make_wavefunction", "settings", "error", "message"),
     [
@@ -160,6 +171,18 @@ def test_circuit_register_holds_two_qubits_per_site(active_space):
             TypeError,
             "requires the unitary_synthesis_dense or unitary_synthesis_block_sparse circuit mapper",
             id="other-circuit-mapper",
+        ),
+        pytest.param(
+            lambda: Wavefunction(
+                make_mps(
+                    _fixture_site_tensors("mps_h2", (0, 1)),
+                    physical_basis=[Configuration.from_spin_half_string(s) for s in ("u", "0", "d", "2")],
+                )
+            ),
+            {},
+            ValueError,
+            "requires physical basis ordering",
+            id="reordered-physical-basis",
         ),
         pytest.param(create_test_wavefunction, {}, TypeError, "requires an MPSContainer", id="non-mps-wavefunction"),
         pytest.param(

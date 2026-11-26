@@ -38,11 +38,12 @@ _DESCRIPTION = "MPS state preparation"
 
 # Supported physical bases by the number of physical states per site. A site with two states
 # is one spinless mode on one qubit; a site with four states is one spatial orbital on two
-# qubits, its alpha and beta modes.
+# qubits, its alpha and beta modes. Each state is compared by its encoding and first mode,
+# since MPS sites may pad their states with empty modes.
 _PHYSICAL_BASIS_LABELS = {2: ("0", "1"), 4: ("0", "u", "d", "2")}
 _PHYSICAL_BASES = {
-    2: [Configuration.from_bitstring(state) for state in _PHYSICAL_BASIS_LABELS[2]],
-    4: [Configuration.from_spin_half_string(state) for state in _PHYSICAL_BASIS_LABELS[4]],
+    2: [(1, Configuration.from_bitstring(state).get_mode_state(0)) for state in _PHYSICAL_BASIS_LABELS[2]],
+    4: [(2, Configuration.from_spin_half_string(state).get_mode_state(0)) for state in _PHYSICAL_BASIS_LABELS[4]],
 }
 
 
@@ -134,7 +135,11 @@ class MatrixProductStatePreparation(StatePreparation):
         (dimension,) = dimensions
         if dimension not in _PHYSICAL_BASES:
             raise ValueError("MPS state preparation requires two or four physical states per site.")
-        if any(site.physical_basis() != _PHYSICAL_BASES[dimension] for site in mps_sites):
+        if any(
+            [(state.bits_per_mode(), state.get_mode_state(0)) for state in site.physical_basis()]
+            != _PHYSICAL_BASES[dimension]
+            for site in mps_sites
+        ):
             labels = ", ".join(f"'{label}'" for label in _PHYSICAL_BASIS_LABELS[dimension])
             raise ValueError(f"MPS state preparation requires physical basis ordering ({labels}).")
         # The bond register holds the largest bond, and at least one qubit.
