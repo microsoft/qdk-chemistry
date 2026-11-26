@@ -10,6 +10,10 @@ concrete implementations so that consumers can import them directly from
 # Licensed under the MIT License. See LICENSE.txt in the project root for license information.
 # --------------------------------------------------------------------------------------------
 
-from qdk_chemistry._core._algorithms import EffectiveHamiltonianConstructor, QdkDuccConstructor
+from qdk_chemistry._core._algorithms import (
+    EffectiveHamiltonianConstructor,
+    QdkDsrgPT2Constructor,
+    QdkDuccConstructor,
+)
 
-__all__ = ["EffectiveHamiltonianConstructor", "QdkDuccConstructor"]
+__all__ = ["EffectiveHamiltonianConstructor", "QdkDsrgPT2Constructor", "QdkDuccConstructor"]

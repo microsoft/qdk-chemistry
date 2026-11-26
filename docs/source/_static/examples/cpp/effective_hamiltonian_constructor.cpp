@@ -73,5 +73,18 @@ H   -0.758602    0.000000    0.504284
   }
   // end-cell-list-implementations
   // --------------------------------------------------------------------------------------------
+
+  // --------------------------------------------------------------------------------------------
+  // start-cell-dsrg-pt2-example
+  // DSRG-PT2 takes the SCF determinant as its reference; s is in Eh^-2
+  auto dsrg = EffectiveHamiltonianConstructorFactory::create("qdk_dsrg_pt2");
+  dsrg->settings().set("flow_parameter", 2.0);
+  auto dsrg_hamiltonian = dsrg->run(scf_wavefunction, hamiltonian, p_indices);
+  auto [dsrg_energy, dsrg_wavefunction] =
+      mc_calculator->run(dsrg_hamiltonian, 2, 2);
+  std::cout << "DSRG-PT2 CASCI Energy: " << dsrg_energy << " Hartree"
+            << std::endl;
+  // end-cell-dsrg-pt2-example
+  // --------------------------------------------------------------------------------------------
   return 0;
 }

@@ -23,6 +23,8 @@ target_sources(chemistry PRIVATE
     sequant_evaluation.cpp
     stabilized_scf.cpp
     stability.cpp
+    effective_hamiltonian/dsrg_pt2_kernel.cpp
+    effective_hamiltonian/dsrg_pt2.cpp
     utils.cpp
 )
 

@@ -8,6 +8,7 @@
 #include <qdk/chemistry/algorithms/effective_hamiltonian.hpp>
 
 #include "factory_bindings.hpp"
+#include "qdk/chemistry/algorithms/microsoft/effective_hamiltonian/dsrg_pt2.hpp"
 #include "qdk/chemistry/algorithms/microsoft/effective_hamiltonian/ducc.hpp"
 #include "stl.hpp"
 
@@ -198,4 +199,41 @@ The ``level`` setting is an integer from 0 to 2, with default 2.
 Level 0 performs bare downfolding without commutator corrections.
 )")
       .def(nb::init<>());
+
+  nb::class_<microsoft::DsrgPT2Constructor, EffectiveHamiltonianConstructor>(
+      m, "QdkDsrgPT2Constructor", R"(
+Second-order driven similarity renormalization group (DSRG-PT2) downfold of the
+window's core and virtual orbitals onto the target space ``P`` (``p_indices``).
+
+Emits the fixed-reference DSRG-PT2 effective Hamiltonian over ``P``, truncated
+to two-body terms in reference normal order and returned in bare normal order.
+Supports single-determinant references: closed-shell determinants on
+restricted orbitals, and closed- or open-shell determinants on unrestricted
+orbitals. The ``flow_parameter`` setting is the Gaussian-source flow ``s`` in
+inverse squared energy units, :math:`E_h^{-2}` for molecules (default ``0.5``;
+``0`` returns the bare core-folded operator over ``P``). Restricted input gives
+a restricted result, unrestricted input an unrestricted one. The restricted and
+same-spin two-body blocks are 4-fold (not 8-fold) symmetric, and the
+unrestricted mixed-spin block is 2-fold Hermitian. The factory name is
+``"qdk_dsrg_pt2"``.
+
+Typical usage:
+
+.. code-block:: python
+
+    import qdk_chemistry.algorithms as alg
+
+    downfolder = alg.create("effective_hamiltonian_constructor", "qdk_dsrg_pt2")
+    h_eff = downfolder.run(reference, window_hamiltonian, p_indices)
+
+See Also:
+    :class:`EffectiveHamiltonianConstructor`
+    :class:`qdk_chemistry.data.Wavefunction`
+    :class:`qdk_chemistry.data.Hamiltonian`
+)")
+      .def(nb::init<>(), R"(
+Default constructor.
+
+Initializes a DSRG-PT2 downfold with default settings.
+)");
 }

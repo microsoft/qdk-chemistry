@@ -11,6 +11,7 @@
 #include <stdexcept>
 #include <string>
 
+#include "microsoft/effective_hamiltonian/dsrg_pt2.hpp"
 #include "microsoft/effective_hamiltonian/ducc.hpp"
 
 namespace qdk::chemistry::algorithms {
@@ -156,6 +157,10 @@ void EffectiveHamiltonianConstructorFactory::register_default_instances() {
   EffectiveHamiltonianConstructorFactory::register_instance(
       []() -> EffectiveHamiltonianConstructorFactory::return_type {
         return std::make_unique<microsoft::DuccConstructor>();
+      });
+  EffectiveHamiltonianConstructorFactory::register_instance(
+      []() -> EffectiveHamiltonianConstructorFactory::return_type {
+        return std::make_unique<microsoft::DsrgPT2Constructor>();
       });
 }
 

@@ -64,7 +64,18 @@ print(f"DUCC CASCI Energy: {ducc_energy:.10f} Hartree")
 # start-cell-list-implementations
 from qdk_chemistry.algorithms import registry
 
-print(registry.available("effective_hamiltonian_constructor"))
-# ['qdk_ducc']
+print(sorted(registry.available("effective_hamiltonian_constructor")))
+# ['qdk_dsrg_pt2', 'qdk_ducc']
 # end-cell-list-implementations
+################################################################################
+
+################################################################################
+# start-cell-dsrg-pt2-example
+# DSRG-PT2 takes the SCF determinant as its reference; s is in Eh^-2
+dsrg = create("effective_hamiltonian_constructor", "qdk_dsrg_pt2")
+dsrg.settings().set("flow_parameter", 2.0)
+dsrg_hamiltonian = dsrg.run(scf_wavefunction, hamiltonian, p_indices)
+dsrg_energy, _ = mc_calculator.run(dsrg_hamiltonian, 2, 2)
+print(f"DSRG-PT2 CASCI Energy: {dsrg_energy:.10f} Hartree")
+# end-cell-dsrg-pt2-example
 ################################################################################

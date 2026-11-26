@@ -203,6 +203,103 @@ Level 0 performs bare downfolding without commutator corrections.
      - int
      - Commutator level, from 0 to 2 inclusive. Default: 2.
 
+QDK DSRG-PT2
+~~~~~~~~~~~~
+
+.. rubric:: Factory name: ``"qdk_dsrg_pt2"``
+
+Constructs the fixed-reference, second-order effective Hamiltonian of the driven similarity renormalization group (DSRG-PT2) :cite:`Evangelista2014,Li2015,Li2017` for a single-determinant reference state.
+The result is an ordinary Hamiltonian over :math:`P`.
+
+DSRG applies a continuous unitary transformation :math:`\bar H(s) = e^{-\hat A(s)} H_W e^{\hat A(s)}` with anti-Hermitian generator :math:`\hat A = \hat T - \hat T^\dagger` to suppress couplings between :math:`P` and :math:`Q` as a function of the flow parameter :math:`s`.
+Through second order, the effective Hamiltonian :cite:`Li2017` is
+
+.. math::
+
+   H_{\mathrm{eff}}^{P} = \hat P\left(H_W + \tfrac{1}{2}\big[\tilde H, \hat A\big]\right)\hat P,
+
+where :math:`\tilde H` is :math:`H_W` with renormalized couplings :cite:`Li2015,Li2017`.
+
+The target space :math:`P` must be non-empty and must contain every singly occupied orbital of the reference.
+Every other orbital of :math:`W` must be doubly occupied or empty in the reference determinant; those outside :math:`P` are folded as core or virtual orbitals, and reference core and virtual orbitals inside :math:`P` are embedded as doubly occupied and empty orbitals.
+Below, the active orbitals are those of :math:`P`, the core orbitals are the doubly occupied orbitals of :math:`Q`, and the virtual orbitals are the rest of :math:`Q`.
+The orbital energies :math:`\varepsilon_{p\sigma}` are the diagonal elements of the generalized Fock matrices
+
+.. math::
+
+   F^\sigma_{pq} = h^\sigma_{pq}
+          + \sum_{\tau}\sum_{rs} \gamma^\tau_{rs}(pq|rs)^{\sigma\tau}
+          - \sum_{rs} \gamma^\sigma_{rs}(pr|sq)^{\sigma\sigma}
+
+in the semicanonical basis, which diagonalizes each :math:`F^\sigma` separately within the core, active, and virtual blocks.
+Here :math:`\gamma^\sigma` is the reference 1-RDM of spin :math:`\sigma` over :math:`W`.
+Blocks whose off-diagonal elements are all below :math:`10^{-6}/\max(1, 2s)` :math:`E_h`, as for converged canonical Hartree-Fock orbitals, are left unrotated, which changes :math:`H_{\mathrm{eff}}^{P}` by at most about :math:`10^{-6}` times the squared couplings.
+
+The first-order cluster operator :math:`\hat T` excites from core and active orbitals into active and virtual orbitals, excluding purely active excitations.
+With the antisymmetrized integrals :math:`v^{ij}_{ab} = \langle ab \Vert ij \rangle` and the gaps :math:`\Delta^{ij}_{ab} = \varepsilon_i + \varepsilon_j - \varepsilon_a - \varepsilon_b` in the semicanonical basis, its doubles amplitudes and the renormalized couplings are
+
+.. math::
+
+   t^{ij}_{ab} = v^{ij}_{ab}\,\frac{1 - e^{-s(\Delta^{ij}_{ab})^2}}{\Delta^{ij}_{ab}},
+   \qquad
+   \tilde v^{ij}_{ab} = v^{ij}_{ab}\left(1 + e^{-s(\Delta^{ij}_{ab})^2}\right),
+
+where :math:`s` is the flow parameter.
+For the singles, :math:`t^i_a` applies :math:`(1 - e^{-s(\Delta^i_a)^2}) / \Delta^i_a` to :math:`f^i_a + b^i_a`, where :math:`b^i_a = \sum_{ux} (\varepsilon_x - \varepsilon_u)\, t^{iu}_{ax}\, \gamma^x_u` sums over active orbitals, while :math:`\tilde f^i_a = f^i_a(1 + e^{-s(\Delta^i_a)^2}) + b^i_a e^{-s(\Delta^i_a)^2}` :cite:`Li2015`.
+
+The commutator in :math:`H_{\mathrm{eff}}^{P}` keeps its scalar, one- and two-body parts in reference normal order :cite:`Kutzelnigg1997`, and discards the residual three-body operator (including for two-electron active spaces).
+The result is returned in ordinary normal order over the unrotated orbitals of :math:`P`.
+The reference expectation value of :math:`H_{\mathrm{eff}}^{P}` is the unrelaxed DSRG-MRPT2 energy :cite:`Li2015`, and diagonalizing it in the reference's electron-number and spin sector over :math:`P` gives the partially relaxed energy :cite:`Li2017`.
+
+``flow_parameter`` must be finite and nonnegative.
+Larger :math:`s` regularizes less, and :math:`s = 0` disables the transformation, returning only the bare core-folded operator over :math:`P`.
+At finite :math:`s`, an amplitude tends continuously to zero as its gap closes.
+For a Hartree-Fock reference and :math:`P` equal to the occupied orbitals, the reference expectation value is the Hartree-Fock energy plus MP2 with each :math:`ij \to ab` term scaled by :math:`1 - e^{-2s(\Delta^{ij}_{ab})^2}`, tending to MP2 as :math:`s \to \infty`.
+
+This implementation supports real, normalized, self-dual single-determinant references: closed-shell determinants on restricted orbitals, and closed- or open-shell determinants on unrestricted orbitals.
+Multi-determinant (correlated) references and open-shell determinants on restricted orbitals are rejected.
+The input Hamiltonian must be Hermitian, and both spins must use the same spatial partitions.
+Its two-body integrals are read as stored, so they must have the Hermitian symmetries: :math:`(pq|rs) = (rs|pq) = (qp|sr)` for the restricted and same-spin blocks, and :math:`(pq|rs)^{\alpha\beta} = (qp|sr)^{\alpha\beta}` for an unrestricted ``aabb`` block.
+Its inactive orbitals must be exactly the reference core outside :math:`W`, which its scalar and integrals already include.
+
+The output orbitals preserve the reference orbital basis, and ``ModelOrbitals`` references give ``ModelOrbitals`` output.
+The output keeps the spin restriction of the input.
+The restricted and same-spin (``aaaa``, ``bbbb``) two-body blocks are 4-fold rather than 8-fold symmetric, :math:`(pq|rs) = (qp|sr) = (rs|pq)`: the commutator is not an electron-repulsion operator, so the bra swap :math:`(pq|rs) = (qp|rs)` does not hold.
+For an unrestricted output, the mixed-spin ``aabb`` block satisfies 2-fold Hermiticity, :math:`(pq|rs)^{\alpha\beta} = (qp|sr)^{\alpha\beta}`.
+
+The constructor logs the partition, the smallest gap, and the largest damped amplitude :math:`\lvert t \rvert` over the coupled channels, and warns when an amplitude exceeds one.
+
+.. rubric:: Settings
+
+.. list-table::
+   :header-rows: 1
+   :widths: 20 20 60
+
+   * - Setting
+     - Type
+     - Description
+   * - ``flow_parameter``
+     - float
+     - Flow parameter :math:`s`, in inverse squared energy units (:math:`E_h^{-2}` for molecules); ``0`` returns the bare operator over :math:`P`. Default: 0.5
+
+.. rubric:: Example
+
+With the inputs of the DUCC example above, DSRG-PT2 needs only the SCF determinant as its reference.
+
+.. tab:: Python API
+
+   .. literalinclude:: ../../../_static/examples/python/effective_hamiltonian_constructor.py
+      :language: python
+      :start-after: # start-cell-dsrg-pt2-example
+      :end-before: # end-cell-dsrg-pt2-example
+
+.. tab:: C++ API
+
+   .. literalinclude:: ../../../_static/examples/cpp/effective_hamiltonian_constructor.cpp
+      :language: cpp
+      :start-after: // start-cell-dsrg-pt2-example
+      :end-before: // end-cell-dsrg-pt2-example
+
 Related classes
 ---------------
 
