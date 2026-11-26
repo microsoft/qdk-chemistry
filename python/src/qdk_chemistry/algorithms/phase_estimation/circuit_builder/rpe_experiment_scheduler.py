@@ -11,7 +11,7 @@ import json
 
 import numpy as np
 
-from qdk_chemistry.algorithms.base import Algorithm, AlgorithmFactory
+from qdk_chemistry.algorithms.base import Algorithm, AlgorithmFactory, create_from_ref
 from qdk_chemistry.algorithms.hamiltonian_unitary_builder.base import TimeEvolutionBuilder
 from qdk_chemistry.algorithms.hamiltonian_unitary_builder.time_evolution.qdrift_error import _qdrift_lambda
 from qdk_chemistry.data import (
@@ -244,7 +244,6 @@ class RobustPhaseEstimationExperimentScheduler(Algorithm):
             raise ValueError("max_qdrift_samples must be positive.")
 
         unitary_ref = self._settings.get("unitary_builder")
-        hadamard_ref = self._settings.get("hadamard_test_circuit_builder")
         # Create first so an unregistered builder name raises the registry's KeyError.
         unitary_builder = self._create_nested("unitary_builder")
         unitary_settings = unitary_builder.settings()
@@ -357,6 +356,13 @@ class RobustPhaseEstimationExperimentScheduler(Algorithm):
             builder_name,
             settings=Settings.from_json(json.dumps(shared_settings)),
         )
+        hadamard_builder = self._create_nested("hadamard_test_circuit_builder")
+        hadamard_settings = hadamard_builder.settings()
+        if hadamard_settings.has("controlled_circuit_mapper"):
+            mapper = create_from_ref(hadamard_settings, "controlled_circuit_mapper")
+            hadamard_settings.set(
+                "controlled_circuit_mapper", AlgorithmRef(mapper.type_name(), mapper.name(), settings=mapper.settings())
+            )
         return RobustPhaseEstimationSchedule(
             rounds=tuple(rounds),
             hamiltonian_hash=RobustPhaseEstimationSchedule.hamiltonian_fingerprint(qubit_hamiltonian),
@@ -371,7 +377,11 @@ class RobustPhaseEstimationExperimentScheduler(Algorithm):
             requested_seed=requested_seed,
             root_seed=root_seed,
             unitary_builder_configuration=shared_configuration,
-            hadamard_test_circuit_builder_configuration=hadamard_ref,
+            hadamard_test_circuit_builder_configuration=AlgorithmRef(
+                hadamard_builder.type_name(),
+                hadamard_builder.name(),
+                settings=Settings.from_json(hadamard_settings.to_json()),
+            ),
         )
 
     def _resolve_budget(

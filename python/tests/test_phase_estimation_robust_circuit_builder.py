@@ -475,6 +475,33 @@ def test_scheduler_records_resolved_default_builder(overrides: dict[str, int]) -
     assert restored.to_json() == schedule("trotter").to_json()
 
 
+@pytest.mark.parametrize("batch_size", [None, 7])
+def test_schedule_snapshots_resolved_hadamard_settings(batch_size: int | None) -> None:
+    """Sparse Hadamard and mapper settings keep their overrides and round-trip with resolved defaults."""
+    overrides = Settings.from_json('{"test_basis":"Y"}')
+    if batch_size is not None:
+        mapper = AlgorithmRef(
+            "controlled_circuit_mapper",
+            "pauli_sequence",
+            settings=Settings.from_json(json.dumps({"max_hamming_weight_phasing_batch_size": batch_size})),
+        )
+        overrides._set_default("controlled_circuit_mapper", "algorithm_ref", mapper)
+    scheduler = RobustPhaseEstimationExperimentScheduler(
+        seed=7,
+        target_accuracy=0.5,
+        hadamard_test_circuit_builder=AlgorithmRef("hadamard_test_circuit_builder", "qdk", settings=overrides),
+    )
+
+    schedule = scheduler.run(QubitOperator(["Z"], [1.0]))
+
+    settings = schedule.hadamard_test_circuit_builder_configuration.settings
+    assert settings.get("test_basis") == "Y"
+    mapper_settings = settings.get("controlled_circuit_mapper").settings
+    assert mapper_settings.has("control_indices")
+    assert mapper_settings.get("max_hamming_weight_phasing_batch_size") == (-1 if batch_size is None else batch_size)
+    assert RobustPhaseEstimationSchedule.from_json(schedule.to_json()).to_json() == schedule.to_json()
+
+
 @pytest.mark.parametrize("builder_name", ["trotter", "qdrift", "partially_randomized"])
 def test_builtin_schedule_preserves_experiment_baseline(
     rpe_problem: tuple[Circuit, QubitOperator],
