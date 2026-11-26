@@ -60,6 +60,7 @@ void bind_syev_solver(nb::module_& m);
 void bind_lattice_geometry(nb::module_& m);
 void bind_lattice_graph(nb::module_& m);
 void bind_model_hamiltonians(nb::module_& m);
+void bind_unitary_synthesis(nb::module_& m);
 void bind_cube_generator(nb::module_& m);
 
 NB_MODULE(_core, m) {
@@ -135,6 +136,7 @@ NB_MODULE(_core, m) {
   bind_orbital_rotation(utils);
   bind_model_hamiltonians(utils);
   bind_logger(utils);
+  bind_unitary_synthesis(utils);
   bind_cube_generator(utils);
 
   // Bind constants and config at the top level

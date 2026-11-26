@@ -152,7 +152,8 @@ class UnaryPhaseEstimation(PhaseEstimation):
 
         Raises:
             TypeError: If the configured circuit builder is not a unary-iteration builder,
-                or if the configured circuit executor is not the sparse-state simulator.
+                the configured circuit executor is not the sparse-state simulator,
+                or the unitary has no eigenvalue mapping.
 
         """
         Logger.trace_entering()
@@ -178,6 +179,8 @@ class UnaryPhaseEstimation(PhaseEstimation):
             unitary_builder.settings().update("quantum_walk", True)
         unitary_rep = unitary_builder.run(qubit_hamiltonian)
         container = unitary_rep.get_container()
+        if not container.has_eigenvalue_mapping:
+            raise TypeError(f"Phase estimation needs a unitary whose phases map to eigenvalues; got {container.type}.")
 
         _, num_bits = circuit_builder.resolve_num_queries()
         circuits = circuit_builder.run(

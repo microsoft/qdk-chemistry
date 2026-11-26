@@ -6,7 +6,7 @@
 # --------------------------------------------------------------------------------------------
 
 from abc import abstractmethod
-from typing import Any
+from typing import Any, ClassVar
 
 import h5py
 
@@ -30,6 +30,9 @@ class UnitaryContainer(DataClass):
 
     # Serialization version for this class
     _serialization_version = "0.1.0"
+
+    has_eigenvalue_mapping: ClassVar[bool] = True
+    """Whether :meth:`eigenvalue_from_phase` is defined; phase estimation rejects containers without it."""
 
     @property
     @abstractmethod
@@ -118,16 +121,21 @@ class UnitaryContainer(DataClass):
     def eigenvalue_from_phase(self, phase_fraction: float) -> float:
         r"""Recover a Hamiltonian eigenvalue from the measured phase fraction.
 
-        Each unitary encoding maps Hamiltonian eigenvalues to phases on the
+        Each Hamiltonian encoding maps Hamiltonian eigenvalues to phases on the
         unit circle.  This method inverts that mapping so that a measured
         phase fraction :math:`\varphi \in [0, 1)` is converted back to the
-        corresponding eigenvalue :math:`E`.
+        corresponding eigenvalue :math:`E`.  Containers without this mapping,
+        such as an explicit matrix, set :attr:`has_eigenvalue_mapping` to
+        ``False`` and raise ``NotImplementedError``.
 
         Args:
             phase_fraction: Measured phase fraction :math:`\varphi \in [0, 1)`.
 
         Returns:
             float: The corresponding Hamiltonian eigenvalue.
+
+        Raises:
+            NotImplementedError: If :attr:`has_eigenvalue_mapping` is ``False``.
 
         """
 

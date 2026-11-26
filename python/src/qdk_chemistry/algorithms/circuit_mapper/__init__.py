@@ -9,13 +9,25 @@ from .base import CircuitMapperFactory
 from .pauli_sequence_mapper import PauliSequenceMapper, PauliSequenceMapperSettings
 from .psp_mapper import PSPMapper, PSPMapperSettings
 from .sossa_mapper import SOSSAMapper, SOSSAMapperSettings
+from .unitary_synthesis_mapper import (
+    BlockSparseUnitarySynthesisMapper,
+    DenseUnitarySynthesisMapper,
+    DenseUnitarySynthesisMapperSettings,
+    UnitarySynthesisMapper,
+    UnitarySynthesisMapperSettings,
+)
 
 __all__ = [
+    "BlockSparseUnitarySynthesisMapper",
     "CircuitMapperFactory",
+    "DenseUnitarySynthesisMapper",
+    "DenseUnitarySynthesisMapperSettings",
     "PSPMapper",
     "PSPMapperSettings",
     "PauliSequenceMapper",
     "PauliSequenceMapperSettings",
     "SOSSAMapper",
     "SOSSAMapperSettings",
+    "UnitarySynthesisMapper",
+    "UnitarySynthesisMapperSettings",
 ]

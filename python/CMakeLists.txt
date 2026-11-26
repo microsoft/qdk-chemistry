@@ -188,6 +188,7 @@ nanobind_add_module(_core
     src/nanobind/algorithms/double_factorization.cpp
     src/nanobind/algorithms/davidson_solver.cpp
     src/nanobind/algorithms/syev_solver.cpp
+    src/nanobind/utils/unitary_synthesis.cpp
     src/nanobind/utils/logger.cpp
     src/nanobind/utils/valence_space.cpp
     src/nanobind/utils/orbital_rotation.cpp
