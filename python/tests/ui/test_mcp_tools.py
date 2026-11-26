@@ -287,14 +287,28 @@ def test_describe_algorithm_reports_nuclear_derivative_default_aliases():
     assert description["is_default"] is True
 
 
-def test_describe_algorithm_handles_interface_only_type():
+def test_describe_algorithm_reports_ducc_default():
     result = srv.describe_algorithm(algorithm_type="effective_hamiltonian_constructor")
+
+    assert result["status"] == "ok"
+    description = result["result"]
+    assert description["name"] == "qdk_ducc"
+    assert description["is_default"] is True
+    assert description["default_settings"]["level"] == 2
+
+
+def test_describe_algorithm_handles_interface_only_type():
+    with patch("qdk_chemistry.algorithms.available", return_value=[]):
+        result = srv.describe_algorithm(algorithm_type="effective_hamiltonian_constructor")
+        rejected = srv.describe_algorithm(algorithm_type="effective_hamiltonian_constructor", algorithm_name="qdk_ducc")
 
     assert result["status"] == "ok"
     description = result["result"]
     assert description["name"] is None
     assert description["interface_only"] is True
     assert description["settings"] == []
+    assert rejected["status"] == "error"
+    assert "has no registered implementations" in rejected["message"]
 
 
 def test_list_algorithms_rejects_unknown_type():

@@ -1,0 +1,57 @@
+# Adds WickTheorem::max_ops: emits only results with at most that many
+# operators (4 = scalar, one- and two-body terms) while still exploring every
+# intermediate contraction, so callers never materialize discarded high-rank terms.
+diff --git a/SeQuant/core/wick.hpp b/SeQuant/core/wick.hpp
+index 4964ebd..89b3429 100644
+--- a/SeQuant/core/wick.hpp
++++ b/SeQuant/core/wick.hpp
+@@ -36,6 +36,7 @@
+ #include <range/v3/view/zip.hpp>
+
+ #include <bitset>
++#include <limits>
+ #include <mutex>
+ #include <optional>
+ #include <ranges>
+@@ -165,6 +166,14 @@ class WickTheorem {
+     return *this;
+   }
+
++  /// Limits the number of surviving individual operators in emitted results.
++  /// Four operators retain scalar, one-body, and two-body terms. Higher-rank
++  /// intermediate contraction states are still explored without truncation.
++  WickTheorem &max_ops(std::size_t n) {
++    max_ops_ = n;
++    return *this;
++  }
++
+   /// Controls whether next call to compute() will assume spin-free or
+   /// spin-orbital normal-ordered operators By default compute() assumes
+   /// spin-orbital operators.
+@@ -495,6 +504,7 @@ class WickTheorem {
+   mutable std::shared_ptr<NormalOperatorSequence<S>> input_;
+   mutable ExprPtr prefactor_;
+   bool full_contractions_ = true;
++  std::size_t max_ops_ = std::numeric_limits<std::size_t>::max();
+   bool use_topology_ = true;
+   std::optional<std::size_t> max_cumulant_rank_;
+   bool eta_as_delta_minus_gamma_ = false;
+@@ -1289,7 +1299,8 @@ class WickTheorem {
+     // if computing everything, and the user does not insist on some
+     // target contractions, include the contraction-free term
+     if (!full_contractions_ &&
+-        (nop_nconnections_total_ == 0 || !pairwise_connectivity())) {
++        (nop_nconnections_total_ == 0 || !pairwise_connectivity()) &&
++        input_->opsize() <= max_ops_) {
+       if (count_only) {
+         ++state.count;
+       } else {
+@@ -1619,7 +1630,7 @@ class WickTheorem {
+                 // if have a nonzero result ...
+                 if (state.sp.size() != state.sp_initial_size) {
+                   // update the result if nothing left to contract and
+-                  if (!full_contractions_ ||
++                  if ((!full_contractions_ && state.nopseq_size <= max_ops_) ||
+                       (full_contractions_ && state.nopseq_size == 0)) {
+                     if (!state.count_only) {
+                       // clang-format off
