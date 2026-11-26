@@ -306,7 +306,11 @@ std::shared_ptr<data::Hamiltonian> DsrgPT2Constructor::_run_impl(
   if (fold_flow > 0.0) {
     auto fock = dsrg::generalized_fock_matrices(one_body, two_body_blocks(),
                                                 density, norb, !unrestricted);
-    constexpr double semicanonical_tolerance = 1e-12;
+    // Leaving a block unrotated neglects its off-diagonal Fock elements e,
+    // which shifts H_eff by about e * V^2 * max|dr/dD| <= 2s * e * V^2 for the
+    // second-order factor r(D) = (1 - exp(-2s*D^2))/D. A converged SCF leaves
+    // e near its convergence threshold.
+    const double semicanonical_tolerance = 1e-6 / std::max(1.0, 2.0 * flow);
     for (int spin = 0; spin < (unrestricted ? 2 : 1); ++spin)
       rotation[spin] = dsrg::semicanonical_rotation(
           fock[spin], {inactive_spatial, active_spatial, virtual_spatial},

@@ -233,6 +233,7 @@ The orbital energies :math:`\varepsilon_{p\sigma}` are the diagonal elements of 
 
 in the semicanonical basis, which diagonalizes each :math:`F^\sigma` separately within the core, active, and virtual blocks.
 Here :math:`\gamma^\sigma` is the reference 1-RDM of spin :math:`\sigma` over :math:`W`.
+Blocks whose off-diagonal elements are all below :math:`10^{-6}/\max(1, 2s)` :math:`E_h`, as for converged canonical Hartree-Fock orbitals, are left unrotated, which changes :math:`H_{\mathrm{eff}}^{P}` by at most about :math:`10^{-6}` times the squared couplings.
 
 The first-order cluster operator :math:`\hat T` excites from core and active orbitals into active and virtual orbitals, excluding purely active excitations.
 With the antisymmetrized integrals :math:`v^{ij}_{ab} = \langle ab \Vert ij \rangle` and the gaps :math:`\Delta^{ij}_{ab} = \varepsilon_i + \varepsilon_j - \varepsilon_a - \varepsilon_b` in the semicanonical basis, its doubles amplitudes and the renormalized couplings are
@@ -248,7 +249,7 @@ For the singles, :math:`t^i_a` applies :math:`(1 - e^{-s(\Delta^i_a)^2}) / \Delt
 
 The commutator in :math:`H_{\mathrm{eff}}^{P}` keeps its scalar, one- and two-body parts in reference normal order :cite:`Kutzelnigg1997`, and discards the residual three-body operator (including for two-electron active spaces).
 The result is returned in ordinary normal order over the unrotated orbitals of :math:`P`.
-The reference expectation value of :math:`H_{\mathrm{eff}}^{P}` is the unrelaxed DSRG-MRPT2 energy :cite:`Li2015`, and its eigenvalues in :math:`P` are partially relaxed energies :cite:`Li2017`.
+The reference expectation value of :math:`H_{\mathrm{eff}}^{P}` is the unrelaxed DSRG-MRPT2 energy :cite:`Li2015`, and diagonalizing it in the reference's electron-number and spin sector over :math:`P` gives the partially relaxed energy :cite:`Li2017`.
 
 ``flow_parameter`` must be finite and nonnegative.
 Larger :math:`s` regularizes less, and :math:`s = 0` disables the transformation, returning only the bare core-folded operator over :math:`P`.

@@ -134,10 +134,9 @@ SemicanonicalRotation semicanonical_rotation(
   for (const auto& block : blocks) {
     if (block.size() < 2) continue;
     const Eigen::MatrixXd sub = fock(block, block);
-    const double scale = sub.cwiseAbs().maxCoeff();
     Eigen::MatrixXd off_diagonal = sub;
     off_diagonal.diagonal().setZero();
-    if (off_diagonal.cwiseAbs().maxCoeff() <= tolerance * scale) continue;
+    if (off_diagonal.cwiseAbs().maxCoeff() <= tolerance) continue;
 
     Eigen::SelfAdjointEigenSolver<Eigen::MatrixXd> solver(sub);
     if (solver.info() != Eigen::Success)
@@ -1013,8 +1012,6 @@ void evaluate_and_merge(const std::vector<Plan>& plans,
     return operands.at(operand_key(node->as_tensor(), in.spin_free));
   };
   const int active_count = static_cast<int>(in.active.size());
-  // Results merge in plan order, so the sum does not depend on the thread
-  // count.
   std::vector<sq::ResultPtr> values(plans.size());
   std::size_t merged = 0;
   std::exception_ptr failure;

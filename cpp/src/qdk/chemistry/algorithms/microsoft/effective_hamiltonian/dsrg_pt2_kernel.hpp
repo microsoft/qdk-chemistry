@@ -64,8 +64,8 @@ struct SemicanonicalRotation {
 
 /// Block-diagonal orthogonal rotation that diagonalizes each block of the
 /// symmetric Fock matrix. Blocks contain spatial-orbital indices and must be
-/// disjoint. Blocks whose off-diagonal max norm does not exceed `tolerance`
-/// times the block max norm are left unchanged.
+/// disjoint. Blocks whose off-diagonal elements do not exceed `tolerance` in
+/// magnitude are left unchanged.
 SemicanonicalRotation semicanonical_rotation(
     const Eigen::MatrixXd& fock, const std::vector<std::vector<int>>& blocks,
     double tolerance);

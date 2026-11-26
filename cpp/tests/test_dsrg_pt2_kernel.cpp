@@ -1435,10 +1435,14 @@ TEST(DsrgPT2KernelTest, SemicanonicalPrimitivesAreCovariantAndReversible) {
   EXPECT_FALSE(noop.rotated);
   EXPECT_EQ(noop.matrix, Eigen::MatrixXd::Identity(count, count));
 
-  // Tolerance scales with block norm.
-  const auto tiny =
-      dsrg::semicanonical_rotation(1e-14 * rotated, {{0}, {1, 2}, {3}}, 1e-12);
-  EXPECT_TRUE(tiny.rotated);
+  // The tolerance bounds the off-diagonal elements themselves.
+  const double coupling = std::abs(rotated(1, 2));
+  EXPECT_FALSE(
+      dsrg::semicanonical_rotation(rotated, {{0}, {1, 2}, {3}}, coupling)
+          .rotated);
+  EXPECT_TRUE(
+      dsrg::semicanonical_rotation(rotated, {{0}, {1, 2}, {3}}, 0.5 * coupling)
+          .rotated);
 
   // aabb integrals rotate their (pq) and (rs) pairs separately.
   const Eigen::MatrixXd second = semicanonical.matrix * basis;
