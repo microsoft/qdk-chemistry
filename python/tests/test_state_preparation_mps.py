@@ -436,12 +436,16 @@ def test_operation_adjoint_returns_to_zero(qsharp_test_context, qsharp_test_util
 
 
 def test_initial_state_normalization_ignores_overall_scale():
-    """Scaling site zero by any finite nonzero factor leaves the prepared initial state unchanged."""
-    tensors = [np.asarray(t) for t in _fixture_site_tensors("mps_spin", _identity_order("mps_spin"))]
-    expected = preparation_data(make_mps(tensors))["initialStateVec"]
-    for scale in (1e-16, 1e200):
-        scaled = preparation_data(make_mps([tensors[0] * scale, *tensors[1:]]))["initialStateVec"]
-        np.testing.assert_allclose(scaled, expected, atol=1e-14)
+    """Scaling site zero by any finite nonzero factor, up to the largest float, leaves the initial state unchanged."""
+    spin = [np.asarray(t) for t in _fixture_site_tensors("mps_spin", _identity_order("mps_spin"))]
+    # A uniform site zero at the largest float overflows if the mixing right factor is absorbed before rescaling.
+    chain = _random_right_canonical_tensors([1, 4, 3, 2, 1], 4, seed=11)
+    chain[0] = np.ones_like(chain[0])
+    for tensors, scales in ((spin, (1e-16, 1e200)), (chain, (np.finfo(float).max,))):
+        expected = preparation_data(make_mps(tensors))["initialStateVec"]
+        for scale in scales:
+            scaled = preparation_data(make_mps([tensors[0] * scale, *tensors[1:]]))["initialStateVec"]
+            np.testing.assert_allclose(scaled, expected, atol=1e-14)
 
 
 def _two_site_tensors(amplitudes: dict[tuple[int, int], float]):

@@ -164,8 +164,13 @@ class MatrixProductStatePreparation(StatePreparation):
             syntheses.append(synthesis)
         syntheses.reverse()
 
-        # With a left bond of dimension one the packed matrix is (physical, right).
+        # With a left bond of dimension one the packed matrix is (physical, right). Dividing by the largest
+        # amplitude before absorbing V keeps the check, the product and the norm independent of the overall scale.
         first_site = np.asarray(mps_sites[0].to_dense())
+        scale = np.max(np.abs(first_site))
+        if not np.isfinite(scale) or scale == 0:
+            raise ValueError("MPS initial state must contain finite amplitudes with nonzero norm.")
+        first_site = first_site / scale
         if right_factor is not None:
             first_site = first_site @ right_factor.T
         # Site zero's right bond only needs the low qubits of the bond register, so the initial state
@@ -173,12 +178,7 @@ class MatrixProductStatePreparation(StatePreparation):
         initial_bond_dim = 1 << (first_site.shape[1] - 1).bit_length()
         padded = np.zeros((first_site.shape[0], initial_bond_dim))
         padded[:, : first_site.shape[1]] = first_site
-        # Dividing by the largest amplitude first keeps the check and the norm independent of the overall scale.
         vector = padded.reshape(-1)
-        scale = np.max(np.abs(vector))
-        if not np.isfinite(scale) or scale == 0:
-            raise ValueError("MPS initial state must contain finite amplitudes with nonzero norm.")
-        vector = vector / scale
 
         # Site zero is the initial state, and each following site is a synthesized isometry.
         return method, {
