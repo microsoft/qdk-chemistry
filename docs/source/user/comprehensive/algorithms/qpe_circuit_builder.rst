@@ -133,6 +133,12 @@ Standard QFT-based Phase Estimation Circuit Builder
 
 Constructs the textbook multi-ancilla QPE circuit with inverse Quantum Fourier Transform. Extracts all phase bits simultaneously using ``num_bits`` ancilla qubits, applying controlled-:math:`U^{2^k}` for each ancilla and finishing with the inverse QFT.
 
+The native ``qdk_standard`` builder also supports SOSSA when both
+``unitary_builder`` and ``controlled_circuit_mapper`` select ``"sossa"``.
+The :ref:`controlled SOSSA mapper <controlled-sossa-mapper>` completes the
+walk; the uncontrolled mapper is reserved for unary QPE.
+Iterative SOSSA QPE is not supported.
+
 **Additional settings (Qiskit implementation):**
 
 .. list-table::
@@ -246,8 +252,15 @@ All powers sharing one circuit must agree on the system and work-register
 widths. Omitting the width is deprecated: QPE emits ``DeprecationWarning``
 and retains the previous allocation based on the unitary's structural width.
 That fallback cannot infer additional workspace introduced by the mapper.
-An explicitly undersized width or a request for shared phase-gradient
-ancillas remains an error.
+An explicitly undersized width remains an error.
+
+Native ``qdk_standard`` and ``qdk_iterative`` builders initialize a shared
+phase-gradient suffix declared through ``Circuit.metadata`` and reuse it
+across controlled powers and state preparation. Nonzero gradient widths
+must agree, and a state-preparation circuit consuming the gradient must
+declare the full system-plus-gradient width.
+The Qiskit builders do not initialize shared gradients and reject them.
+Shared-register support does not enable iterative SOSSA QPE.
 
 Related Classes
 ---------------

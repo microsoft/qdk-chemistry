@@ -4,6 +4,38 @@ Changelog
 
 For detailed release notes with code examples and feature walkthroughs, see the :doc:`release-notes/index` section.
 
+Version 2.4.0
+=============
+
+See :ref:`release-v2.4.0` for full details.
+
+- DUCC effective Hamiltonian construction (``effective_hamiltonian_constructor`` / ``qdk_ducc``) with restricted and unrestricted singles/doubles amplitudes and commutator levels 0 through 2
+- Matrix product state storage through ``MPSSite`` and ``MPSContainer``, including real/complex tensors, optional particle counts and RDMs, and JSON/HDF5 serialization
+- Independent auxiliary bases and role-tagged ``AuxiliaryBasisCollection`` values, with ``JFit``, ``JKFit``, ``RIFit``, and ``CABS`` roles
+- Four-fold-symmetric two-electron integrals in native correlation and qubit-mapping workflows, including downfolded Hamiltonians
+- Controlled SOSSA quantum walks for standard QPE, and shared phase-gradient registers in native standard and iterative QPE
+- Unary-iteration SELECT as the default for LCU PREPARE-SELECT-PREPARE mappers, retaining ``select_method="multi_controlled"`` as an alternative
+- Generalized phase-gradient catalysts for Hubbard plaquette Hamming-weight phasing, with ``"rz_ladder"`` retained as an alternative
+- Adjointable repeated Pauli evolution and Q# circuit composition
+- Optional C++ MACIS ASCI execution contexts, with the ordinary CPU path unchanged
+
+Behavior changes and fixes:
+
+- Python 3.10 is no longer supported; Python 3.11 or newer is required
+- Sparse Hamiltonian containers use serialization schema ``0.3.0``; migrate older files with ``python -m qdk_chemistry.migrate`` and explicitly expand symmetry representatives in newly constructed sparse maps
+- PySCF references use the Hamiltonian's stored one- and two-electron integrals and core energy; conversions requiring eight-fold symmetry reject more general downfolded integrals
+- Native ROHF handles rank-reduced orbital spaces, and four-center/Cholesky construction preserves integral permutation symmetry
+- Externally supplied QIR requires explicit full-state-executor opt-in; restored remote jobs use current connection configuration instead of saved connection parameters
+- Hardened sparse Hamiltonian loading, basis extraction, and cache paths; guarded infeasible ASCI excitation constraints
+- Unary iteration no longer depends on recursive Q# calls, and the molecular QPE tutorial no longer assumes fixed sampled histograms
+
+Packaging and build changes:
+
+- Migrated Python bindings from pybind11 to nanobind; standard CPython 3.11+ shares a ``cp311-abi3`` chemistry wheel per platform/architecture, with an interpreter-specific ``nanobind-backend`` dependency
+- Raised the QDK minimum to ``1.34.0``
+- Added SeQuant with the BTAS numerical backend and support for installed dependencies in no-fetch source builds
+- Parallelized wheel validation, reduced CI cache pressure, and isolated CI reporting from untrusted artifacts
+
 Version 2.3.1
 =============
 

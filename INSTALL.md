@@ -114,7 +114,7 @@ The examples and test suite live in the source repository. Clone it and check ou
 pip show qdk-chemistry          # check your installed version
 git clone https://github.com/microsoft/qdk-chemistry.git
 cd qdk-chemistry
-git checkout v2.2.0              # match the tag to your installed version
+git checkout v2.4.0              # match the tag to your installed version
 ```
 
 > **NOTE:** The `main` branch is the active development branch and may be incompatible with the released pip package. Check out the release tag matching the exact version reported by `pip show qdk-chemistry`.
@@ -137,7 +137,7 @@ If you chose the minimal `pip install qdk-chemistry` above, you can add specific
 | `openfermion-extras` | OpenFermion ecosystem packages | openfermion |
 | `networkx-extras` | NetworkX ecosystem packages | networkx |
 | `docs` | [Sphinx documentation build tools](docs/README.md) | sphinx, sphinx-rtd-theme, myst-parser, breathe, sphinx-autodoc-typehints, sphinx-inline-tabs, sphinxcontrib-napoleon, sphinxcontrib-bibtex, sphinx_copybutton |
-| `qre` | Quantum Resource Estimator support | qdk[qre,jupyter]>=1.31.0 |
+| `qre` | Quantum Resource Estimator support | qdk[qre,jupyter]>=1.34.0 |
 | `dev` | Development and testing tools | pytest, ruff, mypy, and related tooling |
 | `test` | Testing tools and optional runtime dependencies; does not include `docs` | qdk-chemistry[azure-quantum,coverage,discovery,jupyter,mcp,networkx-extras,openfermion-extras,plugins,qiskit-extras,qre], nbclient, nbformat, pennylane, rdkit, requests>=2.33.0 |
 | `all` | Union of all defined extras | azure-quantum, coverage, dev, discovery, docs, jupyter, mcp, networkx-extras, openfermion-extras, plugins, qiskit-extras, qre, test |

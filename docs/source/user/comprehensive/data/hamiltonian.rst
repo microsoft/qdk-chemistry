@@ -120,6 +120,20 @@ From a theoretical perspective, these symmetries can be expressed as:
 These permutational symmetries arise from the mathematical properties of the two-electron repulsion integrals.
 When accessing specific elements with ``get_two_body_element(i, j, k, l)``, the function handles the appropriate index mapping to retrieve the correct value based on the implementation's storage format.
 
+Effective two-body operators, such as DUCC-downfolded Hamiltonians, need not
+have the full eight-fold symmetry of ordinary Coulomb integrals.
+Native correlation and :doc:`qubit mapping <../algorithms/qubit_mapper>`
+support four-fold-symmetric restricted and same-spin integrals; the
+unrestricted opposite-spin block has a different symmetry contract.
+FCIDUMP export and PySCF conversion retain stronger symmetry requirements
+and reject unsupported tensors rather than discarding information.
+
+``SparseHamiltonianContainer`` stores two-body entries literally, with
+unstored positions zero. Use ``expand_symmetry_representatives`` to populate
+a map from symmetry representatives rather than relying on consumers to
+expand it. Sparse files written before schema ``0.3.0`` require
+:doc:`migration <../../migrating-data-files>`.
+
 .. tab:: Python API
 
    .. literalinclude:: ../../../_static/examples/python/hamiltonian.py
