@@ -81,11 +81,127 @@ The base interface defines no common settings.
 Concrete implementations can expose method-specific configuration through the ``settings()`` object.
 See :doc:`Settings <settings>` for a general treatment of algorithm settings in QDK/Chemistry.
 
+.. rubric:: Creating a constructor
+
+.. tab:: Python API
+
+   .. literalinclude:: ../../../_static/examples/python/effective_hamiltonian_constructor.py
+      :language: python
+      :start-after: # start-cell-create
+      :end-before: # end-cell-create
+
+.. tab:: C++ API
+
+   .. literalinclude:: ../../../_static/examples/cpp/effective_hamiltonian_constructor.cpp
+      :language: cpp
+      :start-after: // start-cell-create
+      :end-before: // end-cell-create
+
+.. rubric:: Configuring settings
+
+Settings can be modified using the ``settings()`` object.
+See `Available implementations`_ below for implementation-specific options.
+
+.. tab:: Python API
+
+   .. literalinclude:: ../../../_static/examples/python/effective_hamiltonian_constructor.py
+      :language: python
+      :start-after: # start-cell-configure
+      :end-before: # end-cell-configure
+
+.. tab:: C++ API
+
+   .. literalinclude:: ../../../_static/examples/cpp/effective_hamiltonian_constructor.cpp
+      :language: cpp
+      :start-after: // start-cell-configure
+      :end-before: // end-cell-configure
+
+.. rubric:: Running the calculation
+
+The example below prepares the inputs of the `QDK DUCC`_ implementation.
+It obtains :math:`T_1` and :math:`T_2` amplitudes over the full window from a :class:`~qdk_chemistry.algorithms.DynamicalCorrelationCalculator`, selects :math:`P` with an :doc:`ActiveSpaceSelector <active_space>`, and diagonalizes the effective Hamiltonian in :math:`P` with a :doc:`MultiConfigurationCalculator <mc_calculator>`.
+
+.. tab:: Python API
+
+   .. literalinclude:: ../../../_static/examples/python/effective_hamiltonian_constructor.py
+      :language: python
+      :start-after: # start-cell-run
+      :end-before: # end-cell-run
+
+.. tab:: C++ API
+
+   .. literalinclude:: ../../../_static/examples/cpp/effective_hamiltonian_constructor.cpp
+      :language: cpp
+      :start-after: // start-cell-run
+      :end-before: // end-cell-run
+
 Available implementations
 -------------------------
 
-QDK/Chemistry currently provides the :class:`~qdk_chemistry.algorithms.EffectiveHamiltonianConstructor` interface but no concrete implementation or default factory choice.
-Creation, configuration, and execution examples will be added with the first concrete implementation.
+You can discover available implementations programmatically:
+
+.. tab:: Python API
+
+   .. literalinclude:: ../../../_static/examples/python/effective_hamiltonian_constructor.py
+      :language: python
+      :start-after: # start-cell-list-implementations
+      :end-before: # end-cell-list-implementations
+
+.. tab:: C++ API
+
+   .. literalinclude:: ../../../_static/examples/cpp/effective_hamiltonian_constructor.cpp
+      :language: cpp
+      :start-after: // start-cell-list-implementations
+      :end-before: // end-cell-list-implementations
+
+QDK DUCC
+~~~~~~~~
+
+.. rubric:: Factory name: ``"qdk_ducc"`` (default)
+
+The :class:`~qdk_chemistry.algorithms.QdkDuccConstructor` implements double unitary coupled-cluster (DUCC) downfolding :cite:`Bauman2019` using real singles and doubles amplitudes, :math:`T_1` and :math:`T_2`, without triples amplitudes.
+Its input :class:`~qdk_chemistry.data.Wavefunction` must carry amplitudes over the same orbital window :math:`W` as the input :class:`~qdk_chemistry.data.Hamiltonian`, together with a single-determinant reference.
+Store both singles and doubles; supply zero singles when the amplitude source contains only doubles.
+Restricted closed-shell and unrestricted open-shell references are supported, including windows with frozen-core orbitals outside :math:`W`.
+The alpha and beta channels must have equal orbital counts in both :math:`W` and the nonempty target :math:`P`, but their occupations and unrestricted orbital selections may differ.
+Restricted amplitudes must obey the closed-shell spin relations; spatial doubles and their explicit same-spin antisymmetrizations are both accepted.
+Unrestricted same-spin doubles may be stored as the full antisymmetric tensor or only for :math:`i<j` and :math:`a<b`.
+The output preserves the input restrictedness.
+Restricted two-electron integrals and unrestricted same-spin blocks satisfy :math:`(pq|rs)=(rs|pq)=(qp|sr)`, while the alpha-beta block satisfies only :math:`(pq|rs)=(qp|sr)`.
+Unrestricted same-spin blocks store the antisymmetrized integrals :math:`\tfrac{1}{2}\left[(pq|rs)-(ps|rq)\right]`, which represent the same operator as plain integrals.
+
+External amplitudes are those whose orbital indices are not entirely contained in :math:`P`.
+The anti-Hermitian generator is
+
+.. math::
+
+   \sigma = T_{\mathrm{ext},1} + T_{\mathrm{ext},2}
+            - \left(T_{\mathrm{ext},1} + T_{\mathrm{ext},2}\right)^\dagger.
+
+Define :math:`C_0(A)=A` and :math:`C_{n+1}(A)=[C_n(A),\sigma]`.
+For level :math:`1\leq L\leq 2`, the transformed operator is
+
+.. math::
+
+   \overline{H}^{(L)} = \sum_{n=0}^{L}\frac{C_n(H)}{n!}
+                        + \frac{C_{L+1}(F)}{(L+1)!},
+
+where :math:`F` is the reference Fock operator :cite:`Bauman2022`.
+Intermediate commutators are not truncated by particle rank; only the final reference-normal-ordered scalar, one-body, and two-body terms are retained and downfolded into :math:`P`.
+Level 0 performs bare downfolding without commutator corrections.
+
+.. rubric:: Settings
+
+.. list-table::
+   :header-rows: 1
+   :widths: 20 20 60
+
+   * - Setting
+     - Type
+     - Description
+   * - ``level``
+     - int
+     - Commutator level, from 0 to 2 inclusive. Default: 2.
 
 Related classes
 ---------------
