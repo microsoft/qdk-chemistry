@@ -285,21 +285,21 @@ Hamiltonian and Wavefunction Data
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 Four-fold integral symmetry
-   Native correlation and qubit mapping accept more general two-body operators,
-   including DUCC-downfolded integrals. FCIDUMP export and PySCF conversion
-   retain their stronger symmetry requirements.
+   First-party correlation algorithms and qubit mapping accept more general
+   two-body operators, including DUCC-downfolded integrals.
+   FCIDUMP export and PySCF conversion retain their stronger symmetry requirements.
    See :doc:`comprehensive/data/hamiltonian`.
 
 Auxiliary bases
    Independent auxiliary basis values are grouped by ``JFit``, ``JKFit``,
    ``RIFit``, and ``CABS`` roles and support JSON/HDF5 serialization.
-   This data interface does not itself enable density-fitted SCF.
+   Algorithms accepting auxiliary-basis inputs consume these role-tagged collections.
    See :doc:`comprehensive/data/basis_set`.
 
 Matrix product states
    ``MPSSite`` and ``MPSContainer`` store real or complex, optionally
-   symmetry-blocked MPS tensors and producer-supplied metadata.
-   They do not run DMRG or compute observables from tensor contractions.
+   symmetry-blocked MPS tensors with optional producer-supplied particle counts
+   and RDMs.
    See :doc:`comprehensive/data/wavefunction`.
 
 
@@ -354,7 +354,7 @@ Symbolic Algebra and Tensor Evaluation
 
 SeQuant and BTAS
    SeQuant provides symbolic many-body tensor algebra, with BTAS as the
-   numerical tensor backend used by DUCC.
+   numerical tensor backend. DUCC currently uses this infrastructure.
    Source builds use pinned revisions and repository patches; no-fetch builds
    can use an installed SeQuant prepared by ``cpp/cmake/sequant``.
    See the `SeQuant <https://github.com/ValeevGroup/SeQuant>`_ and

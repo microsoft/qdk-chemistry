@@ -120,8 +120,8 @@ From a theoretical perspective, these symmetries can be expressed as:
 These permutational symmetries arise from the mathematical properties of the two-electron repulsion integrals.
 When accessing specific elements with ``get_two_body_element(i, j, k, l)``, the function handles the appropriate index mapping to retrieve the correct value based on the implementation's storage format.
 
-Effective two-body operators, such as DUCC-downfolded Hamiltonians, need not
-have the full eight-fold symmetry of ordinary Coulomb integrals.
+Effective two-body operators, such as DUCC-downfolded Hamiltonians, do not
+necessarily exhibit the full eight-fold symmetry of ordinary Coulomb integrals.
 Native correlation and :doc:`qubit mapping <../algorithms/qubit_mapper>`
 support four-fold-symmetric restricted and same-spin integrals; the
 unrestricted opposite-spin block has a different symmetry contract.

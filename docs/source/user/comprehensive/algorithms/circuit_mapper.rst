@@ -299,21 +299,10 @@ SOSSA quantum walk mapper
 
 :class:`~qdk_chemistry.algorithms.controlled_circuit_mapper.ControlledSOSSAMapper`
 completes and controls the walk of a :ref:`SOSSA block encoding <sossa-builder>`
-for native standard QPE. Unlike ``circuit_mapper`` / ``sossa``, which emits
-the uncontrolled block encoding for unary QPE, this mapper includes the outer
-reflection and supports positive integer walk powers.
+for native standard QPE and supports positive integer walk powers.
 
-Only the two reflections are controlled, so the PREPARE oracles need no
-controlled implementation. The callable takes a single control at index 0,
-then a fixed system/ancilla/phase-gradient register; ``target_indices`` is
-not supported. ``Circuit.num_qubits`` includes the control and the shared
-gradient suffix declared by ``num_phase_gradient_ancillas``.
-
-It shares the :ref:`SOSSA oracle and lookup settings <sossa-mapper-settings>`
-with the uncontrolled mapper. Native standard QPE prepares a compatible
-gradient once and shares it across controlled powers and state preparation.
-Iterative SOSSA QPE is rejected because feedback cannot separate the two walk
-eigenphases of a system eigenstate.
+It shares the :ref:`oracle and lookup settings <sossa-mapper-settings>` with
+the uncontrolled ``circuit_mapper`` / ``sossa`` used by unary QPE.
 
 See :ref:`release-v2.4.0` for a complete input-construction example:
 

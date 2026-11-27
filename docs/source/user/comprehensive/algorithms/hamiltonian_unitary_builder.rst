@@ -488,11 +488,7 @@ Both uncontrolled and controlled ``prepare_select_prepare`` mappers accept
 ``select_method="unary_iteration"`` (default) or ``"multi_controlled"``.
 The latter retains the earlier SELECT construction.
 
-With alias-sampling or QROM PREPARE, simulation and resource estimation are
-supported, but ``Circuit.get_qir()`` and ``Circuit.to_json()`` currently
-fail when the Q# compiler lowers measurement-based lookup uncomputation.
-The mapper emits a warning for these PREPARE choices.
-Use ``dense_pure_state`` when QIR export is needed.
+Use ``dense_pure_state`` PREPARE for QIR export.
 
 .. _sossa-builder:
 

@@ -10,9 +10,9 @@ Version 2.4.0
 See :ref:`release-v2.4.0` for full details.
 
 - DUCC effective Hamiltonian construction (``effective_hamiltonian_constructor`` / ``qdk_ducc``) with restricted and unrestricted singles/doubles amplitudes and commutator levels 0 through 2
-- Matrix product state storage through ``MPSSite`` and ``MPSContainer``, including real/complex tensors, optional particle counts and RDMs, and JSON/HDF5 serialization
+- Matrix product state data structures ``MPSSite`` and ``MPSContainer``, including real/complex tensors, optional particle counts and RDMs, and JSON/HDF5 serialization
 - Independent auxiliary bases and role-tagged ``AuxiliaryBasisCollection`` values, with ``JFit``, ``JKFit``, ``RIFit``, and ``CABS`` roles
-- Four-fold-symmetric two-electron integrals in native correlation and qubit-mapping workflows, including downfolded Hamiltonians
+- Four-fold-symmetric two-electron integrals supported by first-party correlation algorithms and qubit-mapping workflows, including downfolded Hamiltonians
 - Controlled SOSSA quantum walks for standard QPE, and shared phase-gradient registers in native standard and iterative QPE
 - Unary-iteration SELECT as the default for LCU PREPARE-SELECT-PREPARE mappers, retaining ``select_method="multi_controlled"`` as an alternative
 - Generalized phase-gradient catalysts for Hubbard plaquette Hamming-weight phasing, with ``"rz_ladder"`` retained as an alternative

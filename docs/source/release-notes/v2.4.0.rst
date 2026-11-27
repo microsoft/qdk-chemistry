@@ -4,13 +4,11 @@
 What's New in Version 2.4
 ==========================
 
-Version 2.4 adds DUCC downfolding, matrix product state storage, auxiliary-basis
-data, more general two-electron integrals, and new quantum-walk circuit paths.
+Version 2.4 adds DUCC downfolding, matrix product state data structures,
+auxiliary-basis data, more general two-electron integrals, and new quantum-walk
+circuit paths.
 Python bindings move to nanobind and require Python 3.11 or newer.
 See :ref:`v2-4-compatibility` before upgrading existing data or integrations.
-
-This release includes the 2.3.1 fixes to dependency metadata, Python/Q#
-interoperability, and batched SOSSA lookups with qubit reuse.
 
 .. contents:: On this page
    :local:
@@ -20,23 +18,22 @@ interoperability, and batched SOSSA lookups with qubit reuse.
 DUCC Effective Hamiltonians
 ===========================
 
-``effective_hamiltonian_constructor`` / ``qdk_ducc`` is the first bundled
-implementation of the downfolding interface introduced in 2.2.
-It constructs a double unitary coupled-cluster (DUCC) effective Hamiltonian
-from real singles/doubles amplitudes over an orbital window and a smaller
-target-space index set :cite:`Bauman2019,Bauman2022`.
+``effective_hamiltonian_constructor`` / ``qdk_ducc`` constructs a double
+unitary coupled-cluster (DUCC) effective active-space Hamiltonian from real
+singles/doubles amplitudes over a larger orbital window
+:cite:`Bauman2019,Bauman2022`.
+The effective Hamiltonian incorporates dynamical correlation from orbitals
+outside the target active space through the DUCC approximation.
 
 Restricted closed-shell and unrestricted open-shell references are supported,
-including frozen-core windows. Alpha and beta orbital counts must match in
-the input window and in the nonempty target, although their occupations and
-unrestricted selections may differ.
-Target indices are absolute molecular-orbital indices, not offsets into an
-active-space array.
+including frozen-core windows. The target active space is selected from the
+input orbital window.
 
-The ``level`` setting selects bare downfolding (0) or commutator corrections
-(1 or 2, default 2). The returned Hamiltonian retains scalar, one-body, and
-two-body terms, with the external-space contribution already included.
-Do not correlate those external orbitals again.
+The ``level`` setting selects a Fock-split Baker-Campbell-Hausdorff (BCH)
+approximation. Level 0 reproduces the original active-space Hamiltonian.
+Levels 1 and 2 retain Hamiltonian commutators through the selected level
+plus one additional order of Fock commutator; the default is level 2.
+The returned Hamiltonian retains scalar, one-body, and two-body terms.
 
 .. literalinclude:: ../_static/examples/python/effective_hamiltonian_constructor.py
    :language: python
@@ -60,31 +57,17 @@ for amplitude conventions, supported spaces, and the approximation.
 Integral Symmetry and Electronic Structure
 ==========================================
 
-Native correlation and qubit mapping now handle Hermitian two-electron
-integrals with four-fold rather than full eight-fold symmetry, as arise in
-downfolded Hamiltonians. The native qubit mapper treats symmetric and
-antisymmetric excitation-pair contributions separately; it no longer assumes
-ordinary Coulomb-integral symmetry for every Hamiltonian.
-See :doc:`../user/comprehensive/algorithms/qubit_mapper`.
+Four-fold-symmetric Hamiltonians are now supported across QDK/Chemistry's
+electronic-structure and qubit-mapping workflows.
+This support enables downfolded Hamiltonians and provides a foundation for
+future relativistic Hamiltonians without assuming full eight-fold
+Coulomb-integral symmetry.
+See :doc:`../user/comprehensive/data/hamiltonian` and
+:doc:`../user/comprehensive/algorithms/qubit_mapper`.
 
-Four-center transformations and Cholesky materialization preserve the
-permutation symmetry of ordinary Coulomb integrals, including in diffuse
-bases. Native ROHF also handles linearly dependent AO bases by optimizing in
-the retained, potentially smaller MO space. Empty closed, open, or virtual
-subspaces are allowed; an insufficient retained space for the requested
-occupations fails explicitly.
-See :doc:`../user/comprehensive/algorithms/scf_solver`.
-
-PySCF reference conversion now uses the supplied Hamiltonian's stored
-one-electron integrals, two-electron integrals, and scalar core energy in
-the MO basis instead of recomputing molecular Coulomb integrals.
-The resulting reference has no AO basis. Methods that require one, such as
-PySCF density fitting, need a molecule constructed separately from the basis.
-Eight-fold symmetry is still required for restricted and same-spin PySCF
-integrals; the opposite-spin block requires pair symmetry.
-General downfolded tensors and active-space effective Hamiltonians are not
-supported by this conversion.
-See :doc:`../user/comprehensive/algorithms/hamiltonian_constructor`.
+FCIDUMP export and PySCF conversion retain their stronger symmetry
+requirements; see
+:doc:`../user/comprehensive/algorithms/hamiltonian_constructor` for conversion details.
 
 
 Auxiliary Basis Data
@@ -93,32 +76,31 @@ Auxiliary Basis Data
 :class:`~qdk_chemistry.data.AuxiliaryBasis` is an independent basis value,
 and :class:`~qdk_chemistry.data.AuxiliaryBasisCollection` groups such values
 by ``JFit``, ``JKFit``, ``RIFit``, and ``CABS`` roles.
-Primary and auxiliary bases are built against the same structure; neither
-the primary basis nor the wavefunction stores the collection.
+Primary and auxiliary bases are independent values built against the same
+structure.
+A collection can carry several roles, providing a common way to organize
+auxiliary bases for different calculation stages.
 
 .. literalinclude:: ../_static/examples/python/basis_set.py
    :language: python
    :start-after: # start-cell-loading-with-aux
    :end-before: # end-cell-loading-with-aux
 
-``resolve_auxiliary_basis`` permits ``JKFit`` to satisfy ``JFit``, but not
-the reverse. ``with_auxiliary_basis`` returns a new collection with a role
-added or replaced. Both individual bases and collections support independent
-JSON/HDF5 serialization.
-
-These are data interfaces for algorithms that explicitly accept auxiliary
-inputs. Constructing a collection does **not** enable density-fitted SCF.
+Individual bases and collections support independent JSON/HDF5 serialization
+and can be supplied to algorithms that accept auxiliary-basis inputs.
 See :doc:`../user/comprehensive/data/basis_set`.
 
 
-Matrix Product State Storage
-============================
+Matrix Product State Data Structures
+====================================
 
 :class:`~qdk_chemistry.data.MPSSite` and
 :class:`~qdk_chemistry.data.MPSContainer` store real or complex matrix product
 states, including symmetry-blocked site tensors, orbital ordering, and an
 optional orthogonality center. They integrate with
 :class:`~qdk_chemistry.data.Wavefunction` and its JSON/HDF5 serialization.
+This provides a common representation for exchanging tensor-network
+wavefunctions and their associated metadata.
 
 This two-site product state illustrates the storage interface:
 
@@ -127,24 +109,22 @@ This two-site product state illustrates the storage interface:
    :start-after: # start-cell-mps
    :end-before: # end-cell-mps
 
-The container does not run DMRG or contract the MPS into determinants.
-Coefficient, determinant, norm, overlap, and occupation accessors raise.
-Particle counts and RDMs are available only when supplied by the producer;
-they are not inferred from the tensors.
+Optional particle counts and RDMs are supplied by the producing algorithm.
 See :doc:`../user/comprehensive/data/wavefunction`.
 
 
 Quantum Walks and Circuit Composition
 =====================================
 
-Standard SOSSA QPE
-------------------
+Standard QPE with SOSSA Walk
+----------------------------
 
 ``controlled_circuit_mapper`` / ``sossa`` completes and controls the SOSSA
-walk for native standard QPE. Only its reflections are controlled; PREPARE
-can run without a controlled implementation.
+walk for native standard QPE.
 The existing uncontrolled ``circuit_mapper`` / ``sossa`` remains the
 block-encoding path used by unary QPE.
+Factorized-Hamiltonian workflows can therefore choose between standard,
+Fourier-transform-based QPE and unary phase-estimation circuits.
 
 Starting from a small factorized hydrogen Hamiltonian:
 
@@ -160,33 +140,32 @@ Configure the controlled mapper explicitly:
    :start-after: # start-cell-standard-sossa
    :end-before: # end-cell-standard-sossa
 
-This example constructs a small circuit; three phase bits are illustrative,
-not a chemical-accuracy setting. SOSSA requires canonical, untapered, blocked
-Jordan-Wigner ordering and reports total energies, including the core energy.
-Iterative SOSSA QPE remains unsupported because its feedback cannot separate
-the two walk-phase branches of a system eigenstate.
+The three-bit example illustrates circuit construction. SOSSA supports native
+standard and unary QPE with canonical, untapered, blocked Jordan-Wigner
+ordering and reports total energies, including the core energy.
 
 Native standard and iterative QPE now initialize compatible shared
 phase-gradient registers once and reuse them across state preparation and
-controlled powers. The Qiskit builders do not initialize this shared suffix.
+controlled powers.
 See :doc:`../user/comprehensive/algorithms/qpe_circuit_builder` and
 :doc:`../user/comprehensive/algorithms/circuit_mapper`.
 
 SOSSA lookup tradeoffs
 ----------------------
 
-The SOSSA mappers expose the lookup controls added in 2.3.1:
-``max_givens_rotation_batches`` trades a smaller angle register for more
-lookup passes; ``lookup_method`` selects plain lookup, clean QROAM, or
-``"dirty_select_swap"`` with borrowed qubits; and ``max_swap_address_bits``
-caps each swap network. These settings apply to both controlled and
-uncontrolled SOSSA mapping.
-See :ref:`sossa-mapper-settings` for defaults and scope.
+Controlled and uncontrolled SOSSA mappers support batched angle lookups
+and clean/dirty QROAM options.
+Batching trades a smaller resident angle register for additional lookup
+passes, while the QROAM options offer different balances of workspace and
+gate cost.
+See :ref:`sossa-mapper-settings` for the configurable qubit/gate tradeoffs.
 
-LCU SELECT and Hubbard phasing
-------------------------------
+LCU with Unary-Iteration SELECT
+-------------------------------
 
-LCU PREPARE-SELECT-PREPARE mappers now default to unary-iteration SELECT.
+LCU PREPARE-SELECT-PREPARE mappers now use unary iteration to select the
+Hamiltonian's Pauli terms. This is the default for both controlled and
+uncontrolled circuits.
 Set ``select_method="multi_controlled"`` to retain the earlier construction:
 
 .. literalinclude:: ../_static/examples/python/release_notes_v2_4.py
@@ -194,99 +173,74 @@ Set ``select_method="multi_controlled"`` to retain the earlier construction:
    :start-after: # start-cell-lcu-select
    :end-before: # end-cell-lcu-select
 
-Unary iteration is implemented without recursive Q# calls.
-For LCU circuits using alias-sampling or QROM PREPARE, simulation and resource
-estimation work, but QIR export and circuit serialization remain limited by
-the Q# compiler's lowering of measurement-based lookup uncomputation.
 Use ``dense_pure_state`` PREPARE when QIR export is required.
 
+Hubbard phasing
+----------------
+
 The Hubbard plaquette controlled mapper now defaults to
-``hamming_weight_phasing_method="catalyst"``: generalized phase gradients
-are prepared for the interaction and hopping layers and reused.
+``hamming_weight_phasing_method="catalyst"``. Equal-angle rotations are grouped
+through Hamming-weight registers, using generalized phase-gradient catalysts
+prepared for the interaction and hopping layers and reused during evolution.
 ``"rz_ladder"`` retains the per-place-value rotation alternative;
 ``use_hamming_weight_phasing=False`` disables phasing.
 The Hubbard resource-estimation notebook demonstrates the new path.
-
-Repeated Pauli-evolution callables and Q# sequential composition now retain
-adjointability, so they can be reused in inverse circuit constructions.
-This does not make measurement-bearing operations reversible.
-
 
 .. _v2-4-compatibility:
 
 Compatibility and Migration
 ===========================
 
+.. _v2-4-electronic-structure-fixes:
+
+Electronic-structure fixes
+--------------------------
+
+PySCF reference conversion now uses the integrals and core energy stored in
+the supplied Hamiltonian. This keeps subsequent PySCF calculations aligned
+with the Hamiltonian used in the QDK/Chemistry workflow.
+
+Corrections to four-center and Cholesky Hamiltonian construction preserve
+integral permutation symmetry and improve consistency across downstream
+calculations. ROHF calculations also gain improved handling of linearly
+dependent basis sets.
+
 Sparse Hamiltonians
 -------------------
 
-``SparseHamiltonianContainer`` uses schema ``0.3.0`` and reads stored
-two-body entries literally, with unstored positions zero.
-Migrate older files with ``python -m qdk_chemistry.migrate``.
-For Hermitian legacy data, migration expands the old eight-fold symmetry
-representatives and rejects conflicting values in a permutation class.
-Non-Hermitian data keeps its entries as stored.
+``SparseHamiltonianContainer`` moves to schema ``0.3.0``, with explicit
+two-body integral entries and omitted entries treated as zero. This provides
+a consistent representation for electronic-structure calculations and qubit
+mapping.
 
-Sparse maps constructed in code are not file-migrated. A lone representative
-in a Hermitian container still expands with a deprecation warning, but a
-class with multiple stored members is read literally.
-Use ``SparseHamiltonianContainer.expand_symmetry_representatives`` or
-explicitly provide all intended entries. Partially populated classes that
-previously relied on mapper-only expansion can change results.
-
-Older four-center and Cholesky files can retain transformation roundoff
-that violates permutation symmetry. Rebuild affected Hamiltonians from
-their orbitals when FCIDUMP export or PySCF conversion rejects them.
-See :doc:`../user/migrating-data-files`.
+Migrate older files with ``python -m qdk_chemistry.migrate`` when upgrading.
+Code that constructs sparse Hamiltonians should explicitly supply the
+intended symmetry-related entries. The :doc:`migration guide <../user/migrating-data-files>`
+explains how to update existing data and construct these entries.
 
 Execution and data loading
 --------------------------
 
-The full-state QDK executor rejects QIR supplied directly or restored from
-files unless ``allow_external_qir=True``. Enable this only for trusted
-producers: execution is not sandboxed and the flag does not validate QIR.
-Internally compiled Q# and OpenQASM do not need this opt-in.
+The full-state executor now requires explicit opt-in for QIR supplied
+directly or loaded from files. Set ``allow_external_qir=True`` when executing
+QIR from a trusted producer; this makes the trust decision explicit when
+running externally supplied circuits.
 
-Restored remote jobs use current runtime connection configuration, not
-connection parameters saved in the job file. Use ``Job.attach_backend``
-when a restored job needs an explicitly configured backend.
-Sparse Hamiltonian deserialization, basis extraction, and cache paths also
-gain stricter validation.
+Restored remote jobs now use current runtime connection settings.
+Saved job records continue to identify the submitted work, while users
+configure connections for the environment in which they resume the job.
 
 
 Python Packaging and Native Builds
 ==================================
 
-Python 3.10 support is removed. Standard, GIL-enabled CPython 3.11 and newer
-share one ``cp311-abi3`` QDK Chemistry wheel per platform and architecture.
-Pip installs the interpreter-specific ``nanobind-backend`` package alongside
-it; that backend and other dependencies must support the chosen interpreter.
-This is not a promise of free-threaded Python support.
-
-The bindings now use nanobind rather than pybind11. Source builds use
-``scikit-build-core>=1.0`` and ``nanobind>=3.1.0``, and the runtime also
-requires ``nanobind-backend>=1.0``. Native extensions that interoperate with
-the former pybind11-bound classes need to be rebuilt and adapted to nanobind;
-the ABI change is not a drop-in replacement for such add-ons.
-Generated native-module type stubs remain generated on first import.
-The minimum QDK dependency increases from ``1.33.1`` to ``1.34.0``.
-
-Supported wheel platforms remain Linux x86-64/Arm64, macOS Arm64, and Windows
-x86-64/Arm64. Optional-dependency restrictions remain in effect: PySCF is
-unavailable on native Windows; MCP, Azure Quantum, Discovery, and the Qiskit
-stack have Windows Arm64 exclusions; OpenFermion requires Python below 3.14;
-Qiskit Aer is omitted on Linux Arm64 with Python 3.14.
-See the `installation instructions
-<https://github.com/microsoft/qdk-chemistry/blob/main/INSTALL.md>`_.
-
+Python 3.11+ and QDK 1.34.0+ are now required.
+Python bindings move to nanobind, allowing one chemistry wheel per platform
+and architecture across supported GIL-enabled CPython versions.
 Native builds add SeQuant symbolic algebra with BTAS tensor evaluation,
-used by DUCC. No-fetch builds can use an installed SeQuant prepared through
-``cpp/cmake/sequant`` with the repository's pinned dependencies and patches.
-MACIS adds optional single-rank C++ ASCI execution contexts for numerical
-search and diagonalization; omitting a context retains the CPU path.
-This does not add a new Python ASCI backend.
-ASCI also guards excitation constraints that cannot be satisfied.
+used by DUCC. MACIS introduces optional C++ ASCI execution extensions for
+determinant search and diagonalization.
 
-CI changes parallelize wheel tests, reduce cache pressure, and isolate
-reporting from untrusted build artifacts. Tutorial checks cover visualization
-outputs and sampled-distribution invariants rather than fixed IQPE counts.
+See the `installation instructions
+<https://github.com/microsoft/qdk-chemistry/blob/main/INSTALL.md>`_ for platform
+support and dependency details.
