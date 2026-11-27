@@ -15,19 +15,17 @@ from __future__ import annotations
 import hashlib
 import importlib.util
 import os
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from typing import TYPE_CHECKING
 
 import numpy as np
 import pytest
 
 from qdk_chemistry import algorithms
-from qdk_chemistry.algorithms.base import create_from_ref
 from qdk_chemistry.algorithms.phase_estimation.circuit_builder.robust_builder import (
     RobustPhaseEstimationCircuitBuilder,
-)
-from qdk_chemistry.algorithms.phase_estimation.circuit_builder.rpe_experiment_scheduler import (
-    RobustPhaseEstimationExperimentScheduler,
+    RobustPhaseEstimationCircuitSet,
+    RobustPhaseEstimationSchedule,
 )
 from qdk_chemistry.algorithms.phase_estimation.robust_phase_estimation import (
     RobustPhaseEstimation,
@@ -40,8 +38,6 @@ from qdk_chemistry.data import (
     CircuitExecutorData,
     QuantumErrorProfile,
     QubitOperator,
-    RobustPhaseEstimationCircuitSet,
-    RobustPhaseEstimationSchedule,
     Settings,
     SettingsAreLocked,
     UnitaryRepresentation,
@@ -294,35 +290,6 @@ class _FakeExecutor:
         return _FakeExecutorData({"0": int(n0), "1": int(self._resolution - n0)})
 
 
-def _make_scheduler(
-    *,
-    target_accuracy: float,
-    unitary_builder_name: str = "trotter",
-    unitary_builder_kwargs: dict[str, object] | None = None,
-    base_time: float = 0.0,
-    unitary_accuracy_fraction: float | None = None,
-    energy_correction: str = "auto",
-    seed: int = 7,
-    epsilon_rpe: float | None = None,
-    epsilon_unitary: float | None = None,
-) -> RobustPhaseEstimationExperimentScheduler:
-    """Create a directly configurable RPE experiment scheduler for tests."""
-    return RobustPhaseEstimationExperimentScheduler(
-        target_accuracy=target_accuracy,
-        base_time=base_time,
-        unitary_accuracy_fraction=unitary_accuracy_fraction,
-        energy_correction=energy_correction,
-        seed=seed,
-        epsilon_rpe=epsilon_rpe,
-        epsilon_unitary=epsilon_unitary,
-        unitary_builder=AlgorithmRef(
-            "hamiltonian_unitary_builder",
-            unitary_builder_name,
-            **(unitary_builder_kwargs or {}),
-        ),
-    )
-
-
 def _make_builder(
     *,
     target_accuracy: float,
@@ -336,14 +303,15 @@ def _make_builder(
     epsilon_unitary: float | None = None,
     max_qdrift_samples: int = 1_000_000,
 ) -> RobustPhaseEstimationCircuitBuilder:
-    """Create a robust builder with a fully configured nested scheduler."""
-    scheduler_ref = AlgorithmRef(
-        "rpe_experiment_scheduler",
-        "qdk",
+    """Create a robust circuit builder with the requested scheduling and evolution settings."""
+    return RobustPhaseEstimationCircuitBuilder(
         target_accuracy=target_accuracy,
         base_time=base_time,
+        unitary_accuracy_fraction=unitary_accuracy_fraction,
         energy_correction=energy_correction,
         seed=seed,
+        epsilon_rpe=epsilon_rpe,
+        epsilon_unitary=epsilon_unitary,
         max_qdrift_samples=max_qdrift_samples,
         unitary_builder=AlgorithmRef(
             "hamiltonian_unitary_builder",
@@ -351,13 +319,6 @@ def _make_builder(
             **(unitary_builder_kwargs or {}),
         ),
     )
-    if unitary_accuracy_fraction is not None:
-        scheduler_ref.set("unitary_accuracy_fraction", unitary_accuracy_fraction)
-    if epsilon_rpe is not None:
-        scheduler_ref.set("epsilon_rpe", epsilon_rpe)
-    if epsilon_unitary is not None:
-        scheduler_ref.set("epsilon_unitary", epsilon_unitary)
-    return RobustPhaseEstimationCircuitBuilder(experiment_scheduler=scheduler_ref)
 
 
 def _install_test_stack(
@@ -418,9 +379,7 @@ def test_post_process_uses_experiment_identity_after_reordering() -> None:
     """Result tuple order does not replace the manifest's round and basis identity."""
     energy = 0.2
     hamiltonian = QubitOperator(pauli_strings=["Z"], coefficients=[1.0])
-    circuit_set = _make_scheduler(target_accuracy=0.5, energy_correction="linear").run(
-        hamiltonian,
-    )
+    circuit_set = _make_builder(target_accuracy=0.5, energy_correction="linear").build_schedule(hamiltonian)
     execution_results: list[_RpeExecutionResult] = []
     resolution = 2_000_000
     for spec in circuit_set.experiment_specs:
@@ -447,12 +406,12 @@ def test_post_process_uses_experiment_identity_after_reordering() -> None:
 def test_post_process_uses_effective_qdrift_samples(energy: float, base_time: float, nested_accuracy: float) -> None:
     """Noiseless qDRIFT signals track the correct branch through the final tangent inversion."""
     hamiltonian = QubitOperator(pauli_strings=["ZI", "IZ"], coefficients=[0.6, 0.4])
-    circuit_set = _make_scheduler(
+    circuit_set = _make_builder(
         target_accuracy=0.1,
         base_time=base_time,
         unitary_builder_name="qdrift",
         unitary_builder_kwargs={"target_accuracy": nested_accuracy},
-    ).run(hamiltonian)
+    ).build_schedule(hamiltonian)
     execution_results: list[_RpeExecutionResult] = []
     resolution = 1_000_000_000
     for round_data in circuit_set.rounds:
@@ -488,9 +447,9 @@ def test_post_process_uses_effective_qdrift_samples(energy: float, base_time: fl
 
 def test_post_process_averages_each_randomized_draw() -> None:
     """Different count totals do not change the equal weighting of randomized draws."""
-    circuit_set = _make_scheduler(target_accuracy=1.0, unitary_builder_name="qdrift", energy_correction="linear").run(
-        QubitOperator(pauli_strings=["Z"], coefficients=np.array([1.0]))
-    )
+    circuit_set = _make_builder(
+        target_accuracy=1.0, unitary_builder_name="qdrift", energy_correction="linear"
+    ).build_schedule(QubitOperator(pauli_strings=["Z"], coefficients=np.array([1.0])))
     assert circuit_set.num_rounds == 1
     assert len(circuit_set.experiment_specs) == 30
     results = tuple(
@@ -569,19 +528,21 @@ def test_qdrift_tangent_correction_uses_sampled_norm(monkeypatch: pytest.MonkeyP
 
 
 def test_qdrift_tangent_replay_resolves_omitted_builder_defaults(monkeypatch: pytest.MonkeyPatch) -> None:
-    """A saved qDRIFT schedule without stored builder defaults replays with the default sampling threshold."""
+    """A qDRIFT schedule without explicit builder defaults replays with the default sampling threshold."""
     hamiltonian = QubitOperator(pauli_strings=["Z"], coefficients=[0.5])
     builder = _make_builder(target_accuracy=0.5, unitary_builder_name="qdrift", energy_correction="qdrift_tangent")
     driver = RobustPhaseEstimation()
     _install_test_stack(
         monkeypatch, driver, builder, _classical_expectation(np.array([0.0, 1.0])), use_real_unitary_builder=True
     )
-    payload = driver.schedule_circuit_set(_DUMMY_STATE_PREPARATION, hamiltonian).to_json()
-    payload["schedule"]["unitary_builder_configuration"]["settings_json"] = Settings().to_json()
-    restored = RobustPhaseEstimationCircuitSet.from_json(payload)
-    assert not restored.schedule.unitary_builder_configuration.settings.has("weight_threshold")
+    schedule = builder.build_schedule(hamiltonian)
+    sparse = replace(schedule, _unitary_builder=("hamiltonian_unitary_builder", "qdrift", Settings().to_json()))
+    workload = RobustPhaseEstimationCircuitSet(
+        schedule=sparse, state_preparation=_DUMMY_STATE_PREPARATION, qubit_hamiltonian=hamiltonian
+    )
+    assert not sparse.unitary_builder_configuration.settings.has("weight_threshold")
 
-    result = driver.execute_circuit_set(restored)
+    result = driver.execute_circuit_set(workload)
 
     assert result.resolved_energy == pytest.approx(-0.5, abs=1e-5)
 
@@ -619,13 +580,13 @@ def test_robust_phase_estimation_name() -> None:
 
 def test_energy_correction_allows_linear_qdrift_override() -> None:
     """An explicit linear map overrides qDRIFT's automatic tangent correction."""
-    scheduler = RobustPhaseEstimationExperimentScheduler(
+    builder = RobustPhaseEstimationCircuitBuilder(
         target_accuracy=0.5,
         seed=7,
         energy_correction="linear",
         unitary_builder=AlgorithmRef("hamiltonian_unitary_builder", "qdrift"),
     )
-    circuit_set = scheduler.run(QubitOperator(pauli_strings=["Z"], coefficients=np.array([1.0])))
+    circuit_set = builder.build_schedule(QubitOperator(pauli_strings=["Z"], coefficients=np.array([1.0])))
 
     assert circuit_set.energy_correction == "linear"
 
@@ -633,14 +594,14 @@ def test_energy_correction_allows_linear_qdrift_override() -> None:
 @pytest.mark.parametrize("builder_name", ["trotter", "partially_randomized", "zassenhaus"])
 def test_qdrift_tangent_requires_qdrift_builder(builder_name: str) -> None:
     """The tangent map models pure qDRIFT and is rejected for other evolution families."""
-    scheduler = RobustPhaseEstimationExperimentScheduler(
+    builder = RobustPhaseEstimationCircuitBuilder(
         target_accuracy=0.5,
         energy_correction="qdrift_tangent",
         unitary_builder=AlgorithmRef("hamiltonian_unitary_builder", builder_name),
     )
 
     with pytest.raises(ValueError, match=f"qdrift_tangent.*{builder_name}"):
-        scheduler.run(QubitOperator(pauli_strings=["Z"], coefficients=np.array([1.0])))
+        builder.build_schedule(QubitOperator(pauli_strings=["Z"], coefficients=np.array([1.0])))
 
 
 @pytest.mark.parametrize("base_time", [0.0, np.pi / 32.0, 3.0 * np.pi / 4.0])
@@ -715,13 +676,13 @@ def test_base_time_preserves_energy_accuracy_with_bounded_phase_bias(
 
 def test_non_trotter_explicit_fraction_retains_clamping() -> None:
     """Non-Trotter routing clamps an explicit negative fraction instead of treating it as omitted."""
-    scheduler = _make_scheduler(
+    builder = _make_builder(
         target_accuracy=0.1,
         unitary_builder_name="partially_randomized",
         unitary_accuracy_fraction=-0.25,
     )
 
-    fraction, epsilon_rpe, epsilon_unitary, budget_mode = scheduler._resolve_budget(
+    fraction, epsilon_rpe, epsilon_unitary, budget_mode = builder._resolve_budget(
         "partial_randomized",
         0.1,
         is_trotter=False,
@@ -736,13 +697,13 @@ def test_non_trotter_explicit_fraction_retains_clamping() -> None:
 def test_partial_builder_retains_explicit_legacy_fraction() -> None:
     """An explicit legacy fraction still selects the fractional PR budget route."""
     hamiltonian = QubitOperator(pauli_strings=["Z"], coefficients=[1.0])
-    scheduler = _make_scheduler(
+    builder = _make_builder(
         target_accuracy=0.1,
         unitary_builder_name="partially_randomized",
         unitary_accuracy_fraction=0.25,
     )
 
-    circuit_set = scheduler.run(hamiltonian)
+    circuit_set = builder.build_schedule(hamiltonian)
 
     assert circuit_set.unitary_accuracy_fraction == pytest.approx(0.25)
     assert circuit_set.epsilon_rpe == pytest.approx(0.075)
@@ -757,13 +718,13 @@ def test_partial_builder_retains_explicit_legacy_fraction() -> None:
 @pytest.mark.parametrize("fraction", [0.25, np.nextafter(np.sin(np.pi / 3.0), 0.0)])
 def test_non_trotter_fraction_accepts_branch_safe_budget(unitary_builder_name: str, fraction: float) -> None:
     """Fraction budgets below the branch-safety limit preserve the requested split."""
-    scheduler = _make_scheduler(
+    builder = _make_builder(
         target_accuracy=1.0,
         unitary_builder_name=unitary_builder_name,
         unitary_accuracy_fraction=fraction,
     )
 
-    schedule = scheduler.run(QubitOperator(pauli_strings=["Z"], coefficients=[1.0]))
+    schedule = builder.build_schedule(QubitOperator(pauli_strings=["Z"], coefficients=[1.0]))
 
     assert schedule.epsilon_unitary == pytest.approx(fraction)
     assert schedule.epsilon_rpe == pytest.approx(1.0 - fraction)
@@ -773,51 +734,51 @@ def test_non_trotter_fraction_accepts_branch_safe_budget(unitary_builder_name: s
 @pytest.mark.parametrize("fraction", [np.sin(np.pi / 3.0), np.nextafter(np.sin(np.pi / 3.0), 1.0), 0.9])
 def test_non_trotter_fraction_rejects_branch_unsafe_budget(unitary_builder_name: str, fraction: float) -> None:
     """Fraction budgets enforce the same strict unitary limit as explicit budgets."""
-    scheduler = _make_scheduler(
+    builder = _make_builder(
         target_accuracy=1.0,
         unitary_builder_name=unitary_builder_name,
         unitary_accuracy_fraction=fraction,
     )
 
     with pytest.raises(ValueError, match="epsilon_unitary must be smaller"):
-        scheduler.run(QubitOperator(pauli_strings=["Z"], coefficients=[1.0]))
+        builder.build_schedule(QubitOperator(pauli_strings=["Z"], coefficients=[1.0]))
 
 
 @pytest.mark.parametrize("unitary_builder_name", ["partially_randomized", "zassenhaus"])
 @pytest.mark.parametrize("fraction", [1.0, 1.5])
 def test_non_trotter_fraction_rejects_unit_fraction(unitary_builder_name: str, fraction: float) -> None:
     """A fraction of one or more would leave the RPE ladder without an energy budget."""
-    scheduler = _make_scheduler(
+    builder = _make_builder(
         target_accuracy=0.1,
         unitary_builder_name=unitary_builder_name,
         unitary_accuracy_fraction=fraction,
     )
 
     with pytest.raises(ValueError, match="unitary_accuracy_fraction must be smaller than 1"):
-        scheduler.run(QubitOperator(pauli_strings=["Z"], coefficients=[1.0]))
+        builder.build_schedule(QubitOperator(pauli_strings=["Z"], coefficients=[1.0]))
 
 
 @pytest.mark.parametrize("unitary_builder_name", ["partially_randomized", "zassenhaus"])
 @pytest.mark.parametrize("epsilon_rpe", [0.0, -0.5])
 def test_non_trotter_rejects_nonpositive_explicit_rpe_budget(unitary_builder_name: str, epsilon_rpe: float) -> None:
     """Only the unset sentinel omits an RPE tolerance; any other explicit value must be positive."""
-    scheduler = _make_scheduler(
+    builder = _make_builder(
         target_accuracy=0.1,
         unitary_builder_name=unitary_builder_name,
         epsilon_rpe=epsilon_rpe,
     )
 
     with pytest.raises(ValueError, match="must both be positive"):
-        scheduler.run(QubitOperator(pauli_strings=["Z"], coefficients=[1.0]))
+        builder.build_schedule(QubitOperator(pauli_strings=["Z"], coefficients=[1.0]))
 
 
 def test_trotter_uses_independent_default_tolerances() -> None:
     """Trotter uses the full energy target for RPE and an independent unitary tolerance."""
     target_accuracy = 1e-2
     hamiltonian = QubitOperator(pauli_strings=["ZZ", "XX"], coefficients=[0.5, 0.5])
-    scheduler = _make_scheduler(target_accuracy=target_accuracy)
+    builder = _make_builder(target_accuracy=target_accuracy)
 
-    circuit_set = scheduler.run(hamiltonian)
+    circuit_set = builder.build_schedule(hamiltonian)
 
     assert circuit_set.epsilon_rpe == pytest.approx(target_accuracy)
     assert circuit_set.epsilon_unitary == pytest.approx(0.85)
@@ -833,9 +794,9 @@ def test_trotter_uses_independent_default_tolerances() -> None:
 def test_trotter_accepts_positive_unitary_tolerance(epsilon_unitary: float) -> None:
     """A positive Trotter unitary tolerance is forwarded without additional policy checks."""
     hamiltonian = QubitOperator(pauli_strings=["Z"], coefficients=[1.0])
-    scheduler = _make_scheduler(target_accuracy=1e-2, epsilon_unitary=epsilon_unitary)
+    builder = _make_builder(target_accuracy=1e-2, epsilon_unitary=epsilon_unitary)
 
-    circuit_set = scheduler.run(hamiltonian)
+    circuit_set = builder.build_schedule(hamiltonian)
 
     assert circuit_set.epsilon_unitary == pytest.approx(epsilon_unitary)
     ref = circuit_set.unitary_builder_configuration
@@ -859,11 +820,11 @@ def test_trotter_rejects_legacy_or_nonpositive_tolerances(
 ) -> None:
     """Trotter rejects dimensional legacy routing and nonpositive sizing inputs."""
     hamiltonian = QubitOperator(pauli_strings=["Z"], coefficients=[1.0])
-    scheduler = _make_scheduler(target_accuracy=1e-2)
-    scheduler.settings().set(setting, value)
+    builder = _make_builder(target_accuracy=1e-2)
+    builder.settings().set(setting, value)
 
     with pytest.raises(ValueError, match=message):
-        scheduler.run(hamiltonian)
+        builder.build_schedule(hamiltonian)
 
 
 @pytest.mark.parametrize("epsilon_unitary", [None, 0.5])
@@ -872,7 +833,7 @@ def test_partial_builder_receives_independent_unitary_budget(epsilon_unitary: fl
     """Partially randomized rounds and standalone builders share the additive accuracy contract."""
     hamiltonian = QubitOperator(pauli_strings=["ZZ", "XX"], coefficients=[0.5, 0.5])
     epsilon_total = 1e-2
-    scheduler = _make_scheduler(
+    builder = _make_builder(
         target_accuracy=epsilon_total,
         unitary_builder_name="partially_randomized",
         unitary_builder_kwargs={"accuracy_split": split},
@@ -881,7 +842,7 @@ def test_partial_builder_receives_independent_unitary_budget(epsilon_unitary: fl
         epsilon_unitary=epsilon_unitary,
     )
 
-    circuit_set = scheduler.run(hamiltonian)
+    circuit_set = builder.build_schedule(hamiltonian)
 
     outer_epsilon_unitary = 0.85 if epsilon_unitary is None else epsilon_unitary
     assert circuit_set.epsilon_rpe == pytest.approx(epsilon_total)
@@ -913,14 +874,14 @@ def test_partial_builder_rejects_invalid_independent_unitary_budget(
     message: str,
 ) -> None:
     """Independent PR routing rejects nonpositive and branch-unsafe tolerances."""
-    scheduler = _make_scheduler(
+    builder = _make_builder(
         target_accuracy=0.1,
         unitary_builder_name="partially_randomized",
         epsilon_unitary=epsilon_unitary,
     )
 
     with pytest.raises(ValueError, match=message):
-        scheduler.run(QubitOperator(pauli_strings=["Z"], coefficients=[1.0]))
+        builder.build_schedule(QubitOperator(pauli_strings=["Z"], coefficients=[1.0]))
 
 
 @pytest.mark.parametrize(
@@ -943,17 +904,17 @@ def test_executor_uses_manifest_shots(
     _, executor = _install_test_stack(monkeypatch, driver, builder, _ideal_expectation(0.2))
 
     circuit_set = driver.schedule_circuit_set(_DUMMY_STATE_PREPARATION, hamiltonian)
-    original_hash = circuit_set.content_hash()
+    original_specs = circuit_set.schedule.experiment_specs
 
     def unexpected_schedule(
-        _self: RobustPhaseEstimationExperimentScheduler, _hamiltonian: QubitOperator
+        _self: RobustPhaseEstimationCircuitBuilder, _hamiltonian: QubitOperator
     ) -> RobustPhaseEstimationSchedule:
-        pytest.fail("Replay must not invoke the experiment scheduler.")
+        pytest.fail("Replay must not build a new schedule.")
 
-    monkeypatch.setattr(RobustPhaseEstimationExperimentScheduler, "_run_impl", unexpected_schedule)
+    monkeypatch.setattr(RobustPhaseEstimationCircuitBuilder, "build_schedule", unexpected_schedule)
     result = driver.execute_circuit_set(circuit_set)
 
-    assert circuit_set.content_hash() == original_hash
+    assert circuit_set.schedule.experiment_specs == original_specs
     with pytest.raises(SettingsAreLocked):
         driver.settings().set("circuit_executor", driver.settings().get("circuit_executor"))
     if randomized:
@@ -1256,21 +1217,16 @@ def _registered_driver(
     """Create a registered robust estimator with nested builder and executor configuration."""
     from qdk_chemistry.algorithms import create  # noqa: PLC0415
 
-    scheduler_ref = AlgorithmRef(
-        "rpe_experiment_scheduler",
-        "qdk",
+    builder_ref = AlgorithmRef(
+        "qpe_circuit_builder",
+        "qdk_robust",
         target_accuracy=target_accuracy,
         energy_correction=energy_correction,
         seed=seed,
         unitary_builder=unitary_builder,
     )
     if unitary_accuracy_fraction is not None:
-        scheduler_ref.set("unitary_accuracy_fraction", unitary_accuracy_fraction)
-    builder_ref = AlgorithmRef(
-        "qpe_circuit_builder",
-        "qdk_robust",
-        experiment_scheduler=scheduler_ref,
-    )
+        builder_ref.set("unitary_accuracy_fraction", unitary_accuracy_fraction)
     return create(
         "phase_estimation",
         "qdk_robust",
@@ -1281,34 +1237,31 @@ def _registered_driver(
 
 @pytest.mark.skipif(not _HAS_QSHARP, reason="requires Q#")
 def test_robust_qpe_registered() -> None:
-    """The robust driver, builders, and scheduler resolve through the registry."""
+    """The robust driver and circuit builders resolve through the registry."""
     from qdk_chemistry.algorithms import create  # noqa: PLC0415
 
     assert create("hadamard_test_circuit_builder", "qdk").name() == "qdk"
     assert create("phase_estimation", "qdk_robust").name() == "qdk_robust"
     assert create("qpe_circuit_builder", "qdk_robust").name() == "qdk_robust"
-    assert create("rpe_experiment_scheduler", "qdk").name() == "qdk"
 
 
 @pytest.mark.skipif(not _HAS_QSHARP, reason="requires Q#")
 def test_robust_circuit_builder_direct_pair_supports_qre() -> None:
-    """A streamed Q# pair supports QRE and a restored workload can be rebound."""
+    """Built circuits support QIR export; an in-memory workload keeps the live Q# preparation."""
     from qdk.qre.application import QIRApplication, QSharpApplication  # noqa: PLC0415
 
     from qdk_chemistry.algorithms import create  # noqa: PLC0415
 
     hamiltonian, ground_vector, _ = _ground_state_problem()
     state_preparation = _make_state_prep(ground_vector, num_qubits=2)
-    scheduler_ref = AlgorithmRef(
-        "rpe_experiment_scheduler",
-        "qdk",
+    builder = create(
+        "qpe_circuit_builder",
+        "qdk_robust",
         target_accuracy=1.0,
         unitary_builder=AlgorithmRef("hamiltonian_unitary_builder", "trotter"),
         energy_correction="linear",
     )
-    builder = create("qpe_circuit_builder", "qdk_robust", experiment_scheduler=scheduler_ref)
-
-    circuit_set = create_from_ref(builder.settings(), "experiment_scheduler").run(hamiltonian)
+    circuit_set = builder.build_schedule(hamiltonian)
     _, x_circuit, y_circuit = next(builder.iter_build(circuit_set, state_preparation, hamiltonian))
 
     assert isinstance(x_circuit.get_qre_application(), QSharpApplication)
@@ -1322,18 +1275,43 @@ def test_robust_circuit_builder_direct_pair_supports_qre() -> None:
     replay = RobustPhaseEstimationCircuitSet(
         schedule=circuit_set, state_preparation=state_preparation, qubit_hamiltonian=hamiltonian
     )
-    restored_set = RobustPhaseEstimationCircuitSet.from_json(replay.to_json())
-    assert restored_set.content_hash() == replay.content_hash()
-    assert isinstance(restored_set.state_preparation.get_qre_application(), QIRApplication)
-    with pytest.raises(ValueError, match="not a Q# callable"):
-        next(builder.iter_build(restored_set.schedule, restored_set.state_preparation, restored_set.qubit_hamiltonian))
-
-    rebound = restored_set.rebind(state_preparation)
-    _, rebound_x, rebound_y = next(
-        builder.iter_build(rebound.schedule, rebound.state_preparation, rebound.qubit_hamiltonian)
+    assert replay.state_preparation is state_preparation
+    _, replay_x, replay_y = next(
+        builder.iter_build(replay.schedule, replay.state_preparation, replay.qubit_hamiltonian)
     )
-    assert isinstance(rebound_x.get_qre_application(), QSharpApplication)
-    assert isinstance(rebound_y.get_qre_application(), QSharpApplication)
+    assert isinstance(replay_x.get_qre_application(), QSharpApplication)
+    assert isinstance(replay_y.get_qre_application(), QSharpApplication)
+
+
+@pytest.mark.skipif(not _HAS_QSHARP, reason="requires Q#")
+@pytest.mark.parametrize(
+    ("family", "dtype"),
+    [("trotter", np.float64), ("qdrift", np.float64), ("trotter", np.float32), ("qdrift", np.complex64)],
+)
+def test_seeded_simulator_replays_full_result_in_memory(
+    family: str, dtype: type, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Fresh execution and replay must agree on the full QPE result without scheduling twice."""
+    coefficients = np.array([0.6, 0.4], dtype=dtype)
+    hamiltonian = QubitOperator(["ZI", "IZ"], coefficients)
+    preparation = _make_state_prep(np.array([1.0, 0.0, 0.0, 0.0]), num_qubits=2)
+    driver = _registered_driver(
+        target_accuracy=1.0,
+        unitary_builder=AlgorithmRef("hamiltonian_unitary_builder", family),
+        energy_correction="auto",
+        seed=17,
+    )
+    expected = driver.run(preparation, hamiltonian)
+    workload = driver.schedule_circuit_set(preparation, hamiltonian)
+    assert (
+        expected.metadata["lambda"]
+        == workload.schedule.lambda_norm
+        == np.sum(np.abs(coefficients.astype(np.complex128)))
+    )
+    monkeypatch.setattr(
+        RobustPhaseEstimationCircuitBuilder, "build_schedule", lambda *_: pytest.fail("Replay rescheduled")
+    )
+    assert driver.execute_circuit_set(workload).to_json() == expected.to_json()
 
 
 @pytest.mark.skipif(not _HAS_QSHARP, reason="requires Q#")
@@ -1354,18 +1332,28 @@ def test_robust_qpe_deterministic_control_recovers_gse() -> None:
 
 @pytest.mark.skipif(not _HAS_QSHARP, reason="requires Q#")
 @pytest.mark.slow
-@pytest.mark.skipif(
-    not _RUN_SLOW_TESTS,
-    reason="Skipping slow Q# randomized integration test. Set QDK_CHEMISTRY_RUN_SLOW_TESTS=1 to enable.",
+@pytest.mark.parametrize(
+    "target_accuracy",
+    [
+        pytest.param(5e-2, id="ci"),
+        pytest.param(
+            1e-2,
+            id="stress",
+            marks=pytest.mark.skipif(
+                os.getenv("QDK_CHEMISTRY_RUN_RPE_STRESS_TESTS", "").lower() not in {"1", "true", "yes"},
+                reason="Set QDK_CHEMISTRY_RUN_SLOW_TESTS=1 and QDK_CHEMISTRY_RUN_RPE_STRESS_TESTS=1 for the full run.",
+            ),
+        ),
+    ],
 )
-def test_robust_qpe_qdrift_recovers_gse() -> None:
+def test_robust_qpe_qdrift_recovers_gse(target_accuracy: float) -> None:
     """End-to-end randomized evolution recovers the GSE within tolerance."""
     hamiltonian, ground_vector, ground_energy = _ground_state_problem()
     trial = ground_vector + 0.1 * np.roll(ground_vector, 1)
     trial = trial / np.linalg.norm(trial)
     state_preparation = _make_state_prep(trial, num_qubits=2)
     driver = _registered_driver(
-        target_accuracy=1e-2,
+        target_accuracy=target_accuracy,
         unitary_builder=AlgorithmRef("hamiltonian_unitary_builder", "qdrift"),
         energy_correction="qdrift_tangent",
         seed=42,

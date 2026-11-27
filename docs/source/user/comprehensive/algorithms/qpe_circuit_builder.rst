@@ -28,8 +28,8 @@ Use QpeCircuitBuilder
 This section demonstrates how to create, configure, and run a phase estimation circuit builder.
 The ``run`` method returns a list of :class:`~qdk_chemistry.data.Circuit` containing the constructed phase estimation circuits.
 
-The robust implementation additionally exposes ``iter_build`` to consume a :class:`~qdk_chemistry.data.RobustPhaseEstimationSchedule` produced by the configured scheduler.
-This method retains the workload metadata needed for execution and allows X/Y pairs to be streamed without retaining the complete circuit list.
+The robust builder's ``build_schedule`` method returns an in-memory :class:`~qdk_chemistry.algorithms.phase_estimation.circuit_builder.robust_builder.RobustPhaseEstimationSchedule` without constructing circuits.
+Use ``iter_build`` to stream its X/Y pairs without retaining the complete circuit list.
 
 Input requirements
 ~~~~~~~~~~~~~~~~~~
@@ -47,7 +47,7 @@ HamiltonianDescription
 
 
 The :class:`~qdk_chemistry.algorithms.phase_estimation.circuit_builder.base.QpeCircuitBuilderSettings` class defines settings used by iterative and standard QPE circuit builders.
-The robust implementation replaces these with an ``experiment_scheduler`` algorithm reference.
+The robust builder instead exposes its scheduling, time-evolution, and Hadamard-test settings directly.
 See :ref:`robust-phase-estimation-circuit-builder` for its workflow and settings.
 
 .. list-table::
@@ -183,9 +183,8 @@ Robust Phase Estimation Circuit Builder
 
 .. rubric:: Factory name: ``"qdk_robust"``
 
-The robust phase-estimation circuit workflow separates scheduling, circuit construction, and execution.
-The :class:`~qdk_chemistry.algorithms.RobustPhaseEstimationExperimentScheduler`, registered as ``"rpe_experiment_scheduler"`` with implementation ``"qdk"``, resolves a :class:`~qdk_chemistry.data.RobustPhaseEstimationSchedule` from a :class:`~qdk_chemistry.data.QubitOperator`.
-The robust circuit builder receives that schedule, the Hamiltonian, and a state-preparation :class:`~qdk_chemistry.data.Circuit` to construct X- and Y-basis Hadamard-test circuits.
+The robust circuit builder plans a workload from a :class:`~qdk_chemistry.data.QubitOperator`.
+It uses that schedule, the Hamiltonian, and a state-preparation :class:`~qdk_chemistry.data.Circuit` to construct X- and Y-basis Hadamard-test circuits.
 The high-level :doc:`PhaseEstimation <phase_estimation>` algorithm streams those pairs through a separately configured :doc:`CircuitExecutor <circuit_executor>`.
 
 Construction workflow
@@ -193,10 +192,10 @@ Construction workflow
 
 Create the circuit builder through the ``"qpe_circuit_builder"`` factory type with implementation name ``"qdk_robust"``.
 Its standard ``run(state_preparation, qubit_hamiltonian)`` method returns a flat ``list[Circuit]`` consistent with the other QPE builders.
-The concrete ``_run_impl`` schedules once and returns that complete list.
+The builder schedules once per ``run`` and returns that complete list.
 
-For workload inspection or replay, run the configured :class:`~qdk_chemistry.algorithms.RobustPhaseEstimationExperimentScheduler` directly with the Hamiltonian.
-It returns a :class:`~qdk_chemistry.data.RobustPhaseEstimationSchedule` without storing live inputs or constructing circuits.
+For workload inspection, call :meth:`~qdk_chemistry.algorithms.RobustPhaseEstimationCircuitBuilder.build_schedule` with the Hamiltonian.
+It locks the builder settings and returns the rounds, timings, and draw seeds without storing live inputs or constructing circuits.
 Pass the resulting schedule and inputs to the builder's streaming method:
 
 ``iter_build(schedule, state_preparation, qubit_hamiltonian)``
@@ -208,26 +207,13 @@ Override this shared method to customize both paths.
 Overriding only ``_run_impl`` changes eager construction, not the estimator's streaming path.
 Each stream creates its X- and Y-basis Hadamard-test builders once and reuses them across all unitary draws.
 
-Run the scheduler only once when the configured seed is ``-1``.
-Scheduling concretizes one entropy-backed root seed, and all later construction or execution should consume that same schedule.
+When the configured seed is ``-1``, ``build_schedule`` chooses a fresh root seed for each new randomized workload.
+To replay the same draws, pass the same schedule to ``iter_build`` instead of calling ``build_schedule`` again.
 
 Configuration
 ^^^^^^^^^^^^^
 
-The robust circuit builder has one setting:
-
-.. list-table::
-   :header-rows: 1
-   :widths: 25 20 55
-
-   * - Setting
-     - Type
-     - Description
-   * - ``experiment_scheduler``
-     - :class:`~qdk_chemistry.data.AlgorithmRef`
-     - Scheduler that resolves the complete reproducible workload. The default is ``AlgorithmRef("rpe_experiment_scheduler", "qdk")``.
-
-The nested experiment scheduler defines:
+Set these options directly on the robust circuit builder or its :class:`~qdk_chemistry.data.AlgorithmRef`:
 
 .. list-table::
    :header-rows: 1
@@ -271,7 +257,7 @@ RPE scheduling policies are selected by the registered unitary-builder name.
 The supported names are ``"trotter"``, ``"qdrift"``, ``"partially_randomized"``, and ``"zassenhaus"``.
 Other names, including renamed subclasses, are rejected until an explicit RPE policy is defined for them.
 
-Scheduler accuracy settings must be finite, and the Hamiltonian must be Hermitian.
+Accuracy settings must be finite, and the Hamiltonian must be Hermitian.
 ``base_time`` must be finite and nonnegative, with only ``0.0`` selecting automatic time.
 For qDRIFT, a tighter nested ``target_accuracy`` can increase the sample count above the RPE ladder's minimum.
 The resolved count is recorded in the schedule and used by circuit construction and tangent energy correction.
@@ -289,7 +275,7 @@ The minimum number of sampled rotations per circuit is
 
 Automatic or shorter base times retain the original :math:`2,8,32,\ldots` ladder.
 Longer base times need more sampled rotations to keep the *early* round phases on the correct branch; a final tangent correction alone cannot undo a wrong branch choice.
-Replay uses the counts in the saved schedule, without resizing previously generated workloads.
+Replay uses the counts in the schedule without resizing the workload.
 
 To see why the floor suffices in the noiseless model, assume an input eigenstate, no discarded Hamiltonian terms, :math:`\lambda>0`, and :math:`u=E/\lambda`.
 For :math:`N\ge N_k` independent rotations with step angle :math:`x=\lambda t_k/N`, the averaged signal is :math:`(\cos x-iu\sin x)^N`.
@@ -336,7 +322,7 @@ The partially randomized builder uses ``accuracy_split`` :math:`s` to allocate a
 The sub-budgets satisfy :math:`\epsilon_D+\epsilon_R=\epsilon_u`, using the same contract as standalone time evolution.
 
 For :math:`\lambda>0`, let :math:`\tau` be the resolved ``base_time`` and :math:`K` the final round index.
-The scheduler chooses
+The builder chooses
 
 .. math::
 
@@ -364,17 +350,17 @@ For ideal expectation values, ``0 < epsilon_unitary < sin(pi/3)``, exact eigenst
 This phase-bias bound is below ``target_accuracy`` on the independent default route, and is checked against that target for explicit paired budgets.
 Finite-shot sampling contributes additional statistical error and is separate from this bound.
 
-Schedule and replay data
-^^^^^^^^^^^^^^^^^^^^^^^^
+In-memory schedules and replay
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-The independently serializable :class:`~qdk_chemistry.data.RobustPhaseEstimationSchedule` describes what to run.
-It stores :class:`~qdk_chemistry.data.RobustPhaseEstimationRound` values containing evolution times, per-basis shot counts, sample counts, and draw seeds.
+The frozen :class:`~qdk_chemistry.algorithms.phase_estimation.circuit_builder.robust_builder.RobustPhaseEstimationSchedule` describes what to run.
+Its rounds contain evolution times, per-basis shot counts, sample counts, and draw seeds.
 Shared builder settings, resolved accuracy metadata, and a Hamiltonian fingerprint accompany those rounds.
-Algorithm instantiation, settings updates, and RPE power policy remain in the scheduler and circuit builder.
+The circuit builder resolves the algorithms, settings, and evolution powers; the schedule stores only data.
 
-The schedule derives ``base_time`` from round zero and derives draw counts and :class:`~qdk_chemistry.data.RobustPhaseEstimationExperimentSpec` entries from the rounds.
+The schedule derives ``base_time`` from round zero and derives draw counts and experiment specifications from the rounds.
 Neither a second time in the builder settings nor a separately stored experiment manifest can contradict those values.
-Constructors and JSON/HDF5 loaders reject invalid counts, nonfinite times, inconsistent time ladders, and a qDRIFT tangent correction on any other evolution family.
+The builder's records reject invalid counts, nonfinite times, inconsistent time ladders, and a qDRIFT tangent correction on any other evolution family.
 
 Each derived experiment specification identifies one X/Y pair and carries its round, randomized draw coordinates, concrete draw seed, and execution count.
 For deterministic evolution, one pair represents every shot in its round.
@@ -384,28 +370,19 @@ Both circuits in a pair always share the same unitary draw.
 The ``x_circuit_index`` and ``y_circuit_index`` properties identify positions in the canonical flat list returned by the builder's ``run`` method.
 When circuits are streamed, filtered, or batched, carry the experiment specification with the pair rather than treating those positions as persistent identifiers.
 
-The optional :class:`~qdk_chemistry.data.RobustPhaseEstimationCircuitSet` is a replay bundle with three fields: ``schedule``, ``state_preparation``, and ``qubit_hamiltonian``.
+Use the estimator's ``schedule_circuit_set`` method to bind the schedule to its live state preparation and Hamiltonian for repeated execution in the same process.
 The Hamiltonian is snapshotted, and accessing it returns a defensive copy.
 The bundle and circuit builder check that the Hamiltonian matches the schedule fingerprint and coefficient norm before construction.
-The high-level ``schedule_circuit_set`` and ``execute_circuit_set`` methods create and consume this bundle without changing the recorded schedule.
+Pass that object to ``execute_circuit_set`` to reuse the recorded draws, or call its ``rebind`` method to use another live state preparation with the same schedule.
 Replay locks the estimator's settings before execution, just like its ordinary ``run`` method.
 
-Resource estimation and serialization
-^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Resource estimation
+^^^^^^^^^^^^^^^^^^^
 
 Every generated :class:`~qdk_chemistry.data.Circuit` supports :meth:`~qdk_chemistry.data.Circuit.get_qre_application`.
 Use ``spec.shots`` when aggregating an experiment-level resource estimate.
 
-Save a schedule alone when the caller manages its inputs, or save a replay bundle to include them alongside the schedule.
-Both formats preserve concrete randomized seeds without materializing circuits.
-A restored Q# factory-backed state preparation contains QIR for resource estimation but does not contain the live Q# callable needed to construct new Hadamard-test circuits.
-Call :meth:`~qdk_chemistry.data.RobustPhaseEstimationCircuitSet.rebind` with the original live state-preparation circuit before rebuilding such a bundle.
-
-.. important::
-
-   The replay-bundle format is version ``0.2.0`` and rejects earlier ``0.1.0`` circuit-set files.
-   Regenerate old files from their original inputs and settings.
-   The standalone schedule uses its own ``0.1.0`` format and the filename suffix ``.robust_phase_estimation_schedule``.
+Schedules and circuit sets have no file format. To save the energy and measurement metadata, serialize the returned :class:`~qdk_chemistry.data.QpeResult`.
 
 
 Unary-iteration Phase Estimation Circuit Builder
@@ -496,10 +473,9 @@ Related Classes
 - :class:`~qdk_chemistry.data.UnitaryRepresentation`: Output of unitary builders
 - :class:`~qdk_chemistry.data.AlgorithmRef`: Nested algorithm references
 - :class:`~qdk_chemistry.algorithms.PhaseEstimation`: High-level phase estimation interface that uses circuit builders internally
-- :class:`~qdk_chemistry.algorithms.RobustPhaseEstimationCircuitBuilder`: Schedule-aware eager and streaming circuit construction
-- :class:`~qdk_chemistry.algorithms.RobustPhaseEstimationExperimentScheduler`: Resolves RPE evolution parameters and draw seeds
-- :class:`~qdk_chemistry.data.RobustPhaseEstimationSchedule`: Immutable RPE experiment parameters
-- :class:`~qdk_chemistry.data.RobustPhaseEstimationCircuitSet`: Schedule and input data packaged for replay
+- :class:`~qdk_chemistry.algorithms.RobustPhaseEstimationCircuitBuilder`: Schedules RPE experiments and builds or streams their circuits
+- :class:`~qdk_chemistry.algorithms.phase_estimation.circuit_builder.robust_builder.RobustPhaseEstimationSchedule`: In-memory RPE experiment parameters
+- :class:`~qdk_chemistry.algorithms.phase_estimation.circuit_builder.robust_builder.RobustPhaseEstimationCircuitSet`: Schedule and live inputs for replay
 
 Further Reading
 ---------------

@@ -25,7 +25,6 @@ from typing import TYPE_CHECKING
 
 import numpy as np
 
-from qdk_chemistry.algorithms.base import create_from_ref
 from qdk_chemistry.algorithms.circuit_executor.base import CircuitExecutor
 from qdk_chemistry.algorithms.hamiltonian_unitary_builder.time_evolution.qdrift_error import _qdrift_lambda
 from qdk_chemistry.data import (
@@ -35,19 +34,17 @@ from qdk_chemistry.data import (
     QpeResult,
     QuantumErrorProfile,
     QubitOperator,
-    RobustPhaseEstimationCircuitSet,
-    RobustPhaseEstimationExperimentSpec,
-    RobustPhaseEstimationSchedule,
     Settings,
 )
 from qdk_chemistry.utils import Logger
 
 from .base import PhaseEstimation
-from .circuit_builder.robust_builder import RobustPhaseEstimationCircuitBuilder
-from .circuit_builder.rpe_experiment_scheduler import RobustPhaseEstimationExperimentScheduler
+from .circuit_builder.robust_builder import RobustPhaseEstimationCircuitBuilder, RobustPhaseEstimationCircuitSet
 
 if TYPE_CHECKING:
     from collections.abc import Iterator
+
+    from .circuit_builder.robust_builder import RobustPhaseEstimationExperimentSpec, RobustPhaseEstimationSchedule
 
 __all__: list[str] = ["RobustPhaseEstimation", "RobustPhaseEstimationSettings"]
 
@@ -124,7 +121,7 @@ class RobustPhaseEstimation(PhaseEstimation):
         """Initialize robust phase estimation orchestration.
 
         Args:
-            qpe_circuit_builder: Optional robust-builder reference, including its nested scheduler configuration.
+            qpe_circuit_builder: Optional robust-builder reference with the schedule and circuit settings.
             circuit_executor: Optional backend reference used to execute all X/Y experiments.
 
         """
@@ -145,8 +142,8 @@ class RobustPhaseEstimation(PhaseEstimation):
     ) -> QpeResult:
         """Schedule, stream, and post-process one robust phase estimation run.
 
-        The configured scheduler runs once and the builder's ``iter_build`` path
-        is consumed lazily. Calling the builder's eager ``run`` instead would
+        The configured circuit builder creates the schedule once and streams
+        its pairs through ``iter_build``. Calling its eager ``run`` instead would
         materialize the complete circuit list and discard the workload needed
         for execution metadata.
 
@@ -161,7 +158,7 @@ class RobustPhaseEstimation(PhaseEstimation):
         """
         Logger.trace_entering()
         circuit_builder = self._create_circuit_builder()
-        schedule = self._create_experiment_scheduler(circuit_builder).run(qubit_hamiltonian)
+        schedule = circuit_builder.build_schedule(qubit_hamiltonian)
         return self._execute_with_builder(circuit_builder, schedule, state_preparation, qubit_hamiltonian, noise=noise)
 
     def schedule_circuit_set(
@@ -176,11 +173,11 @@ class RobustPhaseEstimation(PhaseEstimation):
             qubit_hamiltonian: Hamiltonian used to resolve the schedule.
 
         Returns:
-            A serializable circuit set that can be reused without drawing new scheduling entropy.
+            An in-memory circuit set that can be reused without drawing new scheduling entropy.
 
         """
         return RobustPhaseEstimationCircuitSet(
-            schedule=self._create_experiment_scheduler(self._create_circuit_builder()).run(qubit_hamiltonian),
+            schedule=self._create_circuit_builder().build_schedule(qubit_hamiltonian),
             state_preparation=state_preparation,
             qubit_hamiltonian=qubit_hamiltonian,
         )
@@ -194,7 +191,7 @@ class RobustPhaseEstimation(PhaseEstimation):
         """Build and execute a previously scheduled RPE workload.
 
         Settings are locked before execution, as for ``run``. The recorded
-        schedule is used directly without invoking the experiment scheduler.
+        schedule is used directly without choosing new rounds or draw seeds.
 
         Args:
             circuit_set: Recorded workload to replay with its original round settings and unitary seeds.
@@ -235,30 +232,6 @@ class RobustPhaseEstimation(PhaseEstimation):
                 f"got {type(circuit_builder)} instead."
             )
         return circuit_builder
-
-    @staticmethod
-    def _create_experiment_scheduler(
-        circuit_builder: RobustPhaseEstimationCircuitBuilder,
-    ) -> RobustPhaseEstimationExperimentScheduler:
-        """Instantiate the scheduler configured on the selected circuit builder.
-
-        Args:
-            circuit_builder: Builder whose settings contain the scheduler reference.
-
-        Returns:
-            A configured RPE experiment scheduler.
-
-        Raises:
-            TypeError: If the configured scheduler has the wrong algorithm type.
-
-        """
-        scheduler = create_from_ref(circuit_builder.settings(), "experiment_scheduler")
-        if not isinstance(scheduler, RobustPhaseEstimationExperimentScheduler):
-            raise TypeError(
-                "Expected experiment_scheduler to be a RobustPhaseEstimationExperimentScheduler, "
-                f"got {type(scheduler)} instead."
-            )
-        return scheduler
 
     def _execute_with_builder(
         self,

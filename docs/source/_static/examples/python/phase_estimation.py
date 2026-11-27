@@ -60,19 +60,13 @@ qpe.settings().set("qpe_circuit_builder", qpe_circuit_builder)
 
 ################################################################################
 # start-cell-configure-robust
-# Configure robust phase estimation through its QPE builder and nested scheduler
-experiment_scheduler = AlgorithmRef(
-    "rpe_experiment_scheduler",
-    "qdk",
+robust_circuit_builder = AlgorithmRef(
+    "qpe_circuit_builder",
+    "qdk_robust",
     target_accuracy=0.5,
     epsilon_unitary=0.85,  # Independent dimensionless Trotter sizing tolerance (default: 0.85).
     seed=42,
     unitary_builder=AlgorithmRef("hamiltonian_unitary_builder", "trotter", order=2),
-)
-robust_circuit_builder = AlgorithmRef(
-    "qpe_circuit_builder",
-    "qdk_robust",
-    experiment_scheduler=experiment_scheduler,
 )
 rpe = create("phase_estimation", "qdk_robust")
 rpe.settings().set("qpe_circuit_builder", robust_circuit_builder)

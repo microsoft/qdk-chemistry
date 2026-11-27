@@ -9,6 +9,5 @@ the eigenvalues of unitary operators.
 # Licensed under the MIT License. See LICENSE.txt in the project root for license information.
 # --------------------------------------------------------------------------------------------
 from .base import PhaseEstimationFactory
-from .circuit_builder.rpe_experiment_scheduler import RobustPhaseEstimationExperimentSchedulerFactory
 
-__all__: list[str] = ["PhaseEstimationFactory", "RobustPhaseEstimationExperimentSchedulerFactory"]
+__all__: list[str] = ["PhaseEstimationFactory"]

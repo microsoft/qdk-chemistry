@@ -33,7 +33,7 @@ Standard QFT-based Quantum Phase Estimation
 
 Robust Phase Estimation
    A Hadamard-test approach that samples a geometric ladder of evolution times and unwraps the measured phases round by round.
-   Its experiment scheduler represents deterministic execution counts and independent randomized draws, while its circuit builder supports eager lists and streamed X/Y pairs.
+   Its circuit builder records deterministic execution counts and independent randomized draws in an in-memory schedule, and can return or stream the resulting X/Y circuits.
 
 Unary-iteration Quantum Phase Estimation
    A qubitization-only approach :cite:`Lee2021` that allows any positive number of queries instead of rounding up to the next power of two.
@@ -84,7 +84,7 @@ HamiltonianDescription
 Settings
    The :class:`~qdk_chemistry.algorithms.PhaseEstimation` is configured via its settings object, which includes:
 
-   - ``qpe_circuit_builder`` — A :class:`~qdk_chemistry.data.AlgorithmRef` to a :doc:`QpeCircuitBuilder <qpe_circuit_builder>` that handles circuit composition. Iterative and standard builders encapsulate a :doc:`HamiltonianUnitaryBuilder <hamiltonian_unitary_builder>` and a :class:`~qdk_chemistry.algorithms.ControlledCircuitMapper`; the robust builder instead contains an experiment scheduler that owns its unitary-builder and Hadamard-test-builder configuration. See :doc:`qpe_circuit_builder` for detailed configuration.
+   - ``qpe_circuit_builder`` — A :class:`~qdk_chemistry.data.AlgorithmRef` to a :doc:`QpeCircuitBuilder <qpe_circuit_builder>` that handles circuit composition. Iterative and standard builders configure a :doc:`HamiltonianUnitaryBuilder <hamiltonian_unitary_builder>` and a :class:`~qdk_chemistry.algorithms.ControlledCircuitMapper`; the robust builder configures the schedule, unitary builder and Hadamard-test builder directly.
 
    - ``circuit_executor`` — A :class:`~qdk_chemistry.data.AlgorithmRef` to a backend that executes :class:`~qdk_chemistry.data.Circuit` objects and returns measurement bitstrings as :class:`~qdk_chemistry.data.CircuitExecutorData`.
      QDK/Chemistry ships native Q# simulators (sparse-state and full-state, with optional :class:`~qdk_chemistry.data.QuantumErrorProfile` noise modelling) and integrates with Qiskit's Aer simulator through the :doc:`plugin system <../plugins>`.
@@ -251,13 +251,13 @@ The measured phase at each round selects the branch consistent with earlier roun
 
 The estimator has two direct settings:
 
-- ``qpe_circuit_builder``: The ``"qdk_robust"`` :ref:`robust circuit builder <robust-phase-estimation-circuit-builder>`, which holds an experiment scheduler as a nested algorithm reference.
+- ``qpe_circuit_builder``: The ``"qdk_robust"`` :ref:`robust circuit builder <robust-phase-estimation-circuit-builder>` and its scheduling and circuit settings.
 - ``circuit_executor`` — The backend used to execute every generated basis circuit.
 
-Configure the scheduler through an :class:`~qdk_chemistry.data.AlgorithmRef`, then call the estimator's ``run`` method with the state preparation and Hamiltonian.
+Set the scheduling options on the circuit builder's :class:`~qdk_chemistry.data.AlgorithmRef`, then call the estimator's ``run`` method with the state preparation and Hamiltonian.
 The estimator schedules once and streams X/Y circuit pairs internally without materializing the full workload.
 The example below uses a coarse accuracy target to keep execution short; the default target remains ``1e-3``.
-See :doc:`qpe_circuit_builder` for separate circuit-preview and saved-workload replay examples.
+See :ref:`robust-phase-estimation-circuit-builder` for workload preview and replay.
 
 .. tab:: Python API
 
