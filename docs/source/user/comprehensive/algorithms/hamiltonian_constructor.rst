@@ -190,7 +190,10 @@ Four-center integrals are lazily computed from the three-center integrals on dem
      - Description
    * - ``cholesky_tolerance``
      - float
-     - Tolerance for Cholesky decomposition accuracy. Smaller values give higher accuracy but more Cholesky vectors. Default: 1e-8
+     - Tolerance for Cholesky decomposition accuracy. Smaller values give higher accuracy but more Cholesky vectors. Values below the round-off level of the largest ERI diagonal (``sqrt(max_rank) * eps * D_max``) are raised to it with a warning. Default: 1e-8
+   * - ``cholesky_span_factor``
+     - float
+     - Each batch of the decomposition only takes pivots of at least this fraction of the largest remaining ERI diagonal; smaller ones are deferred to later batches. This keeps the decomposition numerically stable, especially for basis sets with steep functions (e.g. heavy elements) at tight tolerances. 0 disables the restriction. Default: 1e-2
    * - ``eri_threshold``
      - float
      - ERI screening threshold for skipping negligible shell quartets during Cholesky decomposition. Default: 1e-12

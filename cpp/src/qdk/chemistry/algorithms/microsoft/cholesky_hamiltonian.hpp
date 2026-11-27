@@ -53,7 +53,15 @@ Eigen::MatrixXd build_K_from_cholesky(
 class CholeskyHamiltonianSettings : public HamiltonianSettings {
  public:
   CholeskyHamiltonianSettings() {
-    set_default("cholesky_tolerance", 1e-8);
+    set_default("cholesky_tolerance", 1e-8,
+                "Cholesky decomposition threshold; values below the round-off "
+                "level of the largest ERI diagonal are raised to it");
+    set_default("cholesky_span_factor", 1e-2,
+                "Pivots of a Cholesky batch must be at least this fraction of "
+                "the largest remaining ERI diagonal; smaller ones are deferred "
+                "to later batches. 0 disables the restriction, which can be "
+                "numerically unstable",
+                qdk::chemistry::data::BoundConstraint<double>{0.0, 1.0});
     set_default("eri_threshold", 1e-12,
                 "ERI screening threshold for skipping negligible shell "
                 "quartets during Cholesky decomposition",
