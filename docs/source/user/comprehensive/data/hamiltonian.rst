@@ -128,10 +128,12 @@ unrestricted opposite-spin block has a different symmetry contract.
 FCIDUMP export and PySCF conversion retain stronger symmetry requirements
 and reject unsupported tensors rather than discarding information.
 
-``SparseHamiltonianContainer`` stores two-body entries literally, with
-unstored positions zero. Use ``expand_symmetry_representatives`` to populate
-a map from symmetry representatives rather than relying on consumers to
-expand it. Sparse files written before schema ``0.3.0`` require
+``SparseHamiltonianContainer`` reads serialized two-body entries literally,
+with unstored positions zero. Its Hermitian map constructor retains a
+deprecated shorthand: a lone nonzero entry in a larger eight-fold symmetry
+class expands to all its permutation partners.
+Use ``expand_symmetry_representatives`` to construct explicit maps from
+symmetry representatives. Sparse files written before schema ``0.3.0`` require
 :doc:`migration <../../migrating-data-files>`.
 
 .. tab:: Python API

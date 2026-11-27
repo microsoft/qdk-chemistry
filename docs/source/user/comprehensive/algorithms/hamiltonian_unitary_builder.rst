@@ -609,7 +609,7 @@ These settings apply to both ``circuit_mapper`` / ``sossa`` and
      - Givens-rotation angle precision, from 1 through 30. Default: 10.
    * - ``max_givens_rotation_batches``
      - int
-     - Upper bound on angle-loading passes for ``"qrom_phase_gradient"`` SELECT, from 1 through 4096. Larger values reduce the resident angle register at the cost of additional lookups. Ignored by ``"direct"`` SELECT. Default: 1.
+     - Upper bound on angle-loading passes for ``"qrom_phase_gradient"`` SELECT, from 1 through 4096; for ``N > 1`` spatial orbitals, also at most ``N - 1``. Larger values reduce the resident angle register at the cost of additional lookups. Ignored by ``"direct"`` SELECT. Default: 1.
    * - ``lookup_method``
      - str
      - Routing for Givens and inner alias-sampling tables: ``"select"`` (plain lookup), ``"select_swap"`` (clean QROAM), or ``"dirty_select_swap"`` (borrowed idle qubits). Each uses plain lookup when its cost model prefers it. Outer PREPARE uses its own settings. Default: ``"select_swap"``.
