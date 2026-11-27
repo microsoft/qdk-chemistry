@@ -125,9 +125,10 @@ class SOSSAMapper(CircuitMapper):
     on ``[system | ancillas | phase gradient]``. The phase-gradient suffix is
     shared ancilla and is excluded from the reflected zero register.
 
-    Unary QPE controls walk iterations through its own index register. Iterative and
-    standard QPE query controlled walk powers instead from
+    Unary QPE controls walk iterations through its own index register. Standard QPE
+    queries controlled walk powers instead from
     :class:`~qdk_chemistry.algorithms.controlled_circuit_mapper.controlled_sossa_mapper.ControlledSOSSAMapper`.
+    Iterative SOSSA QPE is not supported.
     """
 
     def __init__(self):

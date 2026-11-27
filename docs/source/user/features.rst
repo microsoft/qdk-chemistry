@@ -30,10 +30,17 @@ Iterative Quantum Phase Estimation (:term:`IQPE`)
 
 Standard QFT-based Quantum Phase Estimation (:term:`QPE`)
    Parallel phase-register measurement via quantum Fourier transform, providing all precision bits simultaneously.
+   The native builder also supports SOSSA through a :ref:`controlled quantum-walk mapper <controlled-sossa-mapper>`.
+   Native standard and iterative builders can share phase-gradient registers, but iterative SOSSA QPE is not supported.
 
 Phase estimation implementations include post-processing with automatic phase wrapping, energy alias detection and resolution, and full serialization of results.
 
 See :doc:`comprehensive/algorithms/phase_estimation` for detailed documentation on available implementations and usage, and :doc:`comprehensive/algorithms/hamiltonian_unitary_builder` for the Hamiltonian simulation methods that underpin phase estimation.
+
+Circuit synthesis includes unary-iteration SELECT for LCU block encodings,
+batched and dirty-qubit SOSSA lookups, and generalized phase-gradient
+Hamming-weight phasing for Hubbard plaquette evolution.
+See :doc:`comprehensive/algorithms/circuit_mapper` for the controlled mappers.
 
 State Preparation
 """""""""""""""""
@@ -265,6 +272,36 @@ Nuclear derivative calculators evaluate the energy, its gradient with respect to
 Geometry optimizers build on these derivatives to relax a molecular structure to a stationary point, returning the converged energy, the optimized structure, and optionally a Hessian and the converged wavefunction.
 Both minimizations and transition-state searches are supported, and the derivative engine is selected through settings, so the same optimizer drives any registered nuclear derivative calculator.
 
+Effective Hamiltonian Construction
+""""""""""""""""""""""""""""""""""
+
+The native ``qdk_ducc`` implementation downfolds a Hamiltonian onto a smaller
+target orbital space using real singles/doubles amplitudes from a restricted
+or unrestricted reference. Its commutator level controls the approximation,
+and the result includes scalar, one-body, and two-body contributions.
+See :doc:`comprehensive/algorithms/effective_hamiltonian_constructor`.
+
+Hamiltonian and Wavefunction Data
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+Four-fold integral symmetry
+   First-party correlation algorithms and qubit mapping accept more general
+   two-body operators, including DUCC-downfolded integrals.
+   FCIDUMP export and PySCF conversion retain their stronger symmetry requirements.
+   See :doc:`comprehensive/data/hamiltonian`.
+
+Auxiliary bases
+   Independent auxiliary basis values are grouped by ``JFit``, ``JKFit``,
+   ``RIFit``, and ``CABS`` roles and support JSON/HDF5 serialization.
+   Algorithms accepting auxiliary-basis inputs consume these role-tagged collections.
+   See :doc:`comprehensive/data/basis_set`.
+
+Matrix product states
+   ``MPSSite`` and ``MPSContainer`` store real or complex, optionally
+   symmetry-blocked MPS tensors with optional producer-supplied particle counts
+   and RDMs.
+   See :doc:`comprehensive/data/wavefunction`.
+
 
 Community Open Source Software Dependencies
 -------------------------------------------
@@ -311,6 +348,17 @@ Multi-Configuration Solvers
 MACIS :cite:`Williams-Young2023`
    The Many-body Adaptive Configuration Interaction Solver powers QDK/Chemistry's selected CI capabilities. :term:`MACIS` implements the :term:`ASCI` algorithm with distributed-memory parallelism, enabling treatment of active spaces far beyond the reach of conventional exact diagonalization.
 
+
+Symbolic Algebra and Tensor Evaluation
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+SeQuant and BTAS
+   SeQuant provides symbolic many-body tensor algebra, with BTAS as the
+   numerical tensor backend. DUCC currently uses this infrastructure.
+   Source builds use pinned revisions and repository patches; no-fetch builds
+   can use an installed SeQuant prepared by ``cpp/cmake/sequant``.
+   See the `SeQuant <https://github.com/ValeevGroup/SeQuant>`_ and
+   `BTAS <https://github.com/BTAS/btas>`_ repositories.
 
 Plugins
 ^^^^^^^

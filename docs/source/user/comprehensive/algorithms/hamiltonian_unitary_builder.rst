@@ -484,6 +484,12 @@ for example alias sampling, which uses Toffolis but no rotations, pass an
 
 The resulting :class:`~qdk_chemistry.data.UnitaryRepresentation` wraps an ``LCUContainer`` containing the Prepare and Select oracles.
 
+Both uncontrolled and controlled ``prepare_select_prepare`` mappers accept
+``select_method="unary_iteration"`` (default) or ``"multi_controlled"``.
+The latter retains the earlier SELECT construction.
+
+Use ``dense_pure_state`` PREPARE for QIR export.
+
 .. _sossa-builder:
 
 Sum-of-squares spectral amplification
@@ -503,10 +509,13 @@ The corresponding ``circuit_mapper`` / ``sossa`` emits
    B = U^\dagger R_{\mathrm{inner}} U,\qquad
    W = R_{\mathrm{outer}} B.
 
-The mapper returns :math:`B`, not the completed walk :math:`W`.
-:ref:`Unary QPE <unary-qpe-algorithm>` supplies the outer reflections.
-This circuit path requires unit power, canonical blocked Jordan-Wigner
-ordering, and untapered input.
+The uncontrolled mapper returns :math:`B`, not the completed walk :math:`W`.
+:ref:`Unary QPE <unary-qpe-algorithm>` supplies the outer reflections and
+requires unit power. For native standard QPE, use the
+:ref:`controlled SOSSA mapper <controlled-sossa-mapper>`, which completes
+the walk and supports positive integer powers.
+Both paths require canonical blocked Jordan-Wigner ordering and untapered
+input. Iterative SOSSA QPE is not supported.
 
 For a completed-walk eigenphase :math:`\varphi`, the energy decoder is
 
@@ -569,7 +578,12 @@ for factorization, simulation, and resource estimation, or the
 Circuit precision and shared registers
 """"""""""""""""""""""""""""""""""""""
 
+.. _sossa-mapper-settings:
+
 .. rubric:: SOSSA circuit mapper settings
+
+These settings apply to both ``circuit_mapper`` / ``sossa`` and
+``controlled_circuit_mapper`` / ``sossa``.
 
 .. list-table::
    :header-rows: 1
@@ -593,6 +607,15 @@ Circuit precision and shared registers
    * - ``rotation_bit_precision``
      - int
      - Givens-rotation angle precision, from 1 through 30. Default: 10.
+   * - ``max_givens_rotation_batches``
+     - int
+     - Upper bound on angle-loading passes for ``"qrom_phase_gradient"`` SELECT, from 1 through 4096; for ``N > 1`` spatial orbitals, also at most ``N - 1``. Larger values reduce the resident angle register at the cost of additional lookups. Ignored by ``"direct"`` SELECT. Default: 1.
+   * - ``lookup_method``
+     - str
+     - Routing for Givens and inner alias-sampling tables: ``"select"`` (plain lookup), ``"select_swap"`` (clean QROAM), or ``"dirty_select_swap"`` (borrowed idle qubits). Each uses plain lookup when its cost model prefers it. Outer PREPARE uses its own settings. Default: ``"select_swap"``.
+   * - ``max_swap_address_bits``
+     - int
+     - Cap on each clean/dirty QROAM swap-address width. ``-1`` lets the loader choose, ``0`` forces plain lookup, and a positive value caps the width at that many address bits. Ignored by ``"select"``. Default: -1.
 
 ``coefficient_bit_precision`` and ``rotation_bit_precision`` control
 different approximations and do not define a total energy-error budget.

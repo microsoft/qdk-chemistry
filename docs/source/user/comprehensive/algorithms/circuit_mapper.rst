@@ -290,6 +290,27 @@ Each layer of the plaquette step is a tower of same-angle :math:`R_z` rotations,
      - str
      - How each Hamming weight is phased: ``"catalyst"`` (default) adds it into a catalyst, a generalized phase gradient prepared once for the interaction layers and once for the hopping layers, and ``"rz_ladder"`` synthesizes each place value as its own :math:`R_z`. Ignored when ``use_hamming_weight_phasing`` is False.
 
+.. _controlled-sossa-mapper:
+
+SOSSA quantum walk mapper
+~~~~~~~~~~~~~~~~~~~~~~~~~
+
+.. rubric:: Factory name: ``"sossa"``
+
+:class:`~qdk_chemistry.algorithms.controlled_circuit_mapper.ControlledSOSSAMapper`
+completes and controls the walk of a :ref:`SOSSA block encoding <sossa-builder>`
+for native standard QPE and supports positive integer walk powers.
+
+It shares the :ref:`oracle and lookup settings <sossa-mapper-settings>` with
+the uncontrolled ``circuit_mapper`` / ``sossa`` used by unary QPE.
+
+See :ref:`release-v2.4.0` for a complete input-construction example:
+
+.. literalinclude:: ../../../_static/examples/python/release_notes_v2_4.py
+   :language: python
+   :start-after: # start-cell-standard-sossa
+   :end-before: # end-cell-standard-sossa
+
 Related classes
 ---------------
 

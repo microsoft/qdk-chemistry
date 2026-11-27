@@ -140,6 +140,13 @@ It holds one :class:`~qdk_chemistry.data.MPSSite` per active orbital, each an op
 It is pure storage: the sites are not expanded into determinants, so coefficient-, determinant-, norm-, overlap-, and occupation-based accessors raise.
 Particle counts and RDMs are available only if they are passed to the constructor.
 
+.. tab:: Python API
+
+   .. literalinclude:: ../../../_static/examples/python/release_notes_v2_4.py
+      :language: python
+      :start-after: # start-cell-mps
+      :end-before: # end-cell-mps
+
 Properties
 ~~~~~~~~~~
 

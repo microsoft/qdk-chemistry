@@ -1,0 +1,246 @@
+.. _release-v2.4.0:
+
+==========================
+What's New in Version 2.4
+==========================
+
+Version 2.4 adds DUCC downfolding, matrix product state data structures,
+auxiliary-basis data, more general two-electron integrals, and new quantum-walk
+circuit paths.
+Python bindings move to nanobind and require Python 3.11 or newer.
+See :ref:`v2-4-compatibility` before upgrading existing data or integrations.
+
+.. contents:: On this page
+   :local:
+   :depth: 1
+
+
+DUCC Effective Hamiltonians
+===========================
+
+``effective_hamiltonian_constructor`` / ``qdk_ducc`` constructs a double
+unitary coupled-cluster (DUCC) effective active-space Hamiltonian from real
+singles/doubles amplitudes over a larger orbital window
+:cite:`Bauman2019,Bauman2022`.
+The effective Hamiltonian incorporates dynamical correlation from orbitals
+outside the target active space through the DUCC approximation.
+
+Restricted closed-shell and unrestricted open-shell references are supported,
+including frozen-core windows. The target active space is selected from the
+input orbital window.
+
+The ``level`` setting selects a Fock-split Baker-Campbell-Hausdorff (BCH)
+approximation. Level 0 reproduces the original active-space Hamiltonian.
+Levels 1 and 2 retain Hamiltonian commutators through the selected level
+plus one additional order of Fock commutator; the default is level 2.
+The returned Hamiltonian retains scalar, one-body, and two-body terms.
+
+.. literalinclude:: ../_static/examples/python/effective_hamiltonian_constructor.py
+   :language: python
+   :start-after: # start-cell-create
+   :end-before: # end-cell-create
+
+The following native workflow obtains amplitudes from MP2, chooses a
+four-electron/four-orbital target, and diagonalizes the effective Hamiltonian:
+
+.. literalinclude:: ../_static/examples/python/effective_hamiltonian_constructor.py
+   :language: python
+   :start-after: # start-cell-run
+   :end-before: # end-cell-run
+
+CCSD amplitudes from ``pyscf_coupled_cluster`` with ``store_amplitudes=True``
+can also supply the reference on platforms supporting PySCF.
+See :doc:`../user/comprehensive/algorithms/effective_hamiltonian_constructor`
+for amplitude conventions, supported spaces, and the approximation.
+
+
+Integral Symmetry and Electronic Structure
+==========================================
+
+Four-fold-symmetric Hamiltonians are now supported across QDK/Chemistry's
+electronic-structure and qubit-mapping workflows.
+This support enables downfolded Hamiltonians and provides a foundation for
+future relativistic Hamiltonians without assuming full eight-fold
+Coulomb-integral symmetry.
+See :doc:`../user/comprehensive/data/hamiltonian` and
+:doc:`../user/comprehensive/algorithms/qubit_mapper`.
+
+FCIDUMP export and PySCF conversion retain their stronger symmetry
+requirements; see
+:doc:`../user/comprehensive/algorithms/hamiltonian_constructor` for conversion details.
+
+
+Auxiliary Basis Data
+====================
+
+:class:`~qdk_chemistry.data.AuxiliaryBasis` is an independent basis value,
+and :class:`~qdk_chemistry.data.AuxiliaryBasisCollection` groups such values
+by ``JFit``, ``JKFit``, ``RIFit``, and ``CABS`` roles.
+Primary and auxiliary bases are independent values built against the same
+structure.
+A collection can carry several roles, providing a common way to organize
+auxiliary bases for different calculation stages.
+
+.. literalinclude:: ../_static/examples/python/basis_set.py
+   :language: python
+   :start-after: # start-cell-loading-with-aux
+   :end-before: # end-cell-loading-with-aux
+
+Individual bases and collections support independent JSON/HDF5 serialization
+and can be supplied to algorithms that accept auxiliary-basis inputs.
+See :doc:`../user/comprehensive/data/basis_set`.
+
+
+Matrix Product State Data Structures
+====================================
+
+:class:`~qdk_chemistry.data.MPSSite` and
+:class:`~qdk_chemistry.data.MPSContainer` store real or complex matrix product
+states, including symmetry-blocked site tensors, orbital ordering, and an
+optional orthogonality center. They integrate with
+:class:`~qdk_chemistry.data.Wavefunction` and its JSON/HDF5 serialization.
+This provides a common representation for exchanging tensor-network
+wavefunctions and their associated metadata.
+
+This two-site product state illustrates the storage interface:
+
+.. literalinclude:: ../_static/examples/python/release_notes_v2_4.py
+   :language: python
+   :start-after: # start-cell-mps
+   :end-before: # end-cell-mps
+
+Optional particle counts and RDMs are supplied by the producing algorithm.
+See :doc:`../user/comprehensive/data/wavefunction`.
+
+
+Quantum Walks and Circuit Composition
+=====================================
+
+Standard QPE with SOSSA Walk
+----------------------------
+
+``controlled_circuit_mapper`` / ``sossa`` completes and controls the SOSSA
+walk for native standard QPE.
+The existing uncontrolled ``circuit_mapper`` / ``sossa`` remains the
+block-encoding path used by unary QPE.
+Factorized-Hamiltonian workflows can therefore choose between standard,
+Fourier-transform-based QPE and unary phase-estimation circuits.
+
+Starting from a small factorized hydrogen Hamiltonian:
+
+.. literalinclude:: ../_static/examples/python/release_notes_v2_4.py
+   :language: python
+   :start-after: # start-cell-sossa-input
+   :end-before: # end-cell-sossa-input
+
+Configure the controlled mapper explicitly:
+
+.. literalinclude:: ../_static/examples/python/release_notes_v2_4.py
+   :language: python
+   :start-after: # start-cell-standard-sossa
+   :end-before: # end-cell-standard-sossa
+
+The three-bit example illustrates circuit construction. SOSSA supports native
+standard and unary QPE with canonical, untapered, blocked Jordan-Wigner
+ordering and reports total energies, including the core energy.
+
+Native standard and iterative QPE now initialize compatible shared
+phase-gradient registers once and reuse them across state preparation and
+controlled powers.
+See :doc:`../user/comprehensive/algorithms/qpe_circuit_builder` and
+:doc:`../user/comprehensive/algorithms/circuit_mapper`.
+
+SOSSA lookup tradeoffs
+----------------------
+
+Controlled and uncontrolled SOSSA mappers support batched angle lookups
+and clean/dirty QROAM options.
+Batching trades a smaller resident angle register for additional lookup
+passes, while the QROAM options offer different balances of workspace and
+gate cost.
+See :ref:`sossa-mapper-settings` for the configurable qubit/gate tradeoffs.
+
+LCU with Unary-Iteration SELECT
+-------------------------------
+
+LCU PREPARE-SELECT-PREPARE mappers now use unary iteration to select the
+Hamiltonian's Pauli terms. This is the default for both controlled and
+uncontrolled circuits.
+Set ``select_method="multi_controlled"`` to retain the earlier construction:
+
+.. literalinclude:: ../_static/examples/python/release_notes_v2_4.py
+   :language: python
+   :start-after: # start-cell-lcu-select
+   :end-before: # end-cell-lcu-select
+
+Use ``dense_pure_state`` PREPARE when QIR export is required.
+
+Hubbard phasing
+----------------
+
+The Hubbard plaquette controlled mapper now defaults to
+``hamming_weight_phasing_method="catalyst"``. Equal-angle rotations are grouped
+through Hamming-weight registers, using generalized phase-gradient catalysts
+prepared for the interaction and hopping layers and reused during evolution.
+``"rz_ladder"`` retains the per-place-value rotation alternative;
+``use_hamming_weight_phasing=False`` uses individual term rotations.
+The Hubbard resource-estimation notebook demonstrates the new path.
+
+.. _v2-4-compatibility:
+
+Compatibility and Migration
+===========================
+
+.. _v2-4-electronic-structure-fixes:
+
+Electronic-structure fixes
+--------------------------
+
+PySCF reference conversion now uses the integrals and core energy stored in
+the supplied Hamiltonian. This keeps subsequent PySCF calculations aligned
+with the Hamiltonian used in the QDK/Chemistry workflow.
+
+Corrections to four-center and Cholesky Hamiltonian construction preserve
+integral permutation symmetry and improve consistency across downstream
+calculations. ROHF calculations also gain improved handling of linearly
+dependent basis sets.
+
+Sparse Hamiltonians
+-------------------
+
+``SparseHamiltonianContainer`` moves to schema ``0.3.0``, with explicit
+two-body integral entries and omitted entries treated as zero. This provides
+a consistent representation for electronic-structure calculations and qubit
+mapping.
+
+Migrate older files with ``python -m qdk_chemistry.migrate`` when upgrading.
+Code that constructs sparse Hamiltonians should explicitly supply the
+intended symmetry-related entries. The :doc:`migration guide <../user/migrating-data-files>`
+explains how to update existing data and construct these entries.
+
+Execution and data loading
+--------------------------
+
+The full-state executor now requires explicit opt-in for QIR supplied
+directly or loaded from files. Set ``allow_external_qir=True`` when executing
+QIR from a trusted producer; this makes the trust decision explicit when
+running externally supplied circuits.
+
+Restored remote jobs now use current runtime connection settings.
+Saved job records continue to identify the submitted work, while users
+configure connections for the environment in which they resume the job.
+
+
+Python Packaging and Native Builds
+==================================
+
+Python 3.11+ and QDK 1.34.0+ are now required.
+Python bindings move to nanobind, allowing one chemistry wheel per platform
+and architecture across supported GIL-enabled CPython versions.
+Native builds add SeQuant symbolic algebra with BTAS tensor evaluation,
+used by DUCC. MACIS introduces optional C++ ASCI execution extensions for
+determinant search and diagonalization.
+
+See the `installation instructions
+<https://github.com/microsoft/qdk-chemistry/blob/main/INSTALL.md>`_ for platform
+support and dependency details.

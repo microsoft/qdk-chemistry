@@ -7,6 +7,7 @@ Detailed release notes for each version of QDK/Chemistry, including new features
 .. toctree::
    :maxdepth: 2
 
+   v2.4.0
    v2.3.0
    v2.2.0
    v2.1.0
