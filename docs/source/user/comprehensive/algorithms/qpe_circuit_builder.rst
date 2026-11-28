@@ -354,7 +354,9 @@ In-memory schedules and replay
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 The frozen :class:`~qdk_chemistry.algorithms.phase_estimation.circuit_builder.robust_builder.RobustPhaseEstimationSchedule` describes what to run.
-Its rounds contain evolution times, per-basis shot counts, sample counts, and draw seeds.
+Its rounds contain evolution times, per-basis shot counts, and draw seeds.
+For pure qDRIFT, ``round.scheduled_samples`` is the number of sampled rotations per unitary draw, before fusion; ``schedule.final_samples`` is that count for the last round.
+Both are ``None`` for other evolution families: their builders size the evolution independently, so these fields are not resource estimates for their circuits.
 Shared builder settings, resolved accuracy metadata, and a Hamiltonian fingerprint accompany those rounds.
 The circuit builder resolves the algorithms, settings, and evolution powers; the schedule stores only data.
 
@@ -366,6 +368,7 @@ Each derived experiment specification identifies one X/Y pair and carries its ro
 For deterministic evolution, one pair represents every shot in its round.
 For randomized evolution, each specification represents one independently sampled unitary and one shot per basis.
 Both circuits in a pair always share the same unitary draw.
+The estimator normalizes each basis measurement within its draw, then accumulates the two signals and draw count per round; it does not retain the raw shot records from previous draws.
 
 The ``x_circuit_index`` and ``y_circuit_index`` properties identify positions in the canonical flat list returned by the builder's ``run`` method.
 When circuits are streamed, filtered, or batched, carry the experiment specification with the pair rather than treating those positions as persistent identifiers.

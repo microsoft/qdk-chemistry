@@ -507,7 +507,9 @@ def test_builtin_schedule_preserves_experiment_baseline(
     ).build_schedule(hamiltonian)
     assert [round_data.evolution_time for round_data in schedule.rounds] == pytest.approx([pi / 2, pi])
     assert [round_data.shots_per_basis for round_data in schedule.rounds] == [41, 30]
-    assert [round_data.scheduled_samples for round_data in schedule.rounds] == [2, 8]
+    expected_samples: list[int | None] = [2, 8] if builder_name == "qdrift" else [None, None]
+    assert [round_data.scheduled_samples for round_data in schedule.rounds] == expected_samples
+    assert schedule.final_samples == expected_samples[-1]
     if builder_name == "trotter":
         assert [round_data.draw_seeds for round_data in schedule.rounds] == [(None,), (None,)]
     else:
@@ -757,9 +759,8 @@ def test_deterministic_round_builds_one_multi_shot_pair(
     spec, _, _ = next(builder.iter_build(circuit_set, state_preparation, hamiltonian))
 
     expected_shots = ceil(e * (11 + 4 * (circuit_set.num_rounds - 1)))
-    expected_samples = 2
     assert circuit_set.rounds[0].shots_per_basis == expected_shots
-    assert circuit_set.rounds[0].scheduled_samples == expected_samples
+    assert circuit_set.rounds[0].scheduled_samples is None
     assert circuit_set.rounds[0].num_draws == 1
     assert spec.draw_index is None
     assert spec.draw_seed is None
@@ -779,7 +780,10 @@ def test_randomized_round_builds_independent_pairs_on_demand(
     builder = RobustPhaseEstimationCircuitBuilder(target_accuracy=0.5, seed=11)
     circuit_set = builder.build_schedule(hamiltonian)
 
-    experiments = list(islice(builder.iter_build(circuit_set, state_preparation, hamiltonian), 2))
+    with patch.object(
+        RobustPhaseEstimationSchedule, "experiment_specs", property(lambda _: pytest.fail("Eager manifest"))
+    ):
+        experiments = list(islice(builder.iter_build(circuit_set, state_preparation, hamiltonian), 2))
     expected_specs = circuit_set.experiment_specs_for_round(0)[:2]
 
     assert [experiment[0] for experiment in experiments] == list(expected_specs)
@@ -1068,6 +1072,29 @@ def test_workload_rejects_duplicated_round_settings(workload: RobustPhaseEstimat
     config = ("hamiltonian_unitary_builder", "qdrift", json.dumps({name: 2}))
     with pytest.raises(ValueError, match=name):
         replace(schedule, _unitary_builder=config)
+
+
+@pytest.mark.parametrize(
+    ("family", "invalid_samples"), [("qdrift", None), ("partially_randomized", 2), ("trotter", 2), ("zassenhaus", 2)]
+)
+def test_schedule_validates_qdrift_only_sample_counts(family: str, invalid_samples: int | None) -> None:
+    """A schedule can report a per-draw count only when the builder will actually execute it."""
+    schedule = RobustPhaseEstimationCircuitBuilder(
+        target_accuracy=1.0, seed=7, unitary_builder=AlgorithmRef("hamiltonian_unitary_builder", family)
+    ).build_schedule(QubitOperator(["Z"], np.array([1.0])))
+    with pytest.raises(ValueError, match="scheduled_samples must be set for pure qDRIFT"):
+        replace(schedule, rounds=(replace(schedule.rounds[0], scheduled_samples=invalid_samples), *schedule.rounds[1:]))
+
+
+@pytest.mark.parametrize("family", ["trotter", "zassenhaus"])
+def test_deterministic_schedule_rejects_seeded_draws(family: str) -> None:
+    """The experiment spec and the circuit builder must agree that a deterministic draw has no seed."""
+    schedule = RobustPhaseEstimationCircuitBuilder(
+        target_accuracy=1.0, unitary_builder=AlgorithmRef("hamiltonian_unitary_builder", family)
+    ).build_schedule(QubitOperator(["Z"], np.array([1.0])))
+    assert schedule.rounds[0].draw_seeds == (None,)
+    with pytest.raises(ValueError, match=r"draw_seeds=\(None,\)"):
+        replace(schedule, rounds=(replace(schedule.rounds[0], draw_seeds=(123,)), *schedule.rounds[1:]))
 
 
 def test_workload_validates_ladder_draws_and_correction(workload: RobustPhaseEstimationCircuitSet) -> None:

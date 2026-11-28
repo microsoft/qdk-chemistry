@@ -42,7 +42,7 @@ from .base import PhaseEstimation
 from .circuit_builder.robust_builder import RobustPhaseEstimationCircuitBuilder, RobustPhaseEstimationCircuitSet
 
 if TYPE_CHECKING:
-    from collections.abc import Iterator
+    from collections.abc import Iterable, Iterator
 
     from .circuit_builder.robust_builder import RobustPhaseEstimationExperimentSpec, RobustPhaseEstimationSchedule
 
@@ -271,8 +271,19 @@ class RobustPhaseEstimation(PhaseEstimation):
                 configuration.algorithm_type, configuration.algorithm_name, **configuration.settings.to_dict()
             )
             correction_lambda = _qdrift_lambda(hamiltonian, unitary_builder.settings().get("weight_threshold"))
-        execution_results, requested_executor_seed, executor_root_seed = self._execute_experiments(
+        executor_ref = self._settings.get("circuit_executor")
+        requested_executor_seed = None
+        executor_root_seed = None
+        if executor_ref.settings is not None and executor_ref.settings.has("seed"):
+            requested_executor_seed = int(executor_ref.settings.get("seed"))
+            executor_root_seed = (
+                requested_executor_seed
+                if requested_executor_seed >= 0
+                else int(np.random.SeedSequence().generate_state(1, dtype=np.uint32)[0])
+            )
+        execution_results = self._execute_experiments(
             circuit_builder.iter_build(circuit_set, state_preparation, hamiltonian),
+            executor_root_seed=executor_root_seed,
             noise=noise,
         )
         return self._post_process(
@@ -287,30 +298,21 @@ class RobustPhaseEstimation(PhaseEstimation):
         self,
         experiments: Iterator[tuple[RobustPhaseEstimationExperimentSpec, Circuit, Circuit]],
         *,
+        executor_root_seed: int | None,
         noise: QuantumErrorProfile | None,
-    ) -> tuple[tuple[_RpeExecutionResult, ...], int | None, int | None]:
-        """Execute streamed X/Y circuit pairs while preserving experiment identities.
+    ) -> Iterator[_RpeExecutionResult]:
+        """Yield each measured X/Y pair without accumulating executor data or raw shot metadata.
 
         Args:
             experiments: Ordered specification/X-circuit/Y-circuit triples produced lazily by the builder.
+            executor_root_seed: Resolved root for per-basis measurement seeds, or ``None`` for an unseeded executor.
             noise: Optional error profile passed to each execution.
 
-        Returns:
-            Paired results, the requested executor seed, and its resolved root; unsupported seeds remain ``None``.
+        Yields:
+            One experiment's X and Y results with their original round and draw identity.
 
         """
-        executor_ref = self._settings.get("circuit_executor")
-        requested_executor_seed = None
-        executor_root_seed = None
-        if executor_ref.settings is not None and executor_ref.settings.has("seed"):
-            requested_executor_seed = int(executor_ref.settings.get("seed"))
-            executor_root_seed = (
-                requested_executor_seed
-                if requested_executor_seed >= 0
-                else int(np.random.SeedSequence().generate_state(1, dtype=np.uint32)[0])
-            )
         shared_executor = self._create_executor(None) if executor_root_seed is None else None
-        execution_results: list[_RpeExecutionResult] = []
         for experiment_spec, x_circuit, y_circuit in experiments:
             measurement_seeds: list[int | None] = [None, None]
             if executor_root_seed is not None:
@@ -326,19 +328,16 @@ class RobustPhaseEstimation(PhaseEstimation):
             imag_executor = (
                 shared_executor if shared_executor is not None else self._create_executor(measurement_seeds[1])
             )
-            execution_results.append(
-                _RpeExecutionResult(
-                    experiment_spec=experiment_spec,
-                    x_result=real_executor.run(x_circuit, shots=experiment_spec.shots, noise=noise),
-                    y_result=imag_executor.run(y_circuit, shots=experiment_spec.shots, noise=noise),
-                )
+            yield _RpeExecutionResult(
+                experiment_spec=experiment_spec,
+                x_result=real_executor.run(x_circuit, shots=experiment_spec.shots, noise=noise),
+                y_result=imag_executor.run(y_circuit, shots=experiment_spec.shots, noise=noise),
             )
-        return tuple(execution_results), requested_executor_seed, executor_root_seed
 
     def _post_process(
         self,
         circuit_set: RobustPhaseEstimationSchedule,
-        execution_results: tuple[_RpeExecutionResult, ...],
+        execution_results: Iterable[_RpeExecutionResult],
         *,
         correction_lambda: float | None = None,
         requested_executor_seed: int | None,
@@ -351,7 +350,7 @@ class RobustPhaseEstimation(PhaseEstimation):
 
         Args:
             circuit_set: Schedule defining round times, experiment identities, and the energy correction.
-            execution_results: X/Y counts associated with their experiment specifications, in any order.
+            execution_results: One-pass stream of paired X/Y counts and experiment identities, in any order.
             correction_lambda: One-norm of the terms qDRIFT samples; ``None`` uses the schedule's coefficient norm.
             requested_executor_seed: Original measurement-seed setting, or ``None`` when unsupported.
             executor_root_seed: Concrete measurement root used for this execution, or ``None`` when unsupported.
@@ -360,33 +359,39 @@ class RobustPhaseEstimation(PhaseEstimation):
             An energy estimate with the resolved workload and measurement-seed metadata.
 
         Raises:
-            RuntimeError: If a round has a different number of results than its manifest specifies.
+            RuntimeError: If results include an unscheduled round or a round's result count disagrees with the schedule.
 
         """
+        signal_sums = [[0.0, 0.0] for _ in circuit_set.rounds]
+        draw_counts = [0] * circuit_set.num_rounds
+        for result in execution_results:
+            index = result.experiment_spec.round_index
+            if not 0 <= index < circuit_set.num_rounds:
+                raise RuntimeError(f"Received an execution result for unscheduled round {index}.")
+            for basis_index, execution_data in enumerate((result.x_result, result.y_result)):
+                counts = execution_data.bitstring_counts
+                num_zero = int(counts.get("0", 0))
+                num_one = int(counts.get("1", 0))
+                total = num_zero + num_one
+                signal_sums[index][basis_index] += (num_zero - num_one) / total if total else 0.0
+            draw_counts[index] += 1
+
         theta = 0.0
-        for round_data in circuit_set.rounds:
-            round_results = tuple(
-                result for result in execution_results if result.experiment_spec.round_index == round_data.round_index
-            )
-            if len(round_results) != round_data.num_draws:
+        for round_data, sums, count in zip(circuit_set.rounds, signal_sums, draw_counts, strict=True):
+            if count != round_data.num_draws:
                 raise RuntimeError(
                     f"Round {round_data.round_index} expected {round_data.num_draws} execution results, "
-                    f"received {len(round_results)}."
+                    f"received {count}."
                 )
-            signal_sums = [0.0, 0.0]
-            for result in round_results:
-                for basis_index, execution_data in enumerate((result.x_result, result.y_result)):
-                    counts = execution_data.bitstring_counts
-                    num_zero = int(counts.get("0", 0))
-                    num_one = int(counts.get("1", 0))
-                    total = num_zero + num_one
-                    signal_sums[basis_index] += (num_zero - num_one) / total if total else 0.0
-            real_part, imag_part = (component / float(round_data.num_draws) for component in signal_sums)
+            real_part, imag_part = (component / float(count) for component in sums)
             measured_phase = float(np.angle(complex(real_part, imag_part)))
             theta = _rpe_angle_update(theta, measured_phase, round_data.round_index)
+            sample_info = (
+                f", qdrift_samples={round_data.scheduled_samples}" if round_data.scheduled_samples is not None else ""
+            )
             Logger.debug(
-                f"Round {round_data.round_index}: shots={round_data.shots_per_basis}, "
-                f"samples={round_data.scheduled_samples}, phi={measured_phase:.6f}, theta={theta:.6f}."
+                f"Round {round_data.round_index}: shots={round_data.shots_per_basis}{sample_info}, "
+                f"phi={measured_phase:.6f}, theta={theta:.6f}."
             )
 
         energy = self._resolve_energy(
@@ -455,7 +460,7 @@ class RobustPhaseEstimation(PhaseEstimation):
         base_time: float,
         total_rounds: int,
         lambda_norm: float,
-        final_samples: int,
+        final_samples: int | None,
         *,
         correction: str,
     ) -> float:
@@ -466,7 +471,7 @@ class RobustPhaseEstimation(PhaseEstimation):
             base_time: Positive base evolution time.
             total_rounds: Final round index, equal to the number of doublings after round zero.
             lambda_norm: One-norm of the Hamiltonian terms sampled by qDRIFT, used by the qDRIFT correction.
-            final_samples: Reference qDRIFT sample count for the final round.
+            final_samples: Executed sample count for the final pure qDRIFT round, or ``None`` for other families.
             correction: Resolved mapping; ``"qdrift_tangent"`` uses the tangent correction, otherwise linear.
 
         Returns:
@@ -478,11 +483,11 @@ class RobustPhaseEstimation(PhaseEstimation):
         """
         if base_time <= 0.0:
             raise ValueError(f"base_time must be positive, received {base_time}.")
-        if correction == "qdrift_tangent" and final_samples < 1:
-            raise ValueError(f"final_samples must be at least 1, received {final_samples}.")
         principal = float((theta + np.pi) % (2 * np.pi) - np.pi)
         if correction != "qdrift_tangent":
             return -principal / base_time
+        if final_samples is None or final_samples < 1:
+            raise ValueError(f"final_samples must be at least 1, received {final_samples}.")
         final_time = (2**total_rounds) * base_time
         final_phase = principal * (2**total_rounds)
         step_angle = lambda_norm * final_time / final_samples

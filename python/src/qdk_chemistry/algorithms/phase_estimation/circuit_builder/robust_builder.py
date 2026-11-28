@@ -98,18 +98,20 @@ class RobustPhaseEstimationExperimentSpec:
 
 @dataclass(frozen=True)
 class RobustPhaseEstimationRound:
-    """Evolution time, per-basis shots, sample count, and unitary seeds for one round."""
+    """Evolution time, per-basis shots, unitary seeds, and the per-draw sample count for pure qDRIFT only."""
 
     round_index: int
     evolution_time: float
     shots_per_basis: int
-    scheduled_samples: int
+    scheduled_samples: int | None
     draw_seeds: tuple[int | None, ...]
 
     def __post_init__(self) -> None:
         """Check the evolution time and counts, and freeze the draw seeds."""
         for name, minimum in (("round_index", 0), ("shots_per_basis", 1), ("scheduled_samples", 1)):
             value = getattr(self, name)
+            if name == "scheduled_samples" and value is None:
+                continue
             if isinstance(value, bool) or not isinstance(value, int) or value < minimum:
                 raise ValueError(f"{name} must be an integer at least {minimum}.")
         if not np.isfinite(self.evolution_time) or self.evolution_time <= 0.0:
@@ -205,6 +207,8 @@ class RobustPhaseEstimationSchedule:
         for index, round_data in enumerate(self.rounds):
             if round_data.round_index != index:
                 raise ValueError("round_index values must be contiguous and match round order.")
+            if (round_data.scheduled_samples is not None) != (self.unitary_builder_category == "qdrift"):
+                raise ValueError("scheduled_samples must be set for pure qDRIFT and None for other evolution families.")
             expected_time = self.base_time * 2**index
             if not np.isfinite(expected_time) or not np.isclose(
                 round_data.evolution_time, expected_time, rtol=1e-12, atol=0.0
@@ -213,8 +217,8 @@ class RobustPhaseEstimationSchedule:
             if randomized:
                 if round_data.num_draws != round_data.shots_per_basis or None in round_data.draw_seeds:
                     raise ValueError("Randomized shots_per_basis must equal the number of concrete draw seeds.")
-            elif round_data.num_draws != 1:
-                raise ValueError("Deterministic rounds must contain exactly one draw.")
+            elif round_data.draw_seeds != (None,):
+                raise ValueError("Deterministic rounds must have draw_seeds=(None,).")
 
     @staticmethod
     def hamiltonian_fingerprint(qubit_hamiltonian: QubitOperator) -> str:
@@ -248,34 +252,36 @@ class RobustPhaseEstimationSchedule:
         return len(self.rounds)
 
     @property
-    def final_samples(self) -> int:
-        """Sample count used by the final round's energy correction."""
+    def final_samples(self) -> int | None:
+        """Pure qDRIFT sample count for the final round, or None for other evolution families."""
         return self.rounds[-1].scheduled_samples
 
     @property
     def experiment_specs(self) -> tuple[RobustPhaseEstimationExperimentSpec, ...]:
         """Canonical X/Y pairs in round and draw order."""
-        return tuple(self._iter_experiment_specs())
-
-    def _iter_experiment_specs(self) -> Iterator[RobustPhaseEstimationExperimentSpec]:
-        randomized = self.unitary_builder_category in ("qdrift", "partial_randomized")
-        experiment_index = 0
-        for round_data in self.rounds:
-            for draw_index, seed in enumerate(round_data.draw_seeds):
-                yield RobustPhaseEstimationExperimentSpec(
-                    experiment_index,
-                    round_data.round_index,
-                    draw_index if randomized else None,
-                    seed if randomized else None,
-                    1 if randomized else round_data.shots_per_basis,
-                )
-                experiment_index += 1
+        return tuple(_iter_experiment_specs(self))
 
     def experiment_specs_for_round(self, round_index: int) -> tuple[RobustPhaseEstimationExperimentSpec, ...]:
         """Return the specified round's pairs, preserving their global indices."""
         if round_index < 0 or round_index >= self.num_rounds:
             raise IndexError(f"round_index must be in [0, {self.num_rounds - 1}], got {round_index}.")
-        return tuple(spec for spec in self._iter_experiment_specs() if spec.round_index == round_index)
+        return tuple(spec for spec in _iter_experiment_specs(self) if spec.round_index == round_index)
+
+
+def _iter_experiment_specs(schedule: RobustPhaseEstimationSchedule) -> Iterator[RobustPhaseEstimationExperimentSpec]:
+    """Derive draw identities lazily from the recorded round seeds."""
+    randomized = schedule.unitary_builder_category in ("qdrift", "partial_randomized")
+    experiment_index = 0
+    for round_data in schedule.rounds:
+        for draw_index, seed in enumerate(round_data.draw_seeds):
+            yield RobustPhaseEstimationExperimentSpec(
+                experiment_index,
+                round_data.round_index,
+                draw_index if randomized else None,
+                seed if randomized else None,
+                1 if randomized else round_data.shots_per_basis,
+            )
+            experiment_index += 1
 
 
 def _validated_snapshot(schedule: RobustPhaseEstimationSchedule, hamiltonian: QubitOperator) -> str:
@@ -538,9 +544,12 @@ class RobustPhaseEstimationCircuitBuilder(QpeCircuitBuilder):
             if lambda_norm == 0.0 or energy_resolution_scale <= epsilon_rpe
             else int(np.ceil(np.log2(energy_resolution_scale / epsilon_rpe)))
         )
-        base_time_ratio = base_time / automatic_base_time if category == "qdrift" and lambda_norm > 0.0 else 1.0
-        round_samples = [_round_sample_floor(round_index, base_time_ratio) for round_index in range(total_round + 1)]
+        round_samples: list[int] | None = None
         if category == "qdrift":
+            base_time_ratio = base_time / automatic_base_time if lambda_norm > 0.0 else 1.0
+            round_samples = [
+                _round_sample_floor(round_index, base_time_ratio) for round_index in range(total_round + 1)
+            ]
             if unitary_settings.has("target_accuracy") and unitary_settings.get("target_accuracy") > 0.0:
                 sample_resolver = getattr(unitary_builder, "_resolve_num_samples_from_lambda", None)
                 if not callable(sample_resolver):
@@ -573,7 +582,7 @@ class RobustPhaseEstimationCircuitBuilder(QpeCircuitBuilder):
             )
 
         rounds: list[RobustPhaseEstimationRound] = []
-        for round_index, samples in enumerate(round_samples):
+        for round_index in range(total_round + 1):
             shots = int(np.ceil(np.e * (11 + 4 * (total_round - round_index))))
             draw_seeds: tuple[int | None, ...] = (None,)
             if root_seed is not None:
@@ -586,7 +595,7 @@ class RobustPhaseEstimationCircuitBuilder(QpeCircuitBuilder):
                     round_index=round_index,
                     evolution_time=float((2**round_index) * base_time),
                     shots_per_basis=shots,
-                    scheduled_samples=samples,
+                    scheduled_samples=round_samples[round_index] if round_samples is not None else None,
                     draw_seeds=draw_seeds,
                 )
             )
@@ -741,21 +750,19 @@ class RobustPhaseEstimationCircuitBuilder(QpeCircuitBuilder):
             **(hadamard_settings | {"test_basis": "Y"}),
         )
         sampled_lambda: float | None = None
-        for experiment_spec in schedule.experiment_specs:
+        for experiment_spec in _iter_experiment_specs(schedule):
             round_data = schedule.rounds[experiment_spec.round_index]
             updates: dict[str, object] = {"time": round_data.evolution_time}
-            draw_index = experiment_spec.draw_index if experiment_spec.draw_index is not None else 0
-            seed = round_data.draw_seeds[draw_index]
-            if seed is not None:
-                updates["seed"] = seed
-            if schedule.unitary_builder_category == "qdrift":
+            if experiment_spec.draw_seed is not None:
+                updates["seed"] = experiment_spec.draw_seed
+            if round_data.scheduled_samples is not None:
                 updates["num_samples"] = round_data.scheduled_samples
             unitary_builder = create(
                 unitary_configuration.algorithm_type,
                 unitary_configuration.algorithm_name,
                 **(unitary_settings | updates),
             )
-            if schedule.unitary_builder_category == "qdrift":
+            if round_data.scheduled_samples is not None:
                 sample_resolver = getattr(unitary_builder, "_resolve_num_samples_from_lambda", None)
                 if callable(sample_resolver):
                     if sampled_lambda is None:

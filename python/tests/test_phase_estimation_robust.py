@@ -12,9 +12,11 @@ QDK circuit stack against exact diagonalization.
 
 from __future__ import annotations
 
+import gc
 import hashlib
 import importlib.util
 import os
+import weakref
 from dataclasses import dataclass, replace
 from typing import TYPE_CHECKING
 
@@ -117,7 +119,7 @@ def test_resolve_energy_inverts_linear_phase() -> None:
         base_time,
         0,
         1.0,
-        1,
+        None,
         correction="linear",
     )
     assert energy == pytest.approx(0.75)
@@ -139,6 +141,12 @@ def _qdrift_forward_phase(energy: float, lambda_norm: float, evolution_time: flo
     """Return the expected qDRIFT signal phase for one eigenenergy."""
     step_angle = lambda_norm * evolution_time / num_samples
     return -num_samples * np.arctan((energy / lambda_norm) * np.tan(step_angle))
+
+
+def test_tangent_correction_requires_executed_sample_count() -> None:
+    """Never substitute a reference count into qDRIFT's tangent correction."""
+    with pytest.raises(ValueError, match="final_samples"):
+        RobustPhaseEstimation._resolve_energy(0.1, 1.0, 0, 1.0, None, correction="qdrift_tangent")
 
 
 @pytest.mark.parametrize("energy", [0.5, -0.5, 0.123])
@@ -393,12 +401,30 @@ def test_post_process_uses_experiment_identity_after_reordering() -> None:
 
     result = RobustPhaseEstimation()._post_process(
         circuit_set,
-        tuple(reversed(execution_results)),
+        reversed(execution_results),
         requested_executor_seed=None,
         executor_root_seed=None,
     )
 
     assert result.resolved_energy == pytest.approx(energy, abs=1e-6)
+
+
+@pytest.mark.parametrize(
+    ("round_indices", "message"),
+    [
+        ((), "expected 1 execution results, received 0"),
+        ((0, 0), "expected 1 execution results, received 2"),
+        ((1,), "unscheduled round 1"),
+    ],
+)
+def test_post_process_validates_streamed_rounds(round_indices: tuple[int, ...], message: str) -> None:
+    """Streaming cannot silently drop a missing pair or include a round outside the schedule."""
+    schedule = _make_builder(target_accuracy=1.0).build_schedule(QubitOperator(["Z"], np.array([1.0])))
+    spec = schedule.experiment_specs[0]
+    data = CircuitExecutorData({"0": 1}, 1, "test")
+    results = (_RpeExecutionResult(replace(spec, round_index=index), data, data) for index in round_indices)
+    with pytest.raises(RuntimeError, match=message):
+        RobustPhaseEstimation()._post_process(schedule, results, requested_executor_seed=None, executor_root_seed=None)
 
 
 @pytest.mark.parametrize("energy", [-0.2, 0.2])
@@ -955,6 +981,28 @@ def test_failed_execution_keeps_settings_locked(monkeypatch: pytest.MonkeyPatch,
 
     with pytest.raises(SettingsAreLocked):
         driver.settings().set("circuit_executor", driver.settings().get("circuit_executor"))
+
+
+def test_execution_releases_raw_results_between_draws(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Raw executor data for earlier draws must not accumulate while later draws execute."""
+    driver = RobustPhaseEstimation()
+    builder = _make_builder(target_accuracy=0.5, unitary_builder_name="qdrift", energy_correction="linear")
+    _, executor = _install_test_stack(monkeypatch, driver, builder, _ideal_expectation(0.2))
+    run = executor.run
+    live: weakref.WeakSet[_FakeExecutorData] = weakref.WeakSet()
+
+    def track(circuit: Circuit, *, shots: int, noise: QuantumErrorProfile | None = None) -> _FakeExecutorData:
+        data = run(circuit, shots=shots, noise=noise)
+        live.add(data)
+        if len(live) > 4:
+            gc.collect()
+        assert len(live) <= 4, "Only the current and preceding X/Y pair may still be live."
+        return data
+
+    monkeypatch.setattr(executor, "run", track)
+    result = driver.run(_DUMMY_STATE_PREPARATION, QubitOperator(["Z"], np.array([1.0])))
+    assert len(executor.shot_calls) > 4
+    assert result.resolved_energy == pytest.approx(0.2, abs=1e-6)
 
 
 def test_executor_entropy_seed_is_resolved_once(monkeypatch: pytest.MonkeyPatch) -> None:
