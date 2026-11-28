@@ -95,6 +95,9 @@ The following table summarizes the available algorithm classes in QDK/Chemistry 
    * - :doc:`QpeCircuitBuilder <qpe_circuit_builder>`
      - Phase estimation circuit composition
      - Circuit + HamiltonianDescription → Circuit list
+   * - :ref:`RobustPhaseEstimationCircuitBuilder <robust-phase-estimation-circuit-builder>`
+     - Schedule robust phase-estimation experiments and construct X/Y circuits
+     - Circuit + QubitOperator → Circuit list
    * - :doc:`EvolutionCircuitBuilder <evolution_circuit_builder>`
      - Time-evolution circuit composition
      - TimeDependentQubitHamiltonian + Circuit → Circuit

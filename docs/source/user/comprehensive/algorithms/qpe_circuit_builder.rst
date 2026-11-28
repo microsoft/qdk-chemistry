@@ -2,18 +2,18 @@ Phase estimation circuit builder
 ================================
 
 The :class:`~qdk_chemistry.algorithms.phase_estimation.circuit_builder.base.QpeCircuitBuilder` is an abstract base class that defines the interface for constructing phase estimation circuits.
-It serves as the central component that orchestrates circuit synthesis by composing a :doc:`HamiltonianUnitaryBuilder <hamiltonian_unitary_builder>` (to construct the target unitary) with a :class:`~qdk_chemistry.algorithms.ControlledCircuitMapper` (to convert it to a controlled circuit).
+It serves as the central component that orchestrates variant-specific circuit synthesis.
 
 The ``QpeCircuitBuilder`` is the primary algorithm reference configured in the :class:`~qdk_chemistry.algorithms.PhaseEstimation` class via the ``qpe_circuit_builder`` setting.
-It encapsulates all details about circuit composition, allowing the high-level phase estimation interface to remain agnostic to the specific phase estimation variant (iterative or standard).
+It encapsulates all details about circuit composition, allowing the high-level phase estimation interface to remain agnostic to the specific phase estimation variant.
 
 Overview
 --------
 
 Phase estimation circuit builders are responsible for:
 
-1. **Composing circuits** from state preparation, controlled unitaries, and measurement/QFT operations
-2. **Generating variant-specific circuits** (iterative uses adaptive feedback; standard uses QFT)
+1. **Composing circuits** from state preparation, unitaries, and phase-readout operations
+2. **Generating variant-specific circuits** (iterative uses adaptive feedback, standard uses QFT, and robust uses paired Hadamard tests)
 
 The :class:`~qdk_chemistry.algorithms.phase_estimation.circuit_builder.base.QpeCircuitBuilder` abstract class provides the common interface, while concrete implementations handle variant-specific details.
 All variants delegate to the same nested algorithm interfaces, enabling flexible composition of different circuit synthesis strategies.
@@ -27,6 +27,9 @@ Use QpeCircuitBuilder
 
 This section demonstrates how to create, configure, and run a phase estimation circuit builder.
 The ``run`` method returns a list of :class:`~qdk_chemistry.data.Circuit` containing the constructed phase estimation circuits.
+
+The robust builder's ``build_schedule`` method returns an in-memory :class:`~qdk_chemistry.algorithms.phase_estimation.circuit_builder.robust_builder.RobustPhaseEstimationSchedule` without constructing circuits.
+Use ``iter_build`` to stream its X/Y pairs without retaining the complete circuit list.
 
 Input requirements
 ~~~~~~~~~~~~~~~~~~
@@ -43,7 +46,9 @@ HamiltonianDescription
    The ``hubbard_plaquette`` builder takes a :class:`~qdk_chemistry.data.FermiHubbardModelHamiltonianDescription`.
 
 
-The :class:`~qdk_chemistry.algorithms.phase_estimation.circuit_builder.base.QpeCircuitBuilderSettings` class defines the general configuration parameters shared by all QPE circuit builders.
+The :class:`~qdk_chemistry.algorithms.phase_estimation.circuit_builder.base.QpeCircuitBuilderSettings` class defines settings used by iterative and standard QPE circuit builders.
+The robust builder instead exposes its scheduling, time-evolution, and Hadamard-test settings directly.
+See :ref:`robust-phase-estimation-circuit-builder` for its workflow and settings.
 
 .. list-table::
    :header-rows: 1
@@ -77,7 +82,7 @@ Once configured, the :class:`~qdk_chemistry.algorithms.phase_estimation.circuit_
 Available Implementations
 -------------------------
 
-QDK/Chemistry provides three primary implementations of :class:`~qdk_chemistry.algorithms.phase_estimation.circuit_builder.base.QpeCircuitBuilder`:
+QDK/Chemistry provides the following implementations of :class:`~qdk_chemistry.algorithms.phase_estimation.circuit_builder.base.QpeCircuitBuilder`:
 
 Iterative Phase Estimation Circuit Builder (IQPE)
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -169,6 +174,220 @@ Constructs the textbook multi-ancilla QPE circuit with inverse Quantum Fourier T
    :start-after: start-cell-configure-standard
    :end-before: end-cell-configure-standard
 
+.. _robust-phase-estimation-circuit-builder:
+
+Robust Phase Estimation Circuit Builder
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+.. rubric:: Class: :class:`~qdk_chemistry.algorithms.RobustPhaseEstimationCircuitBuilder`
+
+.. rubric:: Factory name: ``"qdk_robust"``
+
+The robust circuit builder plans a workload from a :class:`~qdk_chemistry.data.QubitOperator`.
+It uses that schedule, the Hamiltonian, and a state-preparation :class:`~qdk_chemistry.data.Circuit` to construct X- and Y-basis Hadamard-test circuits.
+The high-level :doc:`PhaseEstimation <phase_estimation>` algorithm streams those pairs through a separately configured :doc:`CircuitExecutor <circuit_executor>`.
+
+Construction workflow
+^^^^^^^^^^^^^^^^^^^^^
+
+Create the circuit builder through the ``"qpe_circuit_builder"`` factory type with implementation name ``"qdk_robust"``.
+Its standard ``run(state_preparation, qubit_hamiltonian)`` method returns a flat ``list[Circuit]`` consistent with the other QPE builders.
+The builder schedules once per ``run`` and returns that complete list.
+
+For workload inspection, call :meth:`~qdk_chemistry.algorithms.RobustPhaseEstimationCircuitBuilder.build_schedule` with the Hamiltonian.
+It locks the builder settings and returns the rounds, timings, and draw seeds without storing live inputs or constructing circuits.
+Pass the resulting schedule and inputs to the builder's streaming method:
+
+``iter_build(schedule, state_preparation, qubit_hamiltonian)``
+  Yield ``(experiment_spec, x_circuit, y_circuit)`` tuples one at a time.
+  The final RPE algorithm uses this path to keep memory bounded for independently randomized draws.
+
+Both eager and streaming construction use :meth:`~qdk_chemistry.algorithms.phase_estimation.circuit_builder.robust_builder.RobustPhaseEstimationCircuitBuilder.iter_build`.
+Override this shared method to customize both paths.
+Overriding only ``_run_impl`` changes eager construction, not the estimator's streaming path.
+Each stream creates its X- and Y-basis Hadamard-test builders once and reuses them across all unitary draws.
+
+When the configured seed is ``-1``, ``build_schedule`` chooses a fresh root seed for each new randomized workload.
+To replay the same draws, pass the same schedule to ``iter_build`` instead of calling ``build_schedule`` again.
+
+Configuration
+^^^^^^^^^^^^^
+
+Set these options directly on the robust circuit builder or its :class:`~qdk_chemistry.data.AlgorithmRef`:
+
+.. list-table::
+   :header-rows: 1
+   :widths: 25 20 55
+
+   * - Setting
+     - Type
+     - Description
+   * - ``unitary_builder``
+     - :class:`~qdk_chemistry.data.AlgorithmRef`
+     - A :class:`~qdk_chemistry.algorithms.hamiltonian_unitary_builder.base.TimeEvolutionBuilder` used to realize each scheduled unitary. Its ``power`` must be ``1`` because RPE owns the evolution-time ladder. Block encodings and quantum walks are not supported.
+   * - ``hadamard_test_circuit_builder``
+     - :class:`~qdk_chemistry.data.AlgorithmRef`
+     - Builder used to generate the X- and Y-basis Hadamard tests.
+   * - ``target_accuracy``
+     - float
+     - Requested absolute accuracy of the final energy estimate.
+   * - ``base_time``
+     - float
+     - Round-zero evolution time. ``0.0`` selects :math:`\pi/(2\lambda)`. An explicit positive value must satisfy :math:`\mathtt{base\_time}\,\lambda < \pi`.
+   * - ``unitary_accuracy_fraction``
+     - float
+     - Legacy fraction used by non-Trotter builders. Partially randomized evolution uses it only when explicitly set. Trotter does not support it. Values must be below ``1``.
+   * - ``epsilon_rpe``
+     - float
+     - Optional explicit RPE energy tolerance for non-Trotter builders. Set it together with ``epsilon_unitary``.
+   * - ``epsilon_unitary``
+     - float
+     - Positive full-unitary tolerance. Trotter and default partially randomized evolution use an independent value of ``0.85`` when omitted.
+   * - ``energy_correction``
+     - str
+     - Phase-to-energy map: ``"auto"``, ``"linear"``, or ``"qdrift_tangent"``. The tangent map requires the qDRIFT builder.
+   * - ``seed``
+     - int
+     - Root random seed. ``-1`` chooses one entropy-backed seed when the schedule is created.
+   * - ``max_qdrift_samples``
+     - int
+     - Positive per-circuit qDRIFT sample ceiling. Default: ``1000000``. Scheduling raises before circuit construction if any round exceeds it. Increase explicitly only when resources permit.
+
+RPE scheduling policies are selected by the registered unitary-builder name.
+The supported names are ``"trotter"``, ``"qdrift"``, ``"partially_randomized"``, and ``"zassenhaus"``.
+Other names, including renamed subclasses, are rejected until an explicit RPE policy is defined for them.
+
+Accuracy settings must be finite, and the Hamiltonian must be Hermitian.
+``base_time`` must be finite and nonnegative, with only ``0.0`` selecting automatic time.
+For qDRIFT, a tighter nested ``target_accuracy`` can increase the sample count above the RPE ladder's minimum.
+The resolved count is recorded in the schedule and used by circuit construction and tangent energy correction.
+The sample ceiling applies to this resolved count and never clamps it or relaxes the requested accuracy.
+Every round's count is checked before any draw seed is generated.
+The tangent correction uses the one-norm of the terms qDRIFT samples after its ``weight_threshold`` filter.
+Partially randomized evolution keeps its configured per-step ``num_random_samples`` floor, which defaults to ``100``; set it to ``1`` to let ``epsilon_unitary`` alone size each random tail.
+
+For qDRIFT at round :math:`k`, let :math:`t_k=2^k\tau` and let :math:`\lambda` be the coefficient one-norm.
+The minimum number of sampled rotations per circuit is
+
+.. math::
+
+  N_k = \left\lceil\max\left(2\cdot 4^k,\; 8(\lambda t_k/\pi)^2\right)\right\rceil.
+
+Automatic or shorter base times retain the original :math:`2,8,32,\ldots` ladder.
+Longer base times need more sampled rotations to keep the *early* round phases on the correct branch; a final tangent correction alone cannot undo a wrong branch choice.
+Replay uses the counts in the schedule without resizing the workload.
+
+To see why the floor suffices in the noiseless model, assume an input eigenstate, no discarded Hamiltonian terms, :math:`\lambda>0`, and :math:`u=E/\lambda`.
+For :math:`N\ge N_k` independent rotations with step angle :math:`x=\lambda t_k/N`, the averaged signal is :math:`(\cos x-iu\sin x)^N`.
+The floor gives :math:`Nx^2\le\pi^2/8` and, since :math:`N\ge2`, :math:`x\le\pi/4`.
+For :math:`0\le u\le1`, concavity of arctangent gives :math:`ux\le\arctan(u\tan x)\le u\tan x`; negative energies follow by symmetry.
+On this interval :math:`\tan^2 y\le\tan y\le 4y/\pi`, so integration gives :math:`\tan x-x\le 2x^2/\pi`.
+The unwrapped phase therefore differs from :math:`-Et_k` by at most :math:`2Nx^2/\pi\le\pi/4`.
+At round zero its magnitude is at most :math:`\lambda\tau<\pi`; at each doubling it differs from twice the previous phase by at most :math:`3\pi/4<\pi`, so the nearest phase branch is unique.
+This bound concerns exact averaged signals, not individual draws, finite-shot noise, or error from discarding Hamiltonian terms.
+
+.. tab:: Python API
+
+   .. literalinclude:: ../../../_static/examples/python/phase_estimation.py
+      :language: python
+      :start-after: # start-cell-configure-robust
+      :end-before: # end-cell-configure-robust
+
+Independent unitary-accuracy routing
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+When ``unitary_builder`` selects Trotter or partially randomized evolution, the default route uses independent quantities with different units:
+
+.. math::
+
+   \epsilon_{\mathrm{RPE}} = \epsilon_{\mathrm{total}} = \mathtt{target\_accuracy},
+   \qquad
+   \epsilon_u = \mathtt{epsilon\_unitary}.
+
+The default ``epsilon_unitary`` is ``0.85``.
+It is dimensionless and controls unitary sizing, and is not added to the energy-valued ``target_accuracy``.
+``unitary_accuracy_fraction`` and explicit ``epsilon_rpe`` are rejected for Trotter.
+For partially randomized evolution, setting ``unitary_accuracy_fraction`` explicitly retains the legacy fractional route, while setting both ``epsilon_rpe`` and ``epsilon_unitary`` selects an explicit paired budget.
+
+The nested builder receives :math:`\epsilon_u` as its ``target_accuracy`` without conversion.
+The partially randomized builder uses ``accuracy_split`` :math:`s` to allocate additive sub-budgets:
+
+.. math::
+
+   \begin{aligned}
+   \epsilon_D &= \epsilon_u\,\frac{\sqrt{s}}{\sqrt{s}+\sqrt{1-s}}, \\
+   \epsilon_R &= \epsilon_u\,\frac{\sqrt{1-s}}{\sqrt{s}+\sqrt{1-s}}.
+   \end{aligned}
+
+The sub-budgets satisfy :math:`\epsilon_D+\epsilon_R=\epsilon_u`, using the same contract as standalone time evolution.
+
+For :math:`\lambda>0`, let :math:`\tau` be the resolved ``base_time`` and :math:`K` the final round index.
+The builder chooses
+
+.. math::
+
+   K = \max\left(0,\left\lceil\log_2\left(\frac{\pi}{2\tau\epsilon_{\mathrm{RPE}}}\right)\right\rceil\right),
+
+so the final evolution time satisfies
+
+.. math::
+
+   t_K = 2^K\tau \geq \frac{\pi}{2\epsilon_{\mathrm{RPE}}}.
+
+The automatic choice :math:`\tau=\pi/(2\lambda)` recovers the norm-based ladder.
+A shorter explicit base time requires additional rounds to retain the energy resolution.
+
+For ideal expectation values, ``0 < epsilon_unitary < sin(pi/3)``, exact eigenstate input, and a valid per-round full-evolution error bound, successful phase unwrapping gives
+
+.. math::
+
+   |\widehat E-E|
+   \leq
+   \frac{\arcsin(\epsilon_u)}{t_K}
+   \leq
+   \frac{2}{\pi}\,\epsilon_{\mathrm{RPE}}\,\arcsin(\epsilon_u).
+
+This phase-bias bound is below ``target_accuracy`` on the independent default route, and is checked against that target for explicit paired budgets.
+Finite-shot sampling contributes additional statistical error and is separate from this bound.
+
+In-memory schedules and replay
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+The frozen :class:`~qdk_chemistry.algorithms.phase_estimation.circuit_builder.robust_builder.RobustPhaseEstimationSchedule` describes what to run.
+Its rounds contain evolution times, per-basis shot counts, and draw seeds.
+For pure qDRIFT, ``round.scheduled_samples`` is the number of sampled rotations per unitary draw, before fusion; ``schedule.final_samples`` is that count for the last round.
+Both are ``None`` for other evolution families: their builders size the evolution independently, so these fields are not resource estimates for their circuits.
+Shared builder settings, resolved accuracy metadata, and a Hamiltonian fingerprint accompany those rounds.
+The circuit builder resolves the algorithms, settings, and evolution powers; the schedule stores only data.
+
+The schedule derives ``base_time`` from round zero and derives draw counts and experiment specifications from the rounds.
+Neither a second time in the builder settings nor a separately stored experiment manifest can contradict those values.
+The builder's records reject invalid counts, nonfinite times, inconsistent time ladders, and a qDRIFT tangent correction on any other evolution family.
+
+Each derived experiment specification identifies one X/Y pair and carries its round, randomized draw coordinates, concrete draw seed, and execution count.
+For deterministic evolution, one pair represents every shot in its round.
+For randomized evolution, each specification represents one independently sampled unitary and one shot per basis.
+Both circuits in a pair always share the same unitary draw.
+The estimator normalizes each basis measurement within its draw, then accumulates the two signals and draw count per round; it does not retain the raw shot records from previous draws.
+
+The ``x_circuit_index`` and ``y_circuit_index`` properties identify positions in the canonical flat list returned by the builder's ``run`` method.
+When circuits are streamed, filtered, or batched, carry the experiment specification with the pair rather than treating those positions as persistent identifiers.
+
+Use the estimator's ``schedule_circuit_set`` method to bind the schedule to its live state preparation and Hamiltonian for repeated execution in the same process.
+The Hamiltonian is snapshotted, and accessing it returns a defensive copy.
+The bundle and circuit builder check that the Hamiltonian matches the schedule fingerprint and coefficient norm before construction.
+Pass that object to ``execute_circuit_set`` to reuse the recorded draws, or call its ``rebind`` method to use another live state preparation with the same schedule.
+Replay locks the estimator's settings before execution, just like its ordinary ``run`` method.
+
+Resource estimation
+^^^^^^^^^^^^^^^^^^^
+
+Every generated :class:`~qdk_chemistry.data.Circuit` supports :meth:`~qdk_chemistry.data.Circuit.get_qre_application`.
+Use ``spec.shots`` when aggregating an experiment-level resource estimate.
+
+Schedules and circuit sets have no file format. To save the energy and measurement metadata, serialize the returned :class:`~qdk_chemistry.data.QpeResult`.
+
+
 Unary-iteration Phase Estimation Circuit Builder
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
@@ -215,7 +434,7 @@ For memory/compute placement, see the `QDK resource-estimation documentation
 Circuit Composition Details
 ----------------------------
 
-The phase estimation circuit is built by composing:
+For iterative and standard QPE, the phase estimation circuit is built by composing:
 
 1. **State Preparation** — Prepares the initial quantum state on the system register
 2. **Controlled Unitaries** — Applies controlled powers of the unitary operator :math:`C\text{-}U^{2^k}` to extract phase information
@@ -257,6 +476,9 @@ Related Classes
 - :class:`~qdk_chemistry.data.UnitaryRepresentation`: Output of unitary builders
 - :class:`~qdk_chemistry.data.AlgorithmRef`: Nested algorithm references
 - :class:`~qdk_chemistry.algorithms.PhaseEstimation`: High-level phase estimation interface that uses circuit builders internally
+- :class:`~qdk_chemistry.algorithms.RobustPhaseEstimationCircuitBuilder`: Schedules RPE experiments and builds or streams their circuits
+- :class:`~qdk_chemistry.algorithms.phase_estimation.circuit_builder.robust_builder.RobustPhaseEstimationSchedule`: In-memory RPE experiment parameters
+- :class:`~qdk_chemistry.algorithms.phase_estimation.circuit_builder.robust_builder.RobustPhaseEstimationCircuitSet`: Schedule and live inputs for replay
 
 Further Reading
 ---------------
@@ -264,6 +486,7 @@ Further Reading
 - :doc:`phase_estimation`: Run phase estimation algorithm
 - :doc:`hamiltonian_unitary_builder`: Constructs unitary operators for Hamiltonian time evolution
 - :doc:`circuit_executor`: Executes quantum circuits
+- :doc:`hadamard_test`: Constructs and executes controlled-unitary overlap tests
 - :doc:`../design/index`: QDK/Chemistry algorithm design principles
 - :doc:`settings`: Configuration and settings management
 - :doc:`factory_pattern`: Understanding algorithm creation and composition

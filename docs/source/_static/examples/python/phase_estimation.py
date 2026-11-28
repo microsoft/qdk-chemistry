@@ -14,6 +14,9 @@ iqpe = create("phase_estimation", "qdk_iterative")
 
 # Or create the standard QFT-based variant
 qpe = create("phase_estimation", "qdk_standard")
+
+# Or create robust phase estimation for a geometric Hadamard-test schedule
+rpe = create("phase_estimation", "qdk_robust")
 # end-cell-create
 ################################################################################
 
@@ -53,6 +56,25 @@ qpe = create("phase_estimation", "qdk_standard")
 qpe.settings().set("shots", 100)
 qpe.settings().set("qpe_circuit_builder", qpe_circuit_builder)
 # end-cell-configure-standard
+################################################################################
+
+################################################################################
+# start-cell-configure-robust
+robust_circuit_builder = AlgorithmRef(
+    "qpe_circuit_builder",
+    "qdk_robust",
+    target_accuracy=0.5,
+    epsilon_unitary=0.85,  # Independent dimensionless Trotter sizing tolerance (default: 0.85).
+    seed=42,
+    unitary_builder=AlgorithmRef("hamiltonian_unitary_builder", "trotter", order=2),
+)
+rpe = create("phase_estimation", "qdk_robust")
+rpe.settings().set("qpe_circuit_builder", robust_circuit_builder)
+rpe.settings().set(
+    "circuit_executor",
+    AlgorithmRef("circuit_executor", "qdk_full_state_simulator", seed=42),
+)
+# end-cell-configure-robust
 ################################################################################
 
 ################################################################################
@@ -130,12 +152,19 @@ print(result.get_summary())
 ################################################################################
 
 ################################################################################
+# start-cell-run-robust
+rpe_result = rpe.run(circuit, qubit_ham)
+print(rpe_result.get_summary())
+# end-cell-run-robust
+################################################################################
+
+################################################################################
 # start-cell-list-implementations
 from qdk_chemistry.algorithms import registry
 
 # List all registered phase estimation implementations
 implementations = registry.available("phase_estimation")
-print(implementations)  # e.g. ['qdk_iterative', 'qdk_standard']
+print(implementations)  # e.g. ['qdk_iterative', 'qdk_standard', 'qdk_robust']
 # end-cell-list-implementations
 ################################################################################
 

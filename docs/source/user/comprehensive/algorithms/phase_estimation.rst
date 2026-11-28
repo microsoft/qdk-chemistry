@@ -2,7 +2,7 @@ Phase estimation
 ================
 
 The :class:`~qdk_chemistry.algorithms.PhaseEstimation` algorithm in QDK/Chemistry extracts eigenvalues from a quantum state by measuring the phase accumulated under repeated application of a unitary operator.
-Following QDK/Chemistry's :doc:`algorithm design principles <../design/index>`, it takes a state-preparation :class:`~qdk_chemistry.data.Circuit` (from :doc:`StatePreparation <state_preparation>`), a :class:`~qdk_chemistry.data.HamiltonianDescription` (for example a :class:`~qdk_chemistry.data.QubitOperator` from :doc:`QubitMapper <qubit_mapper>` or a :doc:`model Hamiltonian <../model_hamiltonians>`, or a :class:`~qdk_chemistry.data.ModelHamiltonianDescription`), a :doc:`QpeCircuitBuilder <qpe_circuit_builder>` (which encapsulates the unitary builder and controlled circuit mapper), and a :doc:`CircuitExecutor <circuit_executor>` as input and returns a :class:`~qdk_chemistry.data.QpeResult` containing the measured phase, reconstructed energy, and alias-resolution metadata.
+Following QDK/Chemistry's :doc:`algorithm design principles <../design/index>`, it takes a state-preparation :class:`~qdk_chemistry.data.Circuit` (from :doc:`StatePreparation <state_preparation>`), a :class:`~qdk_chemistry.data.HamiltonianDescription` (for example a :class:`~qdk_chemistry.data.QubitOperator` from :doc:`QubitMapper <qubit_mapper>` or a :doc:`model Hamiltonian <../model_hamiltonians>`, or a :class:`~qdk_chemistry.data.ModelHamiltonianDescription`), a variant-specific :doc:`QpeCircuitBuilder <qpe_circuit_builder>`, and a :doc:`CircuitExecutor <circuit_executor>` as input and returns a :class:`~qdk_chemistry.data.QpeResult` containing the measured phase, reconstructed energy, and alias-resolution metadata.
 
 Overview
 --------
@@ -21,7 +21,7 @@ QDK/Chemistry supports the following unitary constructions for QPE:
 
 The QPE algorithm itself is agnostic to how the unitary is constructed — the choice of unitary builder determines the phase-to-energy mapping used in post-processing.
 
-QDK/Chemistry provides three :term:`QPE` approaches, each suited to different hardware constraints:
+QDK/Chemistry provides four :term:`QPE` approaches, each suited to different execution constraints:
 
 Iterative Quantum Phase Estimation (:term:`IQPE`)
    Kitaev's single-ancilla algorithm :cite:`Kitaev1995` that extracts phase bits one at a time, from least significant to most significant, using adaptive feedback corrections between iterations.
@@ -31,10 +31,14 @@ Standard QFT-based Quantum Phase Estimation
    The textbook multi-ancilla approach :cite:`Nielsen-Chuang2010-QPE` that uses a register of :math:`n` ancilla qubits and an inverse Quantum Fourier Transform to extract all phase bits simultaneously.
    This approach achieves all precision bits in a single circuit execution but requires more ancilla qubits and longer circuit depth.
 
+Robust Phase Estimation
+   A Hadamard-test approach that samples a geometric ladder of evolution times and unwraps the measured phases round by round.
+   Its circuit builder records deterministic execution counts and independent randomized draws in an in-memory schedule, and can return or stream the resulting X/Y circuits.
+
 Unary-iteration Quantum Phase Estimation
    A qubitization-only approach :cite:`Lee2021` that allows any positive number of queries instead of rounding up to the next power of two.
 
-All three implementations share the same interface and produce :class:`~qdk_chemistry.data.QpeResult` objects with automatic phase-wrapping, energy alias detection, and full :doc:`serialization <../data/serialization>` support.
+All four implementations share the same interface and produce :class:`~qdk_chemistry.data.QpeResult` objects with automatic phase-wrapping, energy alias detection, and full :doc:`serialization <../data/serialization>` support.
 See :doc:`../data/qpe_result` for details on the result data class.
 
 .. _qpe-workflow:
@@ -80,9 +84,7 @@ HamiltonianDescription
 Settings
    The :class:`~qdk_chemistry.algorithms.PhaseEstimation` is configured via its settings object, which includes:
 
-   - ``qpe_circuit_builder`` — A :class:`~qdk_chemistry.data.AlgorithmRef` to a :doc:`QpeCircuitBuilder <qpe_circuit_builder>` that handles circuit composition.
-     The circuit builder encapsulates a :doc:`HamiltonianUnitaryBuilder <hamiltonian_unitary_builder>` and a :class:`~qdk_chemistry.algorithms.ControlledCircuitMapper` as its own nested algorithms.
-     See :doc:`qpe_circuit_builder` for detailed configuration.
+   - ``qpe_circuit_builder`` — A :class:`~qdk_chemistry.data.AlgorithmRef` to a :doc:`QpeCircuitBuilder <qpe_circuit_builder>` that handles circuit composition. Iterative and standard builders configure a :doc:`HamiltonianUnitaryBuilder <hamiltonian_unitary_builder>` and a :class:`~qdk_chemistry.algorithms.ControlledCircuitMapper`; the robust builder configures the schedule, unitary builder and Hadamard-test builder directly.
 
    - ``circuit_executor`` — A :class:`~qdk_chemistry.data.AlgorithmRef` to a backend that executes :class:`~qdk_chemistry.data.Circuit` objects and returns measurement bitstrings as :class:`~qdk_chemistry.data.CircuitExecutorData`.
      QDK/Chemistry ships native Q# simulators (sparse-state and full-state, with optional :class:`~qdk_chemistry.data.QuantumErrorProfile` noise modelling) and integrates with Qiskit's Aer simulator through the :doc:`plugin system <../plugins>`.
@@ -121,6 +123,13 @@ See `Available implementations`_ below for implementation-specific options.
       :language: python
       :start-after: # start-cell-configure-standard
       :end-before: # end-cell-configure-standard
+
+.. tab:: Python API (Robust)
+
+   .. literalinclude:: ../../../_static/examples/python/phase_estimation.py
+      :language: python
+      :start-after: # start-cell-configure-robust
+      :end-before: # end-cell-configure-robust
 
 .. rubric:: Running the calculation
 
@@ -229,6 +238,39 @@ When using the estimator, configure ``combine_iterations`` and ``shots_per_bit``
            num_bits=4,
        ),
    )
+
+.. _robust-qpe-algorithm:
+
+Robust phase estimation
+~~~~~~~~~~~~~~~~~~~~~~~
+
+.. rubric:: Factory name: ``"qdk_robust"``
+
+Robust phase estimation measures the real and imaginary parts of the evolution signal with X- and Y-basis Hadamard tests at geometrically increasing evolution times.
+The measured phase at each round selects the branch consistent with earlier rounds, producing an energy estimate without a coherent multi-bit phase register.
+
+The estimator has two direct settings:
+
+- ``qpe_circuit_builder``: The ``"qdk_robust"`` :ref:`robust circuit builder <robust-phase-estimation-circuit-builder>` and its scheduling and circuit settings.
+- ``circuit_executor`` — The backend used to execute every generated basis circuit.
+
+Set the scheduling options on the circuit builder's :class:`~qdk_chemistry.data.AlgorithmRef`, then call the estimator's ``run`` method with the state preparation and Hamiltonian.
+The estimator schedules once and streams X/Y circuit pairs internally without materializing the full workload.
+The example below uses a coarse accuracy target to keep execution short; the default target remains ``1e-3``.
+See :ref:`robust-phase-estimation-circuit-builder` for workload preview and replay.
+
+.. tab:: Python API
+
+   .. literalinclude:: ../../../_static/examples/python/phase_estimation.py
+      :language: python
+      :start-after: # start-cell-configure-robust
+      :end-before: # end-cell-configure-robust
+
+   .. literalinclude:: ../../../_static/examples/python/phase_estimation.py
+      :language: python
+      :start-after: # start-cell-run-robust
+      :end-before: # end-cell-run-robust
+
 
 .. _standard-qpe-algorithm:
 
@@ -421,6 +463,7 @@ Further reading
 
 - The above examples can be downloaded as a complete `Python <../../../_static/examples/python/phase_estimation.py>`_ script.
 - :doc:`QpeCircuitBuilder <qpe_circuit_builder>`: Abstract base class for phase estimation circuit builders
+- :ref:`RobustPhaseEstimationCircuitBuilder <robust-phase-estimation-circuit-builder>`: Schedule-aware eager and streaming robust circuit generation
 - :doc:`HamiltonianUnitaryBuilder <hamiltonian_unitary_builder>`: Hamiltonian simulation via Trotter-Suzuki decomposition or block-encoding methods
 - :doc:`CircuitExecutor <circuit_executor>`: Quantum circuit execution backends
 - :doc:`StatePreparation <state_preparation>`: Load wavefunctions onto qubits as quantum circuits

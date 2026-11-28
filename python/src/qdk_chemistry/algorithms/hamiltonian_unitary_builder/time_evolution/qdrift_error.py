@@ -66,6 +66,11 @@ def qdrift_samples_campbell(
     if target_accuracy <= 0:
         raise ValueError(f"target_accuracy must be positive, got {target_accuracy}.")
 
+    return _campbell_samples(_qdrift_lambda(hamiltonian, weight_threshold), time, target_accuracy)
+
+
+def _qdrift_lambda(hamiltonian: QubitOperator, weight_threshold: float) -> float:
+    """Return the one-norm of the real coefficients that qDRIFT samples after thresholding."""
     container_type = hamiltonian.get_container_type()
     if not isinstance(hamiltonian.get_container(), PauliDecompositionContainer):
         raise ValueError(
@@ -75,8 +80,11 @@ def qdrift_samples_campbell(
 
     # Only magnitudes enter the bound, so skip building Pauli labels.
     real_parts = (complex(coeff).real for coeff in hamiltonian.coefficients)
-    lambda_norm = sum(abs(real) for real in real_parts if abs(real) > weight_threshold)
+    return sum(abs(real) for real in real_parts if abs(real) > weight_threshold)
 
+
+def _campbell_samples(lambda_norm: float, time: float, target_accuracy: float) -> int:
+    """Apply the Campbell bound to a precomputed qDRIFT one-norm."""
     if lambda_norm == 0.0 or time == 0.0:
         return 1
 

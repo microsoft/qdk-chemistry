@@ -24,7 +24,8 @@ from qdk_chemistry.algorithms.hamiltonian_unitary_builder.base import (
     TimeEvolutionSettings,
 )
 from qdk_chemistry.algorithms.hamiltonian_unitary_builder.time_evolution.qdrift_error import (
-    qdrift_samples_campbell,
+    _campbell_samples,
+    _qdrift_lambda,
 )
 from qdk_chemistry.data import QubitOperator, UnitaryRepresentation
 from qdk_chemistry.data.qubit_operator.containers.pauli_decomposition import PauliDecompositionContainer
@@ -291,28 +292,28 @@ class QDrift(TimeEvolutionBuilder):
         larger value wins. When neither is provided, the default
         *num_samples* is used.
         """
-        num_samples = self._settings.get("num_samples")
+        lambda_norm = 0.0
+        if self._settings.get("target_accuracy") > 0.0:
+            lambda_norm = _qdrift_lambda(qubit_hamiltonian, self._settings.get("weight_threshold"))
+        return self._resolve_num_samples_from_lambda(lambda_norm, time)
+
+    def _resolve_num_samples_from_lambda(
+        self, lambda_norm: float, time: float, minimum_samples: int | None = None
+    ) -> int:
+        """Size samples from a precomputed sampled-term norm, optionally replacing the configured floor."""
+        num_samples = self._settings.get("num_samples") if minimum_samples is None else minimum_samples
         if num_samples <= 0:
             raise ValueError(f"num_samples must be a positive integer, got {num_samples}.")
-        manual = num_samples
 
         target_accuracy = self._settings.get("target_accuracy")
         if target_accuracy <= 0.0:
-            return manual
+            return num_samples
 
-        weight_threshold = self._settings.get("weight_threshold")
         error_bound = self._settings.get("error_bound")
-        if error_bound == "campbell":
-            auto = qdrift_samples_campbell(
-                hamiltonian=qubit_hamiltonian,
-                time=time,
-                target_accuracy=target_accuracy,
-                weight_threshold=weight_threshold,
-            )
-        else:
+        if error_bound != "campbell":
             raise NotImplementedError(f"Unsupported qDRIFT error_bound: {error_bound!r}.")
 
-        return max(manual, auto)
+        return max(num_samples, _campbell_samples(lambda_norm, time, target_accuracy))
 
     @staticmethod
     def _sample_qdrift_terms(

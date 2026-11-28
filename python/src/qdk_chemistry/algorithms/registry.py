@@ -949,6 +949,9 @@ def _register_python_algorithms():
     from qdk_chemistry.algorithms.phase_estimation.circuit_builder.iterative_builder import (  # noqa: PLC0415
         QdkIterativeQpeCircuitBuilder,
     )
+    from qdk_chemistry.algorithms.phase_estimation.circuit_builder.robust_builder import (  # noqa: PLC0415
+        RobustPhaseEstimationCircuitBuilder,
+    )
     from qdk_chemistry.algorithms.phase_estimation.circuit_builder.standard_builder import (  # noqa: PLC0415
         QdkStandardQpeCircuitBuilder,
     )
@@ -957,6 +960,9 @@ def _register_python_algorithms():
     )
     from qdk_chemistry.algorithms.phase_estimation.iterative_phase_estimation import (  # noqa: PLC0415
         IterativePhaseEstimation,
+    )
+    from qdk_chemistry.algorithms.phase_estimation.robust_phase_estimation import (  # noqa: PLC0415
+        RobustPhaseEstimation,
     )
     from qdk_chemistry.algorithms.phase_estimation.standard_phase_estimation import (  # noqa: PLC0415
         StandardPhaseEstimation,
@@ -1023,7 +1029,9 @@ def _register_python_algorithms():
     register(lambda: IterativePhaseEstimation())
     register(lambda: HadamardTest())
     register(lambda: QdkHadamardTestCircuitBuilder())
+    register(lambda: RobustPhaseEstimationCircuitBuilder())
     register(lambda: StandardPhaseEstimation())
+    register(lambda: RobustPhaseEstimation())
     register(lambda: UnaryPhaseEstimation())
     register(lambda: AmplitudeAmplification())
     register(lambda: QPESubspaceMarking())
